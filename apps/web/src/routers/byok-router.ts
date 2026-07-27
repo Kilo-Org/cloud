@@ -41,8 +41,6 @@ import {
   formatDirectByokModelId,
 } from '@/lib/ai-gateway/providers/direct-byok';
 
-const CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completions';
-const CODESTRAL_TEST_MODEL = 'codestral-2508';
 const GENERIC_TEST_FAILURE_MESSAGE =
   'API key test failed. Check the credential and supported models, then try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
@@ -55,41 +53,6 @@ function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
       code: 'CONFLICT',
       message: MANAGED_KEY_READ_ONLY_MESSAGE,
     });
-  }
-}
-
-async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; message: string }> {
-  try {
-    const res = await fetch(CODESTRAL_FIM_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: CODESTRAL_TEST_MODEL,
-        prompt: 'def hi():\n    ',
-        suffix: '\n',
-        max_tokens: 1,
-        stream: false,
-      }),
-    });
-    // Always drain the body so the underlying Undici connection is released.
-    await res.text().catch(() => '');
-    if (res.ok) {
-      return {
-        success: true,
-        message: `API key test success. Provider: codestral. Model: ${CODESTRAL_TEST_MODEL}.`,
-      };
-    }
-    logByokWarning('Codestral BYOK key test failed', {
-      providerId: 'codestral',
-      status: res.status,
-    });
-    return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
-  } catch {
-    logByokWarning('Codestral BYOK key test request failed', { providerId: 'codestral' });
-    return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
   }
 }
 
@@ -439,11 +402,14 @@ export const byokRouter = createTRPCRouter({
 
       const decryptedKey = decryptByokRow(existingKey);
 
-      // Codestral keys only authenticate against codestral.mistral.ai, not api.mistral.ai
-      // (the endpoint the Vercel gateway's `mistral` provider uses). Test the key directly
-      // against the Codestral FIM endpoint instead of going through the gateway.
+      // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,
+      // which the gateway test path below cannot reach (it routes codestral to api.mistral.ai).
+      // Decline to test it rather than returning a misleading failure for a still-valid key.
       if (decryptedKey.providerId === 'codestral') {
-        return await testCodestralApiKey(decryptedKey.decryptedAPIKey);
+        return {
+          success: false,
+          message: 'Codestral is deprecated and its API key can no longer be tested.',
+        };
       }
 
       function setup() {

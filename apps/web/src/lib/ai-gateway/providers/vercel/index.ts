@@ -17,24 +17,40 @@ import { createCachedFetch } from '@/lib/cached-fetch';
 import {
   GatewayPercentageSchema,
   DEFAULT_VERCEL_PERCENTAGE,
+  DEFAULT_VERCEL_PERCENTAGE_FREE,
 } from '@/lib/ai-gateway/gateway-config';
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 
-const getVercelRoutingPercentage = createCachedFetch(
+type VercelRoutingPercentages = {
+  paid: number;
+  free: number;
+};
+
+const DEFAULT_VERCEL_ROUTING_PERCENTAGES: VercelRoutingPercentages = {
+  paid: DEFAULT_VERCEL_PERCENTAGE,
+  free: DEFAULT_VERCEL_PERCENTAGE_FREE,
+};
+
+const getVercelRoutingPercentages = createCachedFetch<VercelRoutingPercentages>(
   async () => {
     const raw = await redisClient.get<string>(VERCEL_ROUTING_REDIS_KEY);
-    if (!raw) return DEFAULT_VERCEL_PERCENTAGE;
-    const { vercel_routing_percentage } = GatewayPercentageSchema.parse(JSON.parse(raw));
-    return vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE;
+    if (!raw) return DEFAULT_VERCEL_ROUTING_PERCENTAGES;
+    const { vercel_routing_percentage, vercel_routing_percentage_free } =
+      GatewayPercentageSchema.parse(JSON.parse(raw));
+    return {
+      paid: vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE,
+      free: vercel_routing_percentage_free ?? DEFAULT_VERCEL_PERCENTAGE_FREE,
+    };
   },
   600_000,
-  DEFAULT_VERCEL_PERCENTAGE
+  DEFAULT_VERCEL_ROUTING_PERCENTAGES
 );
 
 export function hasCompatibleVercelInferenceProvider(
@@ -79,7 +95,10 @@ export async function shouldRouteToVercel(
   randomSeed: string
 ) {
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const routingPercentage = await getVercelRoutingPercentage();
+  const percentages = await getVercelRoutingPercentages();
+  const routingPercentage = (await isFreeModel(requestedModel))
+    ? percentages.free
+    : percentages.paid;
 
   const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
 

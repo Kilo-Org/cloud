@@ -102,7 +102,7 @@ function pullRequestPayload(overrides: Record<string, unknown> = {}) {
       state: 'open',
       draft: false,
       html_url: 'https://github.com/acme/widgets/pull/42',
-      user: { id: 111, login: 'alice', avatar_url: 'https://example.com/a.png' },
+      user: { id: 111, login: 'alice', avatar_url: 'https://example.com/a.png', type: 'User' },
       head: { sha: 'abc123', ref: 'feature/widgets', repo: { full_name: 'acme/widgets' } },
       base: { sha: 'def456', ref: 'main' },
     },

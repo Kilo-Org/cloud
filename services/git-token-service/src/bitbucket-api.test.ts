@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { listBitbucketWorkspaceRepositories } from './bitbucket-api.js';
 
 const REPOSITORY_PAGE_LENGTH = 50;
-const MAX_REPOSITORY_PAGES = 20;
-const MAX_REPOSITORY_ITEMS = 500;
+const MAX_REPOSITORY_PAGES = 100;
+const MAX_REPOSITORY_ITEMS = 5000;
 const MAX_RESPONSE_BYTES = 1_000_000;
 const accessToken = 'bitbucket-access-token-fixture';
 const workspaceUuid = 'a07d5c40-2d2d-4e79-a812-6a47824a77d6';

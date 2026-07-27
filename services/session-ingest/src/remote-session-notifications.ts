@@ -104,6 +104,7 @@ export async function dispatchRemoteSessionAttentionSignal(
     // status when building the push — the body carries the real semantics. Extending the
     // enum would fail validation on a notifications worker deployed with the old schema.
     status: 'completed',
+    category: params.signal.kind === 'needs_input' ? 'attention' : 'status',
     body: buildRemoteSessionAttentionPushBody(signal),
     suppressIfViewingSession: true,
   });

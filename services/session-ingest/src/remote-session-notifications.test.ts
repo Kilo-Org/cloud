@@ -67,7 +67,37 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
       cliSessionId: 'ses_1',
       executionId: 'remote:msg-1',
       status: 'completed',
+      category: 'status',
       body: 'Done',
+      suppressIfViewingSession: true,
+    });
+  });
+
+  it('tags a needs_input push with category "attention"', async () => {
+    const hasActiveCliSession = vi.fn(async () => true);
+    const sendPush = vi.fn(async () => ({ dispatched: true }));
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: null,
+        signal: needsInputSignal(),
+      },
+      {
+        hasActiveCliSession,
+        sendPush,
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+      }
+    );
+
+    expect(outcome).toBe('sent');
+    expect(sendPush).toHaveBeenCalledWith({
+      userId: 'usr_1',
+      cliSessionId: 'ses_1',
+      executionId: 'remote:status:question:123',
+      status: 'completed',
+      category: 'attention',
+      body: 'Kilo needs your input.',
       suppressIfViewingSession: true,
     });
   });

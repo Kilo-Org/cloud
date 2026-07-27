@@ -204,7 +204,6 @@ export function ConversationScreen({
           members={conversationMembers}
           botName={instanceLabel}
           fetchOlder={fetchOlder}
-          isFetchingOlder={messagesQuery.isFetchingNextPage}
           pendingAction={messageController.pendingAction}
           scrollToNewestRequest={messageController.scrollToNewestRequest}
           onExecuteAction={messageController.handleExecuteAction}

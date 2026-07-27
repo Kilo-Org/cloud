@@ -3,6 +3,8 @@ import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull } from '
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
+import { getWorkerDb } from '@kilocode/db/client';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import type { IngestBatch } from '../types/session-sync';
@@ -36,6 +38,7 @@ import {
   readKiloSdkSessionSnapshot,
   type KiloSdkSessionSnapshotRead,
 } from './kilo-sdk-materialization';
+import { resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -446,6 +449,15 @@ export class SessionIngestDO extends DurableObject<Env> {
     );
   }
 
+  /**
+   * Clear a stored attention status when the owning CLI disconnects.
+   * Metadata owner entry point — UserConnectionDO has no Postgres write path.
+   * Attention check and conditional write live in `resetAttentionStatusOnCliDisconnect`.
+   */
+  async resetAttentionStatusOnCliDisconnect(kiloUserId: string, sessionId: string): Promise<void> {
+    await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
+  }
+
   /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
   private buildAssistantExcerptForMessage(messageId: string): string {
     const range = getPartItemIdentityRange(messageId);
@@ -690,6 +702,31 @@ export class SessionIngestDO extends DurableObject<Env> {
       } catch {
         // Best-effort: skip model on parse errors.
       }
+    }
+
+    // Best-effort persist the per-session total cost to Postgres so the session
+    // list can surface it. Runs before the O11Y RPC so an analytics failure cannot
+    // skip it. Failures are logged and swallowed — must never break metrics emission.
+    try {
+      if (Number.isFinite(metrics.totalCost)) {
+        const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));
+        await getWorkerDb(this.env.HYPERDRIVE.connectionString)
+          .update(cli_sessions_v2)
+          .set({ total_cost_microdollars: totalCostMicrodollars })
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+            )
+          );
+      }
+    } catch (error) {
+      console.error('SessionIngestDO failed to persist session total cost', {
+        sessionId,
+        kiloUserId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
 
     await this.env.O11Y.ingestSessionMetrics({

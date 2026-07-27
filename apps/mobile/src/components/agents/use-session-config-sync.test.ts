@@ -43,4 +43,46 @@ describe('resolveSessionConfigSelection', () => {
       })
     ).toEqual({ model: 'gateway/first', variant: 'high' });
   });
+
+  it('prefers the cloud-agent model override over stored session config', () => {
+    expect(
+      resolveSessionConfigSelection({
+        activeSessionType: 'cloud-agent',
+        fetchedData: { model: 'stored/from-fetch', variant: 'low' },
+        sessionConfig: { model: 'stored/from-session', variant: 'medium' },
+        modelOptions: gatewayModels,
+        selectedModel: '',
+        selectedVariant: '',
+        cloudAgentModelOverride: { model: 'user/picked', variant: 'high' },
+      })
+    ).toEqual({ model: 'user/picked', variant: 'high' });
+  });
+
+  it('falls back to stored session model when there is no cloud-agent override', () => {
+    expect(
+      resolveSessionConfigSelection({
+        activeSessionType: 'cloud-agent',
+        fetchedData: { model: 'stored/from-fetch', variant: 'low' },
+        sessionConfig: { model: 'stored/from-session', variant: 'medium' },
+        modelOptions: gatewayModels,
+        selectedModel: '',
+        selectedVariant: '',
+        cloudAgentModelOverride: null,
+      })
+    ).toEqual({ model: 'stored/from-session', variant: 'medium' });
+  });
+
+  it('ignores cloud-agent override on remote sessions', () => {
+    expect(
+      resolveSessionConfigSelection({
+        activeSessionType: 'remote',
+        fetchedData: {},
+        sessionConfig: null,
+        modelOptions: gatewayModels,
+        selectedModel: 'remote/selected',
+        selectedVariant: 'max',
+        cloudAgentModelOverride: { model: 'should/not/win', variant: 'high' },
+      })
+    ).toEqual({ model: 'remote/selected', variant: 'max' });
+  });
 });

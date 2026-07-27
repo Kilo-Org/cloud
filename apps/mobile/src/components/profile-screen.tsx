@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- The profile screen composes Credits, Agents, Reviews, Organization, Linked accounts, Notifications, Restore Purchases, and Actions; each section is a small rendered surface that mirrors the shared ConfigureRow/Text-header pattern. Splitting would re-encode the same hooks. */
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import {
+  Bell,
   Building2,
   GitMerge,
   GitPullRequest,
@@ -17,13 +19,13 @@ import { toast } from 'sonner-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
-import { NotificationsCard } from '@/components/notifications-card';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
@@ -31,6 +33,11 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  setThemePreference,
+  type ThemePreference,
+  useThemePreference,
+} from '@/lib/hooks/use-theme-preference';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
@@ -49,6 +56,7 @@ export function ProfileScreen() {
   const router = useRouter();
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const { preference: themePreference } = useThemePreference();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
@@ -263,9 +271,38 @@ export function ProfileScreen() {
           </Animated.View>
         )}
 
+        {/* Appearance */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Appearance
+          </Text>
+          <SegmentedControl<ThemePreference>
+            accessibilityLabel="Appearance"
+            options={[
+              { value: 'system', label: 'System' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+            value={themePreference}
+            onChange={setThemePreference}
+          />
+        </View>
+
         {/* Notifications */}
-        <View className="mt-6">
-          <NotificationsCard />
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Notifications
+          </Text>
+          <ConfigureRow
+            icon={Bell}
+            title="Notifications"
+            subtitle="Push preferences"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+            }}
+          />
         </View>
 
         {/* Restore Purchases (iOS-only; self-hides on Android and for org accounts) */}

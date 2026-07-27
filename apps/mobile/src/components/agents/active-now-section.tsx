@@ -7,7 +7,7 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 
-import { RemoteSessionRow } from '@/components/agents/session-row';
+import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { ACTIVE_NOW_TRAY_CAP, selectTrayWindow } from '@/components/agents/active-now-window';
 import { Text } from '@/components/ui/text';
@@ -26,15 +26,18 @@ type ActiveNowSectionProps = {
 };
 
 /**
- * Pinned "Active now" tray for the Agents session list. Renders above the
- * history list. The section never scrolls itself — it sits inside the
- * screen's non-scrolling vertical layout so it animates in/out with
- * Reanimated `FadeIn`/`FadeOut` while the screen's `LinearTransition`
- * wrappers absorb the layout change without jumping the history list.
+ * Pinned "Active now" tray for the Agents session list. Rendered as the
+ * history `SectionList`'s `ListHeaderComponent`, so it scrolls with the
+ * session history in one continuous gesture (search/filter chrome stays
+ * pinned above the list). `ListHeaderComponent` is not a virtualized cell,
+ * so Reanimated `FadeIn`/`FadeOut`/`LinearTransition` wrappers on the tray
+ * and its rows keep working.
  *
  * The tray caps the visible rows at `ACTIVE_NOW_TRAY_CAP` while collapsed
  * and exposes a `+N more` expander when more sessions are pinned. Expansion
- * is local `useState` (no persistence — resets on unmount).
+ * is local `useState` (no persistence — resets on unmount). The list keeps
+ * a single SectionList mount across loading → rows so this state is not
+ * wiped when skeletons are replaced by real sections.
  */
 export function ActiveNowSection({
   pinned,

@@ -47,7 +47,9 @@ export function buildAgentMessageBubbleAccessibilityProps(
   input: AgentMessageBubbleA11yInput
 ): AgentMessageBubbleAccessibility {
   const accessibilityLabel = input.isUser ? 'User message' : 'Assistant message';
-  const accessibilityHint = 'Long press to copy message text';
+  // Long-press opens the message-details sheet; copy remains available only
+  // through the rotor custom action below.
+  const accessibilityHint = 'Long press for message details';
   const accessibilityActions: AccessibilityActionInfo[] = input.canCopy
     ? [{ name: 'copy', label: 'Copy message' }]
     : [];

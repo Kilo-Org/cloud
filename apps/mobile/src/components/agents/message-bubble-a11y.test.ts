@@ -37,7 +37,7 @@ describe('buildAgentMessageBubbleAccessibilityProps', () => {
     });
 
     expect(props.accessibilityRole).toBe('text');
-    expect(props.accessibilityHint).toBe('Long press to copy message text');
+    expect(props.accessibilityHint).toBe('Long press for message details');
   });
 
   it('exposes the copy custom action with the same name and label as before', () => {

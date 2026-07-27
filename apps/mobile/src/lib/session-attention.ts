@@ -1,13 +1,15 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 
 /**
  * Pure session-attention derivation + in-memory ack store for the mobile
  * Agents session list "needs input" indicator.
  *
- * The detail screen is the only ack writer. Acks are intentionally NOT
- * persisted across app restarts. Raise identity is `statusUpdatedAt ?? status`
- * (stored rows carry server `status_updated_at`; remote active-only rows
- * carry none so identity degrades to the status string).
+ * Acks are written only when the user successfully answers, skips, or
+ * responds to a permission — never on merely opening the detail screen.
+ * Acks are intentionally NOT persisted across app restarts. Raise identity
+ * is `statusUpdatedAt ?? status` (stored rows carry server
+ * `status_updated_at`; remote active-only rows carry none so identity
+ * degrades to the status string).
  *
  * No backend, tRPC, or shared-package imports: this is a mobile-local
  * module so the web client can keep its own copy.
@@ -67,10 +69,15 @@ function getServerSnapshot(): number {
   return 0;
 }
 
+/**
+ * Hide the needs-input badge immediately after a successful answer / skip /
+ * permission response, before the server status round-trip lands.
+ * `reconcileSessionAttention` clears the entry once status leaves attention.
+ *
+ * If the entry is already pending, nothing changes — skip the bump so we
+ * don't fire a redundant global re-render.
+ */
 export function ackSessionAttention(sessionId: string): void {
-  // Opening a session always leaves the entry pending. If it is already
-  // pending, nothing changes — skip the bump so we don't fire a redundant
-  // global re-render (e.g. React Strict Mode's double effect invocation).
   if (store.entries.get(sessionId)?.raiseId === null) {
     return;
   }
@@ -133,16 +140,6 @@ export function shouldShowNeedsInput({
  */
 export function useSessionAttentionRevision(): number {
   return useSyncExternalStore(subscribe, getRevisionSnapshot, getServerSnapshot);
-}
-
-/**
- * Ack a session's attention indicator when the detail screen opens.
- * Re-runs if `sessionId` changes (e.g. switching sessions).
- */
-export function useAckSessionAttentionOnOpen(sessionId: string): void {
-  useEffect(() => {
-    ackSessionAttention(sessionId);
-  }, [sessionId]);
 }
 
 /**

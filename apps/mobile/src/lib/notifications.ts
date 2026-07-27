@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { type PushData, pushDataSchema } from '@kilocode/notifications';
 
+import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
@@ -40,7 +41,6 @@ export function parseNotificationData(data: unknown): PushData | null {
 }
 
 const shown = {
-  shouldShowAlert: true,
   shouldPlaySound: true,
   shouldSetBadge: true,
   shouldShowBanner: true,
@@ -48,7 +48,6 @@ const shown = {
 } satisfies Notifications.NotificationBehavior;
 
 const suppressed = {
-  shouldShowAlert: false,
   shouldPlaySound: false,
   shouldSetBadge: false,
   shouldShowBanner: false,
@@ -73,16 +72,6 @@ export function setupNotificationHandler() {
   });
 }
 
-// Pending deep link from a notification tap (cold start or background).
-// Consumed by the root nav after auth/navigation is ready.
-let pendingNotificationLink: string | null = null;
-
-export function getPendingNotificationLink(): string | null {
-  const link = pendingNotificationLink;
-  pendingNotificationLink = null;
-  return link;
-}
-
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = parseNotificationData(response.notification.request.content.data);
@@ -99,7 +88,7 @@ export function setupNotificationResponseHandler() {
     try {
       router.navigate(path as Href);
     } catch {
-      pendingNotificationLink = path;
+      setPendingDeepLink(path, 'notification');
     }
   });
 
@@ -114,7 +103,7 @@ export function checkInitialNotification(): void {
   }
   const data = parseNotificationData(response.notification.request.content.data);
   if (data) {
-    pendingNotificationLink = notificationPathForData(data);
+    setPendingDeepLink(notificationPathForData(data), 'notification');
   }
   Notifications.clearLastNotificationResponse();
 }

@@ -13,6 +13,8 @@ import {
   sliceFileLines,
 } from '@/lib/github-pr-review/mappers';
 import {
+  CONVERSATION_COMMENTS_MAX_PAGES,
+  CONVERSATION_COMMENTS_PAGE_SIZE,
   FILE_LINES_MAX,
   FILES_MAX_PAGES,
   FILES_PAGE_SIZE,
@@ -226,13 +228,11 @@ const REVIEW_THREADS_QUERY = /* GraphQL */ `
                   login
                   avatarUrl
                 }
-                reactions(first: 20) {
-                  nodes {
-                    content
-                    count: reactors(first: 0) {
-                      totalCount
-                    }
-                    viewerHasReacted
+                reactionGroups {
+                  content
+                  viewerHasReacted
+                  reactors(first: 0) {
+                    totalCount
                   }
                 }
               }
@@ -262,13 +262,53 @@ const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY = /* GraphQL */ `
               login
               avatarUrl
             }
-            reactions(first: 20) {
-              nodes {
-                content
-                count: reactors(first: 0) {
-                  totalCount
-                }
-                viewerHasReacted
+            reactionGroups {
+              content
+              viewerHasReacted
+              reactors(first: 0) {
+                totalCount
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+// PR conversation (issue) comments — separate from reviewThreads so this
+// connection can be paginated to completion on the first listReviewThreads
+// page only. Node selection matches the live review-comment selection so
+// normalizeComment / normalizeReactions apply unchanged.
+const CONVERSATION_COMMENTS_QUERY = /* GraphQL */ `
+  query PrReviewConversationComments(
+    $owner: String!
+    $name: String!
+    $number: Int!
+    $first: Int!
+    $after: String
+  ) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        comments(first: $first, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            databaseId
+            id
+            body
+            createdAt
+            author {
+              login
+              avatarUrl
+            }
+            reactionGroups {
+              content
+              viewerHasReacted
+              reactors(first: 0) {
+                totalCount
               }
             }
           }
@@ -340,10 +380,12 @@ const REMOVE_REACTION_MUTATION = /* GraphQL */ `
   }
 `;
 
-type GraphQlReactionNode = {
+// Mirrors GitHub's ReactionGroup (not Reaction): reactionGroups is an
+// unpaginated list of all group types; only groups with totalCount > 0 are kept.
+type GraphQlReactionGroup = {
   content: string;
-  count?: { totalCount: number } | null;
   viewerHasReacted: boolean;
+  reactors?: { totalCount: number } | null;
 };
 
 type GraphQlCommentNode = {
@@ -352,7 +394,7 @@ type GraphQlCommentNode = {
   body: string;
   createdAt: string;
   author: { login: string; avatarUrl: string } | null;
-  reactions: { nodes: GraphQlReactionNode[] };
+  reactionGroups: GraphQlReactionGroup[];
 };
 
 type GraphQlCommentConnection = {
@@ -374,12 +416,14 @@ type GraphQlReviewThreadNode = {
   comments: GraphQlCommentConnection;
 };
 
-function normalizeReactions(nodes: GraphQlReactionNode[]) {
-  return nodes.map(n => ({
-    content: n.content,
-    count: n.count?.totalCount ?? 0,
-    viewerHasReacted: Boolean(n.viewerHasReacted),
-  }));
+function normalizeReactions(groups: GraphQlReactionGroup[]) {
+  return groups
+    .map(g => ({
+      content: g.content,
+      count: g.reactors?.totalCount ?? 0,
+      viewerHasReacted: Boolean(g.viewerHasReacted),
+    }))
+    .filter(r => r.count > 0);
 }
 
 function normalizeComment(node: GraphQlCommentNode) {
@@ -389,12 +433,13 @@ function normalizeComment(node: GraphQlCommentNode) {
     body: node.body,
     createdAt: node.createdAt,
     author: node.author,
-    reactions: normalizeReactions(node.reactions?.nodes ?? []),
+    reactions: normalizeReactions(node.reactionGroups ?? []),
   };
 }
 
 // Exported for unit testing the follow-up pagination loop.
 export const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST = REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY;
+export const CONVERSATION_COMMENTS_QUERY_FOR_TEST = CONVERSATION_COMMENTS_QUERY;
 
 export async function fetchAllThreadComments(args: {
   octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
@@ -424,6 +469,71 @@ export async function fetchAllThreadComments(args: {
     collected.push(...node.comments.nodes.map(normalizeComment));
     hasNext = node.comments.pageInfo.hasNextPage;
     cursor = node.comments.pageInfo.endCursor;
+  }
+  return collected;
+}
+
+async function fetchConversationCommentsPage(args: {
+  octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
+  owner: string;
+  repo: string;
+  number: number;
+  cursor: string | null;
+}): Promise<GraphQlCommentConnection | null> {
+  const { octokit, owner, repo, number, cursor } = args;
+  const response = (await octokit.request('POST /graphql', {
+    query: CONVERSATION_COMMENTS_QUERY,
+    variables: {
+      owner,
+      name: repo,
+      number,
+      first: CONVERSATION_COMMENTS_PAGE_SIZE,
+      after: cursor ?? null,
+    },
+  })) as {
+    data: {
+      data: {
+        repository: {
+          pullRequest: {
+            comments: GraphQlCommentConnection;
+          } | null;
+        } | null;
+      } | null;
+      errors?: unknown;
+    };
+  };
+  throwTrpcFromGraphQlErrors(response.data.errors as never);
+  return response.data.data?.repository?.pullRequest?.comments ?? null;
+}
+
+// First-page-only conversation comments. Loops against pageInfo up to
+// CONVERSATION_COMMENTS_MAX_PAGES × CONVERSATION_COMMENTS_PAGE_SIZE (5 × 100).
+// Past the cap, remaining pages are dropped and whatever was collected is
+// returned (silent truncation) — same ceiling spirit as bot review-comment
+// pagination (bot/platforms/github.ts).
+export async function fetchAllConversationComments(args: {
+  octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
+  owner: string;
+  repo: string;
+  number: number;
+}): Promise<ReturnType<typeof normalizeComment>[]> {
+  const { octokit, owner, repo, number } = args;
+  const collected: ReturnType<typeof normalizeComment>[] = [];
+  let cursor: string | null = null;
+  for (let page = 1; page <= CONVERSATION_COMMENTS_MAX_PAGES; page += 1) {
+    const connection = await fetchConversationCommentsPage({
+      octokit,
+      owner,
+      repo,
+      number,
+      cursor,
+    });
+    if (!connection) break;
+    collected.push(...connection.nodes.map(normalizeComment));
+    if (!connection.pageInfo.hasNextPage || !connection.pageInfo.endCursor) {
+      return collected;
+    }
+    cursor = connection.pageInfo.endCursor;
   }
   return collected;
 }
@@ -640,15 +750,33 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        const connection = await fetchReviewThreadsPage({
-          octokit,
-          owner: input.owner,
-          repo: input.repo,
-          number: input.number,
-          cursor: input.cursor ?? null,
-        });
+        const isFirstPage = input.cursor == null;
+        const [connection, conversation] = await Promise.all([
+          fetchReviewThreadsPage({
+            octokit,
+            owner: input.owner,
+            repo: input.repo,
+            number: input.number,
+            cursor: input.cursor ?? null,
+          }),
+          // Conversation comments only on the first page; cursored pages get [].
+          isFirstPage
+            ? fetchAllConversationComments({
+                octokit,
+                owner: input.owner,
+                repo: input.repo,
+                number: input.number,
+              })
+            : Promise.resolve([]),
+        ]);
         if (!connection) {
-          return { threads: [], nextCursor: null };
+          return buildReviewThreadsResult({
+            threads: [],
+            conversation,
+            page: 1,
+            hasNextPage: false,
+            endCursor: null,
+          });
         }
         const threads = await Promise.all(
           connection.nodes.map(async node => {
@@ -674,6 +802,7 @@ export const githubPrReviewRouter = createTRPCRouter({
         );
         return buildReviewThreadsResult({
           threads: threads as never,
+          conversation,
           page: 1,
           hasNextPage: connection.pageInfo.hasNextPage,
           endCursor: connection.pageInfo.endCursor,

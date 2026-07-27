@@ -223,8 +223,9 @@ export function AgentSessionListScreen() {
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
   const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
 
-  // Search header is rendered at the screen level (above the pinned tray)
-  // so it's always visible. Recompute the body's `showInlineError` here
+  // Search header is rendered at the screen level (above the scrolling list)
+  // so it stays reachable without scrolling. The Active now tray scrolls
+  // inside the list header. Recompute the body's `showInlineError` here
   // via the SAME pure selector, with the same inputs, so the inline
   // "Couldn't refresh" line stays identical and the body-model test keeps
   // covering it.
@@ -289,11 +290,6 @@ export function AgentSessionListScreen() {
           onClearSearch={handleClearSearchInput}
         />
       ) : null}
-      <ActiveNowSection
-        pinned={pinnedActive}
-        organizationIdBySessionId={organizationIdBySessionId}
-        onSessionPress={navigateToSession}
-      />
       <Animated.View layout={LinearTransition} className="flex-1">
         <AgentSessionListContent
           sections={sections}
@@ -309,11 +305,19 @@ export function AgentSessionListScreen() {
           onSessionPress={navigateToSession}
           hasActiveQuery={isSearching || hasActiveFilter}
           isSearching={isSearching}
+          searchQuery={searchQuery}
           onClearQuery={handleClearQuery}
           onCreateSession={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}
           sortBy={sortBy}
+          activeNowSection={
+            <ActiveNowSection
+              pinned={pinnedActive}
+              organizationIdBySessionId={organizationIdBySessionId}
+              onSessionPress={navigateToSession}
+            />
+          }
         />
       </Animated.View>
       {showFilterModal && (

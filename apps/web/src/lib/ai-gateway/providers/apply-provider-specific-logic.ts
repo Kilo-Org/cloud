@@ -20,6 +20,7 @@ import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
+import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
@@ -58,6 +59,9 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
+  }
+  if (isDeepseekModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.novita];
   }
   if (isGlmModel(requestedModel)) {
     return [

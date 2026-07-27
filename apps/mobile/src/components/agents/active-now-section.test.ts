@@ -179,7 +179,7 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: () => ({}) },
   useReducedMotion: () => true,
 }));
-vi.mock('@/components/agents/session-row', () => ({
+vi.mock('@/components/agents/remote-session-row', () => ({
   RemoteSessionRow: 'RemoteSessionRow',
 }));
 vi.mock('@/components/agents/session-list-section-header', () => ({

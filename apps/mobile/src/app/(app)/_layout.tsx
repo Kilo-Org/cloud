@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
+import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -15,6 +16,7 @@ export default function AppLayout() {
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <SharePayloadNavigator />
       <KiloChatProvider>
         <KiloChatPresenceMount>
           <StoreKiloPassPurchaseProvider>
@@ -27,11 +29,10 @@ export default function AppLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="pr-review/index" options={{ headerShown: false }} />
               <Stack.Screen
-                name="pr-review"
-                options={{
-                  headerShown: false,
-                }}
+                name="pr-review/[owner]/[repo]/[number]"
+                options={{ headerShown: false }}
               />
               <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
               <Stack.Screen name="agent-chat/[session-id]" />
@@ -64,6 +65,15 @@ export default function AppLayout() {
               />
               <Stack.Screen
                 name="agent-chat/instance-picker"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: [0.5, fullSheetDetent],
+                  sheetGrabberVisible: true,
+                  headerShown: false,
+                }}
+              />
+              <Stack.Screen
+                name="share-gate"
                 options={{
                   presentation: 'formSheet',
                   sheetAllowedDetents: [0.5, fullSheetDetent],

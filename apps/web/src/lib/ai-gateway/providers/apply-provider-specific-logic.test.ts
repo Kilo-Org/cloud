@@ -71,6 +71,14 @@ describe('applyPreferredProvider', () => {
     });
   });
 
+  it('prefers Novita for DeepSeek models', () => {
+    const request = makeRequest('deepseek/deepseek-v4-pro');
+
+    applyPreferredProvider('deepseek/deepseek-v4-pro', request.body);
+
+    expect(request.body.provider).toEqual({ order: ['novita'] });
+  });
+
   it('overwrites a malformed provider value', () => {
     const request = makeRequest('anthropic/claude-sonnet-4.5');
     Object.assign(request.body, { provider: 'lmstudio' });

@@ -25,6 +25,8 @@ type MessageBubbleProps = {
   onOpenChildSession?: OpenChildSession;
   /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
   deliveryState?: MessageDeliveryState;
+  /** Opens the message-details sheet; long-press never triggers the copy ActionSheet. */
+  onLongPressDetails?: (message: StoredMessage) => void;
 };
 
 export function MessageBubble({
@@ -35,23 +37,24 @@ export function MessageBubble({
   defaultReasoningExpanded,
   onOpenChildSession,
   deliveryState,
+  onLongPressDetails,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
 
   const handleLongPress = () => {
-    void copyMessage(message);
+    onLongPressDetails?.(message);
   };
 
-  // Long-press is an accelerator; expose the same "copy" action to
-  // accessibility tooling (VoiceOver/TalkBack rotor) since a long-press
-  // gesture isn't reliably discoverable there. The wrapping `Pressable` is
-  // explicitly `accessible={false}` so iOS does not collapse the message
-  // subtree (permission/question `Button`s, child-session "open" `Pressable`,
-  // tool cards, file parts, markdown link handlers) into a single, unnavigable
-  // node; the role/label/hint/copy action live on a dedicated, non-interactive
-  // focusable overlay so the rotor still has a target.
+  // Long-press opens the details sheet; the VoiceOver/TalkBack rotor "copy"
+  // action stays available so a11y tooling still reaches the existing
+  // ActionSheet copy path. The wrapping `Pressable` is explicitly
+  // `accessible={false}` so iOS does not collapse the message subtree
+  // (permission/question `Button`s, child-session "open" `Pressable`, tool
+  // cards, file parts, markdown link handlers) into a single, unnavigable
+  // node; the role/label/hint/copy action live on a dedicated,
+  // non-interactive focusable overlay so the rotor still has a target.
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === 'copy') {
       void copyMessage(message);

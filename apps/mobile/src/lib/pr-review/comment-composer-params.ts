@@ -8,6 +8,8 @@ type RawComposerParams = {
   side?: string | string[] | undefined;
   line?: string | string[] | undefined;
   startLine?: string | string[] | undefined;
+  /** Optional pending-queue item id when the composer opens in edit mode. */
+  pendingId?: string | string[] | undefined;
 };
 
 type ParsedComposerParams = {
@@ -18,6 +20,8 @@ type ParsedComposerParams = {
   side: 'LEFT' | 'RIGHT';
   line: number;
   startLine?: number;
+  /** Present only when the route was opened to edit a queued comment. */
+  pendingId?: string;
 };
 
 function parsePositiveInt(value: string | string[] | undefined): number | null {
@@ -47,6 +51,10 @@ export function parseComposerParams(raw: RawComposerParams): ParsedComposerParam
   const line = parsePositiveInt(raw.line);
   const startLine = parsePositiveInt(raw.startLine);
   const hasStartLine = parseParam(raw.startLine) !== null;
+  // Optional edit-mode id: absent → undefined; present non-empty string
+  // passes through. Empty/array values are treated as absent (not a hard
+  // reject) so create-mode deep links stay tolerant.
+  const pendingId = parseParam(raw.pendingId);
 
   if (!owner || !repo || !number || !path || !side || !line) {
     return null;
@@ -68,5 +76,6 @@ export function parseComposerParams(raw: RawComposerParams): ParsedComposerParam
     side,
     line,
     ...(startLine !== null ? { startLine } : {}),
+    ...(pendingId !== null ? { pendingId } : {}),
   };
 }

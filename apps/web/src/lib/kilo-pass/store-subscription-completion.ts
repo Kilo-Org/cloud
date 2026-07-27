@@ -388,13 +388,6 @@ async function applyStoreUpgradeCreditAdjustments(
     originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
   });
 
-  if (issueResult.wasInserted) {
-    await updateKiloPassThresholdAfterBaseCredits(tx, {
-      kiloUserId: params.user.id,
-      baseAmountUsd: newTierAmountUsd,
-    });
-  }
-
   await appendKiloPassAuditLog(tx, {
     action: KiloPassAuditLogAction.BaseCreditsIssued,
     result: issueResult.wasInserted
@@ -426,6 +419,13 @@ async function applyStoreUpgradeCreditAdjustments(
     upgradedBaseAmountUsd: newTierAmountUsd,
     originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
   });
+
+  if (issueResult.wasInserted) {
+    await updateKiloPassThresholdAfterBaseCredits(tx, {
+      kiloUserId: params.user.id,
+      baseAmountUsd: newTierAmountUsd,
+    });
+  }
 }
 
 export async function completeStoreKiloPassPurchase(params: {

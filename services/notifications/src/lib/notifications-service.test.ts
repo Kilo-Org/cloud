@@ -39,6 +39,7 @@ function fakeDeps(overrides: Partial<LifecycleDispatchDeps> = {}): {
   };
 
   const deps: LifecycleDispatchDeps = {
+    readPreference: async () => true,
     getTokens: async userId => {
       calls.getTokenQueries.push(userId);
       return ['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]'];
@@ -267,5 +268,58 @@ describe('dispatchInstanceLifecyclePush', () => {
       event: 'ready',
       sandboxId: 'ki_deadbeef',
     });
+  });
+});
+
+describe('dispatchInstanceLifecyclePush per-category enforcement', () => {
+  const emptyTicketErrors = { total: 0, retryable: 0, terminal: 0 } as const;
+
+  it('sends when the preference is true and skips the gate when no row exists (default-on)', async () => {
+    const { deps, calls } = fakeDeps({ readPreference: async () => null });
+    const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
+    expect(result).toEqual({
+      tokenCount: 2,
+      sent: 2,
+      staleTokens: 0,
+      receiptCount: 2,
+      ticketErrors: emptyTicketErrors,
+    });
+    expect(calls.sentMessages).toHaveLength(1);
+  });
+
+  it('suppresses with suppressedByPreference:true and does not fetch tokens when the user opted out', async () => {
+    const { deps, calls } = fakeDeps({ readPreference: async () => false });
+    const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
+    expect(result).toEqual({
+      tokenCount: 0,
+      sent: 0,
+      staleTokens: 0,
+      receiptCount: 0,
+      suppressedByPreference: true,
+      ticketErrors: emptyTicketErrors,
+    });
+    expect(calls.getTokenQueries).toEqual([]);
+    expect(calls.sentMessages).toHaveLength(0);
+    expect(calls.deletedTokens).toHaveLength(0);
+    expect(calls.enqueuedReceipts).toHaveLength(0);
+  });
+
+  it('fails closed (suppressedByPreference:true) when the preference read throws and does not fetch tokens', async () => {
+    const { deps, calls } = fakeDeps({
+      readPreference: async () => {
+        throw new Error('preference read failed');
+      },
+    });
+    const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
+    expect(result).toEqual({
+      tokenCount: 0,
+      sent: 0,
+      staleTokens: 0,
+      receiptCount: 0,
+      suppressedByPreference: true,
+      ticketErrors: emptyTicketErrors,
+    });
+    expect(calls.getTokenQueries).toEqual([]);
+    expect(calls.sentMessages).toHaveLength(0);
   });
 });

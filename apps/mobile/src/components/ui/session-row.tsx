@@ -33,6 +33,12 @@ type SessionRowProps = {
    * opts in so tray rows show a dot beside the relative-time meta.
    */
   metaWhileLive?: boolean;
+  /**
+   * Optional platform-origin icon rendered in the eyebrow-right cluster.
+   * When unset, existing callers (incl. Home `variant='card'`) stay
+   * bit-for-bit identical. Suppressed entirely for needs-input rows.
+   */
+  platformIcon?: React.ReactNode;
   onPress?: () => void;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -60,6 +66,7 @@ export function SessionRow({
   live,
   needsInput = false,
   metaWhileLive = false,
+  platformIcon,
   onPress,
   last,
   stripMode = 'edge',
@@ -74,10 +81,15 @@ export function SessionRow({
     live: Boolean(live),
     hasMeta: Boolean(meta),
     metaWhileLive,
+    hasPlatformIcon: platformIcon != null,
   });
-  let eyebrowRight: React.ReactNode = null;
+
+  // Build the branch content EXACTLY as before (no icon wrapper yet).
+  // When platformIcon is unset the rendered structure stays bit-for-bit
+  // identical to today — no new wrapper around bare Text/StatusDot/null.
+  let branchContent: React.ReactNode = null;
   if (eyebrowDecision.kind === 'needs-input') {
-    eyebrowRight = (
+    branchContent = (
       <View className="flex-row items-center gap-1.5">
         <StatusDot tone="warn" pulse />
         <Text variant="mono" className="shrink text-xs text-warn">
@@ -86,7 +98,7 @@ export function SessionRow({
       </View>
     );
   } else if (eyebrowDecision.kind === 'live-and-meta') {
-    eyebrowRight = (
+    branchContent = (
       <View className="flex-row items-center gap-1.5">
         <StatusDot tone="good" />
         <Text variant="mono" className="shrink text-xs text-ink2">
@@ -95,13 +107,32 @@ export function SessionRow({
       </View>
     );
   } else if (eyebrowDecision.kind === 'live') {
-    eyebrowRight = <StatusDot tone="good" />;
+    branchContent = <StatusDot tone="good" />;
   } else if (eyebrowDecision.kind === 'meta' && meta) {
-    eyebrowRight = (
+    branchContent = (
       <Text variant="mono" className="shrink text-xs text-ink2">
         {meta}
       </Text>
     );
+  }
+
+  let eyebrowRight: React.ReactNode = null;
+  if (eyebrowDecision.kind === 'needs-input') {
+    // Icon suppressed — render exactly as today.
+    eyebrowRight = branchContent;
+  } else if (eyebrowDecision.showPlatformIcon && platformIcon != null) {
+    // `none` kind: icon alone, no extra wrapper. Otherwise wrap icon + branch.
+    eyebrowRight =
+      branchContent == null ? (
+        platformIcon
+      ) : (
+        <View className="shrink flex-row items-center gap-1.5">
+          {platformIcon}
+          {branchContent}
+        </View>
+      );
+  } else {
+    eyebrowRight = branchContent;
   }
 
   const row = (

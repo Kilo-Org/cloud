@@ -13,6 +13,14 @@
 //     `diff-selection-bridge` (so the comment composer can read it on
 //     mount) and a floating action bar (`PrDiffFloatingActions`)
 //     hosts the "Comment" and "Finish review" affordances.
+//
+// Cold first paint: FlashList mounts only after the first page of files is
+// present. The first-load waiting state is a plain skeleton outside the list
+// (see `PrDiffFileListLoading`). Mounting the list on a single pagination-row
+// loading item and then swapping in ~50 file rows left FlashList v2 with a
+// full content height but zero mounted cells until the user scrolled; warm
+// remounts already had data at mount and painted. Deferring the list mount
+// makes cold match warm.
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -28,6 +36,7 @@ import {
   PrDiffFileListHeader,
   useDiffViewMode,
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
+import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
@@ -36,8 +45,9 @@ import {
   LIST_CONTENT_STYLE,
   TabStateMessage,
 } from '@/components/pr-review/diff/pr-diff-rows';
+import { dedupeFilesByPath } from '@/lib/pr-review/diff/dedupe-file-pages';
 import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
-import { fileHeaderKey, itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
 import {
   useFetchToCompletion,
@@ -45,11 +55,8 @@ import {
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
+import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
-import {
-  type FileNavigatorRequest,
-  subscribeFileNavigatorRequest,
-} from '@/lib/pr-review/file-navigator-bridge';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 
 type PrReviewFileListProps = {
@@ -115,7 +122,9 @@ export function PrReviewFileList({
         all.push(f);
       }
     }
-    return all;
+    // Dedupe by path (first wins) so retry/refetch races cannot emit
+    // duplicate `file-header:<path>` keys into FlashList.
+    return dedupeFilesByPath(all);
   }, [query.data]);
 
   const viewedCount = useMemo(() => {
@@ -170,33 +179,15 @@ export function PrReviewFileList({
     ]
   );
 
-  const indexByKey = useMemo(() => {
-    const map = new Map<string, number>();
-    for (let index = 0; index < items.length; index += 1) {
-      const item = items[index];
-      if (item) {
-        map.set(item.key, index);
-      }
-    }
-    return map;
-  }, [items]);
-  const indexByKeyRef = useRef(indexByKey);
-  indexByKeyRef.current = indexByKey;
-
-  useEffect(() => {
-    const unsubscribe = subscribeFileNavigatorRequest(
-      { owner, repo, number },
-      (request: FileNavigatorRequest) => {
-        const targetKey = fileHeaderKey(request.path);
-        const index = indexByKeyRef.current.get(targetKey);
-        if (typeof index === 'number' && index !== -1) {
-          setExpanded(prev => (prev[request.path] ? prev : { ...prev, [request.path]: true }));
-          void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
-        }
-      }
-    );
-    return unsubscribe;
-  }, [owner, repo, number]);
+  const { handleContentSizeChange } = usePrDiffListScroll({
+    owner,
+    repo,
+    number,
+    filesLength: files.length,
+    items,
+    listRef,
+    setExpanded,
+  });
 
   const renderItem = useDiffRenderItem({
     viewed,
@@ -253,6 +244,10 @@ export function PrReviewFileList({
 
   const isTruncated = query.hasNextPage || Boolean(fetchToCompletion.error);
   const effectiveViewMode = isTablet ? viewMode : 'unified';
+  // First page still in flight: keep FlashList unmounted. A list that first
+  // lays out a single loading pagination-row and later receives the real file
+  // rows can measure full content height without mounting cells until scroll.
+  const showFirstPageLoading = files.length === 0;
 
   return (
     <DiffFontMetricsContext.Provider value={diffFontMetrics}>
@@ -267,23 +262,28 @@ export function PrReviewFileList({
           viewMode={effectiveViewMode}
           onViewModeChange={setViewMode}
         />
-        <FlashList
-          ref={listRef}
-          data={items}
-          renderItem={renderItem}
-          keyExtractor={item => item.key}
-          getItemType={item => itemTypeFor(item)}
-          // Re-measure rows when the bounded font scale changes.
-          extraData={diffFontMetrics.scale}
-          onEndReached={() => {
-            if (query.hasNextPage && !query.isFetchingNextPage) {
-              void query.fetchNextPage();
-            }
-          }}
-          onEndReachedThreshold={0.5}
-          contentContainerStyle={LIST_CONTENT_STYLE}
-          ItemSeparatorComponent={null}
-        />
+        {showFirstPageLoading ? (
+          <PrDiffFileListLoading />
+        ) : (
+          <FlashList
+            ref={listRef}
+            data={items}
+            renderItem={renderItem}
+            keyExtractor={item => item.key}
+            getItemType={item => itemTypeFor(item)}
+            // Re-measure rows when the bounded font scale changes.
+            extraData={diffFontMetrics.scale}
+            onContentSizeChange={handleContentSizeChange}
+            onEndReached={() => {
+              if (query.hasNextPage && !query.isFetchingNextPage) {
+                void query.fetchNextPage();
+              }
+            }}
+            onEndReachedThreshold={0.5}
+            contentContainerStyle={LIST_CONTENT_STYLE}
+            ItemSeparatorComponent={null}
+          />
+        )}
         <PrDiffFloatingActions
           owner={owner}
           repo={repo}

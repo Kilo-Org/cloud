@@ -16,6 +16,12 @@ type ScreenHeaderProps = {
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
+  /**
+   * Optional non-interactive content between the back button and the title
+   * (e.g. session platform icon). Outside the title pressable when rename
+   * is enabled. Unset ⇒ header layout is unchanged.
+   */
+  leadingAccessory?: React.ReactNode;
   modal?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
@@ -37,6 +43,7 @@ export function ScreenHeader({
   eyebrow,
   size = 'default',
   headerRight,
+  leadingAccessory,
   modal,
   showBackButton,
   onBack,
@@ -112,6 +119,7 @@ export function ScreenHeader({
               )}
             </Pressable>
           )}
+          {leadingAccessory != null ? <View className="shrink-0">{leadingAccessory}</View> : null}
           <View className="min-w-0 flex-1">
             {eyebrow ? <Eyebrow className="mb-0.5">{eyebrow}</Eyebrow> : null}
             {titleNode}

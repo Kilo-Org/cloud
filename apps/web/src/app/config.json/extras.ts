@@ -75,6 +75,12 @@ export const kiloExtras = {
       description: 'Hide Kilo Gateway models that may train on your prompts from model listings',
       type: 'boolean',
     },
+    web_search: {
+      description:
+        'Make web search available to models from all providers (default: true). Set to false to limit it to managed providers.',
+      type: 'boolean',
+      default: true,
+    },
     commit_message: {
       description: 'Configuration for AI-generated commit messages',
       type: 'object',

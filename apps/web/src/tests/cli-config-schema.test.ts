@@ -51,6 +51,7 @@ describe('kilo config.json schema merge', () => {
     expect(props.terminal_command_display).toBeDefined();
     expect(props.code_edit_display).toBeDefined();
     expect(props.hide_prompt_training_models).toBeDefined();
+    expect(props.web_search).toEqual(expect.objectContaining({ type: 'boolean', default: true }));
   });
 
   test('auto_collapse_reasoning is a boolean', () => {

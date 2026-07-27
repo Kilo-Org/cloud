@@ -249,15 +249,43 @@ function splitSegments(pathname: string): string[] {
   return stripped.split('/');
 }
 
+/**
+ * Single pass over the template: already-inserted capture text is never
+ * rescanned, so a captured segment — external input — always lands verbatim.
+ * A per-capture `replaceAll` loop would both run ECMA-262 GetSubstitution on
+ * `$` patterns in the capture and re-replace a literal `<n>` inserted by an
+ * earlier pass.
+ */
 function substituteCaptures(appPath: string, captures: string[]): string {
-  let result = appPath;
-  for (const [i, capture] of captures.entries()) {
-    // Function replacement: a captured segment is external input and must be
-    // inserted literally — string replacement would interpret `$&`, `` $` ``,
-    // and `$'` (ECMA-262 GetSubstitution applies even for string searches).
-    result = result.replaceAll(`<${i + 1}>`, () => capture);
+  const parts: string[] = [];
+  let cursor = 0;
+
+  while (cursor < appPath.length) {
+    const open = appPath.indexOf('<', cursor);
+    if (open < 0) {
+      break;
+    }
+    const close = appPath.indexOf('>', open);
+    if (close < 0) {
+      break;
+    }
+
+    const token = appPath.slice(open + 1, close);
+    const n = Number.parseInt(token, 10);
+    const capture = String(n) === token && n >= 1 ? captures[n - 1] : undefined;
+    if (capture === undefined) {
+      // Not a known placeholder — keep the text verbatim and move past it.
+      parts.push(appPath.slice(cursor, close + 1));
+      cursor = close + 1;
+      continue;
+    }
+
+    parts.push(appPath.slice(cursor, open), capture);
+    cursor = close + 1;
   }
-  return result;
+
+  parts.push(appPath.slice(cursor));
+  return parts.join('');
 }
 
 /** Single entry point: raw URL → Expo Router group href (or null). */

@@ -139,6 +139,17 @@ describe('wildcard capture substitution', () => {
       '/(app)/(tabs)/(3_profile)/code-reviewer/a$b/reviews/rev_9'
     );
   });
+
+  it('never rescans inserted captures — a literal <n> in a capture stays verbatim', () => {
+    // Per-capture replaceAll passes would substitute the `<2>` inserted for
+    // `<1>` again in pass 2. Single-pass substitution must not.
+    expect(resolveIncomingUrl('kiloapp:///organizations/<2>/code-reviews/rev_9')).toBe(
+      '/(app)/(tabs)/(3_profile)/code-reviewer/<2>/reviews/rev_9'
+    );
+    expect(resolveIncomingUrl('kiloapp:///organizations/org_1/code-reviews/<1>')).toBe(
+      '/(app)/(tabs)/(3_profile)/code-reviewer/org_1/reviews/<1>'
+    );
+  });
 });
 
 describe('exclusions', () => {

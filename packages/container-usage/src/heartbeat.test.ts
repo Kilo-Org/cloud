@@ -418,6 +418,67 @@ describe('installBillingHeartbeat', () => {
     }
   });
 
+  it('does not abandon a replacement generation after a pending-stop failure', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      let replacement: Awaited<ReturnType<typeof setBillingContext>> | undefined;
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async () => {
+        replacement = await setBillingContext(storage, {
+          service: 'cloud-agent-next',
+          instanceId: 'instance-1',
+          startEpochMs: 456,
+          sku: 'cloud-agent-next:Sandbox',
+          subject: { type: 'user', id: 'user-1' },
+          actor: { type: 'user', id: 'user-1' },
+        });
+        throw new Error('meter unavailable');
+      });
+      const deleteSchedules = vi.fn();
+      const onGenerationClosed = vi.fn();
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules,
+          getState: vi.fn(),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client: new ContainerUsageClient(
+            {
+              recordStart: async () => ({
+                success: true,
+                ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+              }),
+              recordHeartbeat: async () => ({
+                intervalId: 'instance-1:123',
+                durable: 'pg',
+                dedup: false,
+                budget: { verdict: 'continue' },
+              }),
+              recordStop,
+            },
+            { service: 'cloud-agent-next', retry: { attempts: 1 } }
+          ),
+          storage,
+          stoppedStateAbandonSeconds: 3_600,
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      await controller.persistStop({ reason: 'exit', exitCode: 1 }, 10_000);
+
+      now.mockReturnValue(3_610_000);
+      await controller.billingHeartbeatTick();
+
+      expect(await getBillingContext(storage)).toEqual(replacement);
+      expect(deleteSchedules).not.toHaveBeenCalled();
+      expect(onGenerationClosed).not.toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('abandons local stopped-state retries after the hard ceiling', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
     try {
@@ -467,6 +528,70 @@ describe('installBillingHeartbeat', () => {
       expect(recordStop).toHaveBeenCalledOnce();
       expect(await getBillingContext(storage)).toBeUndefined();
       expect(deleteSchedules).toHaveBeenCalledWith(BILLING_HEARTBEAT_CALLBACK);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('does not abandon a replacement generation after a stopped-state failure', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      let replacement: Awaited<ReturnType<typeof setBillingContext>> | undefined;
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async () => {
+        replacement = await setBillingContext(storage, {
+          service: 'cloud-agent-next',
+          instanceId: 'instance-1',
+          startEpochMs: 456,
+          sku: 'cloud-agent-next:Sandbox',
+          subject: { type: 'user', id: 'user-1' },
+          actor: { type: 'user', id: 'user-1' },
+        });
+        throw new Error('meter unavailable');
+      });
+      const deleteSchedules = vi.fn();
+      const onGenerationClosed = vi.fn();
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules,
+          getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: Date.now() })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client: new ContainerUsageClient(
+            {
+              recordStart: async () => ({
+                success: true,
+                ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+              }),
+              recordHeartbeat: async () => ({
+                intervalId: 'instance-1:123',
+                durable: 'pg',
+                dedup: false,
+                budget: { verdict: 'continue' },
+              }),
+              recordStop,
+            },
+            { service: 'cloud-agent-next', retry: { attempts: 1 } }
+          ),
+          storage,
+          stopOnStoppedState: false,
+          stoppedStateGraceSeconds: 900,
+          stoppedStateAbandonSeconds: 3_600,
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      now.mockReturnValue(10_000);
+      await controller.billingHeartbeatTick();
+      now.mockReturnValue(3_610_000);
+      await controller.billingHeartbeatTick();
+
+      expect(await getBillingContext(storage)).toEqual(replacement);
+      expect(deleteSchedules).toHaveBeenCalledTimes(1);
+      expect(onGenerationClosed).not.toHaveBeenCalled();
     } finally {
       now.mockRestore();
     }
@@ -593,6 +718,72 @@ describe('installBillingHeartbeat', () => {
       await controller.billingHeartbeatTick();
 
       expect(recordHeartbeat).toHaveBeenCalledWith(expect.objectContaining({ usageSinceLast: 3 }));
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('does not let late scheduling restore an abandoned generation', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      let resolveSchedule = (): void => undefined;
+      const schedule = vi.fn(
+        () =>
+          new Promise(resolve => {
+            resolveSchedule = () => resolve({});
+          })
+      );
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async () => {
+        throw new Error('meter unavailable');
+      });
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(),
+          schedule: schedule as Container['schedule'],
+        },
+        {
+          client: new ContainerUsageClient(
+            {
+              recordStart: async () => ({
+                success: true,
+                ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+              }),
+              recordHeartbeat: async () => ({
+                intervalId: 'instance-1:123',
+                durable: 'pg',
+                dedup: false,
+                budget: { verdict: 'continue' },
+              }),
+              recordStop,
+            },
+            { service: 'cloud-agent-next', retry: { attempts: 1 } }
+          ),
+          storage,
+          stoppedStateAbandonSeconds: 3_600,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      await controller.persistStop({ reason: 'exit', exitCode: 1 }, 1_000);
+      const scheduling = controller.scheduleHeartbeat();
+      await vi.waitFor(() => expect(schedule).toHaveBeenCalledOnce());
+
+      now.mockReturnValue(3_601_000);
+      await controller.billingHeartbeatTick();
+      const replacement = await setBillingContext(storage, {
+        service: 'cloud-agent-next',
+        instanceId: 'instance-1',
+        startEpochMs: 456,
+        sku: 'cloud-agent-next:Sandbox',
+        subject: { type: 'user', id: 'user-1' },
+        actor: { type: 'user', id: 'user-1' },
+      });
+      resolveSchedule();
+      await scheduling;
+
+      expect(await getBillingContext(storage)).toEqual(replacement);
     } finally {
       now.mockRestore();
     }

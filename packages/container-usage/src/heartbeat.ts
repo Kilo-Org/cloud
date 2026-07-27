@@ -110,7 +110,13 @@ export function installBillingHeartbeat(
       startedContext.generation
     );
     if (!context.measurementStarted) {
-      await updateBillingContext(dependencies.storage, startedContext);
+      const current = await getBillingContext(dependencies.storage);
+      if (!current || !isSameBillingGeneration(current, context)) return;
+      await updateBillingContext(dependencies.storage, {
+        ...current,
+        measurementStarted: true,
+        usageMeasuredAtMs: startedContext.usageMeasuredAtMs,
+      });
     }
   };
 
@@ -130,6 +136,15 @@ export function installBillingHeartbeat(
       usageMeasuredAtMs: context.pendingHeartbeat.measuredAtMs,
       pendingHeartbeat: undefined,
     };
+  };
+
+  const abandonIfCurrent = async (expected: BillingContext): Promise<boolean> => {
+    const current = await getBillingContext(dependencies.storage);
+    if (!current || !isSameBillingGeneration(current, expected)) return false;
+    await clearBillingContext(dependencies.storage);
+    cancelHeartbeat();
+    dependencies.onGenerationClosed?.(expected);
+    return true;
   };
 
   const computeStopSegment = (context: BillingContext, usageEndedAtMs: number) => {
@@ -246,12 +261,10 @@ export function installBillingHeartbeat(
           context.stoppedObservedAtMs !== undefined &&
           Date.now() - context.stoppedObservedAtMs >= stoppedStateAbandonSeconds * 1_000
         ) {
-          cancelHeartbeat();
-          await clearBillingContext(dependencies.storage);
-          dependencies.onGenerationClosed?.(context);
+          await abandonIfCurrent(context);
           return;
         }
-        await rescheduleIfCurrent(context);
+        if (!(await rescheduleIfCurrent(context))) return;
         throw error;
       }
       return;
@@ -299,12 +312,10 @@ export function installBillingHeartbeat(
           context.stoppedObservedAtMs !== undefined &&
           Date.now() - context.stoppedObservedAtMs >= stoppedStateAbandonSeconds * 1_000
         ) {
-          cancelHeartbeat();
-          await clearBillingContext(dependencies.storage);
-          dependencies.onGenerationClosed?.(context);
+          await abandonIfCurrent(context);
           return;
         }
-        await rescheduleIfCurrent(context);
+        if (!(await rescheduleIfCurrent(context))) return;
         throw error;
       }
       return;

@@ -49,8 +49,13 @@ function usageServiceForSandboxClass(sandboxClassName: SandboxClassName): string
   return `${SERVICE}-${suffix}`;
 }
 
-function stoppedAtFromState(state: { lastChange: number }, observedAtMs = Date.now()): number {
+function stoppedAtFromState(
+  state: { status: string; lastChange?: number },
+  observedAtMs = Date.now()
+): number {
+  if (state.status !== 'stopped' && state.status !== 'stopped_with_code') return observedAtMs;
   return Number.isFinite(state.lastChange) &&
+    state.lastChange !== undefined &&
     state.lastChange >= 0 &&
     state.lastChange <= observedAtMs
     ? state.lastChange

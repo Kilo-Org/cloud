@@ -338,6 +338,26 @@ describe('MeteredSandbox', () => {
     );
   });
 
+  it('uses observation time when re-acquiring against stale healthy SDK state', async () => {
+    const { rpc, storage, sandbox, flushShadowTasks } = createSandbox();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    expect((await getBillingContext(storage))?.measurementStarted).toBe(true);
+
+    now.mockReturnValue(500_000);
+    sandbox.setPhysicalRunning(false);
+    sandbox.mockState = { status: 'healthy' };
+    Object.assign(sandbox.mockState, { lastChange: 10_000 });
+    await sandbox.configureBilling(billingInput);
+
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ usageSinceLast: 499, reason: 'runtime_signal' })
+    );
+  });
+
   it('keeps physical start non-fatal while retrying an unacknowledged shadow start', async () => {
     const rpc = createRpc();
     vi.mocked(rpc.recordStart)

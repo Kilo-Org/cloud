@@ -110,6 +110,29 @@ export function createPendingStop(
   };
 }
 
+/** Derive the public billing state for an idle (no open interval) town. */
+function idleBillingState(
+  state: Extract<StoredUsageState, { phase: 'idle' }>,
+  runPolicy: ContainerRunPolicy
+): GastownBillingStatus['state'] {
+  if (runPolicy === 'paused_by_user') return 'paused';
+  if (state.blocked) return 'blocked';
+  return 'idle';
+}
+
+/** Derive the public billing state for a town with an open interval. */
+function openIntervalBillingState(
+  state: OpenUsageInterval,
+  runPolicy: ContainerRunPolicy
+): GastownBillingStatus['state'] {
+  if (runPolicy === 'paused_by_user') return 'stopping';
+  if (state.phase === 'starting') return 'starting';
+  if (state.phase === 'stopping') return 'stopping';
+  if (state.latestBudget?.verdict === 'stop') return 'stopping';
+  if (state.latestBudget?.verdict === 'warn') return 'warning';
+  return 'running';
+}
+
 export function toBillingStatus(
   enabled: boolean,
   state: StoredUsageState,
@@ -124,7 +147,7 @@ export function toBillingStatus(
     return {
       enabled: true,
       enforcing,
-      state: runPolicy === 'paused_by_user' ? 'paused' : state.blocked ? 'blocked' : 'idle',
+      state: idleBillingState(state, runPolicy),
       runPolicy,
       ...(payer ? { payer } : {}),
       ...(state.latestBudget?.remaining === undefined
@@ -143,18 +166,7 @@ export function toBillingStatus(
     };
   }
 
-  const publicState =
-    runPolicy === 'paused_by_user'
-      ? 'stopping'
-      : state.phase === 'starting'
-        ? 'starting'
-        : state.phase === 'stopping'
-          ? 'stopping'
-          : state.latestBudget?.verdict === 'stop'
-            ? 'stopping'
-            : state.latestBudget?.verdict === 'warn'
-              ? 'warning'
-              : 'running';
+  const publicState = openIntervalBillingState(state, runPolicy);
 
   const currentSliceSeconds =
     state.phase === 'running' || (state.phase === 'stopping' && state.stopObservedAt === undefined)

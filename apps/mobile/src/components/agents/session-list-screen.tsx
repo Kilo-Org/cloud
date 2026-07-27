@@ -309,6 +309,7 @@ export function AgentSessionListScreen() {
           onSessionPress={navigateToSession}
           hasActiveQuery={isSearching || hasActiveFilter}
           isSearching={isSearching}
+          searchQuery={searchQuery}
           onClearQuery={handleClearQuery}
           onCreateSession={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);

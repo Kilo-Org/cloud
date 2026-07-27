@@ -33,7 +33,15 @@ const config: ExpoConfig = {
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
   ios: {
-    icon: './assets/images/logo.png',
+    // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
+    // canonical mobile brand yellow on a dark backdrop; `tinted` is grayscale because iOS
+    // applies its own tint. All three are opaque 1024x1024 — Expo requires the icon to fill
+    // the square with no transparent pixels.
+    icon: {
+      light: './assets/images/logo.png',
+      dark: './assets/images/logo-dark.png',
+      tinted: './assets/images/logo-tinted.png',
+    },
     bundleIdentifier: 'com.kilocode.kiloapp',
     requireFullScreen: true,
     supportsTablet: true,

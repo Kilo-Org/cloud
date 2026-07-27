@@ -47,6 +47,25 @@ const connectedInstancesResponseSchema = z.object({
 export type ActiveSession = z.infer<typeof activeSessionSchema>;
 export type ConnectedInstance = z.infer<typeof connectedInstanceSchema>;
 
+/**
+ * Overlay stored attention (question/permission) onto a live heartbeat
+ * status. Non-attention DB values yield to live so busy/idle remain
+ * authoritative while the CLI is connected.
+ *
+ * Must run in the router: client fetchQuery replaces the cache wholesale,
+ * so sticky attention held only in client helpers is wiped on every
+ * enrichment / reconnect / cli.connected refresh.
+ */
+export function resolveActiveSessionStatus(
+  liveStatus: string,
+  storedStatus: string | null | undefined
+): string {
+  if (storedStatus === 'question' || storedStatus === 'permission') {
+    return storedStatus;
+  }
+  return liveStatus;
+}
+
 export const activeSessionsRouter = createTRPCRouter({
   getToken: baseProcedure.query(async ({ ctx }) => {
     const token = generateInternalServiceToken(ctx.user.id);
@@ -99,6 +118,7 @@ export const activeSessionsRouter = createTRPCRouter({
       created_on_platform: string | null;
       created_at: string;
       updated_at: string;
+      status: string | null;
     }> = [];
     try {
       rows = await db
@@ -107,6 +127,7 @@ export const activeSessionsRouter = createTRPCRouter({
           created_on_platform: cli_sessions_v2.created_on_platform,
           created_at: cli_sessions_v2.created_at,
           updated_at: cli_sessions_v2.updated_at,
+          status: cli_sessions_v2.status,
         })
         .from(cli_sessions_v2)
         .where(
@@ -129,8 +150,12 @@ export const activeSessionsRouter = createTRPCRouter({
       // Explicit snake_case → camelCase mapping: the mobile client only
       // reads createdOnPlatform/createdAt/updatedAt, so we do not spread
       // the DB row (which carries snake_case keys it never uses).
+      // Status: prefer DB attention (question/permission) over the live
+      // heartbeat so a released CLI that only reports idle/busy still
+      // surfaces NEEDS INPUT after tRPC seed / enrichment / reconnect.
       return {
         ...session,
+        status: resolveActiveSessionStatus(session.status, row.status),
         createdOnPlatform: row.created_on_platform ?? undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,

@@ -10,7 +10,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 
 type UpstreamFetchFailureFamily =
@@ -178,10 +178,14 @@ export async function upstreamRequest({
 
   const targetUrl = `${provider.apiUrl}${path}${search}`;
 
-  const TEN_MINUTES_MS = 10 * 60 * 1000;
-  const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
-  timeoutSignal.addEventListener('abort', () => {
+  const TIMEOUT_MS = 15 * 60 * 1000; // longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout
+  const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
+  const onTimeoutAbort = () => {
     errorExceptInTest('[upstreamRequest] timeout');
+  };
+  timeoutSignal.addEventListener('abort', onTimeoutAbort);
+  after(() => {
+    timeoutSignal.removeEventListener('abort', onTimeoutAbort);
   });
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 

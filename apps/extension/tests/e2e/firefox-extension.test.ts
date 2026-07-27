@@ -74,6 +74,7 @@ test('firefox build installs as a running add-on without invalid manifest warnin
     sidebar_action: sidebarAction,
   } = manifest;
 
+  expect(permissions).toContain('contextMenus');
   expect(permissions).toContain('storage');
   expect(permissions).toContain('scripting');
   expect(permissions).toContain('tabs');

@@ -1,5 +1,8 @@
+/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry init are kept together */
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
+
+import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 
 import {
   JetBrainsMono_500Medium,
@@ -19,9 +22,11 @@ import {
   useSegments,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
@@ -34,20 +39,37 @@ import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
+import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
+import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
 import {
   checkInitialNotification,
-  getPendingNotificationLink,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
-import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
+import { resolvePendingNavigation } from '@/lib/pending-navigation';
+import {
+  isShellReadyForShare,
+  resolvePendingShareNavigation,
+  resolveSupersededPendingShareId,
+} from '@/lib/pending-share-navigation';
+import {
+  clearSharePayload,
+  discardUnstoredSharePayload,
+  normalizeShareIntent,
+  putSharePayload,
+  type ShareId,
+  type SharePayload,
+} from '@/lib/share-payload';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
+
+// No-op unless E2E_LATENCY_WS_MS is set at bundle time (see lib/e2e-ws-latency).
+installE2EWebSocketLatency();
 
 // Session replay, screenshots, and view-hierarchy capture are gated on
 // stored consent (see src/lib/sentry-consent.ts) — the consent copy only
@@ -81,6 +103,7 @@ initSentry(false);
 void SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
 checkInitialNotification();
+captureLaunchDeepLink();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading, signOut } = useAuth();
@@ -93,6 +116,7 @@ function RootLayoutNav() {
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const {
     userId,
     email,
@@ -114,11 +138,49 @@ function RootLayoutNav() {
   useSentryConsentSync(consentChecked && !needsConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
-  const isLoading = authLoading || updateChecking || !fontsReady;
+  const isLoading = authLoading || updateChecking || !fontsReady || !themeHasLoaded;
+
+  useEffect(() => {
+    if (themeHasLoaded) {
+      applyThemePreference(themePreference);
+    }
+  }, [themeHasLoaded, themePreference]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
+  const onGateRoute = (segments as readonly string[]).includes('share-gate');
+  const {
+    hasShareIntent,
+    shareIntent,
+    resetShareIntent,
+    error: shareIntentError,
+  } = useShareIntentContext();
+  // expo-share-intent rebuilds resetShareIntent every render; keep it out of
+  // the ingest/error effect deps via ref (same pattern as share-prefill.ts).
+  const resetShareIntentRef = useRef(resetShareIntent);
+  resetShareIntentRef.current = resetShareIntent;
+  const [pendingShareId, setPendingShareId] = useState<ShareId | null>(null);
+  // Mirror pendingShareId so the ingest effect can release a superseded share
+  // without reading stale state or adding the id to effect deps.
+  const pendingShareIdRef = useRef(pendingShareId);
+  pendingShareIdRef.current = pendingShareId;
+
+  // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
+  const isShellReady = isShellReadyForShare({
+    hasToken: token != null,
+    isLoading,
+    updateRequired,
+    inAuthGroup,
+    inForceUpdate,
+    userIdLoading,
+    userIdError,
+    consentCheckError: consentCheckError != null,
+    consentChecked,
+    needsConsent,
+    onConsentRoute,
+    onConsentReviewRoute,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +240,59 @@ function RootLayoutNav() {
   useScreenTracking();
 
   useEffect(() => {
+    if (shareIntentError) {
+      Sentry.captureException(new Error(shareIntentError));
+      toast.error("Couldn't read the shared content");
+      resetShareIntentRef.current();
+    }
+  }, [shareIntentError]);
+
+  // Keyed per shareIntent identity so a newer intent cancels and supersedes
+  // an in-flight ingest. Success/failure reset for the happy path lives here
+  // (gate must never reset); the shareIntentError effect also resets on the
+  // error path. Calls go through resetShareIntentRef so the unstable context
+  // function stays out of the deps.
+  useEffect(() => {
+    if (!hasShareIntent) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const ingestShareIntent = async () => {
+      try {
+        const payload: SharePayload = await normalizeShareIntent(shareIntent);
+        if (cancelled) {
+          // Superseded mid-copy: never stored, so no lifecycle path can clean it.
+          discardUnstoredSharePayload(payload);
+          return;
+        }
+        const shareId = putSharePayload(payload);
+        resetShareIntentRef.current();
+        // Latest-wins: a superseded pending share is released — never silently orphaned.
+        const superseded = resolveSupersededPendingShareId(pendingShareIdRef.current, shareId);
+        if (superseded !== null) {
+          clearSharePayload(superseded);
+        }
+        setPendingShareId(shareId);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        Sentry.captureException(error);
+        toast.error("Couldn't read the shared content");
+        resetShareIntentRef.current();
+      }
+    };
+
+    void ingestShareIntent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasShareIntent, shareIntent]);
+
+  useEffect(() => {
     if (isLoading) {
       return;
     }
@@ -232,11 +347,12 @@ function RootLayoutNav() {
       }
 
       void SplashScreen.hideAsync();
-      // Navigate to pending notification deep link (cold start / background tap)
-      const pendingNavigation = resolvePendingNotificationNavigation(getPendingNotificationLink());
+      // Navigate to pending deep link (cold start universal link / notification tap)
+      const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
       if (pendingNavigation) {
         router.navigate(pendingNavigation.href as Href);
       }
+      // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
     }
   }, [
     token,
@@ -253,6 +369,29 @@ function RootLayoutNav() {
     onConsentRoute,
     onConsentReviewRoute,
   ]);
+
+  // Declared after the auth effect so that on the same flush a pending
+  // notification navigate runs first and the share gate opens on top.
+  useEffect(() => {
+    if (pendingShareId === null || !isShellReady) {
+      return;
+    }
+
+    const navigation = resolvePendingShareNavigation({
+      shareId: pendingShareId,
+      onGateRoute,
+    });
+    if (!navigation) {
+      return;
+    }
+
+    if (navigation.mode === 'replace') {
+      router.replace(navigation.href as Href);
+    } else {
+      router.push(navigation.href as Href);
+    }
+    setPendingShareId(null);
+  }, [pendingShareId, isShellReady, onGateRoute, router]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;
@@ -343,12 +482,14 @@ function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={navigationTheme}>
-      <AppRootProviders>
-        <StatusBar style="auto" />
-        <RootLayoutNav />
-      </AppRootProviders>
-    </ThemeProvider>
+    <ShareIntentProvider>
+      <ThemeProvider value={navigationTheme}>
+        <AppRootProviders>
+          <StatusBar style="auto" />
+          <RootLayoutNav />
+        </AppRootProviders>
+      </ThemeProvider>
+    </ShareIntentProvider>
   );
 }
 

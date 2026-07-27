@@ -164,6 +164,7 @@ export type CloudAgentTerminalReason =
   | 'timeout'
   | 'upstream_error'
   | 'sandbox_error'
+  | 'workspace_capacity'
   | 'unknown';
 
 export class CloudAgentNextError extends Error {

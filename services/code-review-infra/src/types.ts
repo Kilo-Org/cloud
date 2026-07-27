@@ -111,6 +111,9 @@ export interface CodeReviewStatusResponse {
 
 export type CodeReviewStatusResult = CodeReviewStatusResponse | null;
 
+// KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS (packages/db/src/schema-types.ts)
+// and CloudAgentTerminalReason (packages/worker-utils/src/cloud-agent-next-client.ts).
+// A value missing here is silently coerced to undefined by `.catch(undefined)`.
 const InternalStatusTerminalReasonSchema = z
   .enum([
     'billing',
@@ -127,6 +130,7 @@ const InternalStatusTerminalReasonSchema = z
     'timeout',
     'upstream_error',
     'sandbox_error',
+    'workspace_capacity',
     'unknown',
   ])
   .nullable()

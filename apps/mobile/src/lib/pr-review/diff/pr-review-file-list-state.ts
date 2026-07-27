@@ -19,7 +19,7 @@
 // to the right terminal state.
 
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { PR_REVIEW_MAX_PAGES } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -149,8 +149,12 @@ export function usePrReviewViewedFiles(
     [owner, repo, number, headSha]
   );
 
-  const set = new Set(paths);
-  return { isViewed: (path: string) => set.has(path), toggle, isLoading };
+  // Stabilize identities for downstream memos (`items`, `renderItem`). A fresh
+  // `{ isViewed, toggle, isLoading }` every render forced FlashList to rebuild
+  // its entire data array on every parent render (D5 preventive).
+  const pathSet = useMemo(() => new Set(paths), [paths]);
+  const isViewed = useCallback((path: string) => pathSet.has(path), [pathSet]);
+  return useMemo(() => ({ isViewed, toggle, isLoading }), [isViewed, toggle, isLoading]);
 }
 
 /**

@@ -371,6 +371,101 @@ describe('recordPendingFlushFailure', () => {
     expect(delays).toEqual([2_000, undefined]);
   });
 
+  it('gives a full-disk workspace failure a longer backed-off retry budget', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const delays: (number | undefined)[] = [];
+    const now = 100_000;
+
+    // A workspace_setup_failed with the sandbox_storage_full subtype is transient
+    // disk backpressure and should retry several times with growing delays before
+    // exhausting, unlike a plain workspace failure (one warm-followup retry above).
+    for (let i = 0; i < 4; i++) {
+      const result = await recordPendingFlushFailure(
+        storage,
+        message,
+        'sandbox storage full',
+        now,
+        {
+          policy: 'warm-followup',
+          code: 'WORKSPACE_SETUP_FAILED',
+          subtype: 'sandbox_storage_full',
+        }
+      );
+      delays.push(
+        result.nextFlushAttemptAt !== undefined ? result.nextFlushAttemptAt - now : undefined
+      );
+      message = result.message;
+    }
+
+    expect(delays).toEqual([10_000, 30_000, 60_000, undefined]);
+  });
+
+  it('starts the capacity retry budget fresh after a different earlier failure', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage({
+      createdAt: 1,
+      flushAttempts: 2,
+      lastFlushFailureCode: 'WRAPPER_START_FAILED',
+    });
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(
+      storage,
+      message,
+      'sandbox storage full',
+      100_000,
+      {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+        subtype: 'sandbox_storage_full',
+      }
+    );
+
+    // Reset to attempt 1 so the full 10s/30s/60s budget applies, not truncated
+    // by the two earlier non-capacity attempts.
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
+    expect(result.nextFlushAttemptAt).toBe(110_000);
+  });
+
+  it('bounds retries when failures alternate between reset-eligible modes', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+    const now = 100_000;
+
+    // Fresh sandbox-connect failure resets to attempt 1.
+    let result = await recordPendingFlushFailure(storage, message, 'connect failed', now, {
+      policy: 'warm-followup',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
+    message = result.message;
+
+    // Switching to capacity (both modes reset-eligible) does NOT reset; attempts accumulate.
+    result = await recordPendingFlushFailure(storage, message, 'sandbox storage full', now, {
+      policy: 'warm-followup',
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'sandbox_storage_full',
+    });
+    expect(result.attempts).toBe(2);
+    message = result.message;
+
+    // Switching back to connect keeps accumulating and exceeds the connect budget,
+    // so the flapping message exhausts instead of resetting forever.
+    result = await recordPendingFlushFailure(storage, message, 'connect failed', now, {
+      policy: 'warm-followup',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
+    expect(result.attempts).toBe(3);
+    expect(result.exhausted).toBe(true);
+    expect(result.nextFlushAttemptAt).toBeUndefined();
+  });
+
   it('retries a sandbox connection failure once after exactly five seconds', async () => {
     const storage = createMemoryStorage();
     let message = makeMessage({ createdAt: 100_000 });

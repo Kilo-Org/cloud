@@ -85,7 +85,7 @@ const getToolCallDetail = (
     return stringifyToolValue(event.arguments);
   }
 
-  return event.query ?? event.elementId ?? event.snapshotId;
+  return event.query ?? event.elementId ?? event.memoryId ?? event.snapshotId;
 };
 
 const renderEvent = (event: AgentConversationEvent): string | undefined => {

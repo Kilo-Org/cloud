@@ -69,8 +69,10 @@ const builtInToolNameSchema = z.enum([
   'eval',
   'find_in_page',
   'get_element_details',
+  'get_memory',
   'get_page_snapshot',
   'get_viewport_screenshot',
+  'search_memories',
 ]);
 // Built-in tools plus dynamically mapped remote MCP tools (mcp_<slug>_<tool>).
 const gatewayToolNameSchema = z.union([
@@ -87,8 +89,9 @@ const streamingToolCallDeltaSchema = z.object({
   id: z.string().optional(),
   index: z.number(),
 });
-// Only prompt_tokens is consumed (the context-usage ratio); other usage fields are ignored.
+// Prompt_tokens drives the context-usage ratio; cost is optional session spend (USD).
 const usageSchema = z.object({
+  cost: z.number().nullish(),
   prompt_tokens: z.number(),
 });
 const streamDataSchema = z.object({
@@ -173,7 +176,9 @@ const parseToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayToolCal
 
   const parsedArguments = (() => {
     try {
-      return parseJson(value.arguments);
+      // Bedrock-served Claude streams a zero-argument tool call as a single empty
+      // `arguments: ""` delta; an empty accumulated buffer is a zero-argument call.
+      return value.arguments === '' ? {} : parseJson(value.arguments);
     } catch {
       throw new TypeError('Gateway tool call arguments were not valid JSON.');
     }
@@ -259,7 +264,11 @@ const applyStreamingData = (
   }
 
   if (parsed.data.usage !== undefined && parsed.data.usage !== null) {
-    accumulator.usage = { promptTokens: parsed.data.usage.prompt_tokens };
+    const { cost, prompt_tokens: promptTokens } = parsed.data.usage;
+    accumulator.usage = {
+      promptTokens,
+      ...(typeof cost === 'number' ? { costUsd: cost } : {}),
+    };
   }
 
   const choice = parsed.data.choices.at(0);

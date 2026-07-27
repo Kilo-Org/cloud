@@ -13,6 +13,14 @@
 //     `diff-selection-bridge` (so the comment composer can read it on
 //     mount) and a floating action bar (`PrDiffFloatingActions`)
 //     hosts the "Comment" and "Finish review" affordances.
+//
+// Cold first paint: FlashList mounts only after the first page of files is
+// present. The first-load waiting state is a plain skeleton outside the list
+// (see `PrDiffFileListLoading`). Mounting the list on a single pagination-row
+// loading item and then swapping in ~50 file rows left FlashList v2 with a
+// full content height but zero mounted cells until the user scrolled; warm
+// remounts already had data at mount and painted. Deferring the list mount
+// makes cold match warm.
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -24,6 +32,7 @@ import {
   PrDiffFileListHeader,
   useDiffViewMode,
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
+import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
@@ -32,8 +41,21 @@ import {
   LIST_CONTENT_STYLE,
   TabStateMessage,
 } from '@/components/pr-review/diff/pr-diff-rows';
+import { dedupeFilesByPath } from '@/lib/pr-review/diff/dedupe-file-pages';
+import {
+  armInitialTopScroll,
+  INITIAL_TOP_SCROLL_IDLE,
+  type InitialTopScrollState,
+  onInitialTopScrollContentSize,
+} from '@/lib/pr-review/diff/initial-top-scroll';
 import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { fileHeaderKey, itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import {
+  cancelPendingScroll,
+  decideOnItemsChange,
+  decideOnScrollRequest,
+  type PendingScrollState,
+} from '@/lib/pr-review/diff/pending-scroll-request';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
 import {
   useFetchToCompletion,
@@ -106,7 +128,9 @@ export function PrReviewFileList({
         all.push(f);
       }
     }
-    return all;
+    // Dedupe by path (first wins) so retry/refetch races cannot emit
+    // duplicate `file-header:<path>` keys into FlashList.
+    return dedupeFilesByPath(all);
   }, [query.data]);
 
   const viewedCount = useMemo(() => {
@@ -174,20 +198,65 @@ export function PrReviewFileList({
   const indexByKeyRef = useRef(indexByKey);
   indexByKeyRef.current = indexByKey;
 
+  // AC4 / D7: one-shot scroll-to-top after first real content lays out.
+  // Arm synchronously on first files.length > 0 (cold + warm-cache remount);
+  // fire from onContentSizeChange only — never in useEffect, which races
+  // FlashList's first layout and blanks the window until the user scrolls.
+  // Page appends cannot re-arm once done.
+  const initialTopScrollRef = useRef<InitialTopScrollState>(INITIAL_TOP_SCROLL_IDLE);
+  initialTopScrollRef.current = armInitialTopScroll(initialTopScrollRef.current, files.length);
+
+  const handleContentSizeChange = (_width: number, height: number) => {
+    const result = onInitialTopScrollContentSize(initialTopScrollRef.current, height);
+    initialTopScrollRef.current = result.state;
+    if (result.shouldScroll) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }
+  };
+
+  // AC4b / D7: resilient navigator scroll — park when key is absent from
+  // indexByKey (items rebuild race), retry on next items change, supersede
+  // on a newer request, cancel on unmount.
+  const pendingScrollRef = useRef<PendingScrollState>(null);
+
+  const applyScrollDecision = (decision: ReturnType<typeof decideOnScrollRequest>) => {
+    pendingScrollRef.current = decision.pending;
+    if (decision.index === null) {
+      return;
+    }
+    void listRef.current?.scrollToIndex({
+      index: decision.index,
+      animated: true,
+      viewPosition: 0,
+    });
+  };
+
   useEffect(() => {
     const unsubscribe = subscribeFileNavigatorRequest(
       { owner, repo, number },
       (request: FileNavigatorRequest) => {
         const targetKey = fileHeaderKey(request.path);
-        const index = indexByKeyRef.current.get(targetKey);
-        if (typeof index === 'number' && index !== -1) {
-          setExpanded(prev => (prev[request.path] ? prev : { ...prev, [request.path]: true }));
-          void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
-        }
+        const decision = decideOnScrollRequest(
+          pendingScrollRef.current,
+          targetKey,
+          indexByKeyRef.current
+        );
+        // Expand as soon as we accept the request so the file is open once
+        // the list can scroll to it (including the deferred/pending path).
+        setExpanded(prev => (prev[request.path] ? prev : { ...prev, [request.path]: true }));
+        applyScrollDecision(decision);
       }
     );
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      pendingScrollRef.current = cancelPendingScroll();
+    };
   }, [owner, repo, number]);
+
+  useEffect(() => {
+    const decision = decideOnItemsChange(pendingScrollRef.current, indexByKey);
+    applyScrollDecision(decision);
+  }, [indexByKey]);
 
   const renderItem = useDiffRenderItem({
     viewed,
@@ -244,6 +313,10 @@ export function PrReviewFileList({
 
   const isTruncated = query.hasNextPage || Boolean(fetchToCompletion.error);
   const effectiveViewMode = isTablet ? viewMode : 'unified';
+  // First page still in flight: keep FlashList unmounted. A list that first
+  // lays out a single loading pagination-row and later receives the real file
+  // rows can measure full content height without mounting cells until scroll.
+  const showFirstPageLoading = files.length === 0;
 
   return (
     <View className="flex-1" accessibilityLabel="Files list">
@@ -257,21 +330,26 @@ export function PrReviewFileList({
         viewMode={effectiveViewMode}
         onViewModeChange={setViewMode}
       />
-      <FlashList
-        ref={listRef}
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={item => item.key}
-        getItemType={item => itemTypeFor(item)}
-        onEndReached={() => {
-          if (query.hasNextPage && !query.isFetchingNextPage) {
-            void query.fetchNextPage();
-          }
-        }}
-        onEndReachedThreshold={0.5}
-        contentContainerStyle={LIST_CONTENT_STYLE}
-        ItemSeparatorComponent={null}
-      />
+      {showFirstPageLoading ? (
+        <PrDiffFileListLoading />
+      ) : (
+        <FlashList
+          ref={listRef}
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={item => item.key}
+          getItemType={item => itemTypeFor(item)}
+          onContentSizeChange={handleContentSizeChange}
+          onEndReached={() => {
+            if (query.hasNextPage && !query.isFetchingNextPage) {
+              void query.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          contentContainerStyle={LIST_CONTENT_STYLE}
+          ItemSeparatorComponent={null}
+        />
+      )}
       <PrDiffFloatingActions
         owner={owner}
         repo={repo}

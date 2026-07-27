@@ -1,6 +1,8 @@
-import { browser } from '#imports';
+import { browser, storage } from '#imports';
 import { z } from 'zod';
 import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-conversation';
+import { searchAgentMemories, toAgentMemorySnippet } from '@/src/shared/agent-memories';
+import { loadAgentMemories } from '@/src/shared/agent-memories-storage';
 import {
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
@@ -178,6 +180,45 @@ const getFindResults = (snapshot: PageSnapshot, query: string) => {
 };
 
 export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalTabResult> => {
+  if (toolCall.name === 'search_memories') {
+    const query = toolCall.query?.trim();
+
+    if (query === undefined || query === '') {
+      return { error: 'Search query is required.', ok: false };
+    }
+
+    const memories = await loadAgentMemories(storage);
+    const matches = searchAgentMemories(memories, query);
+    const results = matches.map(memory => ({
+      createdAt: memory.createdAt,
+      id: memory.id,
+      ...(memory.note === undefined ? {} : { note: memory.note }),
+      pageTitle: memory.pageTitle,
+      pageUrl: memory.pageUrl,
+      snippet: toAgentMemorySnippet(memory),
+      ...(memory.truncated === undefined ? {} : { truncated: memory.truncated }),
+    }));
+
+    return matches.length === 0
+      ? { ok: true, value: { message: 'No memories matched.', results: [] } }
+      : { ok: true, value: { results } };
+  }
+
+  if (toolCall.name === 'get_memory') {
+    const memoryId = toolCall.memoryId?.trim();
+
+    if (memoryId === undefined || memoryId === '') {
+      return { error: 'Memory id is required.', ok: false };
+    }
+
+    const memories = await loadAgentMemories(storage);
+    const memory = memories.find(entry => entry.id === memoryId);
+
+    return memory === undefined
+      ? { error: 'Memory not found.', ok: false }
+      : { ok: true, value: memory };
+  }
+
   if (toolCall.name === 'get_viewport_screenshot') {
     return readViewportScreenshot(toolCall.tabId);
   }

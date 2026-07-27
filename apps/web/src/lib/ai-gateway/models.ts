@@ -41,6 +41,7 @@ export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
+  'inclusionai/ling-3.0-flash:free',
 ].filter(m => m !== null);
 
 export const preferredModels = [
@@ -112,14 +113,6 @@ export function shouldRedactModelNameInMicrodollarUsage(
 
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
   return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
-}
-
-export function shouldRedactModelNameInResponse(provider: ProviderId, model: string): boolean {
-  // custom is only used internally so we don't have to risk the perf or reliablity impact of rewriting the response
-  return (
-    provider !== 'martian' && // this is a stealth provider, but the models aren't stealth, so we can keep the model name in place
-    (provider === 'experiment' || isKiloStealthModel(model))
-  );
 }
 
 export function isDeadFreeModel(model: string): boolean {

@@ -1,8 +1,11 @@
 // PR review Discussion tab body.
 //
-// State matrix (per S7b §6 Discussion):
-//   - happy:        threads render, grouped by file path; first
-//                   page auto-loads, "Load more" paginates.
+// State matrix (per S7b §6 Discussion + Batch F item 2):
+//   - happy:        one merged ascending list of review threads and
+//                   conversation comments; first page auto-loads,
+//                   "Load more" paginates threads. Full re-sort of
+//                   the entire loaded set on every update (R4: a
+//                   later page can insert rows mid-list).
 //   - loading:      first page in flight; render `Skeleton`
 //                   placeholders matching the row dimensions.
 //   - retryable:    first page failed with a transient error;
@@ -19,17 +22,15 @@
 //                   connect gate (the connect flow is owned by the
 //                   screen-level `PrReviewConnectGate`, which is
 //                   already mounted by the parent screen).
-//   - empty:        first page returned zero threads AND no
-//                   terminal error; render `EmptyState` with the
-//                   "No review comments yet" copy and a "Review
-//                   files" CTA that switches to the Files tab via
-//                   the `onRequestFiles` prop (the screen must
-//                   pass it; we degrade gracefully if it's
-//                   omitted).
+//   - empty:        first page returned zero threads AND zero
+//                   conversation comments AND no terminal error;
+//                   render `EmptyState` with copy covering both
+//                   kinds and a "Review files" CTA that switches
+//                   to the Files tab via `onRequestFiles`.
 //
 //   - later-page error: a per-page refetch failure during a
 //                       "Load more" tap. The current loaded
-//                       threads are kept and a small retry row
+//                       items are kept and a small retry row
 //                       renders at the bottom of the list.
 //
 // The component does NOT own a ScrollView — the tab is mounted
@@ -41,6 +42,7 @@ import { FlashList } from '@shopify/flash-list';
 import { MessageSquarePlus } from 'lucide-react-native';
 import { View } from 'react-native';
 
+import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { EmptyState } from '@/components/empty-state';
@@ -49,25 +51,28 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
-  groupThreadsByPath,
-  type ReviewThread,
+  type DiscussionListItem,
+  isDiscussionEmpty,
+  mergeDiscussionListItems,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
-import { cn } from '@/lib/utils';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;
   /**
-   * Invoked by the empty state ("No review comments yet") to switch
-   * to the Files tab. Optional; if absent, the CTA is hidden.
+   * Invoked by the empty state to switch to the Files tab.
+   * Optional; if absent, the CTA is hidden.
    */
   readonly onRequestFiles?: () => void;
 };
 
 const SKELETON_ROW_COUNT = 4;
 const DISCUSSION_LIST_CONTENT_STYLE = { paddingTop: 12 };
+const noopReactionToggle = () => {
+  // Conversation comments are read-only (A2.3): no reaction mutations.
+};
 
 export function PrReviewDiscussionTab({
   owner,
@@ -75,11 +80,12 @@ export function PrReviewDiscussionTab({
   number,
   onRequestFiles,
 }: PrReviewDiscussionTabProps) {
-  const { query, threads, firstPageErrorState, laterPageError } = usePrReviewDiscussionThreads({
-    owner,
-    repo,
-    number,
-  });
+  const { query, threads, conversation, firstPageErrorState, laterPageError } =
+    usePrReviewDiscussionThreads({
+      owner,
+      repo,
+      number,
+    });
 
   // ── First-page error / terminal states ─────────────────────────────
   if (firstPageErrorState) {
@@ -139,14 +145,14 @@ export function PrReviewDiscussionTab({
     );
   }
 
-  // ── Empty ──────────────────────────────────────────────────────────
-  if (threads.length === 0) {
+  // ── Empty (neither threads nor conversation comments) ──────────────
+  if (isDiscussionEmpty(threads, conversation)) {
     return (
       <View className="flex-1 px-4 pb-6">
         <EmptyState
           icon={MessageSquarePlus}
-          title="No review comments yet"
-          description="Reviewers haven't left any inline comments on this pull request."
+          title="No discussion yet"
+          description="No review threads or conversation comments on this pull request."
           action={
             onRequestFiles ? (
               <Button variant="outline" onPress={onRequestFiles} accessibilityLabel="Review files">
@@ -160,28 +166,28 @@ export function PrReviewDiscussionTab({
   }
 
   // ── Happy / paginated list ─────────────────────────────────────────
-  const groups = groupThreadsByPath(threads);
-  // Flatten the grouped list into a single list with separator
-  // rows between groups. Separator rows have `type: 'separator'`
-  // and the threads have `type: 'thread'`.
-  const listItems: ListItem[] = [];
-  for (const group of groups) {
-    if (groups.length > 1) {
-      listItems.push({ type: 'separator', path: group.path });
-    }
-    for (const thread of group.threads) {
-      listItems.push({ type: 'thread', thread });
-    }
-  }
+  // Full re-sort of every loaded thread + first-page conversation
+  // comments (R4: "Load more" may insert rows mid-list; accepted).
+  const listItems = mergeDiscussionListItems(threads, conversation);
 
   return (
     <FlashList
       data={listItems}
       keyExtractor={keyForItem}
-      getItemType={item => item.type}
+      getItemType={item => item.kind}
       renderItem={({ item }) => {
-        if (item.type === 'separator') {
-          return <GroupSeparator path={item.path} />;
+        if (item.kind === 'comment') {
+          return (
+            <View className="px-4 pb-3">
+              <View className="gap-2.5 rounded-xl border border-border bg-card p-3.5">
+                <CommentRow
+                  comment={item.comment}
+                  reactionsDisabled
+                  onToggleReaction={noopReactionToggle}
+                />
+              </View>
+            </View>
+          );
         }
         return (
           <View className="px-4 pb-3">
@@ -209,31 +215,10 @@ export function PrReviewDiscussionTab({
   );
 }
 
-// ── List item shape ──────────────────────────────────────────────────
-
-type ListItem =
-  | { readonly type: 'separator'; readonly path: string }
-  | {
-      readonly type: 'thread';
-      readonly thread: ReviewThread;
-    };
-
-function keyForItem(item: ListItem): string {
-  return item.type === 'separator' ? `sep:${item.path}` : `thread:${item.thread.threadId}`;
-}
-
-function GroupSeparator({ path }: Readonly<{ path: string }>) {
-  return (
-    <View className="flex-row items-center gap-2 px-4 pb-2 pt-3">
-      <Text
-        className={cn('font-mono-medium text-[11px] uppercase tracking-wide text-muted-foreground')}
-        numberOfLines={1}
-      >
-        {path}
-      </Text>
-      <View className="h-px flex-1 bg-border" />
-    </View>
-  );
+function keyForItem(item: DiscussionListItem): string {
+  return item.kind === 'thread'
+    ? `thread:${item.thread.threadId}`
+    : `comment:${item.comment.nodeId}`;
 }
 
 // ── Footer (Load more / error row) ───────────────────────────────────

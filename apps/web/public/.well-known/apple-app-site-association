@@ -1,0 +1,24 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["X96D76J65Z.com.kilocode.kiloapp"],
+        "components": [
+          { "/": "/profile" },
+          { "/": "/claw" },
+          { "/": "/cloud/sessions" },
+          { "/": "/security-agent" },
+          { "/": "/security-agent/findings" },
+          { "/": "/code-reviews" },
+          { "/": "/code-reviews/review-md", "exclude": true },
+          { "/": "/code-reviews/*" },
+          { "/": "/organizations/*/security-agent" },
+          { "/": "/organizations/*/security-agent/findings" },
+          { "/": "/organizations/*/code-reviews" },
+          { "/": "/organizations/*/code-reviews/review-md", "exclude": true },
+          { "/": "/organizations/*/code-reviews/*" }
+        ]
+      }
+    ]
+  }
+}

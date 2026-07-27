@@ -149,36 +149,45 @@ describe('formatRemainingTokens', () => {
 
 describe('getHeaderSummary', () => {
   it('returns null when there is no completed assistant context usage', () => {
-    expect(getHeaderSummary(undefined, 0.08)).toBeNull();
+    expect(getHeaderSummary(undefined, 80_000)).toBeNull();
     expect(getHeaderSummary(undefined, 0)).toBeNull();
+    expect(getHeaderSummary(undefined, null)).toBeNull();
   });
 
   it('shows percentage as primary and cost as secondary when capacity is known', () => {
-    const summary = getHeaderSummary(info({ percentage: 42 }), 0.08);
+    const summary = getHeaderSummary(info({ percentage: 42 }), 80_000);
     expect(summary).toEqual({
       primary: '42%',
-      secondary: '$0.0800',
+      secondary: '$0.08',
       hasCost: true,
       tone: 'primary',
     });
   });
 
-  it('omits the secondary cost when cost is zero', () => {
-    const summary = getHeaderSummary(info({ percentage: 10 }), 0);
-    expect(summary).toEqual({ primary: '10%', hasCost: false, tone: 'primary' });
+  it('omits the secondary cost when cost is zero or null', () => {
+    expect(getHeaderSummary(info({ percentage: 10 }), 0)).toEqual({
+      primary: '10%',
+      hasCost: false,
+      tone: 'primary',
+    });
+    expect(getHeaderSummary(info({ percentage: 10 }), null)).toEqual({
+      primary: '10%',
+      hasCost: false,
+      tone: 'primary',
+    });
   });
 
   it('uses percentage as primary and a warning tone at 75-89%', () => {
-    const summary = getHeaderSummary(info({ percentage: 80 }), 0.5);
+    const summary = getHeaderSummary(info({ percentage: 80 }), 500_000);
     expect(summary?.primary).toBe('80%');
     expect(summary?.tone).toBe('warning');
-    expect(summary?.secondary).toBe('$0.5000');
+    expect(summary?.secondary).toBe('$0.50');
   });
 
   it('keeps the real overflow percentage visible (does not clamp above 100) and uses a destructive tone', () => {
     const summary = getHeaderSummary(
       info({ contextTokens: 250_000, contextWindow: 200_000, percentage: 125 }),
-      1
+      1_000_000
     );
     expect(summary?.primary).toBe('125%');
     expect(summary?.tone).toBe('destructive');
@@ -187,11 +196,11 @@ describe('getHeaderSummary', () => {
   it('falls back to compact tokens and a neutral tone when capacity is unknown', () => {
     const summary = getHeaderSummary(
       info({ contextWindow: undefined, percentage: undefined, contextTokens: 32_418 }),
-      0.12
+      120_000
     );
     expect(summary).toEqual({
       primary: '32.4K',
-      secondary: '$0.1200',
+      secondary: '$0.12',
       hasCost: true,
       tone: 'neutral',
     });
@@ -210,7 +219,7 @@ describe('getContextSheetContent', () => {
   it('describes exact usage and remaining tokens when capacity is known', () => {
     const content = getContextSheetContent(
       info({ contextTokens: 84_000, contextWindow: 200_000, percentage: 42 }),
-      0.08
+      80_000
     );
     expect(content.usedTokens).toBe('84,000');
     expect(content.windowTokens).toBe('200,000');
@@ -218,7 +227,7 @@ describe('getContextSheetContent', () => {
     expect(content.percentage).toBe('42%');
     expect(content.remainingTokens).toBe('116,000');
     expect(content.remainingPercentage).toBe('58%');
-    expect(content.cost).toBe('$0.0800');
+    expect(content.cost).toBe('$0.08');
     expect(content.tone).toBe('primary');
   });
 
@@ -249,22 +258,23 @@ describe('getContextSheetContent', () => {
     expect(content.tone).toBe('neutral');
   });
 
-  it('omits the cost line when total cost is zero', () => {
+  it('returns null cost when total cost is zero (sheet omits the Total cost row)', () => {
     const content = getContextSheetContent(info({ percentage: 20 }), 0);
     expect(content.cost).toBeNull();
   });
 });
 
 describe('getMetricsAccessibilityLabel', () => {
-  it('includes exact usage, real percentage, and tap intent when capacity is known with cost', () => {
+  it('includes exact usage, real percentage, humanized cost, and tap intent when capacity is known with cost', () => {
     const label = getMetricsAccessibilityLabel(
       info({ contextTokens: 84_000, contextWindow: 200_000, percentage: 42 }),
-      0.08
+      80_000
     );
     expect(label).toContain('84,000');
     expect(label).toContain('200,000');
     expect(label).toContain('42%');
-    expect(label).toContain('$0.0800');
+    expect(label).toContain('8 cents');
+    expect(label).not.toContain('$');
     expect(label.toLowerCase()).toContain('context details');
   });
 
@@ -274,6 +284,7 @@ describe('getMetricsAccessibilityLabel', () => {
       0
     );
     expect(label).not.toContain('$');
+    expect(label).not.toContain('cost');
   });
 
   it('switches to the unavailable-capacity copy and omits percentage/cost when not available', () => {
@@ -287,12 +298,13 @@ describe('getMetricsAccessibilityLabel', () => {
     expect(label).not.toContain('$');
   });
 
-  it('includes the positive cost in the unknown-capacity case', () => {
+  it('includes the humanized positive cost in the unknown-capacity case', () => {
     const label = getMetricsAccessibilityLabel(
       info({ contextWindow: undefined, percentage: undefined, contextTokens: 32_418 }),
-      0.12
+      120_000
     );
-    expect(label).toContain('$0.1200');
+    expect(label).toContain('12 cents');
+    expect(label).not.toContain('$');
   });
 
   it('preserves the real overflow percentage in the known-capacity case (125%)', () => {
@@ -306,11 +318,11 @@ describe('getMetricsAccessibilityLabel', () => {
 });
 
 describe('pure integration fallback', () => {
-  it('shows the cost-only header when there is no completed assistant context usage', () => {
+  it('returns null summary when there is no completed assistant context usage', () => {
     // Mirrors the SessionDetailContent integration: when resolveSessionContextInfo
-    // returns undefined the header should keep the legacy positive cost text
-    // (no context control, no sheet) rather than an empty header.
-    const summary = getHeaderSummary(undefined, 0.08);
+    // returns undefined the header falls through to SessionContextCostFallback
+    // rather than a context control.
+    const summary = getHeaderSummary(undefined, 80_000);
     expect(summary).toBeNull();
   });
 });

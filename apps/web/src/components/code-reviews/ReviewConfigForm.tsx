@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -44,6 +45,8 @@ import {
 } from '@/lib/code-reviews/core/council-selection';
 import {
   COUNCIL_AGGREGATION_STRATEGIES,
+  COUNCIL_MAX_REQUIRED_LABELS,
+  COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
   DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
   type CouncilAggregationStrategy,
 } from '@kilocode/db/schema-types';
@@ -272,6 +275,8 @@ export function ReviewConfigForm({
   const [councilEnabledRepositoryIds, setCouncilEnabledRepositoryIds] = useState<Set<number>>(
     new Set()
   );
+  // Optional council label gate, edited as a comma-separated string; parsed to a list on save.
+  const [councilRequiredLabelsInput, setCouncilRequiredLabelsInput] = useState<string>('');
   const [useReviewMd, setUseReviewMd] = useState(true);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
@@ -411,6 +416,7 @@ export function ReviewConfigForm({
       setCouncilSelections(
         loadedCouncil ? councilSelectionsFromConfig(loadedCouncil) : defaultCouncilSelections()
       );
+      setCouncilRequiredLabelsInput((loadedCouncil?.required_labels ?? []).join(', '));
       setCouncilEnabledRepositoryIds(
         new Set(
           (configData.councilEnabledRepositoryIds ?? []).filter(
@@ -613,11 +619,44 @@ export function ReviewConfigForm({
       });
       return;
     }
+    // Parse the comma-separated label gate into a deduped, trimmed list (case-insensitive dedupe).
+    // Empty ⇒ omit the field entirely (no label requirement), keeping the persisted config clean.
+    const requiredLabels = (() => {
+      const seen = new Set<string>();
+      const labels: string[] = [];
+      for (const raw of councilRequiredLabelsInput.split(',')) {
+        const label = raw.trim();
+        const key = label.toLowerCase();
+        if (label && !seen.has(key)) {
+          seen.add(key);
+          labels.push(label);
+        }
+      }
+      return labels;
+    })();
+    // Enforce the same caps the server schema applies, so exceeding them shows a targeted message
+    // instead of failing the whole save with a raw Zod error. Only relevant when council persists.
+    if (councilActiveForSave && requiredLabels.length > COUNCIL_MAX_REQUIRED_LABELS) {
+      toast.error('Too many council labels', {
+        description: `Use at most ${COUNCIL_MAX_REQUIRED_LABELS} labels.`,
+      });
+      return;
+    }
+    if (
+      councilActiveForSave &&
+      requiredLabels.some(label => label.length > COUNCIL_REQUIRED_LABEL_MAX_LENGTH)
+    ) {
+      toast.error('Council label too long', {
+        description: `Each label must be ${COUNCIL_REQUIRED_LABEL_MAX_LENGTH} characters or fewer.`,
+      });
+      return;
+    }
     const councilPayload = councilActiveForSave
       ? {
           enabled: true,
           aggregation_strategy: councilAggregation,
           specialists: buildCouncilSpecialists(councilSelections),
+          ...(requiredLabels.length > 0 ? { required_labels: requiredLabels } : {}),
         }
       : null;
     // Gate on `councilActiveForSave` (not just `perRepoOverridesEnabled`) so `council` and its
@@ -1106,6 +1145,31 @@ export function ReviewConfigForm({
                                 >
                                   Select {COUNCIL_MIN_SPECIALISTS}–4 specialists.{' '}
                                   {councilEnabledCount} selected.
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="council-required-labels">
+                                  Labels that trigger a council review (optional)
+                                </Label>
+                                <Input
+                                  id="council-required-labels"
+                                  value={councilRequiredLabelsInput}
+                                  onChange={event =>
+                                    setCouncilRequiredLabelsInput(event.target.value)
+                                  }
+                                  placeholder="e.g. council, deep review"
+                                  disabled={orgSaveMutation.isPending}
+                                  aria-describedby="council-required-labels-help"
+                                />
+                                <p
+                                  id="council-required-labels-help"
+                                  className="text-muted-foreground text-sm"
+                                >
+                                  Separate labels with commas. When set, a repository with council
+                                  enabled runs council only for pull requests carrying at least one
+                                  of these labels (matched regardless of case). Other pull requests
+                                  get a standard review. Leave blank to run council on every
+                                  eligible pull request.
                                 </p>
                               </div>
                             </div>

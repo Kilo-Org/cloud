@@ -384,6 +384,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       status: session.status,
       status_updated_at: session.status_updated_at?.toISOString() ?? null,
       associatedPr: session.associatedPr ?? null,
+      total_cost_microdollars: session.total_cost_microdollars ?? null,
     };
   }
 

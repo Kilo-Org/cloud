@@ -898,6 +898,8 @@ export const userRouter = createTRPCRouter({
         agent_attention_enabled: user_notification_preferences.agent_attention_enabled,
         session_status_enabled: user_notification_preferences.session_status_enabled,
         kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
+        balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+        security_findings_enabled: user_notification_preferences.security_findings_enabled,
       })
       .from(user_notification_preferences)
       .where(eq(user_notification_preferences.user_id, ctx.user.id))
@@ -911,6 +913,8 @@ export const userRouter = createTRPCRouter({
       agentUpdates: agentPushEnabled,
       sessionStatus: row?.session_status_enabled ?? true,
       kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
+      balanceAlerts: row?.balance_alerts_enabled ?? true,
+      securityFindings: row?.security_findings_enabled ?? true,
       agentPushEnabled,
     };
   }),
@@ -923,6 +927,8 @@ export const userRouter = createTRPCRouter({
         agentUpdates: z.boolean().optional(),
         sessionStatus: z.boolean().optional(),
         kiloclawActivity: z.boolean().optional(),
+        balanceAlerts: z.boolean().optional(),
+        securityFindings: z.boolean().optional(),
         // Legacy shipped-client input: still accepted and writes the same column as `agentUpdates`.
         agentPushEnabled: z.boolean().optional(),
       })
@@ -954,6 +960,14 @@ export const userRouter = createTRPCRouter({
         set.kiloclaw_activity_enabled = input.kiloclawActivity;
         values.kiloclaw_activity_enabled = input.kiloclawActivity;
       }
+      if (input.balanceAlerts !== undefined) {
+        set.balance_alerts_enabled = input.balanceAlerts;
+        values.balance_alerts_enabled = input.balanceAlerts;
+      }
+      if (input.securityFindings !== undefined) {
+        set.security_findings_enabled = input.securityFindings;
+        values.security_findings_enabled = input.securityFindings;
+      }
       if (agentPush !== undefined) {
         set.agent_push_enabled = agentPush;
         values.agent_push_enabled = agentPush;
@@ -978,6 +992,8 @@ export const userRouter = createTRPCRouter({
           agent_attention_enabled: user_notification_preferences.agent_attention_enabled,
           session_status_enabled: user_notification_preferences.session_status_enabled,
           kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
+          balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+          security_findings_enabled: user_notification_preferences.security_findings_enabled,
         })
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, ctx.user.id))
@@ -989,6 +1005,8 @@ export const userRouter = createTRPCRouter({
         agentUpdates: effectiveAgentPush,
         sessionStatus: row?.session_status_enabled ?? true,
         kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
+        balanceAlerts: row?.balance_alerts_enabled ?? true,
+        securityFindings: row?.security_findings_enabled ?? true,
         agentPushEnabled: effectiveAgentPush,
       };
     }),

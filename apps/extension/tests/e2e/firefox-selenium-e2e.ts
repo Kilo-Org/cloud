@@ -23,12 +23,13 @@ const waitMs = 15_000;
 
 const chromeWorkflowNames = [
   'conversation automatically continues through another eval request',
-  'new conversation inherits the selected target tab',
+  'new conversation does not inherit the selected target tab',
   'conversation tabs can run in parallel',
   'conversation tabs persist across side panel reloads',
   'closing a conversation removes only that tab',
   'conversation tab bar scrolls horizontally',
   'assistant messages render markdown',
+  'long assistant code blocks are collapsible',
   'only the message pane scrolls virtualized overflowing conversation content',
   'manual scroll up shows jump to latest without following new messages',
   'scrolling back to bottom reactivates automatic scroll to new messages',
@@ -36,6 +37,7 @@ const chromeWorkflowNames = [
   'native side panel is outside the page DOM',
   'dangerous mode conversation can eval against a normal tab',
   'safe mode conversation reads the selected tab with safe tools',
+  'safe mode conversation completes a tool call streamed with empty arguments',
   'dangerous mode conversation can use safe read tools',
   'running conversation can be stopped',
   'target tab list updates automatically',
@@ -47,6 +49,25 @@ const chromeWorkflowNames = [
   'switching credit accounts clears the model while the next catalog loads',
   'stale organization model loads cannot overwrite the current catalog',
   'new conversation keeps the running request in its original tab',
+  'analytics opt-out toggle persists across side panel reloads',
+  'memories can be saved from a pending draft and listed in settings',
+  'memories save card cancel discards the draft',
+  'memory index is included in the chat request context',
+  'memory tools search and read saved memories',
+  'settings memories list supports delete and shows the empty state',
+] as const;
+
+const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
+const AGENT_MEMORIES_KEY = 'kiloAgentMemories';
+const EMPTY_MEMORIES_MESSAGE =
+  'No memories yet. Highlight text on any page, right-click, and choose Add to memory.';
+const CONFIRMATION_MESSAGE = 'Saved to memory';
+const safeToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
 ] as const;
 
 interface ServerHandle {
@@ -69,6 +90,7 @@ interface KiloApiOptions {
   readonly observeFirstChatAbort?: () => void;
   readonly organizations?: Organization[];
   readonly secondCompletionEvents?: unknown[];
+  readonly seenChatBodies?: unknown[];
   readonly seenChatOrganizationIds?: string[];
   readonly thirdCompletionEvents?: unknown[];
   readonly toolNames?: string[];
@@ -135,7 +157,14 @@ const chatCompletionStreamResponse = (events: unknown[]): string =>
   `${events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
 
 const defaultEvalCode = 'return document.documentElement.outerHTML.length;';
-const dangerousToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page', 'eval'];
+const dangerousToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
+  'eval',
+];
 
 const defaultFirstCompletionEvents = (): unknown[] => [
   { choices: [{ delta: { content: 'I will inspect Firefox.' } }] },
@@ -160,7 +189,9 @@ const defaultFirstCompletionEvents = (): unknown[] => [
   },
 ];
 
-const readRequestBody = async (request: IncomingMessage): Promise<unknown> => {
+const readRequestBody = async (
+  request: IncomingMessage
+): Promise<{ parsed: unknown; raw: unknown }> => {
   const chunks: string[] = [];
 
   for await (const chunk of request) {
@@ -169,7 +200,13 @@ const readRequestBody = async (request: IncomingMessage): Promise<unknown> => {
 
   const body = chunks.join('');
 
-  return body === '' ? undefined : chatRequestSchema.parse(JSON.parse(body));
+  if (body === '') {
+    return { parsed: undefined, raw: undefined };
+  }
+
+  const raw: unknown = JSON.parse(body);
+
+  return { parsed: chatRequestSchema.parse(raw), raw };
 };
 
 const getToolResultHtmlLength = (body: unknown): string => {
@@ -344,7 +381,8 @@ const startKiloApiServer = async (): Promise<KiloApiHandle> => {
             });
           }
 
-          const body = await readRequestBody(request);
+          const { parsed: body, raw: rawBody } = await readRequestBody(request);
+          options.seenChatBodies?.push(rawBody);
           assert.deepEqual(getRequestToolNames(body), options.toolNames ?? dangerousToolNames);
 
           if (chatCall === 1 && options.beforeFirstCompletion !== undefined) {
@@ -517,6 +555,118 @@ const seedFirefoxAuth = async (driver: WebDriver): Promise<void> => {
   });
 
   assert.equal(result, 'ok');
+};
+
+const readFirefoxSyncStorage = async (driver: WebDriver, key: string): Promise<unknown> => {
+  const result = await driver.executeAsyncScript(
+    (storageKey: string, done: (value: unknown) => void) => {
+      const browserApi = (
+        globalThis as typeof globalThis & {
+          browser?: {
+            storage?: {
+              sync?: {
+                get: (keys: string[]) => Promise<Record<string, unknown>>;
+              };
+            };
+          };
+        }
+      ).browser;
+
+      browserApi?.storage?.sync
+        ?.get([storageKey])
+        .then(items => {
+          done({ ok: true, value: items[storageKey] });
+          return null;
+        })
+        .catch((error: unknown) => {
+          done({
+            error: error instanceof Error ? error.message : String(error),
+            ok: false,
+          });
+        });
+    },
+    key
+  );
+
+  assert.equal(
+    isRecord(result) && result['ok'],
+    true,
+    `readFirefoxSyncStorage failed: ${String(result)}`
+  );
+  return isRecord(result) ? result['value'] : undefined;
+};
+
+const seedFirefoxStorage = async (
+  driver: WebDriver,
+  key: string,
+  value: unknown
+): Promise<void> => {
+  const result = await driver.executeAsyncScript(
+    (storageKey: string, storageValue: unknown, done: (value: unknown) => void) => {
+      const browserApi = (
+        globalThis as typeof globalThis & {
+          browser?: {
+            storage?: {
+              local?: {
+                set: (items: Record<string, unknown>) => Promise<void>;
+              };
+            };
+          };
+        }
+      ).browser;
+
+      browserApi?.storage?.local
+        ?.set({ [storageKey]: storageValue })
+        .then(() => {
+          done('ok');
+          return null;
+        })
+        .catch((error: unknown) => {
+          done(error instanceof Error ? error.message : String(error));
+        });
+    },
+    key,
+    value
+  );
+
+  assert.equal(result, 'ok');
+};
+
+const readFirefoxStorage = async (
+  driver: WebDriver,
+  keys: readonly string[]
+): Promise<Record<string, unknown>> => {
+  const result = await driver.executeAsyncScript(
+    (storageKeys: string[], done: (value: unknown) => void) => {
+      const browserApi = (
+        globalThis as typeof globalThis & {
+          browser?: {
+            storage?: {
+              local?: {
+                get: (keys: string[]) => Promise<Record<string, unknown>>;
+              };
+            };
+          };
+        }
+      ).browser;
+
+      browserApi?.storage?.local
+        ?.get(storageKeys)
+        .then(items => {
+          done(items);
+          return null;
+        })
+        .catch((error: unknown) => {
+          done({ __error: error instanceof Error ? error.message : String(error) });
+        });
+    },
+    [...keys]
+  );
+
+  assert.ok(isRecord(result));
+  assert.equal(result['__error'], undefined);
+
+  return result;
 };
 
 const seedFirefoxConversation = async (driver: WebDriver, events: unknown[]): Promise<void> => {
@@ -798,17 +948,29 @@ const clickButtonByText = async (driver: WebDriver, text: string): Promise<void>
     .click();
 };
 
+const buttonLabelLocator = (label: string): ReturnType<typeof By.css> => {
+  // Delete-memory labels embed `"` around the preview, which breaks CSS attribute
+  // Selectors; XPath can wrap the whole value in single quotes instead.
+  if (label.includes('"') && !label.includes("'")) {
+    return By.xpath(`//button[@aria-label='${label}']`);
+  }
+
+  return By.css(`button[aria-label="${label}"]`);
+};
+
 const clickButtonByLabel = async (driver: WebDriver, label: string): Promise<void> => {
+  const locator = buttonLabelLocator(label);
+
   await waitUntil(
     driver,
     async () => {
-      const elements = await driver.findElements(By.css(`button[aria-label="${label}"]`));
+      const elements = await driver.findElements(locator);
 
       return elements.length > 0;
     },
     `Timed out waiting for button label: ${label}`
   );
-  await driver.findElement(By.css(`button[aria-label="${label}"]`)).click();
+  await driver.findElement(locator).click();
 };
 
 const waitForButtonByLabel = async (driver: WebDriver, label: string): Promise<void> => {
@@ -846,6 +1008,163 @@ const sendMessage = async (driver: WebDriver, text: string): Promise<void> => {
   await input.clear();
   await input.sendKeys(text, Key.ENTER);
 };
+
+const expandToolExchange = (driver: WebDriver, toolName: string): Promise<string> =>
+  expandNthToolExchange(driver, toolName, 0);
+
+const expandNthToolExchange = async (
+  driver: WebDriver,
+  toolName: string,
+  index: number
+): Promise<string> => {
+  const summaryText = `${toolName} completed`;
+  await waitForText(driver, summaryText);
+
+  const summaries = await driver.findElements(
+    By.xpath(`//summary[contains(normalize-space(.), ${JSON.stringify(summaryText)})]`)
+  );
+  assert.ok(
+    summaries.length > index,
+    `Expected at least ${String(index + 1)} "${summaryText}" rows, found ${String(summaries.length)}`
+  );
+
+  const summary = summaries[index];
+  assert.ok(summary !== undefined);
+  await summary.click();
+
+  const details = await summary.findElement(By.xpath('ancestor::details[1]'));
+  await waitUntil(
+    driver,
+    async () => {
+      const open = await details.getAttribute('open');
+      return open !== null;
+    },
+    `Timed out waiting for ${toolName} details #${String(index)} to open`
+  );
+
+  return details.getText();
+};
+
+const openFirefoxSettings = async (driver: WebDriver): Promise<void> => {
+  await clickButtonByLabel(driver, 'Settings');
+  await waitUntil(
+    driver,
+    async () => {
+      const regions = await driver.findElements(By.css('section[aria-label="Memories"]'));
+      return regions.length > 0;
+    },
+    'Timed out waiting for Memories settings region'
+  );
+};
+
+const closeFirefoxSettings = async (driver: WebDriver): Promise<void> => {
+  await clickButtonByLabel(driver, 'Close settings');
+};
+
+const userMessageSchema = z.object({
+  content: z.string(),
+  role: z.literal('user'),
+});
+
+const chatBodySchema = z.object({
+  messages: z.array(z.unknown()).optional(),
+});
+
+const storedMemorySchema = z
+  .object({
+    createdAt: z.number(),
+    id: z.string(),
+    note: z.string().optional(),
+    pageTitle: z.string(),
+    pageUrl: z.string(),
+    text: z.string(),
+    truncated: z.boolean().optional(),
+  })
+  .strip();
+
+const lastUserMessageContent = (body: unknown): string => {
+  const parsedBody = chatBodySchema.safeParse(body);
+  if (!parsedBody.success || parsedBody.data.messages === undefined) {
+    return '';
+  }
+
+  const { messages } = parsedBody.data;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const parsedMessage = userMessageSchema.safeParse(messages[index]);
+    if (parsedMessage.success) {
+      return parsedMessage.data.content;
+    }
+  }
+
+  return '';
+};
+
+const findStoredMemoryByText = (
+  value: unknown,
+  text: string
+): z.infer<typeof storedMemorySchema> | undefined => {
+  const memories = z.array(z.unknown()).safeParse(value);
+  if (!memories.success) {
+    return undefined;
+  }
+
+  return memories.data
+    .map(entry => storedMemorySchema.safeParse(entry))
+    .find(entry => entry.success && entry.data.text === text)?.data;
+};
+
+const makeFirefoxMemory = ({
+  id,
+  text,
+  createdAt,
+  pageTitle = 'Source page',
+  pageUrl = 'https://example.com/page',
+  note,
+}: {
+  id: string;
+  text: string;
+  createdAt: number;
+  pageTitle?: string;
+  pageUrl?: string;
+  note?: string;
+}): Record<string, unknown> => ({
+  createdAt,
+  id,
+  pageTitle,
+  pageUrl,
+  text,
+  ...(note === undefined ? {} : { note }),
+});
+
+/** List/delete labels use the first 40 chars of note-or-text. */
+const memoryListPreview = (text: string): string =>
+  text.trim().replaceAll(/\s+/g, ' ').slice(0, 40);
+
+const contentOnlyCompletion = (text: string): unknown[] => [
+  { choices: [{ delta: { content: text } }] },
+];
+
+const toolCallCompletion = (name: string, args: Record<string, unknown>, id: string): unknown[] => [
+  {
+    choices: [
+      {
+        delta: {
+          tool_calls: [
+            {
+              function: {
+                arguments: JSON.stringify(args),
+                name,
+              },
+              id,
+              index: 0,
+              type: 'function',
+            },
+          ],
+        },
+      },
+    ],
+  },
+];
 
 const getButtonByText = (driver: WebDriver, text: string): Promise<WebElement> =>
   driver.findElement(By.xpath(`//button[normalize-space(.)=${JSON.stringify(text)}]`));
@@ -943,18 +1262,46 @@ const scenarios: FirefoxScenario[] = [
       ),
   },
   {
-    name: 'new conversation inherits the selected target tab',
+    // R3 non-inheritance without activation (A9 probe FAIL / harness-limited).
+    name: 'new conversation does not inherit the selected target tab',
     run: context =>
       withSession(context.api, {}, async session => {
         await session.openTargetPage('First target tab');
         await session.openTargetPage('Second target tab');
         await openAuthenticatedPanel(session);
         await waitForModel(session.driver);
-        await setSelectByText(session.driver, 'Target tab', 'Second target tab');
-        await waitForTargetTab(session.driver, 'Second target tab');
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const optionsText = await getSelectOptionsText(session.driver, 'Target tab');
+
+            return (
+              optionsText.includes('First target tab') && optionsText.includes('Second target tab')
+            );
+          },
+          'Timed out waiting for both target tab options'
+        );
+
+        const optionsText = await getSelectOptionsText(session.driver, 'Target tab');
+        const optionLabels = optionsText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0 && line !== 'No tab selected');
+        const [firstListed] = optionLabels;
+        const nonFirstListed = optionLabels.find(label => label !== firstListed);
+
+        assert.ok(firstListed !== undefined, 'expected a first-listed target tab option');
+        assert.ok(nonFirstListed !== undefined, 'expected a non-first-listed target tab option');
+
+        // Conv1 picks non-first-listed so inheritance would differ from first-listed.
+        await setSelectByText(session.driver, 'Target tab', nonFirstListed);
+        await waitForTargetTab(session.driver, nonFirstListed);
 
         await clickButtonByLabel(session.driver, 'New conversation');
-        await waitForTargetTab(session.driver, 'Second target tab');
+        // New conversation must not inherit conv1's pick; defaults to first-listed.
+        await waitForTargetTab(session.driver, firstListed);
+        assert.notEqual(firstListed, nonFirstListed);
       }),
   },
   {
@@ -969,7 +1316,13 @@ const scenarios: FirefoxScenario[] = [
           beforeFirstCompletion: () => pendingFirstCompletion,
           firstCompletionEvents: [{ choices: [{ delta: { content: 'First tab finished.' } }] }],
           secondCompletionEvents: [{ choices: [{ delta: { content: 'Second tab finished.' } }] }],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           try {
@@ -1008,7 +1361,13 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'Second persisted reply.' } }] },
           ],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           await session.openTargetPage();
@@ -1038,7 +1397,13 @@ const scenarios: FirefoxScenario[] = [
         {
           firstCompletionEvents: [{ choices: [{ delta: { content: 'Keep this reply.' } }] }],
           secondCompletionEvents: [{ choices: [{ delta: { content: 'Close this reply.' } }] }],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           await session.openTargetPage();
@@ -1137,7 +1502,116 @@ const scenarios: FirefoxScenario[] = [
       ),
   },
   {
+    name: 'long assistant code blocks are collapsible',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [
+            {
+              choices: [
+                {
+                  delta: {
+                    content: [
+                      '```ts',
+                      ...Array.from({ length: 20 }, (_value, index) => `line ${index + 1}`),
+                      '```',
+                      '',
+                      '```ts',
+                      ...Array.from({ length: 18 }, (_value, index) => `other ${index + 1}`),
+                      '```',
+                      '',
+                      '```ts',
+                      ...Array.from({ length: 3 }, (_value, index) => `short ${index + 1}`),
+                      '```',
+                    ].join('\n'),
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        async session => {
+          await submitDangerousPrompt(session, 'Show collapsible code');
+          await waitForText(session.driver, 'Show more (20 lines)');
+          await waitForText(session.driver, 'Show more (18 lines)');
+          await waitForText(session.driver, 'short 3');
+
+          const showMore20 = await session.driver.findElement(
+            By.xpath('//button[contains(normalize-space(.), "Show more (20 lines)")]')
+          );
+          const showMore18 = await session.driver.findElement(
+            By.xpath('//button[contains(normalize-space(.), "Show more (18 lines)")]')
+          );
+
+          assert.equal(await showMore20.getAttribute('aria-expanded'), 'false');
+          assert.equal(await showMore18.getAttribute('aria-expanded'), 'false');
+
+          const toggleCount = await session.driver.executeScript(
+            () =>
+              [...document.querySelectorAll('button')].filter(button => {
+                const label = button.textContent?.replaceAll(/\s+/gu, ' ').trim() ?? '';
+
+                return label.startsWith('Show more') || label === 'Show less';
+              }).length
+          );
+
+          assert.equal(toggleCount, 2);
+
+          const bodyTextCollapsed = await getBodyText(session.driver);
+
+          assert.match(bodyTextCollapsed, /line 1/u);
+          assert.match(bodyTextCollapsed, /line 8/u);
+          assert.doesNotMatch(bodyTextCollapsed, /line 9/u);
+          assert.match(bodyTextCollapsed, /other 1/u);
+          assert.match(bodyTextCollapsed, /other 8/u);
+          assert.doesNotMatch(bodyTextCollapsed, /other 9/u);
+          assert.match(bodyTextCollapsed, /short 1/u);
+          assert.match(bodyTextCollapsed, /short 2/u);
+          assert.match(bodyTextCollapsed, /short 3/u);
+          assert.doesNotMatch(bodyTextCollapsed, /Show more \(3 lines\)/u);
+
+          await showMore20.click();
+          await waitForText(session.driver, 'Show less');
+          await waitForText(session.driver, 'line 20');
+
+          const showLess = await session.driver.findElement(
+            By.xpath('//button[contains(normalize-space(.), "Show less")]')
+          );
+
+          assert.equal(await showLess.getAttribute('aria-expanded'), 'true');
+
+          const bodyTextExpanded = await getBodyText(session.driver);
+
+          assert.match(bodyTextExpanded, /line 20/u);
+          assert.doesNotMatch(bodyTextExpanded, /other 18/u);
+          assert.match(bodyTextExpanded, /Show more \(18 lines\)/u);
+
+          const secondExpanded = await session.driver
+            .findElement(By.xpath('//button[contains(normalize-space(.), "Show more (18 lines)")]'))
+            .getAttribute('aria-expanded');
+
+          assert.equal(secondExpanded, 'false');
+
+          await showLess.click();
+          await waitForText(session.driver, 'Show more (20 lines)');
+
+          const bodyTextRecollapsed = await getBodyText(session.driver);
+
+          assert.doesNotMatch(bodyTextRecollapsed, /line 20/u);
+          assert.doesNotMatch(bodyTextRecollapsed, /Show less/u);
+
+          const firstRecollapsed = await session.driver
+            .findElement(By.xpath('//button[contains(normalize-space(.), "Show more (20 lines)")]'))
+            .getAttribute('aria-expanded');
+
+          assert.equal(firstRecollapsed, 'false');
+        }
+      ),
+  },
+  {
     name: 'only the message pane scrolls virtualized overflowing conversation content',
+
     run: context =>
       withSession(context.api, {}, async session => {
         await openAuthenticatedPanel(session);
@@ -1203,7 +1677,13 @@ const scenarios: FirefoxScenario[] = [
           firstCompletionEvents: [
             { choices: [{ delta: { content: 'Delayed Firefox reply arrived.' } }] },
           ],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           try {
@@ -1347,7 +1827,13 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'Second Firefox reply after bottom.' } }] },
           ],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           try {
@@ -1526,7 +2012,13 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
           ],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           await session.openTargetPage();
@@ -1536,6 +2028,59 @@ const scenarios: FirefoxScenario[] = [
           await sendMessage(session.driver, 'What is on this page?');
           await waitForText(session.driver, 'get_page_snapshot completed');
           await waitForText(session.driver, 'The page is the Kilo extension fixture.');
+        }
+      ),
+  },
+  {
+    name: 'safe mode conversation completes a tool call streamed with empty arguments',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [
+            { choices: [{ delta: { content: 'I will read the page.' } }] },
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        function: {
+                          arguments: '',
+                          name: 'get_page_snapshot',
+                        },
+                        id: 'call_snapshot_1',
+                        index: 0,
+                        type: 'function',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+          secondCompletionEvents: [
+            { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
+          ],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+          await sendMessage(session.driver, 'What is on this page?');
+          await waitForText(session.driver, 'get_page_snapshot completed');
+          await waitForText(session.driver, 'The page is the Kilo extension fixture.');
+          await getButtonByText(session.driver, 'Send message');
+          const bodyText = await getBodyText(session.driver);
+          assert.ok(!bodyText.includes('Gateway tool call arguments were not valid JSON.'));
         }
       ),
   },
@@ -1866,7 +2411,13 @@ const scenarios: FirefoxScenario[] = [
         {
           beforeFirstCompletion: () => pendingCompletion,
           firstCompletionEvents: [{ choices: [{ delta: { content: 'Original tab completed.' } }] }],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           try {
@@ -1889,6 +2440,325 @@ const scenarios: FirefoxScenario[] = [
       );
     },
   },
+  {
+    name: 'analytics opt-out toggle persists across side panel reloads',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        await openAuthenticatedPanel(session);
+        await clickButtonByLabel(session.driver, 'Settings');
+
+        const switchSelector = 'button[role="switch"][aria-label="Share usage analytics"]';
+        await waitUntil(
+          session.driver,
+          async () => {
+            const elements = await session.driver.findElements(By.css(switchSelector));
+            return elements.length > 0;
+          },
+          'Timed out waiting for Share usage analytics switch'
+        );
+
+        const analyticsSwitch = await session.driver.findElement(By.css(switchSelector));
+        assert.equal(await analyticsSwitch.getAttribute('aria-checked'), 'true');
+
+        await analyticsSwitch.click();
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const element = await session.driver.findElement(By.css(switchSelector));
+            return (await element.getAttribute('aria-checked')) === 'false';
+          },
+          'Timed out waiting for analytics switch to turn off'
+        );
+
+        await waitUntil(
+          session.driver,
+          async () => (await readFirefoxSyncStorage(session.driver, 'analyticsOptOut')) === true,
+          'Timed out waiting for analyticsOptOut in browser.storage.sync'
+        );
+
+        await session.driver.navigate().refresh();
+        await waitForText(session.driver, 'Kilo');
+        await clickButtonByLabel(session.driver, 'Settings');
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const elements = await session.driver.findElements(By.css(switchSelector));
+            if (elements.length === 0) {
+              return false;
+            }
+            return (await elements[0]?.getAttribute('aria-checked')) === 'false';
+          },
+          'Timed out waiting for analytics switch to stay off after reload'
+        );
+      }),
+  },
+  {
+    name: 'memories can be saved from a pending draft and listed in settings',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        await openAuthenticatedPanel(session);
+        const draft = {
+          createdAt: 1_700_000_000_000,
+          pageTitle: 'Docs page',
+          pageUrl: 'https://docs.example.com/guide',
+          text: 'Remember to rotate the staging API key monthly.',
+        };
+        await seedFirefoxStorage(session.driver, PENDING_DRAFT_KEY, draft);
+        await waitForText(session.driver, draft.text);
+        await waitForText(session.driver, 'Save memory');
+
+        const noteInput = await session.driver.findElement(
+          By.css('textarea[aria-label="Memory note (optional)"]')
+        );
+        await noteInput.clear();
+        await noteInput.sendKeys('Ops note');
+        await clickButtonByText(session.driver, 'Save memory');
+        await waitForText(session.driver, CONFIRMATION_MESSAGE);
+        await clickButtonByText(session.driver, 'Done');
+        await waitForTextGone(session.driver, CONFIRMATION_MESSAGE);
+
+        const stored = await readFirefoxStorage(session.driver, [
+          AGENT_MEMORIES_KEY,
+          PENDING_DRAFT_KEY,
+        ]);
+        assert.equal(stored[PENDING_DRAFT_KEY], undefined);
+        const saved = findStoredMemoryByText(stored[AGENT_MEMORIES_KEY], draft.text);
+        assert.ok(saved !== undefined);
+        assert.equal(saved.note, 'Ops note');
+        assert.equal(saved.pageUrl, 'https://docs.example.com/guide');
+        assert.equal(saved.truncated, undefined);
+        assert.match(saved.pageUrl, /^[^?#]*$/u);
+
+        await openFirefoxSettings(session.driver);
+        await waitForText(session.driver, 'Ops note');
+        await closeFirefoxSettings(session.driver);
+      }),
+  },
+  {
+    name: 'memories save card cancel discards the draft',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        await openAuthenticatedPanel(session);
+        const draft = {
+          createdAt: 1_700_000_000_000,
+          pageTitle: 'Docs page',
+          pageUrl: 'https://docs.example.com/guide',
+          text: 'Draft that should be discarded on cancel.',
+        };
+        await seedFirefoxStorage(session.driver, PENDING_DRAFT_KEY, draft);
+        await waitForText(session.driver, draft.text);
+        await clickButtonByText(session.driver, 'Cancel');
+        await waitForTextGone(session.driver, draft.text);
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const stored = await readFirefoxStorage(session.driver, [
+              AGENT_MEMORIES_KEY,
+              PENDING_DRAFT_KEY,
+            ]);
+            return (
+              stored[PENDING_DRAFT_KEY] === undefined && stored[AGENT_MEMORIES_KEY] === undefined
+            );
+          },
+          'Timed out waiting for draft discard'
+        );
+      }),
+  },
+  {
+    name: 'memory index is included in the chat request context',
+    run: context => {
+      const seenChatBodies: unknown[] = [];
+
+      return withSession(
+        context.api,
+        {
+          firstCompletionEvents: contentOnlyCompletion('First reply with memory index.'),
+          secondCompletionEvents: contentOnlyCompletion('Second reply without memory index.'),
+          seenChatBodies,
+          toolNames: [...safeToolNames],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+
+          const memories = [
+            makeFirefoxMemory({
+              createdAt: 1_700_000_000_100,
+              id: 'memory-alpha',
+              text: 'Alpha memory unique preview text',
+            }),
+            makeFirefoxMemory({
+              createdAt: 1_700_000_000_200,
+              id: 'memory-beta',
+              text: 'Beta memory unique preview text',
+            }),
+          ];
+          await seedFirefoxStorage(session.driver, AGENT_MEMORIES_KEY, memories);
+          await openFirefoxSettings(session.driver);
+          await waitForText(session.driver, memoryListPreview('Alpha memory unique preview text'));
+          await waitForText(session.driver, memoryListPreview('Beta memory unique preview text'));
+          await closeFirefoxSettings(session.driver);
+
+          await sendMessage(session.driver, 'Use my memories');
+          await waitForText(session.driver, 'First reply with memory index.');
+          await waitUntil(
+            session.driver,
+            () => Promise.resolve(seenChatBodies.length > 0),
+            'Timed out waiting for first chat body'
+          );
+
+          const firstUserContent = lastUserMessageContent(seenChatBodies[0]);
+          assert.match(firstUserContent, /<system_environment>/u);
+          assert.match(firstUserContent, /<memories/u);
+          assert.match(firstUserContent, /Alpha memory unique preview text/u);
+          assert.match(firstUserContent, /Beta memory unique preview text/u);
+
+          await seedFirefoxStorage(session.driver, AGENT_MEMORIES_KEY, []);
+          await openFirefoxSettings(session.driver);
+          await waitForText(session.driver, EMPTY_MEMORIES_MESSAGE);
+          await closeFirefoxSettings(session.driver);
+
+          await sendMessage(session.driver, 'Memories should be gone');
+          await waitForText(session.driver, 'Second reply without memory index.');
+          await waitUntil(
+            session.driver,
+            () => Promise.resolve(seenChatBodies.length >= 2),
+            'Timed out waiting for second chat body'
+          );
+
+          const secondUserContent = lastUserMessageContent(seenChatBodies[1]);
+          assert.match(secondUserContent, /<system_environment>/u);
+          assert.doesNotMatch(secondUserContent, /<memories/u);
+        }
+      );
+    },
+  },
+  {
+    name: 'memory tools search and read saved memories',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: toolCallCompletion(
+            'search_memories',
+            { query: 'UniqueApple' },
+            'call_search_1'
+          ),
+          secondCompletionEvents: toolCallCompletion(
+            'get_memory',
+            { memoryId: 'memory-search-1' },
+            'call_get_1'
+          ),
+          thirdCompletionEvents: toolCallCompletion(
+            'search_memories',
+            { query: 'zzzz-no-match-token' },
+            'call_search_2'
+          ),
+          toolNames: [...safeToolNames],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+
+          const memories = [
+            makeFirefoxMemory({
+              createdAt: 1_700_000_000_300,
+              id: 'memory-search-1',
+              text: 'UniqueApple memory full body about orchards.',
+            }),
+            makeFirefoxMemory({
+              createdAt: 1_700_000_000_200,
+              id: 'memory-search-2',
+              text: 'UniqueBanana memory full body about tropics.',
+            }),
+            makeFirefoxMemory({
+              createdAt: 1_700_000_000_100,
+              id: 'memory-search-3',
+              text: 'UniqueCherry memory full body about pies.',
+            }),
+          ];
+          await seedFirefoxStorage(session.driver, AGENT_MEMORIES_KEY, memories);
+          await openFirefoxSettings(session.driver);
+          await waitForText(
+            session.driver,
+            memoryListPreview('UniqueApple memory full body about orchards.')
+          );
+          await waitForText(
+            session.driver,
+            memoryListPreview('UniqueBanana memory full body about tropics.')
+          );
+          await waitForText(
+            session.driver,
+            memoryListPreview('UniqueCherry memory full body about pies.')
+          );
+          await closeFirefoxSettings(session.driver);
+
+          await sendMessage(session.driver, 'Search and read memories');
+          await waitForText(session.driver, 'search_memories completed');
+          await waitForText(session.driver, 'get_memory completed');
+
+          const firstSearchBody = await expandNthToolExchange(session.driver, 'search_memories', 0);
+          assert.match(firstSearchBody, /UniqueApple memory full body about orchards\./u);
+          assert.match(firstSearchBody, /memory-search-1/u);
+
+          const getMemoryBody = await expandToolExchange(session.driver, 'get_memory');
+          assert.match(getMemoryBody, /UniqueApple memory full body about orchards\./u);
+          assert.match(getMemoryBody, /memory-search-1/u);
+
+          const secondSearchBody = await expandNthToolExchange(
+            session.driver,
+            'search_memories',
+            1
+          );
+          assert.match(secondSearchBody, /No memories matched\./u);
+        }
+      ),
+  },
+  {
+    name: 'settings memories list supports delete and shows the empty state',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        await openAuthenticatedPanel(session);
+        const memories = [
+          makeFirefoxMemory({
+            createdAt: 1_700_000_000_200,
+            id: 'memory-list-1',
+            text: 'ListAlpha unique settings preview',
+          }),
+          makeFirefoxMemory({
+            createdAt: 1_700_000_000_100,
+            id: 'memory-list-2',
+            text: 'ListBeta unique settings preview',
+          }),
+        ];
+        await seedFirefoxStorage(session.driver, AGENT_MEMORIES_KEY, memories);
+        await openFirefoxSettings(session.driver);
+        const alphaPreview = memoryListPreview('ListAlpha unique settings preview');
+        const betaPreview = memoryListPreview('ListBeta unique settings preview');
+        await waitForText(session.driver, alphaPreview);
+        await waitForText(session.driver, betaPreview);
+
+        await clickButtonByLabel(session.driver, `Delete memory "${alphaPreview}"`);
+        await waitForTextGone(session.driver, alphaPreview);
+        await waitForText(session.driver, betaPreview);
+
+        await clickButtonByLabel(session.driver, `Delete memory "${betaPreview}"`);
+        await waitForText(session.driver, EMPTY_MEMORIES_MESSAGE);
+
+        const regionButtons = await session.driver.findElements(
+          By.css('section[aria-label="Memories"] button')
+        );
+        assert.equal(regionButtons.length, 0);
+        await closeFirefoxSettings(session.driver);
+      }),
+  },
 ];
 
 assert.deepStrictEqual(
@@ -1903,6 +2773,15 @@ const main = async (): Promise<void> => {
     await runCommand('pnpm', ['run', 'zip:firefox'], {
       VITE_KILO_API_BASE_URL: api.url,
     });
+
+    const firefoxManifestPath = resolvePath(extensionRoot, '.output/firefox-mv3/manifest.json');
+    const firefoxManifest = z
+      .object({ permissions: z.array(z.string()).optional() })
+      .parse(JSON.parse(readFileSync(firefoxManifestPath, 'utf8')));
+    assert.ok(
+      firefoxManifest.permissions?.includes('contextMenus') === true,
+      'Firefox manifest must include the contextMenus permission'
+    );
 
     for (const scenario of scenarios) {
       process.stdout.write(`Firefox e2e: ${scenario.name} ... `);

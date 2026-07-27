@@ -12,7 +12,7 @@ export const stepfun_37_flash_free_model: KiloExclusiveModel = {
   context_length: 262_144,
   max_completion_tokens: 262_144,
   status: 'public',
-  flags: ['reasoning', 'vision'],
+  flags: ['reasoning', 'vision', 'vercel-routing'],
   gateway: 'openrouter',
   internal_id: 'stepfun/step-3.7-flash',
   pricing: null,

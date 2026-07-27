@@ -258,6 +258,9 @@ describe('organization review agent router: patchReviewConfig', () => {
         council: activeCouncil,
         council_enabled_repository_ids: [101, 202],
         disable_review_md: true,
+        // Web-only setting the patch schema never carries; `false` proves
+        // the patch passes it through instead of resetting to the default.
+        skip_bot_pull_requests: false,
         review_memory_enabled: true,
         review_analytics_enabled: true,
       },
@@ -445,7 +448,49 @@ describe('organization review agent router: patchReviewConfig', () => {
         repository_selection_mode: 'all',
         gate_threshold: 'off',
         disable_review_md: true,
+        skip_bot_pull_requests: false,
       })
     );
+  });
+});
+
+describe('organization review agent router: skip bot pull requests', () => {
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+      await db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
+  it('defaults skipBotPullRequests to true and round-trips an explicit false', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    // Default (no config saved) is to skip bot PRs.
+    const defaults = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(defaults.skipBotPullRequests).toBe(true);
+
+    // Saving false persists and reloads as false.
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'anthropic/claude-sonnet-5',
+      skipBotPullRequests: false,
+    });
+    const cfg = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(cfg.skipBotPullRequests).toBe(false);
   });
 });

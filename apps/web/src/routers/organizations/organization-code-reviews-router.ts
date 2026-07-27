@@ -142,6 +142,8 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  // Feature-level guardrail: skip automated reviews of bot-authored PRs. Defaults to true.
+  skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // Org-level council config (specialists + governance), shared by every council-enabled repo.
   // `null`/absent leaves council unset. Persisted only for entitled orgs (checked in the handler).
@@ -544,6 +546,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           council: null,
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
+          skipBotPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
         };
@@ -584,6 +587,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: isBitbucket ? true : (cfg.disable_review_md ?? true),
+        skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
         council: cfg.council ?? null,
         councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
         reviewMemoryEnabled: isBitbucket ? false : getReviewMemoryEnabledFromConfig(config.config),
@@ -677,6 +681,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council,
             council_enabled_repository_ids: input.councilEnabledRepositoryIds ?? [],
             disable_review_md: isBitbucket ? true : (input.disableReviewMd ?? true),
+            skip_bot_pull_requests: input.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },
@@ -970,6 +975,12 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council,
             council_enabled_repository_ids: councilEnabledRepositoryIds,
             disable_review_md: disableReviewMd,
+            // The patch schema never carries `skipBotPullRequests` (a
+            // web-only setting from the full save). Pass the stored value
+            // through so a mobile PATCH can't silently reset it to the
+            // default — same field-merge contract as every other omitted
+            // field.
+            skip_bot_pull_requests: prevCfg.skip_bot_pull_requests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },

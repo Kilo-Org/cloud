@@ -625,23 +625,42 @@ describe('request log capture', () => {
     }
   );
 
-  test.each(rewriters)('%s: records a read error when the stream fails', async (_name, rewrite) => {
-    const capture = makeCapture();
+  test.each(rewriters)(
+    '%s: records a read error with the chunks received before the stream failed',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+      const receivedChunks = 'data: {"id":"gen-1","choices":[]}\n\n';
 
-    const result = await rewrite(
-      failingResponse(
-        'text/event-stream',
-        'ResponseAborted',
-        'data: {"id":"gen-1","choices":[]}\n\n'
-      ),
-      true,
-      capture
-    );
-    await readOutputStream(result);
+      const result = await rewrite(
+        failingResponse('text/event-stream', 'ResponseAborted', receivedChunks),
+        true,
+        capture
+      );
+      await readOutputStream(result);
 
-    expect(capture.setReadError).toHaveBeenCalledTimes(1);
-    expect(capture.setBody).not.toHaveBeenCalled();
-  });
+      expect(capture.setReadError).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks);
+      expect(capture.setBody).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: records a read error without a partial body when the stream fails immediately',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+
+      const result = await rewrite(
+        failingResponse('text/event-stream', 'ResponseAborted'),
+        true,
+        capture
+      );
+      await readOutputStream(result);
+
+      expect(capture.setReadError).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined);
+      expect(capture.setBody).not.toHaveBeenCalled();
+    }
+  );
 
   test.each(rewriters)(
     '%s: records a read error when a JSON body cannot be read',

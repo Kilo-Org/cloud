@@ -23,7 +23,7 @@ import type Anthropic from '@anthropic-ai/sdk';
  */
 export type RequestLogCapture = {
   setBody(text: string): void;
-  setReadError(error: unknown): void;
+  setReadError(error: unknown, partialBody?: string): void;
 };
 
 export type RequestLoggingParams = {
@@ -34,7 +34,9 @@ export type RequestLoggingParams = {
   request: GatewayRequest;
 };
 
-type CapturedResponseBody = { text: string } | { readError: string };
+type CapturedResponseBody =
+  | { text: string; readError?: never }
+  | { readError: string; text?: string };
 
 async function isLoggingEnabledForUser(
   user: User | null,
@@ -88,7 +90,12 @@ async function createRequestLogCapture(
     try {
       const error =
         responseText !== undefined
-          ? detectToolCallArgumentErrors(responseText, request)
+          ? responseReadError !== undefined
+            ? {
+                ...(detectToolCallArgumentErrors(responseText, request) ?? {}),
+                response_body_read_error: responseReadError,
+              }
+            : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
       const apiRequestLogId = await db
         .insert(api_request_log)
@@ -119,7 +126,12 @@ async function createRequestLogCapture(
 
   return {
     setBody: text => settleOnce({ text }),
-    setReadError: error => settleOnce({ readError: String(error).substring(0, 4000) }),
+    setReadError: (error, partialBody) =>
+      settleOnce(
+        partialBody !== undefined && partialBody.length > 0
+          ? { text: partialBody, readError: String(error).substring(0, 4000) }
+          : { readError: String(error).substring(0, 4000) }
+      ),
   };
 }
 
@@ -231,6 +243,11 @@ async function rewriteSseStream(
   // Accumulate the raw upstream text for request logging while the stream is
   // being processed anyway, so it doesn't have to be processed a second time.
   const capturedChunks: string[] | null = capture ? [] : null;
+  const settleReadError = (error: unknown) =>
+    capture?.setReadError(
+      error,
+      capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined
+    );
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -255,12 +272,12 @@ async function rewriteSseStream(
   } catch (error) {
     const responseReadError = getResponseReadError(error);
     if (!responseReadError) {
-      capture?.setReadError(error);
+      settleReadError(error);
       throw error;
     }
 
     errorExceptInTest('[rewriteModelResponse] emitting stream error event', responseReadError);
-    capture?.setReadError(error);
+    settleReadError(error);
     controller.enqueue(serializeError(responseReadError));
     controller.close();
   } finally {

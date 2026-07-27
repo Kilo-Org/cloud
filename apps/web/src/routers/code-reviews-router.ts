@@ -107,6 +107,7 @@ const SaveReviewConfigInputSchema = z.object({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks
   autoConfigureWebhooks: z.boolean().optional().default(true),
@@ -257,6 +258,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           council: null,
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
+          skipBotPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
         };
@@ -288,6 +290,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: cfg.disable_review_md ?? true,
+        skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
         // Council is org-only; personal configs never set it, but expose it so the query shape
         // matches the org query (the form's `configData` is a union of the two).
         council: cfg.council ?? null,
@@ -343,6 +346,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             manually_added_repositories: input.manuallyAddedRepositories || [],
             repository_model_overrides: repositoryModelOverrides,
             disable_review_md: input.disableReviewMd ?? true,
+            skip_bot_pull_requests: input.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },
@@ -549,6 +553,11 @@ export const personalReviewAgentRouter = createTRPCRouter({
             manually_added_repositories: merged.manuallyAddedRepositories ?? [],
             repository_model_overrides: repositoryModelOverrides,
             disable_review_md: merged.disableReviewMd ?? true,
+            // The patch schema never carries `skipBotPullRequests` (a
+            // web-only setting from the full save). Pass the stored value
+            // through so a PATCH can't silently reset it to the default —
+            // same field-merge contract as every other omitted field.
+            skip_bot_pull_requests: prevCfg.skip_bot_pull_requests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },

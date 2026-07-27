@@ -264,6 +264,8 @@ export function ReviewConfigForm({
   // Optional council label gate, edited as a comma-separated string; parsed to a list on save.
   const [councilRequiredLabelsInput, setCouncilRequiredLabelsInput] = useState<string>('');
   const [useReviewMd, setUseReviewMd] = useState(true);
+  // Feature-level guardrail; defaults to skipping bot PRs (matches the server default).
+  const [skipBotPullRequests, setSkipBotPullRequests] = useState(true);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
   // Webhook sync result from last save
@@ -445,6 +447,7 @@ export function ReviewConfigForm({
         )
       );
       setUseReviewMd(!(configData.disableReviewMd ?? false));
+      setSkipBotPullRequests(configData.skipBotPullRequests ?? true);
     }
   }, [configData, isGitLab]);
 
@@ -706,6 +709,7 @@ export function ReviewConfigForm({
         council: councilPayload,
         councilEnabledRepositoryIds: councilEnabledRepositoryIdsPayload,
         disableReviewMd: !useReviewMd,
+        skipBotPullRequests,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -723,6 +727,7 @@ export function ReviewConfigForm({
         manuallyAddedRepositories,
         repositoryModelOverrides: repositoryModelOverridesPayload,
         disableReviewMd: !useReviewMd,
+        skipBotPullRequests,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -907,6 +912,30 @@ export function ReviewConfigForm({
                 disabled={orgSaveMutation.isPending || personalSaveMutation.isPending || !isEnabled}
               />
             </div>
+
+            {/* GitHub only: bot detection relies on the GitHub-authoritative user.type, which
+                GitLab/Bitbucket webhooks do not provide, so the toggle is hidden there. */}
+            {!isGitLab && (
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="skip-bot-prs" className="text-base font-semibold">
+                    Skip pull requests from bots
+                  </Label>
+                  <p className="text-muted-foreground text-sm">
+                    Do not run automated reviews on {prLabel} opened by bot accounts (for example
+                    Dependabot or Renovate). Turn this off to review bot {prLabel} too.
+                  </p>
+                </div>
+                <Switch
+                  id="skip-bot-prs"
+                  checked={skipBotPullRequests}
+                  onCheckedChange={setSkipBotPullRequests}
+                  disabled={
+                    orgSaveMutation.isPending || personalSaveMutation.isPending || !isEnabled
+                  }
+                />
+              </div>
+            )}
 
             {/* Focus Areas (global) */}
             <div className="space-y-3">

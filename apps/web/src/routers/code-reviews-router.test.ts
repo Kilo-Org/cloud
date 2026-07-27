@@ -2317,6 +2317,9 @@ describe('personalReviewAgent.patchReviewConfig', () => {
           },
         ],
         disable_review_md: true,
+        // Web-only setting the patch schema never carries; `false` proves
+        // the patch passes it through instead of resetting to the default.
+        skip_bot_pull_requests: false,
         review_memory_enabled: true,
         review_analytics_enabled: true,
       },
@@ -2384,6 +2387,8 @@ describe('personalReviewAgent.patchReviewConfig', () => {
         repository_selection_mode: 'all',
         gate_threshold: 'off',
         disable_review_md: true,
+        // Web-only setting preserved by the patch pass-through:
+        skip_bot_pull_requests: false,
         // Feature flags preserved by `preserveCodeReviewFeatureSettings`:
         review_memory_enabled: true,
         review_analytics_enabled: true,

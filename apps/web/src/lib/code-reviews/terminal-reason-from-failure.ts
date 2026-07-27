@@ -16,7 +16,9 @@
  */
 
 import type {
+  CloudAgentAssistantFailureReason,
   CloudAgentFailureCode,
+  CloudAgentProviderOwnership,
   CloudAgentSafeFailure,
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
@@ -73,16 +75,42 @@ const FAILURE_CODE_REASONS = {
 /**
  * `assistant_error` is a single code covering every provider-side failure, so on
  * its own it would collapse rate limiting (by far the largest bucket) into one
- * undifferentiated category. The finer reason lives only in the safe message.
+ * undifferentiated category.
+ *
+ * cloud-agent-next now reports the finer reason structurally on
+ * `failure.assistantReason`, so this is an enum-to-enum map with no text
+ * matching. `satisfies Record<...>` keeps it exhaustive: a new assistant reason
+ * upstream is a type error here rather than a silent fall back to generic.
+ */
+const ASSISTANT_REASON_REASONS = {
+  rate_limited: 'assistant_rate_limited',
+  provider_unavailable: 'assistant_unavailable',
+  timeout: 'assistant_timeout',
+  provider_authentication: 'assistant_unauthorized',
+  invalid_request: 'assistant_invalid_request',
+  insufficient_credits: 'billing',
+  model_unavailable: 'model_not_found',
+  unknown: 'assistant_failed',
+} as const satisfies Record<CloudAgentAssistantFailureReason, CodeReviewTerminalReason>;
+
+/**
+ * Rate limiting split by whose key was throttled. A customer's own key hitting
+ * its quota is not actionable for us; our managed key hitting ours is.
+ * Unknown ownership keeps the unqualified reason.
+ */
+const RATE_LIMITED_BY_OWNERSHIP = {
+  byok: 'assistant_rate_limited_byok',
+  managed: 'assistant_rate_limited_managed',
+  unknown: 'assistant_rate_limited',
+} as const satisfies Record<CloudAgentProviderOwnership, CodeReviewTerminalReason>;
+
+/**
+ * Fallback for payloads sent before cloud-agent-next reported `assistantReason`.
  *
  * These are exact, whole-string matches against the constants produced by
- * `classifyAssistantFailure` in
- * services/cloud-agent-next/src/session/safe-failure-projection.ts — not
- * substring heuristics. If a message there is reworded this map stops matching
- * and callers fall back to the generic `assistant_failed`, which is no worse
- * than the current behaviour.
- *
- * KEEP IN SYNC with classifyAssistantFailure's safeMessage values.
+ * `classifyAssistantFailure`, not substring heuristics. Retained only so that
+ * in-flight callbacks from an older sender still classify; new payloads take the
+ * structured path above and never reach this.
  *
  * A Map rather than an object literal: the key is caller-supplied free text (the
  * schema bounds only its length), and an object lookup for 'constructor' or
@@ -116,8 +144,16 @@ export function terminalReasonFromCloudAgentFailure(
   }
 
   if (failure.code === 'assistant_error') {
-    // The projection puts the safe message on the failure; fall back to the
-    // callback's errorMessage for payloads that only carry the flattened text.
+    // Structured reason wins. Rate limiting refines further by whose key was
+    // throttled, which is the difference between an actionable failure and one
+    // only the customer can resolve.
+    if (failure.assistantReason) {
+      return failure.assistantReason === 'rate_limited'
+        ? RATE_LIMITED_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown']
+        : ASSISTANT_REASON_REASONS[failure.assistantReason];
+    }
+
+    // Older payloads carry only the flattened text.
     const message = (failure.message ?? errorMessage)?.trim();
     return (message ? ASSISTANT_MESSAGE_REASONS.get(message) : undefined) ?? 'assistant_failed';
   }

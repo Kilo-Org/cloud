@@ -1,4 +1,9 @@
-import { CLOUD_AGENT_FAILURE_CODES } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  CLOUD_AGENT_ASSISTANT_FAILURE_REASONS,
+  CLOUD_AGENT_FAILURE_CODES,
+  CLOUD_AGENT_PROVIDER_OWNERSHIPS,
+  CloudAgentSafeFailureSchema,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { describe, expect, it } from 'vitest';
 import {
   SAFE_FAILURE_MESSAGE_MAX_LENGTH,
@@ -26,6 +31,59 @@ describe('projectSafeFailure', () => {
       message: 'Assistant request failed',
     });
   });
+
+  it('forwards the assistant reason and provider ownership', () => {
+    expect(
+      projectSafeFailure({
+        failureStage: 'agent_activity',
+        failureCode: 'assistant_error',
+        safeFailureMessage: 'Assistant request was rate limited',
+        assistantFailureReason: 'rate_limited',
+        providerOwnership: 'byok',
+      })
+    ).toStrictEqual({
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      message: 'Assistant request was rate limited',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'byok',
+    });
+  });
+
+  it('omits the new fields when the source has neither', () => {
+    const failure = projectSafeFailure({
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+    });
+
+    expect(failure).not.toHaveProperty('assistantReason');
+    expect(failure).not.toHaveProperty('providerOwnership');
+  });
+
+  it('projects a failure carrying only the assistant classification', () => {
+    expect(
+      projectSafeFailure({ assistantFailureReason: 'rate_limited', providerOwnership: 'managed' })
+    ).toStrictEqual({ assistantReason: 'rate_limited', providerOwnership: 'managed' });
+  });
+
+  // The producer contract is .strict() and the callback wrapper turns any parse
+  // failure into undefined, discarding the entire failure object. Every shape
+  // the projection can emit must survive that parse.
+  it.each(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS)(
+    'emits a payload the strict contract accepts for reason %s',
+    assistantFailureReason => {
+      for (const providerOwnership of CLOUD_AGENT_PROVIDER_OWNERSHIPS) {
+        const failure = projectSafeFailure({
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+          assistantFailureReason,
+          providerOwnership,
+        });
+
+        expect(CloudAgentSafeFailureSchema.safeParse(failure).success).toBe(true);
+      }
+    }
+  );
 
   it.each(CLOUD_AGENT_FAILURE_CODES)('always derives a bounded message for %s', failureCode => {
     const failure = projectSafeFailure({ failureCode });

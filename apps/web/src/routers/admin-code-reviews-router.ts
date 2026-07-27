@@ -100,6 +100,8 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   sandbox_connection: 'Sandbox Connection',
   container_shutdown: 'Container Shutdown',
   assistant_rate_limited: 'Rate Limited',
+  assistant_rate_limited_byok: 'Rate Limited (customer key)',
+  assistant_rate_limited_managed: 'Rate Limited (managed key)',
   assistant_unavailable: 'Assistant Unavailable',
   assistant_timeout: 'Assistant Timeout',
   assistant_unauthorized: 'Assistant Unauthorized',

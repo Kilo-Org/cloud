@@ -257,6 +257,20 @@ export const CloudAgentSafeFailureSchema = z
     subtype: WorkspaceFailureSubtypeSchema.optional(),
     attempts: z.number().int().nonnegative().optional(),
     message: z.string().min(1).max(CLOUD_AGENT_SAFE_FAILURE_MESSAGE_MAX_LENGTH).optional(),
+    // `assistant_error` is a single code covering every provider-side failure,
+    // so on its own it cannot tell rate limiting apart from an outage, and it
+    // cannot say whose key was throttled. Both values are already computed by
+    // classifyAssistantFailure and persisted on the session message state; these
+    // fields carry them across the callback so receivers stop having to infer
+    // the reason from the safe message text.
+    //
+    // Deliberately not covered by a refine. This schema is `.strict()` and
+    // CloudAgentCallbackFailureSchema turns any parse failure into `undefined`,
+    // which discards the WHOLE failure object (stage, code, subtype, message),
+    // not just the offending field. Neither field carries an invariant worth
+    // that blast radius.
+    assistantReason: CloudAgentAssistantFailureReasonSchema.optional(),
+    providerOwnership: CloudAgentProviderOwnershipSchema.optional(),
   })
   .strict()
   .refine(failure => failure.subtype === undefined || failure.code === 'workspace_setup_failed', {

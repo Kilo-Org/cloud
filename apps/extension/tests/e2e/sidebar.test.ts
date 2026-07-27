@@ -1,4 +1,4 @@
-/* eslint-disable import/no-nodejs-modules */
+/* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test, max-lines */
 import { expect, test } from '@playwright/test';
 import type { Locator } from '@playwright/test';
 import { readFile, rm } from 'node:fs/promises';
@@ -101,9 +101,10 @@ test('native side panel is outside the page DOM', async () => {
 test('dangerous mode conversation can eval against a normal tab', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
+  const seenChatBodies: { messages?: { role?: string }[] }[] = [];
 
   try {
-    await mockKiloApi(context);
+    await mockKiloApi(context, { seenChatBodies });
 
     const page = await context.newPage();
     await page.goto(fixture.url);
@@ -119,6 +120,15 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await expect(sidePanel.getByText('user@kilo.ai')).toBeVisible();
     await sidePanel.getByLabel('Close settings').click();
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
+
+    const conversation = sidePanel.getByLabel('Agent conversation');
+    const emptyHint = conversation.getByText('Pick a tab and ask Kilo to inspect it.');
+    await expect(emptyHint).toBeVisible();
+    const hintBox = await emptyHint.boundingBox();
+    expect(hintBox).not.toBeNull();
+    expect(hintBox?.height ?? 0).toBeGreaterThan(0);
+    expect(hintBox?.width ?? 0).toBeGreaterThan(0);
+    await expect(conversation.getByRole('button')).toHaveCount(0);
 
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
     await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
@@ -141,9 +151,21 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await expect(sidePanel.getByText('Code')).toBeVisible();
     await expectEvalToolBoxNoHorizontalOverflow(sidePanel);
 
+    await expect.poll(() => seenChatBodies.length).toBeGreaterThan(0);
+    const [firstBody] = seenChatBodies;
+    const roles = (firstBody?.messages ?? []).map(message => message.role);
+    expect(roles.filter(role => role === 'user')).toHaveLength(1);
+    expect(roles.filter(role => role === 'assistant')).toHaveLength(0);
+
     await sidePanel.getByLabel('New conversation').click();
     await expect(sidePanel.getByText('eval completed')).toBeHidden();
-    await expect(sidePanel.getByText('Pick a tab and ask Kilo to inspect it.')).toBeVisible();
+    const newConversation = sidePanel.getByLabel('Agent conversation');
+    const newEmptyHint = newConversation.getByText('Pick a tab and ask Kilo to inspect it.');
+    await expect(newEmptyHint).toBeVisible();
+    const newHintBox = await newEmptyHint.boundingBox();
+    expect(newHintBox).not.toBeNull();
+    expect(newHintBox?.height ?? 0).toBeGreaterThan(0);
+    await expect(newConversation.getByRole('button')).toHaveCount(0);
   } finally {
     await context.close();
     await fixture.close();

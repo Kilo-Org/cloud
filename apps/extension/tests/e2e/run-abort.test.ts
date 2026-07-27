@@ -1,4 +1,4 @@
-/* eslint-disable import/no-nodejs-modules */
+/* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import {
@@ -45,7 +45,13 @@ test('new conversation keeps the running request in its original tab', async () 
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
     await sidePanel.getByLabel('New conversation').click();
 
-    await expect(sidePanel.getByText('Pick a tab and ask Kilo to inspect it.')).toBeVisible();
+    const emptyHint = sidePanel
+      .getByLabel('Agent conversation')
+      .getByText('Pick a tab and ask Kilo to inspect it.');
+    await expect(emptyHint).toBeVisible();
+    const hintBox = await emptyHint.boundingBox();
+    expect(hintBox).not.toBeNull();
+    expect(hintBox?.height ?? 0).toBeGreaterThan(0);
     await expect.poll(() => wasChatCompletionAborted(sidePanel)).toBe(false);
     await sidePanel.getByRole('tab', { name: /Original tab/u }).click();
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();

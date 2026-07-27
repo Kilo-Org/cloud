@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import { createAssistantMessage, createUserMessage } from './agent-conversation';
 import {
@@ -8,6 +9,7 @@ import {
   deleteStoredConversation,
   getSortedStoredConversationHistory,
   getStoredConversationTitle,
+  LEGACY_CONVERSATION_GREETING,
   openStoredConversation,
   normalizeStoredConversations,
   updateActiveStoredConversationEvents,
@@ -124,7 +126,7 @@ describe('agent conversation tabs', () => {
         activeConversationId: 'conversation-1',
         conversations: [
           {
-            events: [createAssistantMessage('Pick a tab and ask Kilo to inspect it.')],
+            events: [],
             id: 'conversation-1',
             title: 'Conversation 1',
             updatedAt: '2026-06-24T10:00:00.000Z',
@@ -151,5 +153,66 @@ describe('agent conversation tabs', () => {
     expect(updatedStore.conversations.map(conversation => conversation.id)).toStrictEqual([
       'conversation-2',
     ]);
+  });
+
+  describe('legacy greeting strip (A2.4)', () => {
+    it('strips a leading legacy greeting from a modern stored conversation', () => {
+      const laterUser = createUserMessage('After greeting');
+      const store = normalizeStoredConversations({
+        store: {
+          activeConversationId: 'conversation-1',
+          conversations: [
+            {
+              events: [createAssistantMessage(LEGACY_CONVERSATION_GREETING), laterUser],
+              id: 'conversation-1',
+              title: 'Conversation 1',
+              updatedAt: '2026-06-24T10:00:00.000Z',
+            },
+          ],
+          openConversationIds: ['conversation-1'],
+        },
+      });
+
+      expect(store.conversations[0]?.events).toStrictEqual([laterUser]);
+    });
+
+    it('strips a leading legacy greeting from legacyEvents-only input', () => {
+      const laterAssistant = createAssistantMessage('Real reply');
+      const store = normalizeStoredConversations({
+        legacyEvents: [createAssistantMessage(LEGACY_CONVERSATION_GREETING), laterAssistant],
+      });
+
+      expect(store.conversations[0]?.events).toStrictEqual([laterAssistant]);
+    });
+
+    it('never strips a user message with the same greeting text', () => {
+      const userGreeting = createUserMessage(LEGACY_CONVERSATION_GREETING);
+      const store = normalizeStoredConversations({
+        store: {
+          activeConversationId: 'conversation-1',
+          conversations: [
+            {
+              events: [userGreeting],
+              id: 'conversation-1',
+              title: 'Conversation 1',
+              updatedAt: '2026-06-24T10:00:00.000Z',
+            },
+          ],
+          openConversationIds: ['conversation-1'],
+        },
+      });
+
+      expect(store.conversations[0]?.events).toStrictEqual([userGreeting]);
+    });
+  });
+
+  it('creates new conversations with zero events', () => {
+    const store = createDefaultStoredConversations();
+
+    expect(store.conversations[0]?.events).toStrictEqual([]);
+
+    const next = createNextStoredConversation(store);
+
+    expect(next.conversations[1]?.events).toStrictEqual([]);
   });
 });

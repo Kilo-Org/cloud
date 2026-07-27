@@ -74,9 +74,7 @@ import { sanitizeTabContextText, sanitizeTabContextUrl } from '@/src/shared/tab-
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
-const createDefaultConversationEvents = (): AgentConversationEvent[] => [
-  createAssistantMessage('Pick a tab and ask Kilo to inspect it.'),
-];
+const emptyDefaultConversationEvents = (): AgentConversationEvent[] => [];
 
 interface ConversationRunState {
   readonly abort: AbortController;
@@ -146,7 +144,7 @@ export const AgentChatPanel = ({
 }): JSX.Element => {
   const store = useStore();
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
-    useStoredAgentConversations(createDefaultConversationEvents);
+    useStoredAgentConversations(emptyDefaultConversationEvents);
   const { memories } = useAgentMemories();
   const runningConversationIds = useAtomValue(runningConversationIdsAtom);
   const setRunningConversationIds = useSetAtom(runningConversationIdsAtom);
@@ -690,7 +688,7 @@ export const AgentChatPanel = ({
 
     conversationStoreRef.current = createNextStoredConversation(
       conversationStoreRef.current,
-      createDefaultConversationEvents(),
+      emptyDefaultConversationEvents(),
       settings
     );
     setConversationStore(conversationStoreRef.current);
@@ -763,7 +761,7 @@ export const AgentChatPanel = ({
 
       abortConversationRun(conversationId);
       setConversationStore(currentStore =>
-        closeStoredConversationTab(currentStore, conversationId, createDefaultConversationEvents())
+        closeStoredConversationTab(currentStore, conversationId, emptyDefaultConversationEvents())
       );
     },
     [abortConversationRun, isConversationStoreLoaded, setConversationStore]
@@ -784,7 +782,7 @@ export const AgentChatPanel = ({
 
       abortConversationRun(conversationId);
       setConversationStore(currentStore =>
-        deleteStoredConversation(currentStore, conversationId, createDefaultConversationEvents())
+        deleteStoredConversation(currentStore, conversationId, emptyDefaultConversationEvents())
       );
       // Free per-conversation atoms; a deleted conversation can never be reopened.
       evictConversationAtoms(conversationId);

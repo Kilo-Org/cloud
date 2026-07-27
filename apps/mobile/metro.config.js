@@ -2,6 +2,7 @@
 const path = require('node:path');
 const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const { withNativewind } = require('nativewind/metro');
+const { getBundleModeMetroConfig } = require('react-native-worklets/bundleMode');
 
 const monorepoRoot = path.resolve(__dirname, '../..');
 
@@ -39,6 +40,8 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return resolve(context, moduleName, platform);
 };
 
-module.exports = withNativewind(config, {
-  inlineVariables: false,
-});
+module.exports = getBundleModeMetroConfig(
+  withNativewind(config, {
+    inlineVariables: false,
+  })
+);

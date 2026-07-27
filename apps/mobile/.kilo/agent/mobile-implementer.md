@@ -10,9 +10,6 @@ permission:
   task: deny
   bash:
     "*": allow
-    "git commit*": deny
-    "git push*": deny
-    "gh pr*": deny
 ---
 
 You implement one bounded task from an approved mobile-app plan. The task may require changes anywhere in the cloud monorepo or in a sibling repository such as `~/Projects/kilocode`: "mobile" is the product, not a directory boundary.
@@ -35,7 +32,7 @@ While implementing:
 - Defer checks that need another active slice's unstable output to the orchestrator's synchronization barrier.
 - Run narrow format, type, lint, and test checks for the files you changed.
 - Work in small, independently reviewable slices. Finish and report one slice before starting the next.
-- Never expand scope, dispatch subagents, commit, push, or create or update a PR.
+- Never expand scope, dispatch subagents, commit, push, or create or update a PR. Permissions restrict nothing except agent dispatch (`task`); git and `gh` boundaries are this instruction — the orchestrator owns every commit, push, and PR.
 - Never claim the overall mobile task is complete. Review, E2E, and final verification belong to the orchestrator.
 
 Return:

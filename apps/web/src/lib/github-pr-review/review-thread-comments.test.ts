@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import {
+  CONVERSATION_COMMENTS_QUERY_FOR_TEST,
   fetchAllThreadComments,
   REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST,
 } from '@/routers/github-pr-review-router';
@@ -98,6 +99,20 @@ describe('fetchAllThreadComments', () => {
       { variables: Record<string, unknown> },
     ];
     expect(secondArgs.variables.after).toBe('c2');
+  });
+
+  // Production GraphQL contract for top-level PR conversation comments.
+  // `reactors` is a connection; GitHub rejects the query without first/last.
+  // The local stub harness cannot catch a bare `reactors` regression.
+  it('locks CONVERSATION_COMMENTS_QUERY load-bearing selection shape', () => {
+    expect(CONVERSATION_COMMENTS_QUERY_FOR_TEST).toMatch(/query\s+PrReviewConversationComments\b/);
+    // Operation must select PR conversation comments (not review threads).
+    expect(CONVERSATION_COMMENTS_QUERY_FOR_TEST).toMatch(
+      /pullRequest\s*\([^)]*\)\s*\{\s*comments\s*\(/
+    );
+    expect(CONVERSATION_COMMENTS_QUERY_FOR_TEST).toContain('reactors(first: 0)');
+    // Bare `reactors {` is invalid GraphQL against GitHub (connection needs first/last).
+    expect(CONVERSATION_COMMENTS_QUERY_FOR_TEST).not.toMatch(/reactors\s*\{/);
   });
 
   it('keeps only reactionGroups with totalCount > 0 in the DTO shape', async () => {

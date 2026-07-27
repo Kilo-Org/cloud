@@ -18,11 +18,15 @@ import { resolveNewSessionPromptControlState } from '@/components/agents/new-ses
 import { QueryError } from '@/components/query-error';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSharePrefill } from '@/lib/share-prefill';
 import { cn } from '@/lib/utils';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
-import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import {
+  type AgentAttachment,
+  type AgentAttachmentCandidate,
+} from '@/lib/agent-attachments/use-agent-attachment-upload';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -61,6 +65,8 @@ type NewSessionPromptProps = {
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
   onRefetchModels: () => void;
+  onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
+  shareId?: string;
   voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
 };
 
@@ -91,6 +97,8 @@ export function NewSessionPrompt({
   onRemoveAttachment,
   onRetryAttachment,
   onRefetchModels,
+  onPrefillAttachments,
+  shareId,
   voiceInputSettlerRef,
 }: Readonly<NewSessionPromptProps>) {
   const colors = useThemeColors();
@@ -114,6 +122,14 @@ export function NewSessionPrompt({
     },
     [onChangeText, promptMeasure]
   );
+
+  useSharePrefill({
+    shareId,
+    inputRef: promptInputRef,
+    maxLength: PROMPT_INPUT_MAX_CHARS,
+    onChangeText: handlePromptChange,
+    addCandidates: onPrefillAttachments,
+  });
 
   const voiceInput = useVoiceInput({
     disabled: isCreating,
@@ -191,7 +207,7 @@ export function NewSessionPrompt({
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           autoFocus
         />
-        <View className="flex-row items-center justify-between pb-1">
+        <View className="flex-row items-center justify-between pb-2">
           <Pressable
             onPress={handlePaperclipPress}
             disabled={paperclipDisabled}
@@ -207,6 +223,11 @@ export function NewSessionPrompt({
             <Paperclip size={18} color={colors.mutedForeground} />
           </Pressable>
           {voiceInput.available ? (
+            <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
+              <VoiceInputStatus status={voiceInput.status} />
+            </View>
+          ) : null}
+          {voiceInput.available ? (
             <VoiceInputButton
               disabled={control.voiceDisabled}
               size="md"
@@ -216,11 +237,6 @@ export function NewSessionPrompt({
           ) : null}
         </View>
       </View>
-      {voiceInput.available ? (
-        <View className="min-h-[20px] px-3 pb-1">
-          <VoiceInputStatus status={voiceInput.status} />
-        </View>
-      ) : null}
       {isModelsError && modelOptions.length === 0 ? (
         <QueryError
           placement="top"

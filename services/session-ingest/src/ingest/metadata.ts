@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
+import { hasOrganizationAccess, normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 
 import type { Env } from '../env';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
@@ -65,13 +65,8 @@ export async function applyMetadataChanges(
   const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
-  const changedNonStatus =
-    mergedChanges.has('title') ||
-    mergedChanges.has('platform') ||
-    mergedChanges.has('orgId') ||
-    mergedChanges.has('gitUrl') ||
-    mergedChanges.has('gitBranch') ||
-    parentSessionId !== undefined;
+  /** True only when an organization_id write was actually applied (authorized claim or explicit null clear). */
+  let organizationIdWriteApplied = false;
 
   const notification = await db.transaction(async tx => {
     const statusChange =
@@ -95,6 +90,46 @@ export async function applyMetadataChanges(
           })();
 
     if (!statusChange) return null;
+
+    // Membership check only for non-null org claims; run on the same tx as the UPDATE.
+    // Residual: SessionIngestDO.writeIngestMetaIfChanged records the claimed orgId in DO
+    // SQLite and emits a change only when the value differs; after a refused write the DO
+    // believes the org is set while Postgres does not, so re-sending the same orgId later
+    // will not re-emit it. Desirable in the attack case; in the benign case (user genuinely
+    // joins the org afterwards) the session stays personal until the CLI sends a different
+    // value. Follow-up tracked in the PR body.
+    if (mergedChanges.has('orgId')) {
+      const organizationId = mergedChanges.get('orgId') ?? null;
+      if (organizationId !== null) {
+        const authorized = await hasOrganizationAccess(tx, {
+          kiloUserId,
+          organizationId,
+        });
+        if (!authorized) {
+          console.warn('Refusing unauthorized organization_id metadata write', {
+            kiloUserId,
+            sessionId,
+            organizationId,
+          });
+          delete updates.organization_id;
+        } else {
+          organizationIdWriteApplied = true;
+        }
+      } else {
+        organizationIdWriteApplied = true;
+      }
+    }
+
+    // Gate only the orgId contribution: a refused-only orgId must not count as a
+    // non-status change (no phantom session.updated). Keep parentSessionId and every
+    // other non-org key exactly as before — do not derive this from `updates` alone.
+    const changedNonStatus =
+      mergedChanges.has('title') ||
+      mergedChanges.has('platform') ||
+      organizationIdWriteApplied ||
+      mergedChanges.has('gitUrl') ||
+      mergedChanges.has('gitBranch') ||
+      parentSessionId !== undefined;
 
     if (Object.keys(updates).length > 0) {
       await tx
@@ -179,7 +214,7 @@ export async function applyMetadataChanges(
     };
   });
 
-  if (mergedChanges.has('orgId')) {
+  if (organizationIdWriteApplied) {
     try {
       await withDORetry(
         () => getSessionAccessCacheDO(env, { kiloUserId }),

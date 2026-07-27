@@ -8947,6 +8947,8 @@ export const user_notification_preferences = pgTable('user_notification_preferen
   agent_attention_enabled: boolean().default(true).notNull(),
   session_status_enabled: boolean().default(true).notNull(),
   kiloclaw_activity_enabled: boolean().default(true).notNull(),
+  balance_alerts_enabled: boolean().default(true).notNull(),
+  security_findings_enabled: boolean().default(true).notNull(),
   created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp({ withTimezone: true, mode: 'string' })
     .defaultNow()

@@ -1,5 +1,5 @@
-import { isNoOpCompletedPreparationAttempt } from 'cloud-agent-sdk/preparation-attempts';
-import { type PreparationAttempt, type StoredMessage } from 'cloud-agent-sdk';
+import { isNoOpCompletedPreparationAttempt } from '@kilocode/cloud-agent-sdk/preparation-attempts';
+import { type PreparationAttempt, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 export type SessionTranscriptItem =
   | { type: 'message'; message: StoredMessage }

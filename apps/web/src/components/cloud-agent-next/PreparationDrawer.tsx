@@ -14,7 +14,7 @@ import type {
   PreparationAttempt,
   PreparationStepSnapshot,
   PreparationStepStatus,
-} from '@/lib/cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { cn } from '@/lib/utils';
 import { useManager } from './CloudAgentProvider';

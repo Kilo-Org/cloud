@@ -30,9 +30,7 @@ import type {
   PullRequestReviewCommentPayload,
   GitHubAuthorAssociation,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
-
-const KILO_MENTION_PATTERN = /@kilo\b/i;
-const FIX_KEYWORD_PATTERN = /\b(fix|patch)\b/i;
+import { parseFixCommand } from '@kilocode/app-shared/code-review';
 
 /**
  * author_association values that imply write access.
@@ -71,8 +69,13 @@ export class ReviewCommentWebhookProcessor {
       commentId: comment.id,
     });
 
-    // 1. Check if comment body contains @kilo and a fix keyword
-    if (!KILO_MENTION_PATTERN.test(comment.body) || !FIX_KEYWORD_PATTERN.test(comment.body)) {
+    // 1. Check if comment body contains @kilo and a fix keyword.
+    //    Admission is delegated to the shared parseFixCommand so the
+    //    product-advertised "@kilocode-bot fix it" footer command and
+    //    the existing "@kilo … fix" shorthand both admit (and a
+    //    mention-only or fix-only body still rejects). See
+    //    @kilocode/app-shared/code-review/mention-command.ts.
+    if (!parseFixCommand(comment.body)) {
       logExceptInTest('[ReviewCommentWebhookProcessor] No @kilo fix mention found', {
         commentId: comment.id,
       });

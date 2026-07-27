@@ -1,4 +1,7 @@
-import { calculateContextUsagePercentage, type ContextUsage } from 'cloud-agent-sdk/context-usage';
+import {
+  calculateContextUsagePercentage,
+  type ContextUsage,
+} from '@kilocode/cloud-agent-sdk/context-usage';
 
 import { type SessionModelOption } from './hooks/use-session-model-options';
 

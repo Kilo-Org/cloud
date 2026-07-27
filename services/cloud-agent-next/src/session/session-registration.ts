@@ -27,12 +27,7 @@ import {
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import {
-  generateSandboxRoutingTarget,
-  isOrgInList,
-  selectSandboxForNewSession,
-  type SandboxSelection,
-} from '../sandbox-id.js';
+import { generateSandboxRoutingTarget, isOrgInList, type SandboxSelection } from '../sandbox-id.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { createMessageId } from './message-id.js';
@@ -145,7 +140,8 @@ async function recordPostSetupFailure(record: () => Promise<void>): Promise<void
 
 async function allocateNewSession(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): Promise<NewSessionAllocation> {
   const sessionService = new SessionService();
   const initialTurn = acceptInitialTurn(input.initialTurn);
@@ -184,7 +180,7 @@ async function allocateNewSession(
       ctx.botId,
       {
         devcontainer: input.runtime?.devcontainer,
-        createdOnPlatform: input.options?.createdOnPlatform,
+        createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
       }
     );
     if (target.kind === 'shared') {
@@ -199,16 +195,8 @@ async function allocateNewSession(
         ...(assignment.suffix ? { suffix: assignment.suffix } : {}),
       };
     } else {
-      const selection = await selectSandboxForNewSession({
-        env: ctx.env,
-        orgId,
-        userId: ctx.userId,
-        sessionId: cloudAgentSessionId,
-        botId: ctx.botId,
-        devcontainer: input.runtime?.devcontainer,
-      });
-      sandboxId = selection.sandboxId;
-      sandboxProvider = selection.provider;
+      sandboxId = target.sandboxId;
+      sandboxProvider = 'cloudflare';
     }
   } catch (error) {
     await recordCloudAgentSessionFailure(
@@ -282,7 +270,8 @@ async function allocateNewSession(
 function buildSessionRegistrationCommand(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
-  allocation: NewSessionAllocation
+  allocation: NewSessionAllocation,
+  options?: { billingOrigin?: string }
 ) {
   return {
     identity: {
@@ -291,6 +280,7 @@ function buildSessionRegistrationCommand(
       orgId: input.options?.kilocodeOrganizationId,
       botId: ctx.botId,
       createdOnPlatform: input.options?.createdOnPlatform,
+      billingOrigin: options?.billingOrigin,
     },
     auth: {
       kiloSessionId: allocation.kiloSessionId,
@@ -328,9 +318,10 @@ function buildSessionRegistrationCommand(
  */
 export async function registerNewSession(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  const allocation = await allocateNewSession(input, ctx);
+  const allocation = await allocateNewSession(input, ctx, options);
   const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
     `${ctx.userId}:${allocation.cloudAgentSessionId}`
   );
@@ -338,7 +329,7 @@ export async function registerNewSession(
   let registerResult: Awaited<ReturnType<typeof stub.registerSession>>;
   try {
     registerResult = await stub.registerSession(
-      buildSessionRegistrationCommand(input, ctx, allocation)
+      buildSessionRegistrationCommand(input, ctx, allocation, options)
     );
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -384,9 +375,10 @@ export async function registerNewSession(
  */
 export async function startNewSession(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): Promise<StartedSessionResult> {
-  const allocation = await allocateNewSession(input, ctx);
+  const allocation = await allocateNewSession(input, ctx, options);
   const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
     `${ctx.userId}:${allocation.cloudAgentSessionId}`
   );
@@ -399,7 +391,7 @@ export async function startNewSession(
       () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
       stub =>
         stub.createSessionWithInitialAdmission({
-          ...buildSessionRegistrationCommand(input, ctx, allocation),
+          ...buildSessionRegistrationCommand(input, ctx, allocation, options),
           message: { initialTurn: allocation.initialTurn },
         }),
       'createSessionWithInitialAdmission'

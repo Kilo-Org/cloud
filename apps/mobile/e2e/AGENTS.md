@@ -2,6 +2,21 @@
 
 Interactive verification against a local backend. Run commands from the repository root unless a step says otherwise. Long-lived services live in a worktree-specific tmux session owned by the repository dev runner; use it, never loose background processes.
 
+## Device Slot: Required First Step
+
+This machine is shared by parallel workflows. Before starting a stack, booting a simulator or emulator, or running a native build — on every run, whether or not you can see another workflow active — acquire a slot:
+
+```bash
+apps/mobile/.kilo/e2e-slot.sh acquire <your-tmux-session>   # blocks until a slot frees
+apps/mobile/.kilo/e2e-slot.sh status                        # current holders
+apps/mobile/.kilo/e2e-slot.sh release <your-tmux-session>   # the moment the device phase ends
+```
+
+- Default 3 slots, machine-global, owned by tmux session name; a dead session's slot is reclaimed automatically, so a crash cannot wedge the queue.
+- `acquire` blocking is correct behavior, not a hang and not a wedge. Wait for it. Never start device work unslotted because the queue was busy, because your phase looks small, or because a stack is already up.
+- Acquiring is idempotent per session; every device phase (repro gate, prewarm, each E2E round) needs a slot.
+- Release as soon as the device phase ends. Planning, implementation, review, checks, and CI waits are uncapped — never hold a slot through them.
+
 ## Fresh Worktree Quickstart
 
 If dependencies or local env files are missing, run once (authorizes both worktree `.envrc` files and copies local env files from the primary checkout):
@@ -21,9 +36,7 @@ xcrun simctl list devices booted
 
 If a complete stack is already running for this worktree, reuse it. Never start a competing stack or stop an unrelated `kilo-dev-*` session.
 
-When other workflows may be running on this machine, acquire a device slot before starting a stack, simulator, or native build, and release it when the device phase ends: `apps/mobile/.kilo/e2e-slot.sh acquire|release <tmux-session>` (see the Local Tooling section of [.kilo/MOBILE_WORKFLOW.md](../.kilo/MOBILE_WORKFLOW.md)).
-
-If this worktree has no stack, start the complete mobile flow:
+If this worktree has no stack, start the complete mobile flow — after acquiring a device slot (see above):
 
 ```bash
 pnpm dev:env -y cloudflare-session-ingest
@@ -99,7 +112,7 @@ xcrun simctl openurl <udid> \
   "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
 ```
 
-- Prefer `simctl openurl` for scheme reconnection; it skips Safari's external-app confirmation. When a flow intentionally goes through Safari or a WebView, look for the exact message `Open this page in "Kilo"?` and tap the exact `Open` accessibility action — one bounded optional prompt inside the existing five-second optional-prompt budget, never a new fixed wait.
+- Prefer `simctl openurl` for scheme reconnection; it skips Safari's external-app confirmation. Since universal links (`associatedDomains`) were configured, iOS may instead show a SpringBoard confirmation with the exact message `Open in "Kilo"?` (curly or straight quotes) — the shared launch flows match both wordings and tap `Open`. When a flow intentionally goes through Safari or a WebView, look for the exact message `Open this page in "Kilo"?` and tap the exact `Open` accessibility action — one bounded optional prompt inside the existing five-second optional-prompt budget, never a new fixed wait.
 - Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen does not prove the bundle came from this worktree.
 - The dev client reads `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` from Metro's manifest; the login preflight checks both against this worktree. After env changes: regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config or plugins changed.
 - The shared launch flows dismiss the clean-install tracking alert, accept the Expo dev-menu introduction with `Continue`, and close the full developer menu (Fast Refresh / Element Inspector) with its `Close` accessibility action.
@@ -211,7 +224,7 @@ Use the wrappers for all Android tooling, including the Expo/Gradle build, so th
 Two launch attempts total, then a test-environment blocker with the tail of `$EMULATOR_LOG`. Attempt 1 uses `-gpu host` (Mac GPU; fastest; software rendering competes for the CPU under parallel-workflow load). Keep `-no-snapshot-save -no-boot-anim` on every launch. Attempt 2 switches GPU only on an observed process-death signal (`pgrep -f "qemu.*<avd-name>"` empty, or the log shows the emulator exiting/erroring — the pane mirrors it live but dies with the session) → `-gpu swiftshader_indirect`. If the process is still alive but the boot envelope expired → repeat `-gpu host`. Never a third launch.
 
 ```bash
-# After e2e-slot acquire (see Fresh Worktree Quickstart)
+# After e2e-slot acquire (see Device Slot: Required First Step)
 ANDROID_SESSION="kilo-e2e-android-$(basename "$PWD")"
 EMULATOR_LOG="/tmp/${ANDROID_SESSION}.log"
 GPU_FLAG=host   # attempt 2: swiftshader_indirect only after process death; else host again
@@ -293,7 +306,7 @@ pnpm dev:stop                                # only if you started this worktree
 xcrun simctl shutdown <udid>                 # only if you booted it
 pnpm dev:mobile:simulator release <udid>     # every simulator you claimed
 pnpm dev:mobile:android release <serial>     # every Android device you claimed
-apps/mobile/.kilo/e2e-slot.sh release <tmux-session>   # if you acquired a device slot
+apps/mobile/.kilo/e2e-slot.sh release <tmux-session>   # always, as soon as the device phase ends
 ```
 
 Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, shut down a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.

@@ -22,6 +22,9 @@ type UpstreamFetchFailureFamily =
   | 'abort'
   | 'unknown';
 
+// Longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout.
+const TIMEOUT_MS = 15 * 60 * 1000;
+
 function getProviderTargetHost(apiUrl: string): string {
   try {
     return new URL(apiUrl).host;
@@ -136,13 +139,56 @@ function classifyUpstreamFetchFailure({
   }
 }
 
-function upstreamDisconnectResponse() {
-  const error = 'The upstream provider disconnected before sending a response.';
+/**
+ * The Vercel request id makes a reported error traceable to the invocation that
+ * produced it, so it is appended to the message when the platform provided one.
+ */
+function withRequestId(message: string, vercelRequestId: string | null | undefined): string {
+  return vercelRequestId ? `${message} (request id: ${vercelRequestId})` : message;
+}
+
+/**
+ * The client going away also aborts our upstream fetch, so the abort has to be
+ * attributed to the client rather than reported as an upstream fault. The body
+ * is mostly for logs and observability: the client that would read it is gone.
+ * 499 mirrors the nginx convention so these cancellations do not show up as
+ * upstream 5xx failures.
+ */
+function clientDisconnectResponse(vercelRequestId: string | null | undefined) {
+  const error = withRequestId(
+    'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
+    vercelRequestId
+  );
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.client_disconnect,
+      message: error,
+      ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
+    },
+    { status: 499 }
+  );
+}
+
+function upstreamFetchFailureResponse(
+  failureFamily: UpstreamFetchFailureFamily,
+  vercelRequestId: string | null | undefined
+) {
+  const error = withRequestId(
+    failureFamily === 'request_timeout' ||
+      failureFamily === 'headers_timeout' ||
+      failureFamily === 'connect_timeout' ||
+      failureFamily === 'read_timeout'
+      ? 'The upstream provider did not send response headers before the gateway timeout.'
+      : 'The upstream provider closed the connection before sending a response.',
+    vercelRequestId
+  );
   return NextResponse.json(
     {
       error,
       error_type: ProxyErrorType.upstream_disconnect,
       message: error,
+      ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
     },
     { status: 503 }
   );
@@ -156,6 +202,7 @@ export async function upstreamRequest({
   extraHeaders,
   provider,
   signal,
+  vercelRequestId,
 }: {
   path: string;
   search: string;
@@ -164,6 +211,8 @@ export async function upstreamRequest({
   extraHeaders: Record<string, string>;
   provider: Provider;
   signal?: AbortSignal;
+  /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
+  vercelRequestId?: string | null;
 }): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
@@ -178,10 +227,12 @@ export async function upstreamRequest({
 
   const targetUrl = `${provider.apiUrl}${path}${search}`;
 
-  const TIMEOUT_MS = 15 * 60 * 1000; // longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout
   const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
   const onTimeoutAbort = () => {
-    errorExceptInTest('[upstreamRequest] timeout');
+    errorExceptInTest(
+      `[upstreamRequest] gateway timeout after ${TIMEOUT_MS}ms waiting for upstream response headers`,
+      { vercelRequestId: vercelRequestId ?? '<none>' }
+    );
   };
   timeoutSignal.addEventListener('abort', onTimeoutAbort);
   after(() => {
@@ -202,6 +253,12 @@ export async function upstreamRequest({
       }),
     };
   } catch (error) {
+    // The caller passes the incoming request signal, so a client that goes away
+    // aborts this fetch as well. Those aborts are client-side cancellations and
+    // must not be reported (or alerted on) as upstream failures.
+    const clientDisconnected = signal?.aborted === true;
+    // Stays `undefined` when diagnostic enrichment below throws before classifying.
+    let failureFamily: UpstreamFetchFailureFamily | undefined;
     try {
       const cause = error instanceof Error ? error.cause : undefined;
       const errorName = getErrorName(error);
@@ -209,7 +266,7 @@ export async function upstreamRequest({
       const causeCode = getCauseCode(cause);
       const causeName = getCauseName(cause);
       const causeMessage = getCauseMessage(cause);
-      const failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
+      failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
       const failureMetadata = {
         providerId: provider.id,
         targetHost: getProviderTargetHost(provider.apiUrl),
@@ -217,12 +274,13 @@ export async function upstreamRequest({
         failureFamily,
         errorName,
         errorMessage,
+        ...(vercelRequestId && { vercelRequestId }),
         ...(causeCode && { causeCode }),
         ...(causeName && { causeName }),
         ...(causeMessage && { causeMessage }),
       };
 
-      if (!(failureFamily === 'abort' && signal?.aborted)) {
+      if (!(failureFamily === 'abort' && clientDisconnected)) {
         errorExceptInTest('AI gateway upstream fetch failed', failureMetadata);
         captureException(createLoggedFetchFailure(errorName, errorMessage), {
           level: 'error',
@@ -238,7 +296,15 @@ export async function upstreamRequest({
       // Fetch failure must remain caller-visible even when diagnostic enrichment fails.
     }
 
-    return { type: 'error', response: upstreamDisconnectResponse() };
+    const causedByClientDisconnect =
+      clientDisconnected && (failureFamily === 'abort' || failureFamily === undefined);
+
+    return {
+      type: 'error',
+      response: causedByClientDisconnect
+        ? clientDisconnectResponse(vercelRequestId)
+        : upstreamFetchFailureResponse(failureFamily ?? 'unknown', vercelRequestId),
+    };
   }
 }
 

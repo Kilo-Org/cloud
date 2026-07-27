@@ -10,6 +10,7 @@ export const billingContextSchema = usageContextSchema
     measurementStarted: z.boolean(),
     nextSeq: z.number().int().positive().max(2_147_483_647).default(1),
     usageMeasuredAtMs: z.number().int().nonnegative().finite(),
+    stoppedObservedAtMs: z.number().int().nonnegative().finite().optional(),
     pendingHeartbeat: z
       .object({
         seq: z.number().int().positive().finite(),
@@ -69,6 +70,7 @@ export async function setBillingContext(
     measurementStarted: false,
     nextSeq: 1,
     usageMeasuredAtMs: Date.now(),
+    stoppedObservedAtMs: undefined,
     pendingHeartbeat: undefined,
     pendingStop: undefined,
   });

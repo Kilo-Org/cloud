@@ -1,5 +1,12 @@
-import { type MessageDeliveryState, type StoredMessage } from 'cloud-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
+
+import {
+  assistantMessage,
+  findText,
+  hasAnimatedBadge,
+  renderBubble,
+  userMessage,
+} from './message-bubble-test-utils';
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -49,78 +56,6 @@ vi.mock('./use-message-copy', () => ({
   useMessageCopy: () => ({ copyMessage: vi.fn() }),
 }));
 
-function userMessage(id: string): StoredMessage {
-  return {
-    info: {
-      id,
-      sessionID: 'ses_1',
-      role: 'user',
-      time: { created: 1_761_000_000_000 },
-      agent: 'build',
-      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
-    },
-    parts: [
-      {
-        id: `${id}-text`,
-        sessionID: 'ses_1',
-        messageID: id,
-        type: 'text',
-        text: 'hi',
-      },
-    ],
-  };
-}
-
-async function renderBubble(
-  message: StoredMessage,
-  deliveryState?: MessageDeliveryState
-): Promise<unknown> {
-  const { MessageBubble } = await import('./message-bubble');
-  // eslint-disable-next-line new-cap
-  return MessageBubble({ message, deliveryState });
-}
-
-function findText(node: unknown, predicate: (text: string) => boolean): boolean {
-  if (typeof node === 'string') {
-    return predicate(node);
-  }
-  if (node == null || typeof node !== 'object') {
-    return false;
-  }
-  const element = node as { type?: unknown; props?: { children?: unknown } };
-  // The mock for the Text component is a plain function; we inspect the
-  // unrendered React element tree, so the string sits in props.children.
-  if (typeof element.props?.children === 'string' && predicate(element.props.children)) {
-    return true;
-  }
-  const children = element.props?.children;
-  if (Array.isArray(children)) {
-    return children.some(child => findText(child, predicate));
-  }
-  if (children && typeof children === 'object') {
-    return findText(children, predicate);
-  }
-  return false;
-}
-
-function hasAnimatedBadge(node: unknown): boolean {
-  if (node == null || typeof node !== 'object') {
-    return false;
-  }
-  const element = node as { type?: unknown; props?: Record<string, unknown> };
-  if (element.type === 'Animated.View') {
-    return true;
-  }
-  const children = element.props?.children;
-  if (Array.isArray(children)) {
-    return children.some(child => hasAnimatedBadge(child));
-  }
-  if (children && typeof children === 'object') {
-    return hasAnimatedBadge(children);
-  }
-  return false;
-}
-
 describe('MessageBubble queued badge', () => {
   it('renders the Queued badge when deliveryState is queued on a user message', async () => {
     const tree = await renderBubble(userMessage('m1'), { status: 'queued' });
@@ -143,25 +78,7 @@ describe('MessageBubble queued badge', () => {
   });
 
   it('does not render the Queued badge for assistant messages even when delivery state is queued', async () => {
-    const base = userMessage('m4');
-    const assistant: StoredMessage = {
-      info: {
-        id: base.info.id,
-        sessionID: base.info.sessionID,
-        role: 'assistant',
-        time: { created: base.info.time.created },
-        parentID: 'm0',
-        modelID: 'anthropic/claude-sonnet-4',
-        providerID: 'kilo',
-        mode: 'code',
-        agent: 'build',
-        path: { cwd: '/', root: '/' },
-        cost: 0,
-        tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-      },
-      parts: [],
-    };
-    const tree = await renderBubble(assistant, { status: 'queued' });
+    const tree = await renderBubble(assistantMessage('m4'), { status: 'queued' });
     expect(findText(tree, t => t === 'Queued')).toBe(false);
   });
 });
@@ -177,77 +94,5 @@ describe('MessageBubble regressions', () => {
     // must be absent, not stuck from a prior render.
     const dequeuedTree = await renderBubble(message);
     expect(findText(dequeuedTree, t => t === 'Queued')).toBe(false);
-  });
-});
-
-function pressableProps(node: unknown): Record<string, unknown> | null {
-  if (node == null || typeof node !== 'object') {
-    return null;
-  }
-  const element = node as { type?: unknown; props?: Record<string, unknown> };
-  if (element.type === 'Pressable' && element.props) {
-    return element.props;
-  }
-  const children = element.props?.children;
-  if (Array.isArray(children)) {
-    for (const child of children) {
-      const found = pressableProps(child);
-      if (found) {
-        return found;
-      }
-    }
-  } else if (children && typeof children === 'object') {
-    return pressableProps(children);
-  }
-  return null;
-}
-
-describe('MessageBubble long-press details', () => {
-  it('uses the details accessibility hint on user messages', async () => {
-    const tree = await renderBubble(userMessage('m-hint-user'));
-    const props = pressableProps(tree);
-    expect(props?.accessibilityHint).toBe('Long press for message details');
-    expect(props?.accessibilityActions).toEqual([{ name: 'copy', label: 'Copy message' }]);
-  });
-
-  it('uses the details accessibility hint on assistant messages', async () => {
-    const base = userMessage('m-hint-asst');
-    const assistant: StoredMessage = {
-      info: {
-        id: base.info.id,
-        sessionID: base.info.sessionID,
-        role: 'assistant',
-        time: { created: base.info.time.created },
-        parentID: 'm0',
-        modelID: 'anthropic/claude-sonnet-4',
-        providerID: 'kilo',
-        mode: 'code',
-        agent: 'build',
-        path: { cwd: '/', root: '/' },
-        cost: 0,
-        tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-      },
-      parts: [],
-    };
-    const tree = await renderBubble(assistant);
-    const props = pressableProps(tree);
-    expect(props?.accessibilityHint).toBe('Long press for message details');
-  });
-
-  it('invokes onLongPressDetails on long-press, not copyMessage', async () => {
-    const onLongPressDetails = vi.fn((..._args: unknown[]) => {
-      // void-returning callback matching MessageBubble's prop type
-    });
-    const { MessageBubble } = await import('./message-bubble');
-    const message = userMessage('m-long');
-    // eslint-disable-next-line new-cap
-    const tree = MessageBubble({ message, onLongPressDetails });
-    const props = pressableProps(tree);
-    expect(props).not.toBeNull();
-    const handler = props === null ? undefined : props.onLongPress;
-    expect(typeof handler).toBe('function');
-    const invoke = handler as (() => void) | undefined;
-    invoke?.();
-    expect(onLongPressDetails).toHaveBeenCalledWith(message);
   });
 });

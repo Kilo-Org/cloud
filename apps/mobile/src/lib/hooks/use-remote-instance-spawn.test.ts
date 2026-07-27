@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { type KiloSessionId, type UserWebConnection } from 'cloud-agent-sdk';
+import { type KiloSessionId, type UserWebConnection } from '@kilocode/cloud-agent-sdk';
 // kilocode_change - K1/C2: runtime imports via the narrow subpath alias —
 // see the matching comment in remote-instance-spawn-classifier.ts and
 // vitest.config.ts for why the full `cloud-agent-sdk` barrel is unsafe here.
-import { CommandDeliveredError, UserWebCommandError } from 'cloud-agent-sdk/user-web-connection';
+import {
+  CommandDeliveredError,
+  UserWebCommandError,
+} from '@kilocode/cloud-agent-sdk/user-web-connection';
 
 // kilocode_change - K1/C2: imported from the classifier module, not
 // `use-remote-instance-spawn.ts` — that file's `useRemoteInstanceSpawn` hook

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { calculateContextUsagePercentage } from '@/lib/cloud-agent-sdk/context-usage';
+import { calculateContextUsagePercentage } from '@kilocode/cloud-agent-sdk/context-usage';
 
 type ContextUsageIndicatorProps = {
   contextTokens?: number;

@@ -1,4 +1,4 @@
-import { type ReasoningPart, type TextPart } from 'cloud-agent-sdk';
+import { type ReasoningPart, type TextPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PartRenderer } from './part-renderer';

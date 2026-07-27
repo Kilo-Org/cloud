@@ -3,6 +3,7 @@ import { BitbucketApiError, type BitbucketRepository } from './bitbucket-api.js'
 import {
   listBitbucketRepositories,
   resolveBitbucketToken,
+  selectCachedBitbucketRepository,
 } from './bitbucket-runtime-token-resolver.js';
 import {
   BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS,
@@ -255,5 +256,63 @@ describe('Bitbucket runtime token resolver', () => {
       reason: 'repository_mismatch',
     });
     expect(deps.authorizationService.invalidateAuthorization).not.toHaveBeenCalled();
+  });
+});
+
+describe('selectCachedBitbucketRepository', () => {
+  const cachedTarget = {
+    id: repositoryUuid,
+    name: 'Widgets',
+    full_name: 'acme/widgets',
+    private: true,
+    default_branch: 'main',
+  };
+
+  it('resolves the target repository even when the cache holds more than 500 repositories', () => {
+    // Filler entries deliberately use non-UUID ids and are never validated: only
+    // the matched target must be well-formed. A workspace this size previously
+    // failed the whole-array `.max(500)` parse and returned temporarily_unavailable.
+    const filler = Array.from({ length: 2091 }, (_, index) => ({
+      id: `filler-${index}`,
+      name: `repo-${index}`,
+      full_name: `acme/repo-${index}`,
+      private: false,
+    }));
+
+    expect(
+      selectCachedBitbucketRepository([...filler, cachedTarget], {
+        workspaceUuid,
+        repositoryUuid,
+      })
+    ).toEqual({
+      status: 'available',
+      repository: {
+        id: repositoryUuid,
+        workspaceUuid,
+        name: 'Widgets',
+        fullName: 'acme/widgets',
+        private: true,
+        defaultBranch: 'main',
+      },
+    });
+  });
+
+  it('returns repository_not_found when the target repository is absent from the cache', () => {
+    expect(selectCachedBitbucketRepository([], { workspaceUuid, repositoryUuid }).status).toBe(
+      'repository_not_found'
+    );
+  });
+
+  it('returns repository_not_found when the matched cache entry is malformed', () => {
+    const malformed = [{ id: repositoryUuid, name: '', full_name: 'x', private: 'nope' }];
+    expect(
+      selectCachedBitbucketRepository(malformed, { workspaceUuid, repositoryUuid }).status
+    ).toBe('repository_not_found');
+  });
+
+  it('returns temporarily_unavailable when the cached value is not an array', () => {
+    expect(selectCachedBitbucketRepository(null, { workspaceUuid, repositoryUuid }).status).toBe(
+      'temporarily_unavailable'
+    );
   });
 });

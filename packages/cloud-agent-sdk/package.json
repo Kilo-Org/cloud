@@ -1,0 +1,41 @@
+{
+  "name": "@kilocode/cloud-agent-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Client-safe cloud agent session SDK shared by the web and mobile apps",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./context-usage": "./src/context-usage.ts",
+    "./create-session": "./src/create-session.ts",
+    "./message-id": "./src/message-id.ts",
+    "./preparation-attempts": "./src/preparation-attempts.ts",
+    "./remote-command-catalog": "./src/remote-command-catalog.ts",
+    "./remote-model-order": "./src/remote-model-order.ts",
+    "./schemas": "./src/schemas.ts",
+    "./session": "./src/session.ts",
+    "./user-web-connection": "./src/user-web-connection.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
+    "jotai": "2.18.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@jest/globals": "30.3.0",
+    "@kilocode/session-ingest-contracts": "workspace:*",
+    "@swc/jest": "0.2.39",
+    "@types/jest": "30.0.0",
+    "@typescript/native-preview": "catalog:",
+    "jest": "30.3.0",
+    "typescript": "catalog:"
+  },
+  "author": "Kilo Code",
+  "license": "MIT"
+}

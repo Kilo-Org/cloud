@@ -1,4 +1,4 @@
-import { type Part } from 'cloud-agent-sdk';
+import { type Part } from '@kilocode/cloud-agent-sdk';
 
 import { isSnapshotProgressPart } from './part-types';
 

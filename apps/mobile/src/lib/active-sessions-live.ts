@@ -26,7 +26,7 @@ import {
   sessionsListDataSchema,
   type SessionStatusUpdatedPayload,
   sessionStatusUpdatedPayloadSchema,
-} from 'cloud-agent-sdk/schemas';
+} from '@kilocode/cloud-agent-sdk/schemas';
 
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 

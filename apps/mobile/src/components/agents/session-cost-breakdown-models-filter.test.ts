@@ -12,7 +12,7 @@ import {
   type Part,
   type StepFinishPart,
   type StoredMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 /**
  * R8 / AC8 — Models section display filter.

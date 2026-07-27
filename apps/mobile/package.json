@@ -24,6 +24,7 @@
     "@expo-google-fonts/jetbrains-mono": "0.4.1",
     "@expo/react-native-action-sheet": "4.1.1",
     "@kilocode/app-shared": "workspace:*",
+    "@kilocode/cloud-agent-sdk": "workspace:*",
     "@kilocode/event-service": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kilo-chat-hooks": "workspace:*",
@@ -100,9 +101,11 @@
   "devDependencies": {
     "@sentry/cli": "catalog:",
     "@types/react": "19.2.14",
+    "@types/react-test-renderer": "^19.1.0",
     "@typescript/native-preview": "catalog:",
     "eslint-plugin-sonarjs": "4.0.3",
     "knip": "6.0.6",
+    "react-test-renderer": "^19.2.7",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

@@ -1,6 +1,6 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
-export type ClawInstance = inferRouterOutputs<RootRouter>['kiloclaw']['listAllInstances'][number];
+export type ClawInstance = inferRouterOutputs<MobileRouter>['kiloclaw']['listAllInstances'][number];
 
 export type InstanceContextResult =
   | { status: 'loading' }

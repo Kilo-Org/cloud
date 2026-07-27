@@ -1,4 +1,4 @@
-import { type MessageDeliveryState, type StoredMessage } from 'cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', () => ({

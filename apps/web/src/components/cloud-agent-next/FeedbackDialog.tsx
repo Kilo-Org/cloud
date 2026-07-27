@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useManager } from './CloudAgentProvider';
-import type { ResolvedSession } from '@/lib/cloud-agent-sdk';
+import type { ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage } from './types';
 import { isTextPart } from './types';
 

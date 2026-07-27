@@ -1,4 +1,4 @@
-import { type RootRouter } from '@kilocode/trpc';
+import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import * as SecureStore from 'expo-secure-store';
@@ -6,7 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL, E2E_LATENCY_MESSAGES_MS, E2E_LATENCY_SESSION_MS } from '@/lib/config';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 
-export const { TRPCProvider, useTRPC } = createTRPCContext<RootRouter>();
+export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
 
 const trpcUrl = `${API_BASE_URL}/api/trpc`;
 
@@ -63,7 +63,7 @@ async function getAuthHeaders() {
   return { Authorization: `Bearer ${token}` };
 }
 
-export const trpcClient = createTRPCClient<RootRouter>({
+export const trpcClient = createTRPCClient<MobileRouter>({
   links: [
     splitLink({
       condition: op => op.context.skipBatch === true,

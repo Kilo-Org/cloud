@@ -27,6 +27,6 @@ appId: com.kilocode.kiloapp
           text: 'Kilo'
 # Cold launch and bundling are slow; wait for any known state before settling.
 - extendedWaitUntil:
-    visible: 'Open this page in "Kilo"\?|Allow “Kilo” to track your activity across other companies’ apps and websites\?|Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
+    visible: 'Open this page in "Kilo"\?|Open in ["“”]Kilo["“”]\?|Allow “Kilo” to track your activity across other companies’ apps and websites\?|Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
     timeout: 30000
 - runFlow: settle-app.yaml

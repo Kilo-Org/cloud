@@ -1,4 +1,9 @@
-import { type KiloSessionId, type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type Part,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 
 import { computeStatus } from './compute-status';
 import { isToolPart } from './part-types';

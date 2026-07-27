@@ -1,10 +1,13 @@
-import { getStepFinishRoutedModel, type RoutedModelRef } from 'cloud-agent-sdk/part-utils';
+import {
+  getStepFinishRoutedModel,
+  type RoutedModelRef,
+} from '@kilocode/cloud-agent-sdk/part-utils';
 import {
   type AssistantMessage,
   type Part,
   type StepFinishPart,
   type StoredMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 export type SessionCostBreakdownTotals = {
   input: number;

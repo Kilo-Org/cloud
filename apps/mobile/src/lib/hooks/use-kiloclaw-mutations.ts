@@ -1,14 +1,14 @@
 /* eslint-disable max-lines */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { renameKiloClawInstance } from '@/lib/kiloclaw-display';
 import { useTRPC } from '@/lib/trpc';
 import { asyncNoop } from '@/lib/utils';
 
 const onMutationError = (error: { message: string }) => {
-  toast.error(error.message || 'Something went wrong');
+  announcingToast.error(error.message || 'Something went wrong');
 };
 
 /**

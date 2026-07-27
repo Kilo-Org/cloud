@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type ContextUsage } from 'cloud-agent-sdk/context-usage';
+import { type ContextUsage } from '@kilocode/cloud-agent-sdk/context-usage';
 
 import { type SessionModelOption } from './hooks/use-session-model-options';
 import { resolveSessionContextInfo } from './session-context-info';

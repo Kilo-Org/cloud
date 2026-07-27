@@ -10,7 +10,7 @@ import {
   type RemoteModelOverride,
   type RemoteModelState,
   type ResolvedSession,
-} from '@/lib/cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import {
   buildContextLengthByProviderAndModel,

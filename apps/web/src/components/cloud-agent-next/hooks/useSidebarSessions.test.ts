@@ -1,4 +1,4 @@
-import type { UserWebSessionEventData } from '@/lib/cloud-agent-sdk';
+import type { UserWebSessionEventData } from '@kilocode/cloud-agent-sdk';
 import type { DbSessionV2 } from '../store/db-session-atoms';
 import {
   createSidebarQueryReconciler,

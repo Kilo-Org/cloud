@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { Sparkles } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { useSessionManager } from '@/components/agents/session-provider';
 

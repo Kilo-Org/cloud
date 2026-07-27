@@ -8,10 +8,10 @@
 // Side-by-side is read-only — commenting is unified-view only — so the
 // row does not accept tap/selection handlers.
 //
-// Renders fixed-height rows so FlashList can virtualize without
-// remeasuring. The row height matches the unified `DiffLine` row so
-// mixed view-mode content (if the toggle changes mid-scroll) would
-// still fit a stable grid.
+// Row height scales with the system font scale (bounded — see
+// `diff-font-metrics.ts`). The cap keeps both columns aligned even at
+// the largest a11y scale we honour; without the cap, the gutter would
+// overflow at AX5 (1.8x).
 
 import { memo, useMemo } from 'react';
 import { Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
@@ -23,35 +23,16 @@ import { type ParsedDiffLine, type ParsedHunk } from '@/lib/pr-review/diff/parse
 import { type SideBySideRow as SideBySideRowData } from '@/lib/pr-review/diff/side-by-side';
 import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
+import {
+  type BoundedFontMetrics,
+  DIFF_MAX_FONT_SCALE,
+  useDiffFontMetrics,
+} from '@/components/pr-review/diff/diff-font-metrics';
 
-const LINE_HEIGHT = 18;
-const VERTICAL_PADDING = 2;
 const COLUMN_GUTTER_WIDTH = 56;
 const COLUMN_INNER_PADDING = 2;
+const VERTICAL_PADDING = 2;
 const NO_NEWLINE_INDICATOR = '\u26A0\uFE0F no newline at end of file';
-
-const ROW_MIN_HEIGHT = LINE_HEIGHT + VERTICAL_PADDING * 2;
-const ROW_STYLE: ViewStyle = { minHeight: ROW_MIN_HEIGHT };
-const GUTTER_STYLE: ViewStyle = {
-  width: COLUMN_GUTTER_WIDTH,
-  height: ROW_MIN_HEIGHT,
-};
-const CODE_CONTAINER_STYLE: ViewStyle = { paddingVertical: VERTICAL_PADDING };
-const CODE_BASE_STYLE: TextStyle = {
-  fontFamily: 'JetBrainsMono_500Medium',
-  fontSize: 12,
-  lineHeight: LINE_HEIGHT,
-};
-const GUTTER_TEXT_BASE: TextStyle = {
-  fontFamily: 'JetBrainsMono_500Medium',
-  fontSize: 11,
-  lineHeight: LINE_HEIGHT,
-};
-const NO_NEWLINE_BASE: TextStyle = {
-  fontFamily: 'JetBrainsMono_500Medium',
-  fontSize: 11,
-  lineHeight: LINE_HEIGHT,
-};
 
 type SideBySideRowProps = {
   row: SideBySideRowData;
@@ -91,6 +72,7 @@ type SideColumnProps = {
 };
 
 function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumnProps) {
+  const metrics = useDiffFontMetrics();
   const tokens = useMemo<HighlightToken[]>(
     () => highlightLine(line.text, language),
     [language, line.text]
@@ -100,26 +82,51 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
   const gutterText = sideGutterText(line, side);
   const noNewlineLabel = line.noNewlineAtEndOfFile ? ` ${NO_NEWLINE_INDICATOR}` : '';
 
+  const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
+  const gutterStyle: ViewStyle = {
+    width: COLUMN_GUTTER_WIDTH,
+    minHeight: metrics.rowMinHeight,
+  };
+  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeBaseStyle: TextStyle = {
+    fontFamily: 'JetBrainsMono_500Medium',
+    fontSize: metrics.codeFontSize,
+    lineHeight: metrics.lineHeight,
+  };
+  const gutterTextBase: TextStyle = {
+    fontFamily: 'JetBrainsMono_500Medium',
+    fontSize: metrics.labelFontSize,
+    lineHeight: metrics.lineHeight,
+  };
+  const noNewlineBase: TextStyle = {
+    fontFamily: 'JetBrainsMono_500Medium',
+    fontSize: metrics.labelFontSize,
+    lineHeight: metrics.lineHeight,
+  };
+
   return (
     <View
       className={cn('flex-1 flex-row items-stretch', rowBackgroundFor(line.type))}
-      style={ROW_STYLE}
+      style={rowStyle}
     >
       <View
         className="items-end justify-center"
-        style={{ ...GUTTER_STYLE, paddingRight: COLUMN_INNER_PADDING }}
+        style={{ ...gutterStyle, paddingRight: COLUMN_INNER_PADDING }}
       >
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme muted color */}
-        <RNText allowFontScaling={false} style={{ ...GUTTER_TEXT_BASE, color: gutterColor }}>
+        <RNText
+          maxFontSizeMultiplier={DIFF_MAX_FONT_SCALE}
+          style={{ ...gutterTextBase, color: gutterColor }}
+        >
           {gutterText}
         </RNText>
       </View>
-      <View className="flex-1" style={CODE_CONTAINER_STYLE} accessibilityLabel={line.text}>
+      <View className="flex-1" style={codeContainerStyle} accessibilityLabel={line.text}>
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme foreground color */}
         <RNText
-          allowFontScaling={false}
+          maxFontSizeMultiplier={DIFF_MAX_FONT_SCALE}
           selectable
-          style={{ ...CODE_BASE_STYLE, color: foreground }}
+          style={{ ...codeBaseStyle, color: foreground }}
         >
           {tokens.map((token, index) => {
             const tokenColor = tokenColorFor(token.className, isDark);
@@ -132,7 +139,7 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
           })}
           {noNewlineLabel ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
-            <RNText style={{ ...NO_NEWLINE_BASE, color: noNewlineColor }}>{noNewlineLabel}</RNText>
+            <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>
           ) : null}
         </RNText>
       </View>
@@ -151,18 +158,24 @@ const SideColumn = memo(
     prev.foreground === next.foreground
 );
 
-function EmptySideColumn() {
+function EmptySideColumn({ metrics }: { metrics: BoundedFontMetrics }) {
+  const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
+  const gutterStyle: ViewStyle = {
+    width: COLUMN_GUTTER_WIDTH,
+    minHeight: metrics.rowMinHeight,
+  };
+  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
   return (
     <View
       className="flex-1 flex-row items-stretch bg-transparent"
-      style={ROW_STYLE}
+      style={rowStyle}
       accessibilityLabel="empty diff column"
     >
       <View
         className="items-end justify-center"
-        style={{ ...GUTTER_STYLE, paddingRight: COLUMN_INNER_PADDING }}
+        style={{ ...gutterStyle, paddingRight: COLUMN_INNER_PADDING }}
       />
-      <View className="flex-1" style={CODE_CONTAINER_STYLE} />
+      <View className="flex-1" style={codeContainerStyle} />
     </View>
   );
 }
@@ -182,14 +195,16 @@ function describeRow(row: SideBySideRowData): string {
 
 function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowProps>) {
   const colors = useThemeColors();
+  const metrics = useDiffFontMetrics();
   const isDark = colors.background === '#0E0E10';
   const leftLine = row.left?.line ?? null;
   const rightLine = row.right?.line ?? null;
+  const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
 
   return (
     <View
       className="flex-row items-stretch border-b border-hair-soft"
-      style={ROW_STYLE}
+      style={rowStyle}
       accessibilityLabel={describeRow(row)}
       testID={rowKeyId}
     >
@@ -202,7 +217,7 @@ function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowPr
           foreground={colors.foreground}
         />
       ) : (
-        <EmptySideColumn />
+        <EmptySideColumn metrics={metrics} />
       )}
       <View className="w-px self-stretch bg-hair-soft" />
       {rightLine ? (
@@ -214,7 +229,7 @@ function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowPr
           foreground={colors.foreground}
         />
       ) : (
-        <EmptySideColumn />
+        <EmptySideColumn metrics={metrics} />
       )}
     </View>
   );

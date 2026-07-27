@@ -61,6 +61,7 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
+import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
 import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
@@ -367,6 +368,33 @@ function normalizePayload(raw: StatusUpdatePayload): {
   ) {
     status = 'cancelled';
     terminalReason = 'model_not_found';
+  }
+
+  // Consume the structured failure cloud-agent-next already sends. This runs
+  // after the specific inferences above so they keep priority, and before the
+  // generic 'interrupted' fallback so an interrupt with a known cause is still
+  // attributed to that cause.
+  if (!terminalReason) {
+    const structuredReason = terminalReasonFromCloudAgentFailure(failure, raw.errorMessage);
+    if (structuredReason) {
+      terminalReason = structuredReason;
+      // The billing and model-not-found blocks above own status normalization
+      // for those reasons, but both key off the error text. A structured-only
+      // payload carries a generic message ('No model was selected' for
+      // model_missing), so those checks miss and the status would stay
+      // unnormalized while terminal_reason is correct — leaving the customer
+      // with generic failure copy from mapStatusToCheckRun instead of the
+      // actionable message. Apply the same normalization here.
+      if (structuredReason === 'billing' && status === 'cancelled') {
+        status = 'failed'; // billing is not a user cancellation
+      }
+      if (
+        structuredReason === 'model_not_found' &&
+        (raw.status === 'failed' || raw.status === 'interrupted')
+      ) {
+        status = 'cancelled';
+      }
+    }
   }
 
   if (!terminalReason && raw.status === 'interrupted') {

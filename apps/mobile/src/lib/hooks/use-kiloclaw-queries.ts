@@ -1,4 +1,4 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
@@ -48,7 +48,7 @@ export function useKiloClawStatusQueryKey(organizationId: string | null) {
     : trpc.kiloclaw.getStatus.queryKey();
 }
 
-type BillingData = inferRouterOutputs<RootRouter>['kiloclaw']['getBillingStatus'];
+type BillingData = inferRouterOutputs<MobileRouter>['kiloclaw']['getBillingStatus'];
 type BillingPollDecider = (data: BillingData | undefined) => number;
 
 export function useKiloClawBillingStatus(

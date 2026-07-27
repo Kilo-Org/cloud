@@ -1,31 +1,28 @@
 {
   "cli": {
-    "version": ">= 18.4.0",
+    "version": ">= 21.0.0",
     "appVersionSource": "remote"
   },
   "build": {
     "base": {
-      "node": "24.15.0",
+      "node": "24.14.1",
       "pnpm": "11.1.2"
     },
     "development": {
       "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
-      "credentialsSource": "remote"
+      "environment": "development"
     },
     "production": {
       "extends": "base",
       "autoIncrement": true,
-      "credentialsSource": "remote"
+      "environment": "production"
     },
     "preview": {
       "extends": "base",
       "distribution": "internal",
-      "credentialsSource": "remote",
-      "ios": {
-        "simulator": false
-      }
+      "environment": "preview"
     }
   },
   "submit": {

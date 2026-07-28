@@ -363,6 +363,10 @@ export default function UsageRecordsContent() {
                     }
                   : null
               );
+              // Sync the URL to the applied filter (not the draft dropdown value) so a
+              // submitted search can be bookmarked/deep-linked without re-triggering a
+              // search merely from changing the Close reason dropdown before submitting.
+              replaceCloseReasonParam(next.closeReason);
               setSubmitted(next);
               resetResultNavigation();
               if (unchanged) void results.refetch();

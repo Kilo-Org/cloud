@@ -38,6 +38,11 @@ CMD+=" > $(printf '%q' "$LOG") 2>&1; echo EXITCODE=\$? >> $(printf '%q' "$LOG")"
 if [ "$ROLE" = "e2e-verifier" ]; then
   tmux new-session -d -s "$NAME" "$CMD"
 else
-  tmux new-window -d -t "$(tmux display-message -p '#S')" -n "$NAME" "$CMD"
+  # Trailing colon pins the target to <session>:<auto-index>. Without it tmux
+  # prefix-matches the session name against WINDOW names first, and a session
+  # named <section> collides with the planner/orchestrator window named
+  # <section>-planner — new-window then fails with "create window failed:
+  # index N in use" (see learnings/tmux-new-window-index-in-use-name-prefix-collision.md).
+  tmux new-window -d -t "$(tmux display-message -p '#S'):" -n "$NAME" "$CMD"
 fi
 echo "$LOG"

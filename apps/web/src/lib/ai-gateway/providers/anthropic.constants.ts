@@ -123,3 +123,7 @@ export function isClaudeModel(requestedModel: string) {
 export function isFableModel(requestedModel: string) {
   return requestedModel.includes('claude-fable');
 }
+
+export function isOpus5Model(requestedModel: string) {
+  return requestedModel.includes('claude-opus-5');
+}

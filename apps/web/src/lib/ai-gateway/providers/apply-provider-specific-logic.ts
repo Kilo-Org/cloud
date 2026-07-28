@@ -10,10 +10,10 @@ import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_OPUS_FALLBACK_MODEL_ID,
   isClaudeModel,
   isFableModel,
+  isOpus5Model,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
@@ -104,7 +104,7 @@ export async function applyGatewayModelsFallback(
 ) {
   if (
     !(await isFreeModel(requestedModel)) &&
-    (isFableModel(requestedModel) || requestedModel === CLAUDE_OPUS_CURRENT_MODEL_ID) &&
+    (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
     (providerId === 'openrouter' || providerId === 'vercel')
   ) {
     requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID];

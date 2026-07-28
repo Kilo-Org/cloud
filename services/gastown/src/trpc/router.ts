@@ -27,6 +27,7 @@ import {
   RpcBeadEventOutput,
   RpcMayorSendResultOutput,
   RpcMayorStatusOutput,
+  RpcBillingStatusOutput,
   RpcStreamTicketOutput,
   RpcPtySessionOutput,
   RpcSlingResultOutput,
@@ -37,6 +38,7 @@ import {
   RpcMergeQueueDataOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
+import { ContainerBillingError } from '../billing/ContainerBilling.error';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
 const RpcTownConfigSchema = z.any().pipe(TownConfigSchema);
@@ -81,6 +83,24 @@ async function refreshGitCredentials(
 /** Extract user identity fields from the tRPC context. */
 function userFromCtx(ctx: TRPCContext): { id: string; api_token_pepper: string | null } {
   return { id: ctx.userId, api_token_pepper: ctx.apiTokenPepper };
+}
+
+function mapContainerBillingError(error: unknown): TRPCError | null {
+  // Only classify errors we actually own. Matching on message substrings is
+  // unreliable (the fallback message itself contains "billing"), so a
+  // non-billing failure could be misreported as a billing error and mask the
+  // real cause. Classify strictly on the ContainerBillingError code.
+  if (!(error instanceof ContainerBillingError)) return null;
+
+  switch (error.code) {
+    case 'INSUFFICIENT_CREDITS':
+    case 'CONTAINER_PAUSED':
+      return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message, cause: error });
+    case 'BILLING_UNAVAILABLE':
+      return new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: error.message, cause: error });
+    default:
+      return null;
+  }
 }
 
 /** Look up a user's membership for a specific org from the JWT claims. */
@@ -974,7 +994,16 @@ export const gastownRouter = router({
       await verifyTownOwnership(ctx.env, ctx, input.townId);
 
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.sendMayorMessage(input.message, input.model, input.uiContext);
+      try {
+        return await townStub.sendMayorMessage(
+          input.message,
+          input.model,
+          input.uiContext,
+          ctx.userId
+        );
+      } catch (error) {
+        throw mapContainerBillingError(error) ?? error;
+      }
     }),
 
   getMayorStatus: gastownProcedure
@@ -993,6 +1022,48 @@ export const gastownRouter = router({
       await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getAlarmStatus();
+    }),
+
+  getBillingStatus: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(RpcBillingStatusOutput)
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
+      return getTownDOStub(ctx.env, input.townId).getBillingStatus();
+    }),
+
+  setContainerRunPolicy: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        policy: z.enum(['automatic', 'paused_by_user']),
+      })
+    )
+    .output(RpcBillingStatusOutput)
+    .mutation(async ({ ctx, input }) => {
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot pause containers for towns they do not own',
+        });
+      }
+
+      const town = getTownDOStub(ctx.env, input.townId);
+      if (ownership.type === 'org') {
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        const townConfig = await town.getTownConfig();
+        const isOrgOwner = membership?.role === 'owner';
+        const isTownCreator = ctx.userId === townConfig.created_by_user_id;
+        if (!isOrgOwner && !isTownCreator) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only town creators and org owners can change automatic starts',
+          });
+        }
+      }
+
+      return town.setContainerRunPolicy(input.policy);
     }),
 
   ensureMayor: gastownProcedure
@@ -1023,7 +1094,11 @@ export const gastownRouter = router({
       }
 
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.ensureMayor();
+      try {
+        return await townStub.ensureMayor(ctx.userId);
+      } catch (error) {
+        throw mapContainerBillingError(error) ?? error;
+      }
     }),
 
   // ── Agent Streams ───────────────────────────────────────────────────

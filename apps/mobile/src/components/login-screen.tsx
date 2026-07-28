@@ -86,13 +86,23 @@ export function LoginScreen() {
     // does not push the form up. Placing the KeyboardAvoidingView at the root
     // gives it a window-relative frame (y ~ 0, height ~ screen height), so
     // behavior="height" computes a non-zero shrink and resizes the ScrollView so
-    // the form stays above the IME. iOS is disabled because the ScrollView's
-    // automaticallyAdjustKeyboardInsets already handles the offset.
-    <KeyboardAvoidingView behavior="height" enabled={Platform.OS === 'android'} className="flex-1">
+    // the form stays above the IME.
+    //
+    // iOS needs it too: automaticallyAdjustKeyboardInsets only made the
+    // ScrollView scrollable, it never scrolls, and iOS only auto-reveals the
+    // focused field — so the centered form kept "Send code" under the keyboard
+    // on shorter devices (verified: iPhone 17 Pro, button centre 568pt vs
+    // keyboard window top 566pt, taps swallowed by UIRemoteKeyboardWindow).
+    // "padding" shrinks the ScrollView instead, so the whole form re-centres in
+    // the space above the keyboard; that replaces the inset, stacking both
+    // pushes the form off the top of the screen.
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1"
+    >
       <ScrollView
         className="flex-1 bg-background"
         contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
-        automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
         <View className="w-full max-w-sm items-center gap-2">

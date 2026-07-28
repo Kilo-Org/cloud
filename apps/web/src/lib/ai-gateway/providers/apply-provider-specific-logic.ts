@@ -38,8 +38,12 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isOpenRouterGpt56PromoModel } from '@/lib/ai-gateway/providers/openai';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
+  if (isOpenRouterGpt56PromoModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.openai];
+  }
   if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
     // fable is not available on bedrock on vercel
     // and specifying bedrock breaks the opus fallback

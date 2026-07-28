@@ -1,4 +1,4 @@
-import { captureMessage } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { toMicrodollars } from '../utils';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
@@ -85,8 +85,19 @@ export function extractVercelIsByok(
 }
 
 export function isResponseInterruptedError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null || !('name' in error)) return false;
-  return error.name === 'ResponseAborted' || error.name === 'TimeoutError';
+  if (typeof error !== 'object' || error === null) return false;
+  if ('name' in error && (error.name === 'ResponseAborted' || error.name === 'TimeoutError')) {
+    return true;
+  }
+
+  if (!('cause' in error)) return false;
+  const cause = error.cause;
+  return (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    cause.code === 'UND_ERR_BODY_TIMEOUT'
+  );
 }
 
 /**
@@ -109,7 +120,10 @@ export async function drainSseStream(
       let readResult: ReadableStreamReadResult<Uint8Array>;
       try {
         readResult = await reader.read();
-      } catch {
+      } catch (error) {
+        if (!isResponseInterruptedError(error)) {
+          captureException(error, { tags: { source: 'usage_stream_read' } });
+        }
         wasAborted = true;
         break;
       }

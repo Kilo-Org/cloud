@@ -190,6 +190,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         }),
       }),
     ],
+    ['unexpected read failure', new Error('Unexpected stream failure')],
   ];
 
   test.each(interruptedStreamErrors)(

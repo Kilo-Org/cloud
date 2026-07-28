@@ -386,8 +386,8 @@ async function forwardCloudAgentFamilyRequest(
   const headers = new Headers(request.headers);
   headers.delete('Authorization');
   headers.delete('X-Internal-Secret');
-  for (const headerName of Object.values(cloudAgentFamilyHeaders)) {
-    headers.delete(headerName);
+  for (const headerName of [...headers.keys()]) {
+    if (headerName.toLowerCase().startsWith('x-kilo-')) headers.delete(headerName);
   }
   headers.set('Authorization', result.authorization);
   headers.set('X-Internal-Secret', internalSecret);

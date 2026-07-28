@@ -88,6 +88,9 @@ export async function applyMetadataChanges(
 
     let familyRootLocked = false;
     if (parentSessionId !== undefined) {
+      // Family identity is write-once for children and only heals null -> value
+      // for roots. That immutability makes this unlocked read safe for choosing
+      // root-before-child lock order; revisit this if family IDs become mutable.
       const [initialRow] = await selectCurrentRow();
       if (!initialRow) return null;
       if (initialRow.cloudAgentFamilyId != null) {
@@ -230,6 +233,12 @@ export async function applyMetadataChanges(
                 );
               parentSessionIdWriteApplied = true;
             }
+          } else {
+            console.warn('Refusing Cloud Agent family reparent without a family root', {
+              kiloUserId,
+              sessionId,
+              cloudAgentFamilyId,
+            });
           }
         }
       } else if (parentSessionId && parentSessionId !== sessionId) {

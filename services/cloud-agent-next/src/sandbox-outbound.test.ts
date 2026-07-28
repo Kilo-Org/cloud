@@ -1095,6 +1095,8 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
             'Content-Type': 'application/json',
             'X-Internal-Secret': 'forged',
             'X-Kilo-Cloud-Agent-Session': 'forged',
+            'X-Kilo-User-Id': 'forged-user',
+            'X-Kilo-Future-Identity': 'forged-future-value',
           },
           body: JSON.stringify({ data: [] }),
         }
@@ -1114,6 +1116,8 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
     expect(forwarded.headers.get('X-Internal-Secret')).toBe('trusted-internal-secret');
     expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('cloud-agent-session-1');
     expect(forwarded.headers.get('X-Kilo-Root-Session')).toBe('ses_12345678901234567890123456');
+    expect(forwarded.headers.get('X-Kilo-User-Id')).toBeNull();
+    expect(forwarded.headers.get('X-Kilo-Future-Identity')).toBeNull();
     await expect(forwarded.json()).resolves.toEqual({ data: [] });
   });
 

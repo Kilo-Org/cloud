@@ -368,8 +368,12 @@ export default function UsageRecordsContent() {
               if (unchanged) void results.refetch();
             }}
           >
-            {/* Primary bar: what to search for, and the actions that trigger it. */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            {/* Primary bar: what to search for, and the actions that trigger it.
+                items-start (not items-end): every column below shares the same
+                label + gap + control rhythm, so their controls line up on the
+                same top edge regardless of any incidental height differences
+                inside a column (e.g. Radix Select's hidden native <select>). */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
               <div className="w-full space-y-1.5 sm:w-40 sm:shrink-0">
                 <Label htmlFor="usage-search-kind">Search by</Label>
                 <Select value={kind} onValueChange={next => setKind(next as SearchKind)}>
@@ -394,32 +398,37 @@ export default function UsageRecordsContent() {
                   onChange={event => setValue(event.target.value)}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-                <Button type="submit" disabled={results.isFetching || !value.trim()}>
-                  <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setValue('');
-                    setStatus('all');
-                    setCloseReason('all');
-                    setSkuId('all');
-                    setSummaryInputError(null);
-                    setSummaryRequest(null);
-                    setSubmitted({ kind: 'recent' });
-                    replaceCloseReasonParam(undefined);
-                    resetResultNavigation();
-                  }}
-                >
-                  Reset
-                </Button>
+              <div className="w-full space-y-1.5 sm:w-auto sm:shrink-0">
+                <Label className="invisible" aria-hidden="true">
+                  Actions
+                </Label>
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <Button type="submit" disabled={results.isFetching || !value.trim()}>
+                    <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setValue('');
+                      setStatus('all');
+                      setCloseReason('all');
+                      setSkuId('all');
+                      setSummaryInputError(null);
+                      setSummaryRequest(null);
+                      setSubmitted({ kind: 'recent' });
+                      replaceCloseReasonParam(undefined);
+                      resetResultNavigation();
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
               </div>
             </div>
 
             {/* Filters: narrow the search above. Wraps freely; never forces the actions off-card. */}
-            <div className="flex flex-wrap items-end gap-4 border-t border-border pt-4">
+            <div className="flex flex-wrap items-start gap-4 border-t border-border pt-4">
               <div className="w-36 space-y-1.5">
                 <Label htmlFor="usage-search-status">Status</Label>
                 <Select

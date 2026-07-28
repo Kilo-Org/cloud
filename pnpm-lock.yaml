@@ -133,8 +133,6 @@ packageExtensionsChecksum: sha256-4f/k7Hd0rFgrZvan+MM5hKRF7ZOROy5CFlQdxSwVtGE=
 
 patchedDependencies:
   expo-server-sdk: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
-  metro-runtime@0.84.4: 4a386cd6f62275a31620c3b0cb489d818359125e5c94f6144933de2dea7e4d98
-  metro@0.84.4: 3311285d3ff06ff147ed0951f5b59171824bc81484aad50405a491dc4fd2310e
   react-native-appsflyer@6.18.0: 82df99378c830e774b0f01796d8be595da114d1d13393d85ddd47d565c5c2aab
 
 importers:
@@ -1258,7 +1256,7 @@ importers:
         version: 7.0.0-dev.20260514.1
       jest:
         specifier: 30.3.0
-        version: 30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)
+        version: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1908,7 +1906,7 @@ importers:
         version: 0.3.7
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@kilocode/sdk':
         specifier: 7.3.54
         version: 7.3.54
@@ -2056,7 +2054,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/jest':
         specifier: 30.0.0
         version: 30.0.0
@@ -2218,7 +2216,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2387,7 +2385,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
@@ -2494,7 +2492,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/content-disposition':
         specifier: 0.5.9
         version: 0.5.9
@@ -2851,7 +2849,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2888,7 +2886,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3118,7 +3116,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -20101,21 +20099,6 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@cloudflare/vitest-pool-workers@0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)':
-    dependencies:
-      '@vitest/runner': 4.1.6
-      '@vitest/snapshot': 4.1.6
-      cjs-module-lexer: 1.2.3
-      esbuild: 0.27.4
-      miniflare: 4.20260603.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
-      wrangler: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - '@cloudflare/workers-types'
-      - bufferutil
-      - utf-8-validate
-
   '@cloudflare/workerd-darwin-64@1.20260603.1':
     optional: true
 
@@ -21046,7 +21029,7 @@ snapshots:
 
   '@expo/metro@56.0.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
-      metro: 0.84.4(patch_hash=3311285d3ff06ff147ed0951f5b59171824bc81484aad50405a491dc4fd2310e)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      metro: 0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-babel-transformer: 0.84.4
       metro-cache: 0.84.4
       metro-cache-key: 0.84.4
@@ -21055,7 +21038,7 @@ snapshots:
       metro-file-map: 0.84.4
       metro-minify-terser: 0.84.4
       metro-resolver: 0.84.4
-      metro-runtime: 0.84.4(patch_hash=4a386cd6f62275a31620c3b0cb489d818359125e5c94f6144933de2dea7e4d98)
+      metro-runtime: 0.84.4
       metro-source-map: 0.84.4
       metro-symbolicate: 0.84.4
       metro-transform-plugins: 0.84.4
@@ -24264,7 +24247,7 @@ snapshots:
       '@react-native/dev-middleware': 0.86.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       debug: 4.4.3
       invariant: 2.2.4
-      metro: 0.84.4(patch_hash=3311285d3ff06ff147ed0951f5b59171824bc81484aad50405a491dc4fd2310e)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      metro: 0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-config: 0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-core: 0.84.4
       semver: 7.8.2
@@ -24889,7 +24872,7 @@ snapshots:
       '@sentry/core': 10.37.0
       '@sentry/react': 10.37.0(react@19.2.3)
       '@sentry/types': 10.37.0
-      metro: 0.84.4(patch_hash=3311285d3ff06ff147ed0951f5b59171824bc81484aad50405a491dc4fd2310e)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      metro: 0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       react: 19.2.3
       react-native: 0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
     optionalDependencies:
@@ -26744,7 +26727,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.0.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -26822,7 +26805,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -32343,10 +32326,10 @@ snapshots:
       connect: 3.7.0
       flow-enums-runtime: 0.0.6
       jest-validate: 29.7.0
-      metro: 0.84.4(patch_hash=3311285d3ff06ff147ed0951f5b59171824bc81484aad50405a491dc4fd2310e)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      metro: 0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-cache: 0.84.4
       metro-core: 0.84.4
-      metro-runtime: 0.84.4(patch_hash=4a386cd6f62275a31620c3b0cb489d818359125e5c94f6144933de2dea7e4d98)
+      metro-runtime: 0.84.4
       yaml: 2.8.4
     transitivePeerDependencies:
       - bufferutil
@@ -32382,7 +32365,7 @@ snapshots:
     dependencies:
       flow-enums-runtime: 0.0.6
 
-  metro-runtime@0.84.4(patch_hash=4a386cd6f62275a31620c3b0cb489d818359125e5c94f6144933de2dea7e4d98):
+  metro-runtime@0.84.4:
     dependencies:
       '@babel/runtime': 7.29.7
       flow-enums-runtime: 0.0.6
@@ -32430,7 +32413,7 @@ snapshots:
       '@babel/parser': 7.29.7
       '@babel/types': 7.29.7
       flow-enums-runtime: 0.0.6
-      metro: 0.84.4(patch_hash=3311285d3ff06ff147ed0951f5b59171824bc81484aad50405a491dc4fd2310e)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      metro: 0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-babel-transformer: 0.84.4
       metro-cache: 0.84.4
       metro-cache-key: 0.84.4
@@ -32443,7 +32426,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  metro@0.84.4(patch_hash=3311285d3ff06ff147ed0951f5b59171824bc81484aad50405a491dc4fd2310e)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  metro@0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.0
@@ -32472,7 +32455,7 @@ snapshots:
       metro-core: 0.84.4
       metro-file-map: 0.84.4
       metro-resolver: 0.84.4
-      metro-runtime: 0.84.4(patch_hash=4a386cd6f62275a31620c3b0cb489d818359125e5c94f6144933de2dea7e4d98)
+      metro-runtime: 0.84.4
       metro-source-map: 0.84.4
       metro-symbolicate: 0.84.4
       metro-transform-plugins: 0.84.4
@@ -34456,7 +34439,7 @@ snapshots:
       hermes-compiler: 250829098.0.14
       invariant: 2.2.4
       memoize-one: 5.2.1
-      metro-runtime: 0.84.4(patch_hash=4a386cd6f62275a31620c3b0cb489d818359125e5c94f6144933de2dea7e4d98)
+      metro-runtime: 0.84.4
       metro-source-map: 0.84.4
       nullthrows: 1.1.1
       pretty-format: 29.7.0

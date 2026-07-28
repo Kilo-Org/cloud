@@ -16,7 +16,7 @@
 #
 # The e2e-verifier gets its own tmux session (device slots are owned and
 # auto-reaped by session name); every other role runs as a window in the
-# caller's session.
+# caller's session, or in its own session when the caller is not inside tmux.
 set -euo pipefail
 
 ROLE=${1:?role} SECTION=${2:?section} LABEL=${3:?label} WT=${4:?worktree} SCRATCH=${5:?scratch} MSG=${6:?message}
@@ -31,13 +31,27 @@ LOG="$SCRATCH/$ROLE-$LABEL.log"
 # `|| true` keeps an empty match from failing under the pane's shell.
 STRIP='$(env | grep -oE "^(KILO|OPENCODE)[A-Za-z0-9_]*" | sed "s/^/-u /" | tr "\n" " " || true)'
 
-CMD="cd $(printf '%q' "$WT") && env $STRIP kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME")"
+# Redirection below means an attached pane shows nothing at all. Say so in the
+# pane itself — a blank window reads as a dead agent otherwise. This prints to
+# the terminal only, never into the log, so the EXITCODE contract is untouched.
+CMD="echo $(printf '%q' "$NAME: output goes to $LOG — this pane stays blank by design; watch with: tail -f $LOG") && cd $(printf '%q' "$WT") && env $STRIP kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME")"
 for arg in "$@"; do CMD+=" $(printf '%q' "$arg")"; done
 CMD+=" > $(printf '%q' "$LOG") 2>&1; echo EXITCODE=\$? >> $(printf '%q' "$LOG")"
 
-if [ "$ROLE" = "e2e-verifier" ]; then
+# Resolve the caller's session through this pane. An untargeted
+# `tmux display-message -p '#S'` answers with the SERVER's current session —
+# the most recently active one — so a dispatcher running outside tmux (a
+# harness shell, a stripped kilo env) silently drops its window into an
+# unrelated session. A freshly created `kilo-e2e-android-*` emulator session
+# is the usual victim, and it gets killed wholesale on device cleanup.
+CALLER_SESSION=""
+if [ -n "${TMUX_PANE:-}" ]; then
+  CALLER_SESSION=$(tmux display-message -p -t "$TMUX_PANE" '#S' 2>/dev/null || true)
+fi
+
+if [ "$ROLE" = "e2e-verifier" ] || [ -z "$CALLER_SESSION" ]; then
   tmux new-session -d -s "$NAME" "$CMD"
 else
-  tmux new-window -d -t "$(tmux display-message -p '#S')" -n "$NAME" "$CMD"
+  tmux new-window -d -t "$CALLER_SESSION" -n "$NAME" "$CMD"
 fi
 echo "$LOG"

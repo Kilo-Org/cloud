@@ -16,10 +16,12 @@
  *    inside the SectionList body).
  *  - When the list body is empty (no history sections rendered):
  *      1. Active search/filter query → filtered-empty OR query-error
- *         (when in error). The query-error variant always gets a Retry
- *         CTA; a secondary Clear CTA is shown for any active query
- *         ("Clear search" or "Clear filters"), while a no-query error
- *         shows only Retry.
+ *         (when in error). EXCEPTION: a text search with a populated
+ *         tray returns render-list — tray matches are matches, so the
+ *         body never claims "No sessions match" beneath them. The
+ *         query-error variant always gets a Retry CTA; a secondary
+ *         Clear CTA is shown for any active query ("Clear search" or
+ *         "Clear filters"), while a no-query error shows only Retry.
  *      2. No query, error → retry-capable error empty state.
  *      3. No query, no error → compact "No past sessions" + New coding
  *         task CTA.
@@ -100,8 +102,10 @@ export function selectSessionListBodyModel(
     return { kind: 'render-list', primaryAction: 'none', showInlineError };
   }
 
-  // History empty: priority is the active query branch (even when the
-  // tray is populated — a query should still narrow the body).
+  // History empty: priority is the active query branch. A text search
+  // with a populated tray renders the list instead (tray matches are
+  // matches); filter-only narrowing keeps the filtered-empty body even
+  // when the tray is populated (pre-existing decision).
   if (hasActiveQuery) {
     if (isError) {
       // Query-error empty: Retry is always available. A Clear CTA is also
@@ -113,6 +117,13 @@ export function selectSessionListBodyModel(
         secondaryAction: isSearching ? 'clear-search' : 'clear-filters',
         showInlineError,
       };
+    }
+    // Text search: matches in the tray are matches. Never claim "No sessions
+    // match" beneath a populated tray — the tray is part of the searched
+    // corpus. (Filter-only narrowing keeps the pre-existing behavior by
+    // design — the tray was always part of that corpus's decision.)
+    if (isSearching && hasPinnedActive) {
+      return { kind: 'render-list', primaryAction: 'none', showInlineError };
     }
     return {
       kind: 'filtered-empty',

@@ -94,15 +94,51 @@ describe('selectSessionListBodyModel', () => {
       });
     });
 
-    it('a populated tray does not change the active-query body decision', () => {
+    it('a populated tray suppresses the filtered-empty body while searching', () => {
       expect(
         model({
           hasHistoryContent: false,
           hasPinnedActive: true,
           hasActiveQuery: true,
           isSearching: true,
-        }).kind
-      ).toBe('filtered-empty');
+        })
+      ).toEqual({
+        kind: 'render-list',
+        primaryAction: 'none',
+        showInlineError: false,
+      });
+    });
+
+    it('a populated tray does not change the filter-only body decision', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasPinnedActive: true,
+          hasActiveQuery: true,
+          isSearching: false,
+        })
+      ).toEqual({
+        kind: 'filtered-empty',
+        primaryAction: 'clear-filters',
+        showInlineError: false,
+      });
+    });
+
+    it('a populated tray does not change the query-error body decision while searching', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasPinnedActive: true,
+          hasActiveQuery: true,
+          isSearching: true,
+          isError: true,
+        })
+      ).toEqual({
+        kind: 'query-error-empty',
+        primaryAction: 'retry',
+        secondaryAction: 'clear-search',
+        showInlineError: true,
+      });
     });
   });
 

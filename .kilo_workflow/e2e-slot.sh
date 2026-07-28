@@ -16,9 +16,11 @@
 # contend for the same slots, so the state dir never lives next to the script.
 set -uo pipefail
 
-DIR="${E2E_SLOT_DIR:-$HOME/.cache/kilo-e2e-slots}"
-TOTAL=${E2E_SLOTS:-3}
-POLL=${E2E_POLL:-60}
+# The state dir and slot count are the machine-global contract — no env
+# overrides, or parallel pipelines split the semaphore and defeat the cap.
+DIR="$HOME/.cache/kilo-e2e-slots"
+TOTAL=3
+POLL=60
 mkdir -p "$DIR"
 
 reap() {
@@ -26,10 +28,17 @@ reap() {
   # cannot be judged — keep every slot rather than wipe live ones. Acquirers
   # always run inside tmux, so the server is up whenever reaping matters.
   alive=$(tmux list-sessions -F '#{session_name}' 2>/dev/null) || return 0
+  now=$(date +%s)
   for s in "$DIR"/slot-*; do
     [ -d "$s" ] || continue
     owner=$(cat "$s/owner" 2>/dev/null || echo)
-    [ -n "$owner" ] || { rm -rf "$s"; continue; }
+    if [ -z "$owner" ]; then
+      # An ownerless slot may be mid-acquire (mkdir landed, owner write
+      # hasn't) — only reap it once it is old enough to be a real orphan.
+      age=$(( now - $(stat -f %m "$s" 2>/dev/null || echo "$now") ))
+      [ "$age" -gt 60 ] && rm -rf "$s"
+      continue
+    fi
     printf '%s\n' "$alive" | grep -qxF -- "$owner" || rm -rf "$s"
   done
 }

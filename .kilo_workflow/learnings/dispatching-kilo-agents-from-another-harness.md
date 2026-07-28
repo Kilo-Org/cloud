@@ -9,9 +9,12 @@ Fix: run the dispatch inside a tmux window, redirect rather than pipe, and appen
 ```bash
 cd "$WORKTREE"
 env $(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /') \
-  kilo run "$(cat msg.txt)" --agent plan-reviewer --file "$PLAN" > "$LOG" 2>&1
+  kilo run "Review the attached plan per your role definition." \
+  --agent plan-reviewer --file msg.txt --file "$PLAN" > "$LOG" 2>&1
 echo "EXITCODE=$?" >> "$LOG"
 ```
+
+The message stays a short literal; the handoff and plan travel via `--file` — see `kilo-run-shell-substitution-executes-backticks.md` for why `"$(cat ...)"` is forbidden.
 
 Do not pass `--model`/`--variant` for role agents — their definitions in `.kilo/agent/` pin the model, and a flag that drifts from the definition silently disagrees with it.
 

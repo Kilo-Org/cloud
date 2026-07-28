@@ -36,6 +36,10 @@ Output findings first, ordered by severity. Each finding contains:
 - The concrete implementation, verification, or product decision that could fail
 - The clarification or evidence required — do not prescribe unnecessary implementation detail
 
-If there are no actionable findings, return exactly `No findings.` followed by any residual risks. Do not praise or summarize the plan before findings. If you must stop early, return: reviewed scope, remaining scope, evidence inspected, and the safest next action, ending with the exact line `STOPPED EARLY.`
+Do not praise or summarize the plan before findings. Put residual risks after the findings (or after the no-findings statement), then end your report with exactly one sentinel as the **last line**:
 
-Your dispatcher treats a log without a verdict (`No findings.`, a findings list, or `STOPPED EARLY.`) as a void round — always end with one.
+- `FINDINGS: <n>` after a findings list
+- `No findings.` when there is nothing actionable
+- `STOPPED EARLY.` after an early stop (preceded by: reviewed scope, remaining scope, evidence inspected, and the safest next action)
+
+Your dispatcher treats a log whose last report line is not one of these as a void round — a crashed run, never a pass.

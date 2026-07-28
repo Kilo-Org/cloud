@@ -392,6 +392,49 @@ test('bootSimulator shuts the device back down on a terminal bootstatus failure'
   );
 });
 
+test('bootSimulator flags the error when the recovery shutdown also fails', () => {
+  const { exec } = recordingExec(call =>
+    call.args[1] === 'shutdown' ? new Error('shutdown failed') : undefined
+  );
+  try {
+    bootSimulator(device(), exec, () => ({
+      stdout: 'Status=3, isTerminal=YES',
+      stderr: '',
+      status: 0,
+    }));
+    assert.fail('expected bootSimulator to throw');
+  } catch (error) {
+    assert.equal((error as Error & { deviceMayBeRunning?: boolean }).deviceMayBeRunning, true);
+  }
+});
+
+test('a prepare failure with a possibly running device keeps the claim reserved', () => {
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  const { rename } = recordingRename();
+
+  assert.throws(
+    () =>
+      claimSimulator({
+        devices: [device()],
+        lockRoot,
+        worktreeRoot,
+        requestedId: 'UDID-1',
+        rename,
+        prepare: () => {
+          const error = new Error('boot failed, shutdown failed') as Error & {
+            deviceMayBeRunning?: boolean;
+          };
+          error.deviceMayBeRunning = true;
+          throw error;
+        },
+      }),
+    /boot failed/
+  );
+  assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-1.json')), true);
+  assert.equal(readRecord(lockRoot, 'UDID-1').worktreeRoot, worktreeRoot);
+});
+
 test('bootSimulator does not shut down a device whose boot never started', () => {
   const { exec, calls } = recordingExec(call =>
     call.args[1] === 'boot' ? new Error('boot exec failed') : undefined

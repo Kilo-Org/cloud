@@ -216,15 +216,18 @@ function bootSimulator(
       throw new Error(`Simulator ${device.id} bootstatus reported terminal failure:\n${bounded}`);
     }
   } catch (error) {
+    const wrapped = error instanceof Error ? error : new Error(String(error));
     if (booted) {
       try {
         exec('xcrun', ['simctl', 'shutdown', device.id], { stdio: 'ignore' });
       } catch {
-        // Best effort: the claim stays in place either way, so a peer
-        // worktree can never adopt a device this attempt left running.
+        // The device may still be running. Flag it so the caller keeps
+        // the claim in place and a peer worktree cannot adopt a device
+        // this attempt left booted.
+        (wrapped as Error & { deviceMayBeRunning?: boolean }).deviceMayBeRunning = true;
       }
     }
-    throw error instanceof Error ? error : new Error(String(error));
+    throw wrapped;
   }
 }
 
@@ -294,8 +297,11 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
       // The mutation lock is released before prepare runs so a stalled
       // bootstatus call cannot block peer claim attempts. The on-disk
       // claim is the source of truth; peers observe it and reject. On
-      // any failure past this point the claim this attempt created is
-      // removed so the device does not stay reserved by a dead run.
+      // failure past this point the claim this attempt created is
+      // removed so the device does not stay reserved by a dead run —
+      // unless the device may still be running (a failed boot whose
+      // follow-up shutdown also failed), in which case the claim stays
+      // so a peer cannot adopt a booted device.
       try {
         args.prepare?.(device);
         if (!args.rename) {
@@ -303,9 +309,14 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
         }
         args.rename(device.id, targetLabel);
       } catch (error) {
-        withClaimMutationLock(lockRoot, device.id, () => {
-          fs.rmSync(lockPath(lockRoot, device.id), { force: true });
-        });
+        const mayBeRunning =
+          error instanceof Error &&
+          (error as Error & { deviceMayBeRunning?: boolean }).deviceMayBeRunning === true;
+        if (!mayBeRunning) {
+          withClaimMutationLock(lockRoot, device.id, () => {
+            fs.rmSync(lockPath(lockRoot, device.id), { force: true });
+          });
+        }
         throw error;
       }
       withClaimMutationLock(lockRoot, device.id, () => {

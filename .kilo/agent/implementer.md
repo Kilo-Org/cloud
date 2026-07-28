@@ -28,8 +28,7 @@ While implementing:
 - Add or update focused behavioral tests for the behavior you changed, covering every applicable feature state. Never merge retryable and non-retryable failures into one generic error presentation.
 - Preserve unrelated working-tree changes. Never revert work you did not create.
 - Edit only your slice's paths and do not reformat another slice's changes. Unexpected changes inside your paths: stop and report the collision. Outside your paths: continue and preserve them.
-- Defer checks that need another active slice's unstable output to the orchestrator's synchronization point.
-- Run narrow format, type, lint, and test checks for the files you changed.
+- Run per-file format and lint checks and the targeted tests for what you changed. Project-wide checks — typecheck included, since it covers the whole project and fails on sibling slices' half-done state — belong to the orchestrator's synchronization point; report them as deferred, never as passed.
 - Never expand scope, dispatch subagents, commit, push, or create or update a PR. Permissions restrict nothing except agent dispatch (`task`); git and `gh` boundaries are this instruction — the orchestrator owns every commit, push, and PR.
 - Never claim the overall task is complete. Review, E2E, and final verification belong to the orchestrator.
 

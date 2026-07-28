@@ -217,7 +217,7 @@ The orchestrator drives the plan to completion. It is the expensive model steeri
 5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it — assign it to the requesting human, and request reviews per repository convention (cloud: `eshurakov`, `jeanduplessis`; kilocode: additionally `marius-kilocode`, `chrarnoldus`). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
 6. Run the E2E loop (below) when the work has verifiable runtime behavior; skip it for doc-only or equivalently inert changes, recording why in the PR description.
 7. Run the Kilobot loop (below).
-8. When both loops are clean, verify the completion gate, then shut the section down. The PR is the deliverable; everything else closes.
+8. When both loops are clean, verify the completion gate, label the PR `human-ready` (`gh pr edit <n> --add-label human-ready`) as the last act before teardown, then shut the section down. The PR is the deliverable; everything else closes.
 
 Two terminal states, distinguished by what remains on disk:
 
@@ -256,6 +256,7 @@ The work is complete only when every item holds:
 - No generated fixture remains, tracked or untracked; every verifier temporary edit is restored
 - Every resource this run started is shut down or released; resources the run did not start stay running
 - New committed learnings are included in the PR
+- The PR carries the `human-ready` label, added only after every item above holds
 
 A PR waiting on required human review is COMPLETE — the workflow never approves or merges its own PR. A gate item that can never hold is BLOCKED (see step 8), never a reason to loop forever or fake completion.
 

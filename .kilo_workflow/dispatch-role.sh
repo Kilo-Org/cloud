@@ -38,6 +38,10 @@ CMD+=" > $(printf '%q' "$LOG") 2>&1; echo EXITCODE=\$? >> $(printf '%q' "$LOG")"
 if [ "$ROLE" = "e2e-verifier" ]; then
   tmux new-session -d -s "$NAME" "$CMD"
 else
-  tmux new-window -d -t "$(tmux display-message -p '#S')" -n "$NAME" "$CMD"
+  # -a (append): bare auto-index allocation can fail with "index N in use" on
+  # sessions whose internal index counter is stale (see
+  # learnings/tmux-new-window-index-in-use.md). Windows are tracked by name,
+  # never by index, so append placement is always safe.
+  tmux new-window -da -t "$(tmux display-message -p '#S')" -n "$NAME" "$CMD"
 fi
 echo "$LOG"

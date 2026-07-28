@@ -381,7 +381,7 @@ type RedeemKiloSessionCapabilityResult =
       success: true;
       authorization: string;
       routeClass: KiloCapabilityRouteClass;
-      sessionIngestFamily?: {
+      sessionIngestScope?: {
         cloudAgentSessionId: string;
         rootKiloSessionId: string;
       };

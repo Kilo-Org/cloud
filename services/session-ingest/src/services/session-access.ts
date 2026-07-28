@@ -1,5 +1,5 @@
 import { getWorkerDb } from '@kilocode/db/client';
-import { queryAccessibleKiloSessionWithFamily } from '@kilocode/worker-utils/cloud-agent-session-access';
+import { queryAccessibleKiloSessionWithSessionScope } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { Env } from '../env';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { withDORetry } from '@kilocode/worker-utils';
@@ -7,13 +7,13 @@ import { withDORetry } from '@kilocode/worker-utils';
 export type AccessibleKiloSession = {
   kiloSessionId: string;
   organizationId: string | null;
-  cloudAgentFamilyId: string | null;
+  cloudAgentSessionScopeId: string | null;
 };
 
 type ResolveAccessibleKiloSessionParams = {
   kiloUserId: string;
   kiloSessionId: string;
-  expectedCloudAgentFamilyId?: string;
+  expectedCloudAgentSessionScopeId?: string;
 };
 
 export async function resolveAccessibleKiloSession(
@@ -28,13 +28,13 @@ export async function resolveAccessibleKiloSession(
     );
     if (
       cached &&
-      (params.expectedCloudAgentFamilyId === undefined ||
-        cached.cloudAgentFamilyId === params.expectedCloudAgentFamilyId)
+      (params.expectedCloudAgentSessionScopeId === undefined ||
+        cached.cloudAgentSessionScopeId === params.expectedCloudAgentSessionScopeId)
     ) {
       return {
         kiloSessionId: cached.sessionId,
         organizationId: cached.organizationId,
-        cloudAgentFamilyId: cached.cloudAgentFamilyId,
+        cloudAgentSessionScopeId: cached.cloudAgentSessionScopeId,
       };
     }
   } catch {
@@ -42,13 +42,13 @@ export async function resolveAccessibleKiloSession(
   }
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-  const session = await queryAccessibleKiloSessionWithFamily(db, params);
+  const session = await queryAccessibleKiloSessionWithSessionScope(db, params);
   if (!session) {
     return null;
   }
   const normalizedSession = {
     ...session,
-    cloudAgentFamilyId: session.cloudAgentFamilyId ?? null,
+    cloudAgentSessionScopeId: session.cloudAgentSessionScopeId ?? null,
   };
 
   try {
@@ -58,7 +58,7 @@ export async function resolveAccessibleKiloSession(
         sessionCache.putValidated({
           sessionId: normalizedSession.kiloSessionId,
           organizationId: normalizedSession.organizationId,
-          cloudAgentFamilyId: normalizedSession.cloudAgentFamilyId,
+          cloudAgentSessionScopeId: normalizedSession.cloudAgentSessionScopeId,
         }),
       'SessionAccessCacheDO.putValidated'
     );

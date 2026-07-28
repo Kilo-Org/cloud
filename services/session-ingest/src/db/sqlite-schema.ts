@@ -23,7 +23,7 @@ export const sessions = sqliteTable(
   {
     session_id: text('session_id').primaryKey(),
     organization_id: text('organization_id'),
-    cloud_agent_family_id: text('cloud_agent_family_id'),
+    cloud_agent_session_scope_id: text('cloud_agent_session_scope_id'),
     authorization_expires_at: integer('authorization_expires_at').notNull().default(0),
   },
   table => [index('sessions_organization_id_idx').on(table.organization_id)]

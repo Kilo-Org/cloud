@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import {
-  cloudAgentFamilyAssertionSchema,
-  cloudAgentFamilyHeaders,
+  cloudAgentSessionScopeAssertionSchema,
+  cloudAgentSessionScopeHeaders,
   containedKiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { hasOrganizationAccess, zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
@@ -17,19 +17,19 @@ import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import type { ApiContext } from './api';
 
-const createFamilySessionSchema = z.object({
+const createScopedSessionSchema = z.object({
   sessionId: containedKiloSessionIdSchema,
 });
 
 const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 
-export const cloudAgentFamilyApi = new Hono<ApiContext>();
+export const cloudAgentSessionScopeApi = new Hono<ApiContext>();
 
-function getFamilyAssertion(c: Context<ApiContext>) {
-  return cloudAgentFamilyAssertionSchema.safeParse({
-    cloudAgentSessionId: c.req.header(cloudAgentFamilyHeaders.cloudAgentSessionId),
-    rootKiloSessionId: c.req.header(cloudAgentFamilyHeaders.rootKiloSessionId),
-    protocolVersion: c.req.header(cloudAgentFamilyHeaders.protocolVersion),
+function getSessionScopeAssertion(c: Context<ApiContext>) {
+  return cloudAgentSessionScopeAssertionSchema.safeParse({
+    cloudAgentSessionId: c.req.header(cloudAgentSessionScopeHeaders.cloudAgentSessionId),
+    rootKiloSessionId: c.req.header(cloudAgentSessionScopeHeaders.rootKiloSessionId),
+    protocolVersion: c.req.header(cloudAgentSessionScopeHeaders.protocolVersion),
   });
 }
 
@@ -54,10 +54,10 @@ function getOptionalExecutionContext(c: Context<ApiContext>): ExecutionContext |
   }
 }
 
-cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema), async c => {
-  const assertion = getFamilyAssertion(c);
+cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionSchema), async c => {
+  const assertion = getSessionScopeAssertion(c);
   if (!assertion.success) {
-    return c.json({ success: false, error: 'Invalid Cloud Agent family assertion' }, 400);
+    return c.json({ success: false, error: 'Invalid Cloud Agent session scope assertion' }, 400);
   }
 
   const body = c.req.valid('json');
@@ -72,7 +72,7 @@ cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema)
       .select({
         sessionId: cli_sessions_v2.session_id,
         organizationId: cli_sessions_v2.organization_id,
-        cloudAgentFamilyId: cli_sessions_v2.cloud_agent_family_id,
+        cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
       })
       .from(cli_sessions_v2)
       .where(
@@ -82,8 +82,8 @@ cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema)
           eq(cli_sessions_v2.cloud_agent_session_id, assertion.data.cloudAgentSessionId),
           isNull(cli_sessions_v2.parent_session_id),
           or(
-            isNull(cli_sessions_v2.cloud_agent_family_id),
-            eq(cli_sessions_v2.cloud_agent_family_id, assertion.data.cloudAgentSessionId)
+            isNull(cli_sessions_v2.cloud_agent_session_scope_id),
+            eq(cli_sessions_v2.cloud_agent_session_scope_id, assertion.data.cloudAgentSessionId)
           )
         )
       )
@@ -101,15 +101,15 @@ cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema)
       return { status: 'root_not_found' } as const;
     }
 
-    if (root.cloudAgentFamilyId === null) {
+    if (root.cloudAgentSessionScopeId === null) {
       await tx
         .update(cli_sessions_v2)
-        .set({ cloud_agent_family_id: assertion.data.cloudAgentSessionId })
+        .set({ cloud_agent_session_scope_id: assertion.data.cloudAgentSessionId })
         .where(
           and(
             eq(cli_sessions_v2.session_id, assertion.data.rootKiloSessionId),
             eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.cloud_agent_family_id)
+            isNull(cli_sessions_v2.cloud_agent_session_scope_id)
           )
         );
     }
@@ -122,7 +122,7 @@ cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema)
         parent_session_id: assertion.data.rootKiloSessionId,
         organization_id: root.organizationId,
         cloud_agent_session_id: null,
-        cloud_agent_family_id: assertion.data.cloudAgentSessionId,
+        cloud_agent_session_scope_id: assertion.data.cloudAgentSessionId,
       })
       .onConflictDoNothing({
         target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
@@ -147,7 +147,7 @@ cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema)
       !existing ||
       existing.cloud_agent_session_id !== null ||
       existing.parent_session_id === null ||
-      existing.cloud_agent_family_id !== assertion.data.cloudAgentSessionId
+      existing.cloud_agent_session_scope_id !== assertion.data.cloudAgentSessionId
     ) {
       return { status: 'conflict' } as const;
     }
@@ -167,7 +167,7 @@ cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema)
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
   if (result.status === 'conflict') {
-    return c.json({ success: false, error: 'session_family_conflict' }, 409);
+    return c.json({ success: false, error: 'session_scope_conflict' }, 409);
   }
 
   try {
@@ -177,12 +177,12 @@ cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema)
         sessionCache.putValidated({
           sessionId: body.sessionId,
           organizationId: result.row.organization_id,
-          cloudAgentFamilyId: assertion.data.cloudAgentSessionId,
+          cloudAgentSessionScopeId: assertion.data.cloudAgentSessionId,
         }),
       'SessionAccessCacheDO.putValidated'
     );
   } catch (error) {
-    console.error('Failed to warm session access cache after family bootstrap', {
+    console.error('Failed to warm session access cache after scoped session bootstrap', {
       kiloUserId,
       sessionId: body.sessionId,
       error: error instanceof Error ? error.message : String(error),
@@ -211,10 +211,10 @@ cloudAgentFamilyApi.post('/session', zodJsonValidator(createFamilySessionSchema)
   );
 });
 
-cloudAgentFamilyApi.post('/session/:sessionId/ingest', async c => {
-  const assertion = getFamilyAssertion(c);
+cloudAgentSessionScopeApi.post('/session/:sessionId/ingest', async c => {
+  const assertion = getSessionScopeAssertion(c);
   if (!assertion.success) {
-    return c.json({ success: false, error: 'Invalid Cloud Agent family assertion' }, 400);
+    return c.json({ success: false, error: 'Invalid Cloud Agent session scope assertion' }, 400);
   }
 
   const sessionId = containedKiloSessionIdSchema.safeParse(c.req.param('sessionId'));
@@ -226,7 +226,7 @@ cloudAgentFamilyApi.post('/session/:sessionId/ingest', async c => {
   const accessibleSession = await resolveAccessibleKiloSession(c.env, {
     kiloUserId,
     kiloSessionId: sessionId.data,
-    expectedCloudAgentFamilyId: assertion.data.cloudAgentSessionId,
+    expectedCloudAgentSessionScopeId: assertion.data.cloudAgentSessionId,
   });
   if (!accessibleSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404);

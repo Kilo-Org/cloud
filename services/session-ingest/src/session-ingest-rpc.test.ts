@@ -169,7 +169,7 @@ describe('createSessionForCloudAgent', () => {
       session_id: params.sessionId,
       kilo_user_id: params.kiloUserId,
       cloud_agent_session_id: params.cloudAgentSessionId,
-      cloud_agent_family_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
       organization_id: params.organizationId,
       parent_session_id: null,
       updated_at: '2026-01-01T00:00:00.000Z',
@@ -182,7 +182,7 @@ describe('createSessionForCloudAgent', () => {
     expect(fake.values).toHaveBeenCalledWith(
       expect.objectContaining({
         cloud_agent_session_id: params.cloudAgentSessionId,
-        cloud_agent_family_id: params.cloudAgentSessionId,
+        cloud_agent_session_scope_id: params.cloudAgentSessionId,
       })
     );
   });
@@ -193,7 +193,7 @@ describe('createSessionForCloudAgent', () => {
         session_id: params.sessionId,
         kilo_user_id: params.kiloUserId,
         cloud_agent_session_id: null,
-        cloud_agent_family_id: null,
+        cloud_agent_session_scope_id: null,
         organization_id: null,
         parent_session_id: null,
       },

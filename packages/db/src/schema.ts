@@ -5549,7 +5549,7 @@ export const cli_sessions_v2 = pgTable(
       onDelete: 'set null',
     }),
     cloud_agent_session_id: text(),
-    cloud_agent_family_id: text(),
+    cloud_agent_session_scope_id: text(),
     created_on_platform: text().notNull().default('unknown'),
     git_url: text(),
     git_branch: text(),

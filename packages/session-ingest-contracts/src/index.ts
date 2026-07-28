@@ -1,2 +1,2 @@
 export * from './rpc-contract';
-export * from './cloud-agent-family';
+export * from './cloud-agent-session-scope';

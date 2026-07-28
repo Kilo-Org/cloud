@@ -9,7 +9,7 @@ import { cli_sessions_v2 } from '@kilocode/db/schema';
 
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
 import { api } from './routes/api';
-import { cloudAgentFamilyApi } from './routes/cloud-agent-family';
+import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { getSessionExport } from './services/session-export';
@@ -63,11 +63,11 @@ export const app = new Hono<{
 app.use('/api/*', kiloJwtAuthMiddleware);
 app.route('/api', api);
 
-// Family routes are internet-reachable through this Worker hostname. The
+// Scoped session routes are internet-reachable through this Worker hostname. The
 // internal secret authenticates the proxy; the JWT identifies the owning user.
 app.use('/internal/cloud-agent/v1/*', kiloJwtAuthMiddleware);
 app.use('/internal/cloud-agent/v1/*', requireValidInternalSecret);
-app.route('/internal/cloud-agent/v1', cloudAgentFamilyApi);
+app.route('/internal/cloud-agent/v1', cloudAgentSessionScopeApi);
 
 // Public session endpoint: look up a session by public_id and return all ingested DO events.
 app.get('/session/:sessionId', async c => {

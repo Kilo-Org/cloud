@@ -1,5 +1,5 @@
 {
-  "id": "0b5dce19-207f-400c-beca-b453cf5d2209",
+  "id": "0eed6d48-1944-44dd-a046-04adc1042b5f",
   "prevId": "71c65daa-6bbc-413f-94d7-68cf95379e89",
   "version": "7",
   "dialect": "postgresql",
@@ -4151,8 +4151,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "cloud_agent_family_id": {
-          "name": "cloud_agent_family_id",
+        "cloud_agent_session_scope_id": {
+          "name": "cloud_agent_session_scope_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false

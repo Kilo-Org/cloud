@@ -214,7 +214,7 @@ describe('api routes', () => {
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
-      cloudAgentFamilyId: null,
+      cloudAgentSessionScopeId: null,
     });
   });
 
@@ -403,7 +403,7 @@ describe('api routes', () => {
     expect(sessionCache.putValidated).toHaveBeenCalledWith({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: null,
-      cloudAgentFamilyId: null,
+      cloudAgentSessionScopeId: null,
     });
 
     const json = await res.json();
@@ -1337,7 +1337,7 @@ describe('api routes', () => {
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: parentSessionId,
       organizationId: null,
-      cloudAgentFamilyId: 'cloud-agent-family-1',
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
     });
     // Recursive CTE
     fns.executeResult.mockResolvedValueOnce({
@@ -1355,7 +1355,7 @@ describe('api routes', () => {
         git_url: null,
         git_branch: null,
         created_on_platform: null,
-        cloud_agent_family_id: 'cloud-agent-family-1',
+        cloud_agent_session_scope_id: 'cloud-agent-session-scope-1',
       },
       {
         session_id: childSessionId,
@@ -1364,7 +1364,7 @@ describe('api routes', () => {
         git_url: null,
         git_branch: null,
         created_on_platform: null,
-        cloud_agent_family_id: 'cloud-agent-family-1',
+        cloud_agent_session_scope_id: 'cloud-agent-session-scope-1',
       },
     ]);
 

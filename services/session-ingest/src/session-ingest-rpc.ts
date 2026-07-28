@@ -67,7 +67,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    * Called via service binding from cloud-agent-next during session preparation.
    *
    * Concurrent retries are idempotent, but an existing session cannot be rebound
-   * to another Cloud Agent family.
+   * to another Cloud Agent session scope.
    */
   async createSessionForCloudAgent(params: CreateSessionForCloudAgentParams): Promise<void> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
@@ -81,7 +81,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           session_id: parsed.sessionId,
           kilo_user_id: parsed.kiloUserId,
           cloud_agent_session_id: parsed.cloudAgentSessionId,
-          cloud_agent_family_id: parsed.cloudAgentSessionId,
+          cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
           organization_id: parsed.organizationId ?? null,
           created_on_platform: parsed.createdOnPlatform,
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
@@ -108,8 +108,8 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         !existing ||
         existing.parent_session_id !== null ||
         existing.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
-        (existing.cloud_agent_family_id !== null &&
-          existing.cloud_agent_family_id !== parsed.cloudAgentSessionId)
+        (existing.cloud_agent_session_scope_id !== null &&
+          existing.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId)
       ) {
         throw new Error('Cloud Agent root session identity conflict');
       }
@@ -117,7 +117,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       const [updated] = await tx
         .update(cli_sessions_v2)
         .set({
-          cloud_agent_family_id: parsed.cloudAgentSessionId,
+          cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
           ...(parsed.organizationId !== undefined
             ? { organization_id: parsed.organizationId }
             : {}),
@@ -133,7 +133,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     });
 
     const hasMeaningfulChange = existingRow
-      ? existingRow.cloud_agent_family_id !== parsed.cloudAgentSessionId ||
+      ? existingRow.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId ||
         (parsed.organizationId !== undefined &&
           existingRow.organization_id !== parsed.organizationId)
       : true;

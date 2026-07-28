@@ -250,7 +250,7 @@ export type RedeemKiloSessionCapabilityResult =
       success: true;
       authorization: string;
       routeClass: KiloCapabilityRouteClass;
-      sessionIngestFamily?: {
+      sessionIngestScope?: {
         cloudAgentSessionId: string;
         rootKiloSessionId: string;
       };
@@ -1174,9 +1174,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       success: true,
       authorization: `Bearer ${claims.userToken}`,
       routeClass: classification.routeClass,
-      ...(classification.sessionIngestFamilyProxy
+      ...(classification.sessionIngestScopedProxy
         ? {
-            sessionIngestFamily: {
+            sessionIngestScope: {
               cloudAgentSessionId: claims.cloudAgentSessionId,
               rootKiloSessionId: claims.kiloSessionId,
             },

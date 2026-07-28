@@ -1278,7 +1278,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
     });
   });
 
-  it('returns trusted family claims only for a broadened child route', async () => {
+  it('returns trusted session scope claims only for a broadened child route', async () => {
     const rootKiloSessionId = 'ses_12345678901234567890123456';
     const childKiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
     const service = createService();
@@ -1300,7 +1300,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       success: true,
       authorization: 'Bearer raw-user-token',
       routeClass: 'session_ingest',
-      sessionIngestFamily: {
+      sessionIngestScope: {
         cloudAgentSessionId: kiloSubject.cloudAgentSessionId,
         rootKiloSessionId,
       },

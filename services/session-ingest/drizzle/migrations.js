@@ -4,7 +4,7 @@ import m0001 from './0001_common_blackheart.sql';
 import m0002 from './0002_watery_venus.sql';
 import m0003 from './0003_free_valkyrie.sql';
 import m0004 from './0004_giant_deathbird.sql';
-import m0005 from './0005_sudden_fabian_cortez.sql';
+import m0005 from './0005_dark_inhumans.sql';
 
 export default {
   journal,

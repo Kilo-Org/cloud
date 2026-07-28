@@ -114,11 +114,11 @@ type ApplyMetadataDbOptions = {
   parentExists?: boolean;
   initialStatus?: string | null;
   rowMissing?: boolean;
-  cloudAgentFamilyId?: string | null;
+  cloudAgentSessionScopeId?: string | null;
   cloudAgentSessionId?: string | null;
   parentSessionId?: string | null;
   createsCycle?: boolean;
-  familyRootMissing?: boolean;
+  scopeRootMissing?: boolean;
 };
 
 /**
@@ -150,7 +150,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     return {
       status: options.initialStatus ?? 'idle',
       parentSessionId: options.parentSessionId ?? null,
-      cloudAgentFamilyId: options.cloudAgentFamilyId ?? null,
+      cloudAgentSessionScopeId: options.cloudAgentSessionScopeId ?? null,
       cloudAgentSessionId: options.cloudAgentSessionId ?? null,
     };
   }
@@ -196,7 +196,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
         initialReadDone = true;
         queryLog.push('session-lock');
         const rows =
-          options.rowMissing || (options.familyRootMissing && lockCount === 1)
+          options.rowMissing || (options.scopeRootMissing && lockCount === 1)
             ? []
             : [currentSessionState()];
         settled = Promise.resolve(rows);
@@ -563,8 +563,10 @@ describe('applyMetadataChanges', () => {
     expect(db.applyUpdate).toHaveBeenCalled();
   });
 
-  it('refuses organization metadata changes for Cloud Agent family sessions', async () => {
-    const db = createApplyMetadataDb({ cloudAgentFamilyId: 'cloud-agent-family-1' });
+  it('refuses organization metadata changes for Cloud Agent session-scoped sessions', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+    });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
 
     await applyMetadataChanges(
@@ -585,7 +587,7 @@ describe('applyMetadataChanges', () => {
 
   it('refuses organization metadata changes for uncontained Cloud Agent roots', async () => {
     const db = createApplyMetadataDb({
-      cloudAgentFamilyId: null,
+      cloudAgentSessionScopeId: null,
       cloudAgentSessionId: 'cloud-agent-session-1',
     });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -607,8 +609,8 @@ describe('applyMetadataChanges', () => {
 
   it('refuses to reparent a Cloud Agent root', async () => {
     const db = createApplyMetadataDb({
-      cloudAgentFamilyId: 'cloud-agent-family-1',
-      cloudAgentSessionId: 'cloud-agent-family-1',
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+      cloudAgentSessionId: 'cloud-agent-session-scope-1',
       parentExists: true,
     });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -619,10 +621,10 @@ describe('applyMetadataChanges', () => {
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
-  it('refuses to reparent a legacy Cloud Agent root before family-marker healing', async () => {
+  it('refuses to reparent a legacy Cloud Agent root before session scope healing', async () => {
     const db = createApplyMetadataDb({
-      cloudAgentFamilyId: null,
-      cloudAgentSessionId: 'cloud-agent-family-1',
+      cloudAgentSessionScopeId: null,
+      cloudAgentSessionId: 'cloud-agent-session-scope-1',
       parentExists: true,
     });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -633,9 +635,9 @@ describe('applyMetadataChanges', () => {
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
-  it('allows a cycle-free same-family child reparent', async () => {
+  it('allows a cycle-free child reparent within the same session scope', async () => {
     const db = createApplyMetadataDb({
-      cloudAgentFamilyId: 'cloud-agent-family-1',
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
       parentSessionId: 'ses_root',
       parentExists: true,
     });
@@ -648,9 +650,9 @@ describe('applyMetadataChanges', () => {
     expect(db.updateSets).toContainEqual({ parent_session_id: 'ses_parent' });
   });
 
-  it('refuses a same-family reparent that would create a cycle', async () => {
+  it('refuses a same-scope reparent that would create a cycle', async () => {
     const db = createApplyMetadataDb({
-      cloudAgentFamilyId: 'cloud-agent-family-1',
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
       parentSessionId: 'ses_root',
       parentExists: true,
       createsCycle: true,
@@ -664,23 +666,23 @@ describe('applyMetadataChanges', () => {
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
-  it('logs when a family root is missing during reparent', async () => {
+  it('logs when a session scope root is missing during reparent', async () => {
     const db = createApplyMetadataDb({
-      cloudAgentFamilyId: 'cloud-agent-family-1',
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
       parentSessionId: 'ses_root',
       parentExists: true,
-      familyRootMissing: true,
+      scopeRootMissing: true,
     });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
 
     await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
 
     expect(console.warn).toHaveBeenCalledWith(
-      'Refusing Cloud Agent family reparent without a family root',
+      'Refusing Cloud Agent reparent without a session scope root',
       expect.objectContaining({
         kiloUserId: 'usr_1',
         sessionId: 'ses_1',
-        cloudAgentFamilyId: 'cloud-agent-family-1',
+        cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
       })
     );
     expect(db.updateSets).toEqual([]);

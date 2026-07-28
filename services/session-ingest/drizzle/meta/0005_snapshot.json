@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "237db044-b5a1-4479-9b59-36d881a95c65",
+  "id": "9bf4ffde-d5fd-4674-9faf-79364c73bcaa",
   "prevId": "21a453b3-2e01-470c-809c-793f5349e6cc",
   "tables": {
     "agent_notification_dispatch": {
@@ -144,8 +144,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "cloud_agent_family_id": {
-          "name": "cloud_agent_family_id",
+        "cloud_agent_session_scope_id": {
+          "name": "cloud_agent_session_scope_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

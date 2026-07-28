@@ -1069,17 +1069,17 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
     });
   });
 
-  it('routes family ingest through the internal binding and treats 404 as terminal', async () => {
+  it('routes session-scoped ingest through the internal binding and treats 404 as terminal', async () => {
     const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
       success: true,
       authorization: REDEEMED_KILO_AUTHORIZATION,
       routeClass: 'session_ingest',
-      sessionIngestFamily: {
+      sessionIngestScope: {
         cloudAgentSessionId: 'cloud-agent-session-1',
         rootKiloSessionId: 'ses_12345678901234567890123456',
       },
     });
-    const familyFetch = vi.fn(
+    const scopedFetch = vi.fn(
       async (_request: Request) => new Response('not deployed', { status: 404 })
     );
     const publicFetch = vi.fn();
@@ -1101,13 +1101,13 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
           body: JSON.stringify({ data: [] }),
         }
       ),
-      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, familyFetch)
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, scopedFetch)
     );
 
     expect(response.status).toBe(404);
     expect(publicFetch).not.toHaveBeenCalled();
-    expect(familyFetch).toHaveBeenCalledTimes(1);
-    const forwarded = familyFetch.mock.calls[0]?.[0] as Request;
+    expect(scopedFetch).toHaveBeenCalledTimes(1);
+    const forwarded = scopedFetch.mock.calls[0]?.[0] as Request;
     expect(new URL(forwarded.url)).toMatchObject({
       pathname: '/internal/cloud-agent/v1/session/ses_abcdefghijklmnopqrstuvwxyz/ingest',
       search: '?v=2',
@@ -1127,7 +1127,7 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
       authorization: REDEEMED_KILO_AUTHORIZATION,
       routeClass: 'session_ingest',
     });
-    const familyFetch = vi.fn();
+    const scopedFetch = vi.fn();
     const publicFetch = vi.fn(async (_request: Request) => new Response('exported'));
     vi.stubGlobal('fetch', publicFetch);
 
@@ -1142,22 +1142,22 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
           },
         }
       ),
-      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, familyFetch)
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, scopedFetch)
     );
 
     expect(publicFetch).toHaveBeenCalledTimes(1);
-    expect(familyFetch).not.toHaveBeenCalled();
+    expect(scopedFetch).not.toHaveBeenCalled();
     const forwarded = publicFetch.mock.calls[0]?.[0] as Request;
     expect(forwarded.headers.get('X-Internal-Secret')).toBeNull();
     expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBeNull();
   });
 
-  it('fails closed when family claims are present but the internal proxy is unavailable', async () => {
+  it('fails closed when session scope claims are present but the internal proxy is unavailable', async () => {
     const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
       success: true,
       authorization: REDEEMED_KILO_AUTHORIZATION,
       routeClass: 'session_ingest',
-      sessionIngestFamily: {
+      sessionIngestScope: {
         cloudAgentSessionId: 'cloud-agent-session-1',
         rootKiloSessionId: 'ses_12345678901234567890123456',
       },

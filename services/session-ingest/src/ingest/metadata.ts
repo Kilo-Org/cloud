@@ -75,7 +75,7 @@ export async function applyMetadataChanges(
           status: cli_sessions_v2.status,
           parentSessionId: cli_sessions_v2.parent_session_id,
           cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
-          cloudAgentFamilyId: cli_sessions_v2.cloud_agent_family_id,
+          cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
         })
         .from(cli_sessions_v2)
         .where(
@@ -86,37 +86,37 @@ export async function applyMetadataChanges(
         )
         .limit(1);
 
-    let familyRootLocked = false;
+    let sessionScopeRootLocked = false;
     if (parentSessionId !== undefined) {
-      // Family identity is write-once for children and only heals null -> value
+      // Session scope identity is write-once for children and only heals null -> value
       // for roots. That immutability makes this unlocked read safe for choosing
-      // root-before-child lock order; revisit this if family IDs become mutable.
+      // root-before-child lock order; revisit this if session scope IDs become mutable.
       const [initialRow] = await selectCurrentRow();
       if (!initialRow) return null;
-      if (initialRow.cloudAgentFamilyId != null) {
-        const [familyRoot] = await tx
+      if (initialRow.cloudAgentSessionScopeId != null) {
+        const [scopeRoot] = await tx
           .select({ sessionId: cli_sessions_v2.session_id })
           .from(cli_sessions_v2)
           .where(
             and(
               eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-              eq(cli_sessions_v2.cloud_agent_session_id, initialRow.cloudAgentFamilyId),
-              eq(cli_sessions_v2.cloud_agent_family_id, initialRow.cloudAgentFamilyId),
+              eq(cli_sessions_v2.cloud_agent_session_id, initialRow.cloudAgentSessionScopeId),
+              eq(cli_sessions_v2.cloud_agent_session_scope_id, initialRow.cloudAgentSessionScopeId),
               sql`${cli_sessions_v2.parent_session_id} IS NULL`
             )
           )
           .limit(1)
           .for('update');
-        familyRootLocked = familyRoot !== undefined;
+        sessionScopeRootLocked = scopeRoot !== undefined;
       }
     }
 
     const [currentRow] = await selectCurrentRow().for('update');
     if (!currentRow) return null;
-    const cloudAgentFamilyId = currentRow.cloudAgentFamilyId;
-    const isCloudAgentFamilySession = cloudAgentFamilyId != null;
+    const cloudAgentSessionScopeId = currentRow.cloudAgentSessionScopeId;
+    const hasCloudAgentSessionScope = cloudAgentSessionScopeId != null;
     const isCloudAgentManagedSession =
-      isCloudAgentFamilySession || currentRow.cloudAgentSessionId != null;
+      hasCloudAgentSessionScope || currentRow.cloudAgentSessionId != null;
 
     const statusChange =
       status === undefined
@@ -136,7 +136,7 @@ export async function applyMetadataChanges(
     if (mergedChanges.has('orgId')) {
       const organizationId = mergedChanges.get('orgId') ?? null;
       if (isCloudAgentManagedSession) {
-        console.warn('Refusing organization_id metadata write for Cloud Agent family session', {
+        console.warn('Refusing organization_id metadata write for Cloud Agent session', {
           kiloUserId,
           sessionId,
         });
@@ -180,9 +180,9 @@ export async function applyMetadataChanges(
           kiloUserId,
           sessionId,
         });
-      } else if (isCloudAgentFamilySession) {
+      } else if (hasCloudAgentSessionScope) {
         if (parentSessionId === null) {
-          console.warn('Refusing invalid Cloud Agent family parent metadata write', {
+          console.warn('Refusing invalid Cloud Agent session scope parent metadata write', {
             kiloUserId,
             sessionId,
           });
@@ -190,7 +190,7 @@ export async function applyMetadataChanges(
           parentSessionId !== sessionId &&
           parentSessionId !== currentRow.parentSessionId
         ) {
-          if (familyRootLocked) {
+          if (sessionScopeRootLocked) {
             const [parent] = await tx
               .select({ sessionId: cli_sessions_v2.session_id })
               .from(cli_sessions_v2)
@@ -198,7 +198,7 @@ export async function applyMetadataChanges(
                 and(
                   eq(cli_sessions_v2.session_id, parentSessionId),
                   eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-                  eq(cli_sessions_v2.cloud_agent_family_id, cloudAgentFamilyId)
+                  eq(cli_sessions_v2.cloud_agent_session_scope_id, cloudAgentSessionScopeId)
                 )
               )
               .limit(1);
@@ -234,10 +234,10 @@ export async function applyMetadataChanges(
               parentSessionIdWriteApplied = true;
             }
           } else {
-            console.warn('Refusing Cloud Agent family reparent without a family root', {
+            console.warn('Refusing Cloud Agent reparent without a session scope root', {
               kiloUserId,
               sessionId,
-              cloudAgentFamilyId,
+              cloudAgentSessionScopeId,
             });
           }
         }

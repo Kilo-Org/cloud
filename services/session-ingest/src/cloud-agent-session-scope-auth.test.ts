@@ -22,10 +22,10 @@ vi.mock('./middleware/kilo-jwt-auth', () => ({
   },
 }));
 
-vi.mock('./routes/cloud-agent-family', async () => {
-  const cloudAgentFamilyApi = new Hono();
-  cloudAgentFamilyApi.post('/session', c => c.body(null, 204));
-  return { cloudAgentFamilyApi };
+vi.mock('./routes/cloud-agent-session-scope', async () => {
+  const cloudAgentSessionScopeApi = new Hono();
+  cloudAgentSessionScopeApi.post('/session', c => c.body(null, 204));
+  return { cloudAgentSessionScopeApi };
 });
 
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
@@ -38,7 +38,7 @@ const env = {
   INTERNAL_API_SECRET_PROD: { get: async () => 'valid-internal-secret' },
 } as never;
 
-describe('Cloud Agent family internal authentication', () => {
+describe('Cloud Agent session scope internal authentication', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

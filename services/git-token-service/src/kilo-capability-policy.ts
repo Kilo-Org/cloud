@@ -11,7 +11,7 @@ export type KiloCapabilityRouteClassification =
   | {
       success: true;
       routeClass: KiloCapabilityRouteClass;
-      sessionIngestFamilyProxy?: true;
+      sessionIngestScopedProxy?: true;
     }
   | { success: false; reason: 'invalid_upstream_url' | 'upstream_not_allowed' };
 
@@ -202,7 +202,7 @@ export function classifyKiloCapabilityRequest(
       return {
         success: true,
         routeClass: 'session_ingest',
-        sessionIngestFamilyProxy: true,
+        sessionIngestScopedProxy: true,
       };
     }
     return { success: false, reason: 'upstream_not_allowed' };
@@ -219,7 +219,7 @@ export function classifyKiloCapabilityRequest(
       return {
         success: true,
         routeClass: 'session_ingest',
-        sessionIngestFamilyProxy: true,
+        sessionIngestScopedProxy: true,
       };
     }
   }

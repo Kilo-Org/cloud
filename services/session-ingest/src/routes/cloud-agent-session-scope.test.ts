@@ -22,11 +22,11 @@ vi.mock('@kilocode/worker-utils', async importOriginal => ({
 }));
 
 import { getWorkerDb } from '@kilocode/db/client';
-import { cloudAgentFamilyHeaders } from '@kilocode/session-ingest-contracts';
+import { cloudAgentSessionScopeHeaders } from '@kilocode/session-ingest-contracts';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
 import { resolveAccessibleKiloSession } from '../services/session-access';
-import { cloudAgentFamilyApi } from './cloud-agent-family';
+import { cloudAgentSessionScopeApi } from './cloud-agent-session-scope';
 
 const rootSessionId = 'ses_12345678901234567890123456';
 const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
@@ -39,16 +39,16 @@ function makeApp() {
     c.set('user_id', 'usr_test');
     await next();
   });
-  app.route('/', cloudAgentFamilyApi);
+  app.route('/', cloudAgentSessionScopeApi);
   return app;
 }
 
 function assertionHeaders() {
   return {
     'Content-Type': 'application/json',
-    [cloudAgentFamilyHeaders.cloudAgentSessionId]: cloudAgentSessionId,
-    [cloudAgentFamilyHeaders.rootKiloSessionId]: rootSessionId,
-    [cloudAgentFamilyHeaders.protocolVersion]: '1',
+    [cloudAgentSessionScopeHeaders.cloudAgentSessionId]: cloudAgentSessionId,
+    [cloudAgentSessionScopeHeaders.rootKiloSessionId]: rootSessionId,
+    [cloudAgentSessionScopeHeaders.protocolVersion]: '1',
   };
 }
 
@@ -59,7 +59,7 @@ function persistedRow(overrides: Record<string, unknown> = {}) {
     parent_session_id: rootSessionId,
     organization_id: '11111111-1111-4111-8111-111111111111',
     cloud_agent_session_id: null,
-    cloud_agent_family_id: cloudAgentSessionId,
+    cloud_agent_session_scope_id: cloudAgentSessionId,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     title: null,
@@ -109,17 +109,17 @@ function makeDb(selectResults: unknown[][], insertResult: unknown[]) {
   return { db, insertedValues, updateSets };
 }
 
-describe('Cloud Agent family routes', () => {
+describe('Cloud Agent session scope routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     workerUtils.hasOrganizationAccess.mockResolvedValue(true);
   });
 
-  it('rejects an incomplete or invalid family assertion before database access', async () => {
+  it('rejects an incomplete or invalid session scope assertion before database access', async () => {
     const { db } = makeDb([], []);
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
     const headers = assertionHeaders();
-    headers[cloudAgentFamilyHeaders.protocolVersion] = '2';
+    headers[cloudAgentSessionScopeHeaders.protocolVersion] = '2';
 
     const response = await makeApp().fetch(
       new Request('http://local/session', {
@@ -134,7 +134,7 @@ describe('Cloud Agent family routes', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
-  it('atomically heals the root and creates a family child', async () => {
+  it('atomically heals the root and creates a session-scoped child', async () => {
     const child = persistedRow();
     const { db, insertedValues, updateSets } = makeDb(
       [
@@ -142,7 +142,7 @@ describe('Cloud Agent family routes', () => {
           {
             sessionId: rootSessionId,
             organizationId: child.organization_id,
-            cloudAgentFamilyId: null,
+            cloudAgentSessionScopeId: null,
           },
         ],
       ],
@@ -162,19 +162,19 @@ describe('Cloud Agent family routes', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(updateSets).toContainEqual({ cloud_agent_family_id: cloudAgentSessionId });
+    expect(updateSets).toContainEqual({ cloud_agent_session_scope_id: cloudAgentSessionId });
     expect(insertedValues).toContainEqual(
       expect.objectContaining({
         session_id: childSessionId,
         parent_session_id: rootSessionId,
-        cloud_agent_family_id: cloudAgentSessionId,
+        cloud_agent_session_scope_id: cloudAgentSessionId,
         cloud_agent_session_id: null,
       })
     );
     expect(putValidated).toHaveBeenCalledWith({
       sessionId: childSessionId,
       organizationId: child.organization_id,
-      cloudAgentFamilyId: cloudAgentSessionId,
+      cloudAgentSessionScopeId: cloudAgentSessionId,
     });
   });
 
@@ -185,10 +185,10 @@ describe('Cloud Agent family routes', () => {
           {
             sessionId: rootSessionId,
             organizationId: null,
-            cloudAgentFamilyId: cloudAgentSessionId,
+            cloudAgentSessionScopeId: cloudAgentSessionId,
           },
         ],
-        [persistedRow({ cloud_agent_family_id: null })],
+        [persistedRow({ cloud_agent_session_scope_id: null })],
       ],
       []
     );
@@ -206,7 +206,7 @@ describe('Cloud Agent family routes', () => {
     expect(response.status).toBe(409);
   });
 
-  it('treats an existing same-family child as an idempotent bootstrap', async () => {
+  it('treats an existing child in the same session scope as an idempotent bootstrap', async () => {
     const existing = persistedRow();
     const { db } = makeDb(
       [
@@ -214,7 +214,7 @@ describe('Cloud Agent family routes', () => {
           {
             sessionId: rootSessionId,
             organizationId: null,
-            cloudAgentFamilyId: cloudAgentSessionId,
+            cloudAgentSessionScopeId: cloudAgentSessionId,
           },
         ],
         [existing],
@@ -236,15 +236,15 @@ describe('Cloud Agent family routes', () => {
 
     expect(response.status).toBe(200);
     expect(putValidated).toHaveBeenCalledWith(
-      expect.objectContaining({ cloudAgentFamilyId: cloudAgentSessionId })
+      expect.objectContaining({ cloudAgentSessionScopeId: cloudAgentSessionId })
     );
   });
 
-  it('requires the asserted family during child ingest authorization', async () => {
+  it('requires the asserted session scope during child ingest authorization', async () => {
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: childSessionId,
       organizationId: null,
-      cloudAgentFamilyId: cloudAgentSessionId,
+      cloudAgentSessionScopeId: cloudAgentSessionId,
     });
     vi.mocked(handleDirectIngestRequest).mockResolvedValue({
       status: 200,
@@ -264,7 +264,7 @@ describe('Cloud Agent family routes', () => {
     expect(resolveAccessibleKiloSession).toHaveBeenCalledWith(expect.anything(), {
       kiloUserId: 'usr_test',
       kiloSessionId: childSessionId,
-      expectedCloudAgentFamilyId: cloudAgentSessionId,
+      expectedCloudAgentSessionScopeId: cloudAgentSessionId,
     });
   });
 });

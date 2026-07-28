@@ -64,7 +64,7 @@ describe('classifyKiloCapabilityRequest', () => {
     ).toEqual({ success: false, reason: 'upstream_not_allowed' });
   });
 
-  describe('Cloud Agent family proxy', () => {
+  describe('Cloud Agent session scope proxy', () => {
     const rootSessionId = 'ses_12345678901234567890123456';
     const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
 
@@ -83,7 +83,7 @@ describe('classifyKiloCapabilityRequest', () => {
       ).toEqual({
         success: true,
         routeClass: 'session_ingest',
-        sessionIngestFamilyProxy: true,
+        sessionIngestScopedProxy: true,
       });
     });
 
@@ -98,7 +98,7 @@ describe('classifyKiloCapabilityRequest', () => {
       ).toEqual({
         success: true,
         routeClass: 'session_ingest',
-        sessionIngestFamilyProxy: true,
+        sessionIngestScopedProxy: true,
       });
     });
 

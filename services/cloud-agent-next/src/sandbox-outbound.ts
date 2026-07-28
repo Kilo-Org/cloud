@@ -6,8 +6,8 @@ import type { GitTokenService } from './types.js';
 import { MeteredSandbox } from './container-usage.js';
 import type { SandboxClassName } from './container-usage-context.js';
 import {
-  cloudAgentFamilyHeaders,
-  cloudAgentFamilyProtocolVersion,
+  cloudAgentSessionScopeHeaders,
+  cloudAgentSessionScopeProtocolVersion,
 } from '@kilocode/session-ingest-contracts';
 
 export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
@@ -354,7 +354,7 @@ async function forwardRedeemedRequest(
   );
 }
 
-function getCloudAgentFamilyInternalUrl(requestUrl: string): URL | null {
+function getCloudAgentSessionScopeInternalUrl(requestUrl: string): URL | null {
   const url = new URL(requestUrl);
   if (url.pathname.endsWith('/api/session')) {
     url.pathname = '/internal/cloud-agent/v1/session';
@@ -369,16 +369,16 @@ function getCloudAgentFamilyInternalUrl(requestUrl: string): URL | null {
   return null;
 }
 
-async function forwardCloudAgentFamilyRequest(
+async function forwardCloudAgentSessionScopeRequest(
   request: Request,
   env: Cloudflare.Env,
   result: {
     authorization: string;
-    sessionIngestFamily: { cloudAgentSessionId: string; rootKiloSessionId: string };
+    sessionIngestScope: { cloudAgentSessionId: string; rootKiloSessionId: string };
   }
 ): Promise<Response> {
-  const url = getCloudAgentFamilyInternalUrl(request.url);
-  if (!url) throw new Error('Unsupported Cloud Agent family route');
+  const url = getCloudAgentSessionScopeInternalUrl(request.url);
+  if (!url) throw new Error('Unsupported Cloud Agent session scope route');
 
   const internalSecret = await env.INTERNAL_API_SECRET_PROD.get();
   if (!internalSecret) throw new Error('Session Ingest internal secret unavailable');
@@ -392,14 +392,14 @@ async function forwardCloudAgentFamilyRequest(
   headers.set('Authorization', result.authorization);
   headers.set('X-Internal-Secret', internalSecret);
   headers.set(
-    cloudAgentFamilyHeaders.cloudAgentSessionId,
-    result.sessionIngestFamily.cloudAgentSessionId
+    cloudAgentSessionScopeHeaders.cloudAgentSessionId,
+    result.sessionIngestScope.cloudAgentSessionId
   );
   headers.set(
-    cloudAgentFamilyHeaders.rootKiloSessionId,
-    result.sessionIngestFamily.rootKiloSessionId
+    cloudAgentSessionScopeHeaders.rootKiloSessionId,
+    result.sessionIngestScope.rootKiloSessionId
   );
-  headers.set(cloudAgentFamilyHeaders.protocolVersion, cloudAgentFamilyProtocolVersion);
+  headers.set(cloudAgentSessionScopeHeaders.protocolVersion, cloudAgentSessionScopeProtocolVersion);
 
   const internalRequest = new Request(url, request);
   return env.SESSION_INGEST.fetch(
@@ -559,14 +559,14 @@ async function handleManagedKiloOutbound(
 
   let response: Response;
   try {
-    response = result.sessionIngestFamily
-      ? await forwardCloudAgentFamilyRequest(request, env, {
+    response = result.sessionIngestScope
+      ? await forwardCloudAgentSessionScopeRequest(request, env, {
           authorization: result.authorization,
-          sessionIngestFamily: result.sessionIngestFamily,
+          sessionIngestScope: result.sessionIngestScope,
         })
       : await forwardRedeemedRequest(request, { authorization: result.authorization }, false, [
           'X-Internal-Secret',
-          ...Object.values(cloudAgentFamilyHeaders),
+          ...Object.values(cloudAgentSessionScopeHeaders),
         ]);
   } catch (error) {
     logDiagnostic(

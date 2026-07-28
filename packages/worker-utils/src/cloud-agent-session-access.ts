@@ -8,7 +8,7 @@ export type AccessibleSession = {
 };
 
 export type AccessibleKiloSession = AccessibleSession & {
-  cloudAgentFamilyId: string | null;
+  cloudAgentSessionScopeId: string | null;
 };
 
 /** Established name used by Cloud Agent consumers. */
@@ -25,7 +25,7 @@ type AccessibleCloudAgentSessionQuery = {
 type AccessibleKiloSessionQuery = {
   kiloUserId: string;
   kiloSessionId: string;
-  expectedCloudAgentFamilyId?: string;
+  expectedCloudAgentSessionScopeId?: string;
 };
 
 type AccessibleSessionQuery = AccessibleCloudAgentSessionQuery | AccessibleKiloSessionQuery;
@@ -66,7 +66,7 @@ async function queryAccessibleSession(
     .select({
       kiloSessionId: cli_sessions_v2.session_id,
       organizationId: cli_sessions_v2.organization_id,
-      cloudAgentFamilyId: cli_sessions_v2.cloud_agent_family_id,
+      cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
     })
     .from(cli_sessions_v2)
     .leftJoin(organization_memberships, membershipJoin)
@@ -76,8 +76,9 @@ async function queryAccessibleSession(
         eq(cli_sessions_v2.kilo_user_id, query.kiloUserId),
         sessionCondition,
         scopeCondition,
-        'expectedCloudAgentFamilyId' in query && query.expectedCloudAgentFamilyId !== undefined
-          ? eq(cli_sessions_v2.cloud_agent_family_id, query.expectedCloudAgentFamilyId)
+        'expectedCloudAgentSessionScopeId' in query &&
+          query.expectedCloudAgentSessionScopeId !== undefined
+          ? eq(cli_sessions_v2.cloud_agent_session_scope_id, query.expectedCloudAgentSessionScopeId)
           : undefined
       )
     )
@@ -106,7 +107,7 @@ export async function queryAccessibleKiloSession(
     : null;
 }
 
-export async function queryAccessibleKiloSessionWithFamily(
+export async function queryAccessibleKiloSessionWithSessionScope(
   db: SessionAccessDb,
   query: AccessibleKiloSessionQuery
 ): Promise<AccessibleKiloSession | null> {

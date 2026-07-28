@@ -86,7 +86,6 @@ function stripLinePrefixes(body: string):
   const stripped: string[] = [];
   let lineStart = 0;
   let lastMatchingNumber = 0;
-  let sawMatch = false;
 
   for (const [index, line] of lines.entries()) {
     const match = LINE_PREFIX.exec(line);
@@ -95,9 +94,8 @@ function stripLinePrefixes(body: string):
     }
     if (match) {
       const num = Number(match[1]);
-      if (!sawMatch) {
+      if (index === 0) {
         lineStart = num;
-        sawMatch = true;
       }
       lastMatchingNumber = num;
       stripped.push(match[2] ?? '');
@@ -109,7 +107,7 @@ function stripLinePrefixes(body: string):
   return {
     text: stripped.join('\n'),
     lineStart,
-    lineEnd: sawMatch ? lastMatchingNumber : lineStart + lines.length - 1,
+    lineEnd: lastMatchingNumber,
   };
 }
 

@@ -46,7 +46,11 @@ stack_session() { echo "kilo-dev-$(basename "$1" | tr -c 'A-Za-z0-9_-\n' '_')"; 
 # real answer; the owner-name prefix is a fallback so slots written before
 # worktrees were recorded never make a live stack look abandoned.
 stack_is_covered() {
-  sess=$1
+  # Every name here is local: this function loops over slots reassigning `wt`,
+  # and its caller `stop_stack` still needs its own `wt` afterwards to know
+  # which worktree to stop. Without `local` the caller's value is clobbered and
+  # the wrong section's stack gets stopped.
+  local sess=$1 s wt owner
   for s in "$DIR"/slot-*; do
     [ -d "$s" ] || continue
     wt=$(cat "$s/worktree" 2>/dev/null || echo)
@@ -60,7 +64,7 @@ stack_is_covered() {
 # Stop a worktree's stack, but only once no remaining slot covers it — a section
 # can hold a second slot for a concurrent phase.
 stop_stack() {
-  wt=$1
+  local wt=$1 sess
   [ -n "$wt" ] && [ -d "$wt" ] || return 0
   sess=$(stack_session "$wt")
   stack_is_covered "$sess" && return 0
@@ -73,6 +77,7 @@ reap() {
   # If tmux cannot answer (missing binary, no server, socket error), liveness
   # cannot be judged — keep every slot rather than wipe live ones. Acquirers
   # always run inside tmux, so the server is up whenever reaping matters.
+  local alive now s owner mtime age wt
   alive=$(tmux list-sessions -F '#{session_name}' 2>/dev/null) || return 0
   now=$(date +%s)
   for s in "$DIR"/slot-*; do

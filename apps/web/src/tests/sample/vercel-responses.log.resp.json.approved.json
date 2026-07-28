@@ -4,7 +4,7 @@
   "model": "gpt-5.4-2026-03-05",
   "responseContent": "hi",
   "inference_provider": "openai",
-  "upstream_id": null,
+  "upstream_id": "req_869e7f2d33124834a2d0a7fb0a271c1a",
   "finish_reason": "completed",
   "latency": null,
   "moderation_latency": null,

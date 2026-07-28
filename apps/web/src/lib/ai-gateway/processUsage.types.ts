@@ -23,6 +23,10 @@ export type VercelProviderAttempt = {
   provider?: string;
   credentialType?: string;
   success?: boolean;
+  /** The upstream provider's own request id, e.g. Fireworks' `chatcmpl-…`. */
+  providerRequestId?: string;
+  /** The upstream provider's own response id; usually equal to `providerRequestId`. */
+  providerResponseId?: string;
 };
 
 export type VercelModelAttempt = {

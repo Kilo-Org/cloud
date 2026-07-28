@@ -296,6 +296,96 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.hasError).toBe(true);
     expect(result.status_code).toBe(502);
   });
+
+  test('records the Vercel upstream provider request id as upstream_id', async () => {
+    const chunk = `data: {"id":"gen_01KYMFY57BAFKZGK45197SCRGD","object":"chat.completion.chunk","created":1785246720,"model":"moonshotai/kimi-k3-fast","choices":[{"index":0,"delta":{"provider_metadata":{"fireworks":{},"gateway":{"routing":{"originalModelId":"moonshotai/kimi-k3-fast","resolvedProvider":"fireworks","fallbacksAvailable":[],"canonicalSlug":"moonshotai/kimi-k3-fast","finalProvider":"fireworks","speed":"fast","modelAttemptCount":1,"modelAttempts":[{"canonicalSlug":"moonshotai/kimi-k3-fast","success":true,"providerAttemptCount":1,"providerAttempts":[{"provider":"fireworks","credentialType":"system","success":true,"startTime":1785246717210,"endTime":1785246721497,"providerRequestId":"chatcmpl-ccebc94c526d4f8797cfe00023478a9a","statusCode":200,"providerResponseId":"chatcmpl-ccebc94c526d4f8797cfe00023478a9a"}]}],"totalProviderAttemptCount":1},"cost":"0.0474822","marketCost":"0.0474822","generationId":"gen_01KYMFY57BAFKZGK45197SCRGD"}}},"logprobs":null,"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":91904,"completion_tokens":134,"total_tokens":92038,"cost":0.0474822,"is_byok":false,"prompt_tokens_details":{"cached_tokens":91136},"cost_details":{"upstream_inference_cost":null},"completion_tokens_details":{"reasoning_tokens":0}},"generationId":"gen_01KYMFY57BAFKZGK45197SCRGD"}\n\ndata: [DONE]\n\n`;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(chunk));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200
+    );
+
+    expect(result.upstream_id).toBe('chatcmpl-ccebc94c526d4f8797cfe00023478a9a');
+    expect(result.inference_provider).toBe('fireworks');
+    expect(result.cost_mUsd).toBe(47482);
+  });
+
+  test('leaves upstream_id null when the Vercel gateway reports no provider request id', async () => {
+    const chunk = `data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"moonshotai/kimi-k3-fast","choices":[{"index":0,"delta":{"provider_metadata":{"gateway":{"routing":{"finalProvider":"fireworks","modelAttempts":[{"success":true,"providerAttempts":[{"provider":"fireworks","credentialType":"system","success":true}]}]},"marketCost":"0.001"}}},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}\n\ndata: [DONE]\n\n`;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(chunk));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200
+    );
+
+    expect(result.upstream_id).toBeNull();
+  });
+
+  test('records the Vercel upstream provider request id for non-streamed responses', () => {
+    const response = JSON.stringify({
+      id: 'gen-2',
+      object: 'chat.completion',
+      created: 1,
+      model: 'moonshotai/kimi-k3-fast',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: 'hi',
+            provider_metadata: {
+              gateway: {
+                routing: {
+                  finalProvider: 'fireworks',
+                  modelAttempts: [
+                    {
+                      success: true,
+                      providerAttempts: [
+                        {
+                          provider: 'fireworks',
+                          credentialType: 'system',
+                          success: true,
+                          providerResponseId: 'chatcmpl-non-streamed',
+                        },
+                      ],
+                    },
+                  ],
+                },
+                marketCost: '0.001',
+              },
+            },
+          },
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    });
+
+    const result = parseMicrodollarUsageFromString(response, 'fake-user-id', 200);
+
+    expect(result.upstream_id).toBe('chatcmpl-non-streamed');
+    expect(result.inference_provider).toBe('fireworks');
+  });
 });
 
 const sampleReqDir = join(process.cwd(), 'src/tests/req_sample');

@@ -550,6 +550,100 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           type: string;
           message: string;
         }[];
+        billing: {
+          enabled: boolean;
+          enforcing: boolean;
+          state:
+            | 'blocked'
+            | 'degraded'
+            | 'idle'
+            | 'paused'
+            | 'running'
+            | 'starting'
+            | 'stopping'
+            | 'warning';
+          runPolicy: 'automatic' | 'paused_by_user';
+          payer?:
+            | {
+                type: 'org' | 'user';
+                id: string;
+              }
+            | undefined;
+          remaining?: number | undefined;
+          minimumRequired?: number | undefined;
+          estimatedHourlyCharge?: number | undefined;
+          estimatedRunCharge?: number | undefined;
+          runUsageSeconds?: number | undefined;
+          intervalStartedAt?: number | undefined;
+          lastReportedAt?: number | undefined;
+        };
+      };
+      meta: object;
+    }>;
+    getBillingStatus: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+      };
+      output: {
+        enabled: boolean;
+        enforcing: boolean;
+        state:
+          | 'blocked'
+          | 'degraded'
+          | 'idle'
+          | 'paused'
+          | 'running'
+          | 'starting'
+          | 'stopping'
+          | 'warning';
+        runPolicy: 'automatic' | 'paused_by_user';
+        payer?:
+          | {
+              type: 'org' | 'user';
+              id: string;
+            }
+          | undefined;
+        remaining?: number | undefined;
+        minimumRequired?: number | undefined;
+        estimatedHourlyCharge?: number | undefined;
+        estimatedRunCharge?: number | undefined;
+        runUsageSeconds?: number | undefined;
+        intervalStartedAt?: number | undefined;
+        lastReportedAt?: number | undefined;
+      };
+      meta: object;
+    }>;
+    setContainerRunPolicy: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+        policy: 'automatic' | 'paused_by_user';
+      };
+      output: {
+        enabled: boolean;
+        enforcing: boolean;
+        state:
+          | 'blocked'
+          | 'degraded'
+          | 'idle'
+          | 'paused'
+          | 'running'
+          | 'starting'
+          | 'stopping'
+          | 'warning';
+        runPolicy: 'automatic' | 'paused_by_user';
+        payer?:
+          | {
+              type: 'org' | 'user';
+              id: string;
+            }
+          | undefined;
+        remaining?: number | undefined;
+        minimumRequired?: number | undefined;
+        estimatedHourlyCharge?: number | undefined;
+        estimatedRunCharge?: number | undefined;
+        runUsageSeconds?: number | undefined;
+        intervalStartedAt?: number | undefined;
+        lastReportedAt?: number | undefined;
       };
       meta: object;
     }>;
@@ -2184,6 +2278,100 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               type: string;
               message: string;
             }[];
+            billing: {
+              enabled: boolean;
+              enforcing: boolean;
+              state:
+                | 'blocked'
+                | 'degraded'
+                | 'idle'
+                | 'paused'
+                | 'running'
+                | 'starting'
+                | 'stopping'
+                | 'warning';
+              runPolicy: 'automatic' | 'paused_by_user';
+              payer?:
+                | {
+                    type: 'org' | 'user';
+                    id: string;
+                  }
+                | undefined;
+              remaining?: number | undefined;
+              minimumRequired?: number | undefined;
+              estimatedHourlyCharge?: number | undefined;
+              estimatedRunCharge?: number | undefined;
+              runUsageSeconds?: number | undefined;
+              intervalStartedAt?: number | undefined;
+              lastReportedAt?: number | undefined;
+            };
+          };
+          meta: object;
+        }>;
+        getBillingStatus: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+          };
+          output: {
+            enabled: boolean;
+            enforcing: boolean;
+            state:
+              | 'blocked'
+              | 'degraded'
+              | 'idle'
+              | 'paused'
+              | 'running'
+              | 'starting'
+              | 'stopping'
+              | 'warning';
+            runPolicy: 'automatic' | 'paused_by_user';
+            payer?:
+              | {
+                  type: 'org' | 'user';
+                  id: string;
+                }
+              | undefined;
+            remaining?: number | undefined;
+            minimumRequired?: number | undefined;
+            estimatedHourlyCharge?: number | undefined;
+            estimatedRunCharge?: number | undefined;
+            runUsageSeconds?: number | undefined;
+            intervalStartedAt?: number | undefined;
+            lastReportedAt?: number | undefined;
+          };
+          meta: object;
+        }>;
+        setContainerRunPolicy: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+            policy: 'automatic' | 'paused_by_user';
+          };
+          output: {
+            enabled: boolean;
+            enforcing: boolean;
+            state:
+              | 'blocked'
+              | 'degraded'
+              | 'idle'
+              | 'paused'
+              | 'running'
+              | 'starting'
+              | 'stopping'
+              | 'warning';
+            runPolicy: 'automatic' | 'paused_by_user';
+            payer?:
+              | {
+                  type: 'org' | 'user';
+                  id: string;
+                }
+              | undefined;
+            remaining?: number | undefined;
+            minimumRequired?: number | undefined;
+            estimatedHourlyCharge?: number | undefined;
+            estimatedRunCharge?: number | undefined;
+            runUsageSeconds?: number | undefined;
+            intervalStartedAt?: number | undefined;
+            lastReportedAt?: number | undefined;
           };
           meta: object;
         }>;

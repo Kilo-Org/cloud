@@ -27,6 +27,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { CODE_REVIEW_COUNCIL_FLAG } from '@/lib/code-reviews/core/council-selection';
+import { CODE_REVIEW_MD_CONVERSION_FLAG } from '@/lib/code-reviews/core/constants';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
@@ -77,6 +78,10 @@ export function ReviewAgentPageClient({
   // Same gate as the manual council UI: local dev, or an entitled org behind the rollout flag.
   const councilUiEnabled =
     localCodeReviewDevelopmentEnabled || (councilEntitled && !!councilFlagEnabled);
+  // Gates the Custom Instructions -> REVIEW.md conversion button/dialog. The route enforces the
+  // same flag server-side; this just hides the entry point.
+  const conversionFlagEnabled = useFeatureFlagEnabled(CODE_REVIEW_MD_CONVERSION_FLAG);
+  const conversionUiEnabled = localCodeReviewDevelopmentEnabled || !!conversionFlagEnabled;
 
   const handlePlatformChange = (platform: Platform) => {
     const params = new URLSearchParams();
@@ -304,6 +309,7 @@ export function ReviewAgentPageClient({
                 organizationId={organizationId}
                 platform="github"
                 councilUiEnabled={councilUiEnabled}
+                conversionUiEnabled={conversionUiEnabled}
               />
             </TabsContent>
 
@@ -405,6 +411,7 @@ export function ReviewAgentPageClient({
                 organizationId={organizationId}
                 platform="gitlab"
                 councilUiEnabled={councilUiEnabled}
+                conversionUiEnabled={conversionUiEnabled}
               />
             </TabsContent>
 

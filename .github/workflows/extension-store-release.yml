@@ -1,0 +1,156 @@
+name: Extension Store Release
+
+# Push-button build of store-submittable extension zips for marketing: Chrome MV3
+# (Chrome Web Store), Firefox MV3 + sources (Firefox Add-ons). Uploads the zips as
+# a run artifact named after the built version, then — on main only — patch-bumps
+# apps/extension/package.json and opens the bump PR so the next run produces a
+# higher version (stores reject re-used version numbers).
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: extension-store-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-artifacts:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      # Works the day a human adds the secret; wxt.config.ts only warns and
+      # disables analytics when it is empty. Do not fail when unset.
+      VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Read version, guard against a pending bump
+        id: version
+        run: |
+          CURRENT=$(node -p "require('./apps/extension/package.json').version")
+          echo "Building version $CURRENT"
+          PENDING=$(git ls-remote --heads origin 'extension-version-bump-*' | awk '{print $2}' | paste -sd' ' -)
+          if [ -n "$PENDING" ]; then
+            echo "::error::Pending version-bump branch(es): $PENDING — merge the open bump PR, or close it and delete the branch (git push origin --delete <branch>), then press again. Re-using a version produces artifacts the stores reject."
+            exit 1
+          fi
+          echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify (typecheck, lint, format, unit tests)
+        run: pnpm --filter kilo-extension verify
+
+      - name: Zip (Chrome MV3)
+        run: pnpm --filter kilo-extension zip
+
+      - name: Zip (Firefox MV3 + AMO sources)
+        run: pnpm --filter kilo-extension zip:firefox
+
+      - name: Confirm expected zips exist
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          ls -l "apps/extension/.output/kilo-extension-$V-chrome.zip" \
+                "apps/extension/.output/kilo-extension-$V-firefox.zip" \
+                "apps/extension/.output/kilo-extension-$V-sources.zip"
+
+      - name: Upload store artifacts
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: extension-store-${{ steps.version.outputs.version }}
+          path: |
+            apps/extension/.output/kilo-extension-${{ steps.version.outputs.version }}-chrome.zip
+            apps/extension/.output/kilo-extension-${{ steps.version.outputs.version }}-firefox.zip
+            apps/extension/.output/kilo-extension-${{ steps.version.outputs.version }}-sources.zip
+          if-no-files-found: error
+          overwrite: true
+          # Store handoff can take weeks; 30 days beats the repo's 7-day CI-debug
+          # norm while keeping the ~74 MB sources zips from piling up forever.
+          retention-days: 30
+
+  bump-version:
+    needs: build-artifacts
+    # Only a main dispatch bumps: a branch dispatch would open a PR carrying
+    # unrelated commits.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: write # push the bump branch
+      pull-requests: write # open the PR, request the reviewer
+      issues: write # PR assignees are an Issues API operation; pull-requests: write alone does not cover --assignee
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Bump patch version
+        id: bump
+        working-directory: apps/extension
+        run: |
+          OLD=$(node -p "require('./package.json').version")
+          npm version patch --no-git-tag-version
+          NEW=$(node -p "require('./package.json').version")
+          echo "Bumped $OLD -> $NEW"
+          echo "old=$OLD" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Push bump branch
+        run: |
+          NEW="${{ steps.bump.outputs.new }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "extension-version-bump-$NEW"
+          git add apps/extension/package.json
+          git commit -m "chore(extension): bump version to $NEW"
+          git push -u origin "extension-version-bump-$NEW"
+
+      - name: Open bump PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW="${{ steps.bump.outputs.new }}"
+          OLD="${{ steps.bump.outputs.old }}"
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat > /tmp/bump-pr-body.md <<EOF
+          ## What
+
+          Bumps apps/extension (kilo-extension) version $OLD -> $NEW.
+
+          ## Why
+
+          The Extension Store Release workflow built store-submittable artifacts for
+          version $OLD (run: $RUN_URL). Stores reject re-used version numbers, so the
+          version is patch-bumped after every successful artifact build to keep the
+          next build submittable.
+
+          ## What to do
+
+          1. Required checks show as pending: PRs opened with the default GITHUB_TOKEN
+             do not trigger workflow runs. Close and reopen this PR (or push an empty
+             commit) to start CI.
+          2. Review and merge. Only the version line changed; no product code.
+          EOF
+          gh pr create --base main \
+            --title "chore(extension): bump version to $NEW" \
+            --body-file /tmp/bump-pr-body.md \
+            --assignee iscekic \
+            --reviewer iscekic

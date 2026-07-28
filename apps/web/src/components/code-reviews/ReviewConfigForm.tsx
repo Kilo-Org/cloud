@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   ChevronDown,
+  Sparkles,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -56,6 +57,8 @@ import {
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
+import { ReviewMdConversionDialog } from './ReviewMdConversionDialog';
+import { buildSelectableRepositories } from '@/lib/code-reviews/core/selectable-repositories';
 import {
   RepositoryModelOverrides,
   type RepositoryModelOverrideValue,
@@ -82,6 +85,8 @@ export type ReviewConfigFormProps = {
   platform?: Platform;
   /** Same gate as the manual council UI: local dev, or an entitled org behind the rollout flag. */
   councilUiEnabled?: boolean;
+  /** Local dev, or behind the `code-review-md-conversion` flag: gates the conversion button/dialog. */
+  conversionUiEnabled?: boolean;
 };
 
 // Labels/descriptions stay web-local; the ids/values themselves are derived
@@ -128,6 +133,7 @@ export function ReviewConfigForm({
   organizationId,
   platform = 'github',
   councilUiEnabled = false,
+  conversionUiEnabled = false,
 }: ReviewConfigFormProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -241,6 +247,7 @@ export function ReviewConfigForm({
   // surfaced to configs that already have something stored in it, and stays
   // visible for the rest of the session even if the user clears it.
   const [showCustomInstructions, setShowCustomInstructions] = useState(false);
+  const [conversionDialogOpen, setConversionDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
@@ -293,20 +300,28 @@ export function ReviewConfigForm({
     [selectedModel]
   );
 
-  const selectableRepositories = useMemo(() => {
-    const cachedRepositories = (repositoriesData?.repositories ?? []).map(repo => ({
-      id: repo.id,
-      name: repo.name,
-      full_name: repo.fullName,
-      private: repo.private,
-    }));
-    const cachedRepositoryIds = new Set(cachedRepositories.map(repo => repo.id));
-    const legacyRepositories = (configData?.manuallyAddedRepositories ?? []).filter(
-      repo => !cachedRepositoryIds.has(repo.id)
-    );
+  const selectableRepositories = useMemo(
+    () =>
+      buildSelectableRepositories(
+        repositoriesData?.repositories ?? [],
+        configData?.manuallyAddedRepositories ?? []
+      ),
+    [configData?.manuallyAddedRepositories, repositoriesData?.repositories]
+  );
 
-    return [...cachedRepositories, ...legacyRepositories];
-  }, [configData?.manuallyAddedRepositories, repositoriesData?.repositories]);
+  // Repos the conversion dialog may offer. Fetched integration repos ONLY (no manually-added
+  // entries, which are unverified client input) so this list stays in sync with the server route's
+  // allowlist — a repo the dialog offers is always one the route will authorize.
+  const conversionRepositories = useMemo(
+    () => buildSelectableRepositories(repositoriesData?.repositories ?? [], []),
+    [repositoriesData?.repositories]
+  );
+
+  // The conversion runs on the SAVED config server-side, so the button gates on the persisted value
+  // and blocks (with an explanation) while there are unsaved edits or nothing is saved yet.
+  const savedCustomInstructions = configData?.customInstructions ?? '';
+  const hasSavedCustomInstructions = savedCustomInstructions.trim().length > 0;
+  const hasUnsavedCustomInstructionEdits = customInstructions !== savedCustomInstructions;
 
   // Reset thinking effort when the model changes and the current selection is invalid
   useEffect(() => {
@@ -987,6 +1002,29 @@ export function ReviewConfigForm({
                     Learn about REVIEW.md
                   </Link>
                 </p>
+                {conversionUiEnabled && (
+                  <div className="space-y-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConversionDialogOpen(true)}
+                      disabled={!hasSavedCustomInstructions || hasUnsavedCustomInstructionEdits}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Help me automate the conversion
+                    </Button>
+                    {hasUnsavedCustomInstructionEdits ? (
+                      <p className="text-muted-foreground text-sm">
+                        Save your changes first. The conversion uses your saved Custom Instructions.
+                      </p>
+                    ) : !hasSavedCustomInstructions ? (
+                      <p className="text-muted-foreground text-sm">
+                        Add and save Custom Instructions above to convert them.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1424,6 +1462,16 @@ export function ReviewConfigForm({
                   : 'Save Configuration'}
               </Button>
             </div>
+
+            {conversionUiEnabled && (
+              <ReviewMdConversionDialog
+                open={conversionDialogOpen}
+                onOpenChange={setConversionDialogOpen}
+                organizationId={organizationId}
+                platform={platform}
+                repositories={conversionRepositories}
+              />
+            )}
           </div>
         </div>
       </CardContent>

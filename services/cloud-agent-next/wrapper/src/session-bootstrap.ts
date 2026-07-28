@@ -468,23 +468,31 @@ async function prepareBranch(
   const reviewSession = isCodeReviewSession(request);
   const hardTimeoutMs = reviewSession ? REVIEW_GIT_HARD_TIMEOUT_MS : LONG_COMMAND_HARD_TIMEOUT_MS;
 
-  // Cloud code review only needs the reviewed branch checked out, so fetch just
-  // that branch at depth 1 instead of every ref with full history. Fall back to
-  // a full fetch on any failure so a review is never lost to the optimization.
-  let fetchResult: ExecResult | undefined;
+  // Cloud code review only needs the reviewed branch, so fetch just that branch
+  // instead of every ref with full history. A shallow clone is single-branch
+  // (`--depth 1` implies `--single-branch`), so its configured refspec covers
+  // only the default branch; an explicit `+<branch>:refs/remotes/origin/<branch>`
+  // refspec is required to populate the remote-tracking ref the checkout below
+  // relies on, since a bare `git fetch origin <branch>` would only update
+  // FETCH_HEAD. Fall back to a full-depth fetch of the same branch on failure so
+  // a review is never lost to the optimization.
+  let fetchResult: ExecResult;
   if (reviewSession || request.repo?.shallow === true) {
+    const branchRefspec = `+${branchName}:refs/remotes/origin/${branchName}`;
     fetchResult = await runGit(
-      ['fetch', '--progress', '--depth', '1', 'origin', branchName],
+      ['fetch', '--progress', '--depth', '1', 'origin', branchRefspec],
       longGitOptions(progress, 'branch', 'Fetching branch...', workspacePath, hardTimeoutMs)
     );
     if (fetchResult.exitCode !== 0) {
       logToFile(
         `bootstrap shallow branch fetch failed; retrying full fetch kiloSessionId=${request.kiloSessionId}`
       );
-      fetchResult = undefined;
+      fetchResult = await runGit(
+        ['fetch', '--progress', 'origin', branchRefspec],
+        longGitOptions(progress, 'branch', 'Fetching branch...', workspacePath, hardTimeoutMs)
+      );
     }
-  }
-  if (!fetchResult) {
+  } else {
     fetchResult = await runGit(
       ['fetch', '--progress', 'origin'],
       longGitOptions(progress, 'branch', 'Fetching repository...', workspacePath, hardTimeoutMs)

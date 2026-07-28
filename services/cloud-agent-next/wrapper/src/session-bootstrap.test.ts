@@ -211,7 +211,13 @@ describe('prepareWrapperBootstrapWorkspace', () => {
             });
           }
           if (args[0] === 'rev-parse') {
-            return { stdout: '', stderr: '', exitCode: 1 };
+            // The targeted fetch populates the remote-tracking ref for the
+            // reviewed branch; the local branch does not exist yet.
+            return {
+              stdout: '',
+              stderr: '',
+              exitCode: args.includes('origin/feature/login') ? 0 : 1,
+            };
           }
           return { stdout: '', stderr: '', exitCode: 0 };
         },
@@ -234,9 +240,21 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       request.workspace.workspacePath,
     ]);
     expect(cloneCall?.opts?.hardTimeoutMs).toBe(600_000);
+    // A shallow clone is single-branch, so the fetch must use an explicit
+    // refspec to create refs/remotes/origin/<branch>; a bare fetch would only
+    // update FETCH_HEAD and the reviewed tree would never be checked out.
     expect(
       gitCalls.some(
-        call => call.args.join(' ') === 'fetch --progress --depth 1 origin feature/login'
+        call =>
+          call.args.join(' ') ===
+          'fetch --progress --depth 1 origin +feature/login:refs/remotes/origin/feature/login'
+      )
+    ).toBe(true);
+    // The reviewed tree is checked out from the fetched remote-tracking ref, not
+    // created off the default branch.
+    expect(
+      gitCalls.some(
+        call => call.args.join(' ') === 'checkout --progress -B feature/login origin/feature/login'
       )
     ).toBe(true);
     // The all-refs, full-history fetch must not run for a review session.

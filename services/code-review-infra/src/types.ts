@@ -26,6 +26,8 @@ export interface SessionInput {
   prompt: string;
   mode: 'code';
   model: string;
+  /** Optional cheap same-vendor model for kilo title/aux calls. */
+  smallModel?: string;
   /** Thinking effort variant name (e.g. "high", "max") — undefined means model default */
   variant?: string;
   upstreamBranch: string;

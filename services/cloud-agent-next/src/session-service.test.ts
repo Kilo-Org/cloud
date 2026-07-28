@@ -2427,11 +2427,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(opencodeConfig).toEqual(kiloConfig);
   });
 
-  it('pins code-review KILO_CONFIG small_model to the session agent model', async () => {
+  it('pins code-review KILO_CONFIG small_model to the dispatched smallModel', async () => {
     const service = new SessionService();
     const env = createEnv();
     env.WORKER_URL = 'https://cloud-agent.example.com';
-    const byokModel = 'neuralwatt/glm-5.2-short';
+    const primaryModel = 'anthropic/claude-sonnet-4.6';
+    const smallModel = 'anthropic/claude-haiku-4.5';
 
     const codeReviewResult = await service.buildWrapperSessionReadyAndPromptRequests({
       env,
@@ -2442,7 +2443,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           messageId: 'msg_018f1e2d3c4bSmallModelAAAA',
           prompt: 'Review the PR',
         },
-        agent: { mode: 'code', model: byokModel },
+        agent: { mode: 'code', model: primaryModel, smallModel },
         workspace: {
           sandboxId: 'ses-abcdef',
           metadata: createMetadata({ createdOnPlatform: 'code-review' }),
@@ -2464,9 +2465,43 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       small_model?: string;
       agent?: { title?: { model?: string } };
     };
-    expect(codeReviewConfig.model).toBe(`kilo/${byokModel}`);
-    expect(codeReviewConfig.small_model).toBe(`kilo/${byokModel}`);
-    expect(codeReviewConfig.agent?.title?.model).toBe(`kilo/${byokModel}`);
+    expect(codeReviewConfig.model).toBe(`kilo/${primaryModel}`);
+    expect(codeReviewConfig.small_model).toBe(`kilo/${smallModel}`);
+    expect(codeReviewConfig.agent?.title?.model).toBe(`kilo/${smallModel}`);
+
+    const unsetResult = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bSmallModelNone',
+          prompt: 'Review the PR',
+        },
+        agent: { mode: 'code', model: primaryModel },
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          metadata: createMetadata({ createdOnPlatform: 'code-review' }),
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_small_model_unset',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_small_model_unset',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+    const unsetConfig = JSON.parse(
+      unsetResult.readyRequest.materialized.env.KILO_CONFIG_CONTENT
+    ) as {
+      model?: string;
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(unsetConfig.model).toBe(`kilo/${primaryModel}`);
+    expect(unsetConfig.small_model).toBeUndefined();
+    expect(unsetConfig.agent?.title).toBeUndefined();
 
     const webResult = await service.buildWrapperSessionReadyAndPromptRequests({
       env,
@@ -2477,7 +2512,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           messageId: 'msg_018f1e2d3c4bSmallModelBBBB',
           prompt: 'Do the work',
         },
-        agent: { mode: 'code', model: byokModel },
+        agent: { mode: 'code', model: primaryModel, smallModel },
         workspace: {
           sandboxId: 'ses-abcdef',
           metadata: createMetadata({ createdOnPlatform: 'cloud-agent-web' }),
@@ -2497,9 +2532,51 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       small_model?: string;
       agent?: { title?: { model?: string } };
     };
-    expect(webConfig.model).toBe(`kilo/${byokModel}`);
+    expect(webConfig.model).toBe(`kilo/${primaryModel}`);
     expect(webConfig.small_model).toBeUndefined();
     expect(webConfig.agent?.title).toBeUndefined();
+  });
+
+  it('sets Bitbucket code-review small_model without injecting agent.title', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const primaryModel = 'anthropic/claude-sonnet-4.6';
+    const smallModel = 'anthropic/claude-haiku-4.5';
+    const metadata = createBitbucketMetadata(true);
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bSmallModelBB',
+          prompt: 'Review the PR',
+        },
+        agent: { mode: 'code', model: primaryModel, smallModel },
+        workspace: {
+          sandboxId: metadata.workspace?.sandboxId ?? 'ses-abcdef',
+          metadata,
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_bb_small_model',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_bb_small_model',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      model?: string;
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(config.model).toBe(`kilo/${primaryModel}`);
+    expect(config.small_model).toBe(`kilo/${smallModel}`);
+    expect(config.agent?.title).toBeUndefined();
   });
 
   it('overrides a runtime title agent model for code-review sessions', async () => {
@@ -2507,6 +2584,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     const env = createEnv();
     env.WORKER_URL = 'https://cloud-agent.example.com';
     const byokModel = 'neuralwatt/glm-5.2-short';
+    const smallModel = 'neuralwatt/glm-5.2-short';
     const metadata = createMetadata({
       createdOnPlatform: 'code-review',
       runtimeAgents: [
@@ -2527,7 +2605,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           messageId: 'msg_018f1e2d3c4bSmallModelCCCC',
           prompt: 'Review the PR',
         },
-        agent: { mode: 'code', model: byokModel },
+        agent: { mode: 'code', model: byokModel, smallModel },
         workspace: { sandboxId: 'ses-abcdef', metadata },
         wrapper: {
           fence: {
@@ -2543,8 +2621,8 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       small_model?: string;
       agent?: { title?: { model?: string; description?: string } };
     };
-    expect(config.small_model).toBe(`kilo/${byokModel}`);
-    expect(config.agent?.title?.model).toBe(`kilo/${byokModel}`);
+    expect(config.small_model).toBe(`kilo/${smallModel}`);
+    expect(config.agent?.title?.model).toBe(`kilo/${smallModel}`);
     expect(config.agent?.title?.description).toBe('titles');
   });
 

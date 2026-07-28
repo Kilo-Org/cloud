@@ -262,6 +262,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     agent: {
       mode: input.mode,
       model: input.model,
+      ...(input.smallModel ? { smallModel: input.smallModel } : {}),
       variant: input.variant,
     },
     repository,

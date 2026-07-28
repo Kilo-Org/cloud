@@ -60,6 +60,7 @@ import {
   type ReviewScope,
 } from '../db/code-reviews';
 import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
+import { resolveReviewSmallModel } from '../core/model-selection';
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
@@ -113,6 +114,11 @@ export type SessionInput = {
   prompt: string;
   mode: 'code';
   model: string;
+  /**
+   * Optional cheap same-vendor model for kilo title/aux calls. When omitted, the
+   * CLI falls through to its default small-model list (kilo-auto/small → Gemma).
+   */
+  smallModel?: string;
   /** Thinking effort variant name (e.g. "high", "max") — undefined means model default */
   variant?: string;
   upstreamBranch: string;
@@ -302,12 +308,14 @@ export async function prepareReviewPayload(
         // Single source for the standard reviewer's model so the session input and the
         // forward-shaped `reviewAgents[0]` can never drift apart.
         const standardModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
+        const smallModel = await resolveReviewSmallModel(standardModel);
         const sessionInput: SessionInput = {
           gitUrl: `https://bitbucket.org/${workspaceSlug.data}/${repositorySlug.data}.git`,
           kilocodeOrganizationId: owner.id,
           prompt,
           mode: DEFAULT_CODE_REVIEW_MODE as 'code',
           model: standardModel,
+          ...(smallModel ? { smallModel } : {}),
           variant: config.thinking_effort ?? undefined,
           upstreamBranch: review.head_ref,
           platform: PLATFORM.BITBUCKET,
@@ -758,6 +766,7 @@ export async function prepareReviewPayload(
     // Single source for the standard reviewer's model so the session input and the
     // forward-shaped `reviewAgents[0]` can never drift apart.
     const standardModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
+    const smallModel = await resolveReviewSmallModel(standardModel);
     const gateThreshold = config.gate_threshold ?? 'off';
     const githubCheckoutRef = getGitHubPullRequestCheckoutRef(review.pr_number);
     const sessionInput: SessionInput =
@@ -771,6 +780,7 @@ export async function prepareReviewPayload(
             prompt,
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',
             model: standardModel,
+            ...(smallModel ? { smallModel } : {}),
             variant,
             upstreamBranch: review.head_ref,
           }
@@ -784,6 +794,7 @@ export async function prepareReviewPayload(
               prompt,
               mode: DEFAULT_CODE_REVIEW_MODE as 'code',
               model: standardModel,
+              ...(smallModel ? { smallModel } : {}),
               variant,
               upstreamBranch: review.head_ref,
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
@@ -797,6 +808,7 @@ export async function prepareReviewPayload(
               prompt,
               mode: DEFAULT_CODE_REVIEW_MODE as 'code',
               model: standardModel,
+              ...(smallModel ? { smallModel } : {}),
               variant,
               upstreamBranch: githubCheckoutRef,
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),

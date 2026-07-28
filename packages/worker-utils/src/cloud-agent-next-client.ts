@@ -39,6 +39,8 @@ export type CloudAgentPrepareSessionInput = {
   prompt: string;
   mode: string;
   model: string;
+  /** Optional cheap same-vendor model for title/aux calls (Code Reviewer). */
+  smallModel?: string;
   variant?: string;
   githubRepo?: string;
   githubToken?: string;

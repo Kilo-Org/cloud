@@ -167,6 +167,7 @@ const MetadataAgentSchema = z
   .object({
     mode: z.string().optional(),
     model: z.string().optional(),
+    smallModel: z.string().optional(),
     variant: z
       .string()
       .max(50)

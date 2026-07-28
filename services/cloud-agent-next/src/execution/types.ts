@@ -85,6 +85,8 @@ export function renderExecutionTurnContent(turn: AcceptedExecutionTurn): string 
 export type ModelChoice = {
   model: string;
   variant?: string;
+  /** Optional cheap same-vendor model for title/aux calls (Code Reviewer). */
+  smallModel?: string;
 };
 
 /** Fully resolved agent selection. */

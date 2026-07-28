@@ -12,13 +12,112 @@
  * or Bitbucket). See `RepositoryModelOverrideSchema`.
  */
 
-import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
+import type { CodeReviewAgentConfig, StoredModel } from '@kilocode/db/schema-types';
+import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export type EffectiveModelSelection = {
   modelSlug: string;
   thinkingEffort: string | null;
   source: 'repository_override' | 'global';
 };
+
+/** Catalog entry used to pick a cheap same-vendor small model. */
+export type CatalogModelPrice = {
+  id: string;
+  /** USD per input token; null when the catalog has no usable prompt price. */
+  promptPrice: number | null;
+};
+
+const DIRECT_BYOK_VENDORS = new Set(Object.keys(DIRECT_BYOK_PROVIDERS_META));
+
+export function modelVendorId(modelId: string): string | undefined {
+  const vendor = modelId.split('/')[0]?.trim();
+  return vendor || undefined;
+}
+
+export function isDirectByokVendor(vendor: string | undefined): boolean {
+  return vendor != null && DIRECT_BYOK_VENDORS.has(vendor);
+}
+
+/**
+ * Build catalog price rows from the OpenRouter `StoredModel` map.
+ * Uses the cheapest endpoint prompt price per model.
+ */
+export function catalogPricesFromStoredModels(
+  models: Record<string, StoredModel>
+): CatalogModelPrice[] {
+  return Object.values(models)
+    .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
+    .map(model => {
+      const prices = model.endpoints
+        .map(endpoint =>
+          endpoint.pricing?.prompt != null ? Number.parseFloat(endpoint.pricing.prompt) : Number.NaN
+        )
+        .filter(price => Number.isFinite(price) && price >= 0);
+      return {
+        id: model.id,
+        promptPrice: prices.length > 0 ? Math.min(...prices) : null,
+      };
+    });
+}
+
+/**
+ * Pick a cheap same-vendor model for Code Reviewer title/aux calls.
+ *
+ * - Prefer the lowest-priced same-vendor sibling that is strictly cheaper than the
+ *   primary when the primary's price is known.
+ * - When the primary has no catalog price, pick the cheapest same-vendor sibling.
+ * - Direct-BYOK vendors with no cheaper sibling fall back to the primary (user's
+ *   key) so aux calls do not fall through to kilo-auto/small → Gemma on Kilo credits.
+ * - Managed vendors with no cheaper sibling leave small_model unset.
+ */
+export function resolveCheapSameVendorSmallModel(
+  primaryModelId: string,
+  catalog: readonly CatalogModelPrice[]
+): string | undefined {
+  const vendor = modelVendorId(primaryModelId);
+  if (!vendor) return undefined;
+
+  const primaryPrice = catalog.find(entry => entry.id === primaryModelId)?.promptPrice ?? undefined;
+
+  const siblings = catalog.filter(
+    entry =>
+      entry.id !== primaryModelId &&
+      modelVendorId(entry.id) === vendor &&
+      entry.promptPrice != null &&
+      Number.isFinite(entry.promptPrice)
+  );
+
+  const cheaper =
+    primaryPrice != null && Number.isFinite(primaryPrice)
+      ? siblings.filter(entry => (entry.promptPrice as number) < primaryPrice)
+      : siblings;
+
+  if (cheaper.length === 0) {
+    return isDirectByokVendor(vendor) ? primaryModelId : undefined;
+  }
+
+  cheaper.sort((a, b) => {
+    const priceDelta = (a.promptPrice as number) - (b.promptPrice as number);
+    return priceDelta !== 0 ? priceDelta : a.id.localeCompare(b.id);
+  });
+  return cheaper[0]?.id;
+}
+
+/**
+ * Resolve the Code Reviewer aux/title small model for a primary review model.
+ * Soft-fails to BYOK-primary or unset when the gateway catalog cannot be loaded.
+ */
+export async function resolveReviewSmallModel(primaryModelId: string): Promise<string | undefined> {
+  const vendor = modelVendorId(primaryModelId);
+  try {
+    const models = await getOpenRouterModelsMetadataFromDatabase();
+    return resolveCheapSameVendorSmallModel(primaryModelId, catalogPricesFromStoredModels(models));
+  } catch {
+    return isDirectByokVendor(vendor) ? primaryModelId : undefined;
+  }
+}
 
 /**
  * Resolve the effective model for a review's repository.

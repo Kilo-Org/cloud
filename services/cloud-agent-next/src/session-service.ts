@@ -1274,6 +1274,7 @@ export class SessionService {
       kiloProviderBaseUrl: opts.kiloProviderBaseUrl,
       kiloSessionIngestBaseUrl: opts.kiloSessionIngestBaseUrl,
       kilocodeModel: opts.kilocodeModel,
+      smallModel: opts.smallModel,
       originalOrgId: opts.originalOrgId,
       githubToken: context.githubToken,
       githubRepo: context.githubRepo,
@@ -1302,6 +1303,7 @@ export class SessionService {
       kiloProviderBaseUrl,
       kiloSessionIngestBaseUrl,
       kilocodeModel,
+      smallModel,
       originalOrgId,
       githubToken,
       githubRepo,
@@ -1512,20 +1514,24 @@ export class SessionService {
         agentCount: runtimeAgents.length,
       });
     }
-    // Code Review sessions: pin small_model (and the title agent) to the configured
-    // review model. Otherwise kilo's title/aux calls fall through to the CLI default
-    // (kilo-auto/small → Gemma) and bill Kilo credits even when the primary review
-    // model is BYOK. See https://github.com/Kilo-Org/cloud/issues/4268
-    if (createdOnPlatform === 'code-review' && normalizedModel) {
-      configContent.small_model = normalizedModel;
-      const existingTitle =
-        agentConfig.title != null &&
-        typeof agentConfig.title === 'object' &&
-        !Array.isArray(agentConfig.title)
-          ? (agentConfig.title as Record<string, unknown>)
-          : {};
-      // Always override model even if a runtime agent named `title` was merged above.
-      agentConfig.title = { ...existingTitle, model: normalizedModel };
+    // Code Review sessions: pin small_model (and title agent when allowed) to the
+    // cheap same-vendor model selected at dispatch time. Leaving this unset falls
+    // through to kilo-auto/small → Gemma. See https://github.com/Kilo-Org/cloud/issues/4268
+    const normalizedSmallModel =
+      smallModel && smallModel.trim() ? normalizeKilocodeModel(smallModel) : undefined;
+    if (createdOnPlatform === 'code-review' && normalizedSmallModel) {
+      configContent.small_model = normalizedSmallModel;
+      // Match MCP/runtimeAgents: do not inject agent.title on Bitbucket code-review
+      // sessions (title falls through to getSmallModel() via small_model anyway).
+      if (!bitbucketInputPath) {
+        const existingTitle =
+          agentConfig.title != null &&
+          typeof agentConfig.title === 'object' &&
+          !Array.isArray(agentConfig.title)
+            ? (agentConfig.title as Record<string, unknown>)
+            : {};
+        agentConfig.title = { ...existingTitle, model: normalizedSmallModel };
+      }
     }
     if (Object.keys(agentConfig).length > 0) {
       configContent.agent = agentConfig;
@@ -2024,6 +2030,7 @@ export class SessionService {
       kiloProviderBaseUrl,
       kiloSessionIngestBaseUrl,
       kilocodeModel: agent.model,
+      smallModel: metadata.agent?.smallModel ?? agent.smallModel,
       originalOrgId: orgId,
       githubToken: resolvedTokens.githubToken,
       githubRepo: github?.repo,
@@ -2929,6 +2936,7 @@ export type GetOrCreateSessionOptions = {
   kiloProviderBaseUrl?: string;
   kiloSessionIngestBaseUrl?: string;
   kilocodeModel?: string;
+  smallModel?: string;
   originalOrgId?: string;
   createdOnPlatform?: string;
   callbackTarget?: NonNullable<CloudAgentSessionState['callback']>['target'];
@@ -2957,6 +2965,8 @@ type GetSaferEnvVarsOptions = {
   kiloProviderBaseUrl?: string;
   kiloSessionIngestBaseUrl?: string;
   kilocodeModel?: string;
+  /** Optional cheap same-vendor model for Code Reviewer title/aux calls. */
+  smallModel?: string;
   originalOrgId?: string;
   githubToken?: string;
   githubRepo?: string;

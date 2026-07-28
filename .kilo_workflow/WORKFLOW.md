@@ -174,6 +174,8 @@ The `orchestrator` agent definition pins the model and permissions, so the launc
 
 After the handoff the planner stops all hands-on work. It has exactly one job — relaunch or unstick the orchestrator when infrastructure fails (a crashed kilo CLI, a dead tmux window, a hung service). Product, logic, design, and review problems are the orchestrator's, handled by its escalation ladder. Check about every 30 minutes; react immediately when the orchestrator's process exits.
 
+A monitor never kills a live dispatch on a judgment call, never edits the worktree, and never writes to another role's dispatch log — a forged `EXITCODE` line corrupts the dispatcher's void-round detection, the exact signal the contract keys on. Before concluding an orchestrator is misbehaving, read its evidence: its pane scrollback (`tmux capture-pane -t <window> -p -S -`), its scratch directory, and the git log. The orchestrator's handoff may route user questions to its own interactive session, so an answer the monitor never saw can exist there (see `learnings/monitor-must-read-orchestrator-scrollback-before-intervening.md`). The only kill-worthy states are the infrastructure failures named above.
+
 A dead orchestrator window is not automatically a crash — check the scratch directory:
 
 - Scratch **gone** → the section COMPLETED and shut itself down; confirm the PR exists in gate state in **every** repository the section touched (`gh pr view <section> --repo <owner>/<repo>` — never bare `gh pr view`, which only checks the cloud branch), tell the user, and close yourself. A missing PR means it was not a completion — treat it as a crash.

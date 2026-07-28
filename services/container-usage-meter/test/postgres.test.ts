@@ -198,6 +198,12 @@ describe('container usage PostgreSQL application', () => {
       last_seen_at: stale.last_seen_at,
       confirmed_seconds: stale.confirmed_seconds,
     });
+    const lateStopSegments = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, staleId));
+    expect(lateStopSegments).toHaveLength(1);
+    expect(lateStopSegments[0]).toMatchObject({ reported_seconds: 5, usage_seconds: 0 });
     await client.db
       .delete(container_usage_interval)
       .where(eq(container_usage_interval.id, staleId));
@@ -343,6 +349,29 @@ describe('container usage PostgreSQL application', () => {
         31_000
       )
     ).rejects.toThrow('Another usage interval is already open');
+
+    await expect(
+      applyStopWithDb(
+        client.db,
+        {
+          service: recoveryContext.service,
+          instanceId: recoveryContext.instanceId,
+          startEpochMs: 800,
+          idempotencyKey: stopIdempotencyKey(
+            recoveryContext.service,
+            recoveryContext.instanceId,
+            800
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          reason: 'exit',
+          context: recoveryContext,
+        },
+        olderId,
+        recoveryFingerprint,
+        32_000
+      )
+    ).rejects.toBeInstanceOf(UsageMutationConflictError);
     await client.db
       .delete(container_usage_interval)
       .where(eq(container_usage_interval.id, newerId));

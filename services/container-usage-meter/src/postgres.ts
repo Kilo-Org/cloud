@@ -400,7 +400,7 @@ export async function applyStopWithDb(
     input.startEpochMs,
     input.seq
   );
-  return db.transaction(async tx => {
+  const operation: Promise<ApplyResult> = db.transaction(async tx => {
     const [existingInterval] = await tx
       .select()
       .from(container_usage_interval)
@@ -450,7 +450,10 @@ export async function applyStopWithDb(
         throw new UsageMutationConflictError('Final usage segment has conflicting payload');
       }
     } else {
-      finalSeconds = appliedUsageSeconds(interval, input.usageSinceLast, receivedAtMs);
+      finalSeconds =
+        interval.status === 'closed' && interval.close_reason === 'unconfirmed'
+          ? 0
+          : appliedUsageSeconds(interval, input.usageSinceLast, receivedAtMs);
       await tx.insert(container_usage_segment).values({
         interval_id: intervalId,
         seq: input.seq,
@@ -483,6 +486,7 @@ export async function applyStopWithDb(
       .where(eq(container_usage_interval.id, intervalId));
     return { kind: 'applied', dedup: false };
   });
+  return operation.catch(mapSingleOpenIntervalConflict);
 }
 
 export async function reconcileStaleIntervals(

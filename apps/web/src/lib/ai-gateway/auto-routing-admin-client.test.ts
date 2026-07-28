@@ -1,7 +1,9 @@
 import {
   getAutoRoutingClassifierAnalytics,
   getAutoRoutingClassifierModel,
+  getAutoRoutingSettings,
   updateAutoRoutingClassifierModel,
+  updateAutoRoutingSettings,
 } from './auto-routing-admin-client';
 
 jest.mock('@/lib/config.server', () => ({
@@ -36,6 +38,21 @@ const classifierAnalyticsResponse = {
   taskTypeBreakdown: [],
   taskSubtypeBreakdown: [],
   classifierModelBreakdown: [],
+};
+
+const settingsResponse = {
+  ownerType: 'user',
+  ownerId: 'user-1',
+  mode: 'cost_per_accuracy',
+  configuredMode: null,
+  defaultMode: 'cost_per_accuracy',
+  configuredPool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+  poolStatuses: [
+    {
+      entry: { model: 'google/gemini-2.5-flash', variant: null },
+      status: 'ready',
+    },
+  ],
 };
 
 describe('auto routing admin client', () => {
@@ -128,5 +145,88 @@ describe('auto routing admin client', () => {
         },
       }
     );
+  });
+
+  it('gets routing settings using worker bearer auth', async () => {
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(settingsResponse),
+    });
+
+    await expect(getAutoRoutingSettings({ ownerType: 'user', ownerId: 'user-1' })).resolves.toEqual(
+      {
+        status: 200,
+        body: settingsResponse,
+      }
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auto-routing.example.com/admin/routing-settings?ownerType=user&ownerId=user-1',
+      {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+        },
+      }
+    );
+  });
+
+  it('updates routing settings and forwards optional retryEntries', async () => {
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(settingsResponse),
+    });
+
+    await updateAutoRoutingSettings({
+      ownerType: 'org',
+      ownerId: 'org-1',
+      mode: 'best_accuracy',
+      pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auto-routing.example.com/admin/routing-settings',
+      {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerType: 'org',
+          ownerId: 'org-1',
+          mode: 'best_accuracy',
+          pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+          retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        }),
+      }
+    );
+  });
+
+  it('preserves benchmark quota 429 bodies including retryAt', async () => {
+    const quotaBody = {
+      error: 'Benchmark profile request limit exceeded',
+      retryAt: '2026-07-29T12:00:00.000Z',
+    };
+    mockFetch.mockResolvedValue({
+      status: 429,
+      ok: false,
+      json: () => Promise.resolve(quotaBody),
+    });
+
+    await expect(
+      updateAutoRoutingSettings({
+        ownerType: 'user',
+        ownerId: 'user-1',
+        mode: null,
+        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      })
+    ).resolves.toEqual({
+      status: 429,
+      body: quotaBody,
+    });
   });
 });

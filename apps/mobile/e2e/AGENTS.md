@@ -13,7 +13,7 @@ This machine is shared by parallel workflows. Before starting a stack, booting a
 .kilo_workflow/e2e-slot.sh stacks                        # any stack running with no slot
 ```
 
-A slot and this worktree's dev stack are one resource: the slot is what entitles you to the stack, and `release` stops the stack with it. Release when your device phase is genuinely over, not partway through a round you still need services for.
+A slot, this worktree's dev stack, and the simulators it claims are one resource: the slot is what entitles you to all three, and `release` takes all three back — it stops the stack and releases every simulator this worktree claimed, powering off the ones your claims booted. Release when your device phase is genuinely over, not partway through a round you still need services or a device for.
 
 - Default 3 slots, machine-global, owned by tmux session name; a dead session's slot is reclaimed automatically, so a crash cannot wedge the queue.
 - `acquire` blocking is correct behavior, not a hang and not a wedge. Wait for it. Never start device work unslotted because the queue was busy, because your phase looks small, or because a stack is already up.
@@ -97,9 +97,10 @@ Never share a simulator with another worktree. Claim one before any build, insta
 
 ```bash
 pnpm dev:mobile:simulator claim [udid]   # idempotent per worktree
+pnpm dev:mobile:simulator release-all    # this worktree's claims; the slot release runs it for you
 ```
 
-The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. A claim is stale — and silently reclaimable — once its owning worktree is deleted; release explicitly anyway.
+The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted. Releasing the slot releases the claims, so an explicit `release-all` is only for handing a device back mid-slot.
 
 Install a validated cached native build. A compatible fingerprint skips rebuilding; a cache miss serializes through the host-wide native compiler semaphore. Never install an arbitrary DerivedData app or run a separate Expo native build:
 
@@ -310,14 +311,13 @@ Clean up only resources you started. The remote CLI session and its disposable i
 tmux kill-session -t "$ANDROID_SESSION"      # if created
 rm -f "$LOGIN_LOG"                           # if created
 rm -f "$EMULATOR_LOG"                        # if created
-pnpm dev:stop                                # only if the slot release below did not already stop it
-xcrun simctl shutdown <udid>                 # only if you booted it
-pnpm dev:mobile:simulator release <udid>     # every simulator you claimed
 pnpm dev:mobile:android release <serial>     # every Android device you claimed
 .kilo_workflow/e2e-slot.sh release <tmux-session>   # always, as soon as the device phase ends
 ```
 
-Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, shut down a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.
+The slot release is the teardown. It stops this worktree's dev stack and releases every simulator this worktree claimed — powering off the ones your claims booted, restoring their names, and leaving a device that was already running before your claim alone. So there is no `pnpm dev:stop`, no `xcrun simctl shutdown`, and no `pnpm dev:mobile:simulator release <udid>` on this list: releasing the slot does all three, and forgetting one is how simulators used to stay booted all day. Never call `xcrun simctl shutdown` on an E2E device yourself — the claim, not your memory of what you booted, is what knows whether the device is yours to power off.
+
+Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, or use `pnpm dev:stop --force` while sibling worktrees are active.
 
 Verify cleanup, and confirm no generated E2E fixtures remain tracked or untracked:
 

@@ -214,7 +214,7 @@ The orchestrator drives the plan to completion. It is the expensive model steeri
 2. Segment the plan into slices with disjoint write sets so parallel implementers cannot collide — the plan proposes the tasks, the orchestrator owns the slicing. Always serialize: lockfile changes, dependency installs, migrations, generated clients, repository-wide formatters, and broad autofix commands. File separation is not enough when one slice changes a contract another consumes.
 3. Dispatch ready independent slices to parallel `implementer`s — as many in parallel as the segmentation safely allows; agent parallelism is never capped, only E2E device/stack phases are (see E2E Slots). Loop per slice, at most five rounds: implementer implements, then a fresh `impl-reviewer` reviews the slice diff — `git add -N -- <owned paths> && git diff HEAD -- <owned paths>` (the `add -N` makes new files visible to the diff; take the reviewer's pre-round snapshot **after** it, since it changes status output) written to a scratch file passed via `--file`, since parallel slices share the worktree; triage remarks (untrusted), route valid ones through a repair dispatch. Exit the loop when a fresh reviewer returns `No findings.`, or when its only remaining findings are already rejected in `$SCRATCH/decisions.md` and cite no evidence the rejection did not consider. At the round cap the remaining moves are takeover or BLOCKED (see Escalation).
 4. Create small logical commits at slice boundaries, staging only the slice's owned paths (`git add -- <owned paths>`, never `git add -A` while other slices are mid-flight). Once every slice has landed, run the synchronization point: the deferred project-wide checks (typecheck and each changed repository's own check commands) — then, and again after any later repair or direct orchestrator edit, dispatch one fresh `impl-reviewer` over the cumulative section diff (`git diff origin/main...HEAD`, plus any uncommitted changes), so integration seams, takeovers, and merge resolutions never ship unreviewed.
-5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it — assign it to the requesting human, and request reviews per repository convention (cloud: `eshurakov`, `jeanduplessis`; kilocode: additionally `marius-kilocode`, `chrarnoldus`). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
+5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it. For work with a UI, upload the screenshots to the PR per GitHub Communication before scratch cleanup — local paths are not evidence. Assign the PR to the requesting human, and request reviews per repository convention (cloud: `eshurakov`, `jeanduplessis`; kilocode: additionally `marius-kilocode`, `chrarnoldus`). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
 6. Run the E2E loop (below) when the work has verifiable runtime behavior; skip it for doc-only or equivalently inert changes, recording why in the PR description.
 7. Run the Kilobot loop (below).
 8. When both loops are clean, verify the completion gate, label the PR `human-ready` (`gh pr edit <n> --add-label human-ready`) as the last act before teardown, then shut the section down. The PR is the deliverable; everything else closes.
@@ -251,6 +251,7 @@ The work is complete only when every item holds:
 - A fresh E2E verifier returned `VERIFICATION PASSED.` for the plan's goals — or E2E was skipped as inert, with the rationale in the PR description
 - Changes are organized into small, coherent commits; format, typecheck, lint, and tests pass in every changed repository, using the check commands the nearest `AGENTS.md` or `package.json` defines for each changed package
 - The PR exists with what/why/how sections and is assigned to the requesting human
+- If any accepted task has a UI, the PR description renders screenshots of the final behavior from the latest head, uploaded to that repository as GitHub `user-attachments`; visual changes include before/after evidence when a meaningful before state exists. A non-UI PR records `Visual Changes: N/A`
 - Kilobot has posted an approving summary comment on the latest head and no actionable posted comment is unresolved — or Kilobot's absence after two retriggers is noted in a `(bot) ` PR comment
 - All expected CI checks on the latest head are green, and GitHub reports the head mergeable with no conflicts
 - No generated fixture remains, tracked or untracked; every verifier temporary edit is restored
@@ -327,3 +328,23 @@ Environment blockers and their fixes — broken local stacks, credential traps, 
 ## GitHub Communication
 
 Every GitHub issue comment, PR comment, review comment, review body, and thread reply written by this workflow begins exactly with `(bot) `, including replies to Kilobot and rejections of findings. Only the PR title and PR description carry no prefix.
+
+GitHub's public API and `gh pr comment` cannot upload attachments. Use the pinned
+[`gh-image`](https://github.com/drogers0/gh-image) extension, which performs the same
+repository-scoped upload as GitHub's comment box and prints ready-to-paste Markdown:
+
+```bash
+gh extension list | grep -q '^gh image' ||
+  gh extension install drogers0/gh-image --pin v1.2.0
+gh image "$SCREENSHOT" --repo <owner/repo>
+# ![screenshot.png](https://github.com/user-attachments/assets/<id>)
+```
+
+Put that Markdown in the PR's `Visual Changes` section (or a `(bot) ` comment when adding
+later), then fetch the PR body/comments with `gh` and verify the
+`github.com/user-attachments/` URL is present. `gh-image` uses an existing GitHub browser
+session because a normal `gh` API token cannot authorize this undocumented upload endpoint.
+It may trigger a one-time OS keychain approval; never print, pass on the command line, commit,
+or place its `user_session` cookie in a handoff. A missing browser session is a completion
+blocker for UI work, not a reason to commit screenshots into the product repository or use an
+unrelated public image host.

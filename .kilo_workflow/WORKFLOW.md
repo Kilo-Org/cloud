@@ -55,7 +55,7 @@ The cwd/worktree is always the **cloud** worktree, even when the slice edits a s
 
 What the script encodes (details in `learnings/`):
 
-- tmux wrapping — harness command timeouts kill bare long runs. The `e2e-verifier` gets its **own tmux session** (E2E slots are owned and auto-reclaimed by session name; a window-named owner leaks or shares slots); other roles run as windows in the dispatcher's session. Names are `<section>-<role>-<label>`, logs `$SCRATCH/<role>-<label>.log`.
+- tmux wrapping — harness command timeouts kill bare long runs. The `e2e-verifier` gets its **own tmux session** (E2E slots are owned and auto-reclaimed by session name; a window-named owner leaks or shares slots); other roles run as windows in the dispatcher's session, resolved through `$TMUX_PANE`. A dispatcher that is not itself inside tmux has no such session, so its roles get their own sessions too — never a guessed one. Names are `<section>-<role>-<label>`, logs `$SCRATCH/<role>-<label>.log`.
 - Full `KILO_*`/`OPENCODE*` env strip — a dispatcher running inside kilo poisons nested runs otherwise (see `learnings/nested-kilo-run-env-poisoning.md`).
 - Output redirected, never piped (`| tee` makes `$?` report the pipe's exit, not kilo's), with `EXITCODE=$?` appended as the log's last line.
 
@@ -106,7 +106,7 @@ The session the user invokes the workflow from is the starter, running on the ha
 2. Explore the relevant parts of the codebase.
 3. Interrogate the requirements — in `hands on` mode by grilling the user one question at a time, in `hands off` mode by grilling itself and answering from repository evidence, recording material assumptions. Always drive toward the simplest solution that achieves the user's goals, and challenge the request itself: "should we even do this?", "why not do this instead?", "we could achieve the same thing simpler, like this".
 4. Divide the finalized work into related, **disjoint** sections — no two sections may touch the same files or contracts.
-5. For each section: create the dedicated worktree and scratch directory (Ground Rules), write the section brief to `$SCRATCH/brief.md` — the work, the mode, acceptance criteria and constraints gathered so far, the requesting human's GitHub handle for PR assignment, the worktree path, and the scratch path — and launch a planner in a new tmux window on the planner harness and model. `<session>` is the starter's own tmux session (`tmux display-message -p '#S'`), and the `$SCRATCH` value must be expanded by the launching shell (double-quote the tmux command string; the tmux server does not know the variable):
+5. For each section: create the dedicated worktree and scratch directory (Ground Rules), write the section brief to `$SCRATCH/brief.md` — the work, the mode, acceptance criteria and constraints gathered so far, the requesting human's GitHub handle for PR assignment, the worktree path, and the scratch path — and launch a planner in a new tmux window on the planner harness and model. `<session>` is the starter's own tmux session, resolved through its own pane — `tmux display-message -p -t "$TMUX_PANE" '#S'`; never the untargeted `tmux display-message -p '#S'`, which answers with the tmux **server's** current session (the most recently active one) and silently files the window under an unrelated section. A starter that is not itself inside tmux has no such session and `$TMUX_PANE` is unset: launch the planner with `tmux new-session -d -s <section>-planner` instead of guessing a target. The `$SCRATCH` value must be expanded by the launching shell (double-quote the tmux command string; the tmux server does not know the variable):
 
 ```bash
 # kilo planner (the planner agent definition pins permissions; the model is the user's pick):
@@ -261,16 +261,19 @@ The machine is shared by parallel workflows, and unslotted device or stack work 
 
 ```bash
 .kilo_workflow/e2e-slot.sh acquire <tmux-session>   # blocks until a slot frees
-.kilo_workflow/e2e-slot.sh status                   # current holders
+.kilo_workflow/e2e-slot.sh status                   # holders, their worktrees, stack coverage
 .kilo_workflow/e2e-slot.sh release <tmux-session>   # the moment the device phase ends
+.kilo_workflow/e2e-slot.sh stacks [--reap]          # stacks running with no slot
 ```
+
+**A slot and a dev stack are the same resource.** The slot is what entitles a worktree to run a stack, and a stack must never outlive it: `release` stops the releasing worktree's stack, and reclaiming a dead holder's slot stops its stack too. So a later round re-acquires and starts a fresh stack rather than inheriting one — that restart is the price of the cap. A stack up with no slot is a defect, not a shortcut; `stacks` lists them and `stacks --reap` stops the workflow-owned ones (a stack with no section run id in its name was started by hand and is only reported). Five live stacks on this host drove the load average past 300 and made every emulator boot and native build time out, which reads as flaky devices rather than as over-subscription.
 
 - Slot state lives in `$HOME/.cache/kilo-e2e-slots`, machine-global by design: every copy of the script — any worktree, any repository — contends for the same slots, and the script has no overrides by design. When working in a repository without the script (a sibling like `~/Projects/kilocode`), invoke it by absolute path from a cloud worktree.
 - This holds on every run, not only when another workflow is visibly active, and a stack that is already up is not an exemption.
 - `acquire` blocking is correct behavior, never a wedge to route around and never a reason to start device work unslotted. If an acquire is still blocked after about 45 minutes, the dispatcher inspects `status` for a wedged foreign holder and reports a blocker instead of waiting forever.
 - The slot caps load, not data: postgres and redis containers are shared across worktrees. Keep test data keyed to this worktree's accounts (the runbooks' per-worktree defaults) and never wipe shared state.
-- Release immediately when the device/stack phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them.
-- Slots are owned by tmux session name and reclaimed automatically when the session dies. A holder that is alive but wedged belongs to its own workflow's monitor — never kill another session to free a slot; if the queue is starved by a foreign wedge, report a blocker to the user instead.
+- Release immediately when the device/stack phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them — and since release takes the stack with it, do not release mid-round while you still need the services.
+- Slots are owned by tmux session name, record the worktree that took them, and are reclaimed automatically when the session dies. A holder that is alive but wedged belongs to its own workflow's monitor — never kill another session to free a slot; if the queue is starved by a foreign wedge, report a blocker to the user instead.
 - The orchestrator is accountable: every device-phase handoff states the slot rule, and a role agent that reports device work with no acquire gets re-dispatched.
 
 ## Feature-State Matrix

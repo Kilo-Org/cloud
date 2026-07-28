@@ -23,6 +23,7 @@ import {
 } from '../openclaw-export';
 import { getBearerToken } from './gateway';
 import { timingSafeTokenEqual } from '../auth';
+import { hookConfigBootViolation } from '../config-writer';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
 import { atomicWrite } from '../atomic-write';
 import { backupFile } from '../backup-file';
@@ -40,6 +41,26 @@ import {
   setUserMdLocation,
   setUserMdTimezone,
 } from '../bootstrap';
+
+/**
+ * Returns a human-readable reason when persisting `content` would leave the
+ * OpenClaw gateway unable to start, or null when it is safe to write.
+ *
+ * Unparseable or non-object content is deferred to the existing validation
+ * flow, which reports malformed JSON with better context than this check.
+ */
+function describeBootBlockingConfig(content: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+  return hookConfigBootViolation(parsed as Record<string, unknown>);
+}
 
 const OpenclawWorkspaceImportFileSchema = z.object({
   path: z.string().min(1),
@@ -1038,6 +1059,21 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
             409
           );
         }
+        // Enforced for every mode, including 'allow-invalid': the override
+        // exists so operators can persist configs OpenClaw merely dislikes, but
+        // this particular shape prevents the gateway from starting at all and
+        // leaves no way back in short of a manual reboot.
+        const bootBlocker = describeBootBlockingConfig(body.content);
+        if (bootBlocker) {
+          return c.json(
+            {
+              code: 'openclaw_config_would_not_boot',
+              error: bootBlocker,
+            },
+            422
+          );
+        }
+
         if (body.mode === 'warn-before-write') {
           const validation = await validateOpenclawConfigCandidate(body.content, result);
           if (!validation.valid) {

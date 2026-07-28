@@ -114,6 +114,22 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       })
       .returning();
 
+    if (existingRow && hasMeaningfulChange && persistedRow) {
+      try {
+        await withDORetry(
+          () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
+          sessionCache => sessionCache.remove(parsed.sessionId),
+          'SessionAccessCacheDO.remove'
+        );
+      } catch (cacheError) {
+        console.error('Failed to invalidate session access after Cloud Agent session write', {
+          sessionId: parsed.sessionId,
+          kiloUserId: parsed.kiloUserId,
+          error: cacheError instanceof Error ? cacheError.message : String(cacheError),
+        });
+      }
+    }
+
     if (hasMeaningfulChange && persistedRow) {
       const session = mapSessionEventRow(persistedRow);
       notifyUserSessionEvent(
@@ -125,22 +141,6 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         },
         this.ctx
       );
-    }
-
-    // Warm the session cache so subsequent ingests can skip Postgres.
-    // Best-effort: cache miss is acceptable; don't fail the create if the DO is unavailable.
-    try {
-      await withDORetry(
-        () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
-        sessionCache => sessionCache.add(parsed.sessionId),
-        'SessionAccessCacheDO.add'
-      );
-    } catch (cacheError) {
-      console.error('Failed to warm session cache after create (non-fatal)', {
-        sessionId: parsed.sessionId,
-        kiloUserId: parsed.kiloUserId,
-        error: cacheError instanceof Error ? cacheError.message : String(cacheError),
-      });
     }
   }
 

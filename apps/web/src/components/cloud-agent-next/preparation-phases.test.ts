@@ -1,4 +1,4 @@
-import type { PreparationStepSnapshot } from '@/lib/cloud-agent-sdk';
+import type { PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 import {
   formatAttemptDuration,
   humanizePhaseLabel,

@@ -51,6 +51,7 @@ import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Switch } from '@/components/ui/switch';
 import {
   COUNCIL_AGGREGATION_STRATEGIES,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
   type CouncilAggregationStrategy,
 } from '@kilocode/db/schema-types';
 import {
@@ -76,8 +77,10 @@ import {
 } from '@/lib/code-reviews/action-required-shared';
 import {
   getCodeReviewRepositoryUrl,
+  getCodeReviewDetailHref,
   type CodeReviewUiPlatform,
 } from '@/lib/code-reviews/code-review-links';
+import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   CODE_REVIEW_STATUS_LABELS,
   hasInFlightReview,
@@ -202,7 +205,7 @@ export function CodeReviewJobsCard({
   const [manualJobInstructions, setManualJobInstructions] = useState('');
   const [manualJobCouncilEnabled, setManualJobCouncilEnabled] = useState(false);
   const [manualJobCouncilAggregation, setManualJobCouncilAggregation] =
-    useState<CouncilAggregationStrategy>('any_blocking_member');
+    useState<CouncilAggregationStrategy>(DEFAULT_COUNCIL_AGGREGATION_STRATEGY);
   const [manualJobCouncilSelections, setManualJobCouncilSelections] = useState<
     Record<string, CouncilSpecialistSelection>
   >(() => defaultCouncilSelections());
@@ -351,7 +354,7 @@ export function CodeReviewJobsCard({
     );
     setManualJobInstructions('');
     setManualJobCouncilEnabled(false);
-    setManualJobCouncilAggregation('any_blocking_member');
+    setManualJobCouncilAggregation(DEFAULT_COUNCIL_AGGREGATION_STRATEGY);
     setManualJobCouncilSelections(defaultCouncilSelections());
     setManualJobSubmitted(false);
     setManualJobSubmitError(null);
@@ -390,7 +393,7 @@ export function CodeReviewJobsCard({
     await invalidateJobsList();
     setManualJobDialogOpen(false);
     resetManualJobForm();
-    router.push(`/code-reviews/${data.reviewId}`);
+    router.push(getCodeReviewDetailHref(data.reviewId, organizationId));
   }
 
   function handleManualJobSubmit(event: FormEvent<HTMLFormElement>) {
@@ -830,7 +833,7 @@ export function CodeReviewJobsCard({
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <Link
-                            href={`/code-reviews/${review.id}`}
+                            href={getCodeReviewDetailHref(review.id, organizationId)}
                             className="text-foreground hover:text-primary text-sm font-medium transition-colors hover:underline"
                           >
                             {review.pr_title}
@@ -892,12 +895,24 @@ export function CodeReviewJobsCard({
                         )}
                       </div>
 
-                      {/* Error Message */}
-                      {review.error_message && (
-                        <div className="text-destructive mt-1 text-xs">
-                          Error: {review.error_message}
-                        </div>
-                      )}
+                      {/* Error Message. Reasons with customer-facing copy render
+                          muted instead of destructive: the cause is stated
+                          plainly and nothing is broken on our side. */}
+                      {(() => {
+                        const reasonCopy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
+                        if (reasonCopy) {
+                          return (
+                            <div className="text-muted-foreground mt-1 text-xs">
+                              {reasonCopy.label}: {reasonCopy.message}
+                            </div>
+                          );
+                        }
+                        return review.error_message ? (
+                          <div className="text-destructive mt-1 text-xs">
+                            Error: {review.error_message}
+                          </div>
+                        ) : null;
+                      })()}
 
                       {/* View Progress Button */}
                       {canShowStream && (

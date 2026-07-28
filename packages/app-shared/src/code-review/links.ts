@@ -37,3 +37,12 @@ export function getCodeReviewJobsHref(
     : '/code-reviews';
   return `${basePath}?${query}`;
 }
+
+// Detail (single-job) link. Keep the org prefix so the left-nav workspace,
+// which is derived purely from the URL path (see useUrlOrganizationId), stays
+// on the owning organization instead of silently falling back to Personal.
+export function getCodeReviewDetailHref(reviewId: string, organizationId?: string | null): string {
+  return organizationId
+    ? `/organizations/${organizationId}/code-reviews/${reviewId}`
+    : `/code-reviews/${reviewId}`;
+}

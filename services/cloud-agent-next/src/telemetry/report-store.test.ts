@@ -184,6 +184,8 @@ describe('cloud agent reporting store', () => {
       failure_at: occurredAt,
       failure_stage: 'initial_admission',
       failure_code: 'initial_queue_full',
+      failure_responsibility: 'unknown',
+      failure_reason: 'initial_admission_unknown',
       error_message_redacted: 'Initial queue is full',
     });
   });
@@ -243,6 +245,9 @@ describe('cloud agent reporting store', () => {
           terminalAt: occurredAt,
           failureStage: 'pre_dispatch',
           failureCode: 'workspace_setup_failed',
+          workspaceFailureSubtype: 'setup_command_failed',
+          failureResponsibility: 'user',
+          failureReason: 'setup_command',
           diagnostic: {
             errorMessageRedacted: 'Workspace setup failed',
             errorExpiresAt: '2026-06-01T12:00:00.000Z',
@@ -258,7 +263,55 @@ describe('cloud agent reporting store', () => {
       cloud_agent_session_id: cloudAgentSessionId,
       message_id: 'msg_failed',
       failure_code: 'workspace_setup_failed',
+      failure_responsibility: 'user',
+      failure_reason: 'setup_command',
       error_message_redacted: 'Workspace setup failed',
+    });
+  });
+
+  it('does not attach responsibility from a replay with conflicting terminal facts', async () => {
+    const fake = makeDb([
+      [{ createdAt: occurredAt }],
+      [
+        {
+          status: 'failed',
+          wrapperRunId: null,
+          queuedAt: occurredAt,
+          dispatchAcceptedAt: null,
+          agentActivityObservedAt: null,
+          terminalAt: occurredAt,
+          failureStage: 'unknown',
+          failureCode: 'unclassified',
+          failureResponsibility: null,
+          failureReason: null,
+        },
+      ],
+    ]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    await store.saveReport(
+      {
+        version: 1,
+        type: 'run.state',
+        occurredAt,
+        session: { cloudAgentSessionId },
+        run: {
+          messageId: 'msg_failed',
+          status: 'failed',
+          terminalAt: occurredAt,
+          failureStage: 'agent_activity',
+          failureCode: 'payment_required',
+          failureResponsibility: 'user',
+          failureReason: 'insufficient_credits',
+        },
+      },
+      occurredAt
+    );
+    expect(
+      fake.updates.find(call => call.table === cloud_agent_session_runs)?.values
+    ).toMatchObject({
+      failure_code: 'unclassified',
+      failure_responsibility: null,
+      failure_reason: null,
     });
   });
 
@@ -275,6 +328,8 @@ describe('cloud agent reporting store', () => {
           terminalAt: '2026-05-25T12:04:00.000Z',
           failureStage: 'unknown',
           failureCode: 'unclassified',
+          failureResponsibility: 'unknown',
+          failureReason: 'unclassified',
         },
       ],
     ]);

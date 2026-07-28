@@ -1,5 +1,11 @@
-import { type KiloSessionId, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type Part,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 
+import { computeStatus } from './compute-status';
 import { isToolPart } from './part-types';
 import { getFilename, truncateText } from './tool-card-utils';
 
@@ -8,7 +14,7 @@ export type ChildSessionActivity = { tool: string; context?: string };
 export type ChildSessionCardState = {
   agentName: string;
   taskName: string;
-  latestActivity: ChildSessionActivity | 'Waiting for activity';
+  latestActivity: ChildSessionActivity | string;
 };
 
 function getStringProperty(obj: unknown, key: string): string | undefined {
@@ -54,13 +60,13 @@ function getToolContext(p: ToolPart): string | undefined {
   return undefined;
 }
 
-function findLatestToolPart(messages: StoredMessage[]): ToolPart | undefined {
+function findLatestAssistantPart(messages: StoredMessage[]): Part | undefined {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
     if (msg?.info.role === 'assistant') {
       for (let j = msg.parts.length - 1; j >= 0; j -= 1) {
         const part = msg.parts[j];
-        if (part && isToolPart(part)) {
+        if (part) {
           return part;
         }
       }
@@ -79,10 +85,16 @@ export function getChildSessionCardState(
   const prompt = getStringProperty(input, 'prompt');
   const taskName = description ?? (prompt ? truncateText(prompt, 60) : 'Task');
 
-  const latestToolPart = findLatestToolPart(childMessages);
-  const latestActivity: ChildSessionActivity | 'Waiting for activity' = latestToolPart
-    ? { tool: latestToolPart.tool, context: getToolContext(latestToolPart) }
-    : 'Waiting for activity';
+  const latestPart = findLatestAssistantPart(childMessages);
+  const latestActivity: ChildSessionActivity | string = (() => {
+    if (!latestPart) {
+      return 'Waiting for activity';
+    }
+    if (isToolPart(latestPart)) {
+      return { tool: latestPart.tool, context: getToolContext(latestPart) };
+    }
+    return computeStatus(latestPart);
+  })();
 
   return { agentName, taskName, latestActivity };
 }
@@ -103,4 +115,25 @@ export function getTaskToolSessionId(part: ToolPart): KiloSessionId | undefined 
     return getStringProperty(state.metadata, 'sessionId') as KiloSessionId | undefined;
   }
   return undefined;
+}
+
+export function getChildSessionStreaming(
+  messages: StoredMessage[],
+  childSessionId: KiloSessionId
+): boolean {
+  for (const message of messages) {
+    if (message.info.role === 'assistant') {
+      for (const part of message.parts) {
+        if (
+          isToolPart(part) &&
+          part.tool === 'task' &&
+          part.state.status === 'running' &&
+          getTaskToolSessionId(part) === childSessionId
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }

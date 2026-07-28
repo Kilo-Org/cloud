@@ -31,6 +31,10 @@ vi.mock('./dos/UserConnectionDO', () => ({
   getUserConnectionDO: vi.fn(),
 }));
 
+vi.mock('./dos/SessionAccessCacheDO', () => ({
+  getSessionAccessCacheDO: vi.fn(),
+}));
+
 vi.mock('./session-events', async importOriginal => {
   const actual = await importOriginal<typeof SessionEvents>();
   return {
@@ -50,6 +54,7 @@ vi.mock('./util/ingest-limits', () => ({
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
+import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from './session-events';
 import { QUEUE_RETRY_DELAY_SECONDS, createItemExtractor, queue } from './queue-consumer';
 import { computeSessionMetadataUpdates } from './ingest/metadata';
@@ -923,6 +928,108 @@ describe('computeSessionMetadataUpdates', () => {
   });
 });
 
+describe('queue organization changes', () => {
+  it('invalidates cached session access after persisting organization scope', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const persistedSession = {
+      session_id: sessionId,
+      created_at: '2026-05-05T00:00:00.000Z',
+      updated_at: '2026-05-05T00:00:01.000Z',
+      title: null,
+      created_on_platform: null,
+      organization_id: organizationId,
+      git_url: null,
+      git_branch: null,
+      parent_session_id: null,
+      status: null,
+      status_updated_at: null,
+    };
+    // loadSession → membership join (authorized) → read-back after org write.
+    const selectResults: unknown[][] = [
+      [{ session_id: sessionId }],
+      [{ id: 'mem_1' }],
+      [persistedSession],
+    ];
+    const selectResult = vi.fn(async () => selectResults.shift() ?? []);
+    const select = {
+      from: vi.fn(() => select),
+      // hasOrganizationAccess joins memberships → organizations (deleted_at IS NULL).
+      innerJoin: vi.fn(() => select),
+      where: vi.fn(() => select),
+      limit: vi.fn(() => select),
+      for: vi.fn(() => select),
+      then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
+    };
+    const update = {
+      set: vi.fn(() => update),
+      where: vi.fn(() => update),
+      then: vi.fn((resolve: (value: undefined) => unknown) => resolve(undefined)),
+    };
+    const dbRef: Record<string, unknown> = {};
+    const db = {
+      select: vi.fn(() => select),
+      update: vi.fn(() => update),
+      transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(dbRef)),
+    } as unknown as ReturnType<typeof getWorkerDb>;
+    Object.assign(dbRef, db);
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      ingest: vi.fn(async () => ({ changes: [{ name: 'orgId', value: organizationId }] })),
+    } as never);
+    const remove = vi.fn(async () => undefined);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ remove } as never);
+
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            JSON.stringify({
+              data: [
+                { type: 'kilo_meta', data: { platform: 'cloud-agent-web', orgId: organizationId } },
+              ],
+            })
+          )
+        );
+        controller.close();
+      },
+    });
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => ({ body })),
+        delete: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      },
+    } as never;
+    const ack = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'ingest/org-change',
+              kiloUserId: 'usr_test',
+              sessionId,
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry: vi.fn(),
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(getSessionAccessCacheDO).toHaveBeenCalledWith(env, { kiloUserId: 'usr_test' });
+    expect(remove).toHaveBeenCalledWith(sessionId);
+  });
+});
+
 describe('queue status notifications', () => {
   it('emits a status update using the locked pre-update status instead of the intake snapshot', async () => {
     vi.mocked(notifyUserSessionEvent).mockClear();
@@ -1024,7 +1131,7 @@ describe('remote session attention notifications', () => {
   const attentionSignal = { signalId: 'msg_1', kind: 'completed', messageExcerpt: 'All done' };
 
   function setUpAttentionTest(params: {
-    sessionRow: { parent_session_id: string | null };
+    sessionRow: { parent_session_id: string | null; created_on_platform?: string | null };
     activeCliSession?: boolean;
     ingest?: ReturnType<typeof vi.fn>;
     stagedItems?: unknown[];
@@ -1099,9 +1206,9 @@ describe('remote session attention notifications', () => {
     return { ack, retry };
   }
 
-  it.skip('dispatches a push notification for an active root session', async () => {
+  it('dispatches a push notification for an active ordinary remote CLI root session', async () => {
     const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
-      sessionRow: { parent_session_id: null },
+      sessionRow: { parent_session_id: null, created_on_platform: 'cli' },
       activeCliSession: true,
     });
 
@@ -1116,10 +1223,11 @@ describe('remote session attention notifications', () => {
       status: 'completed',
       body: 'All done',
       suppressIfViewingSession: true,
+      category: 'status',
     });
   });
 
-  it.skip('suppresses the push when no active CLI owns the root session', async () => {
+  it('suppresses the push when no active CLI owns the root session', async () => {
     const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
       sessionRow: { parent_session_id: null },
       activeCliSession: false,
@@ -1128,6 +1236,18 @@ describe('remote session attention notifications', () => {
     await runAttentionQueue(env);
 
     expect(hasActiveCliSession).toHaveBeenCalledWith('ses_remote');
+    expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
+  });
+
+  it('suppresses cloud-agent-web completed signals before checking active CLI state', async () => {
+    const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
+      sessionRow: { parent_session_id: null, created_on_platform: 'cloud-agent-web' },
+      activeCliSession: true,
+    });
+
+    await runAttentionQueue(env);
+
+    expect(hasActiveCliSession).not.toHaveBeenCalled();
     expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
   });
 
@@ -1195,5 +1315,256 @@ describe('remote session attention notifications', () => {
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
     expect(sendCloudAgentSessionNotification).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('agent_notification attention signals', () => {
+  type AgentNotificationItem = {
+    type: 'agent_notification';
+    data: { id: string; message: string };
+  };
+
+  function setUpAgentNotificationTest(params: {
+    sessionRow: { parent_session_id: string | null };
+    ingest?: ReturnType<typeof vi.fn>;
+    stagedItems?: unknown[];
+    sendAgentSessionNotification?: ReturnType<typeof vi.fn>;
+    sendCloudAgentSessionNotification?: ReturnType<typeof vi.fn>;
+    hasActiveCliSession?: ReturnType<typeof vi.fn>;
+  }) {
+    const defaultIngest = vi.fn(async (items: unknown[]) => ({
+      changes: [],
+      attentionSignals: items
+        .filter(
+          (item): item is AgentNotificationItem =>
+            typeof item === 'object' &&
+            item !== null &&
+            (item as { type?: string }).type === 'agent_notification'
+        )
+        .map(item => ({
+          kind: 'agent_notification' as const,
+          notificationId: item.data.id,
+          message: item.data.message,
+        })),
+    }));
+    const ingest = params.ingest ?? defaultIngest;
+    const markAgentNotificationDispatched = vi.fn();
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      ingest,
+      markAgentNotificationDispatched,
+    } as never);
+
+    const limit = vi.fn(async () => [{ session_id: 'ses_agent', ...params.sessionRow }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select } as never);
+
+    const sendAgentSessionNotification =
+      params.sendAgentSessionNotification ?? vi.fn(async () => ({ dispatched: true }));
+    const sendCloudAgentSessionNotification =
+      params.sendCloudAgentSessionNotification ?? vi.fn(async () => ({ dispatched: true }));
+    const body = JSON.stringify({ data: params.stagedItems ?? [] });
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: vi.fn(async () => undefined),
+      },
+      NOTIFICATIONS: { sendAgentSessionNotification, sendCloudAgentSessionNotification },
+    } as never;
+
+    const hasActiveCliSession = params.hasActiveCliSession ?? vi.fn(async () => true);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      hasActiveCliSession,
+    } as never);
+
+    return {
+      env,
+      ingest,
+      markAgentNotificationDispatched,
+      sendAgentSessionNotification,
+      sendCloudAgentSessionNotification,
+      hasActiveCliSession,
+    };
+  }
+
+  async function runAgentNotificationQueue(env: unknown) {
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const waitUntilPromises: Promise<unknown>[] = [];
+    const ctx = {
+      waitUntil: vi.fn((p: Promise<unknown>) => waitUntilPromises.push(p)),
+    } as unknown as ExecutionContext;
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/agent-notification',
+              kiloUserId: 'usr_agent',
+              sessionId: 'ses_agent',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env as never,
+      ctx
+    );
+    await Promise.all(waitUntilPromises);
+
+    return { ack, retry };
+  }
+
+  it('dispatches a valid agent_notification and marks it dispatched', async () => {
+    const { env, markAgentNotificationDispatched, sendAgentSessionNotification } =
+      setUpAgentNotificationTest({
+        sessionRow: { parent_session_id: null },
+        stagedItems: [
+          { type: 'agent_notification', data: { id: 'note_1', message: 'Build done' } },
+        ],
+      });
+
+    const { ack } = await runAgentNotificationQueue(env);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(sendAgentSessionNotification).toHaveBeenCalledWith({
+      userId: 'usr_agent',
+      cliSessionId: 'ses_agent',
+      notificationId: 'note_1',
+      message: 'Build done',
+    });
+    expect(markAgentNotificationDispatched).toHaveBeenCalledWith('note_1');
+  });
+
+  it('drops an invalid agent_notification item and still dispatches the valid one', async () => {
+    const { env, sendAgentSessionNotification, markAgentNotificationDispatched, ingest } =
+      setUpAgentNotificationTest({
+        sessionRow: { parent_session_id: null },
+        stagedItems: [
+          { type: 'agent_notification', data: { id: 'note_bad', message: '' } },
+          { type: 'agent_notification', data: { id: 'note_ok', message: 'OK' } },
+        ],
+      });
+
+    const { ack } = await runAgentNotificationQueue(env);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    // Invalid item was dropped before reaching the DO ingest.
+    expect(ingest).toHaveBeenCalledWith(
+      [{ type: 'agent_notification', data: { id: 'note_ok', message: 'OK' } }],
+      'usr_agent',
+      'ses_agent',
+      1,
+      1,
+      undefined
+    );
+    expect(sendAgentSessionNotification).toHaveBeenCalledTimes(1);
+    expect(sendAgentSessionNotification).toHaveBeenCalledWith({
+      userId: 'usr_agent',
+      cliSessionId: 'ses_agent',
+      notificationId: 'note_ok',
+      message: 'OK',
+    });
+    expect(markAgentNotificationDispatched).toHaveBeenCalledWith('note_ok');
+  });
+
+  it('dispatches several distinct notifications in one batch', async () => {
+    const { env, sendAgentSessionNotification, markAgentNotificationDispatched } =
+      setUpAgentNotificationTest({
+        sessionRow: { parent_session_id: null },
+        stagedItems: [
+          { type: 'agent_notification', data: { id: 'a', message: 'one' } },
+          { type: 'agent_notification', data: { id: 'b', message: 'two' } },
+          { type: 'agent_notification', data: { id: 'c', message: 'three' } },
+        ],
+      });
+
+    const { ack } = await runAgentNotificationQueue(env);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(sendAgentSessionNotification).toHaveBeenCalledTimes(3);
+    expect(markAgentNotificationDispatched).toHaveBeenCalledTimes(3);
+    expect(markAgentNotificationDispatched).toHaveBeenCalledWith('a');
+    expect(markAgentNotificationDispatched).toHaveBeenCalledWith('b');
+    expect(markAgentNotificationDispatched).toHaveBeenCalledWith('c');
+  });
+
+  it('leaves the marker pending when the RPC throws', async () => {
+    const sendAgentSessionNotification = vi.fn(async () => {
+      throw new Error('Notifications service unreachable');
+    });
+    const { env, markAgentNotificationDispatched } = setUpAgentNotificationTest({
+      sessionRow: { parent_session_id: null },
+      stagedItems: [
+        { type: 'agent_notification', data: { id: 'note_throw', message: 'Will fail' } },
+      ],
+      sendAgentSessionNotification,
+    });
+
+    const { ack, retry } = await runAgentNotificationQueue(env);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    expect(sendAgentSessionNotification).toHaveBeenCalledTimes(1);
+    expect(markAgentNotificationDispatched).not.toHaveBeenCalled();
+  });
+
+  it('marks the identity dispatched for an ineligible child session and skips the RPC', async () => {
+    const { env, sendAgentSessionNotification, markAgentNotificationDispatched } =
+      setUpAgentNotificationTest({
+        sessionRow: { parent_session_id: 'ses_parent' },
+        stagedItems: [
+          { type: 'agent_notification', data: { id: 'note_child', message: 'Child session' } },
+        ],
+      });
+
+    const { ack } = await runAgentNotificationQueue(env);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(sendAgentSessionNotification).not.toHaveBeenCalled();
+    expect(markAgentNotificationDispatched).toHaveBeenCalledWith('note_child');
+  });
+
+  it('still dispatches legacy signals when the agent_notification RPC throws and leaves the agent identity pending', async () => {
+    const sendAgentSessionNotification = vi.fn(async () => {
+      throw new Error('Notifications service unreachable');
+    });
+    const ingest = vi.fn(async () => ({
+      changes: [],
+      attentionSignals: [
+        { kind: 'completed', signalId: 'sig_1', messageExcerpt: 'All done' },
+        { kind: 'agent_notification', notificationId: 'note_throw', message: 'Will fail' },
+      ],
+    }));
+    const { env, sendCloudAgentSessionNotification, markAgentNotificationDispatched } =
+      setUpAgentNotificationTest({
+        sessionRow: { parent_session_id: null },
+        stagedItems: [{ type: 'message', data: { id: 'msg_1' } }],
+        ingest,
+        sendAgentSessionNotification,
+      });
+
+    const { ack, retry } = await runAgentNotificationQueue(env);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    expect(sendAgentSessionNotification).toHaveBeenCalledTimes(1);
+    expect(sendCloudAgentSessionNotification).toHaveBeenCalledWith({
+      userId: 'usr_agent',
+      cliSessionId: 'ses_agent',
+      executionId: 'remote:sig_1',
+      status: 'completed',
+      body: 'All done',
+      suppressIfViewingSession: true,
+      category: 'status',
+    });
+    expect(markAgentNotificationDispatched).not.toHaveBeenCalled();
   });
 });

@@ -516,8 +516,8 @@ describe('Bitbucket Workspace Access Token adapter', () => {
         accessToken: ACCESS_TOKEN,
       })
     ).rejects.toMatchObject({ code: 'page_limit_exceeded' });
-    expect(repositoryPage).toBe(20);
-    expect(fetchMock).toHaveBeenCalledTimes(23);
+    expect(repositoryPage).toBe(100);
+    expect(fetchMock).toHaveBeenCalledTimes(103);
   });
 
   it('stops repository pagination at the item limit', async () => {
@@ -547,8 +547,8 @@ describe('Bitbucket Workspace Access Token adapter', () => {
         accessToken: ACCESS_TOKEN,
       })
     ).rejects.toMatchObject({ code: 'item_limit_exceeded' });
-    expect(repositoryPage).toBe(10);
-    expect(fetchMock).toHaveBeenCalledTimes(13);
+    expect(repositoryPage).toBe(100);
+    expect(fetchMock).toHaveBeenCalledTimes(103);
   });
 
   it('rejects repository projections outside the exact workspace full name', async () => {

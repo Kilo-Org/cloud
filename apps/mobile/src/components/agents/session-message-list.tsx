@@ -1,11 +1,18 @@
 import { FlashList, type FlashListRef, type ListRenderItem } from '@shopify/flash-list';
-import { type OlderMessagesError } from 'cloud-agent-sdk';
-import { useCallback, useEffect, useRef } from 'react';
-import { type ViewStyle } from 'react-native';
+import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
+import { ChevronDown } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  shouldAnnounceOlderMessagesArrival,
+} from '@/components/agents/older-messages-a11y';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
@@ -14,7 +21,7 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // flight. The manager dedupes too, but the UI guard keeps us from issuing
 // repeated `onStartReached` callbacks during a single drag, which would
 // otherwise spam the FlashList event log.
-const ON_START_REACHED_THRESHOLD = 0.5;
+const ON_START_REACHED_THRESHOLD = 2;
 
 type SessionMessageListProps<T> = {
   sessionId: string;
@@ -27,6 +34,15 @@ type SessionMessageListProps<T> = {
   onLoadOlderMessages: () => void;
   renderItem: ListRenderItem<T>;
   ListFooterComponent?: React.ComponentType | React.ReactElement | null;
+  /**
+   * Extra bottom padding (in dp) applied to the list's content container.
+   * The default (undefined) keeps the legacy `paddingVertical: 8` behavior
+   * exactly, so the main session view is unaffected. Hosts that render
+   * inside a React Native `Modal` (e.g. the subagent sheet) pass a
+   * safe-area-aware value so the last row clears curved-bottom home
+   * indicators.
+   */
+  contentBottomInset?: number;
 };
 
 export function SessionMessageList<T>({
@@ -40,13 +56,16 @@ export function SessionMessageList<T>({
   onLoadOlderMessages,
   renderItem,
   ListFooterComponent,
+  contentBottomInset,
 }: Readonly<SessionMessageListProps<T>>) {
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
   // message on first render and after prepended older pages, which is the
   // exact behavior we want for the agent session transcript.
   const {
+    isAtBottom,
     listRef,
+    scrollToLatestAnimated,
     handleContentSizeChange,
     handleListLayout,
     handleScroll,
@@ -58,6 +77,7 @@ export function SessionMessageList<T>({
     itemCount: items.length,
     resetKey: sessionId,
   });
+  const colors = useThemeColors();
 
   // Coalesce the trigger: only fire `onLoadOlderMessages` while there is
   // actually a cursor, we are not already loading, and we are not in a
@@ -93,47 +113,115 @@ export function SessionMessageList<T>({
     inFlightRef.current = false;
   }, [sessionId]);
 
+  // Non-visual a11y signal for older-page arrival (visual loading skeleton
+  // was removed). Announce only when items were actually prepended.
+  const olderArrivalInitializedRef = useRef(false);
+  const olderArrivalCountRef = useRef(0);
+  const olderArrivalNewestKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    olderArrivalInitializedRef.current = false;
+    olderArrivalCountRef.current = 0;
+    olderArrivalNewestKeyRef.current = null;
+  }, [sessionId]);
+  useEffect(() => {
+    const newestItem = items.at(-1);
+    const nextNewestKey = newestItem === undefined ? null : keyExtractor(newestItem);
+    const nextCount = items.length;
+    if (
+      shouldAnnounceOlderMessagesArrival({
+        wasInitialized: olderArrivalInitializedRef.current,
+        previousCount: olderArrivalCountRef.current,
+        nextCount,
+        previousNewestKey: olderArrivalNewestKeyRef.current,
+        nextNewestKey,
+      })
+    ) {
+      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+    }
+    olderArrivalInitializedRef.current = true;
+    olderArrivalCountRef.current = nextCount;
+    olderArrivalNewestKeyRef.current = nextNewestKey;
+  }, [items, keyExtractor]);
+
   // Defensive: the structural list ref is required by the hook but
   // downstream types may infer it as nullable.
   const listRefSafe = listRef as unknown as React.RefObject<FlashListRef<T>>;
 
+  // When the optional `contentBottomInset` is omitted we return the
+  // original module-level `listContentContainerStyle` reference so the
+  // default-prop path is behavior-identical (no allocation, no value
+  // change). When provided we extend the bottom padding to clear safe
+  // areas such as the home indicator on curved-bottom iPhones.
+  const resolvedContentContainerStyle = useMemo<ViewStyle>(
+    () =>
+      contentBottomInset
+        ? { paddingTop: 8, paddingBottom: 8 + contentBottomInset }
+        : listContentContainerStyle,
+    [contentBottomInset]
+  );
+
   return (
-    <FlashList<T>
-      ref={listRefSafe}
-      style={listStyle}
-      contentContainerStyle={listContentContainerStyle}
-      data={items}
-      keyExtractor={keyExtractor}
-      renderItem={renderItem}
-      onScroll={handleScroll}
-      onScrollBeginDrag={handleScrollBeginDrag}
-      onScrollEndDrag={handleScrollEndDrag}
-      onMomentumScrollBegin={handleMomentumScrollBegin}
-      onMomentumScrollEnd={handleMomentumScrollEnd}
-      onContentSizeChange={handleContentSizeChange}
-      onLayout={handleListLayout}
-      scrollEventThrottle={16}
-      onStartReached={hasOlderMessages ? handleStartReached : undefined}
-      onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
-      maintainVisibleContentPosition={{
-        // Start rendering from the bottom so the newest message is visible
-        // on first render. `autoscrollToTopThreshold` is left at its default
-        // so the viewport only repositions when the user is far enough away
-        // from the top — preserving the existing auto-follow behavior on
-        // streaming insertions at the bottom.
-        startRenderingFromBottom: true,
-      }}
-      ListHeaderComponent={
-        <SessionPaginationHeader
-          isLoadingOlderMessages={isLoadingOlderMessages}
-          olderMessagesError={olderMessagesError}
-          olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-          onRetry={onLoadOlderMessages}
-        />
-      }
-      ListFooterComponent={ListFooterComponent}
-      keyboardDismissMode="interactive"
-      keyboardShouldPersistTaps="handled"
-    />
+    <View className="flex-1">
+      <FlashList<T>
+        ref={listRefSafe}
+        style={listStyle}
+        contentContainerStyle={resolvedContentContainerStyle}
+        data={items}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        onScroll={handleScroll}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onScrollEndDrag={handleScrollEndDrag}
+        onMomentumScrollBegin={handleMomentumScrollBegin}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        onContentSizeChange={handleContentSizeChange}
+        onLayout={handleListLayout}
+        scrollEventThrottle={16}
+        onStartReached={hasOlderMessages ? handleStartReached : undefined}
+        onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
+        maintainVisibleContentPosition={{
+          // Start rendering from the bottom so the newest message is visible
+          // on first render. `autoscrollToTopThreshold` is left at its default
+          // so the viewport only repositions when the user is far enough away
+          // from the top — preserving the existing auto-follow behavior on
+          // streaming insertions at the bottom.
+          startRenderingFromBottom: true,
+        }}
+        ListHeaderComponent={
+          <SessionPaginationHeader
+            isLoadingOlderMessages={isLoadingOlderMessages}
+            olderMessagesError={olderMessagesError}
+            olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+            onRetry={onLoadOlderMessages}
+          />
+        }
+        ListFooterComponent={ListFooterComponent}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+      />
+      {/* Floating "scroll to bottom" affordance. Rendered only when the
+          user has scrolled past the 100px bottom threshold; the fade
+          animations match the chat-composer convention. `pointerEvents`
+          is set on the wrapper so empty space around the button keeps
+          scrolling the list, while the Pressable itself catches taps. */}
+      {!isAtBottom ? (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
+          pointerEvents="box-none"
+          className="absolute bottom-4 right-4"
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Scroll to bottom"
+            onPress={scrollToLatestAnimated}
+            hitSlop={2}
+            className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-black/25 active:opacity-70"
+          >
+            <ChevronDown size={20} color={colors.foreground} />
+          </Pressable>
+        </Animated.View>
+      ) : null}
+    </View>
   );
 }

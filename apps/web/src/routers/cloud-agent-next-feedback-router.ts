@@ -13,9 +13,18 @@ const recentMessageSchema = z.object({
   ts: z.number(),
 });
 
+const feedbackSessionTypeSchema = z.enum(['cloud-agent', 'remote', 'read-only']);
+
+const feedbackSessionTypeLabels = {
+  'cloud-agent': 'Cloud Agent',
+  remote: 'Remote',
+  'read-only': 'Read-only',
+} as const satisfies Record<z.infer<typeof feedbackSessionTypeSchema>, string>;
+
 const CreateCloudAgentFeedbackInputSchema = z.object({
   cloud_agent_session_id: z.string().max(500).optional(),
   kilo_session_id: z.string().max(500).optional(),
+  session_type: feedbackSessionTypeSchema.optional(),
   organization_id: z.string().uuid().optional(),
   feedback_text: z.string().min(1).max(10_000),
   model: z.string().max(255).optional(),
@@ -38,6 +47,7 @@ export const cloudAgentNextFeedbackRouter = createTRPCRouter({
         .values({
           kilo_user_id: ctx.user.id,
           cloud_agent_session_id: input.cloud_agent_session_id,
+          session_type: input.session_type,
           organization_id: input.organization_id,
           feedback_text: input.feedback_text,
           model: input.model,
@@ -54,7 +64,12 @@ export const cloudAgentNextFeedbackRouter = createTRPCRouter({
           ? `<https://app.kilo.ai/admin/session-traces?sessionId=${input.kilo_session_id}|${input.kilo_session_id}>`
           : '_unknown_';
 
-        const metadataLines = [`• session: ${sessionLink}`];
+        const metadataLines = [
+          `• session: ${sessionLink}`,
+          `• session type: ${
+            input.session_type ? feedbackSessionTypeLabels[input.session_type] : '_unknown_'
+          }`,
+        ];
 
         const trimmedFeedback = input.feedback_text.trim();
         const feedbackText =

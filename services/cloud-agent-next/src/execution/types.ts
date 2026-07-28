@@ -228,11 +228,19 @@ export type RetryableResultCode =
   | 'WRAPPER_START_FAILED'
   | 'WRAPPER_FINALIZING';
 
+export type PermanentDeliveryResultCode = 'SANDBOX_CAPABILITY_UNAVAILABLE';
+
 export type AdmissionFailure = {
   success: false;
   code: 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL' | 'PENDING_QUEUE_FULL' | RetryableResultCode;
   error: string;
   failureBoundary?: 'registration' | 'admission';
+};
+
+export type PermanentDeliveryFailure = {
+  success: false;
+  code: PermanentDeliveryResultCode;
+  error: string;
 };
 
 /** Durable acknowledgement that a message intent is stored for asynchronous delivery. */
@@ -252,7 +260,10 @@ export type RuntimeAcceptanceResult = {
 };
 
 export type SessionMessageAdmissionResult = DurableAdmissionAck | AdmissionFailure;
-export type MessageDeliveryResult = RuntimeAcceptanceResult | AdmissionFailure;
+export type MessageDeliveryResult =
+  | RuntimeAcceptanceResult
+  | AdmissionFailure
+  | PermanentDeliveryFailure;
 
 /** Compatibility request retained only for external schema/type imports. */
 export type QueueSessionMessageRequest = SubmittedSessionMessageRequest;

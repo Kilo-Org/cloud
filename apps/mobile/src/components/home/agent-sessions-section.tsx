@@ -1,58 +1,20 @@
 import { type Href, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
-import {
-  expandPlatformFilter,
-  formatGitUrlProject,
-} from '@/components/agents/session-list-helpers';
+import { RemoteSessionRow } from '@/components/agents/remote-session-row';
+import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
+import { StoredSessionRow } from '@/components/agents/session-row';
 import { SectionHeader } from '@/components/home/section-header';
-import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
 import {
   type ActiveSession,
   type StoredSession,
   useAgentSessions,
 } from '@/lib/hooks/use-agent-sessions';
-import { parseTimestamp, timeAgo } from '@/lib/utils';
+import { parseTimestamp } from '@/lib/utils';
 
 const MAX_ROWS = 3;
 const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));
-
-/**
- * Map backend `created_on_platform` strings to a pretty uppercase label.
- * The row's hue is hashed from the label in `SessionRow`, so no agent
- * key needs to be emitted here.
- */
-function platformLabel(platform: string): string {
-  switch (platform) {
-    case 'cloud-agent':
-    case 'cloud-agent-web': {
-      return 'CLOUD AGENT';
-    }
-    case 'vscode':
-    case 'agent-manager': {
-      return 'VSCODE';
-    }
-    case 'slack': {
-      return 'SLACK';
-    }
-    case 'cli': {
-      return 'CLI';
-    }
-    default: {
-      return platform.toUpperCase();
-    }
-  }
-}
-
-function repoNameFromGitUrl(gitUrl: string | null | undefined): string | null {
-  if (!gitUrl) {
-    return null;
-  }
-  const project = formatGitUrlProject(gitUrl);
-  const parts = project.split('/');
-  return parts.at(-1) ?? project;
-}
 
 type Row =
   | {
@@ -64,7 +26,6 @@ type Row =
       key: string;
       kind: 'stored';
       session: StoredSession;
-      isLive: boolean;
     };
 
 function buildRows(params: {
@@ -100,7 +61,7 @@ function buildRows(params: {
       break;
     }
     if (!seenSessionIds.has(session.session_id)) {
-      rows.push({ key: `stored:${session.session_id}`, kind: 'stored', session, isLive: true });
+      rows.push({ key: `stored:${session.session_id}`, kind: 'stored', session });
       seenSessionIds.add(session.session_id);
     }
   }
@@ -111,7 +72,7 @@ function buildRows(params: {
       break;
     }
     if (!seenSessionIds.has(session.session_id)) {
-      rows.push({ key: `stored:${session.session_id}`, kind: 'stored', session, isLive: false });
+      rows.push({ key: `stored:${session.session_id}`, kind: 'stored', session });
       seenSessionIds.add(session.session_id);
     }
   }
@@ -137,29 +98,6 @@ export function hasDisplayableAgentSessions(
 type AgentSessionsSectionProps = {
   organizationId: string | null;
 };
-
-function activeSessionTitle(session: ActiveSession): string {
-  return session.title.length > 0 ? session.title : 'Untitled session';
-}
-
-function storedSessionTitle(session: StoredSession): string {
-  return session.title && session.title.length > 0 ? session.title : 'Untitled session';
-}
-
-function storedSessionMeta(session: StoredSession): string {
-  const tsSource = session.status_updated_at ?? session.updated_at;
-  return timeAgo(parseTimestamp(tsSource)).toUpperCase();
-}
-
-function activeSessionLabel(session: ActiveSession): string {
-  const repo = repoNameFromGitUrl(session.gitUrl);
-  return repo ? repo.toUpperCase() : platformLabel('cloud-agent');
-}
-
-function storedSessionLabel(session: StoredSession): string {
-  const repo = repoNameFromGitUrl(session.git_url);
-  return repo ? repo.toUpperCase() : platformLabel(session.created_on_platform);
-}
 
 export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
   const router = useRouter();
@@ -203,11 +141,10 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
                 key={row.key}
                 className="overflow-hidden rounded-2xl border border-border bg-card"
               >
-                <SessionRow
-                  agentLabel={activeSessionLabel(session)}
-                  title={activeSessionTitle(session)}
-                  live
-                  last
+                <RemoteSessionRow
+                  session={session}
+                  variant="card"
+                  interactive={false}
                   onPress={() => {
                     navigateTo(session.id);
                   }}
@@ -221,12 +158,11 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
               key={row.key}
               className="overflow-hidden rounded-2xl border border-border bg-card"
             >
-              <SessionRow
-                agentLabel={storedSessionLabel(session)}
-                title={storedSessionTitle(session)}
-                meta={storedSessionMeta(session)}
-                live={row.isLive}
-                last
+              <StoredSessionRow
+                session={session}
+                sortBy="updated_at"
+                variant="card"
+                interactive={false}
                 onPress={() => {
                   navigateTo(session.session_id, session.organization_id);
                 }}

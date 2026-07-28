@@ -1,4 +1,4 @@
-import { type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
+import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import {
   ChildSessionSection,

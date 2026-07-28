@@ -257,6 +257,11 @@ jobs:
       - name: Run builder Postgres repository tests
         run: pnpm --filter kilo-deploy-builder test:postgres
 
+      - name: Run container usage Postgres tests
+        # The meter suite connects to POSTGRES_URL directly. Avoid the Jest worker
+        # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter container-usage-meter test:postgres
+
   build:
     needs: [changes, typecheck, lint, format-check, drizzle-check]
     if: needs.changes.outputs.kilocode_backend == 'true'

@@ -1,7 +1,7 @@
 import { type AlertButton, type AlertOptions } from 'react-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { showRemoteCliExitConfirmation } from '@/components/agents/remote-cli-exit-alert';
+import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
@@ -33,7 +33,7 @@ function createExitSubmissionHarness() {
   const lock = createSubmitLock();
   const lockAdapter = createSubmitLockAdapter(lock);
   const order: string[] = [];
-  const onExitCli = vi.fn(async (onAccepted: () => void) => {
+  const onExitSession = vi.fn(async (onAccepted: () => void) => {
     order.push('exit');
     await Promise.resolve();
     order.push('accepted');
@@ -50,7 +50,7 @@ function createExitSubmissionHarness() {
   return {
     lock,
     order,
-    onExitCli,
+    onExitSession,
     clearDraft,
     dismiss,
     resetAttachments,
@@ -63,10 +63,10 @@ function createExitSubmissionHarness() {
         },
         submit: async () => {
           await executeChatComposerSubmission(
-            { type: 'exit-cli' },
+            { type: 'exit-session' },
             {
-              confirmExitCli: showRemoteCliExitConfirmation,
-              onExitCli,
+              confirmExitSession: showRemoteSessionExitConfirmation,
+              onExitSession,
               onSendCommand: vi.fn(),
               onCreateSession: vi.fn(),
               onSendPrompt: vi.fn(),
@@ -88,7 +88,7 @@ function getAlertCall(index: number): AlertCall {
   return call;
 }
 
-describe('remote CLI exit submit lock integration', () => {
+describe('remote session exit submit lock integration', () => {
   beforeEach(() => {
     reactNativeMock.alert.mockReset();
   });
@@ -116,7 +116,7 @@ describe('remote CLI exit submit lock integration', () => {
     getAlertCall(0)[2][0]?.onPress?.();
     await expect(first).resolves.toBe(true);
 
-    expect(harness.onExitCli).not.toHaveBeenCalled();
+    expect(harness.onExitSession).not.toHaveBeenCalled();
     expect(harness.clearDraft).not.toHaveBeenCalled();
     expect(harness.dismiss).not.toHaveBeenCalled();
     expect(harness.lock.isLocked()).toBe(false);
@@ -128,7 +128,7 @@ describe('remote CLI exit submit lock integration', () => {
     getAlertCall(1)[3]?.onDismiss?.();
     await expect(afterCancel).resolves.toBe(true);
 
-    expect(harness.onExitCli).not.toHaveBeenCalled();
+    expect(harness.onExitSession).not.toHaveBeenCalled();
     expect(harness.clearDraft).not.toHaveBeenCalled();
     expect(harness.dismiss).not.toHaveBeenCalled();
     expect(harness.lock.isLocked()).toBe(false);
@@ -147,7 +147,7 @@ describe('remote CLI exit submit lock integration', () => {
     getAlertCall(0)[2][1]?.onPress?.();
     await expect(first).resolves.toBe(true);
 
-    expect(harness.onExitCli).toHaveBeenCalledTimes(1);
+    expect(harness.onExitSession).toHaveBeenCalledTimes(1);
     expect(harness.order).toEqual(['exit', 'accepted', 'clear', 'dismiss']);
     expect(harness.resetAttachments).not.toHaveBeenCalled();
     expect(harness.lock.isLocked()).toBe(false);

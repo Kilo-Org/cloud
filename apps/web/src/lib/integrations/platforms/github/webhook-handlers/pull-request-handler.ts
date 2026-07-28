@@ -13,6 +13,14 @@ import {
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import {
+  councilHardExcludeReason,
+  councilSelectionSkipReason,
+  determineAutomatedReviewType,
+  isCouncilActive,
+  type AutomatedReviewPrFacts,
+} from '@kilocode/worker-utils/code-review-council';
+import { isCouncilEntitledForOwner } from '@/lib/code-reviews/core/council-entitlement';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/code-reviews/core';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
@@ -132,6 +140,14 @@ export async function handlePullRequestCodeReview(
 
     // 3. Check if repository is in allowed list (when using selected repositories mode)
     const config = agentConfig.config as CodeReviewAgentConfig;
+
+    // Bot PRs are skipped by default (enforced at step 5b). Compute the decision up front so the
+    // merge-commit path (step 4) also defers to it: otherwise a bot PR whose head is a merge commit
+    // would be re-pointed to a new SHA with a fresh check run, keeping alive a review the guardrail
+    // is meant to skip. When true, the PR falls through to cancellation + skip instead.
+    const skipBotPullRequests = config.skip_bot_pull_requests ?? true;
+    const isBotPullRequestSkip = skipBotPullRequests && pull_request.user.type === 'Bot';
+
     if (
       config?.repository_selection_mode === 'selected' &&
       Array.isArray(config?.selected_repository_ids)
@@ -168,6 +184,7 @@ export async function handlePullRequestCodeReview(
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
     if (
+      !isBotPullRequestSkip &&
       headOwner &&
       headRepoName &&
       (await shouldSkipSynchronizeForMergeCommit({
@@ -280,6 +297,21 @@ export async function handlePullRequestCodeReview(
       );
     }
 
+    // 5b. Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
+    // (dependabot/renovate/etc.) — high-volume, low-value dependency bumps otherwise consume review
+    // compute and clutter the PR. Configurable per org via `skip_bot_pull_requests` (see the
+    // decision computed before step 4). Applies to standard and council reviews; manual reviews
+    // never reach this handler. Runs AFTER supersession (step 5) so a bot push still cancels any
+    // stale in-flight review and resolves its check run, instead of leaving it stuck.
+    if (isBotPullRequestSkip) {
+      logExceptInTest('Skipping bot-authored PR:', {
+        pr_number: pull_request.number,
+        repo: repository.full_name,
+        author: pull_request.user.login,
+      });
+      return NextResponse.json({ message: 'Skipped bot-authored PR' }, { status: 200 });
+    }
+
     // 6. Check for duplicate review (same repo, PR, SHA)
     const existingReview = await findExistingReview(reviewScope, pull_request.head.sha);
 
@@ -297,9 +329,52 @@ export async function handlePullRequestCodeReview(
       );
     }
 
+    // 6b. Decide standard vs council for this automated review. Council is a per-repo opt-in and
+    // requires an active council config + entitlement. The entitlement lookup is a DB call, so it
+    // is gated behind the two cheap local checks (most webhooks are standard and skip it). Falls
+    // back to 'standard' if any condition is missing, so a bad/absent council config never blocks.
+    const councilConfigActive = isCouncilActive(config.council);
+    const councilEnabledForRepo =
+      Array.isArray(config.council_enabled_repository_ids) &&
+      config.council_enabled_repository_ids.includes(repository.id);
+    const councilEntitled =
+      councilConfigActive && councilEnabledForRepo ? await isCouncilEntitledForOwner(owner) : false;
+    // Hard, code-owned facts that can veto council even when it is otherwise available. Bot type and
+    // fork origin are GitHub-authoritative (not author-controlled), so they cannot be spoofed to
+    // reach the expensive council path.
+    const prFacts: AutomatedReviewPrFacts = {
+      isDraft: pull_request.draft ?? false,
+      isBot: pull_request.user.type === 'Bot',
+      isFork: checkoutRef.isForkPr,
+      author: pull_request.user.login,
+      labels: (pull_request.labels ?? []).map(label => label.name),
+    };
+    const councilSelection = { requiredLabels: config.council?.required_labels };
+    const reviewType = determineAutomatedReviewType(prFacts, {
+      councilEntitled,
+      councilConfigActive,
+      councilEnabledForRepo,
+      selection: councilSelection,
+    });
+    if (
+      councilEntitled &&
+      councilConfigActive &&
+      councilEnabledForRepo &&
+      reviewType !== 'council'
+    ) {
+      // Council was available but downgraded; record why (a hard exclude or a selection gate).
+      const downgradeReason =
+        councilHardExcludeReason(prFacts) ?? councilSelectionSkipReason(prFacts, councilSelection);
+      logExceptInTest(
+        `Council downgraded for ${repository.full_name}#${pull_request.number}: ${downgradeReason}`,
+        { pr_number: pull_request.number, repo: repository.full_name, reason: downgradeReason }
+      );
+    }
+
     // 7. Create review record (session_id will be updated async)
     const reviewId = await createCodeReview({
       owner,
+      reviewType,
       platformIntegrationId: integration.id,
       repoFullName: repository.full_name,
       prNumber: pull_request.number,

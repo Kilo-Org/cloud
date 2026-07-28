@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
   Pencil,
+  LoaderCircle,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TimeAgo } from '@/components/shared/TimeAgo';
@@ -107,6 +108,7 @@ type ChatSidebarProps = {
   currentSessionId?: string;
   organizationId?: string;
   onDeleteSession?: (sessionId: string) => void;
+  deletingSessionId?: string;
   onRenameSession?: (sessionId: string, title: string) => Promise<void>;
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
@@ -125,6 +127,7 @@ function SessionRow({
   isActive,
   isLive,
   onDeleteSession,
+  isDeleting,
   onStartRename,
   isEditing,
   editTitle,
@@ -137,6 +140,7 @@ function SessionRow({
   isActive: boolean;
   isLive: boolean;
   onDeleteSession?: (sessionId: string) => void;
+  isDeleting: boolean;
   onStartRename?: () => void;
   isEditing: boolean;
   editTitle: string;
@@ -179,11 +183,12 @@ function SessionRow({
 
   return (
     <div
-      onClick={isEditing ? undefined : onClick}
+      onClick={isEditing || isDeleting ? undefined : onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
         'hover:bg-accent cursor-pointer rounded-lg text-sm transition-colors',
+        isDeleting && 'cursor-wait opacity-60',
         isActive && 'bg-accent font-medium'
       )}
     >
@@ -202,7 +207,12 @@ function SessionRow({
             <span className="line-clamp-1 min-w-0 flex-1 leading-snug">{session.prompt}</span>
             <SessionPrIndicator session={session} />
             <span className="relative flex w-6 shrink-0 justify-end">
-              {shouldReplaceTime ? (
+              {isDeleting ? (
+                <LoaderCircle
+                  className="text-muted-foreground h-4 w-4 animate-spin"
+                  aria-label="Deleting session"
+                />
+              ) : shouldReplaceTime ? (
                 <span
                   className={cn(
                     'flex h-4 w-4 items-center justify-center',
@@ -226,7 +236,7 @@ function SessionRow({
                   <TimeAgo timestamp={session.updatedAt} compact />
                 </span>
               )}
-              {(onDeleteSession || onStartRename) && (
+              {!isDeleting && (onDeleteSession || onStartRename) && (
                 <span
                   className={cn(
                     'absolute inset-y-0 right-0 flex items-center',
@@ -257,7 +267,10 @@ function SessionRow({
                       {onDeleteSession && (
                         <DropdownMenuItem
                           variant="destructive"
-                          onClick={() => onDeleteSession(session.sessionId)}
+                          onClick={e => {
+                            e.stopPropagation();
+                            onDeleteSession(session.sessionId);
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete session
@@ -311,6 +324,7 @@ export function ChatSidebar({
   currentSessionId,
   organizationId,
   onDeleteSession,
+  deletingSessionId,
   onRenameSession,
   isInSheet = false,
   activeSessions = [],
@@ -594,6 +608,7 @@ export function ChatSidebar({
                     isLive={activeSessionIds.has(session.sessionId)}
                     onDeleteSession={onDeleteSession}
                     onStartRename={onRenameSession ? () => handleStartRename(session) : undefined}
+                    isDeleting={deletingSessionId === session.sessionId}
                     isEditing={editingSessionId === session.sessionId}
                     editTitle={editTitle}
                     onEditTitleChange={setEditTitle}

@@ -54,6 +54,35 @@ describe('notificationPathForData', () => {
       })
     ).toBe('/(app)/agent-chat/ses_1?via=push');
   });
+
+  it('routes low_balance notifications to organization credit activity with via=push', () => {
+    expect(
+      notificationPathForData({
+        type: 'low_balance',
+        organizationId: 'org-abc',
+      })
+    ).toBe('/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-abc&via=push');
+  });
+
+  it('routes security_finding notifications for personal scope', () => {
+    expect(
+      notificationPathForData({
+        type: 'security_finding',
+        findingId: 'finding-1',
+        scope: 'personal',
+      })
+    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1?via=push');
+  });
+
+  it('routes security_finding notifications for an organization scope', () => {
+    expect(
+      notificationPathForData({
+        type: 'security_finding',
+        findingId: 'finding-2',
+        scope: 'org-xyz',
+      })
+    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-xyz/findings/finding-2?via=push');
+  });
 });
 
 describe('pushDataSchema', () => {
@@ -106,6 +135,57 @@ describe('pushDataSchema', () => {
         cliSessionId: 'ses_1',
       }).success
     ).toBe(true);
+  });
+
+  it('accepts valid low_balance and security_finding notification data', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'low_balance',
+        organizationId: 'org-abc',
+      }).success
+    ).toBe(true);
+    expect(
+      pushDataSchema.safeParse({
+        type: 'security_finding',
+        findingId: 'finding-1',
+        scope: 'personal',
+      }).success
+    ).toBe(true);
+    expect(
+      pushDataSchema.safeParse({
+        type: 'security_finding',
+        findingId: 'finding-2',
+        scope: 'org-xyz',
+      }).success
+    ).toBe(true);
+  });
+
+  it('parses low_balance and security_finding through the schema into notification paths', () => {
+    const lowBalance = pushDataSchema.parse({
+      type: 'low_balance',
+      organizationId: 'org-parsed',
+    });
+    expect(notificationPathForData(lowBalance)).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-parsed&via=push'
+    );
+
+    const personalFinding = pushDataSchema.parse({
+      type: 'security_finding',
+      findingId: 'f-parsed',
+      scope: 'personal',
+    });
+    expect(notificationPathForData(personalFinding)).toBe(
+      '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f-parsed?via=push'
+    );
+
+    const orgFinding = pushDataSchema.parse({
+      type: 'security_finding',
+      findingId: 'f-org',
+      scope: 'org-99',
+    });
+    expect(notificationPathForData(orgFinding)).toBe(
+      '/(app)/(tabs)/(3_profile)/security-agent/org-99/findings/f-org?via=push'
+    );
   });
 
   it('rejects empty cloud agent session IDs', () => {

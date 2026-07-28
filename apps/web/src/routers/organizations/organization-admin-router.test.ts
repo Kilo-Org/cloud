@@ -6,6 +6,7 @@ import {
   organization_seats_purchases,
   organization_memberships,
   kilo_pass_subscriptions,
+  platform_integrations,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -13,6 +14,7 @@ import { createOrganization, addUserToOrganization } from '@/lib/organizations/o
 import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { fetchExpiringTransactionsForOrganization } from '@/lib/creditExpiration';
 import type { User, Organization } from '@kilocode/db/schema';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 
 jest.mock('@/lib/organizations/organization-billing', () => ({
   getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_admin_org'),
@@ -49,6 +51,63 @@ describe('organization admin router', () => {
 
   afterAll(async () => {
     await db.delete(organizations).where(eq(organizations.id, testOrganization.id));
+  });
+
+  describe('getDetails', () => {
+    beforeEach(async () => {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, testOrganization.id));
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, testOrganization.id));
+    });
+
+    it('returns active organization integrations grouped by platform', async () => {
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_organization_id: testOrganization.id,
+          platform: PLATFORM.GITHUB,
+          integration_type: 'app',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          platform_installation_id: 'admin-details-github-1',
+        },
+        {
+          owned_by_organization_id: testOrganization.id,
+          platform: PLATFORM.GITHUB,
+          integration_type: 'app',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          platform_installation_id: 'admin-details-github-2',
+        },
+        {
+          owned_by_organization_id: testOrganization.id,
+          platform: PLATFORM.LINEAR,
+          integration_type: 'oauth',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          platform_installation_id: 'admin-details-linear',
+        },
+        {
+          owned_by_organization_id: testOrganization.id,
+          platform: PLATFORM.SLACK,
+          integration_type: 'oauth',
+          integration_status: INTEGRATION_STATUS.PENDING,
+          platform_installation_id: 'admin-details-slack',
+        },
+      ]);
+
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.organizations.admin.getDetails({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.integrations).toEqual([
+        { platform: PLATFORM.GITHUB, installation_count: 2 },
+        { platform: PLATFORM.LINEAR, installation_count: 1 },
+      ]);
+    });
   });
 
   describe('nullifyCredits', () => {

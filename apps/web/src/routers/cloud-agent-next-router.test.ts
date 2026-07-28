@@ -42,6 +42,14 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
   }) => Promise<{ signedUrl: string; key: string; expiresAt: string }>
 >(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
 
+const mockGenerateCloudAgentAttachmentDownloadUrl = jest.fn<
+  (input: { userId: string; messageUuid: string; filename: string }) => Promise<{
+    signedUrl: string;
+    key: string;
+    expiresAt: string;
+  }>
+>(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
+
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
 
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
@@ -125,6 +133,7 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
+  generateCloudAgentAttachmentDownloadUrl: mockGenerateCloudAgentAttachmentDownloadUrl,
 }));
 
 jest.mock('@/lib/cloud-agent/session-ownership', () => ({
@@ -163,6 +172,7 @@ let createCaller: (ctx: { user: User }) => {
     contentType: 'application/pdf';
     contentLength: number;
   }) => Promise<unknown>;
+  getAttachmentDownloadUrl: (input: { messageUuid: string; filename: string }) => Promise<unknown>;
   checkEligibility: () => Promise<{
     balance: number;
     minBalance: number;
@@ -358,6 +368,44 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
       contentType: 'application/pdf',
       contentLength: 42,
     });
+  });
+
+  it('presigns Cloud Agent attachment downloads with the caller-scoped key prefix', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    await caller.getAttachmentDownloadUrl({
+      messageUuid: '12345678-1234-4234-9234-123456789abc',
+      filename: '87654321-4321-4321-8321-cba987654321.kilo',
+    });
+
+    expect(mockGenerateCloudAgentAttachmentDownloadUrl).toHaveBeenCalledWith({
+      userId: 'user-1',
+      messageUuid: '12345678-1234-4234-9234-123456789abc',
+      filename: '87654321-4321-4321-8321-cba987654321.kilo',
+    });
+  });
+
+  it('rejects a deny-listed extension before reaching the presign helper', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.getAttachmentDownloadUrl({
+        messageUuid: '12345678-1234-4234-9234-123456789abc',
+        filename: '87654321-4321-4321-8321-cba987654321.exe',
+      })
+    ).rejects.toThrow();
+    expect(mockGenerateCloudAgentAttachmentDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it('rejects a filename that violates the relaxed-regex shape', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.getAttachmentDownloadUrl({
+        messageUuid: '12345678-1234-4234-9234-123456789abc',
+        filename: 'not-a-uuid.kilo',
+      })
+    ).rejects.toThrow();
+    expect(mockGenerateCloudAgentAttachmentDownloadUrl).not.toHaveBeenCalled();
   });
 });
 

@@ -6,6 +6,7 @@ import type {
   CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
+import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export const CLOUD_AGENT_REPORT_RETENTION_DAYS = 90;
 const CLOUD_AGENT_ERROR_RETENTION_DAYS = 30;
@@ -78,6 +79,8 @@ type StoredRunRow = {
   terminalAt: string | null;
   failureStage: string | null;
   failureCode: string | null;
+  failureResponsibility: string | null;
+  failureReason: string | null;
 };
 
 function retentionCutoff(now: string): string {
@@ -154,6 +157,8 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         terminalAt: cloud_agent_session_runs.terminal_at,
         failureStage: cloud_agent_session_runs.failure_stage,
         failureCode: cloud_agent_session_runs.failure_code,
+        failureResponsibility: cloud_agent_session_runs.failure_responsibility,
+        failureReason: cloud_agent_session_runs.failure_reason,
       })
       .from(cloud_agent_session_runs)
       .where(
@@ -179,6 +184,8 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         terminal_at: incoming.terminalAt ?? null,
         failure_stage: incoming.failureStage ?? null,
         failure_code: incoming.failureCode ?? null,
+        failure_responsibility: incoming.failureResponsibility ?? null,
+        failure_reason: incoming.failureReason ?? null,
         ...(diagnostic ?? {}),
       });
       return { outcome: 'applied' };
@@ -205,6 +212,17 @@ export function createCloudAgentReportStore(db: WorkerDb) {
       });
     }
     if (
+      incomingSameTerminal &&
+      existing.failureResponsibility !== null &&
+      incoming.failureResponsibility !== undefined &&
+      (existing.failureResponsibility !== incoming.failureResponsibility ||
+        existing.failureReason !== incoming.failureReason)
+    ) {
+      console.error('Conflicting Cloud Agent failure responsibility ignored', {
+        establishedStatus: existing.status,
+      });
+    }
+    if (
       existing.wrapperRunId !== null &&
       incoming.wrapperRunId !== undefined &&
       existing.wrapperRunId !== incoming.wrapperRunId
@@ -213,6 +231,9 @@ export function createCloudAgentReportStore(db: WorkerDb) {
     }
     const mayApplyTerminalFacts = !establishedTerminal && incomingTerminal;
     const mayFillTerminalFacts = mayApplyTerminalFacts || incomingSameTerminal;
+    const mayFillFailureResponsibility =
+      mayFillTerminalFacts &&
+      (existing.failureCode === null || existing.failureCode === incoming.failureCode);
     const status = establishedTerminal
       ? existing.status
       : incomingTerminal || incoming.status === 'accepted'
@@ -241,6 +262,12 @@ export function createCloudAgentReportStore(db: WorkerDb) {
           existing.failureStage ?? (mayFillTerminalFacts ? (incoming.failureStage ?? null) : null),
         failure_code:
           existing.failureCode ?? (mayFillTerminalFacts ? (incoming.failureCode ?? null) : null),
+        failure_responsibility:
+          existing.failureResponsibility ??
+          (mayFillFailureResponsibility ? (incoming.failureResponsibility ?? null) : null),
+        failure_reason:
+          existing.failureReason ??
+          (mayFillFailureResponsibility ? (incoming.failureReason ?? null) : null),
         ...(mayFillTerminalFacts ? (diagnostic ?? {}) : {}),
       })
       .where(
@@ -328,6 +355,11 @@ export function createCloudAgentReportStore(db: WorkerDb) {
       rawInput: z.input<typeof recordSessionFailureSchema>
     ): Promise<MutationResult> {
       const input = recordSessionFailureSchema.parse(rawInput);
+      const classification = classifyCloudAgentFailure({
+        source: 'setup',
+        stage: input.failure.stage,
+        code: input.failure.code,
+      });
       let applied = false;
       const result = await withReportingSessionLock(db, input.cloudAgentSessionId, async tx => {
         const rows = await tx
@@ -336,6 +368,8 @@ export function createCloudAgentReportStore(db: WorkerDb) {
             failure_at: input.occurredAt,
             failure_stage: input.failure.stage,
             failure_code: input.failure.code,
+            failure_responsibility: classification.responsibility,
+            failure_reason: classification.reason,
             ...(input.diagnostic
               ? {
                   error_message_redacted: input.diagnostic.errorMessageRedacted,

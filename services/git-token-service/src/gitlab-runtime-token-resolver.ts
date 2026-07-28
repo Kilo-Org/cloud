@@ -77,7 +77,7 @@ type GitLabCandidateEvaluation =
   | { status: 'lookup_failed' }
   | { status: 'token_failed'; failure: GetGitLabTokenFailure };
 
-const GitLabProjectIdentitySchema = z.object({ id: z.number().int().positive() }).strict();
+const GitLabProjectIdentitySchema = z.object({ id: z.number().int().positive() });
 const MAX_PROJECT_LOOKUP_RESPONSE_BYTES = 16_000;
 
 function mapCredentialFailure(status: string, project = false): GetGitLabTokenFailure {
@@ -161,10 +161,7 @@ async function evaluateGitLabProjectTokenCandidate(
   match: GitLabRepositoryMatch,
   resolver: GitLabCredentialResolver
 ): Promise<GitLabCandidateEvaluation> {
-  if (
-    (!match.metadata.project_tokens || Object.keys(match.metadata.project_tokens).length === 0) &&
-    resolver.hasProjectCredentialCandidates
-  ) {
+  if (resolver.hasProjectCredentialCandidates) {
     try {
       if (!(await resolver.hasProjectCredentialCandidates(params, match.integrationId))) {
         return { status: 'ruled_out' };

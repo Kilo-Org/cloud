@@ -1,7 +1,6 @@
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   selectSessionPaginationHeaderRenderModel,
@@ -31,18 +30,6 @@ export function SessionPaginationHeader({
 
   if (model.kind === 'hidden') {
     return null;
-  }
-
-  if (model.kind === 'loading') {
-    return (
-      <View
-        testID={model.testID}
-        className="items-start gap-1 px-4 py-2"
-        accessibilityRole={model.accessibilityRole}
-      >
-        <Skeleton className="h-16 w-3/4 rounded-2xl rounded-tl-sm" />
-      </View>
-    );
   }
 
   if (model.kind === 'retryable') {

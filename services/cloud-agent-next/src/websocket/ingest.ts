@@ -34,12 +34,19 @@ import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
 import type { TerminalizeParams } from '../session/session-message-state.js';
-import { classifyAssistantFailureMessage } from '../session/safe-failure-projection.js';
+import {
+  classifyAssistantFailure,
+  classifyAssistantFailureMessage,
+} from '../session/safe-failure-projection.js';
 import { parseModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
 import {
   cloudStatusForPreparingEvent,
   materializePreparationEvent,
 } from '../session/preparation-history.js';
+import {
+  classifyAttentionKilocodeEvent,
+  type AttentionEvent,
+} from './ingest-attention-classifier.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -257,6 +264,14 @@ export type IngestDOContext = {
   ) => Promise<void>;
   /** Persist the slash-command catalog so connecting clients can be hydrated. */
   setAvailableCommands: (commands: SlashCommandInfo[]) => Promise<void>;
+  /**
+   * Optional callback invoked for qualifying question/permission kilocode
+   * events. Synchronous/fire-and-forget; the DO owns any `waitUntil` for
+   * external notification IO. Duplicate snapshot replays call it again
+   * and dedup is the notification dispatch's job (idempotency key on
+   * `executionId`), not this hook's.
+   */
+  onAttentionEvent?: (event: AttentionEvent) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -743,6 +758,10 @@ export function createIngestHandler(
               }
             );
             ws.serializeAttachment(attachment);
+            const attention = classifyAttentionKilocodeEvent(ingestEvent.data);
+            if (attention) {
+              doContext.onAttentionEvent?.(attention);
+            }
           } else {
             console.warn('Invalid kilocode event payload');
           }
@@ -764,6 +783,7 @@ export function createIngestHandler(
             if (parentMessageId !== undefined) {
               await doContext.observeCorrelatedAgentActivity?.(parentMessageId);
               if (assistantError !== undefined) {
+                const assistantFailure = classifyAssistantFailure(assistantError);
                 await doContext.terminalizeSessionMessageOnce(
                   parentMessageId,
                   {
@@ -771,7 +791,11 @@ export function createIngestHandler(
                     assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
                     reason: 'assistant_error',
                     error: assistantError,
-                    safeFailureMessage: classifyAssistantFailureMessage(assistantError),
+                    failureStage: 'agent_activity',
+                    failureCode: assistantFailure.terminalCode ?? 'assistant_error',
+                    assistantFailureReason: assistantFailure.reason,
+                    providerOwnership: assistantFailure.providerOwnership,
+                    safeFailureMessage: assistantFailure.safeMessage,
                     completionSource: 'assistant_message_event',
                   },
                   wrapperRunId

@@ -5,22 +5,25 @@
  * web app and the `code-review-infra` worker can import it without duplicating logic.
  *
  * Scope: the settled, capture-agnostic pieces — the code-owned governance DECISION,
- * the per-specialist result contract (vote + findings), the single-session combined
- * result manifest + parser, the display-only governance marker, specialist presets,
- * and the automated review-type stub. Prompt builders (web) and execution wiring
- * (worker/DO, runtimeAgents) live with their callers, not here.
+ * the per-specialist result contract (findings only; votes are DERIVED), the single-session
+ * combined result manifest + parser, specialist presets, and the automated review-type stub.
+ * Prompt builders (web) and execution wiring (worker/DO, runtimeAgents) live with their
+ * callers, not here.
  *
- * The council runs as ONE cloud-agent session: an orchestrator delegates to one
- * sub-agent per specialist (each pinned to its own model via `runtimeAgents[]`), then
- * relays every specialist's structured result in its final message. Our code — never
- * the model — computes the decision from the collected votes.
+ * v2: the model reports FACTS only (findings + a fixed severity per finding). Code derives
+ * each specialist's BINARY vote (any critical finding → block), then computes the aggregate
+ * decision per the governance mode (advisory → no decision; unanimous/majority → block/pass).
+ * The model never authors a vote, decision, or verdict.
  */
 
 import * as z from 'zod';
 import {
+  COUNCIL_BLOCKING_SEVERITY,
+  COUNCIL_FINDING_SEVERITIES,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
   CouncilFindingSchema,
-  CouncilVoteSchema,
   type CodeReviewCouncilConfig,
+  type CodeReviewCouncilResult,
   type CodeReviewType,
   type CouncilAggregationStrategy,
   type CouncilFinding,
@@ -30,85 +33,92 @@ import {
 } from '@kilocode/db/schema-types';
 
 // ============================================================================
-// Governance decision (code-owned, deterministic)
+// Governance decision (code-owned, deterministic) — v2
 // ============================================================================
 
-/** A specialist's vote as seen by aggregation. */
+/** A specialist's BINARY vote as seen by aggregation (code-derived, never model-authored). */
 export type SpecialistVote = { specialistId: string; vote: CouncilVote };
 
+// Ranking derived from the canonical scale (index 0 = most severe) so it can never drift from
+// COUNCIL_FINDING_SEVERITIES: extend/reorder the scale and the ranking follows automatically.
+// Off-scale labels rank 0 (below the whole scale).
+const SEVERITY_RANK: Record<string, number> = Object.fromEntries(
+  COUNCIL_FINDING_SEVERITIES.map((severity, index) => [
+    severity,
+    COUNCIL_FINDING_SEVERITIES.length - index,
+  ])
+);
+
+function severityRank(severity: string): number {
+  return SEVERITY_RANK[severity.trim().toLowerCase()] ?? 0;
+}
+
+/** Whether a finding severity counts as BLOCKING (the canonical `COUNCIL_BLOCKING_SEVERITY`).
+ * Case/space-insensitive. */
+export function isBlockingSeverity(severity: string | null | undefined): boolean {
+  return (severity ?? '').trim().toLowerCase() === COUNCIL_BLOCKING_SEVERITY;
+}
+
 /**
- * Computes the council governance decision from the collected specialist votes using
- * the selected strategy. This is the deterministic, code-owned replacement for asking
- * the model to compute the decision. The semantics MUST stay in lockstep with
- * `describeAggregationStrategy` (the prompt text the specialists/orchestrator see).
+ * The highest-severity label present in a specialist's findings (original casing preserved),
+ * or null if there are none. Ranks off the canonical scale; unknown labels rank lowest.
+ */
+export function highestSeverityOf(findings: readonly CouncilFinding[]): string | null {
+  let top: string | null = null;
+  let topRank = 0;
+  for (const finding of findings) {
+    const rank = severityRank(finding.severity);
+    if (rank > topRank || (rank === 0 && top === null)) {
+      topRank = rank;
+      top = finding.severity;
+    }
+  }
+  return top;
+}
+
+/**
+ * Derives a specialist's BINARY vote from its findings — code-owned, never model-authored.
+ * Any finding at the blocking severity (`critical`) → `block`; otherwise (including zero
+ * findings — "I ran and found nothing") → `pass`. This is the "a member votes yes/no, not
+ * 'warning'" rule: severity is the model's judgment, the vote follows deterministically.
+ */
+export function deriveSpecialistVote(findings: readonly CouncilFinding[]): CouncilVote {
+  return findings.some(finding => isBlockingSeverity(finding.severity)) ? 'block' : 'pass';
+}
+
+/**
+ * Computes the aggregate council decision from the collected BINARY specialist votes.
+ * Only the enforcing modes are valid here ('unanimous' | 'majority'); 'advisory' produces
+ * NO decision and is handled by `decideCouncilFromManifest`.
  *
- * Abstain semantics (deliberate): a returned `abstain` vote is treated leniently — it
- * is NOT counted under `any_blocking_member` or `majority` (so a specialist that ran
- * but had nothing to flag does not force a block), and only `unanimous_required`
- * blocks on it. The one universal guard is total no-coverage: if there is no usable
- * vote at all (empty, or every specialist abstained), the decision is `block` for
- * every strategy (never pass on absent coverage).
+ * - `unanimous` — block unless every specialist voted pass (any block → block). Strict.
+ * - `majority`  — block only when block votes outnumber pass votes. Lenient (ties → pass).
  *
- * IMPORTANT: this operates only on the votes it is GIVEN. It does NOT know which
- * specialists were configured, so it cannot detect a missing/dropped specialist. That
- * coverage-integrity guard (missing configured specialist → block regardless of
- * strategy) lives in `decideCouncilFromManifest`, which callers should use when
- * deciding from a captured manifest.
+ * Empty votes → `block` (never pass on absent coverage). Missing-configured-specialist
+ * coverage is enforced separately in `decideCouncilFromManifest`.
  */
 export function computeCouncilDecision(
   votes: readonly SpecialistVote[],
-  strategy: CouncilAggregationStrategy
+  strategy: Exclude<CouncilAggregationStrategy, 'advisory'>
 ): CouncilVote {
-  const counts = { pass: 0, warn: 0, block: 0, abstain: 0 } satisfies Record<CouncilVote, number>;
-  for (const { vote } of votes) counts[vote]++;
-
-  // No usable signal (empty, or every specialist abstained) => never pass.
-  if (counts.pass + counts.warn + counts.block === 0) return 'block';
-
-  const anyWarn = counts.warn > 0;
-
+  if (votes.length === 0) return 'block'; // no usable coverage → never pass
+  const blockCount = votes.filter(vote => vote.vote === 'block').length;
+  const passCount = votes.length - blockCount;
   switch (strategy) {
-    case 'majority': {
-      if (counts.block > counts.pass) return 'block';
-      return anyWarn ? 'warn' : 'pass';
-    }
-    case 'unanimous_required': {
-      if (counts.block > 0 || counts.abstain > 0) return 'block';
-      return anyWarn ? 'warn' : 'pass';
-    }
-    case 'any_blocking_member':
-    default: {
-      if (counts.block > 0) return 'block';
-      return anyWarn ? 'warn' : 'pass';
-    }
+    case 'majority':
+      return blockCount > passCount ? 'block' : 'pass';
+    case 'unanimous':
+    default:
+      return blockCount > 0 ? 'block' : 'pass';
   }
 }
 
 /**
- * Whether a governance decision should block merge. `block` always blocks; `warn` is
- * non-blocking here (warning-as-blocking is a separate gate-threshold policy).
+ * Whether a governance decision should block merge. `block` blocks; `pass` and `null`
+ * (advisory — no verdict) do not.
  */
-export function councilDecisionBlocksMerge(decision: CouncilVote): boolean {
+export function councilDecisionBlocksMerge(decision: CouncilVote | null): boolean {
   return decision === 'block';
-}
-
-/** Human-readable governance rule text so the orchestrator applies the SELECTED strategy.
- * Every configured specialist is a voting member; all votes count equally. Keep the
- * wording in lockstep with `computeCouncilDecision`. */
-export function describeAggregationStrategy(strategy: CouncilAggregationStrategy): string {
-  // Every strategy blocks when there is no usable coverage (no votes at all, or every
-  // specialist abstained) — this MUST match the guard in `computeCouncilDecision`.
-  const noCoverageRule =
-    ' If no specialist produced a usable vote (all abstained, or no votes at all), the decision is block.';
-  switch (strategy) {
-    case 'majority':
-      return `Majority: count votes across all specialists. If block votes outnumber pass votes, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
-    case 'unanimous_required':
-      return `Unanimous: every specialist must vote pass. If any specialist voted block or abstain, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
-    case 'any_blocking_member':
-    default:
-      return `Any blocking member: if any specialist voted block, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
-  }
 }
 
 // ============================================================================
@@ -124,15 +134,19 @@ export { CouncilFindingSchema as CouncilSpecialistFindingSchema } from '@kilocod
 export type CouncilSpecialistFinding = CouncilFinding;
 
 /**
- * One specialist's structured result. STRICT only on `vote` (the load-bearing value
- * the code-side decision depends on); findings + severity are lenient. `findings` is
- * the full list surfaced in the Kilo UI and published to the PR.
+ * One specialist's structured result (v2). The model reports ONLY facts: `findings` (each
+ * with a severity from the canonical scale). It does NOT report a vote — the vote is
+ * code-derived from the findings (`deriveSpecialistVote`), as is `highestSeverity`. `findings`
+ * is required and severities must be on-scale (both fail closed if not); only `model` is
+ * lenient (a missing model does not invalidate the manifest).
  */
 export const CouncilSpecialistResultSchema = z.object({
   specialistId: z.string().min(1).max(64),
-  vote: CouncilVoteSchema,
-  highestSeverity: z.string().max(64).nullable().optional(),
-  findings: z.array(CouncilFindingSchema).max(200).default([]),
+  // REQUIRED (no default): an entry must explicitly carry its findings array — `[]` means
+  // "reviewed, nothing blocking" (→ pass). A missing `findings` key is ambiguous (truncated
+  // report vs. clean) and must NOT silently derive to pass, so it invalidates the manifest →
+  // the decision fails closed. The coordinator prompt requires `findings` on every entry.
+  findings: z.array(CouncilFindingSchema).max(200),
   // Best-effort: the concrete model this specialist actually ran on, as reported back by
   // the specialist itself. We assign a model per specialist, but an "auto" slug (e.g.
   // `kilo-auto/...`) resolves to a concrete model at runtime inside cloud-agent-next, which
@@ -144,10 +158,10 @@ export type CouncilSpecialistResult = z.infer<typeof CouncilSpecialistResultSche
 
 /**
  * Marker tag for the single-session combined council manifest. The orchestrator emits
- * ONE of these in its final message, carrying every specialist's result. (One marker
- * + strict schema is more deterministic than N scattered per-specialist markers.)
+ * ONE of these in its final message, carrying every specialist's findings. v2 dropped the
+ * model-authored `vote` (code derives it), so the shape changed → the tag version bumped.
  */
-export const COUNCIL_RESULT_MARKER_TAG = 'kilo-code-review-council:v1';
+export const COUNCIL_RESULT_MARKER_TAG = 'kilo-code-review-council:v2';
 
 /** Hard cap on the manifest JSON payload (UTF-8 bytes) to bound parsing cost. */
 export const COUNCIL_RESULT_MAX_BYTES = 128 * 1024;
@@ -350,14 +364,15 @@ export type CouncilSpecialistSummary = {
   findingsCount: number;
 };
 
-/** Summarizes each specialist's result (findings count included) for UI display. */
+/** Summarizes each specialist's result (findings count included) for UI display. Vote and
+ * highest severity are DERIVED from the findings (the model reports neither). */
 export function summarizeCouncilManifest(
   manifest: CouncilResultManifest
 ): CouncilSpecialistSummary[] {
   return manifest.specialists.map(specialist => ({
     specialistId: specialist.specialistId,
-    vote: specialist.vote,
-    highestSeverity: specialist.highestSeverity ?? null,
+    vote: deriveSpecialistVote(specialist.findings),
+    highestSeverity: highestSeverityOf(specialist.findings),
     findingsCount: specialist.findings.length,
   }));
 }
@@ -404,20 +419,21 @@ export function reconcileCouncilVotes(
   for (const specialist of manifest.specialists) {
     counts.set(specialist.specialistId, (counts.get(specialist.specialistId) ?? 0) + 1);
   }
-  const reported = new Map(manifest.specialists.map(s => [s.specialistId, s.vote]));
+  const reported = new Map(manifest.specialists.map(s => [s.specialistId, s]));
 
   const votes: SpecialistVote[] = [];
   const missingSpecialistIds: string[] = [];
   // Iterate the DEDUPED configured ids so a specialist is never counted more than once.
   for (const specialistId of configuredSeen) {
-    const vote = reported.get(specialistId);
+    const specialist = reported.get(specialistId);
     // Reliable coverage requires exactly one configured entry AND exactly one report.
     if (
       !duplicateConfigured.has(specialistId) &&
       counts.get(specialistId) === 1 &&
-      vote !== undefined
+      specialist !== undefined
     ) {
-      votes.push({ specialistId, vote });
+      // The vote is DERIVED from the reported findings, never model-authored.
+      votes.push({ specialistId, vote: deriveSpecialistVote(specialist.findings) });
     } else {
       missingSpecialistIds.push(specialistId);
     }
@@ -425,9 +441,9 @@ export function reconcileCouncilVotes(
   return { votes, missingSpecialistIds };
 }
 
-/** A council decision plus the coverage that produced it. */
+/** A council decision plus the coverage that produced it. `decision` is null in advisory mode. */
 export type CouncilDecision = {
-  decision: CouncilVote;
+  decision: CouncilVote | null;
   votes: SpecialistVote[];
   missingSpecialistIds: string[];
 };
@@ -452,6 +468,10 @@ export function decideCouncilFromManifest(
   strategy: CouncilAggregationStrategy
 ): CouncilDecision {
   const { votes, missingSpecialistIds } = reconcileCouncilVotes(configuredSpecialistIds, manifest);
+  // Advisory: report the derived votes but compute NO aggregate verdict and no gate.
+  if (strategy === 'advisory') {
+    return { decision: null, votes, missingSpecialistIds };
+  }
   if (missingSpecialistIds.length > 0) {
     return { decision: 'block', votes, missingSpecialistIds };
   }
@@ -462,57 +482,9 @@ export function decideCouncilFromManifest(
   };
 }
 
-// ============================================================================
-// Governance marker (display-only human-readable summary)
-// ============================================================================
-
-/** Marker tag for the human-readable governance summary. Display-only: it is NOT the
- * source of the decision (our code computes that via `computeCouncilDecision`). */
-export const GOVERNANCE_MARKER_TAG = 'kilo-review-governance:v1';
-
-const GovernanceMemberSchema = z.object({
-  id: z.string(),
-  vote: CouncilVoteSchema,
-  // Display-only label; accept any wording the model emits (e.g. "low", "info",
-  // "none") so a severity vocabulary mismatch never rejects the whole marker.
-  highestSeverity: z
-    .string()
-    .max(50)
-    .nullable()
-    .optional()
-    .transform(value => (value && value.toLowerCase() !== 'none' ? value : null)),
-  reason: z.string().max(1000).optional(),
-});
-
-// The overall `decision` is deliberately NOT part of this schema: it is code-owned
-// (`computeCouncilDecision`), and a model-authored decision here could contradict it in
-// the UI. Consumers render the per-member votes from this marker and inject the computed
-// decision. Any `decision` key the model emits is ignored (non-strict object strips it).
-export const GovernanceSchema = z.object({
-  members: z.array(GovernanceMemberSchema).max(8),
-});
-export type Governance = z.infer<typeof GovernanceSchema>;
-export type GovernanceMember = z.infer<typeof GovernanceMemberSchema>;
-
-/**
- * Extracts and validates the display-only governance marker (per-member votes/reasons)
- * from an assistant message. Returns null when absent or malformed. This drives display
- * only; the overall merge decision comes from `computeCouncilDecision`, never from here.
- */
-export function parseGovernanceMarker(text: string | null | undefined): Governance | null {
-  if (!text) return null;
-  // Same line-anchored, brace-aware, size-capped extraction as the manifest parser.
-  const { json } = extractLastMarkerJson(text, GOVERNANCE_MARKER_TAG);
-  if (json === null) return null;
-  if (utf8ByteLengthExceeds(json, COUNCIL_RESULT_MAX_BYTES)) return null;
-  try {
-    const parsed: unknown = JSON.parse(json);
-    const result = GovernanceSchema.safeParse(parsed);
-    return result.success ? result.data : null;
-  } catch {
-    return null;
-  }
-}
+// (v1's display-only "kilo-review-governance:v1" marker was removed in v2: the model no
+// longer authors votes/decisions, so there is nothing model-reported to render from a
+// separate marker. Per-specialist votes are DERIVED from the manifest findings.)
 
 // ============================================================================
 // Council config helpers
@@ -537,15 +509,143 @@ export function isCouncilActive(council: CodeReviewCouncilConfig | undefined | n
 }
 
 const AGGREGATION_STRATEGY_LABELS: Record<CouncilAggregationStrategy, string> = {
-  any_blocking_member: 'Any blocking member',
+  advisory: 'Advisory (report only)',
+  unanimous: 'Unanimous',
   majority: 'Majority',
-  unanimous_required: 'Unanimous required',
 };
 
-/** Display label for an aggregation strategy (falls back to the default label). */
+/** Display label for a governance mode (falls back to the safe-default label). */
 export function formatAggregationStrategy(strategy: string | null | undefined): string {
-  if (!strategy) return AGGREGATION_STRATEGY_LABELS.any_blocking_member;
+  if (!strategy) return AGGREGATION_STRATEGY_LABELS[DEFAULT_COUNCIL_AGGREGATION_STRATEGY];
   return AGGREGATION_STRATEGY_LABELS[strategy as CouncilAggregationStrategy] ?? strategy;
+}
+
+// ============================================================================
+// PR summary Council Review section (code-owned, injected into the review comment)
+// ============================================================================
+
+/** Delimiters for the code-owned Council Review section injected into the PR summary comment. */
+export const COUNCIL_VERDICT_BLOCK_START = '<!-- kilo-council-verdict:start -->';
+export const COUNCIL_VERDICT_BLOCK_END = '<!-- kilo-council-verdict:end -->';
+
+/** Leading marker every Kilo review summary comment carries; the section is inserted after it. */
+const KILO_REVIEW_COMMENT_MARKER = '<!-- kilo-review -->';
+
+/** One-line explanation of what each governance mode does, shown as an info line in the section. */
+const GOVERNANCE_EXPLANATIONS: Record<CouncilAggregationStrategy, string> = {
+  advisory: 'the council reports findings but does not decide a merge verdict',
+  unanimous: 'every specialist must pass; a single blocking vote blocks the merge',
+  majority: 'the merge is blocked when blocking votes outnumber passing votes',
+};
+
+/**
+ * Escapes a value for safe use inside a single markdown table cell. Backslashes are escaped
+ * FIRST (before pipes), otherwise a pre-existing backslash in the input would consume the
+ * escape we add to a following pipe and let the pipe break out of the cell.
+ */
+function escapeTableCell(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+}
+
+/**
+ * The full, code-owned `## Council Review` section injected into the PR summary comment: the
+ * governance decision, a per-specialist table, and a governance-mode info line. Everything here
+ * is derived from `council_result` — the model never authors any of it, so the decision on the
+ * PR always matches the stored result.
+ *
+ * `options.gates` states whether this review actually enforces a merge gate. Manual runs report
+ * the decision but do NOT block merge (no check run), so a blocking decision is phrased as
+ * "would block merge" with an explicit caveat; automated runs (a gate check carries the verdict)
+ * are phrased as "merge blocked".
+ */
+export function buildCouncilReviewSection(
+  result: CodeReviewCouncilResult,
+  options: { gates: boolean }
+): string {
+  const blockVotes = result.specialists.filter(s => s.vote === 'block').length;
+  const passVotes = result.specialists.filter(s => s.vote === 'pass').length;
+  const noResult = result.specialists.filter(s => s.vote === null).length;
+
+  const tally = [
+    `${blockVotes} block`,
+    `${passVotes} pass`,
+    ...(noResult > 0 ? [`${noResult} no result`] : []),
+  ].join(', ');
+
+  const governanceLabel = formatAggregationStrategy(result.aggregationStrategy);
+
+  let decisionLine: string;
+  let detailLine: string;
+  if (result.decision === 'block') {
+    decisionLine = `**Decision: ${options.gates ? 'Merge blocked' : 'Would block merge'}** (${governanceLabel} governance)`;
+    detailLine = options.gates
+      ? 'Merge is blocked until the blocking findings are addressed.'
+      : 'This manual review reports the decision but does not block merge. An automated review with this decision would block merge until the blocking findings are addressed.';
+  } else if (result.decision === 'pass') {
+    decisionLine = `**Decision: Approved** (${governanceLabel} governance)`;
+    // Under majority governance a pass can still carry blocking votes (they were outvoted); only
+    // claim "no blocking finding" when that is actually true, otherwise state the outvoted count.
+    detailLine =
+      blockVotes > 0
+        ? `${blockVotes} specialist${blockVotes === 1 ? '' : 's'} raised a blocking finding, but the passing votes carried the ${governanceLabel} decision.`
+        : 'No specialist raised a blocking finding.';
+  } else {
+    // Advisory: the governance label already reads "Advisory (report only)", so don't repeat it
+    // in the decision line — the governance-mode line below states it once.
+    decisionLine = '**Advisory review** — findings reported, no merge decision';
+    detailLine = 'Advisory mode records these votes but does not aggregate them into a decision.';
+  }
+
+  const tableRows = result.specialists
+    .map(
+      s =>
+        `| ${escapeTableCell(s.name)} | ${s.model ? escapeTableCell(s.model) : '—'} | ${s.highestSeverity ?? '—'} | ${s.findings.length} |`
+    )
+    .join('\n');
+
+  return [
+    '## Council Review',
+    '',
+    decisionLine,
+    '',
+    `Specialist votes: ${tally}. ${detailLine}`,
+    '',
+    '| Specialist | Model | Highest severity | Findings |',
+    '|------------|-------|------------------|----------|',
+    tableRows,
+    '',
+    '_Findings are counted per specialist; when specialists flag the same line their findings are grouped into one inline comment, so the inline comment count is lower than this total._',
+    `_Governance mode: ${governanceLabel} — ${GOVERNANCE_EXPLANATIONS[result.aggregationStrategy]}._`,
+  ].join('\n');
+}
+
+/**
+ * Idempotently inserts (or replaces) the code-owned Council Review section in a PR summary
+ * comment body. On re-runs the delimited block is replaced in place; otherwise it is inserted
+ * right after the leading `<!-- kilo-review -->` marker line (or prepended if that marker is
+ * absent). `section` is the block body from `buildCouncilReviewSection`.
+ */
+export function upsertCouncilVerdictInBody(body: string, section: string): string {
+  const block = `${COUNCIL_VERDICT_BLOCK_START}\n${section}\n${COUNCIL_VERDICT_BLOCK_END}`;
+
+  const startIdx = body.indexOf(COUNCIL_VERDICT_BLOCK_START);
+  if (startIdx !== -1) {
+    const endIdx = body.indexOf(COUNCIL_VERDICT_BLOCK_END, startIdx);
+    if (endIdx !== -1) {
+      const after = body.slice(endIdx + COUNCIL_VERDICT_BLOCK_END.length);
+      return `${body.slice(0, startIdx)}${block}${after}`;
+    }
+    // Start marker without a matching end (corrupted) — fall through and insert fresh.
+  }
+
+  const markerIdx = body.indexOf(KILO_REVIEW_COMMENT_MARKER);
+  if (markerIdx !== -1) {
+    const lineEnd = body.indexOf('\n', markerIdx);
+    const insertAt = lineEnd === -1 ? body.length : lineEnd;
+    return `${body.slice(0, insertAt)}\n\n${block}${body.slice(insertAt)}`;
+  }
+
+  return `${block}\n\n${body}`;
 }
 
 // ============================================================================
@@ -613,6 +713,10 @@ export function presetToSpecialist(preset: CouncilSpecialistPreset): CouncilSpec
  */
 export type AutomatedReviewPrFacts = {
   isDraft?: boolean;
+  // The PR is authored by a bot account (GitHub `user.type === 'Bot'`, e.g. dependabot/renovate).
+  isBot?: boolean;
+  // The PR head is a fork / cross-repo branch (the author does not have write access to the base).
+  isFork?: boolean;
   labels?: string[];
   baseRef?: string;
   changedFileCount?: number;
@@ -621,20 +725,103 @@ export type AutomatedReviewPrFacts = {
 };
 
 /**
- * Determines the review type for an AUTOMATED (webhook) run from PR facts.
+ * Code-owned reasons the COUNCIL review type is HARD-EXCLUDED for an automated run, regardless of
+ * config or entitlement. These are non-configurable abuse/cost floors, not customer choices:
+ * council is the expensive path, so untrusted or low-value PRs must never reach it. A hard-excluded
+ * PR still gets a `'standard'` review — this vetoes council only, it does not skip the review.
  *
- * STUB (intentional, phased plan): the real standard-vs-council determination is later
- * work — it must be configured/evaluated Kilo-side and resistant to SCM-side abuse (a
- * dev must not be able to force paid council reviews via a PR label). For now this is a
- * safe stub that always returns `'standard'`, so automated reviews behave exactly as
- * they do today. The plumbing (passing full PR facts + `councilAvailable`) is defined
- * here so the logic can be filled in at the webhook step without further wiring.
+ * - `draft`      — draft PRs are WIP; in practice the webhook handler skips them entirely before
+ *                  this runs, so this is a defensive belt-and-suspenders check.
+ * - `bot-author` — bot PRs (dependabot/renovate/etc.) are high-volume and low council value.
+ * - `fork-pr`    — fork / cross-repo PRs come from authors without base write access. On public
+ *                  repos this is the primary abuse vector: an external contributor must not be able
+ *                  to trigger the expensive council path (or spend the org's council budget) by
+ *                  opening/pushing PRs.
+ */
+export type CouncilHardExcludeReason = 'draft' | 'bot-author' | 'fork-pr';
+
+/**
+ * Returns the first hard-exclude reason that vetoes council for this PR, or `null` if none apply.
+ * Pure and code-owned (never driven by SCM-controlled input or org config); ordered cheapest and
+ * most-fundamental first. Returning the reason (not just a bool) lets callers log/surface WHY
+ * council was downgraded without re-deriving it.
+ */
+export function councilHardExcludeReason(
+  facts: AutomatedReviewPrFacts
+): CouncilHardExcludeReason | null {
+  if (facts.isDraft) return 'draft';
+  if (facts.isBot) return 'bot-author';
+  if (facts.isFork) return 'fork-pr';
+  return null;
+}
+
+/**
+ * Customer-configured selection gates that further NARROW which eligible PRs get council. Unlike
+ * the hard excludes, these are org config, not code-owned floors. Each gate can only restrict (a
+ * PR still has to be council-available and not hard-excluded first); a gate never widens who gets
+ * council and never overrides a hard exclusion.
+ */
+export type CouncilSelectionConfig = {
+  // When non-empty, council runs only for PRs carrying at least one of these labels (any-match,
+  // case-insensitive). Empty/absent = no label requirement (the gate is off).
+  requiredLabels?: string[];
+};
+
+/** Why a configured selection gate skipped council for this PR, or `null` if all gates passed. */
+export type CouncilSelectionSkipReason = 'missing-required-label';
+
+/**
+ * Returns the first configured selection gate that skips council for this PR, or `null` if every
+ * configured gate passes (or none are configured). Pure; ordered so cheaper gates fail first.
+ */
+export function councilSelectionSkipReason(
+  facts: AutomatedReviewPrFacts,
+  selection: CouncilSelectionConfig | undefined
+): CouncilSelectionSkipReason | null {
+  const required = (selection?.requiredLabels ?? [])
+    .map(label => label.trim().toLowerCase())
+    .filter(label => label.length > 0);
+  if (required.length > 0) {
+    const prLabels = new Set((facts.labels ?? []).map(label => label.trim().toLowerCase()));
+    if (!required.some(label => prLabels.has(label))) return 'missing-required-label';
+  }
+  return null;
+}
+
+/**
+ * Determines the review type for an AUTOMATED (webhook) run.
  *
+ * Plan A: an automated review runs the COUNCIL type only when ALL of these hold, otherwise it
+ * falls back to `'standard'` (fail-safe — a bad or missing council config never blocks reviews):
+ * - `councilEntitled` — the org is council-entitled (enterprise + active entitlement). This is
+ *   the abuse-resistant gate: it is decided Kilo-side, never from an SCM-controlled signal.
+ * - `councilConfigActive` — the org has a configured, active council (>= min specialists).
+ * - `councilEnabledForRepo` — the target repo explicitly opted in
+ *   (`config.council_enabled_repository_ids`). Council is per-repo opt-in, not org-wide.
+ *
+ * The decision is layered, cheapest/most-fundamental first, and any layer can fall back to
+ * `'standard'`:
+ *   1. council available (entitled + config active + repo opted in),
+ *   2. not hard-excluded (`councilHardExcludeReason`: draft/bot/fork — non-configurable floors),
+ *   3. passes every configured selection gate (`councilSelectionSkipReason`: labels, etc.).
+ * Hard excludes are evaluated before selection gates so no config can opt a PR past a floor.
  * Manual runs never call this — they carry an explicit user-selected review type.
  */
 export function determineAutomatedReviewType(
-  _prFacts: AutomatedReviewPrFacts,
-  _options: { councilAvailable: boolean }
+  prFacts: AutomatedReviewPrFacts,
+  options: {
+    councilEntitled: boolean;
+    councilConfigActive: boolean;
+    councilEnabledForRepo: boolean;
+    selection?: CouncilSelectionConfig;
+  }
 ): CodeReviewType {
-  return 'standard';
+  const councilAvailable =
+    options.councilEntitled && options.councilConfigActive && options.councilEnabledForRepo;
+  if (!councilAvailable) return 'standard';
+  // Hard, code-owned vetoes win over an otherwise-available council.
+  if (councilHardExcludeReason(prFacts)) return 'standard';
+  // Customer-configured gates narrow further (no-op when unconfigured).
+  if (councilSelectionSkipReason(prFacts, options.selection)) return 'standard';
+  return 'council';
 }

@@ -5,6 +5,10 @@ const drizzleMocks = vi.hoisted(() => ({
   migrate: vi.fn(),
 }));
 
+const dbClientMocks = vi.hoisted(() => ({
+  getWorkerDb: vi.fn(),
+}));
+
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
     ctx: unknown;
@@ -22,6 +26,10 @@ vi.mock('drizzle-orm/durable-sqlite', () => ({
 
 vi.mock('drizzle-orm/durable-sqlite/migrator', () => ({
   migrate: drizzleMocks.migrate,
+}));
+
+vi.mock('@kilocode/db/client', () => ({
+  getWorkerDb: dbClientMocks.getWorkerDb,
 }));
 
 import { SessionIngestDO, ingestOrderCursor } from './SessionIngestDO';
@@ -291,6 +299,26 @@ describe('SessionIngestDO session-ready push', () => {
   it('pushes on first claim and never again', async () => {
     const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
 
+    durableObject.claimSessionReadyPush('usr_push', 'ses_push', 'My title');
+    await settle();
+
+    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
+    expect(sendSessionReadyNotification).toHaveBeenCalledWith({
+      userId: 'usr_push',
+      cliSessionId: 'ses_push',
+      title: 'My title',
+    });
+
+    // Re-claims (CLI reconnect, UserConnectionDO eviction) must not re-push.
+    durableObject.claimSessionReadyPush('usr_push', 'ses_push', 'My title');
+    await settle();
+
+    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards an undefined title when none is supplied', async () => {
+    const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
+
     durableObject.claimSessionReadyPush('usr_push', 'ses_push');
     await settle();
 
@@ -298,13 +326,8 @@ describe('SessionIngestDO session-ready push', () => {
     expect(sendSessionReadyNotification).toHaveBeenCalledWith({
       userId: 'usr_push',
       cliSessionId: 'ses_push',
+      title: undefined,
     });
-
-    // Re-claims (CLI reconnect, UserConnectionDO eviction) must not re-push.
-    durableObject.claimSessionReadyPush('usr_push', 'ses_push');
-    await settle();
-
-    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
   });
 
   it('never pushes for a deleted session', async () => {
@@ -357,5 +380,241 @@ describe('SessionIngestDO session-ready push', () => {
     await settle();
 
     expect(sendSessionReadyNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
+  /**
+   * Pins: Postgres total_cost_microdollars persist runs before the unguarded
+   * O11Y.ingestSessionMetrics RPC. An O11Y rejection must not skip the persist.
+   */
+  function makeAlarmHarness(options: { totalCostDollars: number; o11yImpl: () => Promise<void> }) {
+    const operations: string[] = [];
+    const meta = new Map<string, string | null>([
+      ['kiloUserId', 'usr_cost'],
+      ['sessionId', 'ses_cost'],
+      ['closeReason', 'completed'],
+      ['ingestVersion', '3'],
+    ]);
+
+    const itemData = JSON.stringify({
+      role: 'assistant',
+      time: { created: 1000 },
+      tokens: { input: 100, output: 50, reasoning: 0, cache: { read: 0, write: 0 } },
+      cost: options.totalCostDollars,
+    });
+    const ingestItemRows = [{ item_type: 'message', item_data: itemData }];
+
+    type EqCondition = { queryChunks?: unknown[] };
+    /** Walk nested drizzle queryChunks (eq / and) and collect string Param values. */
+    const collectBoundStringParams = (condition: unknown, out: string[] = []): string[] => {
+      const chunks = (condition as EqCondition | undefined)?.queryChunks ?? [];
+      for (const chunk of chunks) {
+        if (chunk == null || typeof chunk !== 'object') continue;
+        const value = (chunk as { value?: unknown }).value;
+        if (typeof value === 'string') {
+          out.push(value);
+          continue;
+        }
+        // Nested SQL (e.g. and(eq(...), eq(...))) embeds child conditions as chunks.
+        if ('queryChunks' in (chunk as object)) {
+          collectBoundStringParams(chunk, out);
+        }
+      }
+      return out;
+    };
+    const extractEqValue = (condition: unknown): string | undefined => {
+      return collectBoundStringParams(condition)[0];
+    };
+
+    const selectQuery = {
+      from: vi.fn(() => selectQuery),
+      where: vi.fn((condition: unknown) => {
+        // Stash eq-bound key for .get(); .all() paths ignore it.
+        (selectQuery as { _key?: string })._key = extractEqValue(condition);
+        return selectQuery;
+      }),
+      orderBy: vi.fn(() => selectQuery),
+      get: vi.fn(() => {
+        const key = (selectQuery as { _key?: string })._key;
+        if (key === 'metricsEmitted') {
+          const value = meta.get('metricsEmitted');
+          return value === undefined ? undefined : { value };
+        }
+        if (key === 'model') {
+          return undefined;
+        }
+        // alarm() loads meta via select().from().where(inArray(...)).all()
+        // — handled by all() below. get() for other keys:
+        if (key !== undefined && meta.has(key)) {
+          return { value: meta.get(key) };
+        }
+        return undefined;
+      }),
+      all: vi.fn(() => {
+        // alarm meta load: returns rows with key/value
+        // emitSessionMetrics item load: returns item_type/item_data rows
+        // Distinguish by whether the last where bound a single eq key used for items.
+        // Simpler: track call site via select columns shape.
+        return (selectQuery as { _allKind?: 'meta' | 'items' })._allKind === 'items'
+          ? ingestItemRows
+          : [...meta.entries()].map(([key, value]) => ({ key, value }));
+      }),
+    };
+
+    const originalSelect = vi.fn((columns?: unknown) => {
+      if (
+        columns &&
+        typeof columns === 'object' &&
+        'item_type' in (columns as Record<string, unknown>)
+      ) {
+        (selectQuery as { _allKind?: 'meta' | 'items' })._allKind = 'items';
+      } else if (
+        columns &&
+        typeof columns === 'object' &&
+        'item_data' in (columns as Record<string, unknown>) &&
+        !('item_type' in (columns as Record<string, unknown>))
+      ) {
+        // model lookup: select({ item_data }).from().where(eq item_id 'model').get()
+        (selectQuery as { _allKind?: 'meta' | 'items' })._allKind = undefined;
+      } else if (
+        columns &&
+        typeof columns === 'object' &&
+        'value' in (columns as Record<string, unknown>)
+      ) {
+        // metricsEmitted check
+        (selectQuery as { _allKind?: 'meta' | 'items' })._allKind = undefined;
+      } else {
+        // bare select() for alarm meta
+        (selectQuery as { _allKind?: 'meta' | 'items' })._allKind = 'meta';
+      }
+      return selectQuery;
+    });
+
+    const db = {
+      select: originalSelect,
+      insert: vi.fn(() => ({
+        values: vi.fn((values: { key?: string; value?: string | null }) => ({
+          onConflictDoUpdate: vi.fn(() => ({
+            run: vi.fn(() => {
+              if (values.key !== undefined) {
+                meta.set(values.key, values.value ?? null);
+                operations.push(`meta:${values.key}:${values.value}`);
+              }
+            }),
+          })),
+        })),
+      })),
+      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+    };
+    drizzleMocks.db = db;
+
+    let persistedMicrodollars: number | undefined;
+    let pgWhereCondition: unknown;
+    let pgWhereBoundParams: string[] = [];
+    /**
+     * Record persist only when the drizzle chain is AWAITED (via .then), not when
+     * .where() is merely invoked. A build-now-await-later refactor must fail this test.
+     */
+    const pgWhere = vi.fn((condition: unknown) => {
+      pgWhereCondition = condition;
+      pgWhereBoundParams = collectBoundStringParams(condition);
+      return {
+        then(
+          onFulfilled?: ((value: unknown) => unknown) | null,
+          onRejected?: ((reason: unknown) => unknown) | null
+        ) {
+          operations.push('persist:total_cost_microdollars');
+          return Promise.resolve(undefined).then(onFulfilled, onRejected);
+        },
+      };
+    });
+    const pgSet = vi.fn((set: { total_cost_microdollars?: number }) => {
+      persistedMicrodollars = set.total_cost_microdollars;
+      return { where: pgWhere };
+    });
+    const pgUpdate = vi.fn(() => ({ set: pgSet }));
+    dbClientMocks.getWorkerDb.mockReset();
+    dbClientMocks.getWorkerDb.mockReturnValue({ update: pgUpdate });
+
+    const ingestSessionMetrics = vi.fn(async () => {
+      operations.push('o11y:ingestSessionMetrics');
+      return options.o11yImpl();
+    });
+
+    const deleteAlarm = vi.fn(async () => {
+      operations.push('deleteAlarm');
+    });
+    const state = {
+      storage: { setAlarm: vi.fn(), deleteAlarm },
+      blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
+    } as unknown as DurableObjectState;
+
+    const env = {
+      SESSION_INGEST_R2: { delete: vi.fn() },
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      O11Y: { ingestSessionMetrics },
+    } as never;
+
+    return {
+      durableObject: new SessionIngestDO(state, env),
+      operations,
+      ingestSessionMetrics,
+      pgSet,
+      pgWhere,
+      getWorkerDb: dbClientMocks.getWorkerDb,
+      get persistedMicrodollars() {
+        return persistedMicrodollars;
+      },
+      get pgWhereCondition() {
+        return pgWhereCondition;
+      },
+      get pgWhereBoundParams() {
+        return pgWhereBoundParams;
+      },
+      meta,
+      deleteAlarm,
+    };
+  }
+
+  it('persists total_cost_microdollars before O11Y when O11Y rejects', async () => {
+    const o11yError = new Error('o11y unavailable');
+    const harness = makeAlarmHarness({
+      totalCostDollars: 0.15,
+      o11yImpl: async () => {
+        throw o11yError;
+      },
+    });
+
+    await expect(harness.durableObject.alarm()).rejects.toThrow('o11y unavailable');
+
+    expect(harness.getWorkerDb).toHaveBeenCalledWith('postgres://test');
+    expect(harness.pgSet).toHaveBeenCalledWith({ total_cost_microdollars: 150_000 });
+    expect(harness.persistedMicrodollars).toBe(150_000);
+    expect(harness.pgWhere).toHaveBeenCalledTimes(1);
+    // where() must bind both session_id and kilo_user_id (and(...) nests eq chunks).
+    expect(harness.pgWhereBoundParams).toEqual(expect.arrayContaining(['ses_cost', 'usr_cost']));
+    expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
+    expect(harness.ingestSessionMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kiloUserId: 'usr_cost',
+        sessionId: 'ses_cost',
+        ingestVersion: 3,
+        totalCost: 0.15,
+        terminationReason: 'completed',
+      })
+    );
+
+    // Ordering: persist must precede the unguarded O11Y RPC.
+    const persistIdx = harness.operations.indexOf('persist:total_cost_microdollars');
+    const o11yIdx = harness.operations.indexOf('o11y:ingestSessionMetrics');
+    expect(persistIdx).toBeGreaterThanOrEqual(0);
+    expect(o11yIdx).toBeGreaterThanOrEqual(0);
+    expect(persistIdx).toBeLessThan(o11yIdx);
+
+    // Rejection propagates out of alarm(); metricsEmitted must not be marked.
+    expect(harness.operations).not.toContain('meta:metricsEmitted:true');
+    expect(harness.operations).not.toContain('deleteAlarm');
+    expect(harness.meta.get('metricsEmitted')).toBeUndefined();
   });
 });

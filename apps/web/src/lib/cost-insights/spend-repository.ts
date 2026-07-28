@@ -5,20 +5,22 @@ import {
   cost_insight_rollup_coverage,
   cost_insight_rollup_degraded_intervals,
 } from '@kilocode/db/schema';
+import { startSpan } from '@sentry/nextjs';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { db } from '@/lib/drizzle';
 
 import {
   COST_INSIGHT_ROLLUP_VERSION,
-  getCanonicalOwnerSpendTotals,
   loadCanonicalCostInsightAggregation,
+  loadCanonicalCostInsightAggregationsByIntervals,
   parseSafeDatabaseInteger,
   requireUtcHour,
   requireUtcTimestamp,
   type CostInsightQueryExecutor,
   type CostInsightSpendCategory,
   type CostInsightSpendSource,
+  type loadCanonicalCostInsightAggregationsByHour,
 } from './canonical-sources';
 
 const HOUR_MS = 60 * 60 * 1_000;
@@ -112,6 +114,11 @@ export type OwnerRolling24HourSpendExact = OwnerRollingSpendExact;
 export type OwnerRolling24HourDriverEvidenceExact = OwnerRollingDriverEvidenceExact;
 export type Rolling24HourFragments = RollingWindowFragments;
 
+export type HourInterval = {
+  startHour: string;
+  endHourExclusive: string;
+};
+
 type DenseHourlySpendRow = {
   hour_start: string | Date;
   variable_microdollars: string | number | bigint | null;
@@ -119,6 +126,14 @@ type DenseHourlySpendRow = {
   variable_record_count: string | number | bigint | null;
   scheduled_record_count: string | number | bigint | null;
   is_covered: boolean;
+};
+
+type HourlyDriverSpendRow = {
+  hour_start: string | Date;
+  variable_microdollars: string | number | bigint;
+  scheduled_microdollars: string | number | bigint;
+  variable_record_count: string | number | bigint;
+  scheduled_record_count: string | number | bigint;
 };
 
 type TopDriverRow = {
@@ -131,6 +146,10 @@ type TopDriverRow = {
   actor_user_id: string;
   total_microdollars: string | number | bigint;
   spend_record_count: string | number | bigint;
+};
+
+type TopDriverByRangeRow = TopDriverRow & {
+  range_key: string;
 };
 
 type CurrentHourRow = {
@@ -155,11 +174,6 @@ type DegradedIntervalRow = {
   source: CostInsightSpendSource | null;
   reason: string;
   detected_at: string | Date;
-};
-
-type InteriorTotalRow = {
-  spend_category: CostInsightSpendCategory;
-  total_microdollars: string | number | bigint;
 };
 
 type InteriorDriverRow = TopDriverRow & {
@@ -222,6 +236,134 @@ function sumSafe(left: number, right: number, fieldName: string): number {
     throw new Error(`${fieldName} is outside the JavaScript safe-integer range.`);
   }
   return total;
+}
+
+export function groupContiguousHourlyIntervals(
+  points: readonly Pick<OwnerHourlySpend, 'hourStart' | 'isCovered'>[],
+  isCovered: boolean
+): HourInterval[] {
+  const intervals: HourInterval[] = [];
+  for (const point of points) {
+    if (point.isCovered !== isCovered) continue;
+    const previous = intervals.at(-1);
+    if (previous && previous.endHourExclusive === point.hourStart) {
+      previous.endHourExclusive = addHours(point.hourStart, 1);
+    } else {
+      intervals.push({
+        startHour: point.hourStart,
+        endHourExclusive: addHours(point.hourStart, 1),
+      });
+    }
+  }
+  return intervals;
+}
+
+function addHours(hourStart: string, hours: number): string {
+  return new Date(Date.parse(hourStart) + hours * HOUR_MS).toISOString();
+}
+
+function hasIntervals<T>(intervals: readonly T[]): intervals is readonly [T, ...T[]] {
+  return intervals.length > 0;
+}
+
+function toCanonicalIntervals(
+  intervals: readonly [HourInterval, ...HourInterval[]]
+): readonly [
+  { startInclusive: string; endExclusive: string },
+  ...{ startInclusive: string; endExclusive: string }[],
+] {
+  return intervals.map(interval => ({
+    startInclusive: interval.startHour,
+    endExclusive: interval.endHourExclusive,
+  })) as [
+    { startInclusive: string; endExclusive: string },
+    ...{ startInclusive: string; endExclusive: string }[],
+  ];
+}
+
+function summarizeCanonicalHourlySpend(
+  hourly: Awaited<ReturnType<typeof loadCanonicalCostInsightAggregationsByHour>>
+): { variableMicrodollars: number; scheduledMicrodollars: number } {
+  let variableMicrodollars = 0;
+  let scheduledMicrodollars = 0;
+  for (const aggregation of hourly) {
+    for (const total of aggregation.totals) {
+      if (total.category === 'variable') {
+        variableMicrodollars = sumSafe(
+          variableMicrodollars,
+          total.totalMicrodollars,
+          'canonical hourly variable microdollars'
+        );
+      } else {
+        scheduledMicrodollars = sumSafe(
+          scheduledMicrodollars,
+          total.totalMicrodollars,
+          'canonical hourly scheduled microdollars'
+        );
+      }
+    }
+  }
+  return { variableMicrodollars, scheduledMicrodollars };
+}
+
+function canonicalHourlyDrivers(
+  hourly: Awaited<ReturnType<typeof loadCanonicalCostInsightAggregationsByHour>>,
+  owner: CostInsightSpendOwner
+): MergeableSpendDriver[] {
+  return hourly.flatMap(aggregation =>
+    aggregation.drivers.map(driver => {
+      if (driver.owner.type !== owner.type || driver.owner.id !== owner.id) {
+        throw new Error('Canonical Cost Insights driver resolved to the wrong Spend owner.');
+      }
+      return {
+        category: driver.category,
+        driverKey: driver.driverKey,
+        source: driver.source,
+        productKey: driver.productKey,
+        featureKey: driver.featureKey,
+        modelOrPlanKey: driver.modelOrPlanKey,
+        providerKey: driver.providerKey,
+        actorUserId: driver.actorUserId,
+        totalMicrodollars: driver.totalMicrodollars,
+        spendRecordCount: driver.spendRecordCount,
+      };
+    })
+  );
+}
+
+async function withCanonicalFallbackTelemetry<T>(
+  operation: 'dashboard_evidence_90d' | 'rolling_spend' | 'rolling_driver_evidence',
+  intervals: readonly HourInterval[],
+  callback: () => Promise<T>
+): Promise<T> {
+  if (intervals.length === 0) return await callback();
+  const intervalHours = intervals.reduce(
+    (total, interval) =>
+      sumSafe(
+        total,
+        (Date.parse(interval.endHourExclusive) - Date.parse(interval.startHour)) / HOUR_MS,
+        'canonical fallback interval hours'
+      ),
+    0
+  );
+  return await startSpan(
+    { name: `cost_insights.${operation}`, op: 'cost_insights.canonical_fallback' },
+    async span => {
+      const startedAt = performance.now();
+      span.setAttribute('cost_insights.operation', operation);
+      span.setAttribute('cost_insights.occurrence', 1);
+      span.setAttribute('cost_insights.interval_count', intervals.length);
+      span.setAttribute('cost_insights.interval_hours', intervalHours);
+      try {
+        return await callback();
+      } finally {
+        span.setAttribute(
+          'cost_insights.fallback_duration_ms',
+          Math.round(performance.now() - startedAt)
+        );
+      }
+    }
+  );
 }
 
 function floorUtcHour(timestamp: number): number {
@@ -383,6 +525,183 @@ export async function getOwnerHourlySpend(
   });
 }
 
+function canonicalHourlySpend(
+  hourly: Awaited<ReturnType<typeof loadCanonicalCostInsightAggregationsByHour>>,
+  intervals: readonly HourInterval[]
+): OwnerHourlySpend[] {
+  const byHour = new Map(hourly.map(hour => [hour.hourStart, hour]));
+  const points: OwnerHourlySpend[] = [];
+  for (const interval of intervals) {
+    for (
+      let hourStart = interval.startHour;
+      hourStart < interval.endHourExclusive;
+      hourStart = addHours(hourStart, 1)
+    ) {
+      const aggregation = byHour.get(hourStart);
+      const variable = aggregation?.totals.find(total => total.category === 'variable');
+      const scheduled = aggregation?.totals.find(total => total.category === 'scheduled');
+      const variableMicrodollars = variable?.totalMicrodollars ?? 0;
+      const scheduledMicrodollars = scheduled?.totalMicrodollars ?? 0;
+      points.push({
+        hourStart,
+        variableMicrodollars,
+        scheduledMicrodollars,
+        totalMicrodollars: sumSafe(
+          variableMicrodollars,
+          scheduledMicrodollars,
+          'canonical hourly total microdollars'
+        ),
+        variableRecordCount: variable?.spendRecordCount ?? 0,
+        scheduledRecordCount: scheduled?.spendRecordCount ?? 0,
+        isCovered: true,
+      });
+    }
+  }
+  return points;
+}
+
+async function getOwnerHourlyDriverSpend(
+  executor: CostInsightQueryExecutor,
+  params: {
+    owner: CostInsightSpendOwner;
+    startHour: string;
+    endHourExclusive: string;
+  }
+): Promise<Map<string, Omit<OwnerHourlySpend, 'hourStart' | 'isCovered'>>> {
+  const range = requireHourlyRange(params);
+  const owner = params.owner;
+  const result = await executor.execute<HourlyDriverSpendRow>(sql`
+    SELECT
+      ${cost_insight_owner_hour_driver_buckets.hour_start} AS hour_start,
+      COALESCE(SUM(${cost_insight_owner_hour_driver_buckets.total_microdollars})
+        FILTER (WHERE ${cost_insight_owner_hour_driver_buckets.spend_category} = 'variable'), 0)::text
+        AS variable_microdollars,
+      COALESCE(SUM(${cost_insight_owner_hour_driver_buckets.total_microdollars})
+        FILTER (WHERE ${cost_insight_owner_hour_driver_buckets.spend_category} = 'scheduled'), 0)::text
+        AS scheduled_microdollars,
+      COALESCE(SUM(${cost_insight_owner_hour_driver_buckets.spend_record_count})
+        FILTER (WHERE ${cost_insight_owner_hour_driver_buckets.spend_category} = 'variable'), 0)::text
+        AS variable_record_count,
+      COALESCE(SUM(${cost_insight_owner_hour_driver_buckets.spend_record_count})
+        FILTER (WHERE ${cost_insight_owner_hour_driver_buckets.spend_category} = 'scheduled'), 0)::text
+        AS scheduled_record_count
+    FROM ${cost_insight_owner_hour_driver_buckets}
+    WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= ${range.startHour}
+      AND ${cost_insight_owner_hour_driver_buckets.hour_start} < ${range.endHourExclusive}
+      AND ${ownerPredicate(
+        owner,
+        sql`${cost_insight_owner_hour_driver_buckets.owned_by_user_id}`,
+        sql`${cost_insight_owner_hour_driver_buckets.owned_by_organization_id}`
+      )}
+    GROUP BY 1
+    ORDER BY 1 ASC
+  `);
+
+  return new Map(
+    result.rows.map(row => {
+      const variableMicrodollars = parseSafeDatabaseInteger(
+        row.variable_microdollars,
+        'driver variable_microdollars'
+      );
+      const scheduledMicrodollars = parseSafeDatabaseInteger(
+        row.scheduled_microdollars,
+        'driver scheduled_microdollars'
+      );
+      return [
+        normalizeDatabaseTimestamp(row.hour_start, 'driver hour_start'),
+        {
+          variableMicrodollars,
+          scheduledMicrodollars,
+          totalMicrodollars: sumSafe(
+            variableMicrodollars,
+            scheduledMicrodollars,
+            'driver hourly total microdollars'
+          ),
+          variableRecordCount: parseSafeDatabaseInteger(
+            row.variable_record_count,
+            'driver variable_record_count'
+          ),
+          scheduledRecordCount: parseSafeDatabaseInteger(
+            row.scheduled_record_count,
+            'driver scheduled_record_count'
+          ),
+        },
+      ];
+    })
+  );
+}
+
+export async function loadOwnerDashboardHourlySpend(
+  primaryDatabase: ExactRollingDatabase,
+  params: {
+    owner: CostInsightSpendOwner;
+    startHour: string;
+    endHourExclusive: string;
+  }
+): Promise<OwnerHourlySpend[]> {
+  const range = requireHourlyRange(params);
+  return await primaryDatabase.transaction(
+    async transaction => {
+      const rollupPoints = await getOwnerHourlySpend(transaction, {
+        owner: params.owner,
+        startHour: range.startHour,
+        endHourExclusive: range.endHourExclusive,
+      });
+      const coverage = await getCostInsightRollupCoverage(transaction, range);
+      const effectiveCoverageStart = coverage.coverageStartHour ?? coverage.liveCaptureStartHour;
+      const uncoveredIntervals = groupContiguousHourlyIntervals(
+        rollupPoints.filter(
+          point =>
+            !point.isCovered &&
+            effectiveCoverageStart !== null &&
+            point.hourStart >= effectiveCoverageStart
+        ),
+        false
+      );
+      const canonicalByHour = hasIntervals(uncoveredIntervals)
+        ? new Map(
+            (
+              await withCanonicalFallbackTelemetry(
+                'dashboard_evidence_90d',
+                uncoveredIntervals,
+                async () =>
+                  canonicalHourlySpend(
+                    await loadCanonicalCostInsightAggregationsByIntervals(transaction, {
+                      owner: params.owner,
+                      intervals: toCanonicalIntervals(uncoveredIntervals),
+                    }),
+                    uncoveredIntervals
+                  )
+              )
+            ).map(point => [point.hourStart, point])
+          )
+        : new Map<string, OwnerHourlySpend>();
+      const pointsWithCanonicalFallback = rollupPoints.map(point =>
+        point.isCovered ? point : (canonicalByHour.get(point.hourStart) ?? point)
+      );
+
+      const preCoverageEnd = effectiveCoverageStart
+        ? new Date(
+            Math.min(Date.parse(effectiveCoverageStart), Date.parse(range.endHourExclusive))
+          ).toISOString()
+        : range.endHourExclusive;
+      if (preCoverageEnd <= range.startHour) return pointsWithCanonicalFallback;
+
+      const driverSpendByHour = await getOwnerHourlyDriverSpend(transaction, {
+        owner: params.owner,
+        startHour: range.startHour,
+        endHourExclusive: preCoverageEnd,
+      });
+      return pointsWithCanonicalFallback.map(point => {
+        if (point.isCovered || point.hourStart >= preCoverageEnd) return point;
+        const driverSpend = driverSpendByHour.get(point.hourStart);
+        return driverSpend ? { ...point, ...driverSpend } : point;
+      });
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
+}
+
 export async function getOwnerTopSpendDrivers(
   executor: CostInsightQueryExecutor,
   params: {
@@ -454,6 +773,151 @@ export async function getOwnerTopSpendDrivers(
       'top-driver spend_record_count'
     ),
   }));
+}
+
+export async function getOwnerTopSpendDriversByRange(
+  executor: CostInsightQueryExecutor,
+  params: {
+    owner: CostInsightSpendOwner;
+    ranges: readonly { key: string; startHour: string }[];
+    endHourExclusive: string;
+    limit?: number;
+  }
+): Promise<Map<string, OwnerTopSpendDriver[]>> {
+  const endHourExclusive = requireUtcHour(params.endHourExclusive, 'endHourExclusive');
+  if (params.ranges.length === 0) {
+    throw new Error('Cost Insights top-driver ranges must not be empty.');
+  }
+
+  const rangeKeys = new Set<string>();
+  const ranges = params.ranges.map(range => {
+    if (!range.key) {
+      throw new Error('Cost Insights top-driver range keys must not be empty.');
+    }
+    if (rangeKeys.has(range.key)) {
+      throw new Error(`Cost Insights top-driver range key ${range.key} is duplicated.`);
+    }
+    rangeKeys.add(range.key);
+    return {
+      key: range.key,
+      ...requireHourlyRange({ startHour: range.startHour, endHourExclusive }),
+    };
+  });
+
+  const requestedLimit = params.limit ?? COST_INSIGHT_MAX_TOP_DRIVERS;
+  if (!Number.isSafeInteger(requestedLimit) || requestedLimit <= 0) {
+    throw new Error('Cost Insights top-driver limit must be a positive safe integer.');
+  }
+  const limit = Math.min(requestedLimit, COST_INSIGHT_MAX_TOP_DRIVERS);
+  const owner = params.owner;
+  const rangeValues = sql.join(
+    ranges.map(range => sql`(${range.key}, ${range.startHour}::timestamptz)`),
+    sql`, `
+  );
+  const result = await executor.execute<TopDriverByRangeRow>(sql`
+    WITH ranges(range_key, start_hour) AS (
+      VALUES ${rangeValues}
+    ), owner_buckets AS MATERIALIZED (
+      SELECT
+        ${cost_insight_owner_hour_driver_buckets.hour_start} AS hour_start,
+        ${cost_insight_owner_hour_driver_buckets.spend_category} AS spend_category,
+        ${cost_insight_owner_hour_driver_buckets.source} AS source,
+        ${cost_insight_owner_hour_driver_buckets.product_key} AS product_key,
+        ${cost_insight_owner_hour_driver_buckets.feature_key} AS feature_key,
+        ${cost_insight_owner_hour_driver_buckets.model_or_plan_key} AS model_or_plan_key,
+        ${cost_insight_owner_hour_driver_buckets.provider_key} AS provider_key,
+        ${cost_insight_owner_hour_driver_buckets.actor_user_id} AS actor_user_id,
+        ${cost_insight_owner_hour_driver_buckets.total_microdollars} AS total_microdollars,
+        ${cost_insight_owner_hour_driver_buckets.spend_record_count} AS spend_record_count
+      FROM ${cost_insight_owner_hour_driver_buckets}
+      WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= (
+        SELECT MIN(start_hour) FROM ranges
+      )
+        AND ${cost_insight_owner_hour_driver_buckets.hour_start} < ${endHourExclusive}
+        AND ${ownerPredicate(
+          owner,
+          sql`${cost_insight_owner_hour_driver_buckets.owned_by_user_id}`,
+          sql`${cost_insight_owner_hour_driver_buckets.owned_by_organization_id}`
+        )}
+    ), driver_totals AS (
+      SELECT
+        ranges.range_key,
+        owner_buckets.spend_category AS spend_category,
+        owner_buckets.source AS source,
+        owner_buckets.product_key AS product_key,
+        owner_buckets.feature_key AS feature_key,
+        owner_buckets.model_or_plan_key AS model_or_plan_key,
+        owner_buckets.provider_key AS provider_key,
+        owner_buckets.actor_user_id AS actor_user_id,
+        SUM(owner_buckets.total_microdollars)::text
+          AS total_microdollars,
+        SUM(owner_buckets.spend_record_count)::text
+          AS spend_record_count
+      FROM owner_buckets
+      CROSS JOIN ranges
+      WHERE owner_buckets.hour_start >= ranges.start_hour
+      GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+    ), ranked_drivers AS (
+      SELECT
+        *,
+        ROW_NUMBER() OVER (
+          PARTITION BY range_key
+          ORDER BY
+            total_microdollars::numeric DESC,
+            spend_category ASC,
+            source ASC,
+            product_key ASC,
+            feature_key ASC,
+            model_or_plan_key ASC,
+            provider_key ASC,
+            actor_user_id ASC
+        ) AS rank
+      FROM driver_totals
+    )
+    SELECT
+      range_key,
+      spend_category,
+      source,
+      product_key,
+      feature_key,
+      model_or_plan_key,
+      provider_key,
+      actor_user_id,
+      total_microdollars,
+      spend_record_count
+    FROM ranked_drivers
+    WHERE rank <= ${limit}
+    ORDER BY range_key ASC, rank ASC
+  `);
+
+  const driversByRange = new Map<string, OwnerTopSpendDriver[]>();
+  for (const range of ranges) {
+    driversByRange.set(range.key, []);
+  }
+  for (const row of result.rows) {
+    const drivers = driversByRange.get(row.range_key);
+    if (!drivers) {
+      throw new Error(`Cost Insights top-driver query returned unknown range ${row.range_key}.`);
+    }
+    drivers.push({
+      category: row.spend_category,
+      source: row.source,
+      productKey: row.product_key,
+      featureKey: row.feature_key,
+      modelOrPlanKey: row.model_or_plan_key,
+      providerKey: row.provider_key,
+      actorUserId: row.actor_user_id,
+      totalMicrodollars: parseSafeDatabaseInteger(
+        row.total_microdollars,
+        'top-driver total_microdollars'
+      ),
+      spendRecordCount: parseSafeDatabaseInteger(
+        row.spend_record_count,
+        'top-driver spend_record_count'
+      ),
+    });
+  }
+  return driversByRange;
 }
 
 export async function getOwnerCurrentHourSpend(
@@ -593,45 +1057,6 @@ export async function getCostInsightRollupCoverage(
       Date.parse(range.endHourExclusive) <= latestCoveredEnd &&
       degradedIntervals.length === 0,
   };
-}
-
-async function getInteriorRollupTotals(
-  executor: CostInsightQueryExecutor,
-  owner: CostInsightSpendOwner,
-  startInclusive: string,
-  endExclusive: string
-): Promise<{ variableMicrodollars: number; scheduledMicrodollars: number }> {
-  if (startInclusive === endExclusive) {
-    return { variableMicrodollars: 0, scheduledMicrodollars: 0 };
-  }
-  const result = await executor.execute<InteriorTotalRow>(sql`
-    SELECT
-      ${cost_insight_owner_hour_totals.spend_category} AS spend_category,
-      SUM(${cost_insight_owner_hour_totals.total_microdollars})::text AS total_microdollars
-    FROM ${cost_insight_owner_hour_totals}
-    WHERE ${cost_insight_owner_hour_totals.hour_start} >= ${startInclusive}
-      AND ${cost_insight_owner_hour_totals.hour_start} < ${endExclusive}
-      AND ${ownerPredicate(
-        owner,
-        sql`${cost_insight_owner_hour_totals.owned_by_user_id}`,
-        sql`${cost_insight_owner_hour_totals.owned_by_organization_id}`
-      )}
-    GROUP BY ${cost_insight_owner_hour_totals.spend_category}
-  `);
-  let variableMicrodollars = 0;
-  let scheduledMicrodollars = 0;
-  for (const row of result.rows) {
-    const amount = parseSafeDatabaseInteger(
-      row.total_microdollars,
-      'rolling interior total_microdollars'
-    );
-    if (row.spend_category === 'variable') {
-      variableMicrodollars = amount;
-    } else if (row.spend_category === 'scheduled') {
-      scheduledMicrodollars = amount;
-    }
-  }
-  return { variableMicrodollars, scheduledMicrodollars };
 }
 
 function compareTopSpendDrivers(left: OwnerTopSpendDriver, right: OwnerTopSpendDriver): number {
@@ -784,13 +1209,22 @@ function toMergeableSpendDrivers(drivers: OwnerTopSpendDriver[]): MergeableSpend
   }));
 }
 
-async function getInteriorRollupDrivers(
+async function getInteriorRollupDriversByIntervals(
   executor: CostInsightQueryExecutor,
   owner: CostInsightSpendOwner,
-  startInclusive: string,
-  endExclusive: string
+  intervals: readonly HourInterval[]
 ): Promise<MergeableSpendDriver[]> {
-  if (startInclusive === endExclusive) return [];
+  if (!hasIntervals(intervals)) return [];
+  const first = intervals[0];
+  const last = intervals.at(-1);
+  if (!last) return [];
+  const intervalValues = sql.join(
+    intervals.map(
+      interval =>
+        sql`(${interval.startHour}::timestamptz, ${interval.endHourExclusive}::timestamptz)`
+    ),
+    sql`, `
+  );
   const result = await executor.execute<InteriorDriverRow>(sql`
     SELECT
       ${cost_insight_owner_hour_driver_buckets.spend_category} AS spend_category,
@@ -806,8 +1240,14 @@ async function getInteriorRollupDrivers(
       SUM(${cost_insight_owner_hour_driver_buckets.spend_record_count})::text
         AS spend_record_count
     FROM ${cost_insight_owner_hour_driver_buckets}
-    WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= ${startInclusive}
-      AND ${cost_insight_owner_hour_driver_buckets.hour_start} < ${endExclusive}
+    WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= ${first.startHour}
+      AND ${cost_insight_owner_hour_driver_buckets.hour_start} < ${last.endHourExclusive}
+      AND EXISTS (
+        SELECT 1
+        FROM (VALUES ${intervalValues}) AS covered_intervals(start_inclusive, end_exclusive)
+        WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= covered_intervals.start_inclusive
+          AND ${cost_insight_owner_hour_driver_buckets.hour_start} < covered_intervals.end_exclusive
+      )
       AND ${ownerPredicate(
         owner,
         sql`${cost_insight_owner_hour_driver_buckets.owned_by_user_id}`,
@@ -1087,41 +1527,53 @@ export async function getOwnerRollingDriverEvidenceExact(
         normalizeDatabaseTimestamp(asOfRow.value, 'as_of'),
         params.windowHours
       );
-      const coverage =
+      const interiorPoints =
         fragments.interiorStart === fragments.interiorEnd
-          ? null
-          : await getCostInsightRollupCoverage(transaction, {
+          ? []
+          : await getOwnerHourlySpend(transaction, {
+              owner: params.owner,
               startHour: fragments.interiorStart,
               endHourExclusive: fragments.interiorEnd,
             });
-
-      const mergedDrivers =
-        coverage?.isFullyCovered === false
-          ? mergeSpendDrivers([
-              await getCanonicalDrivers(transaction, {
-                owner: params.owner,
-                startInclusive: fragments.windowStart,
-                endExclusive: fragments.asOf,
-              }),
-            ])
-          : mergeSpendDrivers([
-              await getInteriorRollupDrivers(
-                transaction,
-                params.owner,
-                fragments.interiorStart,
-                fragments.interiorEnd
-              ),
-              await getCanonicalDrivers(transaction, {
-                owner: params.owner,
-                startInclusive: fragments.windowStart,
-                endExclusive: fragments.oldestBoundaryEnd,
-              }),
-              await getCanonicalDrivers(transaction, {
-                owner: params.owner,
-                startInclusive: fragments.currentBoundaryStart,
-                endExclusive: fragments.asOf,
-              }),
-            ]);
+      const coveredIntervals = groupContiguousHourlyIntervals(interiorPoints, true);
+      const uncoveredIntervals = groupContiguousHourlyIntervals(interiorPoints, false);
+      const canonicalIntervals: HourInterval[] = [
+        ...(fragments.windowStart === fragments.oldestBoundaryEnd
+          ? []
+          : [
+              {
+                startHour: fragments.windowStart,
+                endHourExclusive: fragments.oldestBoundaryEnd,
+              },
+            ]),
+        ...uncoveredIntervals,
+        ...(fragments.currentBoundaryStart === fragments.asOf
+          ? []
+          : [
+              {
+                startHour: fragments.currentBoundaryStart,
+                endHourExclusive: fragments.asOf,
+              },
+            ]),
+      ];
+      const canonicalDrivers = await withCanonicalFallbackTelemetry(
+        'rolling_driver_evidence',
+        uncoveredIntervals,
+        async () =>
+          hasIntervals(canonicalIntervals)
+            ? canonicalHourlyDrivers(
+                await loadCanonicalCostInsightAggregationsByIntervals(transaction, {
+                  owner: params.owner,
+                  intervals: toCanonicalIntervals(canonicalIntervals),
+                }),
+                params.owner
+              )
+            : []
+      );
+      const mergedDrivers = mergeSpendDrivers([
+        await getInteriorRollupDriversByIntervals(transaction, params.owner, coveredIntervals),
+        canonicalDrivers,
+      ]);
       const evidence = summarizeSpendDrivers(mergedDrivers);
       return {
         asOf: fragments.asOf,
@@ -1177,33 +1629,16 @@ export async function getOwnerRollingSpendExact(
         currentBoundaryStart,
       } = fragments;
 
-      const coverage =
+      const interiorPoints =
         interiorStart === interiorEnd
-          ? null
-          : await getCostInsightRollupCoverage(transaction, {
+          ? []
+          : await getOwnerHourlySpend(transaction, {
+              owner: params.owner,
               startHour: interiorStart,
               endHourExclusive: interiorEnd,
             });
-      if (coverage && !coverage.isFullyCovered) {
-        if (params.fallbackToCanonical) {
-          const canonical = await getCanonicalOwnerSpendTotals(transaction, {
-            owner: params.owner,
-            startInclusive: windowStart,
-            endExclusive: asOf,
-          });
-          return {
-            asOf,
-            windowStart,
-            variableMicrodollars: canonical.variableMicrodollars,
-            scheduledMicrodollars: canonical.scheduledMicrodollars,
-            totalMicrodollars: sumSafe(
-              canonical.variableMicrodollars,
-              canonical.scheduledMicrodollars,
-              'canonical rolling total microdollars'
-            ),
-            isComplete: true,
-          };
-        }
+      const uncoveredIntervals = groupContiguousHourlyIntervals(interiorPoints, false);
+      if (uncoveredIntervals.length > 0 && !params.fallbackToCanonical) {
         return {
           asOf,
           windowStart,
@@ -1214,52 +1649,58 @@ export async function getOwnerRollingSpendExact(
         };
       }
 
-      const interior = await getInteriorRollupTotals(
-        transaction,
-        params.owner,
-        interiorStart,
-        interiorEnd
+      let interior = { variableMicrodollars: 0, scheduledMicrodollars: 0 };
+      for (const point of interiorPoints) {
+        if (!point.isCovered) continue;
+        interior = {
+          variableMicrodollars: sumSafe(
+            interior.variableMicrodollars,
+            point.variableMicrodollars ?? 0,
+            'rolling interior variable microdollars'
+          ),
+          scheduledMicrodollars: sumSafe(
+            interior.scheduledMicrodollars,
+            point.scheduledMicrodollars ?? 0,
+            'rolling interior scheduled microdollars'
+          ),
+        };
+      }
+      const canonicalIntervals: HourInterval[] = [
+        ...(windowStart === oldestBoundaryEnd
+          ? []
+          : [{ startHour: windowStart, endHourExclusive: oldestBoundaryEnd }]),
+        ...uncoveredIntervals,
+        ...(currentBoundaryStart === asOf
+          ? []
+          : [{ startHour: currentBoundaryStart, endHourExclusive: asOf }]),
+      ];
+      const canonical = await withCanonicalFallbackTelemetry(
+        'rolling_spend',
+        uncoveredIntervals,
+        async () =>
+          hasIntervals(canonicalIntervals)
+            ? summarizeCanonicalHourlySpend(
+                await loadCanonicalCostInsightAggregationsByIntervals(transaction, {
+                  owner: params.owner,
+                  intervals: toCanonicalIntervals(canonicalIntervals),
+                })
+              )
+            : { variableMicrodollars: 0, scheduledMicrodollars: 0 }
       );
-      const oldestBoundary =
-        windowStart === oldestBoundaryEnd
-          ? {
-              variableMicrodollars: 0,
-              scheduledMicrodollars: 0,
-            }
-          : await getCanonicalOwnerSpendTotals(transaction, {
-              owner: params.owner,
-              startInclusive: windowStart,
-              endExclusive: interiorStart,
-            });
-      const currentBoundary =
-        currentBoundaryStart === asOf
-          ? {
-              variableMicrodollars: 0,
-              scheduledMicrodollars: 0,
-            }
-          : await getCanonicalOwnerSpendTotals(transaction, {
-              owner: params.owner,
-              startInclusive: interiorEnd,
-              endExclusive: asOf,
-            });
-      const variableMicrodollars = sumSafe(
-        sumSafe(
+      interior = {
+        variableMicrodollars: sumSafe(
           interior.variableMicrodollars,
-          oldestBoundary.variableMicrodollars,
-          'rolling variable microdollars'
+          canonical.variableMicrodollars,
+          'rolling interior variable microdollars'
         ),
-        currentBoundary.variableMicrodollars,
-        'rolling variable microdollars'
-      );
-      const scheduledMicrodollars = sumSafe(
-        sumSafe(
+        scheduledMicrodollars: sumSafe(
           interior.scheduledMicrodollars,
-          oldestBoundary.scheduledMicrodollars,
-          'rolling scheduled microdollars'
+          canonical.scheduledMicrodollars,
+          'rolling interior scheduled microdollars'
         ),
-        currentBoundary.scheduledMicrodollars,
-        'rolling scheduled microdollars'
-      );
+      };
+      const variableMicrodollars = interior.variableMicrodollars;
+      const scheduledMicrodollars = interior.scheduledMicrodollars;
       return {
         asOf,
         windowStart,

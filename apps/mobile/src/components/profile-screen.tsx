@@ -1,8 +1,11 @@
+/* eslint-disable max-lines -- The profile screen composes Credits, Agents, Reviews, Organization, Linked accounts, Notifications, Restore Purchases, and Actions; each section is a small rendered surface that mirrors the shared ConfigureRow/Text-header pattern. Splitting would re-encode the same hooks. */
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import {
+  Bell,
   Building2,
+  GitMerge,
   GitPullRequest,
   KeyRound,
   Lock,
@@ -16,21 +19,31 @@ import { toast } from 'sonner-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
-import { NotificationsCard } from '@/components/notifications-card';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  setThemePreference,
+  type ThemePreference,
+  useThemePreference,
+} from '@/lib/hooks/use-theme-preference';
 import { useOrganization } from '@/lib/organization-context';
-import { getCodeReviewerProfilePath, getProfileAgentScope } from '@/lib/profile-agent-navigation';
+import {
+  getCodeReviewerProfilePath,
+  getProfileAgentScope,
+  getPrReviewEntryPath,
+} from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -43,8 +56,10 @@ export function ProfileScreen() {
   const router = useRouter();
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const { preference: themePreference } = useThemePreference();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const {
     data,
     isLoading,
@@ -161,6 +176,25 @@ export function ProfileScreen() {
           />
         </View>
 
+        {/* PR Review */}
+        {prReviewEnabled && (
+          <View className="mt-6 gap-3">
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              Reviews
+            </Text>
+            <ConfigureRow
+              icon={GitMerge}
+              title="PR Review"
+              subtitle="Review pull requests on mobile"
+              className="rounded-lg bg-secondary px-3"
+              last
+              onPress={() => {
+                router.push(getPrReviewEntryPath());
+              }}
+            />
+          </View>
+        )}
+
         {/* Organization */}
         {organizationId != null && (
           <View className="mt-6 gap-3">
@@ -221,11 +255,11 @@ export function ProfileScreen() {
               return (
                 <Animated.View
                   key={`${p.provider}-${p.email}`}
-                  className="flex-row items-center gap-3 rounded-lg bg-secondary p-3"
+                  className="flex-row items-start gap-3 rounded-lg bg-secondary p-3"
                   entering={FadeIn.duration(200)}
                 >
                   <Icon size={18} color={colors.secondaryForeground} />
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Text className="text-sm font-medium capitalize">{p.provider}</Text>
                     <Text variant="muted" className="text-xs">
                       {p.email}
@@ -237,9 +271,38 @@ export function ProfileScreen() {
           </Animated.View>
         )}
 
+        {/* Appearance */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Appearance
+          </Text>
+          <SegmentedControl<ThemePreference>
+            accessibilityLabel="Appearance"
+            options={[
+              { value: 'system', label: 'System' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+            value={themePreference}
+            onChange={setThemePreference}
+          />
+        </View>
+
         {/* Notifications */}
-        <View className="mt-6">
-          <NotificationsCard />
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Notifications
+          </Text>
+          <ConfigureRow
+            icon={Bell}
+            title="Notifications"
+            subtitle="Push preferences"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+            }}
+          />
         </View>
 
         {/* Restore Purchases (iOS-only; self-hides on Android and for org accounts) */}
@@ -249,40 +312,36 @@ export function ProfileScreen() {
           </View>
         ) : null}
 
-        {/* Actions */}
+        {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
-          <View className="flex-row gap-3">
-            <ActionTile
-              icon={MessageSquare}
-              label="Feedback"
-              color={colors.mutedForeground}
-              onPress={() => {
-                showFeedbackPrompt(userId);
-              }}
-            />
-            <ActionTile
-              icon={Lock}
-              label="Privacy choices"
-              color={colors.mutedForeground}
-              onPress={showPrivacyChoices}
-            />
-          </View>
-          <View className="flex-row gap-3">
-            <ActionTile
-              icon={LogOut}
-              label="Sign Out"
-              color={colors.mutedForeground}
-              onPress={confirmSignOut}
-            />
-            <ActionTile
-              icon={Trash2}
-              label="Delete Account"
-              color={colors.destructive}
-              destructive
-              disabled={deleteAccount.isPending}
-              onPress={confirmDeleteAccount}
-            />
-          </View>
+          <ActionTile
+            icon={MessageSquare}
+            label="Feedback"
+            color={colors.mutedForeground}
+            onPress={() => {
+              showFeedbackPrompt(userId);
+            }}
+          />
+          <ActionTile
+            icon={Lock}
+            label="Privacy choices"
+            color={colors.mutedForeground}
+            onPress={showPrivacyChoices}
+          />
+          <ActionTile
+            icon={LogOut}
+            label="Sign Out"
+            color={colors.mutedForeground}
+            onPress={confirmSignOut}
+          />
+          <ActionTile
+            icon={Trash2}
+            label="Delete Account"
+            color={colors.destructive}
+            destructive
+            disabled={deleteAccount.isPending}
+            onPress={confirmDeleteAccount}
+          />
 
           <Text className="text-center text-xs text-muted-foreground">
             v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})

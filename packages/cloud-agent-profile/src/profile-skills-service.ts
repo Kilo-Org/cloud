@@ -14,7 +14,7 @@ export const MAX_SKILL_NAME_LENGTH = 100;
 export const MAX_SKILL_MARKDOWN_LENGTH = 100_000; // ~100 KB
 export const MAX_SKILL_DESCRIPTION_LENGTH = 2000;
 /** Companion-file limits for multi-file skills (SKILL.md itself is stored in raw_markdown). */
-export const MAX_SKILL_COMPANION_FILES = 20;
+export const MAX_SKILL_COMPANION_FILES = 40;
 export const MAX_SKILL_COMPANION_FILE_SIZE = 100_000; // ~100 KB per file
 export const MAX_SKILL_COMPANION_FILES_TOTAL = 500_000; // ~500 KB across all companion files
 export const MAX_SKILL_COMPANION_PATH_LENGTH = 200;

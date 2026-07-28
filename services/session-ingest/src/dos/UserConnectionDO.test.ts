@@ -12,6 +12,16 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
+const sessionIngestMocks = vi.hoisted(() => ({
+  resetAttentionStatusOnCliDisconnect: vi.fn(async () => undefined),
+  claimSessionReadyPush: vi.fn(async () => undefined),
+  getSessionIngestDO: vi.fn(),
+}));
+
+vi.mock('./SessionIngestDO', () => ({
+  getSessionIngestDO: sessionIngestMocks.getSessionIngestDO,
+}));
+
 import { MAX_CATALOG_RESULT_BYTES, UserConnectionDO } from './UserConnectionDO';
 
 // ---------------------------------------------------------------------------
@@ -87,8 +97,15 @@ function createMockCtx() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeSession(id: string, status = 'busy', title = 'Test', parentSessionId?: string) {
-  return parentSessionId ? { id, status, title, parentSessionId } : { id, status, title };
+function makeSession(
+  id: string,
+  status = 'busy',
+  title = 'Test',
+  parentSessionId?: string,
+  platform?: string
+) {
+  const base = platform ? { id, status, title, platform } : { id, status, title };
+  return parentSessionId ? { ...base, parentSessionId } : base;
 }
 
 function parseSent(ws: MockWS, callIndex = 0): unknown {
@@ -186,9 +203,20 @@ function addCliSocket(
     id: string;
     status: string;
     title: string;
-  }> = []
+    platform?: string;
+  }> = [],
+  instance?: { name: string; projectName: string; version?: string },
+  kiloUserId?: string
 ): MockWS {
-  const attachment = { role: 'cli' as const, connectionId, sessions };
+  const attachment: {
+    role: 'cli';
+    connectionId: string;
+    sessions: typeof sessions;
+    instance?: typeof instance;
+    kiloUserId?: string;
+  } = { role: 'cli', connectionId, sessions };
+  if (instance) attachment.instance = instance;
+  if (kiloUserId) attachment.kiloUserId = kiloUserId;
   const ws = createMockWs(['cli'], attachment);
   mockCtx.addSocket(ws);
   return ws;
@@ -214,13 +242,20 @@ function sendHeartbeat(
     id: string;
     status: string;
     title: string;
+    platform?: string;
   }>,
-  protocolVersion?: string
+  options: {
+    protocolVersion?: string;
+    capabilities?: { attachments?: boolean };
+    instance?: { name: string; projectName: string; version?: string };
+  } = {}
 ) {
   const msg = JSON.stringify({
     type: 'heartbeat',
     sessions,
-    ...(protocolVersion ? { protocolVersion } : {}),
+    ...(options.protocolVersion ? { protocolVersion: options.protocolVersion } : {}),
+    ...(options.capabilities ? { capabilities: options.capabilities } : {}),
+    ...(options.instance ? { instance: options.instance } : {}),
   });
   doInstance.webSocketMessage(cliWs as never, msg);
 }
@@ -286,14 +321,14 @@ function createUtf8OversizedResult(): { padding: string } {
   return result;
 }
 
-/** Trigger CLI disconnect */
-function disconnectCli(doInstance: UserConnectionDO, cliWs: MockWS) {
-  doInstance.webSocketClose(cliWs as never, 0, '', false);
+/** Trigger CLI disconnect (awaits attention reset before broadcast). */
+async function disconnectCli(doInstance: UserConnectionDO, cliWs: MockWS) {
+  await doInstance.webSocketClose(cliWs as never, 0, '', false);
 }
 
 /** Trigger web disconnect */
 function disconnectWeb(doInstance: UserConnectionDO, webWs: MockWS) {
-  doInstance.webSocketClose(webWs as never, 0, '', false);
+  void doInstance.webSocketClose(webWs as never, 0, '', false);
 }
 
 // ===========================================================================
@@ -303,6 +338,14 @@ function disconnectWeb(doInstance: UserConnectionDO, webWs: MockWS) {
 describe('UserConnectionDO', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockReset();
+    sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockResolvedValue(undefined);
+    sessionIngestMocks.claimSessionReadyPush.mockReset();
+    sessionIngestMocks.getSessionIngestDO.mockReset();
+    sessionIngestMocks.getSessionIngestDO.mockReturnValue({
+      resetAttentionStatusOnCliDisconnect: sessionIngestMocks.resetAttentionStatusOnCliDisconnect,
+      claimSessionReadyPush: sessionIngestMocks.claimSessionReadyPush,
+    });
   });
 
   afterEach(() => {
@@ -355,7 +398,7 @@ describe('UserConnectionDO', () => {
   });
 
   describe('hasActiveCliSession', () => {
-    it('tracks whether a connected CLI heartbeat currently owns the session', () => {
+    it('tracks whether a connected CLI heartbeat currently owns the session', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -366,7 +409,7 @@ describe('UserConnectionDO', () => {
       expect(doInstance.hasActiveCliSession('ses_1')).toBe(true);
 
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       expect(doInstance.hasActiveCliSession('ses_1')).toBe(false);
     });
@@ -428,6 +471,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, firstOwner, [makeSession('s1')]);
       sendHeartbeat(doInstance, nextOwner, []);
       firstOwner.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
@@ -439,7 +483,10 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
 
-      expect(parseSent(webWs)).toEqual({
+      // The owner-change heartbeat broadcasts sessions.heartbeat and also fires
+      // the SESSION_OWNER_CHANGED error response for the in-flight command. The
+      // test cares about the latter; find it by type+id.
+      expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
         type: 'response',
         id: 'cmd-1',
         error: {
@@ -449,7 +496,11 @@ describe('UserConnectionDO', () => {
         },
       });
       sendCliResponse(doInstance, firstOwner, { id: correlationId, result: 'late' });
-      expect(webWs.send).toHaveBeenCalledTimes(1);
+      // The late sendCliResponse is filtered (the pending entry was already
+      // removed by the owner-change path) so webWs sees exactly the two
+      // messages produced by the owner-change heartbeat itself: the broadcast
+      // sessions.heartbeat and the SESSION_OWNER_CHANGED error response.
+      expect(webWs.send).toHaveBeenCalledTimes(2);
     });
 
     it('replays existing web subscriptions when a session gets a new CLI owner', () => {
@@ -476,7 +527,7 @@ describe('UserConnectionDO', () => {
       expect(cli2Msgs).toContainEqual({ type: 'subscribe', sessionId: 's1' });
     });
 
-    it('sends heartbeat only to web clients subscribed to sessions from this connection', () => {
+    it('broadcasts heartbeat to every web socket regardless of subscription', () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const cli2 = addCliSocket(mockCtx, 'cli-2');
@@ -487,13 +538,14 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cli1, [makeSession('s1')]);
       sendHeartbeat(doInstance, cli2, [makeSession('s2')]);
 
-      // subWeb subscribes to s1, otherWeb subscribes to s2
+      // subWeb subscribes to s1, otherWeb subscribes to s2 (subscriptions are
+      // irrelevant to broadcast delivery — both should still receive cli1's heartbeat)
       sendSubscribe(doInstance, subWeb, 's1');
       sendSubscribe(doInstance, otherWeb, 's2');
       subWeb.send.mockClear();
       otherWeb.send.mockClear();
 
-      // cli1 sends heartbeat — only subWeb (watching s1) should receive it
+      // cli1 sends heartbeat — both viewers must receive it
       sendHeartbeat(doInstance, cli1, [makeSession('s1')]);
 
       expect(subWeb.send).toHaveBeenCalledTimes(1);
@@ -502,19 +554,54 @@ describe('UserConnectionDO', () => {
         event: 'sessions.heartbeat',
         data: { connectionId: 'cli-1' },
       });
-      expect(otherWeb.send).not.toHaveBeenCalled();
+      expect(otherWeb.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(otherWeb)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'cli-1' },
+      });
     });
 
-    it('forwards the CLI-reported protocolVersion to subscribed web clients', () => {
+    it('delivers one heartbeat per web socket (delivery count equals ws count)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const web1 = addWebSocket(mockCtx, 'web-1');
+      const web2 = addWebSocket(mockCtx, 'web-2');
+      const web3 = addWebSocket(mockCtx, 'web-3');
+
+      // No subscriptions — the broadcast must still hit every web socket.
+      web1.send.mockClear();
+      web2.send.mockClear();
+      web3.send.mockClear();
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      // One heartbeat frame per active web socket.
+      expect(web1.send).toHaveBeenCalledTimes(1);
+      expect(web2.send).toHaveBeenCalledTimes(1);
+      expect(web3.send).toHaveBeenCalledTimes(1);
+
+      // The delivered payload is the same shape (including the connectionId).
+      for (const ws of [web1, web2, web3]) {
+        const sent = parseSent(ws) as { data: { connectionId: string; sessions: unknown[] } };
+        expect(sent).toMatchObject({
+          type: 'system',
+          event: 'sessions.heartbeat',
+          data: { connectionId: 'cli-1', sessions: [{ id: 's1' }] },
+        });
+      }
+    });
+
+    it('forwards the CLI-reported protocolVersion to every web socket', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
-      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], '1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], { protocolVersion: '1' });
       sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
-      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], '1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], { protocolVersion: '1' });
 
       expect(parseSent(webWs)).toMatchObject({
         type: 'system',
@@ -538,36 +625,50 @@ describe('UserConnectionDO', () => {
       expect(sent.data).not.toHaveProperty('protocolVersion');
     });
 
-    it('sends heartbeat to subscribers of removed sessions', () => {
+    it('broadcasts removed-session information to every web socket (no subscriber special-case)', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
-      const webWs = addWebSocket(mockCtx, 'web-1');
+      // subWeb subscribed to s1, otherWeb is unrelated — both must learn s1 is gone.
+      const subWeb = addWebSocket(mockCtx, 'web-sub');
+      const otherWeb = addWebSocket(mockCtx, 'web-other');
 
       // cli1 owns s1
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendSubscribe(doInstance, webWs, 's1');
-      webWs.send.mockClear();
+      sendSubscribe(doInstance, subWeb, 's1');
+      subWeb.send.mockClear();
+      otherWeb.send.mockClear();
 
-      // s1 disappears from heartbeat — subscriber should still get the heartbeat
+      // s1 disappears from heartbeat — every web socket gets a heartbeat with sessions:[].
       sendHeartbeat(doInstance, cliWs, []);
 
-      expect(webWs.send).toHaveBeenCalledTimes(1);
-      expect(parseSent(webWs)).toMatchObject({
+      expect(subWeb.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(subWeb)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'cli-1', sessions: [] },
+      });
+      expect(otherWeb.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(otherWeb)).toMatchObject({
         type: 'system',
         event: 'sessions.heartbeat',
         data: { connectionId: 'cli-1', sessions: [] },
       });
     });
 
-    it('does not send heartbeat to unsubscribed web clients', () => {
+    it('delivers heartbeat to web sockets that are not subscribed to anything', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
-      // webWs is not subscribed to anything
+      // webWs has no subscriptions
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
 
-      expect(webWs.send).not.toHaveBeenCalled();
+      expect(webWs.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(webWs)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'cli-1', sessions: [{ id: 's1' }] },
+      });
     });
 
     it('schedules stale alarm on heartbeat', () => {
@@ -586,6 +687,194 @@ describe('UserConnectionDO', () => {
 
       const msgs = allSent(cliWs);
       expect(msgs).toContainEqual({ type: 'heartbeat_ack' });
+    });
+
+    // -----------------------------------------------------------------------
+    // capabilities transitions (decision 8): exercise true→absent, true→false,
+    // and absent/false→true through the actual DO event path and assert the
+    // projected value in BOTH aggregateSessions() and the sessions.heartbeat
+    // event rows, including omission when the latest heartbeat omits
+    // capabilities.
+    // -----------------------------------------------------------------------
+
+    it('projects capabilities.attachments=true on every aggregateSessions row when the owning CLI advertises it', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
+        capabilities: { attachments: true },
+      });
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.capabilities).toEqual({ attachments: true });
+      }
+    });
+
+    it('projects the latest connection capabilities onto every sessions.heartbeat row', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      // Establish ownership and subscription first so the heartbeat broadcast
+      // is targeted at this web socket.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
+      sendSubscribe(doInstance, webWs, 's1');
+      webWs.send.mockClear();
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
+        capabilities: { attachments: true },
+      });
+
+      expect(parseSent(webWs)).toMatchObject({
+        data: {
+          sessions: [
+            { id: 's1', capabilities: { attachments: true } },
+            { id: 's2', capabilities: { attachments: true } },
+          ],
+        },
+      });
+
+      webWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
+      expect(parseSent(webWs)).toMatchObject({
+        data: { sessions: [{ id: 's1' }, { id: 's2' }] },
+      });
+      const legacyRows = (parseSent(webWs) as { data: { sessions: Record<string, unknown>[] } })
+        .data.sessions;
+      expect(legacyRows.every(row => !Object.hasOwn(row, 'capabilities'))).toBe(true);
+
+      webWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
+        capabilities: { attachments: false },
+      });
+      expect(parseSent(webWs)).toMatchObject({
+        data: {
+          sessions: [
+            { id: 's1', capabilities: { attachments: false } },
+            { id: 's2', capabilities: { attachments: false } },
+          ],
+        },
+      });
+    });
+
+    it('omits capabilities from aggregateSessions rows when the latest heartbeat omits the field (legacy CLI)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      // First heartbeat with capabilities
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+      // Second heartbeat omits capabilities (CLI rollback / legacy)
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).not.toHaveProperty('capabilities');
+    });
+
+    it('omits capabilities from sessions.heartbeat event envelope when the latest heartbeat omits the field', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+      sendSubscribe(doInstance, webWs, 's1');
+      webWs.send.mockClear();
+
+      // Latest heartbeat omits capabilities.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      const sent = parseSent(webWs) as { data: Record<string, unknown> };
+      expect(sent.data).not.toHaveProperty('capabilities');
+    });
+
+    it('flips capabilities.attachments from true to false on the next heartbeat (CLI revocation)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+      expect(doInstance.getActiveSessions()[0].capabilities).toEqual({ attachments: true });
+
+      // CLI advertises attachments=false (e.g. feature gated, profile change)
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: false },
+      });
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].capabilities).toEqual({ attachments: false });
+    });
+
+    it('flips capabilities.attachments from absent to true when a legacy CLI starts advertising it', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      // Legacy heartbeat — no capabilities field
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      const legacy = doInstance.getActiveSessions();
+      expect(legacy[0]).not.toHaveProperty('capabilities');
+
+      // Upgraded CLI starts advertising attachments=true
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+
+      const upgraded = doInstance.getActiveSessions();
+      expect(upgraded[0].capabilities).toEqual({ attachments: true });
+    });
+
+    it('flips capabilities.attachments from false to true on the next heartbeat', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: false },
+      });
+      expect(doInstance.getActiveSessions()[0].capabilities).toEqual({ attachments: false });
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+
+      expect(doInstance.getActiveSessions()[0].capabilities).toEqual({ attachments: true });
+    });
+
+    it('projects the same owning-connection capabilities on every session row of a multi-session heartbeat', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
+        capabilities: { attachments: false },
+      });
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(2);
+      expect(rows[0].capabilities).toEqual({ attachments: false });
+      expect(rows[1].capabilities).toEqual({ attachments: false });
+    });
+
+    it('reconstructs capabilities from a hibernated CLI attachment', () => {
+      const { doInstance, mockCtx } = setup();
+      // Pre-existing attachment with capabilities — simulates a socket that
+      // was accepted before the DO was evicted.
+      const cliWs = createMockWs(['cli'], {
+        role: 'cli',
+        connectionId: 'cli-hiber',
+        sessions: [makeSession('s1')],
+        capabilities: { attachments: true },
+      });
+      mockCtx.addSocket(cliWs);
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].capabilities).toEqual({ attachments: true });
     });
   });
 
@@ -685,6 +974,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')]);
+      webWs.send.mockClear();
       sendSubscribe(doInstance, webWs, 's1');
 
       expect(parseSent(webWs)).toEqual({
@@ -899,7 +1189,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('CLI disconnect', () => {
-    it('cleans up session ownership and broadcasts cli.disconnected', () => {
+    it('cleans up session ownership and broadcasts cli.disconnected', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -909,7 +1199,7 @@ describe('UserConnectionDO', () => {
 
       // Remove from sockets before disconnect (simulates runtime closing)
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       // Web receives cli.disconnected
       expect(webWs.send).toHaveBeenCalled();
@@ -929,7 +1219,7 @@ describe('UserConnectionDO', () => {
       expect(parseSent(web2)).toMatchObject({ type: 'response', error: 'Session owner not found' });
     });
 
-    it('sends error responses for pending commands on disconnect', () => {
+    it('sends error responses for pending commands on disconnect', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -942,7 +1232,7 @@ describe('UserConnectionDO', () => {
 
       // CLI disconnects
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       // Web receives error response with original id
       const msgs = allSent(webWs);
@@ -952,7 +1242,7 @@ describe('UserConnectionDO', () => {
       expect(errorResp).toMatchObject({ type: 'response', id: 'cmd-1', error: 'CLI disconnected' });
     });
 
-    it('reports owner change when an owner-fenced command target disconnects', () => {
+    it('reports owner change when an owner-fenced command target disconnects', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -967,7 +1257,7 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       expect(parseSent(webWs)).toEqual({
         type: 'response',
@@ -1009,7 +1299,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('sends error for connection-routed pending commands on CLI disconnect', () => {
+    it('sends error for connection-routed pending commands on CLI disconnect', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1026,7 +1316,7 @@ describe('UserConnectionDO', () => {
 
       // CLI disconnects before responding
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       const msgs = allSent(webWs);
       const errorResp = msgs.find(
@@ -1039,7 +1329,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('sends error for fallback-routed pending commands on CLI disconnect', () => {
+    it('sends error for fallback-routed pending commands on CLI disconnect', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1051,7 +1341,7 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       const msgs = allSent(webWs);
       const errorResp = msgs.find(
@@ -1064,7 +1354,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('reconnecting CLI — old socket close does not destroy state', () => {
+    it('reconnecting CLI — old socket close does not destroy state', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1079,7 +1369,7 @@ describe('UserConnectionDO', () => {
       // DON'T remove cli2 from sockets — cli2 is the replacement
       // Just remove cli1 to simulate it being closed
       mockCtx.removeSocket(cli1);
-      disconnectCli(doInstance, cli1);
+      await disconnectCli(doInstance, cli1);
 
       // State should NOT be cleaned up — cli2 is live
       // Verify by routing a command to s1 — should reach cli2
@@ -1089,7 +1379,7 @@ describe('UserConnectionDO', () => {
       expect(parseSent(cli2)).toEqual({ type: 'subscribe', sessionId: 's1' });
     });
 
-    it('reconnecting CLI — commands sent to replacement socket are not spuriously failed', () => {
+    it('reconnecting CLI — commands sent to replacement socket are not spuriously failed', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1114,7 +1404,7 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       // Now cli1's close event fires (stale socket teardown)
-      disconnectCli(doInstance, cli1);
+      await disconnectCli(doInstance, cli1);
 
       // Web should NOT have received an error for cmd-new — it was sent to cli2, not cli1
       const errorMsgs = allSent(webWs).filter(
@@ -1134,7 +1424,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('reconnecting CLI — pending commands from old socket get error responses', () => {
+    it('reconnecting CLI — pending commands from old socket get error responses', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1151,7 +1441,7 @@ describe('UserConnectionDO', () => {
 
       // cli1's close event fires — cmd-1 was sent on cli1's wire, cli2 never saw it
       mockCtx.removeSocket(cli1);
-      disconnectCli(doInstance, cli1);
+      await disconnectCli(doInstance, cli1);
 
       // Web should receive an error for the stranded command
       const msgs = allSent(webWs);
@@ -1163,6 +1453,171 @@ describe('UserConnectionDO', () => {
         id: 'cmd-1',
         error: 'CLI disconnected',
       });
+    });
+
+    it('resets attention status for owned sessions before broadcasting cli.disconnected', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('s-question', 'question'),
+        makeSession('s-busy', 'busy'),
+      ]);
+      webWs.send.mockClear();
+
+      const callOrder: string[] = [];
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockImplementation(async () => {
+        callOrder.push('reset');
+        // Disconnect must not have been broadcast yet (ordering guarantee).
+        expect(
+          allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')
+        ).toBe(false);
+      });
+
+      // Leave the socket in getWebSockets() — matches workerd during webSocketClose.
+      await disconnectCli(doInstance, cliWs);
+
+      callOrder.push('disconnect');
+
+      expect(sessionIngestMocks.getSessionIngestDO).toHaveBeenCalledWith(expect.anything(), {
+        kiloUserId: 'usr_1',
+        sessionId: 's-question',
+      });
+      expect(sessionIngestMocks.getSessionIngestDO).toHaveBeenCalledWith(expect.anything(), {
+        kiloUserId: 'usr_1',
+        sessionId: 's-busy',
+      });
+      // Both owned sessions are delegated; attention-only filtering is on the metadata side.
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledTimes(2);
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's-question'
+      );
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's-busy'
+      );
+      expect(callOrder.filter(step => step === 'reset')).toHaveLength(2);
+      expect(callOrder.at(-1)).toBe('disconnect');
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+    });
+
+    it('resets attention when the closing socket is still listed in getWebSockets (workerd)', async () => {
+      // Production wrangler/workerd keeps the closing WebSocket in getWebSockets()
+      // during webSocketClose. Matching connectionId without excluding self would
+      // treat every disconnect as a stale reconnect and skip the attention reset.
+      // Prior unit tests always called removeSocket first, so they never caught this.
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s-question', 'question')]);
+      webWs.send.mockClear();
+      sessionIngestMocks.getSessionIngestDO.mockClear();
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockClear();
+
+      // Do NOT removeSocket — mirrors workerd during webSocketClose.
+      expect(mockCtx.sockets).toContain(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledTimes(1);
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's-question'
+      );
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+    });
+
+    it('does not reset attention when kiloUserId is missing on the attachment', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      webWs.send.mockClear();
+
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      expect(sessionIngestMocks.getSessionIngestDO).not.toHaveBeenCalled();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'Skipping attention status reset on CLI disconnect: missing kiloUserId on attachment',
+        { ownedSessionCount: 1 }
+      );
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+    });
+
+    it('does not reset attention for sessions owned by another live connection', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const cli2 = addCliSocket(mockCtx, 'cli-2', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cli1, [makeSession('s1', 'question')]);
+      // cli2 takes ownership of s1
+      sendHeartbeat(doInstance, cli2, [makeSession('s1', 'question')]);
+      webWs.send.mockClear();
+      sessionIngestMocks.getSessionIngestDO.mockClear();
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockClear();
+
+      mockCtx.removeSocket(cli1);
+      await disconnectCli(doInstance, cli1);
+
+      // cli1 no longer owns s1, so no reset for that session
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+    });
+
+    it('stale reconnect close does not reset attention status', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const cli2 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+
+      sendHeartbeat(doInstance, cli1, [makeSession('s1', 'question')]);
+      sendHeartbeat(doInstance, cli2, [makeSession('s1', 'question')]);
+      sessionIngestMocks.getSessionIngestDO.mockClear();
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockClear();
+
+      mockCtx.removeSocket(cli1);
+      await disconnectCli(doInstance, cli1);
+
+      expect(sessionIngestMocks.getSessionIngestDO).not.toHaveBeenCalled();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+    });
+
+    it('still broadcasts cli.disconnected when attention reset fails', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      webWs.send.mockClear();
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockRejectedValueOnce(
+        new Error('db down')
+      );
+
+      // Leave socket listed (workerd close semantics).
+      await disconnectCli(doInstance, cliWs);
+
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+      expect(error).toHaveBeenCalledWith(
+        'Failed to reset attention status on CLI disconnect',
+        expect.objectContaining({ error: 'db down' })
+      );
     });
   });
 
@@ -1364,6 +1819,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
@@ -1398,6 +1854,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
@@ -1481,6 +1938,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       for (let index = 0; index < 128; index++) {
         sendCommand(doInstance, webWs, {
           id: `cmd-${index}`,
@@ -1621,6 +2079,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, staleOwner, []);
       currentOwner.send.mockClear();
       staleOwner.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
@@ -1756,6 +2215,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, { id: 'cmd-1', command: 'eval', sessionId: 's1' });
 
@@ -1778,6 +2238,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
@@ -1828,6 +2289,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, { id: 'cmd-1', command: 'eval', sessionId: 's1' });
       const sent = parseSent(webWs) as Record<string, unknown>;
@@ -1852,6 +2314,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, staleOwner, []);
       currentOwner.send.mockClear();
       staleOwner.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
@@ -1886,6 +2349,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_commands',
@@ -2281,6 +2745,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_command',
@@ -2321,6 +2786,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, []);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'create_session',
@@ -2427,6 +2893,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
@@ -2486,6 +2953,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, staleOwner, []);
       currentOwner.send.mockClear();
       staleOwner.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
@@ -2533,6 +3001,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
@@ -2561,6 +3030,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
@@ -2773,15 +3243,13 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('broadcast resilience', () => {
-    it('one closed socket does not abort send to other subscribers', () => {
+    it('one closed socket does not abort send to other web sockets', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const failWeb = addWebSocket(mockCtx, 'web-fail');
       const okWeb = addWebSocket(mockCtx, 'web-ok');
 
-      // Both subscribe to s1 so they receive heartbeats
-      sendSubscribe(doInstance, failWeb, 's1');
-      sendSubscribe(doInstance, okWeb, 's1');
+      // Both web sockets receive heartbeats via broadcast (no subscription needed).
       failWeb.send.mockClear();
       okWeb.send.mockClear();
 
@@ -2898,7 +3366,9 @@ describe('UserConnectionDO', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
-      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')], '1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')], {
+        protocolVersion: '1',
+      });
 
       const result = doInstance.getActiveSessions();
       expect(result).toEqual([
@@ -2949,6 +3419,231 @@ describe('UserConnectionDO', () => {
       const result = doInstance.getActiveSessions();
       expect(result).toEqual([
         { id: 'root-1', status: 'idle', title: 'Root session', connectionId: 'cli-1' },
+      ]);
+    });
+
+    it('forwards the per-session platform when the CLI reports it (newer CLIs)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('s1', 'busy', 'On a Mac', undefined, 'darwin'),
+        makeSession('s2', 'idle', 'Other'),
+      ]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 's1', status: 'busy', title: 'On a Mac', connectionId: 'cli-1', platform: 'darwin' },
+        { id: 's2', status: 'idle', title: 'Other', connectionId: 'cli-1' },
+      ]);
+    });
+
+    it('omits the platform key entirely for legacy CLIs (byte-identical response)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      // Legacy CLI heartbeat without platform.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Legacy')]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 's1', status: 'busy', title: 'Legacy', connectionId: 'cli-1' },
+      ]);
+      expect(result[0]).not.toHaveProperty('platform');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getConnectedInstances RPC (W3)
+  // -------------------------------------------------------------------------
+
+  describe('getConnectedInstances', () => {
+    it('returns one row per CLI socket that has an `instance` attachment', () => {
+      const { doInstance, mockCtx } = setup();
+      // Use the hibernated-attachment pattern (no heartbeat) — the live
+      // scan reads the `instance` directly from the attachment, which is
+      // what the spec requires: a fresh value with no in-memory map.
+      addCliSocket(mockCtx, 'cli-A', [], {
+        name: 'laptop-A',
+        projectName: 'kilo',
+        version: '0.1.2',
+      });
+      addCliSocket(mockCtx, 'cli-B', [], { name: 'laptop-B', projectName: 'kilo' });
+      addWebSocket(mockCtx);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toHaveLength(2);
+      expect(instances).toEqual(
+        expect.arrayContaining([
+          { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
+          { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+        ])
+      );
+    });
+
+    it('omits the `version` key when the CLI did not report one', () => {
+      const { doInstance, mockCtx } = setup();
+      addCliSocket(mockCtx, 'cli-1', [], { name: 'laptop-1', projectName: 'kilo' });
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([{ connectionId: 'cli-1', name: 'laptop-1', projectName: 'kilo' }]);
+      expect(instances[0]).not.toHaveProperty('version');
+    });
+
+    it('excludes legacy CLIs that never reported an `instance`', () => {
+      const { doInstance, mockCtx } = setup();
+      // Legacy CLI: pre-spawner heartbeat has no `instance`.
+      const cliWs = addCliSocket(mockCtx, 'legacy-1');
+      sendHeartbeat(doInstance, cliWs, []);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([]);
+    });
+
+    it('excludes web sockets', () => {
+      const { doInstance, mockCtx } = setup();
+      addWebSocket(mockCtx);
+      // A web socket with an `instance`-shaped attachment must still be skipped.
+      const webWithInstance = createMockWs(['web'], {
+        role: 'web',
+        connectionId: 'web-1',
+        subscribedSessions: [],
+      } as never);
+      mockCtx.addSocket(webWithInstance);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([]);
+    });
+
+    it('reads `instance` directly from the live socket (no in-memory map)', () => {
+      const { doInstance, mockCtx } = setup();
+      // Simulate a hibernated attach: socket exists, attachment has `instance`
+      // set, but no heartbeat has been processed through the in-memory state.
+      addCliSocket(mockCtx, 'cli-h', [], {
+        name: 'laptop-h',
+        projectName: 'kilo',
+        version: '1.0.0',
+      });
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([
+        { connectionId: 'cli-h', name: 'laptop-h', projectName: 'kilo', version: '1.0.0' },
+      ]);
+    });
+
+    it('persists `instance` in the WS attachment across heartbeats', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], {
+        protocolVersion: '1',
+        instance: { name: 'laptop-1', projectName: 'kilo', version: '0.1.0' },
+      });
+
+      const att = cliWs.deserializeAttachment() as { instance?: { name: string } };
+      expect(att.instance).toEqual({ name: 'laptop-1', projectName: 'kilo', version: '0.1.0' });
+    });
+
+    it('drops `instance` from the attachment on a subsequent heartbeat that omits it', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      // First heartbeat: with instance.
+      sendHeartbeat(doInstance, cliWs, [], {
+        instance: { name: 'laptop-1', projectName: 'kilo' },
+      });
+      // Second heartbeat: instance removed (legacy fallback). The DO must not
+      // keep a stale `instance` value in the attachment.
+      sendHeartbeat(doInstance, cliWs, []);
+
+      const att = cliWs.deserializeAttachment() as { instance?: unknown };
+      expect(att.instance).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // WS attachment size guardrail (W3)
+  // -------------------------------------------------------------------------
+
+  describe('WS attachment size', () => {
+    // The Cloudflare `serializeAttachment` budget is ~2 KiB. A bounded
+    // instance object (name+projectName+version, all max length) adds well
+    // under 200 bytes; this test pins that contract so a future schema
+    // change cannot silently push us over the budget.
+    const SERIALIZE_ATTACHMENT_BUDGET = 2048;
+    // Bounded `instance` = 64 + 64 + 32 chars content + JSON framing ≈ 200
+    // bytes; we allow a 25% safety margin so a future protocol bump to the
+    // instance shape (e.g. adding `pid`) cannot silently blow the 2 KiB
+    // attachment budget.
+    const INSTANCE_HEADROOM = 250;
+
+    it('keeps the combined CLI attachment comfortably under 2 KiB with a worst-case instance', () => {
+      const worstCaseInstance = {
+        name: 'x'.repeat(64),
+        projectName: 'x'.repeat(64),
+        version: 'x'.repeat(32),
+      };
+      // 4 sessions with realistic-but-large titles, git URLs, and branches.
+      // (4 is a generous upper bound for a single CLI owning a live session
+      // fleet; the actual HeartbeatSession shape imposes tighter per-field
+      // limits at the protocol layer.)
+      const sessions = Array.from({ length: 4 }, (_, i) => ({
+        id: `ses_${String(i).padStart(26, '0')}`,
+        status: 'busy',
+        title: 'T'.repeat(120),
+        gitUrl: 'https://github.com/org/' + 'x'.repeat(60) + '.git',
+        gitBranch: 'b'.repeat(40),
+      }));
+
+      const attachment = {
+        role: 'cli' as const,
+        connectionId: 'cli-1',
+        sessions,
+        protocolVersion: '255.255.65535',
+        kiloUserId: 'usr_' + 'x'.repeat(28),
+        instance: worstCaseInstance,
+      };
+
+      const serialized = new TextEncoder().encode(JSON.stringify(attachment)).byteLength;
+
+      expect(serialized).toBeLessThan(SERIALIZE_ATTACHMENT_BUDGET);
+      // Sanity: the bounded instance alone is far below the headroom.
+      const instanceBytes = new TextEncoder().encode(JSON.stringify(worstCaseInstance)).byteLength;
+      expect(instanceBytes).toBeLessThan(INSTANCE_HEADROOM);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Owner-unique active sessions (W-followup)
+  // -------------------------------------------------------------------------
+
+  describe('owner-unique active sessions', () => {
+    it('emits owner-unique rows: ownership transfer with both CLIs live yields exactly one row under the new owner', () => {
+      const { doInstance, ctx, mockCtx } = setup();
+      const oldOwner = addCliSocket(mockCtx, 'cli-old');
+      const newOwner = addCliSocket(mockCtx, 'cli-new');
+
+      // cli-old claims the session
+      sendHeartbeat(doInstance, oldOwner, [makeSession('ses_transfer', 'busy', 'Transfer me')]);
+
+      // cli-new also claims the same session id while cli-old is still connected.
+      // The DO routes the session to the new owner (sessionOwners.get === 'cli-new').
+      sendHeartbeat(doInstance, newOwner, [makeSession('ses_transfer', 'busy', 'Transfer me')]);
+
+      // Both CLIs are still live sockets — the snapshot should see them both.
+      expect(ctx.getWebSockets('cli').map(ws => ws.deserializeAttachment())).toEqual([
+        expect.objectContaining({ role: 'cli', connectionId: 'cli-old' }),
+        expect.objectContaining({ role: 'cli', connectionId: 'cli-new' }),
+      ]);
+
+      const result = doInstance.getActiveSessions();
+
+      // Exactly one row for the transferred session id, under the new owner.
+      expect(result).toEqual([
+        {
+          id: 'ses_transfer',
+          status: 'busy',
+          title: 'Transfer me',
+          connectionId: 'cli-new',
+        },
       ]);
     });
   });
@@ -3030,7 +3725,7 @@ describe('UserConnectionDO', () => {
       expect(JSON.stringify(warn.mock.calls)).not.toContain(secret);
     });
 
-    it('webSocketError triggers webSocketClose', () => {
+    it('webSocketError triggers webSocketClose', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3040,7 +3735,7 @@ describe('UserConnectionDO', () => {
 
       // Remove CLI so disconnect can clean up
       mockCtx.removeSocket(cliWs);
-      doInstance.webSocketError(cliWs as never);
+      await doInstance.webSocketError(cliWs as never);
 
       // Should broadcast cli.disconnected
       const msgs = allSent(webWs);
@@ -3066,13 +3761,11 @@ describe('UserConnectionDO', () => {
       const mockCtx = createMockCtx();
       const ctx = mockCtx.build();
       const claimSessionReadyPush = vi.fn(async () => {});
-      const env = {
-        SESSION_INGEST_DO: {
-          idFromName: vi.fn((name: string) => name),
-          get: vi.fn(() => ({ claimSessionReadyPush })),
-        },
-      };
-      const doInstance = new UserConnectionDO(ctx as never, env as never);
+      sessionIngestMocks.getSessionIngestDO.mockReturnValue({
+        claimSessionReadyPush,
+        resetAttentionStatusOnCliDisconnect: sessionIngestMocks.resetAttentionStatusOnCliDisconnect,
+      });
+      const doInstance = new UserConnectionDO(ctx as never, {} as never);
       return { doInstance, mockCtx, claimSessionReadyPush };
     }
 
@@ -3094,7 +3787,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
 
       expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
-      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main');
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main', 'Test');
 
       // Subsequent heartbeats for the same session must not re-claim.
       sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
@@ -3111,7 +3804,7 @@ describe('UserConnectionDO', () => {
       ]);
 
       expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
-      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main');
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main', 'Test');
     });
 
     it('does not claim on sockets without a kiloUserId (legacy attachment)', () => {

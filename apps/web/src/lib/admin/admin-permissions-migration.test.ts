@@ -99,5 +99,7 @@ describe('admin permissions migration', () => {
       await adminPool.end();
       await rm(temporaryRoot, { recursive: true, force: true });
     }
-  }, 60_000);
+    // Runs the full migration set on a fresh database; fork PRs run on slower
+    // GitHub-hosted runners where this exceeds 60s (vs ~20s on Blacksmith).
+  }, 300_000);
 });

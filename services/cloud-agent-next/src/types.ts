@@ -6,6 +6,7 @@ import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
+import type { ContainerUsageRpcMethods } from '@kilocode/container-usage';
 import type { SecretBinding } from './auth.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
@@ -123,6 +124,8 @@ export type SandboxId =
   | `dind-${string}`
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
+
+export type AgentSandboxProvider = 'cloudflare';
 
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}`;
@@ -471,6 +474,8 @@ export type Env = {
   SHARED_SANDBOX_OVERRIDES: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
+  /** Record-only container lifecycle usage meter. */
+  CONTAINER_USAGE_METER: ContainerUsageRpcMethods;
   /** Shared secret for internal service-to-service authentication */
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
@@ -518,7 +523,7 @@ export type Env = {
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */
   GITHUB_APP_BOT_USER_ID?: string;
-  /** Comma-separated org IDs that use per-session sandbox containers */
+  /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** Comma-separated org IDs whose GitHub token uses credential containment, or `*` for all orgs */
   GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;

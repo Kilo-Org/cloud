@@ -9,6 +9,10 @@ import type {
   PlatformIntegration,
 } from '@kilocode/db/schema';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import {
+  COUNCIL_RESULT_MARKER_TAG,
+  COUNCIL_VERDICT_BLOCK_START,
+} from '@kilocode/worker-utils/code-review-council';
 
 // --- Mock functions ---
 
@@ -35,6 +39,9 @@ const mockGetLatestCodeReviewAttempt = jest.fn() as jest.MockedFunction<
 >;
 const mockCreateInfraRetryAttemptIfMissing = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.createInfraRetryAttemptIfMissing
+>;
+const mockSetCodeReviewCouncilResult = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.setCodeReviewCouncilResult
 >;
 const mockFinalizeCompletedCodeReviewWithAnalytics = jest.fn() as jest.MockedFunction<
   typeof analyticsDbModule.finalizeCompletedCodeReviewWithAnalytics
@@ -102,6 +109,7 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt: mockGetLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing: mockCreateInfraRetryAttemptIfMissing,
+  setCodeReviewCouncilResult: mockSetCodeReviewCouncilResult,
 }));
 
 jest.mock('@/lib/code-reviews/analytics/db', () => ({
@@ -360,9 +368,13 @@ function mockCreatedInfraRetryFlow(
 
 // --- Tests ---
 
-import type { POST as POSTType } from './route';
+import type {
+  POST as POSTType,
+  isWorkspaceCapacityFailure as isWorkspaceCapacityFailureType,
+} from './route';
 
 let POST: typeof POSTType;
+let isWorkspaceCapacityFailure: typeof isWorkspaceCapacityFailureType;
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -410,6 +422,7 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
+  mockSetCodeReviewCouncilResult.mockResolvedValue(undefined);
   mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'applied' });
   mockAppendPreviousReviewSummaryHistory.mockImplementation((body: string) => body);
   mockBuildReviewSummaryFooter.mockImplementation(
@@ -422,7 +435,27 @@ beforeEach(async () => {
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
-  ({ POST } = await import('./route'));
+  ({ POST, isWorkspaceCapacityFailure } = await import('./route'));
+});
+
+describe('isWorkspaceCapacityFailure', () => {
+  it('detects a full-disk failure from the structured subtype or the message', () => {
+    expect(
+      isWorkspaceCapacityFailure(undefined, 'Workspace setup failed: sandbox storage full')
+    ).toBe(true);
+    // Orchestrator session-start path reports it inside a "(500)" message.
+    expect(
+      isWorkspaceCapacityFailure(
+        undefined,
+        'initiate failed (500): Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup'
+      )
+    ).toBe(true);
+  });
+
+  it('ignores unrelated failures', () => {
+    expect(isWorkspaceCapacityFailure(undefined, 'The message could not be delivered')).toBe(false);
+    expect(isWorkspaceCapacityFailure(undefined, undefined)).toBe(false);
+  });
 });
 
 describe('POST /api/internal/code-review-status/[reviewId]', () => {
@@ -1273,6 +1306,86 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         REVIEW_ID,
         'completed',
         expect.objectContaining({ terminalReason: undefined })
+      );
+    });
+
+    it('derives the terminal reason from the structured failure payload', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Agent wrapper failed while processing the message',
+          failure: { stage: 'agent_activity', code: 'wrapper_error_after_activity' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'wrapper_failed' })
+      );
+    });
+
+    it('keeps rate limiting distinct from generic assistant failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          failure: { code: 'assistant_error', message: 'Assistant request was rate limited' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'assistant_rate_limited' })
+      );
+    });
+
+    // model_missing arrives with the generic message 'No model was selected',
+    // which the message-based model-not-found check cannot match. Without the
+    // structured path re-applying normalization the row would stay 'failed' and
+    // the customer would get generic copy instead of the actionable message.
+    it('normalizes status to cancelled for a structured model_missing failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'No model was selected',
+          failure: { stage: 'pre_dispatch', code: 'model_missing' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'cancelled', terminalReason: 'model_not_found' })
+      );
+    });
+
+    // errorMessage is deliberately omitted. The real payment_required safe
+    // message contains 'insufficient credits', which the earlier text-based
+    // billing heuristic matches, so including it would set terminalReason before
+    // the structured branch runs and the assertion would pass even if the
+    // payment_required mapping were deleted.
+    it('normalizes status to failed for a structured payment_required failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'interrupted',
+          failure: { code: 'payment_required' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'billing' })
       );
     });
   });
@@ -2612,6 +2725,204 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     });
   });
 
+  describe('council decision gate', () => {
+    const crit = [{ path: 'a.ts', line: 1, severity: 'critical', rationale: 'x' }];
+
+    const councilManifest = (specialists: unknown[]): string =>
+      `Council review complete.\n<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify({ specialists })} -->`;
+
+    const makeCouncilReview = (
+      aggregationStrategy: 'advisory' | 'unanimous' | 'majority',
+      overrides: Partial<CloudAgentCodeReview> = {}
+    ): CloudAgentCodeReview =>
+      makeReview({
+        review_type: 'council',
+        manual_config: {
+          instructions: null,
+          outputMode: 'provider',
+          agentConfig: {
+            review_style: 'balanced',
+            focus_areas: [],
+            model_slug: 'base/model',
+            council: {
+              enabled: true,
+              aggregation_strategy: aggregationStrategy,
+              specialists: [
+                {
+                  id: 'security',
+                  role: 'security',
+                  name: 'Security',
+                  enabled: true,
+                  required: false,
+                  lens: 'security',
+                },
+                {
+                  id: 'performance',
+                  role: 'performance',
+                  name: 'Performance',
+                  enabled: true,
+                  required: false,
+                  lens: 'performance',
+                },
+              ],
+            },
+          },
+        },
+        ...overrides,
+      });
+
+    const findCheckRunConclusion = (): string | undefined => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const call = mockUpdateCheckRun.mock.calls.at(-1) as any[] | undefined;
+      return call?.[4]?.conclusion as string | undefined;
+    };
+
+    it('reports a block decision but does NOT gate a manual council run (check stays green)', async () => {
+      // Council is manual-only today, so a council review is always a manual run. Manual runs never
+      // enforce a merge gate (they report the decision only), so a block decision must NOT fail the
+      // check — matching the "does not block merge" copy in the injected Council Review section.
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('unanimous'));
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      // The decision is still computed and persisted as block...
+      expect(mockSetCodeReviewCouncilResult).toHaveBeenCalledWith(
+        REVIEW_ID,
+        expect.objectContaining({ decision: 'block' })
+      );
+      // ...but a manual run does not enforce it, so the check is not failed.
+      expect(findCheckRunConclusion()).toBe('success');
+    });
+
+    it('does NOT post a blocking GitLab commit status for a manual council block', async () => {
+      // Finding: without a single gate flag, GitLab's branch would setCommitStatus('failed') on a
+      // manual block (which can block MR merge) while the comment says it does not block. The gate
+      // must resolve to a non-blocking status for a manual run on GitLab too.
+      mockGetCodeReviewById.mockResolvedValue(
+        makeCouncilReview('unanimous', {
+          platform: 'gitlab',
+          platform_project_id: 42,
+          check_run_id: null,
+        })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      const call = mockSetCommitStatus.mock.calls.at(-1);
+      expect(call?.[3]).toBe('success'); // NOT 'failed'
+    });
+
+    it('passes the check when every specialist passes under unanimous governance', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('unanimous'));
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: [] },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(findCheckRunConclusion()).toBe('success');
+    });
+
+    it('never gates in advisory mode even with a blocking finding', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('advisory'));
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockSetCodeReviewCouncilResult).toHaveBeenCalledWith(
+        REVIEW_ID,
+        expect.objectContaining({ decision: null })
+      );
+      expect(findCheckRunConclusion()).toBe('success');
+    });
+
+    const findCouncilSectionCall = () =>
+      mockUpdateKiloReviewComment.mock.calls.find(
+        call => typeof call[4] === 'string' && call[4].includes(COUNCIL_VERDICT_BLOCK_START)
+      );
+
+    it('injects the code-owned Council Review section, phrased as "would block" for a manual run', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('unanimous'));
+
+      await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      const call = findCouncilSectionCall();
+      expect(call).toBeDefined();
+      // Manual jobs never create a check run, so the decision is reported but does not block.
+      expect(call?.[4]).toContain('## Council Review');
+      expect(call?.[4]).toContain('Would block merge');
+      expect(call?.[4]).toContain('does not block merge');
+      // Efficiency: the council section is folded into the summary footer update — one fetch,
+      // one update, not a separate find+patch pass.
+      expect(mockFindKiloReviewComment).toHaveBeenCalledTimes(1);
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledTimes(1);
+    });
+
+    it('injects an advisory Council Review section (governance info, no merge decision)', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('advisory'));
+
+      await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      const call = findCouncilSectionCall();
+      expect(call).toBeDefined();
+      expect(call?.[4]).toContain('Advisory review');
+      expect(call?.[4]).not.toContain('Would block merge');
+    });
+  });
+
   describe('GitHub check run billing messaging', () => {
     it('uses action_required conclusion for billing failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
@@ -2640,6 +2951,99 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         }),
         'standard'
       );
+    });
+
+    // Notification only: the customer is told the cause, but the check stays a
+    // plain failure and Code Reviewer is not disabled. A provider rate limit is
+    // transient and there is nothing to reconfigure.
+    it('names the customer key for a byok rate limit without requiring action', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'failure',
+          output: expect.objectContaining({
+            title: 'Kilo Code Review rate limited',
+            summary: 'Your provider API key hit its rate limit.',
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    // A customer's exhausted quota will still be exhausted a moment later, so
+    // retrying burns a second review against the same closed door.
+    it('does not auto-retry a byok rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+    });
+
+    // The GitLab commit status is built by a separate function from the GitHub
+    // check run, so it needs its own coverage.
+    it('names the customer key in the GitLab commit status', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Your provider API key hit its rate limit.',
+        }),
+        'https://gitlab.com'
+      );
+    });
+
+    // Our own capacity can free up, so this one stays retryable.
+    it('still auto-retries a managed key rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_managed',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalled();
     });
 
     it('uses failure conclusion for non-billing failures', async () => {

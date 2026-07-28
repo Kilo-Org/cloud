@@ -18,11 +18,15 @@ import { resolveNewSessionPromptControlState } from '@/components/agents/new-ses
 import { QueryError } from '@/components/query-error';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSharePrefill } from '@/lib/share-prefill';
 import { cn } from '@/lib/utils';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
-import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import {
+  type AgentAttachment,
+  type AgentAttachmentCandidate,
+} from '@/lib/agent-attachments/use-agent-attachment-upload';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -61,18 +65,20 @@ type NewSessionPromptProps = {
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
   onRefetchModels: () => void;
+  onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
+  shareId?: string;
   voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
 };
 
 /**
- * New-session prompt surface: attachment strip, paperclip + multiline text
- * input + voice toggle row, and the model/mode toolbar. Owns the prompt
- * ref (for voice input to read), the height-measuring TextInput machinery,
- * and the `useVoiceInput` hook. The route listens to `onChangeText` so the
- * create handler can read the live prompt value after
- * `settleVoiceInputBeforeSubmit` resolves; the attachment, repository, and
- * create flows stay in the route so navigation and tRPC mutations stay
- * colocated.
+ * New-session prompt surface: attachment strip, full-width multiline text
+ * input, bottom action row (paperclip leading, voice toggle trailing), and
+ * the model/mode toolbar. Owns the prompt ref (for voice input to read), the
+ * height-measuring TextInput machinery, and the `useVoiceInput` hook. The
+ * route listens to `onChangeText` so the create handler can read the live
+ * prompt value after `settleVoiceInputBeforeSubmit` resolves; the attachment,
+ * repository, and create flows stay in the route so navigation and tRPC
+ * mutations stay colocated.
  */
 export function NewSessionPrompt({
   attachments,
@@ -91,6 +97,8 @@ export function NewSessionPrompt({
   onRemoveAttachment,
   onRetryAttachment,
   onRefetchModels,
+  onPrefillAttachments,
+  shareId,
   voiceInputSettlerRef,
 }: Readonly<NewSessionPromptProps>) {
   const colors = useThemeColors();
@@ -114,6 +122,14 @@ export function NewSessionPrompt({
     },
     [onChangeText, promptMeasure]
   );
+
+  useSharePrefill({
+    shareId,
+    inputRef: promptInputRef,
+    maxLength: PROMPT_INPUT_MAX_CHARS,
+    onChangeText: handlePromptChange,
+    addCandidates: onPrefillAttachments,
+  });
 
   const voiceInput = useVoiceInput({
     disabled: isCreating,
@@ -165,21 +181,7 @@ export function NewSessionPrompt({
         onRemove={onRemoveAttachment}
         onRetry={onRetryAttachment}
       />
-      <View className="flex-row items-end px-2 pt-2">
-        <Pressable
-          onPress={handlePaperclipPress}
-          disabled={paperclipDisabled}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          className={cn(
-            'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
-            paperclipDisabled && 'opacity-50'
-          )}
-          accessibilityRole="button"
-          accessibilityLabel="Add attachment"
-          accessibilityState={{ disabled: paperclipDisabled }}
-        >
-          <Paperclip size={18} color={colors.mutedForeground} />
-        </Pressable>
+      <View className="px-2 pt-2">
         {promptMeasure.measureElement}
         <RNTextInput
           ref={promptInputRef}
@@ -187,7 +189,7 @@ export function NewSessionPrompt({
           placeholderTextColor={colors.mutedForeground}
           multiline
           className={cn(
-            'flex-1 px-2 py-2 text-base leading-6 text-foreground',
+            'w-full px-2 py-2 text-base leading-6 text-foreground',
             isCreating && 'opacity-50'
           )}
           style={[
@@ -205,18 +207,35 @@ export function NewSessionPrompt({
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           autoFocus
         />
-        {voiceInput.available ? (
-          <View className="ml-1">
+        <View className="flex-row items-center justify-between pb-2">
+          <Pressable
+            onPress={handlePaperclipPress}
+            disabled={paperclipDisabled}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            className={cn(
+              'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
+              paperclipDisabled && 'opacity-50'
+            )}
+            accessibilityRole="button"
+            accessibilityLabel="Add attachment"
+            accessibilityState={{ disabled: paperclipDisabled }}
+          >
+            <Paperclip size={18} color={colors.mutedForeground} />
+          </Pressable>
+          {voiceInput.available ? (
+            <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
+              <VoiceInputStatus status={voiceInput.status} />
+            </View>
+          ) : null}
+          {voiceInput.available ? (
             <VoiceInputButton
               disabled={control.voiceDisabled}
+              size="md"
               status={voiceInput.status}
               onPress={handleVoiceToggle}
             />
-          </View>
-        ) : null}
-      </View>
-      <View className="px-3 pb-1">
-        <VoiceInputStatus status={voiceInput.status} />
+          ) : null}
+        </View>
       </View>
       {isModelsError && modelOptions.length === 0 ? (
         <QueryError

@@ -5554,6 +5554,7 @@ export const cli_sessions_v2 = pgTable(
     git_branch: text(),
     status: text(),
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    total_cost_microdollars: bigint({ mode: 'number' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -5601,6 +5602,31 @@ export type CloudAgentSessionFailureCode =
   | 'initial_queue_full'
   | 'invalid_initial_intent'
   | 'do_rpc_outcome_unknown';
+export type CloudAgentFailureResponsibility = 'platform' | 'user' | 'unknown';
+export type CloudAgentFailureReason =
+  | 'insufficient_credits'
+  | 'rate_limited'
+  | 'model_unavailable'
+  | 'provider_authentication'
+  | 'setup_command'
+  | 'source_control_authentication'
+  | 'source_control_configuration'
+  | 'sandbox_capacity'
+  | 'sandbox_connectivity'
+  | 'runtime_startup'
+  | 'wrapper_liveness'
+  | 'delivery'
+  | 'managed_provider_unavailable'
+  | 'managed_provider_authentication'
+  | 'managed_model_configuration'
+  | 'provider_unavailable'
+  | 'source_control_network'
+  | 'assistant_unknown'
+  | 'workspace_unknown'
+  | 'session_coordination'
+  | 'initial_request_invalid'
+  | 'initial_admission_unknown'
+  | 'unclassified';
 
 export const cloud_agent_sessions = pgTable(
   'cloud_agent_sessions',
@@ -5613,6 +5639,8 @@ export const cloud_agent_sessions = pgTable(
     failure_at: timestamp({ withTimezone: true, mode: 'string' }),
     failure_stage: text().$type<CloudAgentSessionFailureStage>(),
     failure_code: text().$type<CloudAgentSessionFailureCode>(),
+    failure_responsibility: text().$type<CloudAgentFailureResponsibility>(),
+    failure_reason: text().$type<CloudAgentFailureReason>(),
     error_message_redacted: text(),
     error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
@@ -5709,6 +5737,8 @@ export const cloud_agent_session_runs = pgTable(
     terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
     failure_stage: text().$type<CloudAgentSessionRunFailureStage>(),
     failure_code: text().$type<CloudAgentSessionRunFailureCode>(),
+    failure_responsibility: text().$type<CloudAgentFailureResponsibility>(),
+    failure_reason: text().$type<CloudAgentFailureReason>(),
     error_message_redacted: text(),
     error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
@@ -5729,21 +5759,16 @@ export const cloud_agent_session_runs = pgTable(
       table.failure_code,
       table.terminal_at
     ),
+    index('IDX_cloud_agent_session_runs_responsibility_reason_terminal')
+      .on(table.failure_responsibility, table.failure_reason, table.terminal_at)
+      .concurrently()
+      .where(sql`${table.status} = 'failed'`),
     index('IDX_cloud_agent_session_runs_error_expires_at')
       .on(table.error_expires_at)
       .where(isNotNull(table.error_expires_at)),
     check(
       'cloud_agent_session_runs_status_check',
       sql`${table.status} IN ('queued', 'accepted', 'completed', 'failed', 'interrupted')`
-    ),
-    check(
-      'cloud_agent_session_runs_failure_classification_check',
-      sql`(${table.failure_stage} IS NULL AND ${table.failure_code} IS NULL) OR
-        (${table.failure_stage} = 'pre_dispatch' AND ${table.failure_code} IN ('sandbox_connect_failed', 'workspace_setup_failed', 'kilo_server_failed', 'wrapper_start_failed', 'invalid_delivery_request', 'session_metadata_missing', 'model_missing', 'delivery_failure_unknown')) OR
-        (${table.failure_stage} = 'post_dispatch_no_activity' AND ${table.failure_code} IN ('wrapper_disconnected', 'wrapper_no_output', 'wrapper_ping_timeout', 'wrapper_error_before_activity', 'missing_assistant_reply')) OR
-        (${table.failure_stage} = 'agent_activity' AND ${table.failure_code} IN ('assistant_error', 'wrapper_error_after_activity')) OR
-        (${table.failure_stage} = 'interruption' AND ${table.failure_code} IN ('user_interrupt', 'container_shutdown', 'system_interrupt')) OR
-        (${table.failure_stage} = 'unknown' AND ${table.failure_code} = 'unclassified')`
     ),
     check(
       'cloud_agent_session_runs_error_message_bounded_check',
@@ -7568,6 +7593,7 @@ export const cloud_agent_feedback = pgTable(
       onUpdate: 'cascade',
     }),
     cloud_agent_session_id: text(),
+    session_type: text(),
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'set null',
     }),
@@ -8907,6 +8933,32 @@ export const user_push_tokens = pgTable(
 export type UserPushToken = typeof user_push_tokens.$inferSelect;
 export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
 
+// ─── Notification Preferences ─────────────────────────────────────────
+
+export const user_notification_preferences = pgTable('user_notification_preferences', {
+  user_id: text()
+    .primaryKey()
+    .notNull()
+    .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+  // Category 3 "Agent updates" — retained in place; new per-category columns below.
+  agent_push_enabled: boolean().default(true).notNull(),
+  // Per-category opt-in flags; defaults preserve current behaviour for existing rows.
+  chat_messages_enabled: boolean().default(true).notNull(),
+  agent_attention_enabled: boolean().default(true).notNull(),
+  session_status_enabled: boolean().default(true).notNull(),
+  kiloclaw_activity_enabled: boolean().default(true).notNull(),
+  balance_alerts_enabled: boolean().default(true).notNull(),
+  security_findings_enabled: boolean().default(true).notNull(),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type UserNotificationPreference = typeof user_notification_preferences.$inferSelect;
+export type NewUserNotificationPreference = typeof user_notification_preferences.$inferInsert;
+
 // ============ EXA USAGE TRACKING ============
 // Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)
 
@@ -9993,3 +10045,147 @@ export const user_model_preferences = pgTable(
 
 export type UserModelPreference = typeof user_model_preferences.$inferSelect;
 export type NewUserModelPreference = typeof user_model_preferences.$inferInsert;
+
+export type CloudBillingSkuUnit = 'second';
+
+// Named commercial usage products. Identity, unit, and rate are immutable;
+// price changes create a new SKU while this flag controls new admission only.
+export const cloud_billing_sku = pgTable(
+  'cloud_billing_sku',
+  {
+    id: text().primaryKey().notNull(),
+    name: text().notNull(),
+    description: text(),
+    unit: text().$type<CloudBillingSkuUnit>().notNull(),
+    rate_cents_per_unit: decimal({ precision: 24, scale: 12 }).notNull(),
+    accepts_new_usage: boolean().notNull().default(true),
+    created_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    check('cloud_billing_sku_id_format', sql`${table.id} ~ '^[a-z0-9][a-z0-9-]{2,79}$'`),
+    check('cloud_billing_sku_name_nonempty', sql`length(btrim(${table.name})) > 0`),
+    check('cloud_billing_sku_rate_positive', sql`${table.rate_cents_per_unit} > 0`),
+  ]
+);
+
+export type CloudBillingSku = typeof cloud_billing_sku.$inferSelect;
+export type NewCloudBillingSku = typeof cloud_billing_sku.$inferInsert;
+
+export type ContainerUsageSubjectType = 'user' | 'org';
+export type ContainerUsageActorType = 'user' | 'bot';
+export type ContainerUsageIntervalStatus = 'open' | 'closed';
+export type ContainerUsageCloseReason =
+  | 'exit'
+  | 'runtime_signal'
+  | 'activity_expired'
+  | 'reconciled'
+  | 'unconfirmed'
+  | 'superseded';
+
+// One authoritative row per continuous awake period. All boundary timestamps
+// are stamped by the meter; observed client clocks never drive billing.
+export const container_usage_interval = pgTable(
+  'container_usage_interval',
+  {
+    id: text().primaryKey().notNull(),
+    service: text().notNull(),
+    instance_id: text().notNull(),
+    start_epoch_ms: bigint({ mode: 'number' }).notNull(),
+    cloud_billing_sku_id: text()
+      .notNull()
+      .references(() => cloud_billing_sku.id),
+    context_fingerprint: text().notNull(),
+    subject_type: text().$type<ContainerUsageSubjectType>().notNull(),
+    subject_id: text().notNull(),
+    actor_type: text().$type<ContainerUsageActorType>().notNull(),
+    actor_id: text().notNull(),
+    session_id: text(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_heartbeat_seq: integer().notNull().default(0),
+    confirmed_seconds: integer().notNull().default(0),
+    stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
+    close_reason: text().$type<ContainerUsageCloseReason>(),
+    exit_code: integer(),
+    final_stop_seq: integer(),
+    status: text().$type<ContainerUsageIntervalStatus>().notNull().default('open'),
+    metadata: jsonb().$type<Record<string, string>>(),
+  },
+  table => [
+    index('IDX_container_usage_interval_sweep').on(table.status, table.last_seen_at),
+    index('IDX_container_usage_interval_subject_started').on(
+      table.subject_type,
+      table.subject_id,
+      table.started_at
+    ),
+    uniqueIndex('UQ_container_usage_interval_single_open')
+      .on(table.service, table.instance_id)
+      .where(sql`${table.status} = 'open'`),
+    check('container_usage_interval_subject_type', sql`${table.subject_type} IN ('user', 'org')`),
+    check('container_usage_interval_actor_type', sql`${table.actor_type} IN ('user', 'bot')`),
+    check(
+      'container_usage_interval_context_fingerprint',
+      sql`${table.context_fingerprint} ~ '^[a-f0-9]{64}$'`
+    ),
+    check(
+      'container_usage_interval_attribution',
+      sql`${table.actor_type} = 'bot' OR (${table.actor_type} = 'user' AND (${table.subject_type} <> 'user' OR ${table.actor_id} = ${table.subject_id}))`
+    ),
+    check('container_usage_interval_status', sql`${table.status} IN ('open', 'closed')`),
+    check(
+      'container_usage_interval_open_closed_shape',
+      sql`(${table.status} = 'open' AND ${table.stopped_at} IS NULL AND ${table.close_reason} IS NULL) OR (${table.status} = 'closed' AND ${table.stopped_at} IS NOT NULL AND ${table.close_reason} IS NOT NULL)`
+    ),
+    check(
+      'container_usage_interval_time_order',
+      sql`${table.last_seen_at} >= ${table.started_at} AND (${table.stopped_at} IS NULL OR (${table.stopped_at} >= ${table.started_at} AND ${table.stopped_at} <= ${table.last_seen_at}))`
+    ),
+    check(
+      'container_usage_interval_last_heartbeat_seq_nonnegative',
+      sql`${table.last_heartbeat_seq} >= 0`
+    ),
+    check(
+      'container_usage_interval_confirmed_seconds_nonnegative',
+      sql`${table.confirmed_seconds} >= 0`
+    ),
+    check(
+      'container_usage_interval_final_stop_seq_positive',
+      sql`${table.final_stop_seq} IS NULL OR ${table.final_stop_seq} > 0`
+    ),
+  ]
+);
+
+export type ContainerUsageInterval = typeof container_usage_interval.$inferSelect;
+export type NewContainerUsageInterval = typeof container_usage_interval.$inferInsert;
+
+export const container_usage_segment = pgTable(
+  'container_usage_segment',
+  {
+    interval_id: text()
+      .notNull()
+      .references(() => container_usage_interval.id, { onDelete: 'cascade' }),
+    seq: integer().notNull(),
+    idempotency_key: text().notNull().unique(),
+    reported_seconds: integer().notNull(),
+    usage_seconds: integer().notNull(),
+    received_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.interval_id, table.seq] }),
+    index('IDX_container_usage_segment_received').on(table.received_at),
+    check('container_usage_segment_seq_positive', sql`${table.seq} > 0`),
+    check(
+      'container_usage_segment_reported_seconds_nonnegative',
+      sql`${table.reported_seconds} >= 0`
+    ),
+    check('container_usage_segment_usage_seconds_nonnegative', sql`${table.usage_seconds} >= 0`),
+    check(
+      'container_usage_segment_usage_within_reported',
+      sql`${table.usage_seconds} <= ${table.reported_seconds}`
+    ),
+  ]
+);
+
+export type ContainerUsageSegment = typeof container_usage_segment.$inferSelect;
+export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;

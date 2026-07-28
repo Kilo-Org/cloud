@@ -16,7 +16,7 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { muse_spark_1_1_model } from '@/lib/ai-gateway/providers/meta';
+import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
 
 const REASONING_VARIANTS_THINKING_ONLY = {
@@ -32,6 +32,12 @@ export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
   low: { reasoning: { enabled: true, effort: 'low' } },
   medium: { reasoning: { enabled: true, effort: 'medium' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
+} as const;
+
+export const REASONING_VARIANTS_MAX_HIGH_LOW = {
+  max: { reasoning: { enabled: true, effort: 'max' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
 } as const;
 
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
@@ -98,9 +104,14 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (model.includes('kimi-k2.7-code')) {
     return REASONING_VARIANTS_THINKING_ONLY;
   }
+  if (model.includes('kimi-k2')) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (isKimiModel(model)) {
+    return REASONING_VARIANTS_MAX_HIGH_LOW;
+  }
   if (
     isMinimaxModel(model) ||
-    isKimiModel(model) ||
     isGrok42Model(model) ||
     isQwenModel(model) ||
     isGemmaModel(model) ||
@@ -120,7 +131,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isDeepseekModel(model) || isGlmModel(model)) {
     return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
-  if (model === muse_spark_1_1_model.public_id) {
+  if (isMuseModel(model)) {
     return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH;
   }
   return undefined;
@@ -148,7 +159,7 @@ export function getAiSdkProvider(
   ) {
     return 'anthropic';
   }
-  if (isOpenAiModel(model) || isGrokModel(model) || model === muse_spark_1_1_model.public_id) {
+  if (isOpenAiModel(model) || isGrokModel(model) || isMuseModel(model)) {
     // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
     // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';

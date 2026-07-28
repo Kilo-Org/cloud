@@ -64,6 +64,15 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
       status: z.enum(['idle', 'busy', 'question', 'permission', 'retry']),
     }),
   }),
+  z.object({
+    type: z.literal('agent_notification'),
+    data: z.object({
+      // `id` participates in storage identities, so it shares the storage-key-segment
+      // restrictions (no `/`, no U+0000). The RPC pair (notificationId) is the same string.
+      id: storageKeySegmentSchema.max(64),
+      message: z.string().trim().min(1).max(500),
+    }),
+  }),
 ]);
 
 export type SessionDataItem = z.infer<typeof SessionItemSchema>;

@@ -7,6 +7,7 @@ import {
 import { getGitLabIntegration, getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { fetchGitLabProjects } from '@/lib/integrations/platforms/gitlab/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
 import {
   requireNumericPlatformRepositories,
   type PlatformRepository,
@@ -119,6 +120,10 @@ export async function fetchGitLabRepositoriesForOrganization(
     return missingIntegrationResponse('No GitLab integration found for this organization');
   }
 
+  if (isPlatformIntegrationSuspended(integration)) {
+    return missingIntegrationResponse('GitLab integration is suspended');
+  }
+
   const metadata = integration.metadata as GitLabMetadata | null;
   const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
 
@@ -167,6 +172,10 @@ export async function fetchGitLabRepositoriesForUser(
 
   if (!integration) {
     return missingIntegrationResponse('No GitLab integration found for this user');
+  }
+
+  if (isPlatformIntegrationSuspended(integration)) {
+    return missingIntegrationResponse('GitLab integration is suspended');
   }
 
   const metadata = integration.metadata as GitLabMetadata | null;

@@ -132,6 +132,11 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Extensionless AASA file gets no inferred type; Apple requires application/json.
+        source: '/.well-known/apple-app-site-association',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+      },
+      {
         source: '/api-docs/swagger-ui/:path*',
         headers: [
           {

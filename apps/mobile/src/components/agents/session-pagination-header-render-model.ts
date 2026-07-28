@@ -15,7 +15,6 @@ function omittedMessage(count: number): string {
 
 export type SessionPaginationHeaderRenderModel =
   | { kind: 'hidden' }
-  | { kind: 'loading'; testID: string; accessibilityRole: 'progressbar'; text: null }
   | {
       kind: 'retryable';
       testID: string;
@@ -26,6 +25,14 @@ export type SessionPaginationHeaderRenderModel =
   | { kind: 'too_large'; testID: string; text: string }
   | { kind: 'omitted'; testID: string; text: string };
 
+function omittedRenderModel(count: number): SessionPaginationHeaderRenderModel {
+  return {
+    kind: 'omitted',
+    testID: 'session-pagination-header-omitted',
+    text: omittedMessage(count),
+  };
+}
+
 export function selectSessionPaginationHeaderRenderModel(
   inputs: SessionMessageListHeaderStateInputs
 ): SessionPaginationHeaderRenderModel {
@@ -35,13 +42,17 @@ export function selectSessionPaginationHeaderRenderModel(
     return { kind: 'hidden' };
   }
 
+  // Suppress the transient loading placeholder so FlashList mVCP is not
+  // disturbed by a header height collapse when the older page arrives.
+  // When an omitted banner is already visible (count > 0), keep it stable
+  // through the load instead of hiding it — a hide/show flap would reintroduce
+  // the same jump. The state layer still prioritizes `loading` over `omitted`;
+  // this mapping is render-model only.
   if (state.kind === 'loading') {
-    return {
-      kind: 'loading',
-      testID: 'session-pagination-header-loading',
-      accessibilityRole: 'progressbar',
-      text: null,
-    };
+    if (inputs.olderMessagesOmittedItemCount > 0) {
+      return omittedRenderModel(inputs.olderMessagesOmittedItemCount);
+    }
+    return { kind: 'hidden' };
   }
 
   if (state.kind === 'retryable') {
@@ -69,9 +80,5 @@ export function selectSessionPaginationHeaderRenderModel(
     };
   }
 
-  return {
-    kind: 'omitted',
-    testID: 'session-pagination-header-omitted',
-    text: omittedMessage(state.count),
-  };
+  return omittedRenderModel(state.count);
 }

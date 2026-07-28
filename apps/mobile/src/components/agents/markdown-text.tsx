@@ -1,206 +1,69 @@
-import { type ReactNode, useMemo } from 'react';
-import {
-  type AccessibilityActionEvent,
-  type GestureResponderEvent,
-  Text,
-  type TextStyle,
-  useColorScheme,
-  View,
-  type ViewStyle,
-} from 'react-native';
-import { Renderer, useMarkdown } from 'react-native-marked';
+import { useMemo } from 'react';
+import { useColorScheme, View } from 'react-native';
+import { useMarkdown } from 'react-native-marked';
 
-import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { getMarkdownStyles, getPalette, type MarkdownVariant } from './markdown-palette';
 import {
-  getLinkAccessibilityActions,
-  getLinkLongPressHandler,
-  LINK_ACCESSIBILITY_HINT,
-  resolveLinkAccessibilityLabel,
-} from './markdown-link';
-import {
-  getMarkdownStyles,
-  getPalette,
-  type MarkdownPalette,
-  type MarkdownVariant,
-} from './markdown-palette';
-import { MarkdownTable } from './markdown-table';
+  type MarkdownLinkLongPressHandler,
+  type MarkdownLinkPressHandler,
+  MarkdownRenderer,
+} from './markdown-renderer';
 
-export type MarkdownLinkLongPressHandler = (href: string, event?: GestureResponderEvent) => void;
+export type { MarkdownLinkLongPressHandler, MarkdownLinkPressHandler };
 
 export type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;
   selectable?: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
+  /**
+   * Optional tap handler invoked when a rendered link is pressed. When this
+   * callback is omitted, or when it returns a falsy value, the link is opened
+   * with `openExternalUrl`. Returning `true` signals that the caller has
+   * fully handled the press and the default browser open should be skipped.
+   */
+  onPressLink?: MarkdownLinkPressHandler;
 };
-
-// The library's default `Renderer` renders code blocks with the `em` text
-// style (italic) and renders tables with fixed column widths that frequently
-// overflow the screen with no way to scroll within a chat bubble. We subclass
-// it to render code blocks in a monospace font and to render tables as a
-// "View table" chip that opens a full-screen modal (see `MarkdownTable`).
-//
-// Notes on horizontal scrolling: the default library renders code (and we
-// previously rendered tables) inside a horizontal ScrollView, but on RN 0.83
-// Fabric a horizontal ScrollView inside a width-constrained bubble produces
-// spurious vertical height (measured up to ~10x the actual content height,
-// growing as sibling messages re-rendered the list), and its scroll gesture
-// loses to the chat bubble's swipe-to-reply pan. We render code as a plain
-// wrapping Text and tables behind a chip instead — no horizontal ScrollView
-// ever renders inside a bubble.
-class MarkdownRenderer extends Renderer {
-  private readonly palette: MarkdownPalette;
-  private readonly selectable: boolean;
-  private readonly onLongPressLink?: MarkdownLinkLongPressHandler;
-
-  constructor(
-    palette: MarkdownPalette,
-    selectable = true,
-    onLongPressLink?: MarkdownLinkLongPressHandler
-  ) {
-    super();
-    this.palette = palette;
-    this.selectable = selectable;
-    this.onLongPressLink = onLongPressLink;
-  }
-
-  private textNode(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return (
-      <Text selectable={this.selectable} key={this.getKey()} style={styles}>
-        {children}
-      </Text>
-    );
-  }
-
-  override heading(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(text, styles);
-  }
-
-  // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
-  override code(
-    text: string,
-    _language: string | undefined,
-    containerStyle: ViewStyle | undefined,
-    _textStyle: TextStyle | undefined
-  ): ReactNode {
-    return (
-      <View key={this.getKey()} style={containerStyle}>
-        <Text
-          selectable={this.selectable}
-          className="font-mono text-sm leading-5"
-          // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color
-          style={{ color: this.palette.textColor }}
-        >
-          {text}
-        </Text>
-      </View>
-    );
-  }
-
-  override escape(text: string, styles?: TextStyle): ReactNode {
-    return this.textNode(text, styles);
-  }
-
-  // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
-  override link(
-    children: string | ReactNode[],
-    href: string,
-    styles?: TextStyle,
-    title?: string
-  ): ReactNode {
-    const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
-    const linkActionsEnabled = this.onLongPressLink !== undefined;
-
-    return (
-      <Text
-        selectable={this.selectable}
-        accessibilityRole="link"
-        accessibilityHint={LINK_ACCESSIBILITY_HINT}
-        accessibilityLabel={accessibilityLabel}
-        accessibilityActions={getLinkAccessibilityActions(linkActionsEnabled)}
-        key={this.getKey()}
-        onAccessibilityAction={(event: AccessibilityActionEvent) => {
-          if (event.nativeEvent.actionName === 'showLinkActions') {
-            this.onLongPressLink?.(href);
-          }
-        }}
-        onLongPress={getLinkLongPressHandler(this.onLongPressLink, href)}
-        onPress={() => {
-          void openExternalUrl(href, { label: accessibilityLabel });
-        }}
-        style={styles}
-      >
-        {children}
-      </Text>
-    );
-  }
-
-  override strong(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(children, styles);
-  }
-
-  override em(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(children, styles);
-  }
-
-  override codespan(text: string, styles?: TextStyle): ReactNode {
-    return this.textNode(text, styles);
-  }
-
-  override br(): ReactNode {
-    return this.textNode('\n', {});
-  }
-
-  override del(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(children, styles);
-  }
-
-  override text(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(text, styles);
-  }
-
-  override html(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(text, styles);
-  }
-
-  // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
-  override table(
-    header: ReactNode[][],
-    rows: ReactNode[][][],
-    _tableStyle: ViewStyle | undefined,
-    _rowStyle: ViewStyle | undefined,
-    _cellStyle: ViewStyle | undefined
-  ): ReactNode {
-    return <MarkdownTable key={this.getKey()} palette={this.palette} header={header} rows={rows} />;
-  }
-}
 
 export function MarkdownText({
   value,
   variant = 'assistant',
   selectable = true,
   onLongPressLink,
+  onPressLink,
 }: Readonly<MarkdownTextProps>) {
   const colorScheme = useColorScheme();
   const colors = useThemeColors();
 
-  const { styles, renderer, theme } = useMemo(() => {
-    const palette = getPalette(variant, colors);
-    return {
-      styles: getMarkdownStyles(palette),
-      renderer: new MarkdownRenderer(palette, selectable, onLongPressLink),
-      theme: {
-        colors: {
-          text: palette.textColor,
-          code: palette.textColor,
-          link: palette.textColor,
-          border: palette.borderColor,
-        },
+  const palette = useMemo(() => getPalette(variant, colors), [variant, colors]);
+
+  const styles = useMemo(() => getMarkdownStyles(palette), [palette]);
+
+  const theme = useMemo(
+    () => ({
+      colors: {
+        text: palette.textColor,
+        code: palette.textColor,
+        link: palette.textColor,
+        border: palette.borderColor,
       },
-    };
-  }, [variant, colors, selectable, onLongPressLink]);
+    }),
+    [palette]
+  );
+
+  // react-native-marked keys elements with a per-instance monotonic slugger;
+  // reusing one instance across re-parses re-keys every element and remounts
+  // the subtree, resetting local state such as MarkdownTable's open modal
+  // during streaming. A fresh instance per `value` change yields identical
+  // keys for identical parse prefixes, so element state survives while
+  // streaming updates flow in as props.
+  const renderer = useMemo(
+    () => new MarkdownRenderer(palette, selectable, { onLongPressLink, onPressLink }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `value` intentionally recreates the renderer per markdown-source change so element keys stay stable across streaming re-parses
+    [palette, selectable, onLongPressLink, onPressLink, value]
+  );
 
   const elements = useMarkdown(value, {
     colorScheme,

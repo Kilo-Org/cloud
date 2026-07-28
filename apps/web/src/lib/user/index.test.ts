@@ -56,6 +56,7 @@ import {
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
+  user_notification_preferences,
   security_advisor_scans,
   credit_campaigns,
   agent_environment_profiles,
@@ -109,6 +110,7 @@ import {
 import { eq, count, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
+  assertUserCanBeSoftDeleted,
   SoftDeletePreconditionError,
   findUserById,
   findUsersByIds,
@@ -3096,6 +3098,22 @@ describe('User', () => {
       expect(tokens).toHaveLength(0);
     });
 
+    it('should delete user_notification_preferences', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_notification_preferences).values({
+        user_id: user.id,
+        agent_push_enabled: false,
+      });
+
+      await softDeleteUser(user.id);
+
+      const rows = await db
+        .select()
+        .from(user_notification_preferences)
+        .where(eq(user_notification_preferences.user_id, user.id));
+      expect(rows).toHaveLength(0);
+    });
+
     it('should delete Coding Plan availability notification intents', async () => {
       const user = await insertTestUser();
       await db.insert(coding_plan_availability_intents).values({
@@ -3422,6 +3440,9 @@ describe('User', () => {
         cancel_at_period_end: false,
       });
 
+      await expect(assertUserCanBeSoftDeleted(user.id)).rejects.toThrow(
+        SoftDeletePreconditionError
+      );
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
       // User should not be modified
       const userAfter = await findUserById(user.id);
@@ -3858,6 +3879,9 @@ describe('User', () => {
         cancel_at_period_end: false,
       });
 
+      await expect(assertUserCanBeSoftDeleted(user.id)).rejects.toThrow(
+        SoftDeletePreconditionError
+      );
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
       // User should not be modified
       const userAfter = await findUserById(user.id);

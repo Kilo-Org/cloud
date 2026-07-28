@@ -19,6 +19,7 @@ import {
   user_auth_provider,
   kiloclaw_instances,
   kiloclaw_subscriptions,
+  user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
@@ -888,4 +889,127 @@ export const userRouter = createTRPCRouter({
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));
   }),
+
+  // ─── Notification Preferences ──────────────────────────────────────
+
+  getNotificationPreferences: baseProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({
+        agent_push_enabled: user_notification_preferences.agent_push_enabled,
+        chat_messages_enabled: user_notification_preferences.chat_messages_enabled,
+        agent_attention_enabled: user_notification_preferences.agent_attention_enabled,
+        session_status_enabled: user_notification_preferences.session_status_enabled,
+        kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
+        balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+        security_findings_enabled: user_notification_preferences.security_findings_enabled,
+      })
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, ctx.user.id))
+      .limit(1);
+    // `agentUpdates` and legacy `agentPushEnabled` both map to the same physical
+    // column `agent_push_enabled`; ship both keys for shipped-client compat.
+    const agentPushEnabled = row?.agent_push_enabled ?? true;
+    return {
+      chatMessages: row?.chat_messages_enabled ?? true,
+      agentAttention: row?.agent_attention_enabled ?? true,
+      agentUpdates: agentPushEnabled,
+      sessionStatus: row?.session_status_enabled ?? true,
+      kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
+      balanceAlerts: row?.balance_alerts_enabled ?? true,
+      securityFindings: row?.security_findings_enabled ?? true,
+      agentPushEnabled,
+    };
+  }),
+
+  setNotificationPreferences: baseProcedure
+    .input(
+      z.object({
+        chatMessages: z.boolean().optional(),
+        agentAttention: z.boolean().optional(),
+        agentUpdates: z.boolean().optional(),
+        sessionStatus: z.boolean().optional(),
+        kiloclawActivity: z.boolean().optional(),
+        balanceAlerts: z.boolean().optional(),
+        securityFindings: z.boolean().optional(),
+        // Legacy shipped-client input: still accepted and writes the same column as `agentUpdates`.
+        agentPushEnabled: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // When both are provided, the explicit `agentUpdates` key wins over the legacy
+      // `agentPushEnabled` key. Clients normally send only one.
+      const agentPush = input.agentUpdates ?? input.agentPushEnabled;
+
+      // Map the new camelCase API keys to the underlying physical columns. Only
+      // include a column in the upsert when the caller actually provided it, so
+      // omitted columns keep their DB default on insert and are left untouched
+      // on update.
+      const set: Record<string, boolean> = {};
+      const values: Record<string, boolean> = {};
+      if (input.chatMessages !== undefined) {
+        set.chat_messages_enabled = input.chatMessages;
+        values.chat_messages_enabled = input.chatMessages;
+      }
+      if (input.agentAttention !== undefined) {
+        set.agent_attention_enabled = input.agentAttention;
+        values.agent_attention_enabled = input.agentAttention;
+      }
+      if (input.sessionStatus !== undefined) {
+        set.session_status_enabled = input.sessionStatus;
+        values.session_status_enabled = input.sessionStatus;
+      }
+      if (input.kiloclawActivity !== undefined) {
+        set.kiloclaw_activity_enabled = input.kiloclawActivity;
+        values.kiloclaw_activity_enabled = input.kiloclawActivity;
+      }
+      if (input.balanceAlerts !== undefined) {
+        set.balance_alerts_enabled = input.balanceAlerts;
+        values.balance_alerts_enabled = input.balanceAlerts;
+      }
+      if (input.securityFindings !== undefined) {
+        set.security_findings_enabled = input.securityFindings;
+        values.security_findings_enabled = input.securityFindings;
+      }
+      if (agentPush !== undefined) {
+        set.agent_push_enabled = agentPush;
+        values.agent_push_enabled = agentPush;
+      }
+
+      if (Object.keys(set).length > 0) {
+        await db
+          .insert(user_notification_preferences)
+          .values({ user_id: ctx.user.id, ...values })
+          .onConflictDoUpdate({
+            target: user_notification_preferences.user_id,
+            set: { ...set, updated_at: sql`now()` },
+          });
+      }
+
+      // Re-select the row so the response always reflects the current effective
+      // values, including the legacy `agentPushEnabled` key for shipped clients.
+      const [row] = await db
+        .select({
+          agent_push_enabled: user_notification_preferences.agent_push_enabled,
+          chat_messages_enabled: user_notification_preferences.chat_messages_enabled,
+          agent_attention_enabled: user_notification_preferences.agent_attention_enabled,
+          session_status_enabled: user_notification_preferences.session_status_enabled,
+          kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
+          balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+          security_findings_enabled: user_notification_preferences.security_findings_enabled,
+        })
+        .from(user_notification_preferences)
+        .where(eq(user_notification_preferences.user_id, ctx.user.id))
+        .limit(1);
+      const effectiveAgentPush = row?.agent_push_enabled ?? true;
+      return {
+        chatMessages: row?.chat_messages_enabled ?? true,
+        agentAttention: row?.agent_attention_enabled ?? true,
+        agentUpdates: effectiveAgentPush,
+        sessionStatus: row?.session_status_enabled ?? true,
+        kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
+        balanceAlerts: row?.balance_alerts_enabled ?? true,
+        securityFindings: row?.security_findings_enabled ?? true,
+        agentPushEnabled: effectiveAgentPush,
+      };
+    }),
 });

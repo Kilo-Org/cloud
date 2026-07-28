@@ -431,6 +431,69 @@ describe('file routes', () => {
       );
     });
 
+    // A templated hook sessionKey without hooks.allowedSessionKeyPrefixes stops
+    // the OpenClaw gateway from starting, and the instance cannot recover on its
+    // own — so this is rejected even when the caller opts out of validation.
+    const BRICKING_CONFIG = JSON.stringify({
+      hooks: {
+        enabled: true,
+        token: 'local-token',
+        mappings: [{ id: 'cloudflare-email-inbound', sessionKey: '{{payload.sessionKey}}' }],
+      },
+    });
+
+    it.each(['warn-before-write', 'allow-invalid'] as const)(
+      'refuses a config that would not boot in %s mode',
+      async mode => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        vi.mocked(fs.lstatSync).mockReturnValue({
+          isSymbolicLink: () => false,
+          isFile: () => true,
+        } as any);
+        vi.mocked(fs.readFileSync).mockReturnValue('old config');
+
+        const res = await app.request('/_kilo/files/write-openclaw-config', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ content: BRICKING_CONFIG, mode }),
+        });
+
+        expect(res.status).toBe(422);
+        const body = (await res.json()) as { code: string; error: string };
+        expect(body.code).toBe('openclaw_config_would_not_boot');
+        expect(body.error).toMatch(/allowedSessionKeyPrefixes/);
+        expect(atomicWrite).not.toHaveBeenCalled();
+      }
+    );
+
+    it('accepts the same config once the required prefixes are present', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isFile: () => true,
+      } as any);
+      vi.mocked(fs.readFileSync).mockReturnValue('old config');
+      vi.mocked(validateOpenclawConfigCandidate).mockResolvedValue({ valid: true });
+
+      const repaired = JSON.stringify({
+        hooks: {
+          enabled: true,
+          token: 'local-token',
+          allowedSessionKeyPrefixes: ['hook:', 'inbound-email:'],
+          mappings: [{ id: 'cloudflare-email-inbound', sessionKey: '{{payload.sessionKey}}' }],
+        },
+      });
+
+      const res = await app.request('/_kilo/files/write-openclaw-config', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ content: repaired, mode: 'warn-before-write' }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(atomicWrite).toHaveBeenCalled();
+    });
+
     it('serializes legacy openclaw writes through in-root aliases behind validation-aware writes', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.lstatSync).mockReturnValue({

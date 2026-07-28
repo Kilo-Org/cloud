@@ -6,7 +6,7 @@ import {
   type InstanceLifecycleEvent,
   type ScheduledActionEvent,
 } from './notification-events';
-import { pushDataSchema } from './push-data';
+import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
 
 export {
   instanceLifecycleEventSchema,
@@ -31,6 +31,7 @@ export type SendPushForConversationInput = z.infer<typeof sendPushForConversatio
 export const perRecipientOutcomeSchema = z.enum([
   'delivered',
   'suppressed_presence',
+  'suppressed_preference',
   'no_tokens',
   'duplicate',
   'failed',
@@ -101,6 +102,7 @@ export const sendInstanceLifecycleNotificationOutputSchema = z.object({
   sent: z.number().int().nonnegative(),
   staleTokens: z.number().int().nonnegative(),
   receiptCount: z.number().int().nonnegative(),
+  suppressedByPreference: z.boolean().optional(),
   ticketErrors: z.object({
     total: z.number().int().nonnegative(),
     retryable: z.number().int().nonnegative(),
@@ -129,6 +131,7 @@ export const sendScheduledActionNoticeOutputSchema = z.object({
   sent: z.number().int().nonnegative(),
   staleTokens: z.number().int().nonnegative(),
   receiptCount: z.number().int().nonnegative(),
+  suppressedByPreference: z.boolean().optional(),
 });
 export type SendScheduledActionNoticeResult = z.infer<typeof sendScheduledActionNoticeOutputSchema>;
 
@@ -144,6 +147,8 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   status: cloudAgentSessionPushStatusSchema,
   body: z.string(),
   suppressIfViewingSession: z.boolean().optional(),
+  // Absent category is treated as 'status' at the enforcement read site.
+  category: cloudAgentSessionCategorySchema.optional(),
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
   typeof sendCloudAgentSessionNotificationInputSchema
@@ -151,7 +156,7 @@ export type SendCloudAgentSessionNotificationParams = z.infer<
 
 export const sendCloudAgentSessionNotificationOutputSchema = z.object({
   dispatched: z.boolean(),
-  reason: z.enum(['missing_session', 'dispatch_failed']).optional(),
+  reason: z.enum(['missing_session', 'dispatch_failed', 'suppressed_preference']).optional(),
 });
 export type SendCloudAgentSessionNotificationResult = z.infer<
   typeof sendCloudAgentSessionNotificationOutputSchema
@@ -162,6 +167,7 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 export const sendSessionReadyNotificationInputSchema = z.object({
   userId: z.string().min(1),
   cliSessionId: z.string().min(1),
+  title: z.string().optional(),
 });
 export type SendSessionReadyNotificationParams = z.infer<
   typeof sendSessionReadyNotificationInputSchema
@@ -171,6 +177,44 @@ export const sendSessionReadyNotificationOutputSchema =
   sendCloudAgentSessionNotificationOutputSchema;
 export type SendSessionReadyNotificationResult = z.infer<
   typeof sendSessionReadyNotificationOutputSchema
+>;
+
+// ── sendAgentSessionNotification ────────────────────────────────────
+//
+// Agent-callable push for an explicit `notify_user` tool call. Resolved
+// session-side (no title supplied by callers). Sibling RPC to
+// `sendCloudAgentSessionNotification`; intentionally not folded into that
+// RPC so the existing completed/failed/interrupted enum stays unchanged.
+
+export const sendAgentSessionNotificationInputSchema = z.object({
+  userId: z.string().min(1),
+  cliSessionId: z.string().min(1),
+  notificationId: z.string().min(1).max(64),
+  message: z.string().min(1).max(500),
+});
+export type SendAgentSessionNotificationParams = z.infer<
+  typeof sendAgentSessionNotificationInputSchema
+>;
+
+export const sendAgentSessionNotificationReasonSchema = z.enum([
+  'not_found',
+  'suppressed_presence',
+  'suppressed_preference',
+  'suppressed_rate_limit',
+  'no_tokens',
+  'duplicate',
+  'failed',
+]);
+export type SendAgentSessionNotificationReason = z.infer<
+  typeof sendAgentSessionNotificationReasonSchema
+>;
+
+export const sendAgentSessionNotificationOutputSchema = z.object({
+  dispatched: z.boolean(),
+  reason: sendAgentSessionNotificationReasonSchema.optional(),
+});
+export type SendAgentSessionNotificationResult = z.infer<
+  typeof sendAgentSessionNotificationOutputSchema
 >;
 
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
@@ -192,14 +236,60 @@ export const dispatchPushInputSchema = z.object({
     sound: z.union([z.literal('default'), z.null()]).optional(),
     priority: z.enum(['default', 'high']).optional(),
   }),
+  // Optional per-call rate limit (sliding window). When set, the DO checks
+  // the sliding window after idempotency/presence and before the Expo send;
+  // an attempt that fails the check returns `suppressed_rate_limit` and
+  // records its idempotency key with that outcome so replays dedup.
+  rateLimit: z
+    .object({
+      key: z.string().min(1),
+      limit: z.number().int().positive(),
+      windowSeconds: z.number().int().positive(),
+    })
+    .optional(),
 });
 export type DispatchPushInput = z.infer<typeof dispatchPushInputSchema>;
 
 export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
   z.object({ kind: z.literal('suppressed_presence') }),
+  z.object({ kind: z.literal('suppressed_rate_limit') }),
   z.object({ kind: z.literal('no_tokens') }),
   z.object({ kind: z.literal('duplicate') }),
   z.object({ kind: z.literal('failed'), error: z.string() }),
 ]);
 export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
+
+// ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
+
+export const internalDispatchLowBalanceRequestSchema = z.object({
+  kind: z.literal('low_balance'),
+  recipientUserIds: z.array(z.string().min(1)).min(1),
+  organizationId: z.string().min(1),
+  organizationName: z.string().min(1),
+  minimumBalanceUsd: z.number().nonnegative(),
+});
+export type InternalDispatchLowBalanceRequest = z.infer<
+  typeof internalDispatchLowBalanceRequestSchema
+>;
+
+export const internalDispatchSecurityFindingRequestSchema = z.object({
+  kind: z.literal('security_finding'),
+  recipientUserId: z.string().min(1),
+  notificationId: z.string().min(1),
+  findingId: z.string().min(1),
+  scope: z.string().min(1),
+  notificationKind: z.enum(['new_finding', 'sla_warning', 'sla_breach']),
+  severity: z.string().min(1),
+  repoFullName: z.string().min(1),
+  title: z.string().min(1),
+});
+export type InternalDispatchSecurityFindingRequest = z.infer<
+  typeof internalDispatchSecurityFindingRequestSchema
+>;
+
+export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
+  internalDispatchLowBalanceRequestSchema,
+  internalDispatchSecurityFindingRequestSchema,
+]);
+export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

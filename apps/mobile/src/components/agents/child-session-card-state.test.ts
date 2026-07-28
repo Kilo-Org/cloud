@@ -1,9 +1,16 @@
-import { type KiloSessionId, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
+/* eslint-disable max-lines -- test file with many fixtures */
+import {
+  type KiloSessionId,
+  type Part,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import {
   getChildSessionActivityLabel,
   getChildSessionCardState,
+  getChildSessionStreaming,
   getTaskToolSessionId,
 } from './child-session-card-state';
 
@@ -55,7 +62,29 @@ function makeTaskPart(
   });
 }
 
-function makeAssistantMessage(parts: ToolPart[], id = 'msg-1'): StoredMessage {
+function makeTextPart(text: string): Part {
+  return {
+    id: 'p-text',
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'text',
+    text,
+    time: { start: 1, end: 2 },
+  };
+}
+
+function makeReasoningPart(text: string): Part {
+  return {
+    id: 'p-reasoning',
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'reasoning',
+    text,
+    time: { start: 1, end: 2 },
+  };
+}
+
+function makeAssistantMessage(parts: Part[], id = 'msg-1'): StoredMessage {
   return {
     info: {
       id,
@@ -242,6 +271,60 @@ describe('getChildSessionCardState', () => {
     });
   });
 
+  it('shows live text activity when the latest assistant part is a text part', () => {
+    const part = makeTaskPart('running', { subagent_type: 'Writer', description: 'Draft reply' });
+    const messages = [makeAssistantMessage([makeTextPart('Here is the answer.')])];
+    expect(getChildSessionCardState(part, messages)).toEqual({
+      agentName: 'Writer',
+      taskName: 'Draft reply',
+      latestActivity: 'Writing response',
+    });
+  });
+
+  it('shows live reasoning activity when the latest assistant part is a reasoning part', () => {
+    const part = makeTaskPart('running', { subagent_type: 'Thinker', description: 'Reason' });
+    const messages = [makeAssistantMessage([makeReasoningPart('stepping through the problem')])];
+    expect(getChildSessionCardState(part, messages)).toEqual({
+      agentName: 'Thinker',
+      taskName: 'Reason',
+      latestActivity: 'Thinking',
+    });
+  });
+
+  it('prefers a newer text part over an older completed tool part', () => {
+    const part = makeTaskPart('running', { subagent_type: 'Agent', description: 'Work' });
+    const olderTool = makeToolPart('read', {
+      status: 'completed',
+      input: { filePath: '/project/docs/spec.md' },
+      output: 'content',
+      title: 'read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    });
+    const newerText = makeTextPart('Based on the spec...');
+    const messages = [makeAssistantMessage([olderTool, newerText])];
+    expect(getChildSessionCardState(part, messages)).toEqual({
+      agentName: 'Agent',
+      taskName: 'Work',
+      latestActivity: 'Writing response',
+    });
+  });
+
+  it('ignores a transient empty-parts assistant message and finds the prior text part', () => {
+    const part = makeTaskPart('running', { subagent_type: 'Agent', description: 'Stream' });
+    const earlierText = makeTextPart('Streaming in progress...');
+    const emptyAssistant: StoredMessage = {
+      ...makeAssistantMessage([], 'msg-latest'),
+      info: { ...makeAssistantMessage([], 'msg-latest').info, id: 'msg-latest' },
+    };
+    const messages = [makeAssistantMessage([earlierText], 'msg-1'), emptyAssistant];
+    expect(getChildSessionCardState(part, messages)).toEqual({
+      agentName: 'Agent',
+      taskName: 'Stream',
+      latestActivity: 'Writing response',
+    });
+  });
+
   it('includes non-assistant messages without throwing, ignoring them for activity', () => {
     const part = makeTaskPart('pending', { subagent_type: 'Helper', description: 'Help' });
     const userMessage: StoredMessage = {
@@ -308,5 +391,49 @@ describe('getTaskToolSessionId', () => {
       time: { start: 1, end: 2 },
     });
     expect(getTaskToolSessionId(readPart)).toBeUndefined();
+  });
+});
+
+describe('getChildSessionStreaming', () => {
+  it('returns true when an assistant message has a running task with a matching sessionId', () => {
+    const runningTask = makeTaskPart('running');
+    const messages = [makeAssistantMessage([runningTask])];
+    expect(getChildSessionStreaming(messages, subagentSessionId)).toBe(true);
+  });
+
+  it('returns false for a completed task with a matching sessionId', () => {
+    const completedTask = makeTaskPart('completed');
+    const messages = [makeAssistantMessage([completedTask])];
+    expect(getChildSessionStreaming(messages, subagentSessionId)).toBe(false);
+  });
+
+  it('returns false for an errored task with a matching sessionId', () => {
+    const erroredTask = makeTaskPart('error');
+    const messages = [makeAssistantMessage([erroredTask])];
+    expect(getChildSessionStreaming(messages, subagentSessionId)).toBe(false);
+  });
+
+  it('returns false when no task part matches the child sessionId', () => {
+    const otherTask = makeTaskPart('running', {});
+    const otherSessionId = 'ses-other' as KiloSessionId;
+    const messages = [makeAssistantMessage([otherTask])];
+    expect(getChildSessionStreaming(messages, otherSessionId)).toBe(false);
+  });
+
+  it('returns false when the only tool is a non-task tool', () => {
+    const readPart = makeToolPart('read', {
+      status: 'completed',
+      input: { filePath: 'x' },
+      output: 'y',
+      title: 'read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    });
+    const messages = [makeAssistantMessage([readPart])];
+    expect(getChildSessionStreaming(messages, subagentSessionId)).toBe(false);
+  });
+
+  it('returns false for an empty messages list', () => {
+    expect(getChildSessionStreaming([], subagentSessionId)).toBe(false);
   });
 });

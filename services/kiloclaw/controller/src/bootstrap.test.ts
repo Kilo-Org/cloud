@@ -2045,12 +2045,15 @@ describe('TOOLS.md section configs', () => {
     expect(GOG_SECTION_CONFIG.section).not.toContain('gog drive files list');
   });
 
-  it('Composio section references core CLI commands', () => {
+  it('Composio section describes the MCP surface and steers the agent away from the CLI', () => {
     const section = COMPOSIO_SECTION_CONFIG.section;
-    expect(section).toContain('composio whoami');
-    expect(section).toContain('composio search');
-    expect(section).toContain('composio connections list');
-    expect(section).toContain('composio link <toolkit>');
+    expect(section).toContain('MCP server');
+    expect(section).toContain('https://dashboard.composio.dev');
+    expect(section).toContain('Do NOT run `composio login`');
+    // The CLI stays installed for users who set it up by hand, but the agent
+    // must not coach anyone back onto it.
+    expect(section).not.toContain('composio whoami');
+    expect(section).not.toContain('composio link <toolkit>');
   });
 });
 

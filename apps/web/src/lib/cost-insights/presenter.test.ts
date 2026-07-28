@@ -555,7 +555,7 @@ describe('Cost Insights presenter', () => {
     ).toThrow('Covered Cost Insights evidence must include both spend categories.');
   });
 
-  it('marks aggregate evidence partial without exposing an understated covered subtotal', () => {
+  it('shows known spend in partial aggregate evidence without presenting it as a complete total', () => {
     const points = [
       {
         hourStart: '2026-06-25T22:00:00.000Z',
@@ -594,8 +594,8 @@ describe('Cost Insights presenter', () => {
         coverage: 'partial',
         coveredHours: 1,
         totalHours: 2,
-        variableUsd: null,
-        scheduledUsd: null,
+        variableUsd: 2,
+        scheduledUsd: 1,
       },
       {
         label: 'Jun 26',
@@ -606,6 +606,36 @@ describe('Cost Insights presenter', () => {
         totalHours: 1,
         variableUsd: null,
         scheduledUsd: null,
+      },
+    ]);
+  });
+
+  it('shows driver-backed spend from an uncovered hour as partial evidence', () => {
+    expect(
+      formatSpendEvidence(
+        [
+          {
+            hourStart: '2026-06-25T23:00:00.000Z',
+            variableMicrodollars: 4_000_000,
+            scheduledMicrodollars: 1_000_000,
+            totalMicrodollars: 5_000_000,
+            variableRecordCount: 2,
+            scheduledRecordCount: 1,
+            isCovered: false,
+          },
+        ],
+        '24h'
+      )
+    ).toEqual([
+      {
+        label: '23',
+        periodStart: '2026-06-25T23:00:00.000Z',
+        periodEndExclusive: '2026-06-26T00:00:00.000Z',
+        coverage: 'partial',
+        coveredHours: 0,
+        totalHours: 1,
+        variableUsd: 4,
+        scheduledUsd: 1,
       },
     ]);
   });

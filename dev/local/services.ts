@@ -100,10 +100,16 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'nextjs',
       'cloudflare-session-ingest',
       'cloudflare-git-token-service',
+      'container-usage-meter',
       'notifications',
     ],
     dir: 'services/cloud-agent-next',
     useLanIp: true,
+  },
+  'container-usage-meter': {
+    group: 'cloud-agent',
+    dependsOn: ['postgres'],
+    dir: 'services/container-usage-meter',
   },
   'cloudflare-webhook-agent-ingest': {
     group: 'cloud-agent',

@@ -211,6 +211,14 @@ export type DbSessionV2 = {
   status: string | null;
   status_updated_at: Date | null;
   associatedPr?: AssociatedPr | null;
+  /**
+   * Persisted session total cost in microdollars (USD × 1,000,000). Optional
+   * because the cloud-agent API path that populates `DbSessionV2` does not
+   * surface it; tRPC list/search results that do carry it flow through
+   * unchanged. The sidebar does not render cost, so missing values are
+   * treated as unknown and serialized as `null`.
+   */
+  total_cost_microdollars?: number | null;
 };
 
 /**

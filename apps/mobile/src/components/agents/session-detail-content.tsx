@@ -1,19 +1,25 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type CloudStatus, type KiloSessionId } from 'cloud-agent-sdk';
+import {
+  type CloudStatus,
+  type KiloSessionId,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
-import { exitRemoteCliWithFeedback } from '@/components/agents/exit-remote-cli-with-feedback';
+import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
@@ -27,12 +33,20 @@ import {
   SessionContextMetrics,
 } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
+import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
+import {
+  buildRemoteAttachmentPartsWithRetryableFeedback,
+  resolveSendAttachmentKind,
+  shouldRefuseSilentAttachmentDrop,
+} from '@/components/agents/session-detail-send-attachment';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
+  shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -50,14 +64,21 @@ import {
 } from '@/components/agents/session-transcript';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
+import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
+import {
+  SessionPlatformIcon,
+  sessionPlatformIconKind,
+} from '@/components/agents/session-platform-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import {
   type AnalyticsSurface,
@@ -65,6 +86,7 @@ import {
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -75,6 +97,8 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { platformLabel } from '@/lib/platform-label';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -86,6 +110,8 @@ import { cn } from '@/lib/utils';
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
   openedVia?: 'push' | 'app';
+  /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
+  shareId?: string;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -96,9 +122,11 @@ const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
 export function SessionDetailContent({
   sessionId,
   openedVia = 'app',
+  shareId,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
+  const colors = useThemeColors();
   const [childSession, setChildSession] = useState<{
     sessionId: KiloSessionId;
     title: string;
@@ -119,6 +147,10 @@ export function SessionDetailContent({
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
+  const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
+    fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
+    totalCost
+  );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -126,6 +158,7 @@ export function SessionDetailContent({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
@@ -135,6 +168,7 @@ export function SessionDetailContent({
   const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
   const [openContextSheetIdentity, setOpenContextSheetIdentity] =
     useState<ContextSheetIdentity | null>(null);
+  const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -146,11 +180,14 @@ export function SessionDetailContent({
   const {
     isAnswering,
     isRespondingToPermission,
+    questionSubmissionError,
+    permissionSubmissionError,
     handleAnswerQuestion,
     handleRejectQuestion,
     handleRespondToPermission,
   } = useInteractionHandlers({
     manager,
+    kiloSessionId: sessionId,
     activeQuestion,
     activePermission,
     surface: analyticsSurface,
@@ -205,7 +242,7 @@ export function SessionDetailContent({
   const headerRight = contextInfo ? (
     <SessionContextMetrics
       info={contextInfo}
-      totalCost={totalCost}
+      totalCostMicrodollars={totalMicrodollars}
       onPress={() => {
         setOpenContextSheetIdentity({
           sessionId,
@@ -215,7 +252,7 @@ export function SessionDetailContent({
       }}
     />
   ) : (
-    <SessionContextCostFallback totalCost={totalCost} />
+    <SessionContextCostFallback totalCostMicrodollars={totalMicrodollars} />
   );
   const sheetMountState = getContextSheetMountState(
     contextInfo,
@@ -260,6 +297,7 @@ export function SessionDetailContent({
     modelOptions,
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
+    cloudAgentModelOverride,
   });
 
   const viewTrackedRef = useRef<string | null>(null);
@@ -338,10 +376,17 @@ export function SessionDetailContent({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: SessionTranscriptItem }) =>
-      item.type === 'preparation' ? (
-        <PreparationGroup attempt={item.attempt} />
-      ) : (
+    ({ item }: { item: SessionTranscriptItem }) => {
+      if (item.type === 'preparation') {
+        return <PreparationGroup attempt={item.attempt} />;
+      }
+      // Look up delivery state by message id. The map is keyed by user-message
+      // id and may briefly contain an entry before the bubble has rendered
+      // (ServiceEvents can be applied while chat events are still buffered),
+      // so a plain lookup is enough — no render-order guard.
+      const deliveryState =
+        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
+      return (
         <MessageBubble
           message={item.message}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
@@ -349,14 +394,18 @@ export function SessionDetailContent({
           getChildMessages={getChildMessages}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
+          deliveryState={deliveryState}
+          onLongPressDetails={setDetailsMessage}
         />
-      ),
+      );
+    },
     [
       lastAssistantMessageId,
       isStreaming,
       getChildMessages,
       reasoningDefaultExpanded,
       handleOpenChildSession,
+      pendingMessages,
     ]
   );
 
@@ -391,6 +440,10 @@ export function SessionDetailContent({
         return;
       }
 
+      manager.setCloudAgentModelOverride({
+        model: value,
+        ...(variant ? { variant } : {}),
+      });
       setCurrentModel(value);
       setCurrentVariant(variant);
       savePersistedModel(organizationId, { model: value, variant });
@@ -417,10 +470,25 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: pendingMessages.size,
   });
+  const hasFooterStatusIndicator =
+    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
-    hasStatusIndicator:
-      statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready'),
+    hasStatusIndicator: hasFooterStatusIndicator,
+  });
+  // Only a live PreparationGroup duplicates footer progress. Completed groups
+  // stay in the transcript after cold starts and must not suppress a later
+  // recycle re-prepare footer (Setting up environment…).
+  const hasInProgressTranscriptPreparation = useMemo(
+    () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
+    [transcript]
+  );
+  const showSessionFooterRow = shouldShowSessionFooterRow({
+    cloudStatusType: cloudStatus?.type,
+    hasInProgressTranscriptPreparation,
+    shouldShowFooterWorking,
+    hasStatusIndicator: statusIndicator !== null,
+    messageCount: messages.length,
   });
 
   const emptyStateText = statusIndicator ? null : 'No messages yet';
@@ -435,9 +503,48 @@ export function SessionDetailContent({
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
+  const platform = isSessionLoaded ? (fetchedData.createdOnPlatform ?? null) : null;
+  const platformKind = sessionPlatformIconKind(platform);
+  const leadingAccessory =
+    platform != null && platformKind != null ? (
+      <View
+        accessibilityRole="image"
+        accessibilityLabel={platformLabel(platform)}
+        testID={`platform-icon-${platformKind}`}
+      >
+        <SessionPlatformIcon platform={platform} size={14} color={colors.mutedForeground} />
+      </View>
+    ) : null;
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+
+  // When a blocking question/permission card dismisses, hand screen-reader
+  // focus back to the transcript so the user does not get stranded on a
+  // node that no longer exists. We track the previous blocking kind and
+  // only fire on the non-none → none transition (i.e. the user satisfied
+  // the card), not on the very first mount.
+  const transcriptRef = useRef<RNText | null>(null);
+  const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
+  useEffect(() => {
+    const wasBlocking = previousBlockingInteractionRef.current !== 'none';
+    const isBlocking = blockingInteraction !== 'none';
+    previousBlockingInteractionRef.current = blockingInteraction;
+    if (!wasBlocking || isBlocking) {
+      return undefined;
+    }
+    if (moveA11yFocus(transcriptRef)) {
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      moveA11yFocus(transcriptRef);
+    }, 50);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [blockingInteraction]);
+  const isComposerMounted = !isReadOnly || messages.length === 0;
+  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
   const isComposerDisabled =
     isReadOnly ||
     !canSend ||
@@ -450,10 +557,47 @@ export function SessionDetailContent({
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
-    async (text: string, attachments?: AgentAttachmentWire) => {
+    async (
+      text: string,
+      attachments?: AgentAttachmentWire,
+      submission?: AgentAttachmentSubmissionPayload
+    ) => {
       if (requiresModel && !currentModel) {
         toast.error('Select a model before sending');
         return;
+      }
+      // Pick the wire shape via the same pure helper the unit test covers:
+      //   - cloud-agent → unchanged `{path, files}` (S3a)
+      //   - remote + supportsAttachments → materialize presigned GETs and
+      //     forward as `attachmentParts` (S3b)
+      //   - everything else → no attachment field on the wire
+      const kind = resolveSendAttachmentKind(
+        activeSessionType,
+        supportsAttachments,
+        attachments !== undefined
+      );
+      if (shouldRefuseSilentAttachmentDrop(kind, attachments !== undefined)) {
+        const message =
+          "This session can't receive files. Remove the attachments to send your message.";
+        toast.error(message);
+        throw new Error(message);
+      }
+      let attachmentParts: Awaited<ReturnType<typeof buildRemoteAttachmentParts>> | undefined =
+        undefined;
+      if (kind === 'remote-capable' && submission) {
+        const result = await buildRemoteAttachmentPartsWithRetryableFeedback(
+          submission,
+          buildRemoteAttachmentParts
+        );
+        if (!result.ok) {
+          // Retryable presign failure: the manager never reached send(), so
+          // its onSendFailed toast does not fire. Surface the retryable message
+          // through the same toast channel and throw so the composer keeps the
+          // draft/attachments for a retry.
+          toast.error(result.message);
+          throw new Error(result.message);
+        }
+        attachmentParts = result.parts;
       }
       // manager.send() reports failures via its own return value (and toasts
       // through the manager's onSendFailed hook) rather than rejecting — it
@@ -468,7 +612,8 @@ export function SessionDetailContent({
           model: currentModel,
           variant: currentVariant || undefined,
         },
-        ...(supportsAttachments && attachments ? { attachments } : {}),
+        ...(kind === 'cloud' && attachments ? { attachments } : {}),
+        ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
       });
       if (!sent) {
         throw new Error('Failed to send message');
@@ -481,6 +626,7 @@ export function SessionDetailContent({
       currentModel,
       currentVariant,
       requiresModel,
+      activeSessionType,
       supportsAttachments,
       analyticsSurface,
     ]
@@ -526,18 +672,18 @@ export function SessionDetailContent({
     return result.success;
   }, [manager, router, organizationId]);
 
-  const handleExitCli = useCallback(
-    async (onAccepted: () => void) => {
-      await exitRemoteCliWithFeedback({
-        exit: manager.exitRemoteCli.bind(manager),
+  const handleExitSession = useCallback(
+    async (
+      onAccepted: () => void,
+      lock: { current: boolean },
+      settleVoiceInput: () => Promise<boolean>
+    ) => {
+      await exitRemoteSessionWithFeedback({
+        exit: manager.exitRemoteSession.bind(manager),
         onAccepted,
-        onSuccess: message => {
-          toast.success(message);
-        },
-        onError: message => {
-          toast.error(message);
-        },
         router,
+        lock,
+        settleVoiceInput,
       });
     },
     [manager, router]
@@ -548,6 +694,7 @@ export function SessionDetailContent({
       <ScreenHeader
         title={rename.title}
         headerRight={headerRight}
+        leadingAccessory={leadingAccessory}
         {...(rename.isTitleInteractive
           ? {
               onTitlePress: rename.openModal,
@@ -568,7 +715,13 @@ export function SessionDetailContent({
         </KeyboardAvoidingView>
       )}
 
-      <View style={{ height: bottom }} className="bg-background" />
+      {isComposerVisible ? (
+        <BlurBar className="border-t-0">
+          <View style={{ height: bottom }} />
+        </BlurBar>
+      ) : (
+        <View style={{ height: bottom }} className="bg-background" />
+      )}
 
       {sheetMountState.mounted ? (
         <SessionContextSheet
@@ -576,12 +729,24 @@ export function SessionDetailContent({
           info={sheetMountState.info}
           modelDisplay={contextModelAndProvider.model}
           providerDisplay={contextModelAndProvider.provider}
-          totalCost={totalCost}
+          totalCostMicrodollars={totalMicrodollars}
+          breakdownCostUsd={breakdownCostUsd}
+          messages={messages}
+          modelOptions={modelOptions}
           onClose={() => {
             setOpenContextSheetIdentity(null);
           }}
         />
       ) : null}
+
+      <MessageDetailsSheet
+        visible={detailsMessage !== null}
+        message={detailsMessage}
+        modelOptions={modelOptions}
+        onClose={() => {
+          setDetailsMessage(null);
+        }}
+      />
 
       {childSession ? (
         <ChildSessionSheet
@@ -589,6 +754,7 @@ export function SessionDetailContent({
           title={childSession.title}
           getChildMessages={getChildMessages}
           hydrationState={getChildSessionHydrationState(childSession.sessionId)}
+          isStreaming={getChildSessionStreaming(messages, childSession.sessionId)}
           renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={handleOpenChildSession}
           onRetry={() => {
@@ -615,10 +781,37 @@ export function SessionDetailContent({
   function renderKeyboardBody() {
     return (
       <>
-        <View className="flex-1">{renderContent()}</View>
+        <View className="flex-1">
+          <Text
+            ref={transcriptRef}
+            accessible
+            accessibilityLabel="Session transcript"
+            pointerEvents="none"
+            className="absolute inset-0 opacity-0"
+          />
+          {renderContent()}
+        </View>
+
+        {/* Fixed indicator row — lives outside the FlashList so per-token
+            content-size changes during streaming cannot reposition it.
+            Gated on has-messages so the empty/connecting path (which
+            renders the centered status indicator inside `renderContent`)
+            does not double-render. While preparing, suppressed when the
+            transcript already shows PreparationGroup (no duplicate). */}
+        {showSessionFooterRow ? (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            layout={LinearTransition.duration(150)}
+          >
+            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
+            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
+          </Animated.View>
+        ) : null}
 
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
+            key={activeQuestion.requestId}
             questions={activeQuestion.questions}
             onAnswer={answers => {
               void handleAnswerQuestion(answers);
@@ -627,11 +820,14 @@ export function SessionDetailContent({
               void handleRejectQuestion();
             }}
             isSubmitting={isAnswering}
+            requestId={activeQuestion.requestId}
+            submissionError={questionSubmissionError}
           />
         ) : null}
 
         {blockingInteraction === 'permission' && activePermission ? (
           <PermissionCard
+            key={activePermission.requestId}
             permission={activePermission.permission}
             patterns={activePermission.patterns}
             metadata={activePermission.metadata}
@@ -639,6 +835,8 @@ export function SessionDetailContent({
               void handleRespondToPermission(response);
             }}
             isSubmitting={isRespondingToPermission}
+            requestId={activePermission.requestId}
+            submissionError={permissionSubmissionError}
           />
         ) : null}
 
@@ -650,7 +848,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {!isReadOnly || messages.length === 0 ? (
+        {isComposerMounted ? (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}
@@ -664,7 +862,7 @@ export function SessionDetailContent({
                 onSend={handleSend}
                 onSendCommand={handleSendCommand}
                 onCreateSession={handleCreateSession}
-                onExitCli={handleExitCli}
+                onExitSession={handleExitSession}
                 onStop={handleStop}
                 disabled={isComposerDisabled}
                 isStreaming={isStreaming}
@@ -680,6 +878,7 @@ export function SessionDetailContent({
                 activeSessionType={activeSessionType}
                 commands={availableCommands}
                 commandState={remoteCommandState}
+                shareId={shareId}
               />
             </ModelPickerSelectionScopeProvider>
           </View>
@@ -738,12 +937,6 @@ export function SessionDetailContent({
           void manager.loadOlderMessages();
         }}
         renderItem={renderItem}
-        ListFooterComponent={
-          <>
-            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
-          </>
-        }
       />
     );
   }

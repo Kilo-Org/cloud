@@ -1,12 +1,40 @@
 import * as Haptics from 'expo-haptics';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActionSheetIOS, Alert, Modal, Platform, Pressable, TextInput, View } from 'react-native';
 
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { parseTimestamp, timeAgo } from '@/lib/utils';
+import {
+  isAttentionAcked,
+  reconcileSessionAttention,
+  shouldShowNeedsInput,
+  useSessionAttentionRevision,
+} from '@/lib/session-attention';
+import {
+  composeStoredSessionSpokenMeta,
+  composeStoredSessionVisibleMeta,
+  formatMeta,
+  formatSessionTotalCost,
+  repoNameFromGitUrl,
+  storedSessionEyebrowLabel,
+} from './session-list-helpers';
+import { SessionPlatformIcon, sessionPlatformIconKind } from './session-platform-icon';
+import {
+  formatSpokenCost,
+  formatSpokenTimeAgo,
+  sessionRowAccessibilityLabel,
+} from './session-row-accessibility-label';
+import { copySessionId, showDeleteConfirm, showRenamePrompt } from './session-row-actions';
+
+/** Container shape only. `'list'` (default) keeps the Agents list look
+ * (`stripMode="inline"`, inner padding so the strip sits inside the
+ * padding). `'card'` mirrors the Home card look (`stripMode="edge"`,
+ * `last` so no divider, no inner padding so the strip meets the
+ * rounded tile border). Content flags (`live`, `needsInput`,
+ * `subtitle`, `meta`, `metaWhileLive`) are passed identically in both. */
+export type RowVariant = 'list' | 'card';
 
 type StoredSessionRowProps = {
   session: {
@@ -19,8 +47,9 @@ type StoredSessionRowProps = {
     updated_at: string;
     git_branch: string | null;
     status: string | null;
+    status_updated_at: string | null;
+    total_cost_microdollars: number | null;
   };
-  isLive: boolean;
   /**
    * Which timestamp drives the row's relative meta label. The list
    * section the session lands in and the timestamp shown here are
@@ -28,98 +57,63 @@ type StoredSessionRowProps = {
    */
   sortBy: AgentSessionSortBy;
   onPress: () => void;
-  onDelete: () => void;
-  onRename: (newTitle: string) => void;
+  onDelete?: () => void;
+  onRename?: (newTitle: string) => void;
+  /** Container shape: see `RowVariant`. Defaults to `'list'`. */
+  variant?: RowVariant;
+  /**
+   * Whether the row is fully interactive. `false` removes the long-press
+   * manage menu (and gates any rename/delete/copy-id actions it owns).
+   * Tap is preserved either way. Defaults to `true`.
+   */
+  interactive?: boolean;
+  /**
+   * Forwarded to the base `SessionRow` live dot. Defaults to `false` so
+   * Home and the Agents list stay behavior-identical.
+   */
+  live?: boolean;
+  /**
+   * Forwarded to the base `SessionRow` meta-while-live opt-in. Defaults to
+   * `false` so existing call sites are unchanged.
+   */
+  metaWhileLive?: boolean;
 };
-
-type RemoteSessionRowProps = {
-  session: {
-    id: string;
-    title: string;
-    status: string;
-    gitBranch?: string;
-  };
-  onPress: () => void;
-};
-
-/**
- * Map backend `created_on_platform` strings to a pretty uppercase label
- * for the row eyebrow. The row's hue is hashed from this label.
- */
-function platformLabel(platform: string): string {
-  switch (platform) {
-    case 'cloud-agent':
-    case 'cloud-agent-web': {
-      return 'CLOUD AGENT';
-    }
-    case 'vscode':
-    case 'agent-manager': {
-      return 'VSCODE';
-    }
-    case 'slack': {
-      return 'SLACK';
-    }
-    case 'cli': {
-      return 'CLI';
-    }
-    default: {
-      return platform.toUpperCase();
-    }
-  }
-}
-
-function formatMeta(timestamp: string): string {
-  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
-}
-
-function showDeleteConfirm(onDelete: () => void) {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  Alert.alert('Delete session?', 'This cannot be undone.', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete', style: 'destructive', onPress: onDelete },
-  ]);
-}
-
-/** iOS-only — uses Alert.prompt which is unavailable on Android. */
-function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => void) {
-  Alert.prompt(
-    'Rename session',
-    'Enter a new name for this session',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Rename',
-        onPress: (newName: string | undefined) => {
-          if (newName?.trim()) {
-            onRename(newName.trim());
-          }
-        },
-      },
-    ],
-    'plain-text',
-    currentTitle
-  );
-}
 
 export function StoredSessionRow({
   session,
-  isLive,
   sortBy,
   onPress,
   onDelete,
   onRename,
+  variant = 'list',
+  interactive = true,
+  live = false,
+  metaWhileLive = false,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const title = session.title && session.title.length > 0 ? session.title : 'Untitled session';
   const [renameVisible, setRenameVisible] = useState(false);
   const renameTextRef = useRef(title);
-  const agentLabel = platformLabel(session.created_on_platform);
+  const agentLabel = storedSessionEyebrowLabel(session);
+  const timestamp = getAgentSessionTimestamp(session, sortBy);
+  const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
+
+  const revision = useSessionAttentionRevision();
+  const raiseId = session.status_updated_at ?? session.status ?? null;
+  const needsInput = shouldShowNeedsInput({
+    status: session.status,
+    raiseId,
+    isAcked: isAttentionAcked(session.session_id, raiseId),
+  });
+  useEffect(() => {
+    reconcileSessionAttention(session.session_id, session.status, session.status_updated_at);
+  }, [session.session_id, session.status, session.status_updated_at, revision]);
 
   const handleRenameConfirm = () => {
     const newName = renameTextRef.current.trim();
     setRenameVisible(false);
     if (newName && newName !== title) {
-      onRename(newName);
+      onRename?.(newName);
     }
   };
 
@@ -129,20 +123,30 @@ export function StoredSessionRow({
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Rename', 'Delete session', 'Cancel'],
-          cancelButtonIndex: 2,
-          destructiveButtonIndex: 1,
+          options: ['Copy session ID', 'Rename', 'Delete session', 'Cancel'],
+          cancelButtonIndex: 3,
+          destructiveButtonIndex: 2,
         },
         buttonIndex => {
           if (buttonIndex === 0) {
-            showRenamePrompt(title, onRename);
-          } else if (buttonIndex === 1) {
+            void copySessionId(session.session_id);
+          } else if (buttonIndex === 1 && onRename) {
+            showRenamePrompt(title, newTitle => {
+              onRename(newTitle);
+            });
+          } else if (buttonIndex === 2 && onDelete) {
             showDeleteConfirm(onDelete);
           }
         }
       );
     } else {
       Alert.alert('Session actions', undefined, [
+        {
+          text: 'Copy session ID',
+          onPress: () => {
+            void copySessionId(session.session_id);
+          },
+        },
         {
           text: 'Rename',
           onPress: () => {
@@ -154,7 +158,9 @@ export function StoredSessionRow({
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            showDeleteConfirm(onDelete);
+            if (onDelete) {
+              showDeleteConfirm(onDelete);
+            }
           },
         },
         { text: 'Cancel', style: 'cancel' },
@@ -162,22 +168,70 @@ export function StoredSessionRow({
     }
   };
 
+  // Visible and spoken meta mirror `formatMeta(timestamp)`. When `needsInput`
+  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered.
+  // When a cost is present, both forms fold it in first (matches the row's
+  // "$0.12 · time" order). Needs-input sessions have no persisted cost.
+  const visibleMeta = composeStoredSessionVisibleMeta(
+    formatSessionTotalCost(session.total_cost_microdollars),
+    formatMeta(timestamp)
+  );
+  const spokenMeta = needsInput
+    ? null
+    : composeStoredSessionSpokenMeta(
+        formatSpokenCost(session.total_cost_microdollars),
+        formatSpokenTimeAgo(timestamp)
+      );
+
+  // Platform icon only on the Agents list variant. Home cards stay
+  // byte-identical (platformIcon defaults to undefined).
+  const platformIconKind =
+    variant === 'list' ? sessionPlatformIconKind(session.created_on_platform) : null;
+  const platformIcon =
+    platformIconKind != null ? (
+      <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
+        <SessionPlatformIcon
+          platform={session.created_on_platform}
+          size={12}
+          color={colors.mutedSoft}
+        />
+      </View>
+    ) : undefined;
+
+  // Speak the platform only when an icon is shown, not needs-input, AND the
+  // eyebrow badge is a repo name (otherwise the badge already speaks the
+  // platform label and appending would be redundant).
+  const a11yPlatform =
+    platformIconKind != null && !needsInput && repoNameFromGitUrl(session.git_url) != null
+      ? session.created_on_platform
+      : undefined;
+
   return (
     <>
       <Pressable
         onPress={onPress}
-        onLongPress={handleLongPress}
-        accessibilityLabel={title}
+        onLongPress={canManage ? handleLongPress : undefined}
+        accessibilityLabel={sessionRowAccessibilityLabel({
+          title,
+          needsInput,
+          badge: agentLabel,
+          meta: spokenMeta,
+          platform: a11yPlatform,
+        })}
         className="active:opacity-70"
       >
         <SessionRow
           agentLabel={agentLabel}
           title={title}
           subtitle={session.git_branch}
-          meta={formatMeta(getAgentSessionTimestamp(session, sortBy))}
-          live={isLive}
-          stripMode="inline"
-          className="pl-[22px] pr-[22px]"
+          meta={visibleMeta}
+          live={live}
+          metaWhileLive={metaWhileLive}
+          needsInput={needsInput}
+          platformIcon={platformIcon}
+          stripMode={variant === 'card' ? 'edge' : 'inline'}
+          last={variant === 'card' ? true : undefined}
+          className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
         />
       </Pressable>
 
@@ -230,23 +284,5 @@ export function StoredSessionRow({
         </View>
       </Modal>
     </>
-  );
-}
-
-export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRowProps>) {
-  const title = session.title.length > 0 ? session.title : 'Untitled session';
-
-  return (
-    <Pressable onPress={onPress} accessibilityLabel={title} className="active:opacity-70">
-      <SessionRow
-        agentLabel="CLOUD AGENT"
-        title={title}
-        subtitle={session.gitBranch}
-        meta={session.status.toUpperCase()}
-        live
-        stripMode="inline"
-        className="pl-[22px] pr-[22px]"
-      />
-    </Pressable>
   );
 }

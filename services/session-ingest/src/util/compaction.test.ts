@@ -76,3 +76,28 @@ describe('getItemIdentity', () => {
     expect(() => getItemIdentity(item('unknown_type'))).toThrow('Unknown item type: unknown_type');
   });
 });
+
+describe('getItemIdentity agent_notification', () => {
+  it('returns agent_notification/{id} for a notification item', () => {
+    expect(
+      getItemIdentity(item('agent_notification', { id: 'note_1', message: 'Build done' }))
+    ).toEqual({
+      item_id: 'agent_notification/note_1',
+      item_type: 'agent_notification',
+    });
+  });
+
+  it('keeps several distinct notifications in one batch from colliding', () => {
+    const items = [
+      item('agent_notification', { id: 'a', message: 'one' }),
+      item('agent_notification', { id: 'b', message: 'two' }),
+      item('agent_notification', { id: 'c', message: 'three' }),
+    ];
+    const identities = items.map(getItemIdentity);
+    expect(identities).toEqual([
+      { item_id: 'agent_notification/a', item_type: 'agent_notification' },
+      { item_id: 'agent_notification/b', item_type: 'agent_notification' },
+      { item_id: 'agent_notification/c', item_type: 'agent_notification' },
+    ]);
+  });
+});

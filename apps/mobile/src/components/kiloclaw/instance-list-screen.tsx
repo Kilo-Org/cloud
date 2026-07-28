@@ -75,7 +75,10 @@ function InstanceSection({
       <View className="flex-row items-center justify-between px-4">
         <Eyebrow>{title}</Eyebrow>
         {showCount ? (
-          <Text variant="mono" className="text-[10px] uppercase tracking-[1.5px] text-muted-soft">
+          <Text
+            variant="mono"
+            className="text-[10px] uppercase tracking-[1.5px] text-muted-foreground"
+          >
             {instances.length}
           </Text>
         ) : null}

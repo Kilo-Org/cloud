@@ -5,6 +5,7 @@ import { getSessionIngestDO } from './SessionIngestDO';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
+  type Instance,
   type SessionEventPayload,
   SessionEventPayloadSchema,
   type WebInboundMessage,
@@ -18,7 +19,15 @@ type HeartbeatSession = {
   gitUrl?: string;
   gitBranch?: string;
   parentSessionId?: string;
+  // Platform the session is running on (e.g. "darwin", "linux", "vscode").
+  // Optional: legacy CLIs (predating the `kilo remote` spawner) do not
+  // report a platform; in that case this field is undefined and the
+  // `getActiveSessions()` response omits it (preserves byte-identical
+  // legacy responses).
+  platform?: string;
 };
+
+type ConnectionCapabilities = { attachments?: boolean };
 
 type WSAttachment =
   | {
@@ -29,11 +38,31 @@ type WSAttachment =
       // CLI hasn't sent its first heartbeat, or it's a legacy build that
       // predates this field entirely. Both cases fall back to legacy behavior.
       protocolVersion?: string;
+      // Latest capabilities advertised by this connection. Undefined means
+      // either the CLI hasn't sent its first heartbeat, or it's a legacy
+      // build that predates the capabilities field — both surface as no
+      // opt-in features.
+      capabilities?: ConnectionCapabilities;
       // Set from the authenticated /user/cli route; undefined on sockets
       // accepted before this field existed. Needed for the session-ready push.
       kiloUserId?: string;
+      // Identity of the spawning CLI process (`kilo remote`). Undefined on
+      // legacy CLIs (no spawner). Persisted in the attachment so the live
+      // socket scan in `getConnectedInstances()` can read it without any
+      // in-memory map or hibernation reconstruction — keeps the response
+      // fresh and avoids stale instance rows on restart.
+      instance?: Instance;
     }
   | { role: 'web'; connectionId: string; subscribedSessions: string[]; replaced?: true };
+
+// Type re-export so test files and other internal callers can reference the
+// connection-row shape from a single place.
+export type ConnectedInstanceRow = {
+  connectionId: string;
+  name: string;
+  projectName: string;
+  version?: string;
+};
 
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 
@@ -140,6 +169,8 @@ export class UserConnectionDO extends DurableObject<Env> {
   private connectionSessions = new Map<string, HeartbeatSession[]>();
   // Protocol version per CLI connection (from heartbeat); absent = legacy CLI
   private connectionProtocolVersion = new Map<string, string | undefined>();
+  // Capabilities per CLI connection (from heartbeat); absent = legacy CLI
+  private connectionCapabilities = new Map<string, ConnectionCapabilities | undefined>();
   // Pending command responses: correlationId → originating web socket
   private pendingCommands = new Map<
     string,
@@ -172,9 +203,10 @@ export class UserConnectionDO extends DurableObject<Env> {
 
       if (attachment.role === 'cli') {
         cliCount++;
-        const { connectionId, sessions, protocolVersion } = attachment;
+        const { connectionId, sessions, protocolVersion, capabilities } = attachment;
         this.connectionSessions.set(connectionId, sessions);
         this.connectionProtocolVersion.set(connectionId, protocolVersion);
+        this.connectionCapabilities.set(connectionId, capabilities);
         sessionCount += sessions.length;
         for (const session of sessions) {
           this.sessionOwners.set(session.id, connectionId);
@@ -299,26 +331,32 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  webSocketClose(ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {
+  webSocketClose(
+    ws: WebSocket,
+    _code: number,
+    _reason: string,
+    _wasClean: boolean
+  ): void | Promise<void> {
     this.ensureState();
 
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     if (!attachment) return;
 
     if (attachment.role === 'cli') {
-      this.handleCliDisconnect(ws, attachment);
-    } else {
-      this.handleWebDisconnect(ws);
+      // Await attention resets so cli.disconnected is not broadcast until the
+      // stored status write has committed (mobile history refetch races otherwise).
+      return this.handleCliDisconnect(ws, attachment);
     }
+    this.handleWebDisconnect(ws);
   }
 
-  webSocketError(ws: WebSocket): void {
+  webSocketError(ws: WebSocket): void | Promise<void> {
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     console.error('WebSocket error', {
       role: attachment?.role ?? 'unknown',
       connectionId: attachment?.connectionId ?? 'unknown',
     });
-    this.webSocketClose(ws, 0, '', false);
+    return this.webSocketClose(ws, 0, '', false);
   }
 
   async alarm(): Promise<void> {
@@ -376,7 +414,14 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     switch (msg.type) {
       case 'heartbeat':
-        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion);
+        this.handleHeartbeat(
+          ws,
+          attachment,
+          msg.sessions,
+          msg.protocolVersion,
+          msg.capabilities,
+          msg.instance
+        );
         break;
       case 'event':
         this.handleCliEvent(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
@@ -391,12 +436,15 @@ export class UserConnectionDO extends DurableObject<Env> {
     ws: WebSocket,
     attachment: WSAttachment & { role: 'cli' },
     sessions: HeartbeatSession[],
-    protocolVersion: string | undefined
+    protocolVersion: string | undefined,
+    capabilities: ConnectionCapabilities | undefined,
+    instance: Instance | undefined
   ): void {
     const { connectionId } = attachment;
     const now = Date.now();
     this.lastHeartbeatAt.set(connectionId, now);
     this.connectionProtocolVersion.set(connectionId, protocolVersion);
+    this.connectionCapabilities.set(connectionId, capabilities);
     this.scheduleNextAlarm(now);
 
     // Remove sessions this connection previously owned but no longer reports
@@ -420,7 +468,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // remote-controllable — the only moment the session-ready push fires.
       // The durable claim in SessionIngestDO makes reconnect re-sights no-ops.
       if (!previousOwner && !session.parentSessionId && attachment.kiloUserId) {
-        this.claimSessionReadyPush(attachment.kiloUserId, session.id);
+        this.claimSessionReadyPush(attachment.kiloUserId, session.id, session.title);
       }
       this.sessionOwners.set(session.id, connectionId);
     }
@@ -439,33 +487,28 @@ export class UserConnectionDO extends DurableObject<Env> {
       connectionId,
       sessions,
       protocolVersion,
+      capabilities,
       kiloUserId: attachment.kiloUserId,
+      ...(instance ? { instance } : {}),
     };
     ws.serializeAttachment(updatedAttachment);
 
-    // Send heartbeat only to web clients subscribed to sessions from this connection.
-    // Include subscribers for just-removed sessions so they learn the session is gone.
-    const subscribers = new Set<WebSocket>();
-    for (const session of sessions) {
-      const subs = this.webSubscriptions.get(session.id);
-      if (subs) for (const ws2 of subs) subscribers.add(ws2);
-    }
-    for (const prev of previousSessions) {
-      if (!currentIds.has(prev.id)) {
-        const subs = this.webSubscriptions.get(prev.id);
-        if (subs) for (const ws2 of subs) subscribers.add(ws2);
-      }
-    }
-    if (subscribers.size > 0) {
-      const msg: WebInboundMessage = {
-        type: 'system',
-        event: 'sessions.heartbeat',
-        data: { connectionId, protocolVersion, sessions },
-      };
-      for (const ws2 of subscribers) {
-        this.sendToWeb(ws2, msg);
-      }
-    }
+    // Broadcast the heartbeat to every one of the user's web sockets. Subscribers
+    // and non-subscribers both receive it: a removed session id is detectable
+    // from its absence in the payload, so no subscriber special-case is needed.
+    this.broadcastToWeb({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId,
+        protocolVersion,
+        capabilities,
+        sessions: sessions.map(session => ({
+          ...session,
+          ...(capabilities ? { capabilities } : {}),
+        })),
+      },
+    });
 
     this.sendToCli(ws, { type: 'heartbeat_ack' });
   }
@@ -474,10 +517,10 @@ export class UserConnectionDO extends DurableObject<Env> {
    * Fire-and-forget "session ready to control from your phone" push via the
    * session's SessionIngestDO, which holds the durable once-ever claim.
    */
-  private claimSessionReadyPush(kiloUserId: string, sessionId: string): void {
+  private claimSessionReadyPush(kiloUserId: string, sessionId: string, title: string): void {
     const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
     this.ctx.waitUntil(
-      stub.claimSessionReadyPush(kiloUserId, sessionId).catch((error: unknown) => {
+      stub.claimSessionReadyPush(kiloUserId, sessionId, title).catch((error: unknown) => {
         console.error('Failed to claim session-ready push (non-fatal)', {
           sessionId,
           error: error instanceof Error ? error.message : String(error),
@@ -795,15 +838,19 @@ export class UserConnectionDO extends DurableObject<Env> {
   // Disconnect handling
   // ---------------------------------------------------------------------------
 
-  private handleCliDisconnect(
+  private async handleCliDisconnect(
     disconnectedWs: WebSocket,
     attachment: WSAttachment & { role: 'cli' }
-  ): void {
+  ): Promise<void> {
     const { connectionId } = attachment;
 
     // If another CLI socket already has this connectionId, this is a stale
     // close from a reconnect — the replacement socket is already active.
+    // Exclude the closing socket: under wrangler/workerd, getWebSockets() still
+    // includes it during webSocketClose, so matching self would always look "replaced"
+    // and skip ownership cleanup + attention reset (DEF-5 E2E failure).
     const replaced = this.ctx.getWebSockets('cli').some(ws => {
+      if (ws === disconnectedWs) return false;
       const att = ws.deserializeAttachment() as WSAttachment | null;
       return att?.role === 'cli' && att.connectionId === connectionId;
     });
@@ -827,6 +874,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
     this.connectionSessions.delete(connectionId);
     this.connectionProtocolVersion.delete(connectionId);
+    this.connectionCapabilities.delete(connectionId);
     this.lastHeartbeatAt.delete(connectionId);
 
     console.log('CLI socket disconnected', {
@@ -837,11 +885,51 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     // Leave webSubscriptions intact — a reconnecting CLI can resume
 
+    // Reset stored attention before broadcasting disconnect so the mobile
+    // departure refetch observes `retry` rather than a stuck `question`.
+    // kiloUserId comes from the CLI attachment (authenticated /user/cli route);
+    // without it we cannot safely target rows and must no-op.
+    await this.resetOwnedSessionAttentionOnDisconnect(attachment.kiloUserId, ownedSessions);
+
     this.broadcastToWeb({
       type: 'system',
       event: 'cli.disconnected',
       data: { connectionId },
     });
+  }
+
+  /**
+   * Commit attention clears for owned sessions before `cli.disconnected`.
+   * Identity: attachment `kiloUserId` only — never guess from DO name.
+   */
+  private async resetOwnedSessionAttentionOnDisconnect(
+    kiloUserId: string | undefined,
+    ownedSessions: ReadonlySet<string>
+  ): Promise<void> {
+    if (ownedSessions.size === 0) return;
+
+    if (!kiloUserId) {
+      console.warn(
+        'Skipping attention status reset on CLI disconnect: missing kiloUserId on attachment',
+        { ownedSessionCount: ownedSessions.size }
+      );
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      [...ownedSessions].map(async sessionId => {
+        const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
+        await stub.resetAttentionStatusOnCliDisconnect(kiloUserId, sessionId);
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('Failed to reset attention status on CLI disconnect', {
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+      }
+    }
   }
 
   private handleWebDisconnect(ws: WebSocket): void {
@@ -887,10 +975,41 @@ export class UserConnectionDO extends DurableObject<Env> {
   // ---------------------------------------------------------------------------
 
   getActiveSessions(): Array<
-    HeartbeatSession & { connectionId: string; protocolVersion?: string }
+    HeartbeatSession & {
+      connectionId: string;
+      protocolVersion?: string;
+      capabilities?: ConnectionCapabilities;
+    }
   > {
     this.ensureState();
     return this.aggregateSessions();
+  }
+
+  /**
+   * Live-socket scan of currently connected CLI WebSockets. Each socket whose
+   * attachment carries an `instance` (i.e. it is a `kilo remote` spawner)
+   * contributes one row; legacy CLIs that predate the spawner never report
+   * `instance` and are excluded by design.
+   *
+   * No in-memory map is consulted: hibernation/restart can never produce a
+   * stale row because we only read from sockets that are alive right now.
+   * The 2KB `serializeAttachment` budget comfortably accommodates a bounded
+   * instance object (well under 200 bytes).
+   */
+  getConnectedInstances(): { instances: ConnectedInstanceRow[] } {
+    this.ensureState();
+    const instances: ConnectedInstanceRow[] = [];
+    for (const ws of this.ctx.getWebSockets('cli')) {
+      const att = ws.deserializeAttachment() as WSAttachment | null;
+      if (att?.role !== 'cli' || !att.instance) continue;
+      instances.push({
+        connectionId: att.connectionId,
+        name: att.instance.name,
+        projectName: att.instance.projectName,
+        ...(att.instance.version ? { version: att.instance.version } : {}),
+      });
+    }
+    return { instances };
   }
 
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
@@ -1072,7 +1191,11 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   private aggregateSessions(): Array<
-    HeartbeatSession & { connectionId: string; protocolVersion?: string }
+    HeartbeatSession & {
+      connectionId: string;
+      protocolVersion?: string;
+      capabilities?: ConnectionCapabilities;
+    }
   > {
     // Build set of connectionIds that still have a live CLI WebSocket.
     // This guards against stale entries that persist if a close event is delayed.
@@ -1082,13 +1205,32 @@ export class UserConnectionDO extends DurableObject<Env> {
       if (att?.role === 'cli') liveConnectionIds.add(att.connectionId);
     }
 
-    const result: Array<HeartbeatSession & { connectionId: string; protocolVersion?: string }> = [];
+    const result: Array<
+      HeartbeatSession & {
+        connectionId: string;
+        protocolVersion?: string;
+        capabilities?: ConnectionCapabilities;
+      }
+    > = [];
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;
       const protocolVersion = this.connectionProtocolVersion.get(connectionId);
+      const capabilities = this.connectionCapabilities.get(connectionId);
       for (const session of sessions) {
         if (session.parentSessionId) continue;
-        result.push({ ...session, connectionId, ...(protocolVersion ? { protocolVersion } : {}) });
+        // Owner-unique: only emit a row for a session id under its current owner,
+        // so a session that has transferred owners while both CLIs are still
+        // connected does not appear twice in the snapshot.
+        if (this.sessionOwners.get(session.id) !== connectionId) continue;
+        result.push({
+          ...session,
+          connectionId,
+          ...(protocolVersion ? { protocolVersion } : {}),
+          ...(capabilities ? { capabilities } : {}),
+          // Preserve byte-identical responses for legacy senders that never
+          // include a `platform`: only forward the field when present.
+          ...(session.platform ? { platform: session.platform } : {}),
+        });
       }
     }
     return result;

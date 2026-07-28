@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -476,25 +476,15 @@ describe('BYOK Router', () => {
     });
   });
 
-  describe('key validation error safety', () => {
-    test('does not return upstream provider error bodies from API key tests', async () => {
+  describe('deprecated codestral provider', () => {
+    test('declines to test a legacy codestral key with a deprecation message', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const key = await caller.byok.create({ provider_id: 'codestral', api_key: 'stored-secret' });
-      const fetchSpy = jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValue(
-          new Response('authorization=stored-secret provider detail', { status: 401 })
-        );
 
-      try {
-        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
-          success: false,
-          message:
-            'API key test failed. Check the credential and supported models, then try again.',
-        });
-      } finally {
-        fetchSpy.mockRestore();
-      }
+      await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+        success: false,
+        message: 'Codestral is deprecated and its API key can no longer be tested.',
+      });
     });
   });
 

@@ -3,10 +3,16 @@ import { Hono } from 'hono';
 import { registerConfigRoutes } from './config';
 import type { Supervisor } from '../supervisor';
 
-vi.mock('../config-writer', () => ({
-  backupConfigFile: vi.fn(),
-  writeBaseConfig: vi.fn(),
-}));
+// Keep the real hookConfigBootViolation: it is pure, and the replace
+// route depends on it to reject configs the gateway could not boot.
+vi.mock('../config-writer', async importOriginal => {
+  const actual = await importOriginal<typeof import('../config-writer')>();
+  return {
+    ...actual,
+    backupConfigFile: vi.fn(),
+    writeBaseConfig: vi.fn(),
+  };
+});
 
 vi.mock('../bootstrap', async importOriginal => {
   const actual = await importOriginal<typeof import('../bootstrap')>();
@@ -219,6 +225,58 @@ describe('/_kilo/config/patch routes', () => {
     expect(written.agents.defaults.model.primary).toBe('kilocode/anthropic/claude-sonnet-4.5');
     // Existing keys preserved
     expect(written.gateway.port).toBe(3001);
+  });
+
+  it('rejects a patch that would stop the gateway from starting', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    // Healthy config: hooks enabled, no templated sessionKey.
+    readMock.mockReturnValue(
+      JSON.stringify({ hooks: { enabled: true, token: 'local-token', mappings: [] } })
+    );
+
+    const resp = await app.request('/_kilo/config/patch', {
+      method: 'POST',
+      body: JSON.stringify({
+        hooks: { mappings: [{ id: 'x', sessionKey: '{{payload.sessionKey}}' }] },
+      }),
+      headers: authHeaders(),
+    });
+
+    expect(resp.status).toBe(422);
+    expect((await resp.json()) as { code: string }).toMatchObject({
+      code: 'openclaw_config_would_not_boot',
+    });
+    expect(atomicWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('allows an unrelated patch on an already-broken config and heals it', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    // Already in the bricking state before this patch touches anything.
+    readMock.mockReturnValue(
+      JSON.stringify({
+        hooks: {
+          enabled: true,
+          token: 'local-token',
+          mappings: [{ id: 'cloudflare-email-inbound', sessionKey: '{{payload.sessionKey}}' }],
+        },
+      })
+    );
+
+    const resp = await app.request('/_kilo/config/patch', {
+      method: 'POST',
+      body: JSON.stringify({ gateway: { port: 3001 } }),
+      headers: authHeaders(),
+    });
+
+    // Must not lock the caller out of repairing an instance that is already down.
+    expect(resp.status).toBe(200);
+    const written = JSON.parse(atomicWriteMock.mock.calls[0][1] as string);
+    expect(written.gateway.port).toBe(3001);
+    expect(written.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
   });
 
   it('rejects non-object body', async () => {
@@ -609,6 +667,34 @@ describe('/_kilo/config/replace routes', () => {
             expect(mock).toHaveBeenCalledOnce();
             const written = JSON.parse(mock.mock.calls[0][1] as string);
             expect(written).toEqual(newConfig);
+          },
+        },
+      },
+    });
+  });
+
+  it('refuses a config the gateway could not boot, without writing or backing up', async () => {
+    const bricking = {
+      hooks: {
+        enabled: true,
+        mappings: [{ id: 'cloudflare-email-inbound', sessionKey: '{{payload.sessionKey}}' }],
+      },
+    };
+
+    await test({
+      route: '/_kilo/config/replace',
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ config: bricking }),
+      expect: {
+        status: 422,
+        mocks: {
+          // The live config must be left exactly as it was.
+          backup: mock => {
+            expect(mock).not.toHaveBeenCalled();
+          },
+          write: mock => {
+            expect(mock).not.toHaveBeenCalled();
           },
         },
       },

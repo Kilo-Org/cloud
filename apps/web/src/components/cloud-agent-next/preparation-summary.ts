@@ -1,5 +1,7 @@
-import type { PreparationAttempt, PreparationStepSnapshot } from '@/lib/cloud-agent-sdk';
+import type { PreparationAttempt, PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 import { formatAttemptDuration, humanizePhaseLabel } from './preparation-phases';
+
+export { isNoOpCompletedPreparationAttempt } from '@kilocode/cloud-agent-sdk';
 
 /** The single line the chat row shows for a preparation attempt. */
 export type PreparationRowSummary =

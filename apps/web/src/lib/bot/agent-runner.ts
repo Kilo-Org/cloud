@@ -30,7 +30,7 @@ import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { BotRequestStep } from '@kilocode/db/schema';
-import { ToolLoopAgent, generateText, stepCountIs, tool } from 'ai';
+import { ToolLoopAgent, generateText, isStepCount, tool } from 'ai';
 import type { StepResult, ToolSet } from 'ai';
 import { Actions, Card, CardText, LinkButton, Section } from 'chat';
 import type { Author, Message, Thread } from 'chat';
@@ -258,7 +258,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
       params.thread,
       params.message
     ),
-    stopWhen: stepCountIs(remainingIterations),
+    stopWhen: isStepCount(remainingIterations),
     tools: {
       spawnCloudAgentSession: tool({
         description: `Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. The agent can make code changes, fix bugs, implement features, review/analyze code, run tests, or open PRs/MRs. Do NOT use it for questions you can answer directly.
@@ -328,7 +328,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
         },
       }),
     },
-    onStepFinish: step => {
+    onStepEnd: step => {
       collectedSteps.push(serializeStep(step, completedStepCount));
       updateBotRequest(params.botRequestId, { steps: [...initialSteps, ...collectedSteps] });
     },

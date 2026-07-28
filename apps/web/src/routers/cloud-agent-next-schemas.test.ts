@@ -1,148 +1,174 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  basePrepareSessionNextSchema,
-  baseSendMessageNextSchema,
-  personalPrepareSessionNextSchema,
-  cloudAgentAttachmentsSchema,
+  cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
+  cloudAgentRelaxedAttachmentFilenameSchema,
 } from './cloud-agent-next-schemas';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
-const PDF_FILENAME = '87654321-4321-4321-8321-cba987654321.pdf';
-const TXT_FILENAME = '87654321-4321-4321-8321-cba987654321.txt';
-const MD_FILENAME = '87654321-4321-4321-8321-cba987654321.md';
-const CSV_FILENAME = '87654321-4321-4321-8321-cba987654321.csv';
-
-describe('cloudAgentAttachmentsSchema', () => {
-  it('accepts document attachments and up to five ordered files', () => {
-    expect(
-      cloudAgentAttachmentsSchema.parse({
-        path: MESSAGE_UUID,
-        files: [PDF_FILENAME, TXT_FILENAME, MD_FILENAME, CSV_FILENAME],
-      })
-    ).toEqual({
-      path: MESSAGE_UUID,
-      files: [PDF_FILENAME, TXT_FILENAME, MD_FILENAME, CSV_FILENAME],
-    });
-  });
-
-  it('rejects unsupported suffixes and more than five attachments', () => {
-    expect(
-      cloudAgentAttachmentsSchema.safeParse({ path: MESSAGE_UUID, files: ['file.docx'] }).success
-    ).toBe(false);
-    expect(
-      cloudAgentAttachmentsSchema.safeParse({
-        path: MESSAGE_UUID,
-        files: Array.from({ length: 6 }, () => PDF_FILENAME),
-      }).success
-    ).toBe(false);
-  });
-});
+const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
 
 describe('cloudAgentGetAttachmentUploadUrlSchema', () => {
-  it.each(['image/png', 'application/pdf', 'text/plain', 'text/markdown', 'text/csv'] as const)(
-    'accepts %s document upload requests',
-    contentType => {
-      expect(
-        cloudAgentGetAttachmentUploadUrlSchema.parse({
-          messageUuid: MESSAGE_UUID,
-          attachmentId: MESSAGE_UUID,
-          contentType,
-          contentLength: 5 * 1024 * 1024,
-        }).contentType
-      ).toBe(contentType);
-    }
-  );
-
-  it('rejects unsupported MIME and oversized uploads', () => {
-    expect(
-      cloudAgentGetAttachmentUploadUrlSchema.safeParse({
-        messageUuid: MESSAGE_UUID,
-        attachmentId: MESSAGE_UUID,
-        contentType: 'application/msword',
-        contentLength: 1,
-      }).success
-    ).toBe(false);
-    expect(
-      cloudAgentGetAttachmentUploadUrlSchema.safeParse({
-        messageUuid: MESSAGE_UUID,
-        attachmentId: MESSAGE_UUID,
-        contentType: 'application/pdf',
-        contentLength: 5 * 1024 * 1024 + 1,
-      }).success
-    ).toBe(false);
-  });
-});
-
-describe('basePrepareSessionNextSchema', () => {
-  it('preserves structured initial slash command payloads', () => {
-    const initialPayload = {
-      type: 'command' as const,
-      command: 'review',
-      arguments: 'main',
-    };
-
-    const result = basePrepareSessionNextSchema.parse({
-      githubRepo: 'kilocode/cloud',
-      prompt: '/review main',
-      mode: 'code',
-      model: 'anthropic/claude-sonnet',
-      initialPayload,
+  it('preserves the legacy 9-MIME contract when extension is absent', () => {
+    const result = cloudAgentGetAttachmentUploadUrlSchema.safeParse({
+      messageUuid: MESSAGE_UUID,
+      attachmentId: ATTACHMENT_ID,
+      contentType: 'image/png',
+      contentLength: 1024,
     });
-
-    expect(result.initialPayload).toEqual(initialPayload);
+    expect(result.success).toBe(true);
   });
 
-  it('accepts canonical attachment references and rejects ambiguous legacy input', () => {
-    const prompt = {
-      githubRepo: 'kilocode/cloud',
-      prompt: 'Review this file',
-      mode: 'code',
-      model: 'anthropic/claude-sonnet',
-      attachments: { path: MESSAGE_UUID, files: [MD_FILENAME] },
-    };
+  it('preserves the existing web-hook request shape (no extension field)', () => {
+    const result = cloudAgentGetAttachmentUploadUrlSchema.parse({
+      messageUuid: MESSAGE_UUID,
+      attachmentId: ATTACHMENT_ID,
+      contentType: 'text/markdown',
+      contentLength: 4096,
+    });
+    expect(result.contentType).toBe('text/markdown');
+    expect(result.extension).toBeUndefined();
+  });
 
-    expect(basePrepareSessionNextSchema.parse(prompt).attachments).toEqual(prompt.attachments);
+  it('accepts a relaxed contentType when extension is provided', () => {
+    const result = cloudAgentGetAttachmentUploadUrlSchema.safeParse({
+      messageUuid: MESSAGE_UUID,
+      attachmentId: ATTACHMENT_ID,
+      contentType: 'application/x-kilo-binary',
+      contentLength: 4096,
+      extension: 'kilo',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a malformed contentType even when extension is provided', () => {
+    const result = cloudAgentGetAttachmentUploadUrlSchema.safeParse({
+      messageUuid: MESSAGE_UUID,
+      attachmentId: ATTACHMENT_ID,
+      contentType: 'not a mime',
+      contentLength: 4096,
+      extension: 'kilo',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a contentType outside the legacy allow-list when extension is absent', () => {
+    const result = cloudAgentGetAttachmentUploadUrlSchema.safeParse({
+      messageUuid: MESSAGE_UUID,
+      attachmentId: ATTACHMENT_ID,
+      contentType: 'application/x-kilo-binary',
+      contentLength: 4096,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects deny-listed extensions on the upload input', () => {
+    for (const extension of ['exe', 'dll', 'msi', 'com', 'scr', 'apk', 'ipa', 'dmg', 'pkg']) {
+      const result = cloudAgentGetAttachmentUploadUrlSchema.safeParse({
+        messageUuid: MESSAGE_UUID,
+        attachmentId: ATTACHMENT_ID,
+        contentType: 'application/octet-stream',
+        contentLength: 4096,
+        extension,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const extensionIssues = result.error.issues.filter(issue => issue.path[0] === 'extension');
+        expect(extensionIssues[0]?.message).toContain(extension);
+      }
+    }
+  });
+
+  it('rejects extensions that exceed the 16-character shape or include non-alphanumerics', () => {
     expect(
-      basePrepareSessionNextSchema.safeParse({
-        ...prompt,
-        images: { path: MESSAGE_UUID, files: ['87654321-4321-4321-8321-cba987654321.png'] },
+      cloudAgentGetAttachmentUploadUrlSchema.safeParse({
+        messageUuid: MESSAGE_UUID,
+        attachmentId: ATTACHMENT_ID,
+        contentType: 'application/octet-stream',
+        contentLength: 4096,
+        extension: 'abcdefghijklmnopq',
       }).success
+    ).toBe(false);
+    expect(
+      cloudAgentGetAttachmentUploadUrlSchema.safeParse({
+        messageUuid: MESSAGE_UUID,
+        attachmentId: ATTACHMENT_ID,
+        contentType: 'application/octet-stream',
+        contentLength: 4096,
+        extension: 'tar.gz',
+      }).success
+    ).toBe(false);
+  });
+
+  it('preserves the 5 MB positive contentLength cap even with an extension', () => {
+    const result = cloudAgentGetAttachmentUploadUrlSchema.safeParse({
+      messageUuid: MESSAGE_UUID,
+      attachmentId: ATTACHMENT_ID,
+      contentType: 'application/octet-stream',
+      contentLength: 5 * 1024 * 1024 + 1,
+      extension: 'kilo',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('cloudAgentRelaxedAttachmentFilenameSchema', () => {
+  it('accepts any 1-16 char alphanumeric extension after the UUID prefix', () => {
+    for (const filename of [
+      `${ATTACHMENT_ID}.kilo`,
+      `${ATTACHMENT_ID}.docx`,
+      `${ATTACHMENT_ID}.tar`,
+      `${ATTACHMENT_ID}.a`,
+      `${ATTACHMENT_ID}.123`,
+    ]) {
+      expect(cloudAgentRelaxedAttachmentFilenameSchema.safeParse(filename).success).toBe(true);
+    }
+  });
+
+  it('rejects filenames whose extension is in the deny-list', () => {
+    for (const extension of ['exe', 'dll', 'msi', 'com', 'scr', 'apk', 'ipa', 'dmg', 'pkg']) {
+      expect(
+        cloudAgentRelaxedAttachmentFilenameSchema.safeParse(`${ATTACHMENT_ID}.${extension}`).success
+      ).toBe(false);
+    }
+  });
+
+  it('rejects filenames outside the UUID + 1-16 alphanumeric shape', () => {
+    expect(cloudAgentRelaxedAttachmentFilenameSchema.safeParse('not-a-uuid.kilo').success).toBe(
+      false
+    );
+    expect(cloudAgentRelaxedAttachmentFilenameSchema.safeParse(`${ATTACHMENT_ID}`).success).toBe(
+      false
+    );
+    expect(
+      cloudAgentRelaxedAttachmentFilenameSchema.safeParse(`${ATTACHMENT_ID}.abcdefghijklmnopq`)
+        .success
     ).toBe(false);
   });
 });
 
-describe('personalPrepareSessionNextSchema', () => {
-  it('rejects Bitbucket repository identity in personal context', () => {
-    expect(
-      personalPrepareSessionNextSchema.safeParse({
-        bitbucketRepo: {
-          fullName: 'acme/api',
-          workspaceUuid: '11111111-1111-4111-8111-111111111111',
-          repositoryUuid: '22222222-2222-4222-8222-222222222222',
-        },
-        prompt: 'Inspect the repository',
-        mode: 'code',
-        model: 'anthropic/claude-sonnet',
-      }).success
-    ).toBe(false);
+describe('cloudAgentGetAttachmentDownloadUrlSchema', () => {
+  it('accepts a relaxed UUID.filename pair', () => {
+    const result = cloudAgentGetAttachmentDownloadUrlSchema.safeParse({
+      messageUuid: MESSAGE_UUID,
+      filename: `${ATTACHMENT_ID}.kilo`,
+    });
+    expect(result.success).toBe(true);
   });
-});
 
-describe('baseSendMessageNextSchema', () => {
-  it('accepts canonical attachment references and rejects both attachment fields', () => {
-    const send = {
-      cloudAgentSessionId: 'agent_1',
-      payload: { type: 'prompt' as const, prompt: 'Summarize', mode: 'code', model: 'test' },
-      attachments: { path: MESSAGE_UUID, files: [PDF_FILENAME] },
-    };
+  it('rejects a deny-listed extension on the download input', () => {
+    const result = cloudAgentGetAttachmentDownloadUrlSchema.safeParse({
+      messageUuid: MESSAGE_UUID,
+      filename: `${ATTACHMENT_ID}.exe`,
+    });
+    expect(result.success).toBe(false);
+  });
 
-    expect(baseSendMessageNextSchema.parse(send).attachments).toEqual(send.attachments);
-    expect(
-      baseSendMessageNextSchema.safeParse({
-        ...send,
-        images: { path: MESSAGE_UUID, files: ['87654321-4321-4321-8321-cba987654321.png'] },
-      }).success
-    ).toBe(false);
+  it('rejects an unparseable filename', () => {
+    const result = cloudAgentGetAttachmentDownloadUrlSchema.safeParse({
+      messageUuid: MESSAGE_UUID,
+      filename: 'not-a-uuid.exe',
+    });
+    expect(result.success).toBe(false);
   });
 });

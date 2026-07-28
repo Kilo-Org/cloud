@@ -111,6 +111,7 @@ describe('GitLabOAuthCredentialRefresher', () => {
       },
     };
     const integrationUpdates: Record<string, unknown>[] = [];
+    const credentialUpdates: Record<string, unknown>[] = [];
     const tx = {
       execute: vi.fn(),
       select: vi.fn(() => ({
@@ -128,6 +129,7 @@ describe('GitLabOAuthCredentialRefresher', () => {
               return Promise.resolve();
             }
             if (table === platform_oauth_credentials) {
+              credentialUpdates.push(values);
               return { returning: vi.fn().mockResolvedValue([{ id: input.credential.id }]) };
             }
             throw new Error('Unexpected table');
@@ -175,14 +177,21 @@ describe('GitLabOAuthCredentialRefresher', () => {
       expect.objectContaining({ integration_type: 'oauth', scopes: ['api', 'read_user'] }),
     ]);
     expect(integrationUpdates[0]).not.toHaveProperty('metadata');
+    expect(credentialUpdates[0]).not.toHaveProperty('oauth_client_secret_encrypted');
   });
 
-  it('promotes an expired legacy OAuth credential into one encrypted row without rewriting plaintext', async () => {
-    const insertedRows: Record<string, unknown>[] = [];
-    const integrationUpdates: Record<string, unknown>[] = [];
+  it('re-encrypts a custom OAuth client secret with the next credential version', async () => {
+    const baseInput = refreshInput();
+    const input = {
+      ...baseInput,
+      credential: {
+        ...baseInput.credential,
+        oauth_client_secret_encrypted: 'encrypted-client-secret',
+      },
+    };
     const loaded = {
-      credential: null,
-      integrationId: 'integration-1',
+      credential: input.credential,
+      integrationId: input.parent.integrationId,
       platform: 'gitlab',
       integrationType: 'oauth',
       integrationStatus: 'active',
@@ -191,37 +200,29 @@ describe('GitLabOAuthCredentialRefresher', () => {
       accountId: '123',
       accountLogin: 'octocat',
       metadata: {
-        access_token: 'legacy-access-token',
-        refresh_token: 'legacy-refresh-token',
-        token_expires_at: '2020-01-01T00:00:00.000Z',
+        client_id: 'custom-client-id',
         gitlab_instance_url: 'https://gitlab.example.com',
-        auth_type: 'oauth',
       },
     };
+    const credentialUpdates: Record<string, unknown>[] = [];
     const tx = {
       execute: vi.fn(),
       select: vi.fn(() => ({
         from: vi.fn(() => ({
-          leftJoin: vi.fn(() => ({
+          innerJoin: vi.fn(() => ({
             where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([loaded]) })),
           })),
         })),
       })),
-      insert: vi.fn(() => ({
-        values: vi.fn((values: Record<string, unknown>) => {
-          insertedRows.push(values);
-          return {
-            onConflictDoNothing: vi.fn(() => ({
-              returning: vi.fn().mockResolvedValue([{ id: values.id }]),
-            })),
-          };
-        }),
-      })),
       update: vi.fn((table: unknown) => ({
         set: vi.fn((values: Record<string, unknown>) => ({
           where: vi.fn(() => {
-            if (table === platform_integrations) integrationUpdates.push(values);
-            return Promise.resolve();
+            if (table === platform_integrations) return Promise.resolve();
+            if (table === platform_oauth_credentials) {
+              credentialUpdates.push(values);
+              return { returning: vi.fn().mockResolvedValue([{ id: input.credential.id }]) };
+            }
+            throw new Error('Unexpected table');
           }),
         })),
       })),
@@ -230,17 +231,18 @@ describe('GitLabOAuthCredentialRefresher', () => {
       transaction: (callback: (transaction: typeof tx) => unknown) => callback(tx),
     });
     const crypto = new GitLabCredentialCrypto({});
-    vi.spyOn(crypto, 'encrypt')
-      .mockResolvedValueOnce({ status: 'available', ciphertext: 'access-envelope' })
-      .mockResolvedValueOnce({ status: 'available', ciphertext: 'refresh-envelope' });
+    vi.spyOn(crypto, 'decrypt')
+      .mockResolvedValueOnce({ status: 'available', token: 'refresh-token' })
+      .mockResolvedValueOnce({ status: 'available', token: 'custom-client-secret' });
+    const encrypt = vi
+      .spyOn(crypto, 'encrypt')
+      .mockResolvedValueOnce({ status: 'available', ciphertext: 'new-access-envelope' })
+      .mockResolvedValueOnce({ status: 'available', ciphertext: 'new-refresh-envelope' })
+      .mockResolvedValueOnce({ status: 'available', ciphertext: 'new-client-secret-envelope' });
 
     await expect(
       new GitLabOAuthCredentialRefresher(
-        {
-          HYPERDRIVE: { connectionString: 'postgres://test' } as Hyperdrive,
-          GITLAB_CLIENT_ID: 'client-id',
-          GITLAB_CLIENT_SECRET: 'client-secret',
-        },
+        { HYPERDRIVE: { connectionString: 'postgres://test' } as Hyperdrive },
         {
           crypto,
           now: () => new Date('2026-07-13T12:00:00.000Z'),
@@ -255,21 +257,28 @@ describe('GitLabOAuthCredentialRefresher', () => {
             })
           ),
         }
-      ).promoteLegacy({ actor: { userId: 'user-1' }, integrationId: 'integration-1' })
+      ).refresh(input)
     ).resolves.toEqual({
       status: 'available',
       token: 'new-access-token',
-      instanceUrl: 'https://gitlab.example.com',
+      credentialVersion: 2,
     });
-    expect(insertedRows).toEqual([
+
+    expect(encrypt).toHaveBeenCalledTimes(3);
+    expect(encrypt.mock.calls[2]?.[0]).toEqual(
       expect.objectContaining({
-        platform_integration_id: 'integration-1',
-        access_token_encrypted: 'access-envelope',
-        refresh_token_encrypted: 'refresh-envelope',
-        credential_version: 1,
+        plaintext: 'custom-client-secret',
+        aad: expect.stringContaining('"credentialVersion":2'),
+      })
+    );
+    expect(encrypt.mock.calls[2]?.[0].aad).toContain('"kind":"oauth-client-secret"');
+    expect(credentialUpdates).toEqual([
+      expect.objectContaining({
+        access_token_encrypted: 'new-access-envelope',
+        refresh_token_encrypted: 'new-refresh-envelope',
+        oauth_client_secret_encrypted: 'new-client-secret-envelope',
+        credential_version: 2,
       }),
     ]);
-    expect(JSON.stringify(insertedRows)).not.toContain('new-access-token');
-    expect(integrationUpdates[0]).not.toHaveProperty('metadata');
   });
 });

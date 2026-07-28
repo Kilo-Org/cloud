@@ -8,7 +8,10 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
-import { queryAccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
+import {
+  queryAccessibleCloudAgentSession,
+  queryAccessibleKiloSession,
+} from '@kilocode/worker-utils/cloud-agent-session-access';
 import {
   verifyOrgOwnsSessionV2ByCloudAgentId,
   verifyUserOwnsSessionV2ByCloudAgentId,
@@ -71,6 +74,10 @@ describe('Cloud Agent session ownership', () => {
   });
 
   beforeEach(async () => {
+    await db
+      .update(organizations)
+      .set({ deleted_at: null })
+      .where(eq(organizations.id, organization.id));
     await db.insert(cli_sessions_v2).values([
       {
         session_id: PERSONAL_SESSION_ID,
@@ -178,6 +185,12 @@ describe('Cloud Agent session ownership', () => {
         cloudAgentSessionId: ORGANIZATION_CLOUD_AGENT_SESSION_ID,
       })
     ).resolves.toBeNull();
+    await expect(
+      queryAccessibleKiloSession(db, {
+        kiloUserId: owner.id,
+        kiloSessionId: ORGANIZATION_SESSION_ID,
+      })
+    ).resolves.toBeNull();
 
     await db.insert(organization_memberships).values({
       organization_id: organization.id,
@@ -202,5 +215,34 @@ describe('Cloud Agent session ownership', () => {
       kiloSessionId: ORGANIZATION_SESSION_ID,
       organizationId: organization.id,
     });
+    await expect(
+      queryAccessibleKiloSession(db, {
+        kiloUserId: owner.id,
+        kiloSessionId: ORGANIZATION_SESSION_ID,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: ORGANIZATION_SESSION_ID,
+      organizationId: organization.id,
+    });
+  });
+
+  it('denies access after the organization is soft-deleted', async () => {
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    await expect(
+      queryAccessibleCloudAgentSession(db, {
+        kiloUserId: owner.id,
+        cloudAgentSessionId: ORGANIZATION_CLOUD_AGENT_SESSION_ID,
+      })
+    ).resolves.toBeNull();
+    await expect(
+      queryAccessibleKiloSession(db, {
+        kiloUserId: owner.id,
+        kiloSessionId: ORGANIZATION_SESSION_ID,
+      })
+    ).resolves.toBeNull();
   });
 });

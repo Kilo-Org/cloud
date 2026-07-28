@@ -1,8 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   backupConfigFile,
+  ensureBootableHookConfig,
   ensureInboundEmailHookFlags,
   generateBaseConfig,
+  hookConfigBootViolation,
+  repairPersistedHookInvariants,
   setNestedValue,
   writeBaseConfig,
   writeMcporterConfig,
@@ -1792,6 +1795,187 @@ function mcporterFakeDeps(existingMcporterConfig?: string) {
   };
 }
 
+describe('Composio Connect MCP server', () => {
+  const KEY = 'ck_FAKE_TEST_KEY_1234567890';
+
+  function composioServer(config: Record<string, any>) {
+    return config.mcp?.servers?.composio;
+  }
+
+  it('registers the remote server with the consumer key header when the key is set', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: KEY },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config)).toEqual({
+      kiloclawManaged: true,
+      transport: 'streamable-http',
+      url: 'https://connect.composio.dev/mcp',
+      headers: { 'x-consumer-api-key': KEY },
+    });
+  });
+
+  it('does not define the server when no key is configured', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toBeUndefined();
+  });
+
+  it('trims surrounding whitespace off a pasted key', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: `  ${KEY}  ` },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config).headers).toEqual({ 'x-consumer-api-key': KEY });
+  });
+
+  it('replaces a stale key on the next boot', () => {
+    const existing = JSON.stringify({
+      mcp: {
+        servers: {
+          composio: {
+            kiloclawManaged: true,
+            transport: 'streamable-http',
+            url: 'https://connect.composio.dev/mcp',
+            headers: { 'x-consumer-api-key': 'ck_OLD_KEY_0987654321' },
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: KEY },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config).headers).toEqual({ 'x-consumer-api-key': KEY });
+  });
+
+  // Taking over an existing definition must not inherit its connection fields.
+  it('replaces a hand-rolled stdio server outright rather than merging into it', () => {
+    const { deps } = fakeDeps(
+      JSON.stringify({
+        mcp: {
+          servers: {
+            composio: { transport: 'stdio', command: 'composio', args: ['mcp', 'serve'] },
+          },
+        },
+      })
+    );
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: KEY },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config)).toEqual({
+      kiloclawManaged: true,
+      transport: 'streamable-http',
+      url: 'https://connect.composio.dev/mcp',
+      headers: { 'x-consumer-api-key': KEY },
+    });
+  });
+
+  // A surviving `auth: 'oauth'` makes OpenClaw drop request headers entirely,
+  // so the pasted key would authenticate nothing and report no error.
+  it('drops a pre-existing oauth mode so the consumer key header is actually sent', () => {
+    const { deps } = fakeDeps(
+      JSON.stringify({
+        mcp: {
+          servers: {
+            composio: {
+              transport: 'streamable-http',
+              url: 'https://connect.composio.dev/mcp',
+              auth: 'oauth',
+            },
+          },
+        },
+      })
+    );
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: KEY },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config).auth).toBeUndefined();
+    expect(composioServer(config).headers).toEqual({ 'x-consumer-api-key': KEY });
+  });
+
+  // openclaw.json lives on the volume, so removing the credential in Settings
+  // only revokes access if the server definition goes with it.
+  it('removes its own server definition once the key is cleared', () => {
+    const existing = JSON.stringify({
+      mcp: {
+        servers: {
+          composio: {
+            kiloclawManaged: true,
+            transport: 'streamable-http',
+            url: 'https://connect.composio.dev/mcp',
+            headers: { 'x-consumer-api-key': KEY },
+          },
+          other: { url: 'https://mcp.example.com/mcp' },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toBeUndefined();
+    expect(config.mcp.servers.other).toEqual({ url: 'https://mcp.example.com/mcp' });
+  });
+
+  // The rollout hazard: before this feature, the only way to use Composio
+  // Connect was to configure it by hand — same URL, same header, no marker.
+  // The first boot after rollout, before the user fills in the new Settings
+  // field, must not delete that working server.
+  it('leaves an unmarked Composio Connect server (same URL and header) alone when no key is set', () => {
+    const handConfigured = {
+      transport: 'streamable-http',
+      url: 'https://connect.composio.dev/mcp',
+      headers: { 'x-consumer-api-key': 'ck_users_own_key_123456' },
+    };
+    const { deps } = fakeDeps(JSON.stringify({ mcp: { servers: { composio: handConfigured } } }));
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toEqual(handConfigured);
+  });
+
+  // Users wired Composio up by hand long before this field existed. Their
+  // config is not ours to delete.
+  it('leaves a hand-rolled composio server alone when no key is configured', () => {
+    const handRolled = {
+      transport: 'stdio',
+      command: 'composio',
+      args: ['mcp', 'serve'],
+    };
+    const { deps } = fakeDeps(JSON.stringify({ mcp: { servers: { composio: handRolled } } }));
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toEqual(handRolled);
+  });
+
+  it('leaves a differently-authenticated remote composio server alone', () => {
+    const oauthServer = {
+      transport: 'streamable-http',
+      url: 'https://connect.composio.dev/mcp',
+      auth: 'oauth',
+    };
+    const { deps } = fakeDeps(JSON.stringify({ mcp: { servers: { composio: oauthServer } } }));
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toEqual(oauthServer);
+  });
+});
+
 describe('writeMcporterConfig', () => {
   it('adds Linear MCP server when LINEAR_API_KEY is set', () => {
     const { deps, written } = mcporterFakeDeps();
@@ -1867,5 +2051,385 @@ describe('writeMcporterConfig', () => {
     const config = JSON.parse(written[0].data);
     // The header should contain the literal string ${LINEAR_API_KEY}, not the actual value
     expect(config.mcpServers.linear.headers.Authorization).toBe('Bearer ${LINEAR_API_KEY}');
+  });
+});
+
+/** Config shaped like the one that bricked a live instance: templated hook
+ * sessionKey, `allowRequestSessionKey` set, but no prefix allow-list. */
+// Mirrors the untyped shape of openclaw.json so cases can break one field at a
+// time without fighting inferred literal types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ConfigLike = { hooks: Record<string, any> };
+
+function bootBlockingConfig(): ConfigLike {
+  return {
+    hooks: {
+      enabled: true,
+      token: 'local-token',
+      path: '/hooks',
+      allowRequestSessionKey: true,
+      mappings: [
+        {
+          id: 'cloudflare-email-inbound',
+          action: 'agent',
+          sessionKey: '{{payload.sessionKey}}',
+        },
+      ],
+    },
+  };
+}
+
+/** Builds a hooks block that is startable, so each case can break one thing. */
+function healthyHookConfig(): ConfigLike {
+  return {
+    hooks: {
+      enabled: true,
+      token: 'local-token',
+      path: '/hooks',
+      mappings: [{ id: 'static', action: 'agent', sessionKey: 'hook:fixed' }],
+    },
+  };
+}
+
+/**
+ * Every way OpenClaw's resolveHooksConfig refuses to start, keyed to the throw
+ * it mirrors. Used to drive both the detector and the repair.
+ */
+const BOOT_BLOCKING_CASES: { name: string; expect: RegExp; build: () => ConfigLike }[] = [
+  {
+    name: 'hooks.enabled with no token',
+    expect: /hooks\.enabled requires hooks\.token/,
+    build: () => {
+      const config = healthyHookConfig();
+      delete config.hooks.token;
+      return config;
+    },
+  },
+  {
+    name: "hooks.path of '/'",
+    expect: /hooks\.path may not be/,
+    build: () => {
+      const config = healthyHookConfig();
+      config.hooks.path = '/';
+      return config;
+    },
+  },
+  {
+    name: 'defaultSessionKey matching no configured prefix',
+    expect: /hooks\.defaultSessionKey must match/,
+    build: () => {
+      const config = healthyHookConfig();
+      config.hooks.defaultSessionKey = 'custom:abc';
+      config.hooks.allowedSessionKeyPrefixes = ['hook:'];
+      return config;
+    },
+  },
+  {
+    name: "prefixes without 'hook:' and no defaultSessionKey",
+    expect: /must include 'hook:'/,
+    build: () => {
+      const config = healthyHookConfig();
+      config.hooks.allowedSessionKeyPrefixes = ['inbound-email:'];
+      return config;
+    },
+  },
+  {
+    name: 'templated sessionKey with no prefixes',
+    expect: /hooks\.allowedSessionKeyPrefixes is required/,
+    build: bootBlockingConfig,
+  },
+];
+
+describe('hookConfigBootViolation', () => {
+  it.each(BOOT_BLOCKING_CASES)('reports $name', ({ build, expect: pattern }) => {
+    expect(hookConfigBootViolation(build())).toMatch(pattern);
+  });
+
+  it('accepts a startable hook config', () => {
+    expect(hookConfigBootViolation(healthyHookConfig())).toBeNull();
+  });
+
+  it('treats a blank-only allow-list as absent, matching OpenClaw', () => {
+    const config = bootBlockingConfig();
+    config.hooks.allowedSessionKeyPrefixes = ['   '];
+    expect(hookConfigBootViolation(config)).not.toBeNull();
+  });
+
+  it.each(BOOT_BLOCKING_CASES)('ignores $name when hooks are disabled', ({ build }) => {
+    const config = build();
+    config.hooks.enabled = false;
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it('ignores configs with no hooks block', () => {
+    expect(hookConfigBootViolation({ gateway: { port: 3001 } })).toBeNull();
+  });
+
+  // Parity with hasEffectiveTemplatedHookSessionKeyMapping. Each of these is a
+  // mapping OpenClaw does NOT treat as templated, so requiring prefixes for
+  // them would reject configs the gateway starts from.
+  it.each([
+    {
+      name: 'a non-agent action',
+      mapping: { id: 'x', action: 'wake', sessionKey: '{{payload.sessionKey}}' },
+    },
+    { name: 'an unclosed template', mapping: { id: 'x', sessionKey: 'literal{{' } },
+    { name: 'an empty template', mapping: { id: 'x', sessionKey: '{{}}' } },
+  ])('does not treat $name as templated', ({ mapping }) => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [mapping];
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  // The mapping sessionKey is attacker-influenced and re-checked on every gateway
+  // spawn, so template detection must stay linear. OpenClaw's own regex spends
+  // ~6s on this input; ours must not, or one crafted mapping stalls every restart.
+  it('detects templates in linear time on an unterminated expression', () => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [{ id: 'x', sessionKey: `{{${' '.repeat(5000)}a` }];
+
+    const startedAt = Date.now();
+    expect(hookConfigBootViolation(config)).toBeNull();
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+  });
+
+  // Parity guard: OpenClaw's regex accepts a whitespace-only interior, so a
+  // "tighten the pattern" change that rejects these would stop us repairing a
+  // config the gateway does treat as templated.
+  it.each(['{{ }}', '{{  }}'])('treats %j as templated, as OpenClaw does', sessionKey => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [{ id: 'x', sessionKey }];
+    expect(hookConfigBootViolation(config)).toMatch(/allowedSessionKeyPrefixes is required/);
+  });
+
+  it('treats a mapping with no explicit action as an agent mapping', () => {
+    const config = healthyHookConfig();
+    // action defaults to 'agent' in OpenClaw, so this one does require prefixes.
+    config.hooks.mappings = [{ id: 'x', sessionKey: '{{payload.sessionKey}}' }];
+    expect(hookConfigBootViolation(config)).toMatch(/allowedSessionKeyPrefixes is required/);
+  });
+
+  it('skips a templated mapping shadowed by an earlier catch-all', () => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [
+      // No matchPath/matchSource — shadows everything after it.
+      { id: 'catch-all', sessionKey: 'hook:fixed' },
+      { id: 'shadowed', sessionKey: '{{payload.sessionKey}}' },
+    ];
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it('still flags a templated mapping that an earlier narrower mapping cannot shadow', () => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [
+      { id: 'narrow', match: { path: 'other' }, sessionKey: 'hook:fixed' },
+      { id: 'templated', match: { path: 'email' }, sessionKey: '{{payload.sessionKey}}' },
+    ];
+    expect(hookConfigBootViolation(config)).toMatch(/allowedSessionKeyPrefixes is required/);
+  });
+
+  // Parity with openclaw 2026.6.11's resolveHooksConfig, which rejects only a
+  // literal '/'. Its trailing-slash strip is greedy, so '//' reduces to '' and
+  // is accepted; blanks fall back to the default. Flagging these would reject
+  // configs the gateway starts from, so the accepted cases are pinned here to
+  // stop a well-meaning "all-slash paths are invalid" change.
+  it.each([
+    { path: '/', rejected: true },
+    { path: '//', rejected: false },
+    { path: '///', rejected: false },
+    { path: '   ', rejected: false },
+    { path: '/hooks', rejected: false },
+    { path: 'hooks', rejected: false },
+  ])('treats hooks.path $path as rejected=$rejected, matching OpenClaw', ({ path, rejected }) => {
+    const config = healthyHookConfig();
+    config.hooks.path = path;
+
+    const violation = hookConfigBootViolation(config);
+    if (rejected) {
+      expect(violation).toMatch(/hooks\.path may not be/);
+    } else {
+      expect(violation).toBeNull();
+    }
+  });
+});
+
+describe('ensureBootableHookConfig', () => {
+  // The property that matters: whatever the repair does, the result must be
+  // something OpenClaw will actually start from.
+  it.each(BOOT_BLOCKING_CASES)('repairs $name into a startable config', ({ build }) => {
+    const config = build();
+    const applied = ensureBootableHookConfig(config, { KILOCLAW_HOOKS_TOKEN: 'env-token' });
+
+    expect(applied.length).toBeGreaterThan(0);
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it.each(BOOT_BLOCKING_CASES)('is idempotent for $name', ({ build }) => {
+    const config = build();
+    ensureBootableHookConfig(config, { KILOCLAW_HOOKS_TOKEN: 'env-token' });
+    expect(ensureBootableHookConfig(config, { KILOCLAW_HOOKS_TOKEN: 'env-token' })).toEqual([]);
+  });
+
+  it('restores a missing token from the environment', () => {
+    const config = healthyHookConfig();
+    delete config.hooks.token;
+
+    const applied = ensureBootableHookConfig(config, { KILOCLAW_HOOKS_TOKEN: 'env-token' });
+
+    expect(config.hooks.token).toBe('env-token');
+    expect(config.hooks.enabled).toBe(true);
+    expect(applied.join()).toMatch(/restored hooks\.token/);
+  });
+
+  it('disables hooks when no token exists anywhere, rather than leaving it unbootable', () => {
+    const config = healthyHookConfig();
+    delete config.hooks.token;
+
+    const applied = ensureBootableHookConfig(config, {});
+
+    // A disabled hook surface still boots; bootstrap re-enables it next start.
+    expect(config.hooks.enabled).toBe(false);
+    expect(applied.join()).toMatch(/disabled hooks/);
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it("resets a '/' path to the default rather than guessing", () => {
+    const config = healthyHookConfig();
+    config.hooks.path = '/';
+
+    ensureBootableHookConfig(config, {});
+    expect(config.hooks.path).toBe('/hooks');
+  });
+
+  // The repair must not touch paths OpenClaw accepts, or it would rewrite a
+  // working config on every gateway spawn.
+  it.each(['//', '///', '   ', '/hooks', 'hooks'])(
+    'leaves the OpenClaw-accepted path %j alone',
+    path => {
+      const config = healthyHookConfig();
+      config.hooks.path = path;
+
+      expect(ensureBootableHookConfig(config, {})).toEqual([]);
+      expect(config.hooks.path).toBe(path);
+    }
+  );
+
+  it('keeps the operator defaultSessionKey by allowing it as its own prefix', () => {
+    const config = healthyHookConfig();
+    config.hooks.defaultSessionKey = 'custom:abc';
+    config.hooks.allowedSessionKeyPrefixes = ['hook:'];
+
+    ensureBootableHookConfig(config, {});
+
+    expect(config.hooks.defaultSessionKey).toBe('custom:abc');
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'custom:abc']);
+  });
+
+  it('adds the required prefixes when a mapping sessionKey is templated', () => {
+    const config = bootBlockingConfig();
+    expect(ensureBootableHookConfig(config, {})).not.toEqual([]);
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
+  });
+
+  it('preserves operator-added prefixes while appending the required ones', () => {
+    const config = bootBlockingConfig();
+    config.hooks.allowedSessionKeyPrefixes = ['custom:'];
+    expect(ensureBootableHookConfig(config, {})).not.toEqual([]);
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['custom:', 'hook:', 'inbound-email:']);
+  });
+
+  it('leaves a startable config untouched', () => {
+    const config = healthyHookConfig();
+    expect(ensureBootableHookConfig(config, {})).toEqual([]);
+    expect(config.hooks).not.toHaveProperty('allowedSessionKeyPrefixes');
+  });
+
+  it('ignores configs with no hooks block', () => {
+    expect(ensureBootableHookConfig({ gateway: { port: 3001 } }, {})).toEqual([]);
+  });
+
+  it('leaves a disabled hook surface alone', () => {
+    const config = bootBlockingConfig();
+    config.hooks.enabled = false;
+    expect(ensureBootableHookConfig(config, {})).toEqual([]);
+  });
+});
+
+describe('repairPersistedHookInvariants', () => {
+  it('rewrites a bricking config and reports the repair', () => {
+    const { deps, written, renamed, chmodded } = fakeDeps(JSON.stringify(bootBlockingConfig()));
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(true);
+
+    expect(written).toHaveLength(1);
+    expect(JSON.parse(written[0].data).hooks.allowedSessionKeyPrefixes).toEqual([
+      'hook:',
+      'inbound-email:',
+    ]);
+    // Written to a temp path, tightened, then renamed over the live config.
+    expect(written[0].path).not.toBe('/root/.openclaw/openclaw.json');
+    expect(chmodded[0].mode).toBe(0o600);
+    expect(renamed[0].to).toBe('/root/.openclaw/openclaw.json');
+  });
+
+  it('does not rewrite a config that is already valid', () => {
+    const config = bootBlockingConfig();
+    ensureBootableHookConfig(config);
+    const { deps, written } = fakeDeps(JSON.stringify(config));
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+    expect(written).toHaveLength(0);
+  });
+
+  it('returns false instead of throwing when the config is unreadable', () => {
+    const { deps, written } = fakeDeps('{ not json');
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+    expect(written).toHaveLength(0);
+  });
+
+  it('returns false when there is no config yet', () => {
+    const { deps } = fakeDeps();
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+  });
+
+  it('cleans up the temp file when the rename fails', () => {
+    const { deps, unlinked } = fakeDeps(JSON.stringify(bootBlockingConfig()));
+    deps.renameSync = vi.fn(() => {
+      throw new Error('EXDEV');
+    });
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+    expect(unlinked).toHaveLength(1);
+    expect(unlinked[0]).toContain('.kilorepair.');
+  });
+});
+
+describe('repairPersistedHookInvariants concurrency', () => {
+  it('abandons the repair when the config changed under it', () => {
+    const { deps, written, renamed, unlinked } = fakeDeps(JSON.stringify(bootBlockingConfig()));
+    let reads = 0;
+    deps.readFileSync = vi.fn(() => {
+      reads += 1;
+      // First read returns the bricking config; the re-read before rename
+      // simulates an admin write landing mid-repair.
+      return reads === 1
+        ? JSON.stringify(bootBlockingConfig())
+        : JSON.stringify({ hooks: { enabled: true, mappings: [], adminEdit: true } });
+    });
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+
+    // Staged, then discarded — the admin's write is left intact.
+    expect(written).toHaveLength(1);
+    expect(renamed).toHaveLength(0);
+    expect(unlinked).toHaveLength(1);
+  });
+
+  it('completes the repair when the config is untouched', () => {
+    const { deps, renamed } = fakeDeps(JSON.stringify(bootBlockingConfig()));
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(true);
+    expect(renamed).toHaveLength(1);
   });
 });

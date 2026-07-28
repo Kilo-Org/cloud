@@ -474,6 +474,11 @@ run_phase() {
     # Candidate only: prove the removed #4054 catalog-refresh workaround is no
     # longer needed — native discovery must supply kilocode image capability.
     assert_kilocode_vision_capability
+    # Candidate only, and last of the config mutations: plants a config the
+    # gateway cannot start from and proves the restart repairs it instead of
+    # crash-looping. Leaves the config valid, so the live turn below still runs
+    # against a working gateway — which doubles as proof the repair is sound.
+    assert_hook_config_self_heal "$CID" "$PORT" "$TOKEN"
   fi
   assert_exec_approvals_seeded "$CID"
   assert_github_gh_auth

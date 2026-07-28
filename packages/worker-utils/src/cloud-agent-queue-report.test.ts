@@ -31,6 +31,8 @@ describe('CloudAgentQueueReportSchema', () => {
           terminalAt,
           failureStage: 'agent_activity',
           failureCode: 'assistant_error',
+          failureResponsibility: 'unknown',
+          failureReason: 'assistant_unknown',
           diagnostic: {
             errorMessageRedacted: 'Wrapper stopped unexpectedly',
             errorExpiresAt: '2026-06-25T08:04:00.000Z',
@@ -144,6 +146,33 @@ describe('CloudAgentQueueReportSchema', () => {
     expect(
       CloudAgentQueueReportSchema.safeParse(
         reportWithRun({ status: 'completed', terminalAt, diagnostic })
+      ).success
+    ).toBe(false);
+  });
+
+  it('accepts additive responsibility facts only as a complete failed-run pair', () => {
+    const failed = {
+      status: 'failed',
+      terminalAt,
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+      workspaceFailureSubtype: 'setup_command_failed',
+      failureResponsibility: 'user',
+      failureReason: 'setup_command',
+    };
+    expect(CloudAgentQueueReportSchema.safeParse(reportWithRun(failed)).success).toBe(true);
+    expect(
+      CloudAgentQueueReportSchema.safeParse(reportWithRun({ ...failed, failureReason: undefined }))
+        .success
+    ).toBe(false);
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({
+          status: 'completed',
+          terminalAt,
+          failureResponsibility: 'platform',
+          failureReason: 'delivery',
+        })
       ).success
     ).toBe(false);
   });

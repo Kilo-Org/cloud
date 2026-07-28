@@ -74,6 +74,9 @@ export function ReviewAgentPageClient({
     )
   );
   const councilEntitled = councilEntitlement?.entitled ?? false;
+  // Same gate as the manual council UI: local dev, or an entitled org behind the rollout flag.
+  const councilUiEnabled =
+    localCodeReviewDevelopmentEnabled || (councilEntitled && !!councilFlagEnabled);
 
   const handlePlatformChange = (platform: Platform) => {
     const params = new URLSearchParams();
@@ -297,7 +300,11 @@ export function ReviewAgentPageClient({
             </TabsList>
 
             <TabsContent value="config" className="mt-6 space-y-4">
-              <ReviewConfigForm organizationId={organizationId} platform="github" />
+              <ReviewConfigForm
+                organizationId={organizationId}
+                platform="github"
+                councilUiEnabled={councilUiEnabled}
+              />
             </TabsContent>
 
             <TabsContent value="jobs" className="mt-6 space-y-4">
@@ -397,20 +404,7 @@ export function ReviewAgentPageClient({
               <ReviewConfigForm
                 organizationId={organizationId}
                 platform="gitlab"
-                gitlabStatusData={
-                  gitlabStatusData
-                    ? {
-                        connected: gitlabStatusData.connected,
-                        integration: gitlabStatusData.integration
-                          ? {
-                              isValid: gitlabStatusData.integration.isValid,
-                              webhookSecret: gitlabStatusData.integration.webhookSecret,
-                              instanceUrl: gitlabStatusData.integration.instanceUrl,
-                            }
-                          : undefined,
-                      }
-                    : undefined
-                }
+                councilUiEnabled={councilUiEnabled}
               />
             </TabsContent>
 

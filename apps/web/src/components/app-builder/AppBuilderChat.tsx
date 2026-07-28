@@ -41,6 +41,9 @@ import {
   paginateMessages,
   getMessageRole,
   DEFAULT_VISIBLE_SESSIONS,
+  tailFromLastUserTurn,
+  loadEarlierUserTurn,
+  lastUserIndex,
 } from './utils/filterMessages';
 import { PromptInput } from '@/components/app-builder/PromptInput';
 import { useProject } from './ProjectSession';
@@ -358,6 +361,11 @@ function V1SessionMessages({
 
 /**
  * Renders a V2 session's messages.
+ *
+ * Renders only the tail of the conversation (from the last user turn onwards)
+ * with a 'Load earlier messages' button at the top that reveals one older
+ * user turn per click. The visible window is local component state, not part
+ * of the session store, so it resets to the tail on session change.
  */
 function V2SessionMessages({
   session,
@@ -368,15 +376,58 @@ function V2SessionMessages({
 }) {
   const sessionState = useSyncExternalStore(session.subscribe, session.getState);
 
+  const getRole = useCallback((m: StoredMessage) => m.info.role, []);
+
+  // Visible window = last N messages. Initialized to "from the last user
+  // turn to the end" so the user lands on the latest exchange.
+  const [visibleCount, setVisibleCount] = useState(
+    () => tailFromLastUserTurn(sessionState.messages, getRole).visibleMessages.length
+  );
+
+  // Track the id of the tail-most user message. When it changes, a new user
+  // turn has been appended (e.g. the optimistic user message on send), so
+  // re-anchor the window to that new turn. Otherwise grow the window along
+  // with the streaming assistant reply (clamped to messages.length and
+  // never below the natural tail), so the user's prompt and earlier chunks
+  // of the current turn stay in view.
+  const lastUserMsgIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const messages = sessionState.messages;
+    if (messages.length === 0) {
+      lastUserMsgIdRef.current = null;
+      setVisibleCount(0);
+      return;
+    }
+    const lastIdx = lastUserIndex(messages, getRole);
+    const currentLastUserId = lastIdx >= 0 ? messages[lastIdx].info.id : null;
+    if (currentLastUserId !== null && currentLastUserId !== lastUserMsgIdRef.current) {
+      lastUserMsgIdRef.current = currentLastUserId;
+      setVisibleCount(messages.length - lastIdx);
+      return;
+    }
+    setVisibleCount(prev => Math.min(messages.length, Math.max(prev, messages.length - lastIdx)));
+  }, [sessionState.messages, getRole]);
+
+  const handleLoadEarlier = useCallback(() => {
+    setVisibleCount(prev => loadEarlierUserTurn(sessionState.messages, prev, getRole).visibleCount);
+  }, [sessionState.messages, getRole]);
+
+  const visibleMessages = useMemo(
+    () => sessionState.messages.slice(-visibleCount),
+    [sessionState.messages, visibleCount]
+  );
+  const hasEarlierMessages = visibleCount < sessionState.messages.length;
+
   // Contiguous-prefix split: prevents stale streaming messages from old
   // executions from being reordered below newer complete messages.
   const { v2Static, v2Dynamic } = useMemo(() => {
     const { staticItems, dynamicItems } = splitByContiguousPrefix(
-      sessionState.messages,
+      visibleMessages,
       msg => !isMessageStreaming(msg)
     );
     return { v2Static: staticItems, v2Dynamic: dynamicItems };
-  }, [sessionState.messages]);
+  }, [visibleMessages]);
 
   // Identity changes when childSessionMessages changes, which forces memo'd
   // V2StaticMessages to re-render with updated child session data.
@@ -387,7 +438,7 @@ function V2SessionMessages({
     [session, sessionState.childSessionMessages]
   );
 
-  if (sessionState.messages.length === 0 && !sessionState.isStreaming) {
+  if (visibleMessages.length === 0 && !sessionState.isStreaming) {
     return null;
   }
 
@@ -397,6 +448,13 @@ function V2SessionMessages({
       cloudAgentSessionId={session.info.cloud_agent_session_id}
       organizationId={organizationId ?? null}
     >
+      {hasEarlierMessages && (
+        <div className="flex justify-center py-2">
+          <Button variant="ghost" size="sm" onClick={handleLoadEarlier}>
+            Load earlier messages
+          </Button>
+        </div>
+      )}
       <V2StaticMessages messages={v2Static} getChildMessages={getChildMessages} />
       <V2DynamicMessages messages={v2Dynamic} getChildMessages={getChildMessages} />
       {sessionState.isStreaming && v2Dynamic.length === 0 && <TypingIndicator />}

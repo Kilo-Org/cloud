@@ -32,7 +32,7 @@ import {
 } from '@/routers/organizations/utils';
 import { platform_integrations } from '@kilocode/db/schema';
 
-const AccessTokenSchema = z.string().min(1).max(8_192);
+const AccessTokenSchema = z.string().trim().min(1).max(8_192);
 const IntegrationIdSchema = z.uuid();
 
 const ConnectInputSchema = OrganizationIdInputSchema.extend({

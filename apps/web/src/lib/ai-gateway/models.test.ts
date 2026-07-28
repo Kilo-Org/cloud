@@ -2,13 +2,13 @@ import { describe, test, expect } from '@jest/globals';
 import { autoFreeModels, findKiloExclusiveModel, kiloExclusiveModels } from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
+import { getAiSdkProvider } from './providers/model-settings';
 import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
-import { muse_spark_1_1_model } from './providers/meta';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -21,13 +21,6 @@ describe('isFreeModel', () => {
 
     test('should return true for openrouter/free', async () => {
       expect(await isFreeModel('openrouter/free')).toBe(true);
-    });
-
-    test('should return true for OpenRouter stealth models (alpha/beta)', async () => {
-      expect(await isFreeModel('openrouter/model-alpha')).toBe(true);
-      expect(await isFreeModel('openrouter/model-beta')).toBe(true);
-      expect(await isFreeModel('openrouter/sonoma-dusk-alpha')).toBe(true);
-      expect(await isFreeModel('openrouter/sonoma-sky-beta')).toBe(true);
     });
 
     test('should return true for enabled Kilo exclusive models with no pricing', async () => {
@@ -99,19 +92,6 @@ describe('isFreeModel', () => {
       ]);
     });
 
-    test('registers Muse Spark 1.1 through Vercel', () => {
-      expect(findKiloExclusiveModel('meta/muse-spark-1.1')).toBe(muse_spark_1_1_model);
-      expect(muse_spark_1_1_model.gateway).toBe('vercel');
-      expect(getInferenceProvider(muse_spark_1_1_model)?.slug).toBe('meta');
-      expect(muse_spark_1_1_model.context_length).toBe(1_048_576);
-      expect(muse_spark_1_1_model.pricing?.[0].pricing).toEqual({
-        prompt_per_million: 1.25,
-        completion_per_million: 4.25,
-        input_cache_read_per_million: 0.15,
-        input_cache_write_per_million: null,
-      });
-    });
-
     test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
       for (const model of kiloExclusiveModels) {
         if (model.pricing) {
@@ -145,6 +125,12 @@ describe('isFreeModel', () => {
       }
     });
 
+    test('all autoFreeModels should use the same AI SDK provider', () => {
+      expect(autoFreeModels.length).toBeGreaterThan(0);
+      const providers = new Set(autoFreeModels.map(model => getAiSdkProvider(model, null)));
+      expect(providers.size).toBe(1);
+    });
+
     test('should return true for disabled Kilo exclusive models that end with :free', async () => {
       const disabledModelsWithFreeSuffix = kiloExclusiveModels.filter(
         m => m.status === 'disabled' && m.public_id.endsWith(':free')
@@ -172,10 +158,15 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('freemium')).toBe(false);
     });
 
-    test('should return false for OpenRouter models that do not end with -alpha or -beta', async () => {
+    test('should return false for OpenRouter models including alpha/beta', async () => {
       expect(await isFreeModel('openrouter/model')).toBe(false);
       expect(await isFreeModel('openrouter/model-gamma')).toBe(false);
       expect(await isFreeModel('openrouter/model-stable')).toBe(false);
+      expect(await isFreeModel('openrouter/model-alpha')).toBe(false);
+      expect(await isFreeModel('openrouter/model-beta')).toBe(false);
+      expect(await isFreeModel('openrouter/sonoma-dusk-alpha')).toBe(false);
+      expect(await isFreeModel('openrouter/sonoma-sky-beta')).toBe(false);
+      expect(await isFreeModel('openrouter/auto-beta')).toBe(false);
     });
 
     test('should return false for non-OpenRouter models ending with -alpha or -beta', async () => {
@@ -199,7 +190,6 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('model:FREE')).toBe(false);
       expect(await isFreeModel('model:Free')).toBe(false);
       expect(await isFreeModel('OPENROUTER/FREE')).toBe(false);
-      expect(await isFreeModel('openrouter/model-ALPHA')).toBe(false);
     });
 
     test('should handle whitespace correctly', async () => {
@@ -207,7 +197,6 @@ describe('isFreeModel', () => {
       expect(await isFreeModel(' model:free')).toBe(true);
       expect(await isFreeModel(' openrouter/free')).toBe(false);
       expect(await isFreeModel('openrouter/free ')).toBe(false);
-      expect(await isFreeModel('openrouter/model-alpha ')).toBe(false);
     });
   });
 });

@@ -10,7 +10,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUserWebConnection } from '../CloudAgentProvider';
-import type { UserWebSessionEventData } from '@/lib/cloud-agent-sdk';
+import type { UserWebSessionEventData } from '@kilocode/cloud-agent-sdk';
 import {
   apiSessionToDbSession,
   dbSessionsAtom,
@@ -384,6 +384,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       status: session.status,
       status_updated_at: session.status_updated_at?.toISOString() ?? null,
       associatedPr: session.associatedPr ?? null,
+      total_cost_microdollars: session.total_cost_microdollars ?? null,
     };
   }
 

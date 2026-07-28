@@ -33,6 +33,7 @@
     "@cloudflare/sandbox": "0.12.1",
     "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
+    "@kilocode/container-usage": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/notifications": "workspace:*",

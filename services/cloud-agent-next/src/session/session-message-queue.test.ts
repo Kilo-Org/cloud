@@ -316,7 +316,39 @@ describe('recordPendingFlushFailure backoff progression', () => {
 });
 
 describe('flushNextPendingSessionMessage', () => {
-  it('retries a queued flush after a pre-start failure without dropping the message', async () => {
+  it('does not retry a delivery whose sandbox capability is intentionally unavailable', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'cannot deliver here',
+        createdAt: 1,
+      })
+    );
+
+    const result = await flushNextPendingSessionMessage({
+      storage,
+      now: 10,
+      getDeliveryContext: async () => createContext(),
+      validateModeAgainstRuntimeAgents: () => null,
+      deliver: async () => ({
+        success: false,
+        code: 'SANDBOX_CAPABILITY_UNAVAILABLE',
+        error: 'Runtime delivery is disabled',
+      }),
+    });
+
+    expect(result).toMatchObject({
+      type: 'failure',
+      attempts: 1,
+      exhausted: true,
+      nextFlushAttemptAt: undefined,
+    });
+  });
+
+  it('retries an ordinary wrapper bootstrap failure without dropping the message', async () => {
     const storage = createMemoryStorage();
     const message = createPendingSessionMessage({
       messageId: FIRST_MESSAGE_ID,
@@ -339,8 +371,8 @@ describe('flushNextPendingSessionMessage', () => {
       .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
       .mockResolvedValueOnce({
         success: false,
-        code: 'WORKSPACE_SETUP_FAILED',
-        error: 'workspace restore failed',
+        code: 'WRAPPER_START_FAILED',
+        error: 'wrapper bootstrap failed',
       })
       .mockResolvedValueOnce({
         success: true,
@@ -1639,7 +1671,7 @@ describe('SessionMessageQueue', () => {
     });
 
     await harness.queue.drainNextPendingMessage();
-    const [pending] = await listPendingSessionMessages(harness.storage);
+    let [pending] = await listPendingSessionMessages(harness.storage);
     expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
     expect(pending?.lastFlushError).toBe(error);
     expect(pending?.lastFlushFailureSubtype).toBe('sandbox_storage_full');
@@ -1648,9 +1680,14 @@ describe('SessionMessageQueue', () => {
       throw new Error('Expected workspace setup failure to be retried before terminalization');
     }
 
-    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
-    await harness.queue.drainNextPendingMessage();
-    vi.restoreAllMocks();
+    // A full disk is transient backpressure, so it now retries on a longer
+    // backoff (10s, 30s, 60s). Drain through the whole budget until exhaustion.
+    for (let attempt = 0; attempt < 5 && pending?.nextFlushAttemptAt !== undefined; attempt++) {
+      vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+      await harness.queue.drainNextPendingMessage();
+      vi.restoreAllMocks();
+      [pending] = await listPendingSessionMessages(harness.storage);
+    }
 
     expect(harness.terminalizations.at(-1)?.params).toMatchObject({
       kind: 'failed',

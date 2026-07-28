@@ -3,8 +3,12 @@ import {
   CloudAgentFailureCodeSchema,
   CloudAgentFailureStageSchema,
   WorkspaceFailureSubtypeSchema,
+  CloudAgentAssistantFailureReasonSchema,
+  CloudAgentProviderOwnershipSchema,
+  type CloudAgentAssistantFailureReason,
   type CloudAgentFailureCode,
   type CloudAgentFailureStage,
+  type CloudAgentProviderOwnership,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackTarget } from '../callbacks/index.js';
@@ -109,6 +113,8 @@ export type SessionMessageState = {
   failureStage?: SessionMessageFailureStage;
   failureCode?: SessionMessageFailureCode;
   failureSubtype?: WorkspaceFailureSubtype;
+  assistantFailureReason?: CloudAgentAssistantFailureReason;
+  providerOwnership?: CloudAgentProviderOwnership;
   safeFailureMessage?: string;
   modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   error?: string;
@@ -215,6 +221,8 @@ export const SessionMessageStateSchema = z
     failureStage: SessionMessageFailureStageSchema.optional(),
     failureCode: SessionMessageFailureCodeSchema.optional(),
     failureSubtype: WorkspaceFailureSubtypeSchema.optional(),
+    assistantFailureReason: CloudAgentAssistantFailureReasonSchema.optional(),
+    providerOwnership: CloudAgentProviderOwnershipSchema.optional(),
     safeFailureMessage: z.string().max(WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH).optional(),
     modelNotFoundRuntimeDiagnostics: ModelNotFoundRuntimeDiagnosticsSchema.optional(),
     error: z.string().optional(),
@@ -520,6 +528,8 @@ export type MarkMessageFailedParams = {
   failureStage?: SessionMessageFailureStage;
   failureCode?: SessionMessageFailureCode;
   failureSubtype?: WorkspaceFailureSubtype;
+  assistantFailureReason?: CloudAgentAssistantFailureReason;
+  providerOwnership?: CloudAgentProviderOwnership;
   safeFailureMessage?: string;
   modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   attempts?: number;
@@ -544,6 +554,8 @@ export async function markMessageFailed(
     failureStage: params.failureStage,
     failureCode: params.failureCode,
     failureSubtype: params.failureSubtype,
+    assistantFailureReason: params.assistantFailureReason,
+    providerOwnership: params.providerOwnership,
     safeFailureMessage: params.safeFailureMessage,
     modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
     attempts: params.attempts,
@@ -719,6 +731,35 @@ export type TerminalizeEffectOptions = {
   allowIdleBatchWithoutObservedIdle?: boolean;
 };
 
+/**
+ * Model admitted for the run, preferring the immutable admission snapshot.
+ * Every admitted model dispatches through the managed kilo provider
+ * (see normalizeKilocodeModel and the kilo client's providerID default).
+ */
+export function admittedAgentModel(state: SessionMessageState): string | undefined {
+  return (
+    state.admissionSnapshot?.agent.model ??
+    state.legacyAdmissionConstraints?.agent?.model ??
+    state.agent?.model
+  );
+}
+
+/**
+ * Assistant-failure terminalizations carry error-text-derived ownership (the
+ * `[BYOK]` marker) from the safe-failure classifier. Since admitted runs always
+ * dispatch through the managed kilo provider, fill managed ownership from the
+ * admitted model unless the error text already identified BYOK routing.
+ */
+function resolveTerminalProviderOwnership(
+  params: Extract<TerminalizeParams, { kind: 'failed' }>,
+  state: SessionMessageState
+): CloudAgentProviderOwnership | undefined {
+  if (params.providerOwnership === 'byok' || params.assistantFailureReason === undefined) {
+    return params.providerOwnership;
+  }
+  return admittedAgentModel(state) === undefined ? params.providerOwnership : 'managed';
+}
+
 export type TerminalizeParams =
   | {
       kind: 'completed';
@@ -734,6 +775,8 @@ export type TerminalizeParams =
       failureStage?: SessionMessageFailureStage;
       failureCode?: SessionMessageFailureCode;
       failureSubtype?: WorkspaceFailureSubtype;
+      assistantFailureReason?: CloudAgentAssistantFailureReason;
+      providerOwnership?: CloudAgentProviderOwnership;
       safeFailureMessage?: string;
       modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
       attempts?: number;
@@ -797,6 +840,8 @@ export async function terminalizeMessageOnce(
       failureStage: params.failureStage,
       failureCode: params.failureCode,
       failureSubtype: params.failureSubtype,
+      assistantFailureReason: params.assistantFailureReason,
+      providerOwnership: resolveTerminalProviderOwnership(params, state),
       safeFailureMessage: params.safeFailureMessage,
       modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
       attempts: params.attempts,

@@ -1,0 +1,210 @@
+import 'server-only';
+
+export type GitHubPrReviewErrorCode =
+  | 'NOT_FOUND'
+  | 'PRECONDITION_FAILED'
+  | 'TOO_MANY_REQUESTS'
+  | 'FORBIDDEN'
+  | 'BAD_REQUEST'
+  | 'CONFLICT'
+  | 'BAD_GATEWAY';
+
+export type ClassifiedGitHubError = {
+  code: GitHubPrReviewErrorCode;
+  message: string;
+  retryAfterEpochMs?: number;
+};
+
+type HeaderRecord = Record<string, string | string[] | undefined> | undefined;
+
+function getHeader(headers: HeaderRecord, name: string): string | undefined {
+  if (!headers) return undefined;
+  const direct = headers[name];
+  if (typeof direct === 'string') return direct;
+  if (Array.isArray(direct)) return direct[0];
+  const lower = headers[name.toLowerCase()];
+  if (typeof lower === 'string') return lower;
+  if (Array.isArray(lower)) return lower[0];
+  return undefined;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return '';
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : '';
+}
+
+type OctokitHttpError = {
+  status: number;
+  message: string;
+  response?: { headers?: HeaderRecord; data?: unknown };
+};
+
+function isOctokitHttpError(error: unknown): error is OctokitHttpError {
+  if (typeof error !== 'object' || error === null) return false;
+  const status = (error as { status?: unknown }).status;
+  return typeof status === 'number';
+}
+
+function isRateLimitHeaders(headers: HeaderRecord): boolean {
+  const remaining = getHeader(headers, 'x-ratelimit-remaining');
+  if (remaining === '0') return true;
+  return Boolean(getHeader(headers, 'retry-after'));
+}
+
+// Absolute epoch (ms) at which the caller may retry, derived purely from the
+// headers plus the supplied `now` (so the classifier stays deterministic and
+// testable). `x-ratelimit-reset` is an absolute epoch in seconds; `retry-after`
+// is either a delta in seconds (relative to `now`) or an HTTP date.
+function retryAfterEpochMs(headers: HeaderRecord, now: number): number | undefined {
+  const reset = getHeader(headers, 'x-ratelimit-reset');
+  if (reset) {
+    const seconds = Number(reset);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return seconds * 1000;
+    }
+  }
+  const retryAfter = getHeader(headers, 'retry-after');
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return now + seconds * 1000;
+    }
+    const date = Date.parse(retryAfter);
+    if (Number.isFinite(date)) {
+      return date;
+    }
+  }
+  return undefined;
+}
+
+function rateLimitMessage(headers: HeaderRecord, now: number): string {
+  const resetAt = retryAfterEpochMs(headers, now);
+  if (resetAt === undefined) {
+    return 'GitHub rate limit reached. Please try again later.';
+  }
+  const minutes = Math.max(1, Math.round((resetAt - now) / 60_000));
+  return `GitHub rate limit reached. Try again in about ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+}
+
+const NOT_FOUND_MESSAGE =
+  "PR not found, you don't have access, or the Kilo GitHub App isn't installed for this repository";
+const PRECONDITION_FAILED_MESSAGE = 'GitHub connection is no longer valid — reconnect';
+const FALLBACK_FORBIDDEN = 'You do not have permission to perform this action on this PR';
+const FALLBACK_BAD_REQUEST = 'GitHub rejected this request';
+const FALLBACK_CONFLICT = 'GitHub reported a conflict for this PR';
+const FALLBACK_BAD_GATEWAY = 'GitHub returned an unexpected error';
+// Canonical sentence GitHub returns on comments/writes to archived repos (403).
+// Reviews on the same repos often 422 with `lock prevents review` instead — map both
+// to this message so submit and composer share identical FORBIDDEN UX.
+const ARCHIVED_READ_ONLY_MESSAGE = 'Repository was archived so is read-only.';
+// GitHub App user-to-server tokens read public repos fine but 403 on writes when
+// the app installation is missing, excludes the repo, or lacks PR write.
+const INTEGRATION_ACCESS_FORBIDDEN_MESSAGE =
+  "The Kilo GitHub App can't write to this repository. An owner of the repository's organization must install the Kilo app (or approve its updated permissions), then try again.";
+
+function forbiddenMessageFromGitHub(message: string): string {
+  if (message.includes('Resource not accessible by integration')) {
+    return INTEGRATION_ACCESS_FORBIDDEN_MESSAGE;
+  }
+  return message || FALLBACK_FORBIDDEN;
+}
+
+/** String entries from Octokit `response.data.errors` (GitHub 422 bodies). */
+function responseDataErrorStrings(data: unknown): string[] {
+  if (typeof data !== 'object' || data === null) return [];
+  const errors = (data as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) return [];
+  return errors.filter((entry): entry is string => typeof entry === 'string');
+}
+
+/**
+ * Archived/read-only write failures: comments 403 with the canonical sentence;
+ * review create/submit often 422 with `errors: ["lock prevents review"]`.
+ * Match only that phrase (and the archived message) so genuine validation 422s
+ * (stale line, own-PR approve, missing fields, thread lock failed, etc.) stay BAD_REQUEST.
+ */
+function isArchivedReadOnlySignal(message: string, data: unknown): boolean {
+  const lowerMessage = message.toLowerCase();
+  if (lowerMessage.includes('repository was archived so is read-only')) {
+    return true;
+  }
+  return responseDataErrorStrings(data).some(entry =>
+    entry.toLowerCase().includes('lock prevents review')
+  );
+}
+
+export function classifyGitHubHttpError(
+  error: unknown,
+  now: number = Date.now()
+): ClassifiedGitHubError {
+  if (!isOctokitHttpError(error)) {
+    return { code: 'BAD_GATEWAY', message: FALLBACK_BAD_GATEWAY };
+  }
+  const status = error.status;
+  const message = getErrorMessage(error) || FALLBACK_BAD_GATEWAY;
+  const headers = error.response?.headers;
+
+  if (status === 404) {
+    return { code: 'NOT_FOUND', message: NOT_FOUND_MESSAGE };
+  }
+  if (status === 401) {
+    return { code: 'PRECONDITION_FAILED', message: PRECONDITION_FAILED_MESSAGE };
+  }
+  if (status === 422) {
+    if (isArchivedReadOnlySignal(message, error.response?.data)) {
+      return { code: 'FORBIDDEN', message: ARCHIVED_READ_ONLY_MESSAGE };
+    }
+    return { code: 'BAD_REQUEST', message: message || FALLBACK_BAD_REQUEST };
+  }
+  if (status === 405 || status === 409) {
+    return { code: 'CONFLICT', message: message || FALLBACK_CONFLICT };
+  }
+  if (status === 403 || status === 429) {
+    if (status === 429 || (headers && isRateLimitHeaders(headers))) {
+      return {
+        code: 'TOO_MANY_REQUESTS',
+        message: rateLimitMessage(headers, now),
+        retryAfterEpochMs: retryAfterEpochMs(headers, now),
+      };
+    }
+    return { code: 'FORBIDDEN', message: forbiddenMessageFromGitHub(message) };
+  }
+  if (status >= 500) {
+    return { code: 'BAD_GATEWAY', message: message || FALLBACK_BAD_GATEWAY };
+  }
+  if (status >= 400) {
+    return { code: 'BAD_REQUEST', message: message || FALLBACK_BAD_REQUEST };
+  }
+  return { code: 'BAD_GATEWAY', message: FALLBACK_BAD_GATEWAY };
+}
+
+export type GraphQlErrorEntry = { type?: string; message?: string };
+
+function classifyGraphQlEntry(entry: GraphQlErrorEntry, now: number): ClassifiedGitHubError {
+  const type = (entry.type ?? '').toUpperCase();
+  const message = entry.message?.trim();
+  if (type === 'NOT_FOUND') {
+    return { code: 'NOT_FOUND', message: NOT_FOUND_MESSAGE };
+  }
+  if (type === 'FORBIDDEN') {
+    return { code: 'FORBIDDEN', message: forbiddenMessageFromGitHub(message ?? '') };
+  }
+  if (type === 'RATE_LIMITED' || type === 'SECONDARY_RATE_LIMIT' || type === 'ABUSE_DETECTION') {
+    return { code: 'TOO_MANY_REQUESTS', message: rateLimitMessage(undefined, now) };
+  }
+  if (message) {
+    return { code: 'BAD_GATEWAY', message };
+  }
+  return { code: 'BAD_GATEWAY', message: FALLBACK_BAD_GATEWAY };
+}
+
+export function classifyGitHubGraphQlErrors(
+  errors: ReadonlyArray<GraphQlErrorEntry> | undefined,
+  now: number = Date.now()
+): ClassifiedGitHubError | null {
+  if (!errors || errors.length === 0) return null;
+  const first = errors[0];
+  if (!first) return null;
+  return classifyGraphQlEntry(first, now);
+}

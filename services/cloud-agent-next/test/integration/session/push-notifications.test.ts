@@ -18,6 +18,8 @@ const INTERRUPTED_MESSAGE_ID = 'msg_018f1e2d3c4bPushIntrptABCD';
 const RETRY_MESSAGE_ID = 'msg_018f1e2d3c4bPushRetryABCDE';
 const MISSING_KILO_SESSION_MESSAGE_ID = 'msg_018f1e2d3c4bPushNoSessionA';
 const SUPPRESSED_MESSAGE_ID = 'msg_018f1e2d3c4bPushSuppressAB';
+const BATCH_OLDER_MESSAGE_ID = 'msg_018f1e2d3c4bBatchOlderMsg1';
+const BATCH_REPRESENTATIVE_MESSAGE_ID = 'msg_018f1e2d3c4bBatchNewestMsg';
 
 async function createSession(userId: string) {
   const sessionId = `agent_${crypto.randomUUID()}`;
@@ -70,10 +72,10 @@ async function seedAssistantText(
   state: DurableObjectState,
   sessionId: string,
   parentMessageId: string,
-  text: string
+  text: string,
+  assistantMessageId = 'msg_push_assistant_response_0001'
 ): Promise<void> {
   const events = createEventQueries(drizzle(state.storage, { logger: false }), state.storage.sql);
-  const assistantMessageId = 'msg_push_assistant_response_0001';
   const timestamp = Date.now();
   events.upsert({
     executionId: 'exc_push',
@@ -151,7 +153,76 @@ describe('CloudAgentSession push notification producer', () => {
           cliSessionId: KILO_SESSION_ID,
           executionId: COMPLETED_MESSAGE_ID,
           status: 'completed',
+          category: 'status',
           body: 'Assistant finished the task.',
+          suppressIfViewingSession: true,
+        },
+      ]);
+  });
+
+  it('dispatches only the unsuppressed representative completion through the outbox binding', async () => {
+    const userId = 'user_push_coalesced_batch';
+    const { sessionId, stub } = await createSession(userId);
+
+    await runInDurableObject(stub, async (instance, state) => {
+      await registerSession(instance, sessionId, userId);
+      await seedAssistantText(
+        state,
+        sessionId,
+        BATCH_OLDER_MESSAGE_ID,
+        'Older assistant reply.',
+        'msg_push_assistant_older'
+      );
+      await seedAssistantText(
+        state,
+        sessionId,
+        BATCH_REPRESENTATIVE_MESSAGE_ID,
+        'Newest assistant reply.',
+        'msg_push_assistant_newest'
+      );
+      await putSessionMessageState(
+        instance.ctx.storage,
+        acceptedMessageState(BATCH_OLDER_MESSAGE_ID)
+      );
+      await putSessionMessageState(
+        instance.ctx.storage,
+        acceptedMessageState(BATCH_REPRESENTATIVE_MESSAGE_ID)
+      );
+      await (instance as any).terminalizeSessionMessageOnce(
+        BATCH_OLDER_MESSAGE_ID,
+        { kind: 'completed', completionSource: 'idle_reconciliation' },
+        { suppressPush: true }
+      );
+      await (instance as any).terminalizeSessionMessageOnce(BATCH_REPRESENTATIVE_MESSAGE_ID, {
+        kind: 'completed',
+        completionSource: 'idle_reconciliation',
+      });
+      await instance.alarm();
+
+      await expect(
+        getSessionMessageState(instance.ctx.storage, BATCH_OLDER_MESSAGE_ID)
+      ).resolves.toMatchObject({
+        status: 'completed',
+        terminalEffects: { push: { disposition: 'suppressed' } },
+      });
+      await expect(
+        getSessionMessageState(instance.ctx.storage, BATCH_REPRESENTATIVE_MESSAGE_ID)
+      ).resolves.toMatchObject({
+        status: 'completed',
+        terminalEffects: { push: { disposition: 'accounted' } },
+      });
+    });
+
+    await expect
+      .poll(() => getNotificationJobs())
+      .toEqual([
+        {
+          userId,
+          cliSessionId: KILO_SESSION_ID,
+          executionId: BATCH_REPRESENTATIVE_MESSAGE_ID,
+          status: 'completed',
+          category: 'status',
+          body: 'Newest assistant reply.',
           suppressIfViewingSession: true,
         },
       ]);
@@ -180,6 +251,7 @@ describe('CloudAgentSession push notification producer', () => {
           cliSessionId: KILO_SESSION_ID,
           executionId: FAILED_MESSAGE_ID,
           status: 'failed',
+          category: 'status',
           body: 'Failed: The message failed',
           suppressIfViewingSession: true,
         },
@@ -211,6 +283,7 @@ describe('CloudAgentSession push notification producer', () => {
           cliSessionId: KILO_SESSION_ID,
           executionId: INTERRUPTED_MESSAGE_ID,
           status: 'interrupted',
+          category: 'status',
           body: 'Interrupted: Task interrupted',
           suppressIfViewingSession: true,
         },
@@ -249,6 +322,7 @@ describe('CloudAgentSession push notification producer', () => {
           cliSessionId: KILO_SESSION_ID,
           executionId: RETRY_MESSAGE_ID,
           status: 'failed',
+          category: 'status',
           body: 'Failed: The message failed',
           suppressIfViewingSession: true,
         },
@@ -257,6 +331,7 @@ describe('CloudAgentSession push notification producer', () => {
           cliSessionId: KILO_SESSION_ID,
           executionId: RETRY_MESSAGE_ID,
           status: 'failed',
+          category: 'status',
           body: 'Failed: The message failed',
           suppressIfViewingSession: true,
         },

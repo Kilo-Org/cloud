@@ -1,9 +1,5 @@
 import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
-import {
-  isKiloExclusiveFreeModel,
-  isOpenRouterStealthModel,
-  kiloExclusiveModels,
-} from '@/lib/ai-gateway/models';
+import { isKiloExclusiveFreeModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 
 /**
@@ -22,7 +18,6 @@ export async function isFreeModel(model: string): Promise<boolean> {
     model === KILO_AUTO_FREE_MODEL.id ||
     (model ?? '').endsWith(':free') ||
     model === 'openrouter/free' ||
-    isOpenRouterStealthModel(model ?? '') ||
     (await isPublicIdExperimented(model ?? ''))
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { AlertCircle, Play, RefreshCw, Save, Settings2, ShieldCheck } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -84,9 +85,16 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [manualReviewUrl, setManualReviewUrl] = useState('');
   const [manualReviewError, setManualReviewError] = useState<string | null>(null);
+  // Custom instructions is deprecated in favour of REVIEW.md. The field is only
+  // surfaced to configs that already have something stored in it, and stays
+  // visible for the rest of the session even if the user clears it.
+  const [showCustomInstructions, setShowCustomInstructions] = useState(false);
 
   useEffect(() => {
     if (!configQuery.data) return;
+    if (configQuery.data.customInstructions?.trim()) {
+      setShowCustomInstructions(true);
+    }
     const nextConfig: BitbucketReviewConfig = {
       reviewStyle: configQuery.data.reviewStyle,
       focusAreas: configQuery.data.focusAreas,
@@ -530,19 +538,34 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
               </div>
             </div>
 
-            <div className="space-y-2 border-t border-border pt-6">
-              <Label htmlFor="bitbucket-custom-instructions">Custom instructions (optional)</Label>
-              <Textarea
-                id="bitbucket-custom-instructions"
-                value={draft.customInstructions}
-                onChange={event =>
-                  setDraft(current => ({ ...current, customInstructions: event.target.value }))
-                }
-                placeholder="Add repository-specific review guidance for your team."
-                rows={4}
-                className="resize-none"
-              />
-            </div>
+            {/* Deprecated — only shown to configs that already have custom instructions stored. */}
+            {showCustomInstructions && (
+              <div className="space-y-2 border-t border-border pt-6">
+                <Label htmlFor="bitbucket-custom-instructions">
+                  Custom instructions (optional)
+                </Label>
+                <Textarea
+                  id="bitbucket-custom-instructions"
+                  value={draft.customInstructions}
+                  onChange={event =>
+                    setDraft(current => ({ ...current, customInstructions: event.target.value }))
+                  }
+                  placeholder="Add repository-specific review guidance for your team."
+                  rows={4}
+                  className="resize-none"
+                />
+                <p className="text-muted-foreground text-sm">
+                  Custom Instructions is planned for deprecation. Move these guidelines into a
+                  REVIEW.md file in your repository instead.{' '}
+                  <Link
+                    href={`/organizations/${organizationId}/code-reviews/review-md`}
+                    className="text-blue-400 underline-offset-2 hover:text-blue-300 hover:underline"
+                  >
+                    Learn about REVIEW.md
+                  </Link>
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">

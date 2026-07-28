@@ -5,8 +5,8 @@
  */
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { type SlashCommandInfo } from 'cloud-agent-sdk';
-import { type RemoteCommandState } from 'cloud-agent-sdk/remote-command-catalog';
+import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
@@ -29,7 +29,7 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
-import { showRemoteCliExitConfirmation } from '@/components/agents/remote-cli-exit-alert';
+import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
@@ -38,12 +38,14 @@ import { BlurBar } from '@/components/ui/blur-bar';
 import { VoiceInputStatus } from '@/components/voice-input-control';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
+  type AgentAttachmentSubmissionPayload,
   type AgentAttachmentWire,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { useSharePrefill } from '@/lib/share-prefill';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
@@ -59,10 +61,18 @@ const TEXT_INPUT_MAX_HEIGHT =
 const TEXT_INPUT_FONT_SIZE = 16;
 
 type ChatComposerProps = {
-  onSend: (text: string, attachments?: AgentAttachmentWire) => void | Promise<void>;
+  onSend: (
+    text: string,
+    attachments?: AgentAttachmentWire,
+    submission?: AgentAttachmentSubmissionPayload
+  ) => void | Promise<void>;
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
-  onExitCli: (onAccepted: () => void) => Promise<void>;
+  onExitSession: (
+    onAccepted: () => void,
+    lock: { current: boolean },
+    settleVoiceInput: () => Promise<boolean>
+  ) => Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -82,13 +92,15 @@ type ChatComposerProps = {
   commands?: SlashCommandInfo[];
   /** Remote command state — empty for non-remote sessions. */
   commandState?: RemoteCommandState | null;
+  /** Share-gate delivery id; composer takes the payload and clears the route param. */
+  shareId?: string;
 };
 
 export function ChatComposer({
   onSend,
   onSendCommand,
   onCreateSession,
-  onExitCli,
+  onExitSession,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -104,6 +116,7 @@ export function ChatComposer({
   activeSessionType = null,
   commands = [],
   commandState = null,
+  shareId,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -150,8 +163,28 @@ export function ChatComposer({
   });
 
   // Compute base composer disabled before the voice hook so voice can react to it.
-  const toolbarDisabled = disabled || isStreaming || isSending;
+  // `isStreaming` is intentionally NOT a composer gate (see
+  // `chat-composer-input-state.ts`); the user must remain able to type and
+  // send while the agent runs.
+  const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
+
+  function handleChangeText(value: string) {
+    textRef.current = value;
+    measure.setText(value);
+    setHasText(value.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(value));
+  }
+
+  const { addCandidates, removeAttachment, retryAttachment } = upload;
+
+  useSharePrefill({
+    shareId,
+    inputRef,
+    maxLength: 4000,
+    onChangeText: handleChangeText,
+    addCandidates,
+  });
 
   const voiceInput = useVoiceInput({
     disabled: voiceDisabled,
@@ -173,7 +206,6 @@ export function ChatComposer({
     hasText,
     isFocused,
     isSending,
-    isStreaming,
     voiceInputActive: voiceInput.isActive,
   });
 
@@ -184,12 +216,8 @@ export function ChatComposer({
   const slashCommandSuggestions =
     slashCommandInput === null ? [] : getSlashCommandSuggestions(slashCommandInput, commandList);
 
-  function handleChangeText(value: string) {
-    textRef.current = value;
-    measure.setText(value);
-    setHasText(value.trim().length > 0);
-    setSlashCommandInput(getSlashCommandCandidate(value));
-  }
+  // The strip must show share-prefilled files before the session resolves.
+  const showAttachments = attachmentsEnabled || upload.attachments.length > 0;
 
   function clearDraft() {
     textRef.current = '';
@@ -244,10 +272,12 @@ export function ChatComposer({
         {
           onSendCommand,
           onCreateSession,
-          onExitCli,
-          confirmExitCli: showRemoteCliExitConfirmation,
+          onExitSession: async onAccepted => {
+            await onExitSession(onAccepted, submissionLockRef, voiceInput.settleBeforeSubmit);
+          },
+          confirmExitSession: showRemoteSessionExitConfirmation,
           onSendPrompt: async prompt => {
-            await onSend(prompt, upload.toWirePayload());
+            await onSend(prompt, upload.toWirePayload(), upload.toSubmissionPayload());
           },
         },
         {
@@ -310,10 +340,11 @@ export function ChatComposer({
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
-  const { addCandidates, removeAttachment, retryAttachment } = upload;
-
   const handleAddAttachment = useCallback(async () => {
-    addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
+    // Fire-and-forget: the upload hook owns its own progress + error toasts,
+    // and the composer's send flow consults `upload.isUploading` /
+    // `upload.hasFailedAttachments` to gate admission.
+    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
   }, [addCandidates, showActionSheetWithOptions]);
 
   const textInputStyle: TextStyle = {
@@ -346,7 +377,7 @@ export function ChatComposer({
         </Animated.View>
       ) : null}
 
-      {attachmentsEnabled ? (
+      {showAttachments ? (
         <AttachmentPreviewStrip
           attachments={upload.attachments}
           onRemove={removeAttachment}

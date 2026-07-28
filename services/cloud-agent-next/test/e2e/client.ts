@@ -369,7 +369,7 @@ export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequest
 export async function waitForGateEngaged(
   config: DriverConfig,
   tag: string,
-  timeoutMs = 90_000,
+  timeoutMs = 120_000,
   pollIntervalMs = 100
 ): Promise<boolean> {
   const base = config.fakeLlmUrl.replace(/\/$/, '');

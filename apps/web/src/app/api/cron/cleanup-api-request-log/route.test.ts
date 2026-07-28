@@ -4,9 +4,22 @@ jest.mock('@/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
+jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
+  createScheduledJobRun: jest.fn(() => ({ runId: 'run-id' })),
+  buildScheduledJobSuccessEvent: jest.fn((_run, fields) => ({ outcome: 'succeeded', ...fields })),
+  buildScheduledJobFailureEvent: jest.fn((_run, error) => ({
+    outcome: 'failed',
+    exception_name: error instanceof Error ? error.name : 'UnknownError',
+  })),
+  emitScheduledJobEvent: jest.fn(),
+}));
+
 import { api_request_compress_log, api_request_log } from '@kilocode/db/schema';
 import { db, sql } from '@/lib/drizzle';
+import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
+
+const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 
 const BATCH_SIZE = 1_000;
 
@@ -54,6 +67,7 @@ async function insertApiRequestCompressLogRecord(created_at: string) {
 
 describe('GET /api/cron/cleanup-api-request-log', () => {
   beforeEach(async () => {
+    jest.clearAllMocks();
     await db.delete(api_request_log).where(sql`true`);
     await db.delete(api_request_compress_log).where(sql`true`);
   });
@@ -63,6 +77,7 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(mockEmitScheduledJobEvent).not.toHaveBeenCalled();
   });
 
   it('returns zero deleted when table is empty', async () => {
@@ -75,6 +90,14 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(body.hasMore).toBe(false);
     expect(body.cutoffDate).toEqual(expect.any(String));
     expect(body.timestamp).toEqual(expect.any(String));
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
+      outcome: 'succeeded',
+      deleted_api_request_log_count: 0,
+      deleted_api_request_compress_log_count: 0,
+      deleted_count: 0,
+      batch_size: BATCH_SIZE,
+      has_more: false,
+    });
   });
 
   it('deletes expired records and preserves recent records', async () => {
@@ -88,6 +111,14 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     const body = await response.json();
     expect(body.deletedCount).toBe(2);
     expect(body.hasMore).toBe(false);
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: 'succeeded',
+        deleted_api_request_log_count: 2,
+        deleted_api_request_compress_log_count: 0,
+        deleted_count: 2,
+      })
+    );
 
     const remaining = await db.select().from(api_request_log);
     expect(remaining).toHaveLength(1);
@@ -131,5 +162,22 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(remainingIds).toEqual(
       expect.arrayContaining([recent1.id.toString(), recent2.id.toString()])
     );
+  });
+
+  it('emits one failure event and preserves rejected database failure semantics', async () => {
+    const select = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+      throw new Error('database unavailable');
+    });
+
+    await expect(GET(makeRequest({ authorization: 'Bearer cron-secret' }))).rejects.toThrow(
+      'database unavailable'
+    );
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledTimes(1);
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
+      outcome: 'failed',
+      exception_name: 'Error',
+    });
+
+    select.mockRestore();
   });
 });

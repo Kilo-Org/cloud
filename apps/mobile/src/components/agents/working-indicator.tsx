@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { type StoredMessage } from 'cloud-agent-sdk';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';

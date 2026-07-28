@@ -1,4 +1,5 @@
 import 'server-only';
+import { TRPCError } from '@trpc/server';
 import { INTERNAL_API_SECRET, SECURITY_SYNC_WORKER_URL } from '@/lib/config.server';
 
 type ManualSecuritySyncOwner =
@@ -38,41 +39,76 @@ export async function submitManualSecuritySync(
   params: SubmitManualSecuritySyncParams
 ): Promise<AcceptedManualSecuritySync> {
   if (!SECURITY_SYNC_WORKER_URL) {
-    throw new Error('SECURITY_SYNC_WORKER_URL is not configured');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Security sync service is not configured',
+    });
   }
 
   if (!INTERNAL_API_SECRET) {
-    throw new Error('INTERNAL_API_SECRET is not configured');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Security sync service is not configured',
+    });
   }
 
-  const response = await fetch(`${SECURITY_SYNC_WORKER_URL}/internal/manual-sync`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
-    },
-    body: JSON.stringify({
-      schemaVersion: 1,
-      owner: params.owner,
-      actor: params.actor,
-      origin: params.origin,
-      repoFullName: params.repoFullName,
-    }),
-  });
-  const body = (await response.json()) as ManualSecuritySyncWorkerResponse;
+  let response: Response;
+  let body: ManualSecuritySyncWorkerResponse | undefined;
+  try {
+    response = await fetch(`${SECURITY_SYNC_WORKER_URL}/internal/manual-sync`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        owner: params.owner,
+        actor: params.actor,
+        origin: params.origin,
+        repoFullName: params.repoFullName,
+      }),
+    });
+    try {
+      body = (await response.json()) as ManualSecuritySyncWorkerResponse;
+    } catch {
+      // Non-JSON response body (e.g. gateway HTML/error page) — treat as transport failure
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Could not reach the security sync service. Try again.',
+      });
+    }
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    }
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Could not reach the security sync service. Try again.',
+    });
+  }
 
   if (!response.ok) {
-    throw new Error(body.error ?? `Security sync Worker request failed with ${response.status}`);
+    // Do not blindly interpolate body.error — the worker may not be ours and the body
+    // can be attacker/gateway-controlled HTML. Keep the message short and non-secret.
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Security sync service request failed (status ${response.status}). Try again.`,
+    });
   }
 
   if (
+    !body ||
     body.success !== true ||
     body.accepted !== true ||
     typeof body.commandId !== 'string' ||
     typeof body.runId !== 'string' ||
     typeof body.messageId !== 'string'
   ) {
-    throw new Error('Security sync Worker returned an invalid accepted response');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Security sync service returned an unexpected response. Try again.',
+    });
   }
 
   return {

@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useManager } from './CloudAgentProvider';
-import type { ResolvedSession } from '@/lib/cloud-agent-sdk';
+import type { ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage } from './types';
 import { isTextPart } from './types';
 
@@ -73,6 +73,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
       kilo_session_id: kiloSessionId ?? undefined,
       organization_id: organizationId ?? undefined,
       feedback_text: feedbackText.trim(),
+      session_type: activeSessionType ?? undefined,
       model: feedbackModelForSession(activeSessionType, sessionConfig?.model),
       repository: sessionConfig?.repository || undefined,
       is_streaming: isStreaming,

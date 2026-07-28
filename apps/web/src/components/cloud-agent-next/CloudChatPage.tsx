@@ -8,7 +8,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, GitBranch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
+import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
@@ -20,6 +20,7 @@ import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
 import { PreparationRow } from './PreparationRow';
+import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
 import { WorkingIndicator } from './WorkingIndicator';
 import { QuestionToolCard } from './QuestionToolCard';
@@ -58,7 +59,7 @@ import type {
   MessageDeliveryState,
   PreparationAttempt,
   StoredMessage,
-} from '@/lib/cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
 
@@ -109,6 +110,7 @@ StaticMessages.displayName = 'StaticMessages';
 // ---------------------------------------------------------------------------
 type DynamicMessagesProps = {
   active: boolean;
+  isStreaming: boolean;
   messages: StoredMessage[];
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
@@ -119,6 +121,7 @@ type DynamicMessagesProps = {
 
 const DynamicMessages = memo(
   function DynamicMessages({
+    isStreaming,
     messages,
     pendingMessages,
     preparationByMessageId,
@@ -129,7 +132,7 @@ const DynamicMessages = memo(
     return (
       <>
         {messages.map(msg => {
-          const streaming = isMessageStreaming(msg);
+          const streaming = isStreaming && isMessageStreaming(msg);
           return (
             <MessageErrorBoundary key={msg.info.id}>
               <MessageBubble
@@ -157,6 +160,7 @@ const DynamicMessages = memo(
 
     return (
       previous.active === next.active &&
+      previous.isStreaming === next.isStreaming &&
       previous.messages === next.messages &&
       previous.pendingMessages === next.pendingMessages &&
       previous.preparationByMessageId === next.preparationByMessageId &&
@@ -761,6 +765,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const preparationByMessageId = useMemo(() => {
     const byMessageId = new Map<string, readonly PreparationAttempt[]>();
     for (const attempt of preparationAttempts) {
+      if (isNoOpCompletedPreparationAttempt(attempt)) continue;
       const attempts = byMessageId.get(attempt.triggerMessageId) ?? [];
       byMessageId.set(attempt.triggerMessageId, [...attempts, attempt]);
     }
@@ -875,6 +880,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                             />
                             <DynamicMessages
                               active={chatTabActive}
+                              isStreaming={isStreaming}
                               messages={dynamicMessages}
                               pendingMessages={pendingMessages}
                               preparationByMessageId={preparationByMessageId}

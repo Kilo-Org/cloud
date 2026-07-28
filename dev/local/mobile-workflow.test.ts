@@ -301,31 +301,3 @@ test('dev CLI shares only the Docker proxy port between worktrees', () => {
   assert.match(cli, /name === 'kiloclaw-docker-tcp'/);
   assert.match(cli, /Refusing to share occupied worktree service ports/);
 });
-
-test('remote CLI runbook is secret-free and defers credential-bearing setup to the orchestrator', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-  const remoteCliSection = runbook.slice(
-    runbook.indexOf('## Remote CLI Session Flows'),
-    runbook.indexOf('## Android Emulator')
-  );
-
-  // The role-agent runbook must not contain bearer tokens, signing secrets,
-  // or credential-bearing environment variables.
-  assert.doesNotMatch(remoteCliSection, /KILO_E2E_AUTH_TOKEN/);
-  assert.doesNotMatch(remoteCliSection, /KILO_AUTH_CONTENT/);
-  assert.doesNotMatch(remoteCliSection, /NEXTAUTH_SECRET/);
-  assert.doesNotMatch(remoteCliSection, /\$\{KILO_[A-Z_]+/);
-
-  // The role-agent runbook must not install the CLI or set up the CLI session.
-  assert.doesNotMatch(remoteCliSection, /npm install.*@kilocode\/cli/);
-  assert.doesNotMatch(remoteCliSection, /CLI_SCRATCH=/);
-  assert.doesNotMatch(remoteCliSection, /tmux set-environment/);
-  assert.doesNotMatch(remoteCliSection, /wrangler secrets/);
-
-  // The role-agent runbook must clearly delegate credential-bearing setup
-  // to the orchestrator and describe how the role agent reuses the prepared
-  // session to verify mobile session discovery and mirroring.
-  assert.match(remoteCliSection, /orchestrator/i);
-  assert.match(remoteCliSection, /kilo-e2e-cli-/);
-  assert.match(remoteCliSection, /session discovery|mirroring/);
-});

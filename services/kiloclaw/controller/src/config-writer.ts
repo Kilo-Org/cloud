@@ -234,6 +234,291 @@ const INBOUND_EMAIL_HOOK_MAPPING = {
   deliver: false,
 };
 
+const DEFAULT_HOOKS_PATH = '/hooks';
+
+const BOOT_BLOCKER_SUFFIX =
+  ' The OpenClaw gateway refuses to start in this state, and because restarts do not ' +
+  're-derive config, the instance cannot recover on its own.';
+
+/** Mirrors OpenClaw's `normalizeOptionalString`. */
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * Mirrors OpenClaw's `hooks.path` normalization, including its quirks.
+ *
+ * Only a literal '/' is rejected by OpenClaw. It is tempting to assume every
+ * all-slash path is, but the trailing-slash strip is greedy, so '//' and '///'
+ * reduce to '' rather than '/' and pass the check; blank strings fall back to
+ * the default. Verified against openclaw 2026.6.11:
+ *
+ *   '/'   -> '/'       (rejected)
+ *   '//'  -> ''        (accepted)
+ *   '///' -> ''        (accepted)
+ *   '   ' -> '/hooks'  (accepted)
+ *
+ * Do not "fix" the empty-string result into '/': that would reject configs
+ * OpenClaw accepts, and make the repair rewrite a working path on every spawn.
+ * Parity with the gateway is the point — see the normalizeHookPath tests.
+ */
+function normalizeHookPath(value: unknown): string {
+  const raw = normalizeOptionalString(value) ?? DEFAULT_HOOKS_PATH;
+  const withSlash = raw.startsWith('/') ? raw : `/${raw}`;
+  return withSlash.length > 1 ? withSlash.replace(/\/+$/, '') : withSlash;
+}
+
+/**
+ * Mirrors OpenClaw's `resolveAllowedSessionKeyPrefixes`: entries are lowercased,
+ * blanks dropped, and an list with nothing usable resolves to undefined rather
+ * than an empty array. That undefined-vs-empty distinction is load-bearing —
+ * OpenClaw skips two of its checks entirely when prefixes are absent.
+ */
+function resolveAllowedPrefixes(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const resolved = new Set<string>();
+  for (const entry of value) {
+    const normalized = normalizeOptionalString(entry)?.toLowerCase();
+    if (normalized) {
+      resolved.add(normalized);
+    }
+  }
+  return resolved.size > 0 ? [...resolved] : undefined;
+}
+
+/** Mirrors OpenClaw's `isSessionKeyAllowedByPrefix`. */
+function isAllowedByPrefix(sessionKey: string, prefixes: string[]): boolean {
+  const normalized = sessionKey.trim().toLowerCase();
+  return normalized.length > 0 && prefixes.some(prefix => normalized.startsWith(prefix));
+}
+
+/**
+ * Mirrors OpenClaw's `hasHookTemplateExpressions`: a complete, non-empty `{{ … }}`.
+ *
+ * Upstream writes this as `/\{\{\s*[^}]+\s*\}\}/`, which accepts exactly the same
+ * strings — `\s` is a subset of `[^}]`, so the `\s*` groups are redundant — but
+ * that redundancy makes them ambiguous with `[^}]+`, and the engine explores
+ * exponentially many splits before failing on a `{{` that never closes.
+ * `{{` + 3000 spaces takes ~6s upstream and ~0.1ms here.
+ *
+ * That matters more for us than for the gateway: this runs on the controller's
+ * event loop on every gateway spawn, against whatever is already on disk, so one
+ * crafted sessionKey would stall every restart. Simplified rather than bounded
+ * so parity is exact — verified identical over templated, empty, whitespace-only,
+ * and unterminated inputs.
+ */
+const HOOK_TEMPLATE_EXPRESSION = /\{\{[^}]+\}\}/;
+
+/** Mirrors OpenClaw's `normalizeMatchPath`. */
+function normalizeMatchPath(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
+  const trimmed = raw.trim();
+  return trimmed ? trimmed.replace(/^\/+/, '').replace(/\/+$/, '') : undefined;
+}
+
+/**
+ * Mirrors OpenClaw's `hasEffectiveTemplatedHookSessionKeyMapping`.
+ *
+ * Three details are load-bearing, and getting any of them wrong makes this
+ * broader than the gateway — which would reject configs OpenClaw starts from:
+ *  - only `action: 'agent'` mappings count, and `action` defaults to 'agent'
+ *  - the template must be a complete `{{ … }}`; a bare '{{' or '{{}}' is literal
+ *  - mappings shadowed by an earlier, broader mapping are skipped entirely
+ */
+function hasEffectiveTemplatedSessionKey(mappings: unknown): boolean {
+  if (!Array.isArray(mappings)) {
+    return false;
+  }
+  const effective: { matchPath?: string; matchSource?: string }[] = [];
+  for (const entry of mappings) {
+    if (typeof entry !== 'object' || entry === null) {
+      continue;
+    }
+    const mapping = entry as ConfigObject;
+    const matchPath = normalizeMatchPath(mapping.match?.path);
+    const matchSource =
+      typeof mapping.match?.source === 'string' ? mapping.match.source.trim() : undefined;
+
+    const shadowed = effective.some(earlier => {
+      if (earlier.matchPath && earlier.matchPath !== matchPath) {
+        return false;
+      }
+      return !earlier.matchSource || earlier.matchSource === matchSource;
+    });
+    if (shadowed) {
+      continue;
+    }
+    effective.push({ matchPath, matchSource });
+
+    const action = mapping.action ?? 'agent';
+    if (
+      action === 'agent' &&
+      typeof mapping.sessionKey === 'string' &&
+      HOOK_TEMPLATE_EXPRESSION.test(mapping.sessionKey)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Report why OpenClaw's gateway would refuse to start with this config, or null
+ * when the hook config is startable.
+ *
+ * Mirrors every throw in OpenClaw's `resolveHooksConfig`, in the same order, so
+ * the message a caller gets matches the one that would otherwise only surface as
+ * a crash-loop. Kept as a local structural check rather than a shell out to
+ * `openclaw config validate`: it runs on every write, and these failures are
+ * unrecoverable without a manual reboot, so they are enforced even when the
+ * caller opts out of advisory validation.
+ *
+ * Pure counterpart to {@link ensureBootableHookConfig}, for write paths that
+ * must reject a bricking config rather than silently rewriting the caller's
+ * content.
+ */
+export function hookConfigBootViolation(config: ConfigObject): string | null {
+  const hooks = config.hooks;
+  if (typeof hooks !== 'object' || hooks === null || Array.isArray(hooks)) {
+    return null;
+  }
+  // OpenClaw skips hook validation entirely when the surface is disabled.
+  if (hooks.enabled !== true) {
+    return null;
+  }
+
+  if (!normalizeOptionalString(hooks.token)) {
+    return `hooks.enabled requires hooks.token.${BOOT_BLOCKER_SUFFIX}`;
+  }
+  if (normalizeHookPath(hooks.path) === '/') {
+    return `hooks.path may not be '/'.${BOOT_BLOCKER_SUFFIX}`;
+  }
+
+  const prefixes = resolveAllowedPrefixes(hooks.allowedSessionKeyPrefixes);
+  const defaultSessionKey = normalizeOptionalString(hooks.defaultSessionKey);
+
+  if (defaultSessionKey && prefixes && !isAllowedByPrefix(defaultSessionKey, prefixes)) {
+    return (
+      'hooks.defaultSessionKey must match hooks.allowedSessionKeyPrefixes ' +
+      `(defaultSessionKey "${defaultSessionKey}" matches none of them).${BOOT_BLOCKER_SUFFIX}`
+    );
+  }
+  if (!defaultSessionKey && prefixes && !isAllowedByPrefix('hook:example', prefixes)) {
+    return (
+      "hooks.allowedSessionKeyPrefixes must include 'hook:' when hooks.defaultSessionKey " +
+      `is unset.${BOOT_BLOCKER_SUFFIX}`
+    );
+  }
+  if (hasEffectiveTemplatedSessionKey(hooks.mappings) && !prefixes) {
+    return (
+      'hooks.allowedSessionKeyPrefixes is required when a hook mapping sessionKey uses ' +
+      'templates (for example "{{payload.sessionKey}}"), even with ' +
+      `hooks.allowRequestSessionKey enabled.${BOOT_BLOCKER_SUFFIX}`
+    );
+  }
+  return null;
+}
+
+/**
+ * Repair a hook config into a shape OpenClaw's gateway will start from.
+ *
+ * Deliberately keyed off the *persisted config* rather than the environment: the
+ * state that trips these checks lives in the config and outlives any single
+ * boot, so the repair must not be gated on `KILOCLAW_HOOKS_TOKEN` (or any other
+ * env var) being set on the boot that happens to observe it. The env is consulted
+ * only as a source for a token that is missing outright.
+ *
+ * Idempotent. Returns a description of each repair applied; empty when the
+ * config was already startable.
+ */
+export function ensureBootableHookConfig(
+  config: ConfigObject,
+  env: EnvLike = process.env
+): string[] {
+  const hooks = config.hooks;
+  if (typeof hooks !== 'object' || hooks === null || Array.isArray(hooks)) {
+    return [];
+  }
+  if (hooks.enabled !== true) {
+    return [];
+  }
+
+  const applied: string[] = [];
+
+  if (!normalizeOptionalString(hooks.token)) {
+    const envToken = normalizeOptionalString(env.KILOCLAW_HOOKS_TOKEN);
+    if (envToken) {
+      hooks.token = envToken;
+      applied.push('restored hooks.token from the environment');
+    } else {
+      // Nothing can serve hooks without a token, and a disabled hook surface
+      // still boots. Bootstrap re-enables it with a fresh token on the next
+      // controller start, so this degrades inbound email rather than the agent.
+      hooks.enabled = false;
+      applied.push('disabled hooks (enabled with no token, and none in the environment)');
+      return applied;
+    }
+  }
+
+  if (normalizeHookPath(hooks.path) === '/') {
+    hooks.path = DEFAULT_HOOKS_PATH;
+    applied.push(`reset hooks.path to '${DEFAULT_HOOKS_PATH}'`);
+  }
+
+  const original: unknown = hooks.allowedSessionKeyPrefixes;
+  const prefixes: string[] = Array.isArray(original)
+    ? original.filter((value): value is string => typeof value === 'string')
+    : [];
+  const before = JSON.stringify(prefixes);
+  const defaultSessionKey = normalizeOptionalString(hooks.defaultSessionKey);
+  const hasTemplated = hasEffectiveTemplatedSessionKey(hooks.mappings);
+
+  // Preserve any operator-added prefixes; only append what is missing.
+  //
+  // Both defaults go in whenever a templated mapping exists, not just when the
+  // allow-list is empty: booting is necessary but not sufficient. Hook dispatch
+  // checks the incoming session key against this same list, so omitting
+  // 'inbound-email:' because some unrelated operator prefix happened to satisfy
+  // the boot check would start the gateway and then reject every inbound email.
+  if (hasTemplated) {
+    for (const required of [DEFAULT_HOOK_SESSION_KEY_PREFIX, INBOUND_EMAIL_SESSION_KEY_PREFIX]) {
+      if (!prefixes.some(prefix => prefix.trim().toLowerCase() === required)) {
+        prefixes.push(required);
+      }
+    }
+  }
+
+  // Only meaningful once prefixes exist: OpenClaw skips both of these checks
+  // when the allow-list resolves to undefined.
+  const effective = resolveAllowedPrefixes(prefixes);
+  if (effective) {
+    if (defaultSessionKey) {
+      if (!isAllowedByPrefix(defaultSessionKey, effective)) {
+        // A key always satisfies itself as a prefix — the least invasive repair
+        // that keeps the operator's chosen defaultSessionKey intact.
+        prefixes.push(defaultSessionKey);
+      }
+    } else if (!isAllowedByPrefix('hook:example', effective)) {
+      prefixes.push(DEFAULT_HOOK_SESSION_KEY_PREFIX);
+    }
+  }
+
+  if (JSON.stringify(prefixes) !== before) {
+    hooks.allowedSessionKeyPrefixes = prefixes;
+    applied.push('added the session-key prefixes OpenClaw requires');
+  }
+
+  return applied;
+}
+
 type ExecFileOptions = { env?: NodeJS.ProcessEnv; stdio?: 'inherit' | 'pipe' };
 
 export type ConfigWriterDeps = {
@@ -598,6 +883,13 @@ export function generateBaseConfig(
     config.plugins.entries.slack.enabled = true;
   }
 
+  // Composio Connect — a remote MCP server operated by Composio. Nothing is
+  // installed in the container: OpenClaw dials the URL over streamable HTTP
+  // and forwards the consumer key as a header, so the whole integration is
+  // this config block. Toolkit connections (Gmail, Calendar, ...) are made by
+  // the user in the Composio dashboard and never touch KiloClaw.
+  applyComposioConnectConfig(config, env.COMPOSIO_CONSUMER_KEY);
+
   // Session — default DM scope to per-channel-peer so each channel+peer
   // combination gets its own session. OpenClaw's onboard sets this for new
   // instances, but legacy instances may not have it.
@@ -638,23 +930,6 @@ export function generateBaseConfig(
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
     config.hooks.path = '/hooks';
     ensureInboundEmailHookFlags(config);
-    config.hooks.allowedSessionKeyPrefixes = Array.isArray(config.hooks.allowedSessionKeyPrefixes)
-      ? config.hooks.allowedSessionKeyPrefixes
-      : [];
-    if (
-      !(config.hooks.allowedSessionKeyPrefixes as string[]).includes(
-        DEFAULT_HOOK_SESSION_KEY_PREFIX
-      )
-    ) {
-      (config.hooks.allowedSessionKeyPrefixes as string[]).push(DEFAULT_HOOK_SESSION_KEY_PREFIX);
-    }
-    if (
-      !(config.hooks.allowedSessionKeyPrefixes as string[]).includes(
-        INBOUND_EMAIL_SESSION_KEY_PREFIX
-      )
-    ) {
-      (config.hooks.allowedSessionKeyPrefixes as string[]).push(INBOUND_EMAIL_SESSION_KEY_PREFIX);
-    }
 
     config.hooks.mappings = Array.isArray(config.hooks.mappings)
       ? config.hooks.mappings.map((mapping: ConfigObject) => migrateHookMapping(mapping))
@@ -679,6 +954,12 @@ export function generateBaseConfig(
     }
     console.log('Hooks enabled with inbound email mapping (dedicated token)');
   }
+
+  // Runs outside the KILOCLAW_HOOKS_TOKEN branch on purpose: a config that
+  // already carries hook state (from an earlier boot, a restored backup, or a
+  // hand-edit) must be brought into a bootable shape even on a boot where the
+  // branch above is skipped. See the function's comment.
+  ensureBootableHookConfig(config, env);
 
   // Vector memory configuration — configures OpenClaw's builtin memory search
   // to use the Kilo Gateway embeddings endpoint via the OpenAI-compatible adapter.
@@ -760,6 +1041,69 @@ export function generateBaseConfig(
   }
 
   return config;
+}
+
+/** Composio's hosted MCP endpoint. */
+export const COMPOSIO_CONNECT_MCP_URL = 'https://connect.composio.dev/mcp';
+/** Header Composio Connect authenticates consumer keys with. */
+export const COMPOSIO_CONNECT_HEADER = 'x-consumer-api-key';
+/** `mcp.servers` key we manage. */
+export const COMPOSIO_MCP_SERVER_NAME = 'composio';
+/**
+ * Marks the server definition as written by KiloClaw.
+ *
+ * Ownership cannot be inferred from the definition's contents: the URL and
+ * header are Composio's own published values, so a user who wired Composio
+ * Connect up by hand produces a byte-identical server. OpenClaw's
+ * McpServerSchema is `.catchall(z.unknown())`, so this extra key validates
+ * and round-trips untouched.
+ */
+export const COMPOSIO_MANAGED_MARKER = 'kiloclawManaged';
+
+/**
+ * Add, update, or remove the Composio Connect MCP server definition.
+ *
+ * Setting a consumer key hands the whole definition to KiloClaw: it is
+ * replaced outright rather than merged. Merging would carry foreign fields
+ * from a hand-rolled server into ours, and a surviving `auth: 'oauth'` is
+ * worse than untidy — OpenClaw drops the request headers entirely for OAuth
+ * servers, so the pasted key would be silently ignored.
+ *
+ * Removal on an absent key is what makes clearing the credential in Settings
+ * actually revoke access, since openclaw.json lives on the volume and
+ * survives redeploys. Only a definition we marked as ours is removed; a
+ * server the user configured themselves is left alone even when it points at
+ * the same endpoint.
+ */
+export function applyComposioConnectConfig(
+  config: ConfigObject,
+  consumerKey: string | undefined
+): void {
+  const key = consumerKey?.trim();
+
+  if (key) {
+    config.mcp = config.mcp ?? {};
+    config.mcp.servers = config.mcp.servers ?? {};
+    config.mcp.servers[COMPOSIO_MCP_SERVER_NAME] = {
+      [COMPOSIO_MANAGED_MARKER]: true,
+      transport: 'streamable-http',
+      url: COMPOSIO_CONNECT_MCP_URL,
+      headers: { [COMPOSIO_CONNECT_HEADER]: key },
+    };
+    console.log('Composio Connect MCP server configured');
+    return;
+  }
+
+  const existing = config.mcp?.servers?.[COMPOSIO_MCP_SERVER_NAME];
+  if (!existing) return;
+
+  if (existing[COMPOSIO_MANAGED_MARKER] !== true) {
+    console.log('Leaving user-managed Composio MCP server untouched');
+    return;
+  }
+
+  delete config.mcp.servers[COMPOSIO_MCP_SERVER_NAME];
+  console.log('Composio Connect MCP server removed');
 }
 
 /**
@@ -893,6 +1237,81 @@ export function backupConfigFile(
   }
 
   pruneOldConfigBackups(dir, base, deps);
+}
+
+/**
+ * Re-apply controller-managed hook invariants to the persisted config.
+ *
+ * Called before every gateway spawn so a config that would refuse to boot is
+ * repaired instead of crash-looping. `generateBaseConfig` only runs during
+ * bootstrap, so without this any writer that leaves the hook config unbootable —
+ * a restored backup, a hand-edit, a whole-file API write — bricks the instance
+ * until someone reboots it by hand.
+ *
+ * Best-effort by contract: returns false and never throws, because a repair
+ * failure must not be the reason the gateway does not start.
+ */
+export function repairPersistedHookInvariants(
+  configPath = DEFAULT_CONFIG_PATH,
+  deps: ConfigWriterDeps = defaultDeps,
+  env: EnvLike = process.env
+): boolean {
+  try {
+    if (!deps.existsSync(configPath)) {
+      return false;
+    }
+    const raw = deps.readFileSync(configPath, 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return false;
+    }
+
+    const config = parsed as ConfigObject;
+    const applied = ensureBootableHookConfig(config, env);
+    if (applied.length === 0) {
+      return false;
+    }
+
+    // Reuse the onboard temp-file convention so a crash mid-write leaves the
+    // live config untouched rather than truncated.
+    const dir = path.dirname(configPath);
+    const base = path.basename(configPath);
+    const tmpPath = path.join(dir, `.${base}.kilorepair.${crypto.randomBytes(6).toString('hex')}`);
+    try {
+      deps.writeFileSync(tmpPath, JSON.stringify(config, null, 2));
+      deps.chmodSync(tmpPath, 0o600);
+
+      // Optimistic concurrency: this writer runs unattended on every gateway
+      // spawn, so unlike the human-initiated edit routes it must not be the one
+      // that silently reverts a concurrent admin write. If the file moved since
+      // the read above, drop the repair — the next spawn re-reads and retries.
+      if (deps.readFileSync(configPath, 'utf8') !== raw) {
+        deps.unlinkSync(tmpPath);
+        console.warn('[controller] Config changed during hook invariant repair, skipping write');
+        return false;
+      }
+
+      deps.renameSync(tmpPath, configPath);
+    } catch (error) {
+      try {
+        deps.unlinkSync(tmpPath);
+      } catch {
+        // Temp file may not exist; nothing to clean up.
+      }
+      throw error;
+    }
+
+    console.warn(
+      `[controller] Repaired unbootable hook config before gateway start: ${applied.join('; ')}`
+    );
+    return true;
+  } catch (error) {
+    console.error(
+      '[controller] Failed to repair hook invariants, starting gateway anyway:',
+      error instanceof Error ? error.message : String(error)
+    );
+    return false;
+  }
 }
 
 /**

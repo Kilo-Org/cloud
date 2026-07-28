@@ -52,12 +52,18 @@ export function buildOverviewRows({
       subtitle:
         data.focusAreas.length > 0 ? data.focusAreas.map(capitalize).join(', ') : 'All areas',
     },
-    {
-      field: 'instructions',
-      icon: ScrollText,
-      title: 'Custom Instructions',
-      subtitle: data.customInstructions ? 'Set' : 'None',
-    },
+    // Custom Instructions is deprecated in favour of REVIEW.md, so the row is
+    // only offered to configs that already have something stored in it.
+    ...(data.customInstructions?.trim()
+      ? [
+          {
+            field: 'instructions',
+            icon: ScrollText,
+            title: 'Custom Instructions',
+            subtitle: 'Set',
+          },
+        ]
+      : []),
     {
       field: 'model',
       icon: FileSliders,

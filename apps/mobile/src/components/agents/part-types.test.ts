@@ -1,7 +1,7 @@
-import { type Part, type ReasoningPart } from 'cloud-agent-sdk';
+import { type ReasoningPart, type TextPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { isPartStreaming, shouldRenderReasoningPart } from './part-types';
+import { isPartStreaming, isSnapshotProgressPart, shouldRenderReasoningPart } from './part-types';
 
 function makeReasoningPart(text: string, ended = true): ReasoningPart {
   return {
@@ -14,8 +14,8 @@ function makeReasoningPart(text: string, ended = true): ReasoningPart {
   };
 }
 
-function makeTextPart(text: string): Part {
-  return {
+function makeTextPart(text: string, synthetic?: boolean): TextPart {
+  const part: TextPart = {
     id: 't1',
     sessionID: 's1',
     messageID: 'm1',
@@ -23,7 +23,33 @@ function makeTextPart(text: string): Part {
     text,
     time: { start: 1, end: 2 },
   };
+  if (synthetic !== undefined) {
+    part.synthetic = synthetic;
+  }
+  return part;
 }
+
+describe('isSnapshotProgressPart', () => {
+  it('is true for a synthetic text part whose text includes Initializing snapshot', () => {
+    const part = makeTextPart('⠋ Initializing snapshot…', true);
+    expect(isSnapshotProgressPart(part)).toBe(true);
+  });
+
+  it('is false for the same text when not synthetic', () => {
+    const part = makeTextPart('⠋ Initializing snapshot…', false);
+    expect(isSnapshotProgressPart(part)).toBe(false);
+  });
+
+  it('is false for a synthetic text part with other content', () => {
+    const part = makeTextPart('Hello from the agent', true);
+    expect(isSnapshotProgressPart(part)).toBe(false);
+  });
+
+  it('is false for non-text parts', () => {
+    const part = makeReasoningPart('thinking');
+    expect(isSnapshotProgressPart(part)).toBe(false);
+  });
+});
 
 describe('shouldRenderReasoningPart', () => {
   it('does not render a completed reasoning part with empty text', () => {

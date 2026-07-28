@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
 import type { Env } from './env';
 import { z } from 'zod';
@@ -8,10 +9,36 @@ import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
 import { api } from './routes/api';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
+import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { getSessionExport } from './services/session-export';
 import { withDORetry } from '@kilocode/worker-utils';
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
+const invalidateSessionAccessSchema = z.object({
+  kiloUserId: z.string().min(1),
+  organizationId: z.uuid(),
+});
+
+async function hasValidInternalSecret(c: {
+  req: { header(name: string): string | undefined };
+  env: Env;
+}): Promise<boolean> {
+  const provided = c.req.header('X-Internal-Secret');
+  const expected = await c.env.INTERNAL_API_SECRET_PROD.get();
+  if (!provided || !expected) return false;
+
+  const encoder = new TextEncoder();
+  const providedBytes = encoder.encode(provided);
+  const expectedBytes = encoder.encode(expected);
+  if (providedBytes.byteLength !== expectedBytes.byteLength) {
+    // timingSafeEqual requires equal lengths; self-compare so a length
+    // mismatch is not observably faster to reject than a value mismatch.
+    timingSafeEqual(providedBytes, providedBytes);
+    return false;
+  }
+
+  return timingSafeEqual(providedBytes, expectedBytes);
+}
 
 export const app = new Hono<{
   Bindings: Env;
@@ -66,20 +93,28 @@ app.get('/session/:sessionId', async c => {
   });
 });
 
-// Internal route for service-binding HTTP fetch (secret-protected)
-app.get('/internal/session/:sessionId/export', async c => {
-  const secret = c.req.header('X-Internal-Secret');
-  const expected = await c.env.INTERNAL_API_SECRET_PROD.get();
-
-  if (!secret || !expected) {
+app.post('/internal/session-access/invalidate', async c => {
+  if (!(await hasValidInternalSecret(c))) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
-  const encoder = new TextEncoder();
-  const a = encoder.encode(secret);
-  const b = encoder.encode(expected);
+  const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
+  }
 
-  if (a.byteLength !== b.byteLength || !crypto.subtle.timingSafeEqual(a, b)) {
+  await withDORetry(
+    () => getSessionAccessCacheDO(c.env, { kiloUserId: parsed.data.kiloUserId }),
+    sessionCache => sessionCache.invalidateOrganization(parsed.data.organizationId),
+    'SessionAccessCacheDO.invalidateOrganization'
+  );
+
+  return c.body(null, 204);
+});
+
+// Internal route for service-binding HTTP fetch (secret-protected)
+app.get('/internal/session/:sessionId/export', async c => {
+  if (!(await hasValidInternalSecret(c))) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 

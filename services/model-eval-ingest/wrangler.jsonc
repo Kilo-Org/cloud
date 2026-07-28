@@ -14,6 +14,17 @@
   },
   "observability": {
     "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": false,
+    },
+  },
+  "logpush": true,
+  "vars": {
+    "ENVIRONMENT": "production",
   },
   "triggers": {
     "crons": ["*/15 * * * *"],
@@ -43,6 +54,9 @@
     "dev": {
       "name": "model-eval-ingest-dev",
       "workers_dev": true,
+      "vars": {
+        "ENVIRONMENT": "development",
+      },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",

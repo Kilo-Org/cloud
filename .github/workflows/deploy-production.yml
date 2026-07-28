@@ -96,6 +96,7 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
+      axiom_annotation_dataset: kilocode-app
     secrets: inherit
 
   promote-global-app:

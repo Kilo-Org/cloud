@@ -29,6 +29,7 @@ import {
   Coins,
   Scale,
   Route,
+  Tags,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
@@ -111,6 +112,11 @@ const userManagementItems: MenuItem[] = [
 ];
 
 const financialItems: MenuItem[] = [
+  {
+    title: () => 'Cloud Billing SKUs',
+    url: '/admin/cloud-billing-skus',
+    icon: () => <Tags />,
+  },
   {
     title: () => 'Credit Categories',
     url: '/admin/credit-categories',

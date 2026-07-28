@@ -6,8 +6,11 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { logger } from '../logger.js';
 import { workspaceFailureMessage } from '../session/safe-failure-projection.js';
-import type { SessionMessageState } from '../session/session-message-state.js';
-import { isWorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
+import { admittedAgentModel, type SessionMessageState } from '../session/session-message-state.js';
+import {
+  classifyCloudAgentFailure,
+  isWorkspaceFailureSubtype,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 
 type ReportQueue = {
   send(report: CloudAgentQueueReport): Promise<unknown>;
@@ -24,7 +27,6 @@ const INSUFFICIENT_CREDIT_TERMINAL_ERRORS = new Set([
   'insufficient credits: payment_required',
   'insufficient credits: insufficient_funds',
   'payment required',
-  'usage_limit_exceeded',
 ]);
 const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
   Record<NonNullable<SessionMessageState['failureCode']>, string>
@@ -44,6 +46,7 @@ const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
   assistant_error: 'Assistant request failed',
   wrapper_error_after_activity: 'Wrapper failed after agent activity',
   missing_assistant_reply: 'No assistant reply was produced',
+  payment_required: 'Model request failed: insufficient credits',
   unclassified: 'Run failed without a classified cause',
 };
 
@@ -51,13 +54,9 @@ function timestamp(value: number): string {
   return new Date(value).toISOString();
 }
 
-function persistedFailureCode(state: SessionMessageState): SessionMessageState['failureCode'] {
-  if (state.failureCode !== 'model_missing' && state.failureCode !== 'payment_required') {
-    return state.failureCode;
-  }
-  if (state.failureStage === 'agent_activity') return 'assistant_error';
-  if (state.failureStage === 'post_dispatch_no_activity') return 'wrapper_error_before_activity';
-  return state.failureCode;
+function usedManagedModelSelection(state: SessionMessageState): boolean {
+  const model = admittedAgentModel(state);
+  return model === undefined ? false : /^(?:kilo\/)?kilo-auto\//.test(model);
 }
 
 function isKnownInsufficientCreditFailure(state: SessionMessageState): boolean {
@@ -85,6 +84,8 @@ function diagnosticForFailedRun(
       : 'Workspace setup failed';
   } else if (isKnownInsufficientCreditFailure(state)) {
     errorMessageRedacted = 'Model request failed: insufficient credits';
+  } else if (state.assistantFailureReason === 'rate_limited') {
+    errorMessageRedacted = 'Assistant request was rate limited';
   }
   if (errorMessageRedacted === undefined) return undefined;
 
@@ -133,8 +134,28 @@ export async function emitRunStateReport(params: {
   const { state } = params;
   const observedDispatchAcceptedAt =
     state.dispatchAcceptanceKind === 'observed' ? state.acceptedAt : undefined;
-  const failureCode = persistedFailureCode(state);
+  const failureCode = state.failureCode;
   const diagnostic = diagnosticForFailedRun({ ...state, failureCode });
+  const failureClassification =
+    state.status === 'failed' && state.failureStage !== undefined && failureCode !== undefined
+      ? classifyCloudAgentFailure({
+          source: 'run',
+          stage: state.failureStage,
+          code: failureCode,
+          ...(isWorkspaceFailureSubtype(state.failureSubtype)
+            ? { workspaceSubtype: state.failureSubtype }
+            : {}),
+          ...(state.assistantFailureReason === undefined
+            ? {}
+            : { assistantReason: state.assistantFailureReason }),
+          ...(state.providerOwnership === undefined
+            ? {}
+            : { providerOwnership: state.providerOwnership }),
+          ...(failureCode === 'model_missing'
+            ? { managedModelSelection: usedManagedModelSelection(state) }
+            : {}),
+        })
+      : undefined;
   const report: CloudAgentRunStateReport = {
     version: 1,
     type: 'run.state',
@@ -154,9 +175,29 @@ export async function emitRunStateReport(params: {
       ...(state.terminalAt === undefined ? {} : { terminalAt: timestamp(state.terminalAt) }),
       ...(state.failureStage === undefined ? {} : { failureStage: state.failureStage }),
       ...(failureCode === undefined ? {} : { failureCode }),
+      ...(state.failureCode === 'workspace_setup_failed' &&
+      isWorkspaceFailureSubtype(state.failureSubtype)
+        ? { workspaceFailureSubtype: state.failureSubtype }
+        : {}),
+      ...(failureClassification === undefined
+        ? {}
+        : {
+            failureResponsibility: failureClassification.responsibility,
+            failureReason: failureClassification.reason,
+          }),
       ...(diagnostic === undefined ? {} : { diagnostic }),
     },
   };
+  if (failureClassification !== undefined) {
+    console.info('Cloud Agent failure classified', {
+      metric: 'cloud_agent_failure_classified',
+      count: 1,
+      responsibility: failureClassification.responsibility,
+      reason: failureClassification.reason,
+      stage: state.failureStage,
+      code: failureCode,
+    });
+  }
   await trySendReport(params.queue, report, {
     cloudAgentSessionId: params.cloudAgentSessionId,
     messageId: state.messageId,

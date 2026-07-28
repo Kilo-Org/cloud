@@ -53,8 +53,8 @@ export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-n
 
 export {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
-  GITLAB_CREDENTIAL_AUDIT_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
 } from './internal-service-token-audiences.js';
 export {
   BITBUCKET_ACCESS_TOKEN_FAMILY_PREFIX,
@@ -196,3 +196,5 @@ export type {
   SecurityFindingAuditSnapshotSource,
   SecurityFindingAuditWriterDb,
 } from './security-finding-audit.js';
+
+export { hasOrganizationAccess } from './organization-membership.js';

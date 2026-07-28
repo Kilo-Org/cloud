@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertCircle, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
   useCloudAgentNextHealthErrorSessions,
   useCloudAgentNextHealthOverview,
   type CloudAgentNextHealthFilters,
+  type CloudAgentFailureResponsibilityFilter,
 } from '@/app/admin/api/cloud-agent-next/hooks';
 import { CopyButton } from '@/components/admin/CopyButton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -30,9 +31,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { rollingHealthInterval } from './health-interval';
-import { getOperationalFailureStats } from './health-summary';
+import {
+  DEFAULT_FAILURE_RESPONSIBILITY_FILTER,
+  failureReasonLabel,
+  getObservedHealthStats,
+  type ObservedHealthOutcomeKind,
+} from './health-summary';
 import {
   DEFAULT_HEALTH_PERIOD,
   getStoredHealthPeriod,
@@ -86,43 +93,41 @@ function intervalForRange(range: RangeValue): CloudAgentNextHealthFilters {
   return rollingHealthInterval(selectedRange);
 }
 
-type MetricTone = 'success' | 'danger' | 'warning';
-
-const metricToneStyles: Record<MetricTone, { panel: string; value: string }> = {
-  success: {
-    panel: 'border-green-500/20 bg-green-500/5',
+const outcomePresentation = {
+  completed: {
+    label: 'Completed runs',
+    segment: 'bg-green-500',
+    marker: 'border-green-500',
     value: 'text-green-400',
   },
-  danger: {
-    panel: 'border-red-500/20 bg-red-500/5',
-    value: 'text-red-400',
+  interrupted: {
+    label: 'Interrupted runs',
+    segment: 'bg-muted-foreground',
+    marker: 'border-muted-foreground',
+    value: 'text-foreground',
   },
-  warning: {
-    panel: 'border-yellow-500/20 bg-yellow-500/5',
+  user: {
+    label: 'User failures',
+    segment: 'bg-yellow-500',
+    marker: 'border-yellow-500',
     value: 'text-yellow-400',
   },
-};
-
-function Metric({
-  label,
-  value,
-  detail,
-  tone,
-}: {
-  label: string;
-  value: string;
-  detail?: string;
-  tone: MetricTone;
-}) {
-  const styles = metricToneStyles[tone];
-  return (
-    <div className={cn('flex min-w-0 flex-col gap-1 rounded-lg border p-4', styles.panel)}>
-      <div className="text-muted-foreground text-xs">{label}</div>
-      <div className={cn('text-2xl font-semibold tabular-nums', styles.value)}>{value}</div>
-      {detail && <div className="text-muted-foreground text-xs tabular-nums">{detail}</div>}
-    </div>
-  );
-}
+  platform: {
+    label: 'Platform failures',
+    segment: 'bg-red-500',
+    marker: 'border-red-500',
+    value: 'text-red-400',
+  },
+  unknown: {
+    label: 'Unknown failures',
+    segment: 'bg-gray-500',
+    marker: 'border-gray-500',
+    value: 'text-foreground',
+  },
+} satisfies Record<
+  ObservedHealthOutcomeKind,
+  { label: string; segment: string; marker: string; value: string }
+>;
 
 function DashboardSkeleton() {
   return (
@@ -134,41 +139,81 @@ function DashboardSkeleton() {
 }
 
 function HealthSummary({ summary }: { summary: HealthData['summary'] }) {
-  const operationalFailures = getOperationalFailureStats(summary);
-  const failureRate = operationalFailures.failureRatePercent;
+  const stats = getObservedHealthStats(summary);
+  const distributionLabel = stats.outcomes
+    .map(outcome => `${outcomePresentation[outcome.kind].label}: ${outcome.count}`)
+    .join(', ');
   return (
     <Card>
       <CardHeader>
         <CardTitle>Observed health</CardTitle>
         <CardDescription>
-          Events observed in the selected rolling period. Interruptions are excluded from failure
-          rate.
+          Completed and interrupted runs alongside failures requiring user action, platform action,
+          or further investigation. Every percentage is a share of all observed outcomes.
         </CardDescription>
+        <p className="text-muted-foreground pt-2 text-sm tabular-nums">
+          <span className="text-foreground font-semibold">
+            {stats.observedOutcomes.toLocaleString()} observed outcomes
+          </span>{' '}
+          · {stats.observedRuns.toLocaleString()} runs + {stats.setupFailures.toLocaleString()}{' '}
+          setup failures
+        </p>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Metric
-          label="Operational failure rate"
-          value={failureRate === null ? '--' : `${failureRate.toFixed(1)}%`}
-          detail={`${operationalFailures.failureEvents.toLocaleString()} failure events / ${operationalFailures.assessedOutcomes.toLocaleString()} assessed`}
-          tone={operationalFailures.failureEvents > 0 ? 'danger' : 'success'}
-        />
-        <Metric
-          label="Completed runs"
-          value={summary.completedRuns.toLocaleString()}
-          tone="success"
-        />
-        <Metric label="Failed runs" value={summary.failedRuns.toLocaleString()} tone="danger" />
-        <Metric
-          label="Setup failures"
-          value={summary.setupFailures.toLocaleString()}
-          tone="danger"
-        />
-        <Metric
-          label="Interrupted runs"
-          value={summary.interruptedRuns.toLocaleString()}
-          detail="Excluded from failure rate"
-          tone="warning"
-        />
+      <CardContent className="flex flex-col gap-4">
+        <div
+          className="bg-muted flex h-3 overflow-hidden rounded-full"
+          role="group"
+          aria-label={`Observed outcome distribution. ${distributionLabel}`}
+        >
+          {stats.outcomes
+            .filter(outcome => outcome.count > 0)
+            .map(outcome => {
+              const presentation = outcomePresentation[outcome.kind];
+              const share = outcome.sharePercent ?? 0;
+              return (
+                <Tooltip key={outcome.kind}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        'h-full cursor-help focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white',
+                        presentation.segment
+                      )}
+                      style={{ width: `${share}%` }}
+                      aria-label={`${presentation.label}: ${outcome.count.toLocaleString()}, ${share.toFixed(1)}% of outcomes`}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-medium">{presentation.label}</p>
+                    <p className="text-muted-foreground tabular-nums">
+                      {outcome.count.toLocaleString()} · {share.toFixed(1)}% of outcomes
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {stats.outcomes.map(outcome => {
+            const presentation = outcomePresentation[outcome.kind];
+            return (
+              <div
+                key={outcome.kind}
+                className={cn('min-w-0 border-l-2 pl-3', presentation.marker)}
+              >
+                <div className="text-muted-foreground min-h-8 text-xs">{presentation.label}</div>
+                <div className={cn('mt-1 text-xl font-semibold tabular-nums', presentation.value)}>
+                  {outcome.count.toLocaleString()}
+                </div>
+                <div className="text-muted-foreground mt-0.5 text-xs tabular-nums">
+                  {outcome.sharePercent === null
+                    ? '--'
+                    : `${outcome.sharePercent.toFixed(1)}% of outcomes`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
@@ -176,6 +221,29 @@ function HealthSummary({ summary }: { summary: HealthData['summary'] }) {
 
 function errorSourceBadge(source: TopError['source']) {
   return <Badge variant="secondary">{source === 'setup' ? 'Setup' : 'Run'}</Badge>;
+}
+
+const RESPONSIBILITY_LABELS = {
+  platform: 'Platform',
+  user: 'User',
+  unknown: 'Unknown',
+} as const;
+
+function responsibilityBadge(responsibility: TopError['responsibility']) {
+  return (
+    <Badge
+      variant={responsibility === 'platform' ? 'destructive' : 'secondary'}
+      className={
+        responsibility === 'user'
+          ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300'
+          : responsibility === 'unknown'
+            ? 'text-muted-foreground'
+            : undefined
+      }
+    >
+      {RESPONSIBILITY_LABELS[responsibility]}
+    </Badge>
+  );
 }
 
 function ErrorSessionsDialog({
@@ -195,10 +263,11 @@ function ErrorSessionsDialog({
         <DialogHeader>
           <DialogTitle>Affected sessions</DialogTitle>
           <DialogDescription>
+            {RESPONSIBILITY_LABELS[error.responsibility]} · {failureReasonLabel(error.reason)} ·{' '}
             <span className="font-mono text-xs">
               {error.source} / {error.stage} / {error.code}
             </span>{' '}
-            - {error.count.toLocaleString()} matching error events in the selected period.
+            — {error.count.toLocaleString()} matching error events in the selected period.
           </DialogDescription>
         </DialogHeader>
         {sessions.isLoading ? (
@@ -286,20 +355,55 @@ function ErrorSessionsDialog({
 function TopErrors({
   errors,
   interval,
+  responsibility,
+  summary,
+  onResponsibilityChange,
 }: {
   errors: TopError[];
   interval: CloudAgentNextHealthFilters;
+  responsibility: CloudAgentFailureResponsibilityFilter;
+  summary: HealthData['summary'];
+  onResponsibilityChange: (value: CloudAgentFailureResponsibilityFilter) => void;
 }) {
   const [selectedError, setSelectedError] = useState<TopError | null>(null);
   const total = errors.reduce((count, error) => count + error.count, 0);
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Top errors</CardTitle>
-        <CardDescription>
-          Setup failures and failed runs only. {total.toLocaleString()} events in the top 10. Select
-          an error to inspect sessions.
-        </CardDescription>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <CardTitle>Top errors</CardTitle>
+            <CardDescription className="mt-1">
+              Setup failures and failed runs only. {total.toLocaleString()} events in the top 10.
+              Select an error to inspect sessions.
+            </CardDescription>
+          </div>
+          <div className="flex min-w-52 flex-col gap-2">
+            <Label htmlFor="cloud-agent-failure-responsibility">Responsibility</Label>
+            <Select
+              value={responsibility}
+              onValueChange={value =>
+                onResponsibilityChange(value as CloudAgentFailureResponsibilityFilter)
+              }
+            >
+              <SelectTrigger id="cloud-agent-failure-responsibility">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="platform">
+                  Platform ({summary.platformFailures.toLocaleString()})
+                </SelectItem>
+                <SelectItem value="user">User ({summary.userFailures.toLocaleString()})</SelectItem>
+                <SelectItem value="unknown">
+                  Unknown ({summary.unknownFailures.toLocaleString()})
+                </SelectItem>
+                <SelectItem value="all">
+                  All failures ({(summary.failedRuns + summary.setupFailures).toLocaleString()})
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {errors.length === 0 ? (
@@ -315,26 +419,34 @@ function TopErrors({
               </TableCaption>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Responsibility</TableHead>
+                  <TableHead>Reason</TableHead>
                   <TableHead>Source</TableHead>
-                  <TableHead>Error</TableHead>
                   <TableHead className="text-right">Events</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {errors.map(error => (
-                  <TableRow key={`${error.source}:${error.stage}:${error.code}`}>
-                    <TableCell>{errorSourceBadge(error.source)}</TableCell>
+                  <TableRow
+                    key={`${error.responsibility}:${error.reason}:${error.source}:${error.stage}:${error.code}`}
+                  >
+                    <TableCell>{responsibilityBadge(error.responsibility)}</TableCell>
                     <TableCell className="p-1">
                       <Button
                         variant="ghost"
-                        className="h-auto w-full justify-start gap-2 px-2 py-2 font-mono text-xs"
-                        aria-label={`View affected sessions for ${error.source} error ${error.stage} / ${error.code}, ${error.count.toLocaleString()} events`}
+                        className="h-auto w-full justify-start px-2 py-2 text-left"
+                        aria-label={`View affected sessions for ${RESPONSIBILITY_LABELS[error.responsibility]} ${failureReasonLabel(error.reason)}, ${error.count.toLocaleString()} events`}
                         onClick={() => setSelectedError(error)}
                       >
-                        {error.stage} / {error.code}
-                        <ChevronRight className="text-muted-foreground size-4" />
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="text-sm">{failureReasonLabel(error.reason)}</span>
+                          <span className="text-muted-foreground font-mono text-xs">
+                            {error.stage} / {error.code}
+                          </span>
+                        </span>
                       </Button>
                     </TableCell>
+                    <TableCell>{errorSourceBadge(error.source)}</TableCell>
                     <TableCell className="text-right font-mono tabular-nums">
                       {error.count.toLocaleString()}
                     </TableCell>
@@ -362,8 +474,15 @@ type TopError = HealthData['topErrors'][number];
 export default function CloudAgentNextOutcomesPage() {
   const [range, setRange] = useState<RangeValue>(DEFAULT_RANGE);
   const [interval, setInterval] = useState(() => intervalForRange(DEFAULT_RANGE));
+  const [responsibility, setResponsibility] = useState<CloudAgentFailureResponsibilityFilter>(
+    DEFAULT_FAILURE_RESPONSIBILITY_FILTER
+  );
   const [hasLoadedPeriodPreference, setHasLoadedPeriodPreference] = useState(false);
-  const health = useCloudAgentNextHealthOverview(interval, hasLoadedPeriodPreference);
+  const health = useCloudAgentNextHealthOverview(
+    interval,
+    hasLoadedPeriodPreference,
+    responsibility
+  );
 
   useEffect(() => {
     const storedRange = getStoredHealthPeriod();
@@ -450,7 +569,13 @@ export default function CloudAgentNextOutcomesPage() {
         ) : health.data ? (
           <>
             <HealthSummary summary={health.data.summary} />
-            <TopErrors errors={health.data.topErrors} interval={interval} />
+            <TopErrors
+              errors={health.data.topErrors}
+              interval={interval}
+              responsibility={responsibility}
+              summary={health.data.summary}
+              onResponsibilityChange={setResponsibility}
+            />
           </>
         ) : null}
       </div>

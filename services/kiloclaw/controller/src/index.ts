@@ -12,6 +12,7 @@ import {
 } from './proxy';
 import { createSupervisor } from './supervisor';
 import type { Supervisor } from './supervisor';
+import { repairPersistedHookInvariants } from './config-writer';
 import { registerHealthRoute, startKiloChatHealthProbe } from './routes/health';
 import type { KiloChatHealthProbe } from './routes/health';
 import { registerGatewayRoutes } from './routes/gateway';
@@ -375,6 +376,12 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   supervisor = createSupervisor({
     args: ['gateway', ...config.gatewayArgs],
     onStdoutLine: line => pc.onPairingLogLine(line),
+    // Self-heal on every attempt, not just the first: a config that OpenClaw
+    // refuses to boot would otherwise crash-loop forever, since restarts do
+    // not re-run bootstrap's config generation.
+    beforeSpawn: () => {
+      repairPersistedHookInvariants();
+    },
   });
 
   let googleAccountEmail: string | null = null;

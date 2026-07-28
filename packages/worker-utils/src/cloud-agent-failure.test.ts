@@ -4,6 +4,7 @@ import {
   CLOUD_AGENT_FAILURE_STAGES,
   CloudAgentCallbackFailureSchema,
   CloudAgentSafeFailureSchema,
+  classifyCloudAgentFailure,
   isWorkspaceFailureSubtype,
   WORKSPACE_FAILURE_SUBTYPES,
 } from './cloud-agent-failure.js';
@@ -29,6 +30,84 @@ describe('CloudAgentCallbackFailureSchema', () => {
     { message: 'x'.repeat(4_097) },
   ])('discards unsupported or malformed structured failures: %o', failure => {
     expect(CloudAgentCallbackFailureSchema.parse(failure)).toBeUndefined();
+  });
+});
+
+describe('classifyCloudAgentFailure', () => {
+  it.each([
+    ['payment_required', 'insufficient_credits'],
+    ['model_missing', 'model_unavailable'],
+  ] as const)('classifies explicit %s as user action', (code, reason) => {
+    expect(classifyCloudAgentFailure({ source: 'run', stage: 'agent_activity', code })).toEqual({
+      responsibility: 'user',
+      reason,
+    });
+  });
+
+  it('preserves ambiguous assistant and source-control failures as unknown', () => {
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: 'unknown',
+        providerOwnership: 'unknown',
+      })
+    ).toEqual({ responsibility: 'unknown', reason: 'assistant_unknown' });
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'pre_dispatch',
+        code: 'workspace_setup_failed',
+        workspaceSubtype: 'git_network_failed',
+      })
+    ).toEqual({ responsibility: 'unknown', reason: 'source_control_network' });
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'pre_dispatch',
+        code: 'workspace_setup_failed',
+        workspaceSubtype: 'git_pack_corrupt',
+      })
+    ).toEqual({ responsibility: 'unknown', reason: 'source_control_network' });
+  });
+
+  it('uses provider ownership for authentication and availability failures', () => {
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: 'provider_authentication',
+        providerOwnership: 'byok',
+      })
+    ).toEqual({ responsibility: 'user', reason: 'provider_authentication' });
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: 'provider_unavailable',
+        providerOwnership: 'managed',
+      })
+    ).toEqual({ responsibility: 'platform', reason: 'managed_provider_unavailable' });
+  });
+
+  it('classifies setup failures from structured stage and code only', () => {
+    expect(
+      classifyCloudAgentFailure({
+        source: 'setup',
+        stage: 'initial_admission',
+        code: 'invalid_initial_intent',
+      })
+    ).toEqual({ responsibility: 'user', reason: 'initial_request_invalid' });
+    expect(
+      classifyCloudAgentFailure({
+        source: 'setup',
+        stage: 'transport',
+        code: 'do_rpc_outcome_unknown',
+      })
+    ).toEqual({ responsibility: 'platform', reason: 'session_coordination' });
   });
 });
 

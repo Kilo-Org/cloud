@@ -1,10 +1,11 @@
+import type Anthropic from '@anthropic-ai/sdk';
+import type OpenAI from 'openai';
 import type {
   GatewayRequest,
   GatewayResponsesRequest,
   OpenCodeSpecificProperties,
   OpenRouterChatCompletionRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import type OpenAI from 'openai';
 
 export function getMaxTokens(request: GatewayRequest) {
   if (request.kind === 'responses') {
@@ -78,6 +79,41 @@ function setCacheControlOnResponsesMessage(message: OpenAI.Responses.ResponseInp
       }
     }
   }
+}
+
+function setCacheControlOnMessagesMessage(
+  message: Anthropic.MessageParam,
+  cacheControl: Anthropic.CacheControlEphemeral
+) {
+  if (typeof message.content === 'string') {
+    message.content = [
+      {
+        type: 'text',
+        text: message.content,
+        cache_control: cacheControl,
+      },
+    ];
+  } else {
+    const lastItem = message.content.findLast(isCacheableMessagesContentBlock);
+    if (lastItem) {
+      lastItem.cache_control = cacheControl;
+    }
+  }
+}
+
+function isCacheableMessagesContentBlock(
+  item: Anthropic.ContentBlockParam
+): item is Exclude<
+  Anthropic.ContentBlockParam,
+  Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam
+> {
+  return item.type !== 'thinking' && item.type !== 'redacted_thinking';
+}
+
+function hasCacheableMessagesContent(message: Anthropic.MessageParam) {
+  return typeof message.content === 'string'
+    ? message.content.length > 0
+    : message.content.some(isCacheableMessagesContentBlock);
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -163,11 +199,16 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   } else if (
     request.kind === 'messages' &&
     request.body.messages.length > 1 &&
-    !request.body.cache_control &&
     !containsCacheControl(request.body.messages)
   ) {
-    console.debug('[addCacheBreakpoints] setting cache breakpoint on messages request');
-    request.body.cache_control = { type: 'ephemeral' };
+    const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
+    if (lastMessage) {
+      console.debug('[addCacheBreakpoints] setting cache breakpoint on last messages message');
+      // Vercel AI Gateway does not honor top-level cache_control on Messages API requests.
+      const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
+      delete request.body.cache_control;
+      setCacheControlOnMessagesMessage(lastMessage, cacheControl);
+    }
   }
 }
 

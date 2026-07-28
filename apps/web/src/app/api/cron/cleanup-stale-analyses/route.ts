@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
+import {
+  buildScheduledJobFailureEvent,
+  buildScheduledJobSuccessEvent,
+  createScheduledJobRun,
+  emitScheduledJobEvent,
+} from '@kilocode/worker-utils/scheduled-job-observability';
 import { cleanupStaleAnalyses } from '@/lib/security-agent/db/security-analysis';
 import { sentryLogger } from '@/lib/utils.server';
-import { CRON_SECRET, SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL } from '@/lib/config.server';
+import { CRON_SECRET } from '@/lib/config.server';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');
@@ -41,6 +47,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const run = createScheduledJobRun({
+    jobName: 'web.cleanup_stale_analyses',
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+  });
+
   try {
     // Execute cleanup - mark analyses running for more than 30 minutes as failed
     const cleanedCount = await cleanupStaleAnalyses(30);
@@ -57,12 +68,13 @@ export async function GET(request: Request) {
       );
     }
 
-    // Send heartbeat to BetterStack on success
-    if (SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL) {
-      await fetch(SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL, {
-        signal: AbortSignal.timeout(5000),
-      }).catch(() => {});
-    }
+    emitScheduledJobEvent(
+      buildScheduledJobSuccessEvent(run, {
+        cleaned_count: cleanedCount,
+        anomaly_threshold: STALE_ANOMALY_THRESHOLD,
+        anomaly_detected: cleanedCount > STALE_ANOMALY_THRESHOLD,
+      })
+    );
 
     return NextResponse.json({
       success: true,
@@ -74,12 +86,7 @@ export async function GET(request: Request) {
       tags: { endpoint: 'cron/cleanup-stale-analyses' },
     });
 
-    // Send failure heartbeat to BetterStack
-    if (SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL) {
-      await fetch(`${SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL}/fail`, {
-        signal: AbortSignal.timeout(5000),
-      }).catch(() => {});
-    }
+    emitScheduledJobEvent(buildScheduledJobFailureEvent(run, error));
 
     return NextResponse.json(
       {

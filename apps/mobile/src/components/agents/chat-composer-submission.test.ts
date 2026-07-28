@@ -18,8 +18,8 @@ function makeCreateSessionSubmission(): ExecutableChatComposerSubmission {
   return { type: 'create-session' };
 }
 
-function makeExitCliSubmission(): ExecutableChatComposerSubmission {
-  return { type: 'exit-cli' };
+function makeExitSessionSubmission(): ExecutableChatComposerSubmission {
+  return { type: 'exit-session' };
 }
 
 function makePromptSubmission(
@@ -40,8 +40,8 @@ function makeHandlers(
   overrides: {
     onSendCommand?: () => Promise<boolean>;
     onCreateSession?: () => Promise<boolean>;
-    onExitCli?: (onAccepted: () => void) => Promise<void>;
-    confirmExitCli?: () => Promise<boolean>;
+    onExitSession?: (onAccepted: () => void) => Promise<void>;
+    confirmExitSession?: () => Promise<boolean>;
     onSendPrompt?: () => Promise<void>;
   } = {}
 ) {
@@ -60,15 +60,15 @@ function makeHandlers(
           return true;
         })
     ),
-    onExitCli: vi.fn(
-      overrides.onExitCli ??
+    onExitSession: vi.fn(
+      overrides.onExitSession ??
         (async onAccepted => {
           await Promise.resolve();
           onAccepted();
         })
     ),
-    confirmExitCli: vi.fn(
-      overrides.confirmExitCli ??
+    confirmExitSession: vi.fn(
+      overrides.confirmExitSession ??
         (async () => {
           await Promise.resolve();
           return true;
@@ -207,20 +207,20 @@ describe('executeChatComposerSubmission', () => {
     });
   });
 
-  describe('exit-cli submission', () => {
+  describe('exit-session submission', () => {
     it('does no cleanup and never exits when confirmation is cancelled', async () => {
       const handlers = makeHandlers({
-        confirmExitCli: async () => {
+        confirmExitSession: async () => {
           await Promise.resolve();
           return false;
         },
       });
       const cleanup = makeCleanup();
 
-      await executeChatComposerSubmission(makeExitCliSubmission(), handlers, cleanup);
+      await executeChatComposerSubmission(makeExitSessionSubmission(), handlers, cleanup);
 
-      expect(handlers.confirmExitCli).toHaveBeenCalledTimes(1);
-      expect(handlers.onExitCli).not.toHaveBeenCalled();
+      expect(handlers.confirmExitSession).toHaveBeenCalledTimes(1);
+      expect(handlers.onExitSession).not.toHaveBeenCalled();
       expect(cleanup.clearDraft).not.toHaveBeenCalled();
       expect(cleanup.dismiss).not.toHaveBeenCalled();
       expect(cleanup.resetAttachments).not.toHaveBeenCalled();
@@ -229,12 +229,12 @@ describe('executeChatComposerSubmission', () => {
     it('awaits confirmation and exit before clearing the draft and dismissing', async () => {
       const order: string[] = [];
       const handlers = makeHandlers({
-        confirmExitCli: async () => {
+        confirmExitSession: async () => {
           order.push('confirm');
           await Promise.resolve();
           return true;
         },
-        onExitCli: async onAccepted => {
+        onExitSession: async onAccepted => {
           order.push('exit');
           await Promise.resolve();
           onAccepted();
@@ -246,16 +246,16 @@ describe('executeChatComposerSubmission', () => {
         dismiss: vi.fn(() => order.push('dismiss')),
       };
 
-      await executeChatComposerSubmission(makeExitCliSubmission(), handlers, cleanup);
+      await executeChatComposerSubmission(makeExitSessionSubmission(), handlers, cleanup);
 
       expect(order).toEqual(['confirm', 'exit', 'clear', 'dismiss']);
-      expect(handlers.onExitCli).toHaveBeenCalledTimes(1);
+      expect(handlers.onExitSession).toHaveBeenCalledTimes(1);
       expect(cleanup.resetAttachments).not.toHaveBeenCalled();
     });
 
     it('preserves the draft and keyboard when confirmed exit fails', async () => {
       const handlers = makeHandlers({
-        onExitCli: async () => {
+        onExitSession: async () => {
           await Promise.resolve();
           throw new Error('CLI is already offline');
         },
@@ -263,10 +263,10 @@ describe('executeChatComposerSubmission', () => {
       const cleanup = makeCleanup();
 
       await expect(
-        executeChatComposerSubmission(makeExitCliSubmission(), handlers, cleanup)
+        executeChatComposerSubmission(makeExitSessionSubmission(), handlers, cleanup)
       ).rejects.toThrow('CLI is already offline');
 
-      expect(handlers.onExitCli).toHaveBeenCalledTimes(1);
+      expect(handlers.onExitSession).toHaveBeenCalledTimes(1);
       expect(cleanup.clearDraft).not.toHaveBeenCalled();
       expect(cleanup.dismiss).not.toHaveBeenCalled();
       expect(cleanup.resetAttachments).not.toHaveBeenCalled();

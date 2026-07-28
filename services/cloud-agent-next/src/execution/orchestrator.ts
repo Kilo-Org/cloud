@@ -18,6 +18,7 @@ import { ExecutionError } from './errors.js';
 import { SessionService } from '../session-service.js';
 import { logger } from '../logger.js';
 import { WrapperError } from '../kilo/wrapper-client.js';
+import { WorkspaceCapacityAdmissionRejectedError } from '../workspace-errors.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
@@ -25,7 +26,11 @@ import {
   getPreparationInfrastructureFailure,
   withPreparationInfrastructureRecovery,
 } from '../sandbox-recovery.js';
-import type { AgentSandbox, WrapperInstanceLease } from '../agent-sandbox/protocol.js';
+import {
+  AgentSandboxUnavailableError,
+  type AgentSandbox,
+  type WrapperInstanceLease,
+} from '../agent-sandbox/protocol.js';
 import { isCodeReviewEphemeralSandboxId } from '../code-review-ephemeral-sandbox.js';
 
 /** Maximum time allowed for complete wrapper readiness, including Kilo startup. */
@@ -53,6 +58,17 @@ function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string)
 
 function translateKnownWrapperFailure(error: unknown): Error | undefined {
   if (error instanceof ExecutionError) return error;
+  // A full workspace disk surfaces here as a raw WorkspaceCapacityAdmissionRejectedError.
+  // Translate it into a workspace_setup_failed / sandbox_storage_full ExecutionError
+  // so it flows through the shared subtype-based classification and gets the
+  // capacity-specific retry backoff instead of being wrapped as a generic
+  // wrapperStartFailed (which would lose its identity and the longer budget).
+  if (error instanceof WorkspaceCapacityAdmissionRejectedError) {
+    return ExecutionError.workspaceSetupFailed(error.message, error, {
+      subtype: 'sandbox_storage_full',
+      retryable: true,
+    });
+  }
   if (!(error instanceof WrapperError)) return undefined;
 
   if (error.code === 'WORKSPACE_SETUP_FAILED') {
@@ -167,6 +183,12 @@ export class ExecutionOrchestrator {
       await this.destroyEphemeralSandboxAfterPreAcceptanceFailure(sandbox, plan, error);
       const knownFailure = translateKnownWrapperFailure(error);
       if (knownFailure) throw knownFailure;
+      if (error instanceof AgentSandboxUnavailableError) {
+        throw ExecutionError.sandboxCapabilityUnavailable(
+          'Sandbox runtime delivery is unavailable for this session',
+          error
+        );
+      }
       throw ExecutionError.wrapperStartFailed(
         `Failed to start wrapper: ${error instanceof Error ? error.message : String(error)}`,
         error

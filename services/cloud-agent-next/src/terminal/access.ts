@@ -1,5 +1,5 @@
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
-import type { AgentSandbox } from '../agent-sandbox/protocol.js';
+import { AgentSandboxUnavailableError, type AgentSandbox } from '../agent-sandbox/protocol.js';
 import type { WrapperHealthResponse, WrapperPty } from '../kilo/wrapper-client.js';
 import type { CloudAgentSessionState, OperationResult } from '../persistence/types.js';
 import type { Env } from '../types.js';
@@ -68,9 +68,20 @@ export async function resolveTerminalWrapperClient(
     return { success: false, error: metadataResult.error };
   }
 
-  const terminal = await deps
-    .createSandbox(params.env, metadataResult.data.metadata)
-    .getRunningTerminalClient();
+  let terminal: Awaited<ReturnType<AgentSandbox['getRunningTerminalClient']>>;
+  try {
+    terminal = await deps
+      .createSandbox(params.env, metadataResult.data.metadata)
+      .getRunningTerminalClient();
+  } catch (error) {
+    if (error instanceof AgentSandboxUnavailableError) {
+      return { success: false, error: error.message };
+    }
+    throw error;
+  }
+  if (terminal.status === 'capability-unavailable') {
+    return { success: false, error: terminal.message };
+  }
   if (terminal.status === 'not-running') {
     return {
       success: false,

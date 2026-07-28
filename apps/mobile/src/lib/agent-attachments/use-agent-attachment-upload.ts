@@ -2,32 +2,32 @@ import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
-import { trpcClient } from '@/lib/trpc';
+import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
-  AGENT_ATTACHMENT_MAX_BYTES,
-  AGENT_ATTACHMENT_MAX_FILES,
-  AGENT_ATTACHMENT_MIME_BY_EXTENSION,
-  type AgentAttachmentExtension,
-} from '@/lib/agent-attachments/constants';
-import { canAddAttachments, classifyAttachment } from '@/lib/agent-attachments/validate';
+  canAddAttachments,
+  classifyAttachment,
+  describeClassificationFailure,
+  mimeForExtension,
+} from '@/lib/agent-attachments/validate';
+import {
+  type AgentAttachment,
+  type AgentAttachmentSubmissionPayload,
+  type AgentAttachmentWire,
+  buildSubmissionPayload,
+  buildWirePayload,
+  classifyUploadFailure,
+  hasAnyFailedAttachment,
+  isAnyAttachmentUploading,
+} from '@/lib/agent-attachments/agent-attachment-types';
+import {
+  describeTerminalReason,
+  measureLocalSize,
+  normalizeFilename,
+  uploadOne,
+} from '@/lib/agent-attachments/upload-task';
 
-export type AgentAttachmentKind = 'image' | 'document';
-export type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'error';
-
-type AllowedContentType = (typeof AGENT_ATTACHMENT_MIME_BY_EXTENSION)[AgentAttachmentExtension];
-
-export type AgentAttachment = {
-  id: string;
-  filename: string;
-  /** Basename of the server-side R2 key; set once the upload succeeds. */
-  remoteFilename?: string;
-  kind: AgentAttachmentKind;
-  mimeType: AllowedContentType;
-  size: number;
-  localUri: string;
-  status: AgentAttachmentStatus;
-  error?: string;
-};
+// Re-export only the types consumers import from this module.
+export type { AgentAttachment, AgentAttachmentSubmissionPayload, AgentAttachmentWire };
 
 export type AgentAttachmentCandidate = {
   name: string;
@@ -36,71 +36,23 @@ export type AgentAttachmentCandidate = {
   size?: number;
 };
 
-export type AgentAttachmentWire = {
-  path: string;
-  files: string[];
-};
-
 type UseAgentAttachmentUploadOptions = {
   organizationId?: string;
 };
 
 type UseAgentAttachmentUploadReturn = {
   attachments: AgentAttachment[];
-  addCandidates: (candidates: AgentAttachmentCandidate[]) => void;
+  addCandidates: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
   removeAttachment: (id: string) => void;
   retryAttachment: (id: string) => void;
   reset: () => void;
   isUploading: boolean;
   hasFailedAttachments: boolean;
+  /** Wire payload for the existing `chat-composer` send path. */
   toWirePayload: () => AgentAttachmentWire | undefined;
+  /** The S2 submission payload. `undefined` when there are no uploads. */
+  toSubmissionPayload: () => AgentAttachmentSubmissionPayload | undefined;
 };
-
-function ensureExtension(name: string, fallback: string): string {
-  const dot = name.lastIndexOf('.');
-  if (dot > 0 && dot < name.length - 1) {
-    return name;
-  }
-  return `${name}.${fallback}`;
-}
-
-async function uploadOne(args: {
-  organizationId?: string;
-  attachmentId: string;
-  path: string;
-  contentType: AllowedContentType;
-  localUri: string;
-}): Promise<{ key: string }> {
-  const { organizationId, attachmentId, path, contentType, localUri } = args;
-  // expo-file-system's `File` is not a `Blob`; materialize a real `Blob` from
-  // the file:// URI so the PUT body matches the signed Content-Length.
-  const localFileResponse = await fetch(localUri);
-  const blob = await localFileResponse.blob();
-  if (blob.size > AGENT_ATTACHMENT_MAX_BYTES) {
-    throw new Error('File is larger than 5 MB');
-  }
-  const baseInput = {
-    messageUuid: path,
-    attachmentId,
-    contentType,
-    contentLength: blob.size,
-  };
-  const result = organizationId
-    ? await trpcClient.organizations.cloudAgentNext.getAttachmentUploadUrl.mutate({
-        ...baseInput,
-        organizationId,
-      })
-    : await trpcClient.cloudAgentNext.getAttachmentUploadUrl.mutate(baseInput);
-  const response = await fetch(result.signedUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': contentType },
-    body: blob,
-  });
-  if (!response.ok) {
-    throw new Error(`Upload failed with status ${response.status}`);
-  }
-  return { key: result.key };
-}
 
 export function useAgentAttachmentUpload(
   options: UseAgentAttachmentUploadOptions = {}
@@ -108,6 +60,7 @@ export function useAgentAttachmentUpload(
   const { organizationId } = options;
   const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
   const pathRef = useRef<string>(Crypto.randomUUID());
+  const messageUuidRef = useRef<string>(Crypto.randomUUID());
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -117,44 +70,62 @@ export function useAgentAttachmentUpload(
     };
   }, []);
 
+  const updateAttachment = useCallback((id: string, patch: Partial<AgentAttachment>) => {
+    if (!isMountedRef.current) {
+      return;
+    }
+    setAttachments(current => current.map(item => (item.id === id ? { ...item, ...patch } : item)));
+  }, []);
+
   const startUpload = useCallback(
     (attachment: AgentAttachment, path: string) => {
-      const update = (patch: Partial<AgentAttachment>) => {
-        if (!isMountedRef.current) {
-          return;
-        }
-        setAttachments(current =>
-          current.map(item => (item.id === attachment.id ? { ...item, ...patch } : item))
-        );
-      };
-
       const run = async () => {
-        update({ status: 'uploading', error: undefined });
+        updateAttachment(attachment.id, {
+          status: 'uploading',
+          error: undefined,
+          terminal: undefined,
+          progress: 0,
+        });
         try {
           const { key } = await uploadOne({
             organizationId,
             attachmentId: attachment.id,
             path,
+            extension: attachment.extension,
             contentType: attachment.mimeType,
+            contentLength: attachment.size,
             localUri: attachment.localUri,
+            onProgress: progress => {
+              updateAttachment(attachment.id, { progress });
+            },
           });
-          // The wire payload must reference the object the server actually
-          // stored, so take the filename from the returned R2 key.
-          update({ status: 'uploaded', remoteFilename: key.split('/').at(-1) });
+          updateAttachment(attachment.id, {
+            status: 'uploaded',
+            remoteFilename: key.split('/').at(-1),
+            progress: 1,
+          });
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'Upload failed';
-          toast.error(`Failed to upload file: ${message}`);
-          update({ status: 'error', error: message });
+          const { retryable, reason } = classifyUploadFailure(error);
+          updateAttachment(attachment.id, {
+            status: 'error',
+            error: retryable ? reason : describeTerminalReason(reason),
+            terminal: !retryable,
+            progress: null,
+          });
+          // Single toast per failed chip. Terminal surfaces its own chip
+          // copy so the toast only needs to echo the same intent.
+          toast.error(
+            retryable ? `Failed to upload file: ${reason}` : describeTerminalReason(reason)
+          );
         }
       };
-
       void run();
     },
-    [organizationId]
+    [organizationId, updateAttachment]
   );
 
   const addCandidates = useCallback(
-    (candidates: AgentAttachmentCandidate[]) => {
+    async (candidates: AgentAttachmentCandidate[]) => {
       if (candidates.length === 0) {
         return;
       }
@@ -170,42 +141,45 @@ export function useAgentAttachmentUpload(
         );
       }
 
+      // We pre-classify synchronously; the *measured* size comes from
+      // `getInfoAsync`. Candidates that the picker reports as zero-size
+      // (common on iOS) are re-measured before the size/empty rule fires.
+      const measured = await Promise.all(
+        accepted.map(async candidate => {
+          const measuredSize = await measureLocalSize(candidate.uri);
+          const size = measuredSize ?? candidate.size ?? 0;
+          return { candidate, size };
+        })
+      );
+
       const additions: AgentAttachment[] = [];
-      for (const candidate of accepted) {
-        const classified = classifyAttachment({
-          name: candidate.name,
-          mimeType: candidate.mimeType,
-          size: candidate.size,
-        });
+      for (const { candidate, size } of measured) {
+        const classified = classifyAttachment({ name: candidate.name, size });
         if (!classified.ok) {
-          toast.error(
-            classified.reason === 'too-large'
-              ? `File too large: ${candidate.name}. Max size is 5 MB.`
-              : `File type not supported: ${candidate.name}. Attach PNG, JPEG, WebP, GIF, PDF, TXT, MD, or CSV files.`
-          );
+          toast.error(describeClassificationFailure(classified.reason));
         } else {
           const ext = classified.extension;
+          const filename = normalizeFilename(candidate.name, ext);
           additions.push({
             id: Crypto.randomUUID(),
-            filename: ensureExtension(candidate.name, ext),
+            filename,
             kind: classified.kind,
-            // Always derive the content type from the extension: OS pickers
-            // report generic types (e.g. application/octet-stream) that the
-            // backend's allowed-type enum rejects.
-            mimeType: AGENT_ATTACHMENT_MIME_BY_EXTENSION[ext],
-            size: candidate.size ?? 0,
+            extension: ext,
+            mimeType: mimeForExtension(ext),
+            size: classified.size,
             localUri: candidate.uri,
             status: 'pending',
+            progress: 0,
           });
         }
       }
       if (additions.length === 0) {
         return;
       }
+      setAttachments(current => [...current, ...additions]);
       for (const addition of additions) {
         startUpload(addition, pathRef.current);
       }
-      setAttachments(current => [...current, ...additions]);
     },
     [attachments.length, startUpload]
   );
@@ -217,7 +191,9 @@ export function useAgentAttachmentUpload(
   const retryAttachment = useCallback(
     (id: string) => {
       const attachment = attachments.find(item => item.id === id);
-      if (!attachment) {
+      if (!attachment || attachment.terminal) {
+        // Terminal chips have no retry affordance; bail so a stray
+        // tap cannot re-upload a server-rejected file.
         return;
       }
       startUpload(attachment, pathRef.current);
@@ -228,23 +204,22 @@ export function useAgentAttachmentUpload(
   const reset = useCallback(() => {
     setAttachments([]);
     pathRef.current = Crypto.randomUUID();
+    messageUuidRef.current = Crypto.randomUUID();
   }, []);
 
-  const toWirePayload = useCallback((): AgentAttachmentWire | undefined => {
-    const files = attachments
-      .filter(item => item.status === 'uploaded')
-      .map(item => item.remoteFilename)
-      .filter((filename): filename is string => filename !== undefined);
-    if (files.length === 0) {
-      return undefined;
-    }
-    return { path: pathRef.current, files };
-  }, [attachments]);
-
-  const isUploading = attachments.some(
-    item => item.status === 'pending' || item.status === 'uploading'
+  const toWirePayload = useCallback(
+    (): AgentAttachmentWire | undefined => buildWirePayload(attachments, pathRef.current),
+    [attachments]
   );
-  const failedAttachments = attachments.some(item => item.status === 'error');
+
+  const toSubmissionPayload = useCallback(
+    (): AgentAttachmentSubmissionPayload | undefined =>
+      buildSubmissionPayload(attachments, pathRef.current, messageUuidRef.current),
+    [attachments]
+  );
+
+  const isUploading = isAnyAttachmentUploading(attachments);
+  const hasFailedAttachments = hasAnyFailedAttachment(attachments);
 
   return useMemo(
     () => ({
@@ -254,8 +229,9 @@ export function useAgentAttachmentUpload(
       retryAttachment,
       reset,
       isUploading,
-      hasFailedAttachments: failedAttachments,
+      hasFailedAttachments,
       toWirePayload,
+      toSubmissionPayload,
     }),
     [
       attachments,
@@ -264,8 +240,9 @@ export function useAgentAttachmentUpload(
       retryAttachment,
       reset,
       isUploading,
-      failedAttachments,
+      hasFailedAttachments,
       toWirePayload,
+      toSubmissionPayload,
     ]
   );
 }

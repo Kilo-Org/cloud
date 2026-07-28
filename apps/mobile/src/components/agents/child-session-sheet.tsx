@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
-import { FlatList, Modal, View } from 'react-native';
-import { type ChildSessionHydrationState, type StoredMessage } from 'cloud-agent-sdk';
+import { Modal, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { type ChildSessionHydrationState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -14,23 +15,30 @@ import {
 } from './child-session-section';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { getChildSessionSheetState } from './child-session-sheet-state';
+import { SessionMessageList } from './session-message-list';
+import { WorkingIndicator } from './working-indicator';
 
 type ChildSessionSheetProps = {
   sessionId: string;
   title: string;
   getChildMessages: (sessionId: string) => StoredMessage[];
   hydrationState: ChildSessionHydrationState;
+  isStreaming: boolean;
   renderPart: RenderPartFn;
   onOpenChildSession: OpenChildSession;
   onRetry: () => void;
   onClose: () => void;
 };
 
+// eslint-disable-next-line no-empty-function -- child sessions are hydrated one-shot, no pagination
+function noopLoadOlder(): void {}
+
 export function ChildSessionSheet({
   sessionId,
   title,
   getChildMessages,
   hydrationState,
+  isStreaming,
   renderPart,
   onOpenChildSession,
   onRetry,
@@ -38,13 +46,25 @@ export function ChildSessionSheet({
 }: Readonly<ChildSessionSheetProps>) {
   const messages = getChildMessages(sessionId);
   const state = getChildSessionSheetState(hydrationState, messages.length);
+  // Safe-area context can return 0 inside a RN `Modal` (pageSheet doesn't
+  // always propagate the home-indicator inset), so we floor the value with
+  // a comfortable constant to keep the last row / working indicator clear
+  // of the home indicator on curved-bottom devices.
+  const insets = useSafeAreaInsets();
+  const sheetBottomInset = Math.max(insets.bottom, 16);
   let content: ReactNode = null;
 
   if (state === 'content') {
     content = (
-      <FlatList
-        data={messages}
+      <SessionMessageList
+        sessionId={sessionId}
+        items={messages}
         keyExtractor={message => message.info.id}
+        hasOlderMessages={false}
+        isLoadingOlderMessages={false}
+        olderMessagesError={null}
+        olderMessagesOmittedItemCount={0}
+        onLoadOlderMessages={noopLoadOlder}
         renderItem={({ item }) => (
           <MessageErrorBoundary>
             <View className="px-4 py-1">
@@ -58,7 +78,8 @@ export function ChildSessionSheet({
             </View>
           </MessageErrorBoundary>
         )}
-        contentContainerClassName="py-2"
+        ListFooterComponent={<WorkingIndicator messages={messages} isStreaming={isStreaming} />}
+        contentBottomInset={sheetBottomInset}
       />
     );
   } else if (state === 'error') {

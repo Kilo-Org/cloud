@@ -39,8 +39,13 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   openRouterToVercelInferenceProviderId,
-  VercelUserByokInferenceProviderIdSchema,
+  VercelInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  applyFreeEndpointDataPolicy,
+  getOpenRouterFreeEndpoints,
+} from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -113,7 +118,7 @@ async function fetchGatewayModels(gateway: Provider) {
 async function fetchProviders(): Promise<OpenRouterProvider[]> {
   console.log('Fetching OpenRouter providers from frontend endpoint...');
 
-  const response = await fetch(`https://openrouter.ai/api/frontend/all-providers`, {
+  const response = await fetch(`https://openrouter.ai/api/frontend/v1/all-providers`, {
     method: 'GET',
     headers: ATTRIBUTION_HEADERS,
   });
@@ -176,7 +181,7 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-function injectExtraUserByokModels(
+function injectExtraProviderModels(
   vercelModels: Record<string, StoredModel>,
   providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>
 ) {
@@ -194,15 +199,13 @@ function injectExtraUserByokModels(
       vercelModel.endpoints
         .map(
           endpoint =>
-            VercelUserByokInferenceProviderIdSchema.safeParse(
-              endpoint.provider_name ?? endpoint.tag
-            ).data
+            VercelInferenceProviderIdSchema.safeParse(endpoint.provider_name ?? endpoint.tag).data
         )
         .filter(p => p !== undefined)
     );
 
     for (const providerData of providerModelData) {
-      const vercelProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(
+      const vercelProviderId = VercelInferenceProviderIdSchema.safeParse(
         openRouterToVercelInferenceProviderId(providerData.provider.slug)
       ).data;
       const endpoint = vercelModel.endpoints.find(e => e.provider_name === vercelProviderId);
@@ -225,7 +228,7 @@ function injectExtraUserByokModels(
           },
         };
         console.warn(
-          '[injectExtraUserByokModels] Adding missing model to user byok provider %s: %s',
+          '[injectExtraProviderModels] Adding missing model to provider %s: %s',
           providerData.provider.name,
           m.name
         );
@@ -267,8 +270,9 @@ async function syncProviders(
       })
     )
   );
+  const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(providerModelData);
 
-  injectExtraUserByokModels(vercelModels, providerModelData);
+  injectExtraProviderModels(vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {
@@ -297,6 +301,10 @@ async function syncProviders(
               prompt: model.pricing.prompt,
               completion: model.pricing.completion,
             },
+            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
+              !isForbiddenFreeModel(kfm.public_id) && {
+                data_policy: { training: true, retainsPrompts: true },
+              }),
           },
         },
         provider: inferenceProvider,
@@ -314,6 +322,12 @@ async function syncProviders(
       providerData.models.splice(0, 0, extraModel.model);
     }
   }
+
+  applyFreeEndpointDataPolicy({
+    providerModelData,
+    openRouterFreeEndpoints,
+    kiloExclusiveModels,
+  });
 
   // Filter out providers with no models
   const filteredProviderModelData = providerModelData.filter(data => data.models.length > 0);

@@ -14,7 +14,7 @@ import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decisi
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
+import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
 
 jest.mock('next/server', () => {
   return {
@@ -55,9 +55,13 @@ jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   getToolsAvailable: jest.fn(() => false),
   getToolsUsed: jest.fn(() => false),
 }));
-jest.mock('@/lib/ai-gateway/handleRequestLogging', () => ({
-  handleRequestLogging: jest.fn(),
-}));
+jest.mock('@/lib/rewriteModelResponse', () => {
+  const actual = jest.requireActual('@/lib/rewriteModelResponse');
+  return {
+    ...actual,
+    rewriteModelResponse: jest.fn(async () => null),
+  };
+});
 jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
   return {
@@ -96,7 +100,7 @@ const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision)
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
-const mockedHandleRequestLogging = jest.mocked(handleRequestLogging);
+const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
 
 const provider = {
   id: 'openrouter',
@@ -193,9 +197,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set(['stepfun/step-3.7-flash:free']));
-    mockedUpstreamRequest.mockResolvedValue(
-      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
-    );
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
+    });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
@@ -254,7 +259,11 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     );
 
     expect(response.status).toBe(200);
-    expect(mockedHandleRequestLogging).toHaveBeenCalledWith(
+    expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
       expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' })
     );
   });
@@ -447,9 +456,14 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
-    mockedUpstreamRequest.mockResolvedValue(
-      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'anthropic/claude-haiku-4', choices: [] })
-    );
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({
+        id: 'chatcmpl-1',
+        model: 'anthropic/claude-haiku-4',
+        choices: [],
+      }),
+    });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedLogMicrodollarUsage.mockResolvedValue(null);
@@ -724,9 +738,10 @@ describe('auto-routing shadow classifier', () => {
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
-    mockedUpstreamRequest.mockResolvedValue(
-      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
-    );
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
+    });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedApplyResolvedAutoModel.mockImplementation(async (_opts, request) => {

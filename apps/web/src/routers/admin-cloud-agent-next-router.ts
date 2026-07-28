@@ -3,10 +3,16 @@ import { db } from '@/lib/drizzle';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
 import { and, desc, eq, gte, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
+import {
+  CloudAgentFailureReasonSchema,
+  CloudAgentFailureResponsibilitySchema,
+  type CloudAgentFailureResponsibility,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 
 const MAX_INTERVAL_MS = 90 * 24 * 60 * 60 * 1000;
 const HEALTH_ERROR_SESSION_LIMIT = 100;
 const healthErrorSourceSchema = z.enum(['setup', 'run']);
+const healthResponsibilityFilterSchema = z.enum(['all', 'platform', 'user', 'unknown']);
 const intervalShape = { startDate: z.string().datetime(), endDate: z.string().datetime() };
 
 function hasAscendingInterval(input: { startDate: string; endDate: string }) {
@@ -18,7 +24,7 @@ function hasBoundedInterval(input: { startDate: string; endDate: string }) {
 }
 
 const HealthOverviewFilterSchema = z
-  .object({ ...intervalShape })
+  .object({ ...intervalShape, responsibility: healthResponsibilityFilterSchema.default('all') })
   .refine(input => hasAscendingInterval(input), {
     message: 'Start date must be before end date',
     path: ['endDate'],
@@ -33,6 +39,8 @@ const HealthErrorSessionsFilterSchema = z
     source: healthErrorSourceSchema,
     stage: z.string().trim().min(1).max(100),
     code: z.string().trim().min(1).max(100),
+    responsibility: CloudAgentFailureResponsibilitySchema,
+    reason: CloudAgentFailureReasonSchema,
   })
   .refine(input => hasAscendingInterval(input), {
     message: 'Start date must be before end date',
@@ -76,8 +84,15 @@ type HealthError = {
   source: 'setup' | 'run';
   stage: string;
   code: string;
+  responsibility: CloudAgentFailureResponsibility;
+  reason: z.infer<typeof CloudAgentFailureReasonSchema>;
   count: number;
 };
+
+function failureRate(failures: number, completed: number): number | null {
+  const denominator = failures + completed;
+  return denominator === 0 ? null : failures / denominator;
+}
 
 export const adminCloudAgentNextRouter = createTRPCRouter({
   getHealthOverview: adminProcedure.input(HealthOverviewFilterSchema).query(async ({ input }) => {
@@ -85,12 +100,27 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
     const sessionCode = sql<string>`COALESCE(${cloud_agent_sessions.failure_code}, 'unclassified')`;
     const runStage = sql<string>`COALESCE(${cloud_agent_session_runs.failure_stage}, 'unknown')`;
     const runCode = sql<string>`COALESCE(${cloud_agent_session_runs.failure_code}, 'unclassified')`;
+    const sessionResponsibility = sql<CloudAgentFailureResponsibility>`COALESCE(${cloud_agent_sessions.failure_responsibility}, 'unknown')`;
+    const sessionReason = sql<
+      z.infer<typeof CloudAgentFailureReasonSchema>
+    >`COALESCE(${cloud_agent_sessions.failure_reason}, 'unclassified')`;
+    const runResponsibility = sql<CloudAgentFailureResponsibility>`COALESCE(${cloud_agent_session_runs.failure_responsibility}, 'unknown')`;
+    const runReason = sql<
+      z.infer<typeof CloudAgentFailureReasonSchema>
+    >`COALESCE(${cloud_agent_session_runs.failure_reason}, 'unclassified')`;
+    const selectedRunResponsibility =
+      input.responsibility === 'all'
+        ? undefined
+        : sql`${runResponsibility} = ${input.responsibility}`;
     const [summaryRows, setupRows, runErrorRows] = await Promise.all([
       db
         .select({
           completed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'completed')`,
           failed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed')`,
           interrupted: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'interrupted')`,
+          platformFailures: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed' AND ${runResponsibility} = 'platform')`,
+          userFailures: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed' AND ${runResponsibility} = 'user')`,
+          unknownFailures: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed' AND ${runResponsibility} = 'unknown')`,
         })
         .from(cloud_agent_session_runs)
         .innerJoin(
@@ -105,6 +135,8 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
         .select({
           stage: sessionStage,
           code: sessionCode,
+          responsibility: sessionResponsibility,
+          reason: sessionReason,
           count: sql<number>`COUNT(*)`,
         })
         .from(cloud_agent_sessions)
@@ -116,10 +148,16 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
             retainedSessionCondition()
           )
         )
-        .groupBy(sessionStage, sessionCode)
-        .orderBy(sessionStage, sessionCode),
+        .groupBy(sessionStage, sessionCode, sessionResponsibility, sessionReason)
+        .orderBy(sessionStage, sessionCode, sessionResponsibility, sessionReason),
       db
-        .select({ stage: runStage, code: runCode, count: sql<number>`COUNT(*)` })
+        .select({
+          stage: runStage,
+          code: runCode,
+          responsibility: runResponsibility,
+          reason: runReason,
+          count: sql<number>`COUNT(*)`,
+        })
         .from(cloud_agent_session_runs)
         .innerJoin(
           cloud_agent_sessions,
@@ -131,10 +169,11 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
         .where(
           and(
             eq(cloud_agent_session_runs.status, 'failed'),
+            selectedRunResponsibility,
             ...terminalRunIntervalConditions(input)
           )
         )
-        .groupBy(runStage, runCode),
+        .groupBy(runStage, runCode, runResponsibility, runReason),
     ]);
     const row = summaryRows[0];
     const summary = {
@@ -142,12 +181,23 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
       failedRuns: count(row?.failed),
       interruptedRuns: count(row?.interrupted),
       setupFailures: 0,
+      platformFailures: count(row?.platformFailures),
+      userFailures: count(row?.userFailures),
+      unknownFailures: count(row?.unknownFailures),
+      platformFailureRate: null as number | null,
+      allFailureRate: null as number | null,
     };
     const setupErrorsByCode = new Map<string, HealthError>();
     for (const setupRow of setupRows) {
       const occurrences = count(setupRow.count);
       summary.setupFailures += occurrences;
-      const key = `${setupRow.stage}:${setupRow.code}`;
+      if (setupRow.responsibility === 'platform') summary.platformFailures += occurrences;
+      else if (setupRow.responsibility === 'user') summary.userFailures += occurrences;
+      else summary.unknownFailures += occurrences;
+      if (input.responsibility !== 'all' && setupRow.responsibility !== input.responsibility) {
+        continue;
+      }
+      const key = `${setupRow.responsibility}:${setupRow.reason}:${setupRow.stage}:${setupRow.code}`;
       const existingError = setupErrorsByCode.get(key);
       if (existingError) {
         existingError.count += occurrences;
@@ -156,6 +206,8 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
           source: 'setup',
           stage: setupRow.stage,
           code: setupRow.code,
+          responsibility: setupRow.responsibility,
+          reason: setupRow.reason,
           count: occurrences,
         });
       }
@@ -168,6 +220,8 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
             source: 'run',
             stage: runRow.stage,
             code: runRow.code,
+            responsibility: runRow.responsibility,
+            reason: runRow.reason,
             count: count(runRow.count),
           }) satisfies HealthError
       ),
@@ -177,9 +231,15 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
           right.count - left.count ||
           left.source.localeCompare(right.source) ||
           left.stage.localeCompare(right.stage) ||
-          left.code.localeCompare(right.code)
+          left.code.localeCompare(right.code) ||
+          left.reason.localeCompare(right.reason)
       )
       .slice(0, 10);
+    summary.platformFailureRate = failureRate(summary.platformFailures, summary.completedRuns);
+    summary.allFailureRate = failureRate(
+      summary.failedRuns + summary.setupFailures,
+      summary.completedRuns
+    );
     return { summary, topErrors };
   }),
 
@@ -188,8 +248,10 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
     .query(async ({ input }) => {
       if (input.source === 'setup') {
         const where = and(
-          sql`${cloud_agent_sessions.failure_stage} = ${input.stage}`,
-          sql`${cloud_agent_sessions.failure_code} = ${input.code}`,
+          sql`COALESCE(${cloud_agent_sessions.failure_stage}, 'unclassified') = ${input.stage}`,
+          sql`COALESCE(${cloud_agent_sessions.failure_code}, 'unclassified') = ${input.code}`,
+          sql`COALESCE(${cloud_agent_sessions.failure_responsibility}, 'unknown') = ${input.responsibility}`,
+          sql`COALESCE(${cloud_agent_sessions.failure_reason}, 'unclassified') = ${input.reason}`,
           isNotNull(cloud_agent_sessions.failure_at),
           gte(cloud_agent_sessions.failure_at, input.startDate),
           lt(cloud_agent_sessions.failure_at, input.endDate),
@@ -244,6 +306,8 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
       const where = and(
         eq(cloud_agent_session_runs.status, 'failed'),
         selectedFailureCondition,
+        sql`COALESCE(${cloud_agent_session_runs.failure_responsibility}, 'unknown') = ${input.responsibility}`,
+        sql`COALESCE(${cloud_agent_session_runs.failure_reason}, 'unclassified') = ${input.reason}`,
         ...terminalRunIntervalConditions(input)
       );
       const latestOccurredAt = sql<string>`MAX(${cloud_agent_session_runs.terminal_at})`;

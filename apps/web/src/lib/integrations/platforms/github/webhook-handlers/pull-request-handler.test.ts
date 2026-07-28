@@ -12,6 +12,7 @@ const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
 const mockAddReactionToPR = jest.fn();
 const mockIsMergeCommit = jest.fn();
+const mockIsCouncilEntitledForOwner = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: (organizationId: string, botType: string) =>
@@ -21,6 +22,10 @@ jest.mock('@/lib/bot-users/bot-user-service', () => ({
 jest.mock('@/lib/agent-config/db/agent-configs', () => ({
   getAgentConfigForOwner: (owner: unknown, agentType: string, platform: string) =>
     mockGetAgentConfigForOwner(owner, agentType, platform),
+}));
+
+jest.mock('@/lib/code-reviews/core/council-entitlement', () => ({
+  isCouncilEntitledForOwner: (...args: unknown[]) => mockIsCouncilEntitledForOwner(...args),
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
@@ -77,7 +82,7 @@ function pullRequestPayload(overrides: Partial<PullRequestPayload> = {}): PullRe
       state: 'open',
       draft: false,
       html_url: 'https://github.com/acme/widgets/pull/42',
-      user: { id: 111, login: 'alice', avatar_url: 'https://example.com/a.png' },
+      user: { id: 111, login: 'alice', avatar_url: 'https://example.com/a.png', type: 'User' },
       head: { sha: 'abc123', ref: 'feature/widgets', repo: { full_name: 'acme/widgets' } },
       base: { sha: 'def456', ref: 'main' },
     },
@@ -117,6 +122,7 @@ beforeEach(() => {
   mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
   mockAddReactionToPR.mockResolvedValue(undefined);
   mockIsMergeCommit.mockResolvedValue(false);
+  mockIsCouncilEntitledForOwner.mockResolvedValue(false);
 });
 
 describe('resolvePullRequestCheckoutRef', () => {
@@ -166,7 +172,9 @@ describe('resolvePullRequestCheckoutRef', () => {
     });
   });
 
-  it('uses refs/pull/<number>/head when head.repo is missing', () => {
+  it('treats a missing head.repo as a fork PR (deleted fork fails closed)', () => {
+    // A same-repo PR always carries head.repo, so a null one can only be a fork whose repo was
+    // deleted after opening. It must resolve to isForkPr: true so the council fork-exclusion holds.
     const result = resolvePullRequestCheckoutRef({
       pull_request: {
         number: 789,
@@ -181,7 +189,7 @@ describe('resolvePullRequestCheckoutRef', () => {
 
     expect(result).toEqual({
       checkoutRef: 'refs/pull/789/head',
-      isForkPr: false,
+      isForkPr: true,
       headRepoFullName: null,
     });
   });
@@ -283,6 +291,255 @@ describe('handlePullRequest', () => {
       { status: 'completed', conclusion: 'cancelled' },
       'standard'
     );
+  });
+
+  describe('automated council review type', () => {
+    const councilConfig = {
+      is_enabled: true,
+      config: {
+        council: {
+          enabled: true,
+          aggregation_strategy: 'unanimous',
+          specialists: [
+            {
+              id: 'security',
+              role: 'security',
+              name: 'Security',
+              enabled: true,
+              required: false,
+              lens: 'x',
+            },
+            {
+              id: 'performance',
+              role: 'performance',
+              name: 'Performance',
+              enabled: true,
+              required: false,
+              lens: 'y',
+            },
+          ],
+        },
+        // Repo 123 (acme/widgets, from pullRequestPayload) opted into council.
+        council_enabled_repository_ids: [123],
+        // Review bot PRs so the council bot-exclusion test reaches the council decision; the
+        // feature-level bot skip (default on) would otherwise drop bot PRs before this point.
+        skip_bot_pull_requests: false,
+      },
+    };
+
+    it('creates a council review when entitled + council active + repo opted in', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'council', repoFullName: 'acme/widgets' })
+      );
+    });
+
+    it('falls back to standard when the repo has not opted into council (entitlement not queried)', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({
+        ...councilConfig,
+        config: { ...councilConfig.config, council_enabled_repository_ids: [999] },
+      });
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+      // Entitlement is only looked up when the repo opted in + council is active.
+      expect(mockIsCouncilEntitledForOwner).not.toHaveBeenCalled();
+    });
+
+    it('falls back to standard when the org is not council-entitled', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(false);
+
+      await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+      expect(mockIsCouncilEntitledForOwner).toHaveBeenCalled();
+    });
+
+    it('hard-excludes a bot-authored PR from council (downgrades to standard)', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+    });
+
+    it('hard-excludes a fork PR from council (downgrades to standard)', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      // Head repo differs from the base repo → resolvePullRequestCheckoutRef marks it a fork PR.
+      const payload = pullRequestPayload();
+      payload.pull_request.head.repo = { full_name: 'contributor/widgets' };
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+    });
+
+    it('hard-excludes a fork PR whose fork was deleted (null head.repo) from council', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      // GitHub nulls head.repo when the contributor deletes their fork; this must still be a fork.
+      const payload = pullRequestPayload();
+      payload.pull_request.head.repo = null;
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+    });
+
+    const labelGatedConfig = {
+      ...councilConfig,
+      config: {
+        ...councilConfig.config,
+        council: { ...councilConfig.config.council, required_labels: ['council'] },
+      },
+    };
+
+    it('runs council when the required-label gate is satisfied', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(labelGatedConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.labels = [{ name: 'Council' }]; // case-insensitive match
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'council' })
+      );
+    });
+
+    it('downgrades to standard when the required label is missing', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(labelGatedConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.labels = [{ name: 'bug' }];
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+    });
+  });
+
+  describe('bot pull request guardrail', () => {
+    it('skips a bot-authored PR by default (skip_bot_pull_requests unset) and creates no review', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ message: 'Skipped bot-authored PR' });
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    });
+
+    it('still cancels a superseded review and resolves its stale check run before skipping a bot PR', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      // A prior in-flight review (from before the skip was enabled) superseded by this bot push.
+      mockCancelSupersededReviewsForPR.mockResolvedValue([
+        {
+          id: 'queued-review',
+          prevStatus: 'queued',
+          sessionId: 'session-queued',
+          latestActiveAttemptId: 'queued-attempt',
+          checkRunId: 555,
+          headSha: 'old-sha',
+          platform: 'github',
+          platformProjectId: null,
+          platformIntegrationId: 'integration-1',
+        },
+      ]);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      // The bot PR is still skipped (no new review)...
+      expect(response.status).toBe(200);
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      // ...but the stale review is cancelled and its check run resolved, so the PR isn't left stuck.
+      expect(mockCancelSupersededReviewsForPR).toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        '98765',
+        'acme',
+        'widgets',
+        555,
+        expect.objectContaining({ status: 'completed', conclusion: 'cancelled' }),
+        'standard'
+      );
+    });
+
+    it('routes a bot PR with a merge-commit head through skip, not merge-commit migration', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      // A non-bot PR here would hit the merge-commit path (step 4) and return 'Skipped merge commit'.
+      mockIsMergeCommit.mockResolvedValue(true);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      // The bot-skip decision defers step 4, so the PR is skipped as a bot PR (not re-pointed to a
+      // new SHA with a fresh check run by migrateInFlightReviewsToMergeCommitHead).
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ message: 'Skipped bot-authored PR' });
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    });
+
+    it('reviews a bot-authored PR when skip_bot_pull_requests is false', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({
+        is_enabled: true,
+        config: { skip_bot_pull_requests: false },
+      });
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalled();
+    });
+
+    it('reviews a non-bot PR while the guardrail is on', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+
+      await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalled();
+    });
   });
 
   it('cancels superseded DB rows, interrupts queued/running only, and creates the new review', async () => {

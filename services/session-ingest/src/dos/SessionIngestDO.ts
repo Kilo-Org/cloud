@@ -3,7 +3,9 @@ import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull } from '
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
-import { ingestItems, ingestMeta } from '../db/sqlite-schema';
+import { getWorkerDb } from '@kilocode/db/client';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
@@ -36,6 +38,7 @@ import {
   readKiloSdkSessionSnapshot,
   type KiloSdkSessionSnapshotRead,
 } from './kilo-sdk-materialization';
+import { resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -192,6 +195,9 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const lifecycleEvents: IngestLifecycleEvent[] = [];
     const orphanedR2Keys: string[] = [];
+    // §4.10: in-batch {notificationId -> message} so the post-loop signal builder can
+    // re-emit on replay without re-reading item_data from SQLite.
+    const pendingAgentNotifications = new Map<string, string>();
 
     for (const item of payload) {
       const { item_id, item_type } = getItemIdentity(item);
@@ -248,6 +254,35 @@ export class SessionIngestDO extends DurableObject<Env> {
           },
         })
         .run();
+
+      // §4.10: agent_notification items carry no state transition, so the DO durably tracks
+      // per-identity dispatch state alongside the item. Insert-if-absent keeps replays from
+      // re-arming an already-pending identity; the row is only flipped to `dispatched` after
+      // the caller reports a terminal local decision. The ingest response will emit the
+      // signal below whenever this row's state is `pending`.
+      if (item.type === 'agent_notification') {
+        const identity = `agent_notification/${item.data.id}`;
+        const inserted = this.db
+          .insert(agentNotificationDispatch)
+          .values({ identity, state: 'pending', created_at: Date.now() })
+          .onConflictDoNothing({ target: agentNotificationDispatch.identity })
+          .returning({ state: agentNotificationDispatch.state })
+          .get();
+        // Insert-if-absent: only a fresh row (returning populated) is `pending` for this batch.
+        // A replay where the row was already `dispatched` must not re-emit the signal.
+        if (inserted) {
+          pendingAgentNotifications.set(item.data.id, item.data.message);
+        } else {
+          const existing = this.db
+            .select({ state: agentNotificationDispatch.state })
+            .from(agentNotificationDispatch)
+            .where(eq(agentNotificationDispatch.identity, identity))
+            .get();
+          if (existing?.state === 'pending') {
+            pendingAgentNotifications.set(item.data.id, item.data.message);
+          }
+        }
+      }
 
       for (const extractor of INGEST_META_EXTRACTORS) {
         const maybeValue = extractor.extract(item);
@@ -347,11 +382,35 @@ export class SessionIngestDO extends DurableObject<Env> {
       });
     }
 
+    // §4.10: include the agent_notification signal in the ingest response WHENEVER the
+    // identity's state is `pending` — fresh insert or replay alike. The caller flips the
+    // state to `dispatched` after a terminal local decision; only a thrown RPC/transport
+    // error leaves the marker `pending` so a subsequent replay can re-emit.
+    for (const [notificationId, message] of pendingAgentNotifications) {
+      attentionSignals.push({ kind: 'agent_notification', notificationId, message });
+    }
+
     return {
       accepted: true,
       changes,
       attentionSignals,
     };
+  }
+
+  /**
+   * Flip a pending `agent_notification` dispatch identity to `dispatched`. Idempotent.
+   * Called by the dispatching caller (queue-consumer / direct-ingest) at the post-commit
+   * dispatch boundary once the attempt reaches a terminal local decision. A thrown
+   * upstream RPC/transport error must NOT reach this call — leaving the row `pending`
+   * is what allows a future replay to re-emit the signal.
+   */
+  markAgentNotificationDispatched(notificationId: string): void {
+    const identity = `agent_notification/${notificationId}`;
+    this.db
+      .update(agentNotificationDispatch)
+      .set({ state: 'dispatched' })
+      .where(eq(agentNotificationDispatch.identity, identity))
+      .run();
   }
 
   /**
@@ -362,7 +421,7 @@ export class SessionIngestDO extends DurableObject<Env> {
    * CLI reconnects and UserConnectionDO evictions can't re-arm it. Push
    * failures are non-fatal: log and move on.
    */
-  claimSessionReadyPush(kiloUserId: string, sessionId: string): void {
+  claimSessionReadyPush(kiloUserId: string, sessionId: string, title?: string): void {
     const deletedRow = this.db
       .select({ value: ingestMeta.value })
       .from(ingestMeta)
@@ -380,6 +439,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       this.env.NOTIFICATIONS.sendSessionReadyNotification({
         userId: kiloUserId,
         cliSessionId: sessionId,
+        title,
       }).catch((error: unknown) => {
         console.error('Failed to send session-ready push (non-fatal)', {
           sessionId,
@@ -387,6 +447,15 @@ export class SessionIngestDO extends DurableObject<Env> {
         });
       })
     );
+  }
+
+  /**
+   * Clear a stored attention status when the owning CLI disconnects.
+   * Metadata owner entry point — UserConnectionDO has no Postgres write path.
+   * Attention check and conditional write live in `resetAttentionStatusOnCliDisconnect`.
+   */
+  async resetAttentionStatusOnCliDisconnect(kiloUserId: string, sessionId: string): Promise<void> {
+    await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
   }
 
   /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
@@ -633,6 +702,31 @@ export class SessionIngestDO extends DurableObject<Env> {
       } catch {
         // Best-effort: skip model on parse errors.
       }
+    }
+
+    // Best-effort persist the per-session total cost to Postgres so the session
+    // list can surface it. Runs before the O11Y RPC so an analytics failure cannot
+    // skip it. Failures are logged and swallowed — must never break metrics emission.
+    try {
+      if (Number.isFinite(metrics.totalCost)) {
+        const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));
+        await getWorkerDb(this.env.HYPERDRIVE.connectionString)
+          .update(cli_sessions_v2)
+          .set({ total_cost_microdollars: totalCostMicrodollars })
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+            )
+          );
+      }
+    } catch (error) {
+      console.error('SessionIngestDO failed to persist session total cost', {
+        sessionId,
+        kiloUserId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
 
     await this.env.O11Y.ingestSessionMetrics({

@@ -6,18 +6,23 @@ import { CloudflareAgentSandbox } from './cloudflare/cloudflare-agent-sandbox.js
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 
-function metadata(): SessionMetadata {
+function metadata(provider?: 'cloudflare'): SessionMetadata {
   return {
     metadataSchemaVersion: 2,
     identity: { sessionId: 'agent_sandbox', userId: 'user_sandbox' },
     auth: {},
-    workspace: { sandboxId: 'ses-abcdef' },
+    workspace: { sandboxId: 'ses-abcdef', ...(provider ? { sandboxProvider: provider } : {}) },
     lifecycle: { version: 1, timestamp: 1 },
   };
 }
 
-describe('AgentSandbox factory', () => {
-  it('constructs the Cloudflare runtime adapter', () => {
-    expect(createAgentSandbox({} as Env, metadata())).toBeInstanceOf(CloudflareAgentSandbox);
-  });
+describe('AgentSandbox provider factory', () => {
+  it.each([undefined, 'cloudflare'] as const)(
+    'resolves %s metadata to the Cloudflare runtime adapter',
+    provider => {
+      expect(createAgentSandbox({} as Env, metadata(provider))).toBeInstanceOf(
+        CloudflareAgentSandbox
+      );
+    }
+  );
 });

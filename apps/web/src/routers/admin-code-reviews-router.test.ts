@@ -341,6 +341,147 @@ describe('adminCodeReviewsRouter', () => {
     expect(exportRows[0]).toHaveProperty('attempt_status');
   });
 
+  it('buckets sandbox capacity and delivery failures instead of Other', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(700),
+        terminalReason: 'workspace_capacity',
+        errorMessage: 'Workspace setup failed: sandbox storage full',
+      }),
+      // terminal_reason is authoritative and must win over the generic '%404%'
+      // branch that this admission-rejected message would otherwise match.
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(705),
+        terminalReason: 'workspace_capacity',
+        errorMessage: 'Workspace admission rejected: 404 MB available below 2048 MB threshold',
+      }),
+      // Orchestrator session-start path: reports capacity as terminal_reason
+      // 'sandbox_error' with a "(500)" message. The capacity message match must
+      // win over the generic '%500%' Upstream Server Error branch.
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(707),
+        terminalReason: 'sandbox_error',
+        errorMessage:
+          'initiate failed (500): Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup',
+      }),
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(710),
+        errorMessage: 'The message could not be delivered',
+      }),
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
+
+    expect(errors.categories).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: 'Sandbox Capacity', count: 3 }),
+        expect.objectContaining({ category: 'Delivery Failure', count: 1 }),
+      ])
+    );
+    const categoryNames = errors.categories.map(category => category.category);
+    expect(categoryNames).not.toContain('Other');
+    expect(categoryNames).not.toContain('Not Found');
+    expect(categoryNames).not.toContain('Upstream Server Error');
+  });
+
+  // The status-code branches used bare substring matches ('%429%', '%500%'),
+  // so any digits embedded in an id, byte count or duration were bucketed as an
+  // HTTP failure. These rows carry no terminal_reason, so they exercise the
+  // message fallback directly.
+  it('does not treat embedded digits as HTTP status codes', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(800),
+        errorMessage: 'Upload finished after 4290 ms',
+      }),
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(805),
+        errorMessage: 'Agent processed 5000 items',
+      }),
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(810),
+        errorMessage: 'Reference req_4045 was rejected',
+      }),
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const categoryNames = (
+      await caller.admin.codeReviews.getErrorAnalysis(filterInput())
+    ).categories.map(category => category.category);
+
+    expect(categoryNames).not.toContain('Rate Limited');
+    expect(categoryNames).not.toContain('Upstream Server Error');
+    expect(categoryNames).not.toContain('Not Found');
+  });
+
+  it('still buckets genuine HTTP status codes', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(820),
+        errorMessage: 'Provider returned HTTP 429',
+      }),
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(825),
+        errorMessage: 'Upstream responded with (503)',
+      }),
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
+
+    expect(errors.categories).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: 'Rate Limited', count: 1 }),
+        expect.objectContaining({ category: 'Upstream Server Error', count: 1 }),
+      ])
+    );
+  });
+
+  it('matches rate limit text regardless of case', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(830),
+        errorMessage: 'RATE LIMIT exceeded for this key',
+      }),
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
+
+    expect(errors.categories).toEqual(
+      expect.arrayContaining([expect.objectContaining({ category: 'Rate Limited', count: 1 })])
+    );
+  });
+
   it('classifies final model-not-found outcomes as cancellations instead of failures', async () => {
     const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
 

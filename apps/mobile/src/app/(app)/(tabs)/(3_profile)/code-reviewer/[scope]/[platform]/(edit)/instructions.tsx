@@ -26,6 +26,10 @@ function InstructionsEditor({
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="gap-4">
+      <Text className="text-sm text-muted-foreground">
+        Custom Instructions is planned for deprecation. Move these guidelines into a REVIEW.md file
+        in your repository instead.
+      </Text>
       <TextInput
         className="h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
         multiline

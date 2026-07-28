@@ -7,6 +7,7 @@ import { openExternalUrl } from '@/lib/external-link';
 
 import {
   buildChatLinkActionSheet,
+  buildPrLinkTapActionSheet,
   getSelectedChatLinkAction,
   performChatLinkAction,
 } from './chat-link-actions';
@@ -39,6 +40,43 @@ describe('chat link actions', () => {
     expect(getSelectedChatLinkAction(sheet, 2)).toBe('share');
     expect(getSelectedChatLinkAction(sheet, 3)).toBeNull();
     expect(getSelectedChatLinkAction(sheet, undefined)).toBeNull();
+  });
+
+  it('prepends Review PR as the first option for PR links and keeps the existing order', () => {
+    const sheet = buildChatLinkActionSheet({ isPrLink: true });
+
+    expect(sheet.options).toEqual(['Review PR', 'Open link', 'Copy link', 'Share link', 'Cancel']);
+    expect(sheet.cancelButtonIndex).toBe(4);
+    expect(getSelectedChatLinkAction(sheet, 0)).toBe('review-pr');
+    expect(getSelectedChatLinkAction(sheet, 1)).toBe('open');
+    expect(getSelectedChatLinkAction(sheet, 2)).toBe('copy');
+    expect(getSelectedChatLinkAction(sheet, 3)).toBe('share');
+    expect(getSelectedChatLinkAction(sheet, 4)).toBeNull();
+  });
+
+  it('builds the tap sheet with exactly Review PR / Open in browser / Cancel', () => {
+    const sheet = buildPrLinkTapActionSheet();
+
+    expect(sheet.options).toEqual(['Review PR', 'Open in browser', 'Cancel']);
+    expect(sheet.cancelButtonIndex).toBe(2);
+    expect(getSelectedChatLinkAction(sheet, 0)).toBe('review-pr');
+    expect(getSelectedChatLinkAction(sheet, 1)).toBe('open');
+    expect(getSelectedChatLinkAction(sheet, 2)).toBeNull();
+    expect(getSelectedChatLinkAction(sheet, undefined)).toBeNull();
+  });
+
+  it('leaves non-PR link sheets byte-identical to the pre-PR behavior', () => {
+    const sheet = buildChatLinkActionSheet({ isPrLink: false });
+
+    expect(sheet.options).toEqual(['Open link', 'Copy link', 'Share link', 'Cancel']);
+    expect(sheet.cancelButtonIndex).toBe(3);
+  });
+
+  it('omits Review PR when the flag is not supplied', () => {
+    const sheet = buildChatLinkActionSheet();
+
+    expect(sheet.options).toEqual(['Open link', 'Copy link', 'Share link', 'Cancel']);
+    expect(getSelectedChatLinkAction(sheet, 0)).toBe('open');
   });
 
   it('opens the exact URL through the existing browser helper with retry enabled', async () => {

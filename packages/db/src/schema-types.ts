@@ -1245,8 +1245,23 @@ export const COUNCIL_SPECIALIST_ROLES = [
 ] as const;
 export type CouncilSpecialistRole = (typeof COUNCIL_SPECIALIST_ROLES)[number];
 
-export const CouncilVoteSchema = z.enum(['pass', 'warn', 'block', 'abstain']);
+// Council decision model v2: a vote is BINARY (yes/no). "warn"/"abstain" are NOT votes —
+// a warning is a finding severity (see COUNCIL_FINDING_SEVERITIES), and a specialist that
+// ran always votes (no-findings = pass). Votes are code-DERIVED from findings, never
+// authored by the model. Same binary type is reused for the aggregate decision.
+export const CouncilVoteSchema = z.enum(['pass', 'block']);
 export type CouncilVote = z.infer<typeof CouncilVoteSchema>;
+
+// Finding severity scale (v2). The LLM assigns one per finding — this is where its
+// judgment lives. `critical` is the only BLOCKING severity: any critical finding makes the
+// specialist's derived vote `block`; warning/suggestion/nitpick are informational.
+export const COUNCIL_FINDING_SEVERITIES = ['critical', 'warning', 'suggestion', 'nitpick'] as const;
+export const CouncilFindingSeveritySchema = z.enum(COUNCIL_FINDING_SEVERITIES);
+export type CouncilFindingSeverity = (typeof COUNCIL_FINDING_SEVERITIES)[number];
+
+// The single blocking severity: a finding at this level makes the specialist's derived vote
+// `block`. Referenced by `isBlockingSeverity` so the blocking rule lives in exactly one place.
+export const COUNCIL_BLOCKING_SEVERITY: CouncilFindingSeverity = 'critical';
 
 /**
  * Review type for a run. 'standard' is the existing single-reviewer scan; 'council'
@@ -1261,15 +1276,21 @@ export const CODE_REVIEW_TRIGGER_SOURCES = ['manual', 'webhook'] as const;
 export const CodeReviewTriggerSourceSchema = z.enum(CODE_REVIEW_TRIGGER_SOURCES);
 export type CodeReviewTriggerSource = z.infer<typeof CodeReviewTriggerSourceSchema>;
 
-// 'weighted' is intentionally omitted until per-specialist vote weights exist in the
-// config — offering it now would be an aggregation option we cannot actually honor.
-export const COUNCIL_AGGREGATION_STRATEGIES = [
-  'any_blocking_member',
-  'majority',
-  'unanimous_required',
-] as const;
+// Governance mode (v2). Field is still named `aggregation_strategy` for continuity, but the
+// values are the three DISTINCT modes under binary votes:
+// - 'advisory'  — report votes/findings only; compute NO aggregate decision and NO merge gate.
+// - 'unanimous' — block unless EVERY specialist votes pass (i.e. any block → block). Strict.
+// - 'majority'  — block only when block votes outnumber pass votes. Lenient.
+// (v1's 'any_blocking_member' is dropped: with no abstain, it is mathematically identical to
+// 'unanimous'. 'advisory' is the safe default so a new council never blocks a merge unasked.)
+export const COUNCIL_AGGREGATION_STRATEGIES = ['advisory', 'unanimous', 'majority'] as const;
 export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRATEGIES);
 export type CouncilAggregationStrategy = z.infer<typeof CouncilAggregationStrategySchema>;
+
+// The safe default governance mode: report only, never gate a merge unasked. Single source of
+// truth — referenced by the schema default, the manual-job UI state, dispatch, and the label
+// fallback, so the default can't drift between the backend and what the UI initializes to.
+export const DEFAULT_COUNCIL_AGGREGATION_STRATEGY: CouncilAggregationStrategy = 'advisory';
 
 // A specialist id doubles as the cloud-agent-next `runtimeAgents[].slug` (single-session
 // execution) AND the manifest correlation key, so it must satisfy the runtime-agent slug
@@ -1330,6 +1351,11 @@ export const CouncilSpecialistSchema = z.object({
 });
 export type CouncilSpecialist = z.infer<typeof CouncilSpecialistSchema>;
 
+// Caps for the council `required_labels` selection gate. Exported so the config UI can enforce the
+// same limits client-side and keep frontend/backend validation in sync.
+export const COUNCIL_MAX_REQUIRED_LABELS = 20;
+export const COUNCIL_REQUIRED_LABEL_MAX_LENGTH = 100;
+
 // The council definition: what the council IS (specialists + how their votes
 // aggregate). It carries no trigger/selection logic — whether a given run is a
 // council run is recorded per-run via `review_type`.
@@ -1338,7 +1364,21 @@ export const CodeReviewCouncilConfigSchema = z.object({
   // and retained while council is toggled off. Defaults true so an existing council
   // object (e.g. from a manual job) is treated as enabled.
   enabled: z.boolean().default(true),
-  aggregation_strategy: CouncilAggregationStrategySchema.default('any_blocking_member'),
+  // Default 'advisory' — the safety net: a council runs and reports, but never blocks a merge
+  // until an org explicitly picks unanimous/majority.
+  //
+  // Backward-compat (read boundary): `aggregation_strategy` is a PERSISTED field, so configs
+  // written before the v2 rollout can hold the legacy v1 values `any_blocking_member` /
+  // `unanimous_required`. Both meant "block on any block", which is exactly v2 `unanimous`, so
+  // we normalize them here rather than throwing when a queued/completed pre-v2 council config
+  // is re-parsed (`getManualCodeReviewConfig`). New values pass through unchanged.
+  aggregation_strategy: z
+    .preprocess(
+      value =>
+        value === 'any_blocking_member' || value === 'unanimous_required' ? 'unanimous' : value,
+      CouncilAggregationStrategySchema
+    )
+    .default(DEFAULT_COUNCIL_AGGREGATION_STRATEGY),
   // Specialist ids must be unique: a specialist must not appear (and therefore vote)
   // more than once, or vote aggregation could be skewed by a duplicate.
   specialists: z
@@ -1354,6 +1394,15 @@ export const CodeReviewCouncilConfigSchema = z.object({
         seen.add(specialist.id);
       }
     }),
+  // Optional selection gate for AUTOMATED (webhook) reviews: when non-empty, an opted-in repo's PR
+  // runs council only if it carries at least one of these labels (any-match, case-insensitive).
+  // Absent/empty = no label requirement (every eligible PR on an opted-in repo gets council, as
+  // before). Narrows only: it never widens who gets council and never overrides a hard exclusion
+  // (draft/bot/fork). Manual runs ignore it.
+  required_labels: z
+    .array(z.string().min(1).max(COUNCIL_REQUIRED_LABEL_MAX_LENGTH))
+    .max(COUNCIL_MAX_REQUIRED_LABELS)
+    .optional(),
 });
 export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
 
@@ -1363,7 +1412,19 @@ export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSche
 export const CouncilFindingSchema = z.object({
   path: z.string().max(1024),
   line: z.number().int().nonnegative().nullable().optional(),
-  severity: z.string().max(64),
+  // Severity MUST be one of the canonical scale (case/space-insensitive). Because the vote is
+  // DERIVED from severity, a loose label would be unsafe: a real critical issue mislabeled
+  // `high`/`sev1` would otherwise derive to `pass`. An off-scale label instead fails the
+  // finding → the manifest is invalid → the decision fails closed (block). Casing/whitespace
+  // is tolerated (normalized on read via `isBlockingSeverity`), but off-scale words are not.
+  severity: z
+    .string()
+    .max(64)
+    .refine(
+      value =>
+        (COUNCIL_FINDING_SEVERITIES as readonly string[]).includes(value.trim().toLowerCase()),
+      'severity must be one of: critical, warning, suggestion, nitpick'
+    ),
   rationale: z.string().max(4000),
 });
 export type CouncilFinding = z.infer<typeof CouncilFindingSchema>;
@@ -1375,7 +1436,11 @@ export const CouncilResultSpecialistSchema = z.object({
   // The model/effort that actually ran this specialist (we assign these), for display.
   model: z.string().max(512).nullable(),
   thinkingEffort: z.string().max(50).nullable(),
-  vote: CouncilVoteSchema,
+  // Binary, CODE-DERIVED from this specialist's findings (any critical → block). NULL when the
+  // specialist returned no reliable result (absent from / not captured in the manifest) — this
+  // is "no result", NOT a `block` vote. The fail-closed AGGREGATE decision (enforcing modes)
+  // is computed separately and still blocks on missing coverage.
+  vote: CouncilVoteSchema.nullable(),
   highestSeverity: z.string().max(64).nullable(),
   findings: z.array(CouncilFindingSchema).max(200),
 });
@@ -1385,8 +1450,9 @@ export type CouncilResultSpecialist = z.infer<typeof CouncilResultSpecialistSche
 // council runs are not posted to a PR). The capture code maps the parsed
 // `kilo-code-review-council:v1` manifest + the code-owned decision into this storage contract.
 export const CodeReviewCouncilResultSchema = z.object({
-  // The code-owned governance decision (never model-authored).
-  decision: CouncilVoteSchema,
+  // The code-owned governance decision (never model-authored). NULL in `advisory` mode —
+  // there is no aggregate verdict, only the per-specialist votes/findings.
+  decision: CouncilVoteSchema.nullable(),
   aggregationStrategy: CouncilAggregationStrategySchema,
   specialists: z.array(CouncilResultSpecialistSchema).max(8),
 });
@@ -1440,6 +1506,19 @@ export const CodeReviewAgentConfigSchema = z.object({
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
   // Per-repository model overrides. Absent/empty = every repo uses the global model_slug.
   repository_model_overrides: z.array(RepositoryModelOverrideSchema).optional(),
+  // Per-repository council opt-in. A repository whose ID is listed here runs the COUNCIL review
+  // type on automated (webhook) reviews, using the single org-level `council` config above.
+  // Absent/empty = no repo runs council automatically. Only meaningful when the org is
+  // council-entitled and `council` is configured + active; the automated trigger re-checks both.
+  // Matched against the platform repository ID the same way as `selected_repository_ids`.
+  council_enabled_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
+  // Feature-level guardrail: when true (the default when absent), skip automated (webhook) code
+  // reviews for bot-authored pull requests (dependabot/renovate/etc.). Applies to standard and
+  // council reviews alike; manual reviews are unaffected. Set false to review bot PRs.
+  // Enforced on GitHub, where the bot signal (`user.type`) is in the webhook payload. GitLab and
+  // Bitbucket do not expose an authoritative bot flag in their webhooks, so the setting has no
+  // effect there yet.
+  skip_bot_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
@@ -1928,6 +2007,37 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'timeout',
   'upstream_error',
   'sandbox_error',
+  'workspace_capacity',
+  // Derived from the structured CloudAgentSafeFailure payload cloud-agent-next
+  // already sends on the status callback. Before these existed the callback
+  // dropped `failure.code` for every case except sandbox_storage_full, so these
+  // outcomes landed with a NULL terminal_reason and were only recoverable by
+  // pattern-matching the human-readable error_message in the admin router.
+  // See apps/web/src/lib/code-reviews/terminal-reason-from-failure.ts.
+  'assistant_failed',
+  // Rate limiting is the single largest failure bucket, and who was throttled
+  // decides whether it is actionable. Split by the provider ownership
+  // cloud-agent-next now reports; the unqualified value remains for payloads
+  // that carry no ownership.
+  'assistant_rate_limited',
+  'assistant_rate_limited_byok',
+  'assistant_rate_limited_managed',
+  'assistant_unavailable',
+  'assistant_timeout',
+  'assistant_unauthorized',
+  'assistant_invalid_request',
+  'assistant_no_reply',
+  'wrapper_failed',
+  'runtime_startup_failed',
+  'sandbox_connection',
+  'delivery_failed',
+  'workspace_setup_failed',
+  'repository_clone_failed',
+  'repository_auth_failed',
+  'repository_checkout_failed',
+  'session_import_failed',
+  'setup_command_failed',
+  'container_shutdown',
   'unknown',
 ] as const;
 
@@ -1952,6 +2062,18 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'selected_model_unavailable',
   'user_cancelled',
   'superseded',
+  // The repository's own setup command failed. That is the customer's script,
+  // not our infrastructure, so it must not page us. Every other new reason is
+  // deliberately left as a system failure: under-alerting is how the Jul 2026
+  // publish-rate collapse ran for three days unnoticed.
+  'setup_command_failed',
+  // The customer's own provider key hit its own quota. Nothing on our side is
+  // broken and nothing on our side can fix it, so it must not page us.
+  // 'assistant_rate_limited_managed' is deliberately NOT benign: that is our
+  // key or our quota, and it is the case worth waking someone for. The
+  // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
+  // ownership could be either.
+  'assistant_rate_limited_byok',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

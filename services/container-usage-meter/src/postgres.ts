@@ -126,6 +126,33 @@ function appliedUsageSeconds(
   );
 }
 
+async function recoverMissingInterval(
+  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  intervalId: string,
+  startEpochMs: number,
+  context: UsageContext,
+  contextFingerprint: string,
+  receivedAtMs: number
+): Promise<typeof container_usage_interval.$inferSelect> {
+  const receivedAt = timestamp(receivedAtMs);
+  const [inserted] = await tx
+    .insert(container_usage_interval)
+    .values(intervalValues(intervalId, startEpochMs, context, contextFingerprint, receivedAt))
+    .onConflictDoNothing({ target: container_usage_interval.id })
+    .returning();
+  if (inserted) return inserted;
+
+  const [existing] = await tx
+    .select()
+    .from(container_usage_interval)
+    .where(eq(container_usage_interval.id, intervalId))
+    .for('update')
+    .limit(1);
+  if (!existing) throw new Error('Container usage interval recovery lost without a winner');
+  assertMatchingContext(existing, context, contextFingerprint);
+  return existing;
+}
+
 export async function applyStart(
   env: Cloudflare.Env,
   input: RecordStartInput,
@@ -256,13 +283,22 @@ export async function applyHeartbeatWithDb(
   receivedAtMs: number
 ): Promise<ApplyResult> {
   const operation: Promise<ApplyResult> = db.transaction(async tx => {
-    const [interval] = await tx
+    const [existingInterval] = await tx
       .select()
       .from(container_usage_interval)
       .where(eq(container_usage_interval.id, intervalId))
       .for('update')
       .limit(1);
-    if (!interval) throw new UsageIntervalNotFoundError(intervalId);
+    const interval =
+      existingInterval ??
+      (await recoverMissingInterval(
+        tx,
+        intervalId,
+        input.startEpochMs,
+        input.context,
+        contextFingerprint,
+        receivedAtMs
+      ));
     assertMatchingContext(interval, input.context, contextFingerprint);
 
     const [existingSegment] = await tx
@@ -365,13 +401,22 @@ export async function applyStopWithDb(
     input.seq
   );
   return db.transaction(async tx => {
-    const [interval] = await tx
+    const [existingInterval] = await tx
       .select()
       .from(container_usage_interval)
       .where(eq(container_usage_interval.id, intervalId))
       .for('update')
       .limit(1);
-    if (!interval) throw new UsageIntervalNotFoundError(intervalId);
+    const interval =
+      existingInterval ??
+      (await recoverMissingInterval(
+        tx,
+        intervalId,
+        input.startEpochMs,
+        input.context,
+        contextFingerprint,
+        receivedAtMs
+      ));
     assertMatchingContext(interval, input.context, contextFingerprint);
     const [existingSegment] = await tx
       .select()
@@ -416,7 +461,10 @@ export async function applyStopWithDb(
       });
     }
 
-    const stopAt = timestamp(Math.max(new Date(interval.last_seen_at).getTime(), receivedAtMs));
+    const wasReconciled = interval.status === 'closed' && interval.close_reason === 'unconfirmed';
+    const stopAt = wasReconciled
+      ? (interval.stopped_at ?? interval.last_seen_at)
+      : timestamp(Math.max(new Date(interval.last_seen_at).getTime(), receivedAtMs));
 
     await tx
       .update(container_usage_interval)
@@ -425,10 +473,12 @@ export async function applyStopWithDb(
         close_reason: input.reason,
         exit_code: input.exitCode,
         final_stop_seq: input.seq,
-        last_seen_at: stopAt,
+        last_seen_at: wasReconciled ? interval.last_seen_at : stopAt,
         stopped_at: stopAt,
         last_heartbeat_seq: sql`GREATEST(${container_usage_interval.last_heartbeat_seq}, ${input.seq})`,
-        confirmed_seconds: interval.confirmed_seconds + finalSeconds,
+        confirmed_seconds: wasReconciled
+          ? interval.confirmed_seconds
+          : interval.confirmed_seconds + finalSeconds,
       })
       .where(eq(container_usage_interval.id, intervalId));
     return { kind: 'applied', dedup: false };

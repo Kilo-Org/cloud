@@ -381,52 +381,6 @@ export default function UsageRecordsContent() {
                 </SelectContent>
               </Select>
             </div>
-            {(kind === 'user' || kind === 'org') && (
-              <div className="space-y-1.5 md:col-span-2 lg:col-span-2 xl:col-span-1">
-                <Label>Usage window</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="usage-summary-start" className="sr-only">
-                      Window start
-                    </Label>
-                    <Input
-                      id="usage-summary-start"
-                      type="datetime-local"
-                      value={summaryStart}
-                      max={summaryEnd}
-                      aria-describedby={
-                        summaryInputError ? 'usage-summary-window-error' : undefined
-                      }
-                      onChange={event => setSummaryStart(event.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="usage-summary-end" className="sr-only">
-                      Window end
-                    </Label>
-                    <Input
-                      id="usage-summary-end"
-                      type="datetime-local"
-                      value={summaryEnd}
-                      min={summaryStart}
-                      aria-describedby={
-                        summaryInputError ? 'usage-summary-window-error' : undefined
-                      }
-                      onChange={event => setSummaryEnd(event.target.value)}
-                    />
-                  </div>
-                </div>
-                {summaryInputError && (
-                  <p
-                    id="usage-summary-window-error"
-                    className="text-destructive type-label"
-                    role="alert"
-                  >
-                    {summaryInputError}
-                  </p>
-                )}
-              </div>
-            )}
             <div className="space-y-1.5">
               <Label htmlFor="usage-search-value">Exact value</Label>
               <Input
@@ -528,6 +482,52 @@ export default function UsageRecordsContent() {
                 </SelectContent>
               </Select>
             </div>
+            {(kind === 'user' || kind === 'org') && (
+              <div className="space-y-1.5 md:col-span-2 lg:col-span-2 xl:col-span-1">
+                <Label>Usage window</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="usage-summary-start" className="sr-only">
+                      Window start
+                    </Label>
+                    <Input
+                      id="usage-summary-start"
+                      type="datetime-local"
+                      value={summaryStart}
+                      max={summaryEnd}
+                      aria-describedby={
+                        summaryInputError ? 'usage-summary-window-error' : undefined
+                      }
+                      onChange={event => setSummaryStart(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="usage-summary-end" className="sr-only">
+                      Window end
+                    </Label>
+                    <Input
+                      id="usage-summary-end"
+                      type="datetime-local"
+                      value={summaryEnd}
+                      min={summaryStart}
+                      aria-describedby={
+                        summaryInputError ? 'usage-summary-window-error' : undefined
+                      }
+                      onChange={event => setSummaryEnd(event.target.value)}
+                    />
+                  </div>
+                </div>
+                {summaryInputError && (
+                  <p
+                    id="usage-summary-window-error"
+                    className="text-destructive type-label"
+                    role="alert"
+                  >
+                    {summaryInputError}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="space-y-1.5 md:col-span-2 lg:col-span-1">
               <Label className="invisible" aria-hidden="true">
                 Actions

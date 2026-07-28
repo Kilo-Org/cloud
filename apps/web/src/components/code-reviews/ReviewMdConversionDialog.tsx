@@ -68,6 +68,11 @@ export function ReviewMdConversionDialog({
   );
 
   const selectedRepositories = sortedRepositories.filter(repo => selectedIds.has(String(repo.id)));
+  // Count only currently-selected repos that were started, so deselecting a started repo (or
+  // selecting a new unstarted one) doesn't leave the progress text overstating "N started".
+  const startedSelectedCount = selectedRepositories.filter(repo =>
+    startedIds.has(String(repo.id))
+  ).length;
 
   function toggleRepository(repositoryId: string, checked: boolean) {
     setSelectedIds(previous => {
@@ -158,7 +163,7 @@ export function ReviewMdConversionDialog({
             <p className="text-muted-foreground text-sm">
               {selectedRepositories.length === 0
                 ? 'Select one or more repositories to get a start link for each.'
-                : `Start each repository from its own link — every one opens its own agent session in a new tab. ${startedIds.size} of ${selectedRepositories.length} started.`}
+                : `Start each repository from its own link — every one opens its own agent session in a new tab. ${startedSelectedCount} of ${selectedRepositories.length} started.`}
             </p>
 
             <p className="text-muted-foreground text-sm">

@@ -84,6 +84,8 @@ export type ReviewConfigFormProps = {
   platform?: Platform;
   /** Same gate as the manual council UI: local dev, or an entitled org behind the rollout flag. */
   councilUiEnabled?: boolean;
+  /** Local dev, or behind the `code-review-md-conversion` flag: gates the conversion button/dialog. */
+  conversionUiEnabled?: boolean;
 };
 
 // Labels/descriptions stay web-local; the ids/values themselves are derived
@@ -130,6 +132,7 @@ export function ReviewConfigForm({
   organizationId,
   platform = 'github',
   councilUiEnabled = false,
+  conversionUiEnabled = false,
 }: ReviewConfigFormProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -990,16 +993,18 @@ export function ReviewConfigForm({
                     Learn about REVIEW.md
                   </Link>
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setConversionDialogOpen(true)}
-                  disabled={!customInstructions.trim()}
-                >
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Help me automate the conversion
-                </Button>
+                {conversionUiEnabled && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConversionDialogOpen(true)}
+                    disabled={!customInstructions.trim()}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Help me automate the conversion
+                  </Button>
+                )}
               </div>
             )}
 
@@ -1438,13 +1443,15 @@ export function ReviewConfigForm({
               </Button>
             </div>
 
-            <ReviewMdConversionDialog
-              open={conversionDialogOpen}
-              onOpenChange={setConversionDialogOpen}
-              organizationId={organizationId}
-              platform={platform}
-              repositories={selectableRepositories}
-            />
+            {conversionUiEnabled && (
+              <ReviewMdConversionDialog
+                open={conversionDialogOpen}
+                onOpenChange={setConversionDialogOpen}
+                organizationId={organizationId}
+                platform={platform}
+                repositories={selectableRepositories}
+              />
+            )}
           </div>
         </div>
       </CardContent>

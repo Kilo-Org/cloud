@@ -44,6 +44,9 @@ queued() { pane | grep -oE '[0-9]+ queued' | tail -1 | cut -d' ' -f1 || true; }
 # First line of the message, whitespace-collapsed, as the needle for the
 # submitted `›`-prefixed echo in the scrollback.
 needle=$(printf '%s' "${MSG%%$'\n'*}" | tr -s '[:space:]' ' ' | cut -c1-60)
+# Still unsent: the needle is on screen on a line the scrollback could not have
+# written — a submitted message is only ever echoed `›`-prefixed.
+composed() { pane | grep -F "$needle" | grep -qv '^›'; }
 # Per-invocation buffer: the tmux server's buffers are shared, so a fixed name
 # lets two sections steering at once paste each other's message.
 BUF=kilo-steer-$$
@@ -59,7 +62,11 @@ tmux load-buffer -b "$BUF" - <<<"$MSG"
 tmux paste-buffer -d -p -b "$BUF" -t "$TARGET"
 
 # Separate keystroke, after the composer has settled — trap 1.
-for _ in 1 2 3; do
+for attempt in 1 2 3; do
+  # Re-press Enter only while the text is demonstrably still in the composer.
+  # Failing to *confirm* a submission is not evidence the Enter was lost, and a
+  # blind resend would submit whatever sits in the composer by then.
+  if [ "$attempt" -gt 1 ] && ! composed; then break; fi
   sleep 1
   tmux send-keys -t "$TARGET" Enter
   for _ in 1 2 3 4; do
@@ -72,6 +79,6 @@ for _ in 1 2 3; do
   done
 done
 
-echo "steer: NOT submitted after 3 attempts — inspect $TARGET before resending" >&2
+echo "steer: submission unconfirmed — inspect $TARGET before resending" >&2
 pane | grep -vE '^ *$' | tail -15 >&2
 exit 1

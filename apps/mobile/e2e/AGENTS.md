@@ -127,7 +127,7 @@ apps/mobile/e2e/logout.sh <udid>
 
 The default email is `e2e-mobile-<worktree-basename>@example.com`, derived deterministically from the worktree directory name. Hyphens are preserved by `normalizeEmail`, so each worktree signs into a distinct backend user. Pass an explicit email only when a test needs a specific account.
 
-Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. It retries the known dev-client launch boundary once. `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app; `flows/open-app.yaml` is the standalone cold-launch flow.
+Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. If the request half fails it cold-relaunches through `flows/open-app.yaml` and retries once — that clears both a half-started dev client and an email field left dirty by an earlier run — and if the retry fails too it says which half broke: no outbox email means the app never reached `POST /api/auth/native/otp`, a new outbox email means the request worked and only the code screen was never reached. `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app; `flows/open-app.yaml` is the standalone cold-launch flow.
 
 Native prompts are states in the flow, not errors to tap through blindly:
 
@@ -149,6 +149,8 @@ When editing the flows, preserve these device-tested constraints:
 - Tap the Kilo home-screen icon; Maestro `launchApp` can bounce the Expo dev client to SpringBoard.
 - Pass `EMAIL` and `OTP` with `-e`; flow-level defaults override `-e` values in the installed Maestro version.
 - Target the email field by its placeholder `you@example.com`, and tap `Verify code` without trying to dismiss the number pad.
+- The email field is uncontrolled, so a login page left on screen by an earlier run still holds its address, and `inputText` inserts at the caret the tap just dropped mid-string. Erase the field first and assert the typed address before submitting; without that, two attempts interleave into one malformed address and the flow dies 15s later on a missing `Verify code`.
+- Keep every control a flow taps clear of the keyboard. Maestro taps an element's centre, and iOS hands a touch inside `UIRemoteKeyboardWindow` to the keyboard while Maestro still logs the tap `COMPLETED` — a silent no-op. Verify with `maestro --device <udid> hierarchy`: the control's centre must be above the keyboard window's top bound. See `.kilo_workflow/learnings/maestro-tap-swallowed-by-ios-keyboard.md`.
 - The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`).
 
 Seed only when needed. `pnpm dev:seed` with no arguments lists every topic and its usage:

@@ -213,11 +213,7 @@ describe('OpenRouter GPT-5.6 promotion', () => {
   };
 
   it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('preserves discounted pricing for %s', modelId => {
-    expect(getModelDisplayPricing(modelId, discountedPricing)).toEqual({
-      prompt: '0.000001',
-      completion: '0.000004',
-      input_cache_read: '0.0000001',
-    });
+    expect(getModelDisplayPricing(modelId, discountedPricing)).toBe(discountedPricing);
   });
 
   it('continues to undo endpoint discounts for other models', () => {

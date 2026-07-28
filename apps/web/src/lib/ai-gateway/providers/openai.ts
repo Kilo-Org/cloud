@@ -27,8 +27,9 @@ export const OPENROUTER_GPT56_PROMO_MODEL_IDS = [
   'openai/gpt-5.6-luna-pro',
 ] as const;
 
-const openRouterGpt56PromoModels: ReadonlySet<string> = new Set(OPENROUTER_GPT56_PROMO_MODEL_IDS);
-
 export function isOpenRouterGpt56PromoModel(modelId: string): boolean {
-  return ENABLE_OPENROUTER_GPT56_PROMO && openRouterGpt56PromoModels.has(modelId);
+  return (
+    ENABLE_OPENROUTER_GPT56_PROMO &&
+    OPENROUTER_GPT56_PROMO_MODEL_IDS.some(promoModelId => promoModelId === modelId)
+  );
 }

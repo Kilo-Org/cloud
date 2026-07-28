@@ -120,20 +120,12 @@ export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
   return result;
 }
 
-function preserveDiscountedPricing(pricing: EndpointPricing): EndpointPricing {
-  const prices = { ...pricing };
-  delete prices.discount;
-  return prices;
-}
-
 export function getModelDisplayPricing(
   modelId: string,
   pricing: EndpointPricing | undefined
 ): EndpointPricing | undefined {
   if (!pricing) return undefined;
-  return isOpenRouterGpt56PromoModel(modelId)
-    ? preserveDiscountedPricing(pricing)
-    : undoPricingDiscount(pricing);
+  return isOpenRouterGpt56PromoModel(modelId) ? pricing : undoPricingDiscount(pricing);
 }
 
 export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {

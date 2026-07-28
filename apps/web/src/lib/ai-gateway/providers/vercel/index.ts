@@ -96,6 +96,9 @@ export async function shouldRouteToVercel(
   randomSeed: string
 ) {
   if (isOpenRouterGpt56PromoModel(requestedModel)) {
+    console.debug(
+      `[shouldRouteToVercel] routing ${requestedModel} to OpenRouter for the GPT-5.6 promotion`
+    );
     return false;
   }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import {
   convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
@@ -159,6 +159,7 @@ describe('passesVercelRoutingPercentage', () => {
 
 describe('OpenRouter GPT-5.6 promotion', () => {
   it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('does not route %s to Vercel', async model => {
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
@@ -168,5 +169,9 @@ describe('OpenRouter GPT-5.6 promotion', () => {
     };
 
     await expect(shouldRouteToVercel(model, request, 'promo-test')).resolves.toBe(false);
+    expect(debugSpy).toHaveBeenCalledWith(
+      `[shouldRouteToVercel] routing ${model} to OpenRouter for the GPT-5.6 promotion`
+    );
+    debugSpy.mockRestore();
   });
 });

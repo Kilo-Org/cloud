@@ -300,8 +300,6 @@ export function ReviewConfigForm({
     [selectedModel]
   );
 
-  // Shared with the server route's conversion allowlist so the offered list and the enforced list
-  // derive from the same inputs and can't desync.
   const selectableRepositories = useMemo(
     () =>
       buildSelectableRepositories(
@@ -310,6 +308,20 @@ export function ReviewConfigForm({
       ),
     [configData?.manuallyAddedRepositories, repositoriesData?.repositories]
   );
+
+  // Repos the conversion dialog may offer. Fetched integration repos ONLY (no manually-added
+  // entries, which are unverified client input) so this list stays in sync with the server route's
+  // allowlist — a repo the dialog offers is always one the route will authorize.
+  const conversionRepositories = useMemo(
+    () => buildSelectableRepositories(repositoriesData?.repositories ?? [], []),
+    [repositoriesData?.repositories]
+  );
+
+  // The conversion runs on the SAVED config server-side, so the button gates on the persisted value
+  // and blocks (with an explanation) while there are unsaved edits or nothing is saved yet.
+  const savedCustomInstructions = configData?.customInstructions ?? '';
+  const hasSavedCustomInstructions = savedCustomInstructions.trim().length > 0;
+  const hasUnsavedCustomInstructionEdits = customInstructions !== savedCustomInstructions;
 
   // Reset thinking effort when the model changes and the current selection is invalid
   useEffect(() => {
@@ -997,24 +1009,20 @@ export function ReviewConfigForm({
                       variant="outline"
                       size="sm"
                       onClick={() => setConversionDialogOpen(true)}
-                      // The conversion reads the SAVED config server-side, so gate on the persisted
-                      // value and block while there are unsaved edits (otherwise the agent would run
-                      // on stale text or fail with no instructions).
-                      disabled={
-                        !configData?.customInstructions?.trim() ||
-                        customInstructions !== (configData?.customInstructions ?? '')
-                      }
+                      disabled={!hasSavedCustomInstructions || hasUnsavedCustomInstructionEdits}
                     >
                       <Sparkles className="mr-2 h-4 w-4" />
                       Help me automate the conversion
                     </Button>
-                    {configData?.customInstructions?.trim() &&
-                      customInstructions !== (configData?.customInstructions ?? '') && (
-                        <p className="text-muted-foreground text-sm">
-                          Save your changes first. The conversion uses your saved Custom
-                          Instructions.
-                        </p>
-                      )}
+                    {hasUnsavedCustomInstructionEdits ? (
+                      <p className="text-muted-foreground text-sm">
+                        Save your changes first. The conversion uses your saved Custom Instructions.
+                      </p>
+                    ) : !hasSavedCustomInstructions ? (
+                      <p className="text-muted-foreground text-sm">
+                        Add and save Custom Instructions above to convert them.
+                      </p>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -1461,7 +1469,7 @@ export function ReviewConfigForm({
                 onOpenChange={setConversionDialogOpen}
                 organizationId={organizationId}
                 platform={platform}
-                repositories={selectableRepositories}
+                repositories={conversionRepositories}
               />
             )}
           </div>

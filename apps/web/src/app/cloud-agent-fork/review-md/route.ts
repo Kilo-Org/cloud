@@ -169,9 +169,11 @@ export async function GET(request: NextRequest) {
       return redirectToError(organizationId, 'conversion_rate_limited');
     }
 
-    // Authorize the repo: it must be one the caller's integration actually exposes (the same list
-    // the dialog is built from). The worker enforces installation scope as well, but validating
-    // here fails fast and avoids creating a billable session for a repo the caller can't target.
+    // Authorize the repo against the caller's FETCHED integration repositories only. Manually-added
+    // config entries are client-supplied and only shape-validated at save time (no proof the
+    // integration actually covers them), so they must NOT gate this credit-spending, PR-opening
+    // action — otherwise a user could add an arbitrary full_name to their config and pass this
+    // check. The worker enforces installation scope regardless; this keeps the fail-fast honest.
     const repositoryList = organizationId
       ? platform === 'gitlab'
         ? await caller.organizations.reviewAgent.listGitLabRepositories({
@@ -186,10 +188,7 @@ export async function GET(request: NextRequest) {
         ? await caller.personalReviewAgent.listGitLabRepositories({ forceRefresh: false })
         : await caller.personalReviewAgent.listGitHubRepositories({ forceRefresh: false });
 
-    const allowedRepoFullNames = buildAllowedRepositoryFullNames(
-      repositoryList.repositories,
-      config.manuallyAddedRepositories ?? []
-    );
+    const allowedRepoFullNames = buildAllowedRepositoryFullNames(repositoryList.repositories, []);
     if (!allowedRepoFullNames.has(repo)) {
       return redirectToError(organizationId, 'repository_not_allowed');
     }

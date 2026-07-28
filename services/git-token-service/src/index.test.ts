@@ -1278,6 +1278,35 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
     });
   });
 
+  it('returns trusted session scope claims only for a broadened child route', async () => {
+    const rootKiloSessionId = 'ses_12345678901234567890123456';
+    const childKiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability({
+      ...kiloSubject,
+      kiloSessionId: rootKiloSessionId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: `https://ingest.kilosessions.ai/api/session/${childKiloSessionId}/ingest`,
+        sessionIngestProxyVersion: 1,
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer raw-user-token',
+      routeClass: 'session_ingest',
+      sessionIngestScope: {
+        cloudAgentSessionId: kiloSubject.cloudAgentSessionId,
+        rootKiloSessionId,
+      },
+    });
+  });
+
   it('does not redeem a session ingest route for another Kilo session', async () => {
     const service = createService();
     const issued = await service.issueKiloSessionCapability(kiloSubject);

@@ -377,7 +377,15 @@ type IssueKiloSessionCapabilityResult =
     };
 
 type RedeemKiloSessionCapabilityResult =
-  | { success: true; authorization: string; routeClass: KiloCapabilityRouteClass }
+  | {
+      success: true;
+      authorization: string;
+      routeClass: KiloCapabilityRouteClass;
+      sessionIngestScope?: {
+        cloudAgentSessionId: string;
+        rootKiloSessionId: string;
+      };
+    }
   | {
       success: false;
       reason:
@@ -449,6 +457,7 @@ export type GitTokenService = {
     requestMethod: string;
     requestUrl: string;
     bootstrapKiloSessionId?: string;
+    sessionIngestProxyVersion?: 1;
   }): Promise<RedeemKiloSessionCapabilityResult>;
 };
 

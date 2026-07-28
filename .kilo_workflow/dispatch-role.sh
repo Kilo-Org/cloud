@@ -52,6 +52,11 @@ fi
 if [ "$ROLE" = "e2e-verifier" ] || [ -z "$CALLER_SESSION" ]; then
   tmux new-session -d -s "$NAME" "$CMD"
 else
-  tmux new-window -d -t "$CALLER_SESSION" -n "$NAME" "$CMD"
+  # Trailing colon pins the target to <session>:<auto-index>. Without it tmux
+  # prefix-matches the session name against WINDOW names first, and a session
+  # named <section> collides with the planner/orchestrator window named
+  # <section>-planner — new-window then fails with "create window failed:
+  # index N in use" (see learnings/tmux-new-window-index-in-use-name-prefix-collision.md).
+  tmux new-window -d -t "$CALLER_SESSION:" -n "$NAME" "$CMD"
 fi
 echo "$LOG"

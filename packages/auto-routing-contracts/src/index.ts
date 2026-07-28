@@ -1,6 +1,8 @@
 import * as z from 'zod';
+import { BenchmarkProfileEntryStatusSchema } from './benchmark';
 import { NormalizedClassifierInputSchema } from './input';
 import { ReasoningEffortSchema } from './reasoning';
+import { EfficientModelPoolSchema } from './routing-table';
 import {
   ClassifierSubtaskTypeSchema,
   ClassifierTaskTypeSchema,
@@ -99,26 +101,45 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
-const BenchmarkAutoRoutingDecisionSchema = z.object({
-  model: z.string(),
-  taskType: ClassifierTaskTypeSchema,
-  subtaskType: ClassifierSubtaskTypeSchema,
-  source: z.literal('benchmark'),
-  tableVersion: z.string(),
-  // Mirrors the effort the chosen model was benchmarked with, when set.
-  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
-  // True when the session's incumbent model was kept over a cheaper fresh
-  // pick. Defaulted so responses from a not-yet-redeployed worker still
-  // parse.
-  sticky: z.boolean().default(false),
-  // Why the session's incumbent model was abandoned, when it was:
-  // 'threshold' — the incumbent is denied, off the route, or below the
-  // accuracy bar; 'cost' — eligible, but the mode's switch condition made
-  // the fresh pick worth it; 'capability' — ejected by the modality/context
-  // capability filters. Null when there was no incumbent or it was kept.
-  // Optional so responses from a not-yet-redeployed worker still parse.
-  switchReason: z.enum(['threshold', 'cost', 'capability']).nullable().optional(),
-});
+/**
+ * Reader precedence for decision variant identity: prefer `variant`; when
+ * absent, a valid legacy `reasoningEffort` string may be interpreted as the
+ * legacy variant key. New writers emit `variant` only; old writers emitted
+ * `reasoningEffort` only. Both non-null is malformed.
+ */
+const BenchmarkAutoRoutingDecisionSchema = z
+  .object({
+    model: z.string(),
+    taskType: ClassifierTaskTypeSchema,
+    subtaskType: ClassifierSubtaskTypeSchema,
+    source: z.literal('benchmark'),
+    tableVersion: z.string(),
+    // Canonical catalog variant key the chosen model was benchmarked with.
+    variant: z.string().trim().min(1).nullable().optional(),
+    // Legacy effort the chosen model was benchmarked with; retained for
+    // rolling deploy reads. Prefer `variant` when present.
+    reasoningEffort: ReasoningEffortSchema.nullable().optional(),
+    // True when the session's incumbent model was kept over a cheaper fresh
+    // pick. Defaulted so responses from a not-yet-redeployed worker still
+    // parse.
+    sticky: z.boolean().default(false),
+    // Why the session's incumbent model was abandoned, when it was:
+    // 'threshold' — the incumbent is denied, off the route, or below the
+    // accuracy bar; 'cost' — eligible, but the mode's switch condition made
+    // the fresh pick worth it; 'capability' — ejected by the modality/context
+    // capability filters. Null when there was no incumbent or it was kept.
+    // Optional so responses from a not-yet-redeployed worker still parse.
+    switchReason: z.enum(['threshold', 'cost', 'capability']).nullable().optional(),
+  })
+  .superRefine((decision, ctx) => {
+    if (decision.variant != null && decision.reasoningEffort != null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['variant'],
+        message: 'Decision must not set both variant and reasoningEffort; emit variant only',
+      });
+    }
+  });
 
 const CodingPlanDefaultDecisionSchema = z.object({
   model: z.string(),
@@ -187,6 +208,26 @@ export const AutoRoutingModeResponseSchema = AutoRoutingModeOwnerQuerySchema.ext
   defaultMode: AutoRoutingModeSchema,
 });
 export type AutoRoutingModeResponse = z.infer<typeof AutoRoutingModeResponseSchema>;
+
+// Combined mode + Efficient model pool settings. Null on each field means
+// inherit independently (mode and pool do not imply each other).
+export const UpdateAutoRoutingSettingsRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
+  mode: AutoRoutingModeSchema.nullable(),
+  pool: EfficientModelPoolSchema.nullable(),
+});
+export type UpdateAutoRoutingSettingsRequest = z.infer<
+  typeof UpdateAutoRoutingSettingsRequestSchema
+>;
+
+export const AutoRoutingSettingsResponseSchema = AutoRoutingModeOwnerQuerySchema.extend({
+  mode: AutoRoutingModeSchema,
+  configuredMode: AutoRoutingModeSchema.nullable(),
+  defaultMode: AutoRoutingModeSchema,
+  configuredPool: EfficientModelPoolSchema.nullable(),
+  // Empty when configuredPool is null.
+  poolStatuses: z.array(BenchmarkProfileEntryStatusSchema),
+});
+export type AutoRoutingSettingsResponse = z.infer<typeof AutoRoutingSettingsResponseSchema>;
 
 export const AutoRoutingAnalyticsPeriodSchema = z.enum(['1h', '24h', '7d', '30d']);
 export type AutoRoutingAnalyticsPeriod = z.infer<typeof AutoRoutingAnalyticsPeriodSchema>;

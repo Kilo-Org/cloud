@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { rankCandidates, RoutingTableSchema } from './routing-table';
+import {
+  CustomRoutingTableSchema,
+  EfficientModelPoolSchema,
+  MAX_POOL_ENTRIES,
+  poolEntryKey,
+  rankCandidates,
+  RankedCandidateSchema,
+  RoutingTableSchema,
+} from './routing-table';
 
 const candidate = (model: string, accuracy: number, avgCostUsd: number) => ({
   model,
@@ -63,5 +71,135 @@ describe('RoutingTableSchema', () => {
     });
 
     expect(parsed.routes['implementation/code_generation']?.[0]?.model).toBe('impl');
+  });
+
+  it('accepts a legacy candidate with reasoningEffort only', () => {
+    const parsed = RankedCandidateSchema.parse({
+      model: 'm',
+      accuracy: 0.9,
+      avgCostUsd: 1,
+      meetsThreshold: true,
+      reasoningEffort: 'high',
+    });
+    expect(parsed.reasoningEffort).toBe('high');
+    expect(parsed.variant).toBeUndefined();
+  });
+
+  it('accepts a candidate with variant only', () => {
+    const parsed = RankedCandidateSchema.parse({
+      model: 'm',
+      accuracy: 0.9,
+      avgCostUsd: 1,
+      meetsThreshold: true,
+      variant: 'xhigh',
+    });
+    expect(parsed.variant).toBe('xhigh');
+    expect(parsed.reasoningEffort).toBeUndefined();
+  });
+
+  it('rejects a candidate with both non-null variant and reasoningEffort', () => {
+    expect(
+      RankedCandidateSchema.safeParse({
+        model: 'm',
+        accuracy: 0.9,
+        avgCostUsd: 1,
+        meetsThreshold: true,
+        variant: 'xhigh',
+        reasoningEffort: 'high',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('CustomRoutingTableSchema', () => {
+  const base = {
+    version: 'v',
+    generatedAt: new Date(0).toISOString(),
+    minAccuracy: 0.7,
+    switchCostFactor: 3,
+    source: 'benchmark' as const,
+  };
+
+  it('accepts a sparse routes record (omitted taxonomy keys)', () => {
+    const parsed = CustomRoutingTableSchema.parse({
+      ...base,
+      routes: {
+        'implementation/code_generation': [candidate('impl', 0.9, 1)],
+      },
+    });
+    expect(Object.keys(parsed.routes)).toEqual(['implementation/code_generation']);
+  });
+
+  it('rejects unknown route keys', () => {
+    expect(
+      CustomRoutingTableSchema.safeParse({
+        ...base,
+        routes: {
+          'not-a-real/route': [candidate('m', 1, 1)],
+        },
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('EfficientModelPoolSchema', () => {
+  it('rejects duplicate exact pairs', () => {
+    expect(
+      EfficientModelPoolSchema.safeParse([
+        { model: 'a/b', variant: 'xhigh' },
+        { model: 'a/b', variant: 'xhigh' },
+      ]).success
+    ).toBe(false);
+  });
+
+  it('accepts the same model with different variants', () => {
+    const parsed = EfficientModelPoolSchema.parse([
+      { model: 'a/b', variant: 'xhigh' },
+      { model: 'a/b', variant: 'max' },
+    ]);
+    expect(parsed).toHaveLength(2);
+  });
+
+  it('rejects zero entries', () => {
+    expect(EfficientModelPoolSchema.safeParse([]).success).toBe(false);
+  });
+
+  it('rejects more than MAX_POOL_ENTRIES entries', () => {
+    const entries = Array.from({ length: MAX_POOL_ENTRIES + 1 }, (_, i) => ({
+      model: `model/${i}`,
+      variant: null,
+    }));
+    expect(EfficientModelPoolSchema.safeParse(entries).success).toBe(false);
+  });
+
+  it('accepts null pool via nullable wrapper (inherit)', () => {
+    expect(EfficientModelPoolSchema.nullable().safeParse(null).success).toBe(true);
+  });
+
+  it('accepts the maximum of 10 unique entries', () => {
+    const entries = Array.from({ length: MAX_POOL_ENTRIES }, (_, i) => ({
+      model: `model/${i}`,
+      variant: null as string | null,
+    }));
+    expect(EfficientModelPoolSchema.safeParse(entries).success).toBe(true);
+  });
+});
+
+describe('poolEntryKey', () => {
+  it('distinguishes xhigh, max, and null variants of one model', () => {
+    const model = 'provider/model';
+    const keys = [
+      poolEntryKey({ model, variant: 'xhigh' }),
+      poolEntryKey({ model, variant: 'max' }),
+      poolEntryKey({ model, variant: null }),
+    ];
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it('round-trips through JSON as a collision-safe encoding', () => {
+    const entry = { model: 'provider/model', variant: 'xhigh' as string | null };
+    const key = poolEntryKey(entry);
+    expect(JSON.parse(key)).toEqual([entry.model, entry.variant]);
+    expect(poolEntryKey({ model: entry.model, variant: entry.variant })).toBe(key);
   });
 });

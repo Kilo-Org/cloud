@@ -41,34 +41,51 @@ Shared request-classification code (prompt, parsing, taxonomy, tier derivation,
 routing-table schema) lives in `packages/auto-routing-contracts` so the benchmark
 replays the exact code production runs.
 
+Owner-configurable **Efficient model pools** extend this design without a new
+routing mode or model ID: a personal user or organization may constrain
+`kilo-auto/efficient` to 1–10 exact **Pool entries** `(managed model, canonical
+catalog variant)`. **Benchmark profiles** for those pairs remain global;
+the benchmark worker stays their sole writer and generates them on demand with
+admission limits and global dedupe. Platform runs still publish the default
+routing table; custom routing uses sparse assembled tables and balanced fallback
+when no selected pair is ready or compatible.
+
 ## Invariants (what not to change without revisiting this ADR)
 
-1. **The benchmark worker is the only writer of routing tables and the classifier
-   winner.** The decision engine and gateway read them through a cache chain
-   (isolate 60s → KV 1h → service binding to D1) and never write back.
+1. **The benchmark worker is the only writer of routing tables, the classifier
+   winner, and Benchmark profiles.** The decision engine and gateway read them
+   through a cache chain (isolate 60s → KV 1h → service binding to D1) and never
+   write back. Owner settings Durable Objects store configured pools only; they
+   never invent or mutate profile measurement state.
 2. **No fabricated data.** There is no default routing table and no default
    benchmark config. `/decide` returns a null decision until a benchmark
    publishes a table; the gateway then serves the balanced fallback. Runs refuse
    to start without a saved config; decider runs additionally require a
-   `benchmarkUserId`.
+   `benchmarkUserId`. Sparse custom tables omit routes with no graded candidates
+   rather than inventing empty candidate lists; omitted routes yield no decision
+   and the gateway's balanced fallback.
 3. **Graceful degradation at every layer.** Corrupt KV → treated as a miss;
    origin failure → previous behavior (stale table stays live); classifier
    failure / `/decide` timeout (2s) → null decision → balanced fallback; publish
    with any empty tier → skipped, previous table stays live. An
-   `efficient` request must never degrade *below* balanced.
+   `efficient` request must never degrade *below* balanced. A configured
+   Efficient model pool with no ready/compatible selected pair likewise returns
+   no decision so balanced fallback is retained.
 4. **Results are reproducible.** Grading is mechanical only (`exact` /
    `contains_all` / `regex` / `json_equal`), never LLM-judged. Each run snapshots
    its config (`min_accuracy`, `switch_cost_factor`, `max_concurrency`,
-   `benchmark_user_id`, per-model `reasoning_effort`); all processing and
-   publishing reads the snapshot, not live config.
-5. **Carried results are identity-gated.** A prior model's summaries are reused on
-   a new run only when the engine identity (dataset + grading/CLI version),
-   repetition count, and the model's `reasoning_effort` all match. Any change
-   re-benchmarks the affected model rather than silently mixing incomparable
-   numbers.
+   `benchmark_user_id`, per-model identity); all processing and publishing reads
+   the snapshot, not live config.
+5. **Carried results and Benchmark profiles are identity-gated on the exact Pool
+   entry.** A prior entry's summaries/profile are current only when the engine
+   identity (dataset + grading/CLI version), repetition count, and the exact
+   `(model, canonical catalog variant)` pair all match. Any change re-benchmarks
+   the affected entry rather than silently mixing incomparable numbers. Null
+   variant is allowed only for models that expose no variants.
 6. **One active run per kind.** A partial unique index plus a server-side check
    admit at most one `running` classifier and one `running` decider run; a second
    start returns 409, not 500. Stale runs are swept to `failed` on run listing.
+   Platform and profile decider work share that single decider slot.
 7. **The model stays hidden** (excluded from `/models`, usable by id) until team
    validation graduates it. Graduation criteria live in the rollout section
    below, not in code.
@@ -76,6 +93,21 @@ replays the exact code production runs.
    token minted by `apps/web`'s internal endpoint (gated by
    `INTERNAL_API_SECRET`). The token only ever lives in a child-process env var —
    never logged, never written to disk.
+9. **Owner Efficient model pools are settings on the existing
+   `kilo-auto/efficient` model**, not a new routing mode or virtual model ID.
+   Mode and pool inherit independently (organization → personal → platform
+   default). Clearing a configured pool restores inheritance.
+10. **Benchmark profiles are global and on-demand.** Profiles are keyed by exact
+    Pool entry plus engine identity and are generated when an owner save admits
+    missing/stale work. Admission is limited to 10 previously unbenchmarked or
+    explicitly retried profiles per owner per rolling 24 hours, with global
+    deduplication of concurrent exact-pair work. Ready or already-pending
+    profiles do not consume request quota.
+11. **Platform vs profile publication.** Platform/admin and scheduled decider runs
+    keep publishing the default routing table. Profile runs update Benchmark
+    profile state only and never replace the platform default artifact. Custom
+    routing assembles a sparse table from ready/current selected profiles at
+    decision time.
 
 ## Billing policy
 

@@ -3,8 +3,11 @@ import {
   AutoRoutingClassifierAnalyticsResponseSchema,
   AutoRoutingClassifierModelResponseSchema,
   AutoRoutingDecisionResponseSchema,
+  AutoRoutingDecisionSchema,
+  AutoRoutingSettingsResponseSchema,
   MirrorPayloadSchema,
   RoutingConstraintsSchema,
+  UpdateAutoRoutingSettingsRequestSchema,
   UpdateClassifierModelRequestSchema,
   detectRequiredInputModalities,
   estimateRoutingTokens,
@@ -12,8 +15,10 @@ import {
 import type { RoutingConstraints } from './index';
 import {
   BenchmarkConfigSchema,
+  BenchmarkProfileStatusesRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
+  RegisterBenchmarkProfilesRequestSchema,
   resolveBenchmarkIdentity,
 } from './benchmark';
 
@@ -482,5 +487,101 @@ describe('package root re-exports', () => {
 
   it('re-exports RoutingConstraintsSchema from the package root', () => {
     expect(RoutingConstraintsSchema.safeParse({}).success).toBe(true);
+  });
+});
+
+describe('AutoRoutingDecisionSchema variant compatibility', () => {
+  const baseBenchmark = {
+    model: 'provider/model',
+    taskType: 'implementation' as const,
+    subtaskType: 'feature_development' as const,
+    source: 'benchmark' as const,
+    tableVersion: 'v1',
+    sticky: false,
+  };
+
+  it('parses a legacy decision with reasoningEffort only', () => {
+    const parsed = AutoRoutingDecisionSchema.parse({
+      ...baseBenchmark,
+      reasoningEffort: 'high',
+    });
+    expect(parsed).toMatchObject({ reasoningEffort: 'high' });
+    expect('variant' in parsed ? parsed.variant : undefined).toBeUndefined();
+  });
+
+  it('parses a decision with variant only', () => {
+    const parsed = AutoRoutingDecisionSchema.parse({
+      ...baseBenchmark,
+      variant: 'xhigh',
+    });
+    expect(parsed).toMatchObject({ variant: 'xhigh' });
+  });
+
+  it('rejects a decision with both non-null variant and reasoningEffort', () => {
+    expect(
+      AutoRoutingDecisionSchema.safeParse({
+        ...baseBenchmark,
+        variant: 'xhigh',
+        reasoningEffort: 'high',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('owner pool settings wire contracts', () => {
+  it('accepts null pool (inherit) on update', () => {
+    const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: null,
+      pool: null,
+    });
+    expect(parsed.pool).toBeNull();
+  });
+
+  it('accepts a configured pool on settings response with statuses', () => {
+    const parsed = AutoRoutingSettingsResponseSchema.parse({
+      ownerType: 'org',
+      ownerId: 'org-1',
+      mode: 'cost_per_accuracy',
+      configuredMode: null,
+      defaultMode: 'cost_per_accuracy',
+      configuredPool: [{ model: 'a/b', variant: null }],
+      poolStatuses: [{ entry: { model: 'a/b', variant: null }, status: 'pending' }],
+    });
+    expect(parsed.poolStatuses).toHaveLength(1);
+  });
+});
+
+describe('benchmark profile request entry bounds', () => {
+  const eleven = Array.from({ length: 11 }, (_, i) => ({
+    model: `model/${i}`,
+    variant: null as string | null,
+  }));
+
+  it('bounds RegisterBenchmarkProfilesRequestSchema entries at 10', () => {
+    expect(
+      RegisterBenchmarkProfilesRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries: eleven,
+      }).success
+    ).toBe(false);
+    expect(
+      RegisterBenchmarkProfilesRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries: eleven.slice(0, 10),
+      }).success
+    ).toBe(true);
+  });
+
+  it('bounds BenchmarkProfileStatusesRequestSchema entries at 10', () => {
+    expect(BenchmarkProfileStatusesRequestSchema.safeParse({ entries: eleven }).success).toBe(
+      false
+    );
+    expect(
+      BenchmarkProfileStatusesRequestSchema.safeParse({ entries: eleven.slice(0, 1) }).success
+    ).toBe(true);
   });
 });

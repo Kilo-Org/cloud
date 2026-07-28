@@ -2,7 +2,7 @@
 
 ## Scope
 
-Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contract defines Code Reviewer, Security Agent, and Cost Insights language plus ownership boundaries used across review execution, analytics, sync, web, email, remediation, billing alerts, tests, and product documentation.
+Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contract defines Code Reviewer, Security Agent, Cost Insights, and Auto Routing language plus ownership boundaries used across review execution, analytics, sync, web, email, remediation, billing alerts, model selection, tests, and product documentation.
 
 Covered domains must use this contract's canonical terms in code, docs, task descriptions, tests, and agent outputs. Do not introduce a synonym for a governed concept without updating this contract. Scoped `AGENTS.md` files link to this contract instead of copying it.
 
@@ -16,6 +16,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Security Agent Email Delivery** | Dispatch-time revalidation, email rendering, owner-aware links, and Mailgun delivery | `apps/web/src/app/api/internal/security-agent/`, `apps/web/src/lib/email.ts`, `apps/web/src/emails/` | Accepts notification identity only and loads current data before sending |
 | **Shared Security Notification Policy** | Canonical config parsing, defaults, severity thresholds, and pure event eligibility rules | `packages/worker-utils/src/security-notification-policy.ts` | Web and Worker must use same policy contract |
 | **Cost Insights** | Spend evidence dashboard, Spend Alerts policy, alert history, and owner-scoped spend alerting | Billing, usage ingestion, usage analytics, and subscription-management surfaces | Applies to both personal users and organizations |
+| **Auto Routing** | Efficient model-pool settings, shared benchmark profiles, and per-request model selection | `packages/auto-routing-contracts/`, `services/auto-routing/`, `services/auto-routing-benchmark/`, `apps/web/src/components/auto-routing/` | Personal and organization settings constrain the existing `kilo-auto/efficient` model |
 
 ## Canonical Terms
 
@@ -44,6 +45,9 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Cost Suggestion** | Optional owner-scoped recommendation based on observed Credit spend that may improve cost efficiency through an eligible Coding Plan or Kilo Pass | Referring to recommendation evaluation, dashboard cards, emails, CTA destinations, dismissal, or settings | Alert, warning, guaranteed savings, automatic optimization |
 | **Suggestion dismissal** | Authorized owner action that hides one Cost Suggestion without changing billing or future suggestion eligibility | Referring to dismissing a recommendation | Alert acknowledgment, unsubscribe, disable suggestions |
 | **Spend owner** | Personal user or organization whose credit balance is charged for Credit spend | Referring to the Spend Alerts policy and evaluation boundary | Account when personal/org ambiguity matters |
+| **Efficient model pool** | The exact model and thinking-variant pairs that `kilo-auto/efficient` may consider for an owner | Referring to either the platform default or an owner-configured pool | Custom mode, custom efficient model |
+| **Pool entry** | One concrete model paired with its canonical thinking-variant key, or the model's default only when it exposes no variants | Referring to benchmark and routing identity inside an Efficient model pool | Model alone, normalized effort |
+| **Benchmark profile** | Globally shared, current benchmark results for one Pool entry | Referring to readiness and measured routing evidence reused across owners | User benchmark, pool benchmark |
 | **Spend Anomaly Alert** | Spend Alert triggered when short-window owner Credit spend exceeds that owner's normal usage pattern | Referring to hourly burst-detection Spend Alerts | Low-balance alert, threshold alert |
 | **Variable Credit spend** | Credit spend created by request-metered product usage such as token usage or metered tool/API usage | Referring to spend that can burst unexpectedly during active usage | Scheduled Credit spend |
 | **Scheduled Credit spend** | Predictable Credit spend created by subscription-like purchases, renewals, or hosting deductions | Referring to expected recurring or explicitly purchased credit deductions | Variable Credit spend |
@@ -67,6 +71,9 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - A **Security Remediation** belongs to one **Security Finding** and can have one or more **Security Remediation Attempts**.
 - A **Security Finding Activity Event** belongs to one Security Agent owner and one Security Finding, including after that finding is deleted.
 - **Spend Alerts** and **Cost Suggestions** belong to exactly one **Spend owner**: one personal user or one organization.
+- An **Efficient model pool** belongs to one personal user or organization; an organization pool overrides members' personal pools, while no configured pool inherits the next available setting and then the platform default.
+- A **Pool entry** has at most one current **Benchmark profile** for a benchmark-engine version, shared by every owner that selects that entry.
+- `kilo-auto/efficient` considers only ready, request-compatible Pool entries from the effective Efficient model pool; its balanced failure fallback remains outside pool membership.
 - All Credit spend charged to a **Spend owner** counts toward that owner's Spend Alerts and Cost Suggestion evaluation.
 - **Cost Suggestions** are enabled by default, independent from Spend Alerts, and recommend an eligible Coding Plan or Kilo Pass when observed Credit spend indicates potential cost-efficiency benefit.
 - Cost Suggestions are advisory. They do not guarantee savings, automatically purchase or change subscriptions, or alter spend behavior.
@@ -189,6 +196,8 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - Do not describe a Cost Suggestion as an alert, warning, guaranteed savings, automatic optimization, or required action.
 - Use **Spend Threshold Alert** and **Spend threshold** for the independent rolling 24-hour, rolling 7-day, and rolling 30-day threshold windows. Do not introduce warning or critical threshold tiers.
 - Keep Spend Alerts alert-only. Do not describe them as spend blocks, hard limits, pauses, throttles, or request admission controls.
+- Use **Efficient model pool** for the candidate set and **Pool entry** for an exact model and canonical thinking variant. Do not introduce a second efficient mode or model ID.
+- Treat **Benchmark profiles** as global evidence, never owner-specific benchmark results.
 
 ## Ambiguities
 
@@ -215,6 +224,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - **Shared Security Notification Policy** defines common parsing and pure eligibility behavior; it does not perform persistence or recipient lookup.
 - Cross-context dispatch sends only stable notification ID from **Security Sync** to authenticated **Security Agent Email Delivery** boundary.
 - **Spend Alerts** evaluate personal and organization Credit spend at the owner boundary, not per product by default.
+- **Auto Routing** owns effective pool resolution and per-request selection. The benchmark worker owns Benchmark profile measurement and publication; web owns catalog validation, permissions, and settings UI.
 - Do not assume Spend Alerts apply to owners who have not opted in.
 - Do not make Spend Alerts block, pause, throttle, suppress auto-top-up, reject paid requests, or emit Spend Alerts-specific HTTP 402 responses.
 - Do not hide v1 Cost Insights behind a release-toggle gate unless a later product decision supersedes public opt-in.

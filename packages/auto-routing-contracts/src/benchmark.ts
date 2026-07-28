@@ -1,10 +1,19 @@
 import * as z from 'zod';
-import { RoutingTableSchema } from './routing-table';
+import {
+  CustomRoutingTableSchema,
+  EfficientModelPoolSchema,
+  PoolEntrySchema,
+  RoutingTableSchema,
+} from './routing-table';
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 
 export { ReasoningEffortSchema } from './reasoning';
 export type { ReasoningEffort } from './reasoning';
+
+// Matches AutoRoutingModeOwnerTypeSchema in index.ts. Declared here (not
+// imported) to avoid a circular package-root dependency.
+const BenchmarkProfileOwnerTypeSchema = z.enum(['user', 'org']);
 
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
@@ -220,3 +229,61 @@ export const ClassifierWinnerResponseSchema = z.object({
   winner: ClassifierWinnerSchema.nullable(),
 });
 export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSchema>;
+
+// --- Benchmark profile registry (global per Pool entry + engine) ---
+
+/**
+ * Wire status for a Benchmark profile. Presentation maps pending/running to
+ * "Benchmarking"; "Unavailable" is a web-derived state and never a wire status.
+ */
+export const BenchmarkProfileStatusSchema = z.enum(['pending', 'running', 'ready', 'failed']);
+export type BenchmarkProfileStatus = z.infer<typeof BenchmarkProfileStatusSchema>;
+
+/** Bounded failure text stored on failed profile rows. */
+export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
+
+export const BenchmarkProfileEntryStatusSchema = z.object({
+  entry: PoolEntrySchema,
+  status: BenchmarkProfileStatusSchema,
+  failureReason: z.string().max(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH).nullable().optional(),
+});
+export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntryStatusSchema>;
+
+export const RegisterBenchmarkProfilesRequestSchema = z.object({
+  ownerType: BenchmarkProfileOwnerTypeSchema,
+  ownerId: z.string().trim().min(1),
+  entries: EfficientModelPoolSchema,
+});
+export type RegisterBenchmarkProfilesRequest = z.infer<
+  typeof RegisterBenchmarkProfilesRequestSchema
+>;
+
+export const BenchmarkProfileStatusesRequestSchema = z.object({
+  entries: EfficientModelPoolSchema,
+});
+export type BenchmarkProfileStatusesRequest = z.infer<typeof BenchmarkProfileStatusesRequestSchema>;
+
+export const BenchmarkProfileStatusesResponseSchema = z.object({
+  statuses: z.array(BenchmarkProfileEntryStatusSchema),
+});
+export type BenchmarkProfileStatusesResponse = z.infer<
+  typeof BenchmarkProfileStatusesResponseSchema
+>;
+
+/** 429 body when an owner exceeds the rolling 24h profile admission limit. */
+export const BenchmarkProfileQuotaErrorSchema = z.object({
+  error: z.string(),
+  // ISO timestamp when the owner may request new benchmarks again.
+  retryAt: z.string(),
+});
+export type BenchmarkProfileQuotaError = z.infer<typeof BenchmarkProfileQuotaErrorSchema>;
+
+export const CustomRoutingTableRequestSchema = z.object({
+  entries: EfficientModelPoolSchema,
+});
+export type CustomRoutingTableRequest = z.infer<typeof CustomRoutingTableRequestSchema>;
+
+export const CustomRoutingTableResponseSchema = z.object({
+  table: CustomRoutingTableSchema.nullable(),
+});
+export type CustomRoutingTableResponse = z.infer<typeof CustomRoutingTableResponseSchema>;

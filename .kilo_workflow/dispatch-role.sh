@@ -38,6 +38,10 @@ CMD+=" > $(printf '%q' "$LOG") 2>&1; echo EXITCODE=\$? >> $(printf '%q' "$LOG")"
 if [ "$ROLE" = "e2e-verifier" ]; then
   tmux new-session -d -s "$NAME" "$CMD"
 else
-  tmux new-window -d -t "$(tmux display-message -p '#S')" -n "$NAME" "$CMD"
+  # Trailing colon forces session-target parsing: when a window in the
+  # session is (auto-)named exactly like the session, a bare session target
+  # resolves to that window and new-window fails with "index 0 in use" (see
+  # learnings/tmux-new-window-session-name-window-name-collision.md).
+  tmux new-window -d -t "$(tmux display-message -p '#S'):" -n "$NAME" "$CMD"
 fi
 echo "$LOG"

@@ -46,6 +46,11 @@ export type PoolEntryWithAvailability = PoolEntry & {
 /** Web API response: worker settings plus per-entry availability for the UI. */
 export type AutoRoutingSettingsApiResponse = Omit<AutoRoutingSettingsResponse, 'configuredPool'> & {
   configuredPool: PoolEntryWithAvailability[] | null;
+  /**
+   * False when the worker only supports legacy mode endpoints (deploy-order
+   * window or worker rollback). UI must hide pool editing and never send pool mutations.
+   */
+  poolSupported: boolean;
 };
 
 export type EligibleModelInfo = {
@@ -385,5 +390,25 @@ export function toApiSettingsResponse(
   return {
     ...workerBody,
     configuredPool,
+    poolSupported: true,
+  };
+}
+
+/**
+ * Synthesize a settings API response from the legacy mode-only worker body
+ * when `/admin/routing-settings` is not yet deployed (or was rolled back).
+ */
+export function toLegacyModeApiSettingsResponse(modeBody: {
+  ownerType: AutoRoutingSettingsResponse['ownerType'];
+  ownerId: string;
+  mode: AutoRoutingSettingsResponse['mode'];
+  configuredMode: AutoRoutingSettingsResponse['configuredMode'];
+  defaultMode: AutoRoutingSettingsResponse['defaultMode'];
+}): AutoRoutingSettingsApiResponse {
+  return {
+    ...modeBody,
+    configuredPool: null,
+    poolStatuses: [],
+    poolSupported: false,
   };
 }

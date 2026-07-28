@@ -1,4 +1,5 @@
 import {
+  AutoRoutingModeResponseSchema,
   AutoRoutingSettingsResponseSchema,
   BenchmarkProfileQuotaErrorSchema,
   UpdateAutoRoutingSettingsRequestSchema,
@@ -8,6 +9,7 @@ import {
 import { TRPCError } from '@trpc/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
+  getAutoRoutingMode,
   getAutoRoutingSettings,
   updateAutoRoutingSettings,
 } from '@/lib/ai-gateway/auto-routing-admin-client';
@@ -15,6 +17,7 @@ import {
   annotateConfiguredPool,
   poolValidationMessage,
   toApiSettingsResponse,
+  toLegacyModeApiSettingsResponse,
   validatePoolEntries,
   type AutoRoutingSettingsApiResponse,
 } from '@/lib/ai-gateway/auto-routing-pool-validation';
@@ -23,6 +26,9 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 
 export type { AutoRoutingSettingsApiResponse };
+
+const POOL_TEMPORARILY_UNAVAILABLE_MESSAGE =
+  'Custom pools are temporarily unavailable while routing backends update. Try again shortly.';
 
 function trpcErrorResponse(error: unknown): NextResponse<{ error: string }> | null {
   if (!(error instanceof TRPCError)) return null;
@@ -93,19 +99,22 @@ async function annotateWorkerSuccess(
   return NextResponse.json(apiBody, { status });
 }
 
-function workerResultResponse(
-  result: { status: number; body: unknown },
-  owner: { userId: string; organizationId: string | null }
-): Promise<NextResponse> | NextResponse {
+function workerErrorResponse(result: { status: number; body: unknown }): NextResponse {
   if (result.status === 429) {
     const quota = BenchmarkProfileQuotaErrorSchema.safeParse(result.body);
     if (quota.success) {
       return NextResponse.json(quota.data, { status: 429 });
     }
   }
+  return NextResponse.json(result.body, { status: result.status });
+}
 
+function workerResultResponse(
+  result: { status: number; body: unknown },
+  owner: { userId: string; organizationId: string | null }
+): Promise<NextResponse> | NextResponse {
   if (result.status >= 400) {
-    return NextResponse.json(result.body, { status: result.status });
+    return workerErrorResponse(result);
   }
 
   const parsed = AutoRoutingSettingsResponseSchema.safeParse(result.body);
@@ -116,6 +125,18 @@ function workerResultResponse(
   return annotateWorkerSuccess(result.status, parsed.data, owner);
 }
 
+function legacyModeSuccessResponse(result: { status: number; body: unknown }): NextResponse {
+  if (result.status >= 400) {
+    return workerErrorResponse(result);
+  }
+  const parsed = AutoRoutingModeResponseSchema.safeParse(result.body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid worker mode response' }, { status: 502 });
+  }
+  // No annotateConfiguredPool — pool is null; no catalog fetch.
+  return NextResponse.json(toLegacyModeApiSettingsResponse(parsed.data), { status: 200 });
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const owner = await resolveOwner(request);
   if ('response' in owner) return owner.response;
@@ -124,6 +145,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     ownerType: owner.ownerType,
     ownerId: owner.ownerId,
   });
+  if (result.status === 404) {
+    const legacy = await getAutoRoutingMode({
+      ownerType: owner.ownerType,
+      ownerId: owner.ownerId,
+    });
+    return legacyModeSuccessResponse(legacy);
+  }
   return workerResultResponse(result, owner);
 }
 
@@ -223,5 +251,19 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     pool,
     ...(parsed.data.retryEntries !== undefined ? { retryEntries: parsed.data.retryEntries } : {}),
   });
+
+  // Settings PUT callers always intend pool-aware writes. An old worker that
+  // 404s cannot honor `pool: null` clear intent (or any pool mutation); return
+  // a retryable 503 rather than silently falling back to mode-only PUT.
+  if (result.status === 404) {
+    return NextResponse.json(
+      {
+        error: POOL_TEMPORARILY_UNAVAILABLE_MESSAGE,
+        reason: 'pool_temporarily_unavailable',
+      },
+      { status: 503 }
+    );
+  }
+
   return workerResultResponse(result, owner);
 }

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import {
   annotatePoolAvailability,
   poolValidationMessage,
+  toApiSettingsResponse,
+  toLegacyModeApiSettingsResponse,
   validatePoolEntries,
   type EligibleCatalog,
 } from './auto-routing-pool-validation';
@@ -434,6 +436,53 @@ describe('auto-routing-pool-validation', () => {
         { model: 'removed/model', variant: null, unavailable: true },
         { model: 'google/gemini-2.5-flash', variant: null, unavailable: false },
       ]);
+    });
+  });
+
+  describe('toApiSettingsResponse / toLegacyModeApiSettingsResponse', () => {
+    test('toApiSettingsResponse includes poolSupported: true', () => {
+      const response = toApiSettingsResponse(
+        {
+          ownerType: 'user',
+          ownerId: 'user-1',
+          mode: 'cost_per_accuracy',
+          configuredMode: null,
+          defaultMode: 'cost_per_accuracy',
+          configuredPool: null,
+          poolStatuses: [],
+        },
+        null
+      );
+      expect(response.poolSupported).toBe(true);
+      expect(response).toEqual(
+        expect.objectContaining({
+          ownerType: 'user',
+          ownerId: 'user-1',
+          configuredPool: null,
+          poolSupported: true,
+        })
+      );
+    });
+
+    test('toLegacyModeApiSettingsResponse synthesizes poolSupported: false', () => {
+      expect(
+        toLegacyModeApiSettingsResponse({
+          ownerType: 'user',
+          ownerId: 'user-1',
+          mode: 'best_accuracy',
+          configuredMode: 'best_accuracy',
+          defaultMode: 'cost_per_accuracy',
+        })
+      ).toEqual({
+        ownerType: 'user',
+        ownerId: 'user-1',
+        mode: 'best_accuracy',
+        configuredMode: 'best_accuracy',
+        defaultMode: 'cost_per_accuracy',
+        configuredPool: null,
+        poolStatuses: [],
+        poolSupported: false,
+      });
     });
   });
 });

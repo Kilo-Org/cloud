@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import type { AutoRoutingSettingsResponse } from '@kilocode/auto-routing-contracts';
 import { NextRequest } from 'next/server';
 import {
+  getAutoRoutingMode,
   getAutoRoutingSettings,
   updateAutoRoutingSettings,
 } from '@/lib/ai-gateway/auto-routing-admin-client';
@@ -49,6 +50,7 @@ const { getAvailableModelsForOrganization } = jest.requireMock(
 
 const mockedGetAutoRoutingSettings = jest.mocked(getAutoRoutingSettings);
 const mockedUpdateAutoRoutingSettings = jest.mocked(updateAutoRoutingSettings);
+const mockedGetAutoRoutingMode = jest.mocked(getAutoRoutingMode);
 const mockedRequireActiveSubscriptionOrTrial = jest.mocked(requireActiveSubscriptionOrTrial);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
@@ -57,6 +59,25 @@ const mockedListExperiments = jest.mocked(listAvailableExperimentModels);
 const mockedGetByokUser = jest.mocked(getDirectByokModelsForUser);
 const mockedGetByokOrg = jest.mocked(getDirectByokModelsForOrganization);
 const mockedGetOrgModels = jest.mocked(getAvailableModelsForOrganization);
+
+function modeBody(
+  overrides: Partial<{
+    ownerType: 'user' | 'org';
+    ownerId: string;
+    mode: 'cost_per_accuracy' | 'best_accuracy';
+    configuredMode: 'cost_per_accuracy' | 'best_accuracy' | null;
+    defaultMode: 'cost_per_accuracy' | 'best_accuracy';
+  }> = {}
+) {
+  return {
+    ownerType: 'user' as const,
+    ownerId: USER_ID,
+    mode: 'best_accuracy' as const,
+    configuredMode: 'best_accuracy' as const,
+    defaultMode: 'cost_per_accuracy' as const,
+    ...overrides,
+  };
+}
 
 const USER_ID = 'user-1';
 const ORGANIZATION_ID = 'org-1';
@@ -159,12 +180,64 @@ describe('/api/auto-routing/settings', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
+        poolSupported: true,
         configuredPool: [
           { model: 'anthropic/claude-sonnet-4', variant: 'high', unavailable: false },
           { model: 'removed/model', variant: null, unavailable: true },
         ],
       })
     );
+    expect(mockedGetAutoRoutingMode).not.toHaveBeenCalled();
+  });
+
+  test('GET falls back to legacy mode when settings endpoint is 404', async () => {
+    mockedGetAutoRoutingSettings.mockResolvedValue({
+      status: 404,
+      body: { error: 'Not found' },
+    });
+    mockedGetAutoRoutingMode.mockResolvedValue({
+      status: 200,
+      body: modeBody({
+        mode: 'best_accuracy',
+        configuredMode: 'best_accuracy',
+      }),
+    });
+
+    const response = await GET(makeRequest('/api/auto-routing/settings'));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ownerType: 'user',
+      ownerId: USER_ID,
+      mode: 'best_accuracy',
+      configuredMode: 'best_accuracy',
+      defaultMode: 'cost_per_accuracy',
+      configuredPool: null,
+      poolStatuses: [],
+      poolSupported: false,
+    });
+    expect(mockedGetAutoRoutingMode).toHaveBeenCalledWith({
+      ownerType: 'user',
+      ownerId: USER_ID,
+    });
+    // Legacy path must not annotate pool / fetch catalog.
+    expect(mockedGetEnhanced).not.toHaveBeenCalled();
+  });
+
+  test('GET passes through legacy mode failure status after settings 404', async () => {
+    mockedGetAutoRoutingSettings.mockResolvedValue({
+      status: 404,
+      body: { error: 'Not found' },
+    });
+    mockedGetAutoRoutingMode.mockResolvedValue({
+      status: 503,
+      body: { error: 'Worker unavailable' },
+    });
+
+    const response = await GET(makeRequest('/api/auto-routing/settings'));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: 'Worker unavailable' });
   });
 
   test('rejects org member PUT without owner/billing_manager role with 401', async () => {
@@ -275,6 +348,9 @@ describe('/api/auto-routing/settings', () => {
     );
 
     expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({ poolSupported: true })
+    );
     expect(mockedUpdateAutoRoutingSettings).toHaveBeenCalledWith({
       ownerType: 'user',
       ownerId: USER_ID,
@@ -282,6 +358,43 @@ describe('/api/auto-routing/settings', () => {
       pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
     });
     expect(mockedRequireActiveSubscriptionOrTrial).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    {
+      name: 'mode-only clear (pool: null)',
+      body: { mode: 'best_accuracy' as const, pool: null },
+    },
+    {
+      name: 'non-null pool',
+      body: {
+        mode: null,
+        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      },
+    },
+    {
+      name: 'retryEntries',
+      body: {
+        mode: null,
+        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      },
+    },
+  ])('PUT with $name returns 503 when settings endpoint is 404', async ({ body }) => {
+    mockedUpdateAutoRoutingSettings.mockResolvedValue({
+      status: 404,
+      body: { error: 'Not found' },
+    });
+
+    const response = await PUT(makeRequest('/api/auto-routing/settings', body));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        'Custom pools are temporarily unavailable while routing backends update. Try again shortly.',
+      reason: 'pool_temporarily_unavailable',
+    });
+    expect(mockedUpdateAutoRoutingSettings).toHaveBeenCalled();
   });
 
   test('returns 400 for invalid body', async () => {

@@ -12,7 +12,10 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Route, Trash2, X } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+// Default `React` is required by Jest's SWC classic JSX transform (see apps/web/jest.config.ts).
+// tsconfig uses "jsx": "react-jsx" for production; changing the Jest transform is out of this
+// slice's owned paths. Keep the default until Jest is switched to the automatic runtime.
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -50,6 +53,13 @@ export type AutoRoutingSettingsApiResponse = {
   defaultMode: AutoRoutingMode;
   configuredPool: PoolEntryWithAvailability[] | null;
   poolStatuses: BenchmarkProfileEntryStatus[];
+  /**
+   * False when the BFF fell back to legacy mode-only workers (deploy window /
+   * rollback). Pool editor is replaced by an informational note; saves go to
+   * the legacy mode endpoint (`{ mode }` only) so a server-side pool is never
+   * cleared or silently preserved via a mismatched settings PUT.
+   */
+  poolSupported: boolean;
 };
 
 export type ModeSelection = AutoRoutingMode | 'inherit';
@@ -84,6 +94,8 @@ export const UNAVAILABLE_ENTRY_EXPLANATION =
 
 export const SETTINGS_POLL_INTERVAL_MS = 15_000;
 
+export const POOL_ROLLOUT_NOTE = 'Custom pools are being rolled out and will be available shortly.';
+
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for focused component tests)
 // ---------------------------------------------------------------------------
@@ -92,6 +104,16 @@ export function settingsEndpoint(organizationId: string | undefined): string {
   if (!organizationId) return '/api/auto-routing/settings';
   const params = new URLSearchParams({ organizationId });
   return `/api/auto-routing/settings?${params}`;
+}
+
+/**
+ * Legacy mode-only BFF used when `poolSupported === false`. Mode PUT never
+ * touches pool keys at any worker version.
+ */
+export function modeEndpoint(organizationId: string | undefined): string {
+  if (!organizationId) return '/api/auto-routing/mode';
+  const params = new URLSearchParams({ organizationId });
+  return `/api/auto-routing/mode?${params}`;
 }
 
 export function settingsQueryKey(organizationId: string | undefined) {
@@ -255,11 +277,13 @@ export function hasBenchmarkingEntries(
 /**
  * React Query refetchInterval: poll while any saved entry is Benchmarking;
  * stop once every entry is terminal (ready/failed) or unavailable.
+ * Never poll when the worker does not support pools (legacy fallback).
  */
 export function settingsRefetchInterval(
   data: AutoRoutingSettingsApiResponse | undefined
 ): number | false {
   if (!data) return false;
+  if (data.poolSupported === false) return false;
   return hasBenchmarkingEntries(data.configuredPool, data.poolStatuses)
     ? SETTINGS_POLL_INTERVAL_MS
     : false;
@@ -283,6 +307,11 @@ export function buildSaveBody(params: { mode: ModeSelection; pool: DraftPool }):
     mode: params.mode === 'inherit' ? null : params.mode,
     pool: params.pool,
   };
+}
+
+/** Mode-only body for the legacy `/api/auto-routing/mode` PUT. */
+export function buildModeSaveBody(mode: ModeSelection): { mode: AutoRoutingMode | null } {
+  return { mode: mode === 'inherit' ? null : mode };
 }
 
 export function buildRetryBody(params: {
@@ -605,6 +634,20 @@ async function fetchSettings(
   return body as AutoRoutingSettingsApiResponse;
 }
 
+function throwSaveError(body: unknown, status: number): never {
+  const message = formatSaveErrorMessage(body, status);
+  const error = new Error(message) as Error & {
+    status?: number;
+    retryAt?: string;
+    quota?: BenchmarkProfileQuotaError;
+  };
+  error.status = status;
+  if (body && typeof body === 'object' && 'retryAt' in body && typeof body.retryAt === 'string') {
+    error.retryAt = body.retryAt;
+  }
+  throw error;
+}
+
 async function putSettings(
   organizationId: string | undefined,
   payload: {
@@ -620,19 +663,28 @@ async function putSettings(
   });
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = formatSaveErrorMessage(body, response.status);
-    const error = new Error(message) as Error & {
-      status?: number;
-      retryAt?: string;
-      quota?: BenchmarkProfileQuotaError;
-    };
-    error.status = response.status;
-    if (body && typeof body === 'object' && 'retryAt' in body && typeof body.retryAt === 'string') {
-      error.retryAt = body.retryAt;
-    }
-    throw error;
+    throwSaveError(body, response.status);
   }
   return body as AutoRoutingSettingsApiResponse;
+}
+
+/**
+ * Legacy mode-only save. On success the caller invalidates the settings query
+ * so GET re-synthesizes `{ poolSupported: false, … }` from the mode endpoint.
+ */
+async function putMode(
+  organizationId: string | undefined,
+  payload: { mode: AutoRoutingMode | null }
+): Promise<void> {
+  const response = await fetch(modeEndpoint(organizationId), {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    throwSaveError(body, response.status);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -708,12 +760,33 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
   }, [query.data, modeOverride, poolOverride]);
 
   const saveMutation = useMutation({
-    mutationFn: (payload: {
+    mutationFn: async (payload: {
+      /** When true, write mode via the legacy mode endpoint (no pool keys). */
+      useLegacyModeEndpoint: boolean;
       mode: AutoRoutingMode | null;
       pool: PoolEntry[] | null;
       retryEntries?: PoolEntry[];
-    }) => putSettings(organizationId, payload),
+    }): Promise<AutoRoutingSettingsApiResponse | 'legacy-mode-saved'> => {
+      if (payload.useLegacyModeEndpoint) {
+        await putMode(organizationId, { mode: payload.mode });
+        return 'legacy-mode-saved';
+      }
+      return putSettings(organizationId, {
+        mode: payload.mode,
+        pool: payload.pool,
+        ...(payload.retryEntries !== undefined ? { retryEntries: payload.retryEntries } : {}),
+      });
+    },
     onSuccess: data => {
+      if (data === 'legacy-mode-saved') {
+        // Refetch settings so GET fallback re-synthesizes poolSupported: false.
+        setSaveError(null);
+        setRetryingKey(null);
+        clearOverridesAfterSaveRef.current = true;
+        void queryClient.invalidateQueries({ queryKey });
+        toast.success('Auto routing settings saved');
+        return;
+      }
       // Align overrides with the saved response immediately so the UI shows
       // the committed pool; the effect above clears them once query.data matches.
       applySaveMutationSuccess({
@@ -829,9 +902,26 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     setAddError(null);
   };
 
+  const poolSupported = query.data?.poolSupported !== false;
+
   const handleSave = () => {
     setSaveError(null);
-    saveMutation.mutate(buildSaveBody({ mode: selectedMode, pool: draftPool }));
+    if (!poolSupported) {
+      // Mode-only legacy endpoint never touches pool keys (any worker version).
+      const { mode } = buildModeSaveBody(selectedMode);
+      saveMutation.mutate({
+        useLegacyModeEndpoint: true,
+        mode,
+        pool: null,
+      });
+      return;
+    }
+    const body = buildSaveBody({ mode: selectedMode, pool: draftPool });
+    saveMutation.mutate({
+      useLegacyModeEndpoint: false,
+      mode: body.mode,
+      pool: body.pool,
+    });
   };
 
   const handleRetryBenchmark = (entry: PoolEntry) => {
@@ -941,11 +1031,13 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-sm font-medium">Efficient model pool</h3>
-              <p id={poolHelpId} className="text-muted-foreground text-sm">
-                Up to {MAX_POOL_ENTRIES} exact model and variant pairs. Leave empty to inherit.
-              </p>
+              {poolSupported ? (
+                <p id={poolHelpId} className="text-muted-foreground text-sm">
+                  Up to {MAX_POOL_ENTRIES} exact model and variant pairs. Leave empty to inherit.
+                </p>
+              ) : null}
             </div>
-            {editableChrome.showAddModel && (
+            {poolSupported && editableChrome.showAddModel && (
               <div className="flex flex-wrap gap-2">
                 {editableChrome.showClearPool ? (
                   <Button
@@ -974,7 +1066,14 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
             )}
           </div>
 
-          {!draftHasEntries ? (
+          {!poolSupported ? (
+            <div
+              className="bg-muted/30 space-y-3 rounded-md border border-dashed p-4"
+              role="status"
+            >
+              <p className="text-muted-foreground text-sm">{POOL_ROLLOUT_NOTE}</p>
+            </div>
+          ) : !draftHasEntries ? (
             <div
               className="bg-muted/30 space-y-3 rounded-md border border-dashed p-4"
               role="status"
@@ -1078,7 +1177,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
             </ul>
           )}
 
-          {showAddFlow && editableChrome.showAddModel ? (
+          {poolSupported && showAddFlow && editableChrome.showAddModel ? (
             <div ref={addModelSectionRef} className="bg-muted/20 space-y-3 rounded-md border p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">Add model</p>

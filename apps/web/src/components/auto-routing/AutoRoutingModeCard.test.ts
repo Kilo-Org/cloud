@@ -1,8 +1,31 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createRequire } from 'node:module';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { BenchmarkProfileEntryStatus, PoolEntry } from '@kilocode/auto-routing-contracts';
+
+jest.mock('@/app/api/openrouter/hooks', () => ({
+  useModelSelectorList: () => ({
+    data: { data: [] },
+    isLoading: false,
+  }),
+}));
+
+jest.mock('sonner', () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
 import {
   applyRetryMutationSuccess,
   applySaveMutationError,
   applySaveMutationSuccess,
+  AutoRoutingModeCard,
+  buildModeSaveBody,
   buildRetryBody,
   buildSaveBody,
   emptyPoolCopy,
@@ -14,9 +37,11 @@ import {
   isEligiblePoolModel,
   isExperimentSelectorModel,
   mapPoolEntryDisplayStatus,
+  modeEndpoint,
   NOT_SAVED_ENTRY_LABEL,
   ORGANIZATION_EMPTY_POOL_COPY,
   PERSONAL_EMPTY_POOL_COPY,
+  POOL_ROLLOUT_NOTE,
   removePoolEntry,
   resolveEditableChrome,
   resolveEffectiveDraft,
@@ -33,7 +58,92 @@ import {
   type DraftPool,
   type PoolEntryWithAvailability,
 } from './AutoRoutingModeCard';
-import type { BenchmarkProfileEntryStatus, PoolEntry } from '@kilocode/auto-routing-contracts';
+
+type LinkedomParseHtml = (html: string) => {
+  window: typeof globalThis & {
+    HTMLElement: typeof HTMLElement;
+    Element: typeof Element;
+    Node: typeof Node;
+    Text: typeof Text;
+    Comment: typeof Comment;
+    DocumentFragment: typeof DocumentFragment;
+    Document: typeof Document;
+    SVGElement: typeof SVGElement;
+    Event: typeof Event;
+    CustomEvent: typeof CustomEvent;
+    navigator: Navigator;
+  };
+  document: Document;
+};
+
+/** linkedom lives in the monorepo pnpm store (transitive); resolve from this file. */
+function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
+  const requireFromHere = createRequire(__filename);
+  const loadLinkedom = (): { parseHTML: LinkedomParseHtml } => {
+    try {
+      return requireFromHere('linkedom') as { parseHTML: LinkedomParseHtml };
+    } catch {
+      // Transitive monorepo path (not a web package dep): test file → repo root.
+      return requireFromHere(
+        '../../../../node_modules/.pnpm/linkedom@0.18.12/node_modules/linkedom'
+      ) as { parseHTML: LinkedomParseHtml };
+    }
+  };
+  const { parseHTML } = loadLinkedom();
+
+  const { window, document } = parseHTML(
+    '<!doctype html><html><body><div id="root"></div></body></html>'
+  );
+
+  const previous = {
+    window: globalThis.window,
+    document: globalThis.document,
+    HTMLElement: globalThis.HTMLElement,
+    Element: globalThis.Element,
+    Node: globalThis.Node,
+    Text: globalThis.Text,
+    Comment: globalThis.Comment,
+    DocumentFragment: globalThis.DocumentFragment,
+    Document: globalThis.Document,
+    SVGElement: globalThis.SVGElement,
+    Event: globalThis.Event,
+    CustomEvent: globalThis.CustomEvent,
+    navigator: globalThis.navigator,
+    requestAnimationFrame: globalThis.requestAnimationFrame,
+    cancelAnimationFrame: globalThis.cancelAnimationFrame,
+    IS_REACT_ACT_ENVIRONMENT: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT,
+  };
+
+  Object.assign(globalThis, {
+    window,
+    document,
+    HTMLElement: window.HTMLElement,
+    Element: window.Element,
+    Node: window.Node,
+    Text: window.Text,
+    Comment: window.Comment,
+    DocumentFragment: window.DocumentFragment,
+    Document: window.Document,
+    SVGElement: window.SVGElement,
+    Event: window.Event,
+    CustomEvent: window.CustomEvent,
+    navigator: window.navigator,
+    requestAnimationFrame: (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0),
+    cancelAnimationFrame: (id: number) => clearTimeout(id),
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+
+  const container = document.getElementById('root');
+  if (!container) throw new Error('linkedom root missing');
+
+  return {
+    container: container as unknown as HTMLElement,
+    cleanup: () => {
+      Object.assign(globalThis, previous);
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -67,8 +177,73 @@ function settings(
     defaultMode: 'cost_per_accuracy',
     configuredPool: null,
     poolStatuses: [],
+    poolSupported: true,
     ...overrides,
   };
+}
+function createTestQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function mountCardHtml(data: AutoRoutingSettingsApiResponse): string {
+  const queryClient = createTestQueryClient();
+  // Seed cache so the first render is the loaded settings state (not skeleton).
+  queryClient.setQueryData(settingsQueryKey(undefined), data);
+
+  return renderToStaticMarkup(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(AutoRoutingModeCard, {})
+    )
+  );
+}
+
+type MountedCard = {
+  container: HTMLElement;
+  root: Root;
+  cleanup: () => void;
+};
+
+function mountCardDom(data: AutoRoutingSettingsApiResponse, organizationId?: string): MountedCard {
+  const dom = installLinkedomDom();
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(settingsQueryKey(organizationId), data);
+
+  let root!: Root;
+  act(() => {
+    root = createRoot(dom.container);
+    root.render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(AutoRoutingModeCard, organizationId ? { organizationId } : {})
+      )
+    );
+  });
+
+  return {
+    container: dom.container,
+    root,
+    cleanup: () => {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    },
+  };
+}
+
+function findSaveButton(container: HTMLElement): HTMLButtonElement {
+  const buttons = Array.from(container.querySelectorAll('button'));
+  const save = buttons.find(button => button.textContent?.includes('Save auto routing'));
+  if (!save) throw new Error('Save auto routing button not found');
+  return save as HTMLButtonElement;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,12 +251,17 @@ function settings(
 // ---------------------------------------------------------------------------
 
 describe('settings endpoint and query key', () => {
-  it('uses the settings route and never the legacy mode route', () => {
+  it('uses the settings route for pool-aware reads/writes', () => {
     expect(settingsEndpoint(undefined)).toBe('/api/auto-routing/settings');
     expect(settingsEndpoint('org-1')).toBe('/api/auto-routing/settings?organizationId=org-1');
     expect(settingsEndpoint(undefined)).not.toContain('/mode');
     expect(settingsQueryKey(undefined)).toEqual(['auto-routing-settings', 'personal']);
     expect(settingsQueryKey('org-9')).toEqual(['auto-routing-settings', 'org-9']);
+  });
+
+  it('exposes the legacy mode endpoint for unsupported-pool saves', () => {
+    expect(modeEndpoint(undefined)).toBe('/api/auto-routing/mode');
+    expect(modeEndpoint('org-1')).toBe('/api/auto-routing/mode?organizationId=org-1');
   });
 });
 
@@ -190,6 +370,18 @@ describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
     { ...entryReady, unavailable: false },
     { ...entryPending, unavailable: false },
   ];
+
+  it('never polls when poolSupported is false', () => {
+    expect(
+      settingsRefetchInterval(
+        settings({
+          poolSupported: false,
+          configuredPool: configured,
+          poolStatuses: statuses,
+        })
+      )
+    ).toBe(false);
+  });
 
   it('polls while any saved entry is pending/running', () => {
     expect(hasBenchmarkingEntries(configured, statuses)).toBe(true);
@@ -636,7 +828,7 @@ describe('toEligibleModelOptions', () => {
 // Save / retry bodies
 // ---------------------------------------------------------------------------
 
-describe('buildSaveBody / buildRetryBody', () => {
+describe('buildSaveBody / buildRetryBody / buildModeSaveBody', () => {
   it('PUTs { mode, pool } with nulls for inherit (happy save payload)', () => {
     expect(buildSaveBody({ mode: 'inherit', pool: null })).toEqual({
       mode: null,
@@ -651,6 +843,12 @@ describe('buildSaveBody / buildRetryBody', () => {
       mode: 'best_accuracy',
       pool: [entryReady],
     });
+  });
+
+  it('buildModeSaveBody is mode-only (no pool fields)', () => {
+    expect(buildModeSaveBody('best_accuracy')).toEqual({ mode: 'best_accuracy' });
+    expect(buildModeSaveBody('inherit')).toEqual({ mode: null });
+    expect(buildModeSaveBody('best_accuracy')).not.toHaveProperty('pool');
   });
 
   it('retry PUTs the current saved pool with retryEntries: [entry]', () => {
@@ -817,6 +1015,172 @@ describe('variantLabel', () => {
   it('labels null as Default and known effort keys for display', () => {
     expect(variantLabel(null)).toBe('Default');
     expect(variantLabel('high')).toBe('High');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mounted card: poolSupported === false (legacy worker fallback)
+// ---------------------------------------------------------------------------
+
+describe('AutoRoutingModeCard poolSupported=false', () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('renders the rollout note and no pool controls; disables polling', () => {
+    const data = settings({
+      poolSupported: false,
+      configuredMode: 'cost_per_accuracy',
+      mode: 'cost_per_accuracy',
+    });
+    const html = mountCardHtml(data);
+
+    expect(html).toContain(POOL_ROLLOUT_NOTE);
+    expect(html).not.toContain('Add model');
+    expect(html).not.toContain('Clear pool');
+    expect(html).not.toContain(PERSONAL_EMPTY_POOL_COPY);
+    expect(html).not.toContain('Retry benchmark');
+    expect(html).toContain('Routing mode');
+    expect(html).toContain('Save auto routing');
+    expect(html).toContain('Efficient model pool');
+
+    // Card wires settingsRefetchInterval into useQuery — must not poll.
+    expect(
+      settingsRefetchInterval(
+        settings({
+          poolSupported: false,
+          configuredPool: [{ ...entryPending, unavailable: false }],
+          poolStatuses: [{ entry: entryPending, status: 'pending' }],
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('Save control PUTs { mode } to the legacy mode endpoint, not settings', async () => {
+    const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auto-routing/mode') && init?.method === 'PUT') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ownerType: 'user',
+            ownerId: 'user-1',
+            mode: 'best_accuracy',
+            configuredMode: 'best_accuracy',
+            defaultMode: 'cost_per_accuracy',
+          }),
+        } as Response;
+      }
+      // invalidate/refetch after legacy save
+      if (url.includes('/api/auto-routing/settings')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () =>
+            settings({
+              poolSupported: false,
+              configuredMode: 'best_accuracy',
+              mode: 'best_accuracy',
+            }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    // Saved mode is inherit (configuredMode null). Dirty by selecting best_accuracy
+    // so the real Save control is enabled, then click it.
+    const data = settings({
+      poolSupported: false,
+      configuredMode: null,
+      mode: 'cost_per_accuracy',
+    });
+    const mounted = mountCardDom(data);
+
+    try {
+      await act(async () => {
+        // Radix Select stores onValueChange on the provider; linkedom cannot open
+        // the portal menu, so drive the same change handler the Select wires up
+        // by finding the combobox trigger's React props is unreliable. Instead
+        // use the Select root via React fiber is fragile — set the mode through
+        // the same public path as Select: dispatch on the trigger after finding
+        // the hidden select value change. Practically: click is enough if we
+        // force-enable by changing draft via a second approach —
+        // query the SelectItem buttons after opening is hard without pointer
+        // events. Use React internals on the Select: the Select root is a
+        // context provider with value/onValueChange. Walk fibers:
+        type Fiber = {
+          memoizedProps?: { onValueChange?: (v: string) => void; value?: string };
+          child?: Fiber | null;
+          sibling?: Fiber | null;
+        };
+        const reactKey = Object.keys(mounted.container).find(key =>
+          key.startsWith('__reactContainer')
+        );
+        const host = reactKey
+          ? (mounted.container as unknown as Record<string, { stateNode?: { current?: Fiber } }>)[
+              reactKey
+            ]
+          : undefined;
+        const walk = (fiber: Fiber | null | undefined, visit: (f: Fiber) => void) => {
+          if (!fiber) return;
+          visit(fiber);
+          walk(fiber.child, visit);
+          walk(fiber.sibling, visit);
+        };
+        let onValueChange: ((v: string) => void) | undefined;
+        const rootFiber = host?.stateNode?.current;
+        walk(rootFiber, fiber => {
+          const props = fiber.memoizedProps;
+          if (
+            props &&
+            typeof props.onValueChange === 'function' &&
+            (props.value === 'inherit' || props.value === undefined)
+          ) {
+            onValueChange = props.onValueChange;
+          }
+        });
+        if (!onValueChange) {
+          throw new Error('Select onValueChange not found on fiber tree');
+        }
+        onValueChange('best_accuracy');
+      });
+
+      const saveButton = findSaveButton(mounted.container);
+      expect(saveButton.disabled).toBe(false);
+
+      await act(async () => {
+        saveButton.click();
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const putCalls = fetchMock.mock.calls.filter(
+        ([, init]) => init && typeof init === 'object' && init.method === 'PUT'
+      );
+      expect(putCalls).toHaveLength(1);
+      const [putUrl, putInit] = putCalls[0]!;
+      expect(String(putUrl)).toBe(modeEndpoint(undefined));
+      expect(String(putUrl)).not.toContain('/settings');
+      expect(putInit?.method).toBe('PUT');
+      const putBody = JSON.parse(String(putInit?.body));
+      expect(putBody).toEqual({ mode: 'best_accuracy' });
+      expect(putBody).not.toHaveProperty('pool');
+      expect(putBody).not.toHaveProperty('retryEntries');
+    } finally {
+      mounted.cleanup();
+    }
   });
 });
 

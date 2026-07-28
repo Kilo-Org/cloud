@@ -297,7 +297,7 @@ export default function UsageRecordsContent() {
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-4 lg:grid-cols-3 lg:items-start xl:grid-cols-[9rem_minmax(12.5rem,1fr)_7rem_10rem_10rem_auto] xl:gap-3"
+            className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 lg:items-start xl:grid-cols-[8rem_minmax(11rem,1fr)_minmax(20rem,1.5fr)_7rem_9rem_9rem_auto] xl:gap-3"
             onSubmit={event => {
               event.preventDefault();
               const trimmed = value.trim();
@@ -382,10 +382,13 @@ export default function UsageRecordsContent() {
               </Select>
             </div>
             {(kind === 'user' || kind === 'org') && (
-              <div className="space-y-1.5 lg:col-span-3 xl:col-span-2">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5 md:col-span-2 lg:col-span-2 xl:col-span-1">
+                <Label>Usage window</Label>
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="usage-summary-start">Window start</Label>
+                    <Label htmlFor="usage-summary-start" className="sr-only">
+                      Window start
+                    </Label>
                     <Input
                       id="usage-summary-start"
                       type="datetime-local"
@@ -398,7 +401,9 @@ export default function UsageRecordsContent() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="usage-summary-end">Window end</Label>
+                    <Label htmlFor="usage-summary-end" className="sr-only">
+                      Window end
+                    </Label>
                     <Input
                       id="usage-summary-end"
                       type="datetime-local"
@@ -523,17 +528,37 @@ export default function UsageRecordsContent() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 md:col-span-2 lg:col-span-1">
               <Label className="invisible" aria-hidden="true">
-                Action
+                Actions
               </Label>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={results.isFetching || !value.trim()}
-              >
-                <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
-              </Button>
+              <div className="grid grid-cols-2 gap-2 xl:flex">
+                <Button
+                  type="submit"
+                  className="w-full xl:w-auto"
+                  disabled={results.isFetching || !value.trim()}
+                >
+                  <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full xl:w-auto"
+                  onClick={() => {
+                    setValue('');
+                    setStatus('all');
+                    setCloseReason('all');
+                    setSkuId('all');
+                    setSummaryInputError(null);
+                    setSummaryRequest(null);
+                    setSubmitted({ kind: 'recent' });
+                    replaceCloseReasonParam(undefined);
+                    resetResultNavigation();
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>

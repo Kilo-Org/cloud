@@ -55,7 +55,7 @@ The cwd/worktree is always the **cloud** worktree, even when the slice edits a s
 
 What the script encodes (details in `learnings/`):
 
-- tmux wrapping — harness command timeouts kill bare long runs. The `e2e-verifier` gets its **own tmux session** (E2E slots are owned and auto-reclaimed by session name; a window-named owner leaks or shares slots); other roles run as windows in the dispatcher's session. Names are `<section>-<role>-<label>`, logs `$SCRATCH/<role>-<label>.log`.
+- tmux wrapping — harness command timeouts kill bare long runs. The `e2e-verifier` gets its **own tmux session** (E2E slots are owned and auto-reclaimed by session name; a window-named owner leaks or shares slots); other roles run as windows in the dispatcher's session, resolved through `$TMUX_PANE`. A dispatcher that is not itself inside tmux has no such session, so its roles get their own sessions too — never a guessed one. Names are `<section>-<role>-<label>`, logs `$SCRATCH/<role>-<label>.log`.
 - Full `KILO_*`/`OPENCODE*` env strip — a dispatcher running inside kilo poisons nested runs otherwise (see `learnings/nested-kilo-run-env-poisoning.md`).
 - Output redirected, never piped (`| tee` makes `$?` report the pipe's exit, not kilo's), with `EXITCODE=$?` appended as the log's last line.
 

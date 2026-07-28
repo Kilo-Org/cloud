@@ -257,6 +257,8 @@ apps/mobile/e2e/login.sh <serial>
 
 `build` installs a validated cached APK when the Android native fingerprint and toolchain match. Never install an APK from another output path or invoke Gradle directly. Reinstall via `build <serial>` only when the native fingerprint changed, never to reset app state.
 
+`build` reads the generated Android project, and `apps/mobile/android/` is git-ignored — a fresh worktree has none. Run `npx expo prebuild --platform android` in `apps/mobile` once before the first `build`; it is codegen only, needs no wrapper, and a missing project is the one failure `build` cannot fix itself.
+
 `login.sh` and `logout.sh` accept an iOS simulator UDID or an Android ADB serial. On Android, `login.sh`'s shared preflight verifies the claim, applies both `adb reverse` mappings (the `nextjs` service's API port and the `mobile` service's Metro port, both from `pnpm dev:status --json` — there is no service named `metro`), and opens the dev-client deep link itself. On the primary path no manual reverse or `am start` is needed.
 
 ### Mid-test recovery

@@ -186,6 +186,110 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(authFile).not.toContain('wrapper-dispatch-ticket');
   });
 
+  it('shallow-clones and fetches only the reviewed branch for code review sessions', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://bitbucket.org/acme/repo.git',
+      token: 'bb-token',
+      platform: 'bitbucket',
+    };
+    request.workspace.branchName = 'feature/login';
+
+    const gitCalls: Array<{ args: string[]; opts?: { hardTimeoutMs?: number } }> = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async (args, opts) => {
+          gitCalls.push({ args, opts: opts as { hardTimeoutMs?: number } });
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    const cloneCall = gitCalls.find(call => call.args[0] === 'clone');
+    expect(cloneCall?.args).toEqual([
+      'clone',
+      '--progress',
+      '--depth',
+      '1',
+      'https://x-token-auth:bb-token@bitbucket.org/acme/repo.git',
+      request.workspace.workspacePath,
+    ]);
+    expect(cloneCall?.opts?.hardTimeoutMs).toBe(600_000);
+    expect(
+      gitCalls.some(
+        call => call.args.join(' ') === 'fetch --progress --depth 1 origin feature/login'
+      )
+    ).toBe(true);
+    // The all-refs, full-history fetch must not run for a review session.
+    expect(gitCalls.some(call => call.args.join(' ') === 'fetch --progress origin')).toBe(false);
+  });
+
+  it('falls back to a full clone when the shallow clone fails', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://bitbucket.org/acme/repo.git',
+      token: 'bb-token',
+      platform: 'bitbucket',
+    };
+    request.workspace.branchName = 'feature/login';
+
+    const cloneArgs: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            cloneArgs.push(args);
+            if (args.includes('--depth')) {
+              return { stdout: '', stderr: 'shallow not supported', exitCode: 1 };
+            }
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return { stdout: '', stderr: '', exitCode: 0 };
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(cloneArgs.length).toBe(2);
+    expect(cloneArgs[0]).toContain('--depth');
+    expect(cloneArgs[1]).not.toContain('--depth');
+  });
+
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];

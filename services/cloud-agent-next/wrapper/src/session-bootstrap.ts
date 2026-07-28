@@ -25,6 +25,9 @@ import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-erro
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
 const LONG_COMMAND_HARD_TIMEOUT_MS = 300_000;
+// Cloud code-review clones may fall back to a full clone on large repositories;
+// give the git clone/fetch steps extra headroom in review sessions only.
+const REVIEW_GIT_HARD_TIMEOUT_MS = 10 * 60_000;
 // Setup commands may legitimately stay silent for minutes (piped tools often
 // buffer), unlike git commands which run with --progress, so they get a more
 // lenient silence watchdog.
@@ -245,12 +248,13 @@ function longGitOptions(
   progress: BootstrapProgress | undefined,
   step: 'cloning' | 'branch',
   progressPrefix: string,
-  cwd?: string
+  cwd?: string,
+  hardTimeoutMs: number = LONG_COMMAND_HARD_TIMEOUT_MS
 ): ProcessOptions {
   return {
     cwd,
     inactivityTimeoutMs: LONG_COMMAND_INACTIVITY_TIMEOUT_MS,
-    hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
+    hardTimeoutMs,
     onOutput: gitProgressReporter(progress, step, progressPrefix),
   };
 }
@@ -332,6 +336,10 @@ async function cleanupWorkspace(request: WrapperSessionReadyRequest): Promise<vo
   ]);
 }
 
+function isCodeReviewSession(request: WrapperSessionReadyRequest): boolean {
+  return request.materialized.env.KILO_PLATFORM === 'code-review';
+}
+
 async function cloneRepository(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner,
@@ -346,16 +354,37 @@ async function cloneRepository(
   const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
   const platform = repo.kind === 'git' ? repo.platform : 'github';
   const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
-  const args = ['clone', '--progress'];
-  if (repo.shallow) {
-    args.push('--depth', '1');
+
+  // Cloud code review reads the diff from the provider API (bb/gh pr diff) and
+  // only needs the head working tree, never git history. A shallow clone keeps
+  // clone time bounded by the working tree instead of full history, which on
+  // large repositories otherwise exceeds the clone hard timeout. Any failure
+  // retries a full clone so a review is never lost to the optimization.
+  const reviewSession = isCodeReviewSession(request);
+  const shallow = reviewSession || repo.shallow === true;
+  const hardTimeoutMs = reviewSession ? REVIEW_GIT_HARD_TIMEOUT_MS : LONG_COMMAND_HARD_TIMEOUT_MS;
+
+  const runClone = async (useShallow: boolean): Promise<ExecResult> => {
+    await removePath(request.workspace.workspacePath, signal);
+    await fs.mkdir(path.dirname(request.workspace.workspacePath), { recursive: true });
+    const args = ['clone', '--progress'];
+    if (useShallow) {
+      args.push('--depth', '1');
+    }
+    args.push(repoUrl, request.workspace.workspacePath);
+    return runGit(
+      args,
+      longGitOptions(progress, 'cloning', 'Cloning repository...', undefined, hardTimeoutMs)
+    );
+  };
+
+  let result = await runClone(shallow);
+  if (result.exitCode !== 0 && shallow) {
+    logToFile(
+      `bootstrap shallow clone failed; retrying full clone kiloSessionId=${request.kiloSessionId}`
+    );
+    result = await runClone(false);
   }
-  args.push(repoUrl, request.workspace.workspacePath);
-
-  await removePath(request.workspace.workspacePath, signal);
-  await fs.mkdir(path.dirname(request.workspace.workspacePath), { recursive: true });
-
-  const result = await runGit(args, longGitOptions(progress, 'cloning', 'Cloning repository...'));
   if (result.exitCode !== 0) {
     throw gitOperationError(result, 'clone');
   }
@@ -436,10 +465,31 @@ async function prepareBranch(
     return;
   }
 
-  const fetchResult = await runGit(
-    ['fetch', '--progress', 'origin'],
-    longGitOptions(progress, 'branch', 'Fetching repository...', workspacePath)
-  );
+  const reviewSession = isCodeReviewSession(request);
+  const hardTimeoutMs = reviewSession ? REVIEW_GIT_HARD_TIMEOUT_MS : LONG_COMMAND_HARD_TIMEOUT_MS;
+
+  // Cloud code review only needs the reviewed branch checked out, so fetch just
+  // that branch at depth 1 instead of every ref with full history. Fall back to
+  // a full fetch on any failure so a review is never lost to the optimization.
+  let fetchResult: ExecResult | undefined;
+  if (reviewSession || request.repo?.shallow === true) {
+    fetchResult = await runGit(
+      ['fetch', '--progress', '--depth', '1', 'origin', branchName],
+      longGitOptions(progress, 'branch', 'Fetching branch...', workspacePath, hardTimeoutMs)
+    );
+    if (fetchResult.exitCode !== 0) {
+      logToFile(
+        `bootstrap shallow branch fetch failed; retrying full fetch kiloSessionId=${request.kiloSessionId}`
+      );
+      fetchResult = undefined;
+    }
+  }
+  if (!fetchResult) {
+    fetchResult = await runGit(
+      ['fetch', '--progress', 'origin'],
+      longGitOptions(progress, 'branch', 'Fetching repository...', workspacePath, hardTimeoutMs)
+    );
+  }
   if (fetchResult.exitCode !== 0) {
     throw gitOperationError(fetchResult, 'checkout');
   }

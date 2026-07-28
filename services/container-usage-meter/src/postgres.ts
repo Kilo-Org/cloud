@@ -134,6 +134,16 @@ async function recoverMissingInterval(
   contextFingerprint: string,
   receivedAtMs: number
 ): Promise<typeof container_usage_interval.$inferSelect> {
+  const [sku] = await tx
+    .select({ unit: cloud_billing_sku.unit })
+    .from(cloud_billing_sku)
+    .where(eq(cloud_billing_sku.id, context.sku))
+    .limit(1);
+  if (!sku) throw new UsageMutationConflictError('Billing SKU not found during interval recovery');
+  if (sku.unit !== 'second') {
+    throw new UsageMutationConflictError('Billing SKU is not measured in seconds');
+  }
+
   const receivedAt = timestamp(receivedAtMs);
   const [inserted] = await tx
     .insert(container_usage_interval)

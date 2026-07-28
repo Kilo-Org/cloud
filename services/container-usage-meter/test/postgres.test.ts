@@ -263,6 +263,73 @@ describe('container usage PostgreSQL application', () => {
       .where(eq(container_usage_interval.id, recoveryId));
   });
 
+  it('rejects missing-interval recovery for an unknown or non-second SKU', async () => {
+    const recoveryContext = { ...context, instanceId: `invalid-sku-recovery-${suffix}` };
+    const unknownSkuContext = { ...recoveryContext, sku: `${skuId}-unknown` };
+    const unknownId = `cloud-agent-next:${recoveryContext.instanceId}:791`;
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        {
+          service: recoveryContext.service,
+          instanceId: recoveryContext.instanceId,
+          startEpochMs: 791,
+          idempotencyKey: heartbeatIdempotencyKey(
+            recoveryContext.service,
+            recoveryContext.instanceId,
+            791,
+            1
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          context: unknownSkuContext,
+        },
+        unknownId,
+        await usageContextFingerprint(unknownSkuContext),
+        13_000
+      )
+    ).rejects.toThrow('Billing SKU not found during interval recovery');
+
+    const nonSecondSkuId = `meter-test-request-${suffix}`;
+    await client.db.insert(cloud_billing_sku).values({
+      id: nonSecondSkuId,
+      name: 'Non-container meter integration test',
+      unit: 'request',
+      rate_cents_per_unit: '0.000001',
+    });
+    const nonSecondContext = { ...recoveryContext, sku: nonSecondSkuId };
+    const nonSecondId = `cloud-agent-next:${recoveryContext.instanceId}:792`;
+    await expect(
+      applyStopWithDb(
+        client.db,
+        {
+          service: recoveryContext.service,
+          instanceId: recoveryContext.instanceId,
+          startEpochMs: 792,
+          idempotencyKey: stopIdempotencyKey(
+            recoveryContext.service,
+            recoveryContext.instanceId,
+            792
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          reason: 'exit',
+          context: nonSecondContext,
+        },
+        nonSecondId,
+        await usageContextFingerprint(nonSecondContext),
+        14_000
+      )
+    ).rejects.toThrow('Billing SKU is not measured in seconds');
+
+    const invalidIntervals = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.instance_id, recoveryContext.instanceId));
+    expect(invalidIntervals).toHaveLength(0);
+    await client.db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, nonSecondSkuId));
+  });
+
   it('recovers a missing interval from a stop at a zero-duration boundary', async () => {
     const recoveryContext = { ...context, instanceId: `stop-recovery-${suffix}` };
     const recoveryFingerprint = await usageContextFingerprint(recoveryContext);

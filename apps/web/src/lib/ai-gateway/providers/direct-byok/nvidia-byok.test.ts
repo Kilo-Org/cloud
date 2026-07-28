@@ -57,6 +57,7 @@ describe('NVIDIA direct BYOK', () => {
       temperature: 0.5,
     });
     expect(body).not.toHaveProperty('provider');
+    expect(body).not.toHaveProperty('providerOptions');
     expect(body).not.toHaveProperty('transforms');
     expect(body).not.toHaveProperty('reasoning');
     expect(body).not.toHaveProperty('include_reasoning');

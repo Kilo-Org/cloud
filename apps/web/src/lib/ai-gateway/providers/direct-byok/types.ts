@@ -2,6 +2,7 @@ import * as z from 'zod';
 import type { DirectByokProviderMetaId } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import type { GatewayChatApiKind, TransformRequestContext } from '@/lib/ai-gateway/providers/types';
 import type { CustomLlmProvider } from '@kilocode/db';
+import { OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision']);
 
@@ -13,6 +14,8 @@ export const DirectByokModelSchema = z.object({
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
+  supported_parameters: z.array(z.string()).optional(),
+  opencode: OpenCodeSettingsSchema.optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);

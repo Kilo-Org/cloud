@@ -51,6 +51,30 @@ jest.mock('./direct-byok-definitions', () => ({
       default_ai_sdk_provider: 'openai-compatible',
       transformRequest: jest.fn(),
     },
+    {
+      id: 'nvidia-byok',
+      base_url: 'https://integrate.api.nvidia.com/v1',
+      models: jest.fn(async () => [
+        {
+          id: 'deepseek-ai/deepseek-v4-flash',
+          name: 'DeepSeek V4 Flash',
+          context_length: 4096,
+          max_completion_tokens: 1024,
+          supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning'],
+          opencode: {
+            ai_sdk_provider: 'openai-compatible',
+            variants: {
+              none: { reasoning: { enabled: false, effort: 'none' } },
+              high: { reasoning: { enabled: true, effort: 'high' } },
+              max: { reasoning: { enabled: true, effort: 'max' } },
+            },
+          },
+        },
+      ]),
+      supported_chat_apis: ['chat_completions'],
+      default_ai_sdk_provider: 'openai-compatible',
+      transformRequest: jest.fn(),
+    },
   ],
 }));
 
@@ -87,5 +111,28 @@ describe('getDirectByokModel', () => {
     expect(result.provider?.id).toBe('chutes-byok');
     expect(directByokProviders[0].models).toHaveBeenCalledTimes(1);
     expect(directByokProviders[1].models).not.toHaveBeenCalled();
+  });
+
+  test('uses per-model metadata before generic model-name defaults', async () => {
+    const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
+    jest.mocked(getBYOKforUser).mockResolvedValue([{ providerId: 'nvidia-byok' }] as never);
+    const { getDirectByokModelsForUser } = await import('.');
+
+    const models = await getDirectByokModelsForUser('user-id');
+
+    expect(models).toEqual([
+      expect.objectContaining({
+        id: 'nvidia-byok/deepseek-ai/deepseek-v4-flash',
+        supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning'],
+        opencode: {
+          ai_sdk_provider: 'openai-compatible',
+          variants: {
+            none: { reasoning: { enabled: false, effort: 'none' } },
+            high: { reasoning: { enabled: true, effort: 'high' } },
+            max: { reasoning: { enabled: true, effort: 'max' } },
+          },
+        },
+      }),
+    ]);
   });
 });

@@ -54,13 +54,20 @@ function convertModel(
       is_moderated: false,
     },
     per_request_limits: null,
-    supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
+    supported_parameters: model.supported_parameters ?? [
+      'max_tokens',
+      'temperature',
+      'tools',
+      'reasoning',
+      'include_reasoning',
+    ],
     default_parameters: {},
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: {
       ai_sdk_provider: getAiSdkProvider(id, provider.id) ?? provider.default_ai_sdk_provider,
       variants: getModelVariants(id),
+      ...model.opencode,
     } satisfies OpenCodeSettings,
   };
 }

@@ -189,6 +189,8 @@ describe('parseNvidiaProviderModels', () => {
         context_length: 128_000,
         max_completion_tokens: 16_000,
         input_modalities: ['text'],
+        supported_parameters: ['max_tokens', 'temperature', 'tools'],
+        opencode: { ai_sdk_provider: 'openai-compatible', variants: {} },
       },
       {
         id: 'nvidia/vision-chat',
@@ -196,6 +198,8 @@ describe('parseNvidiaProviderModels', () => {
         context_length: 256_000,
         max_completion_tokens: 32_000,
         input_modalities: ['text', 'image'],
+        supported_parameters: ['max_tokens', 'temperature', 'tools'],
+        opencode: { ai_sdk_provider: 'openai-compatible', variants: {} },
       },
     ]);
   });
@@ -247,7 +251,34 @@ describe('parseNvidiaProviderModels', () => {
         context_length: 4096,
         max_completion_tokens: 8192,
         input_modalities: ['text'],
+        supported_parameters: ['max_tokens', 'temperature', 'tools'],
+        opencode: { ai_sdk_provider: 'openai-compatible', variants: {} },
       },
+    ]);
+  });
+
+  test('maps documented NVIDIA reasoning efforts into model metadata', () => {
+    const model = {
+      id: 'nvidia/nemotron-3-super-120b-a12b',
+      name: 'Nemotron 3 Super',
+      tool_call: true,
+      modalities: { input: ['text'], output: ['text'] },
+    };
+
+    expect(
+      parseNvidiaProviderModels({ data: [{ id: model.id }] }, { models: { super: model } })
+    ).toEqual([
+      expect.objectContaining({
+        supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning'],
+        opencode: {
+          ai_sdk_provider: 'openai-compatible',
+          variants: {
+            none: { reasoning: { enabled: false, effort: 'none' } },
+            low: { reasoning: { enabled: true, effort: 'low' } },
+            high: { reasoning: { enabled: true, effort: 'high' } },
+          },
+        },
+      }),
     ]);
   });
 });

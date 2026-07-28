@@ -4,6 +4,7 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 import { redisClient } from '@/lib/redis';
 import {
   getNvidiaContextLengthOverride,
+  getNvidiaReasoningEfforts,
   isNvidiaSupportedModel,
 } from '@/lib/ai-gateway/providers/nvidia';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
@@ -66,6 +67,8 @@ type RawModel = {
   context_length?: number;
   max_completion_tokens?: number;
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
+  supported_parameters?: string[];
+  opencode?: DirectByokModel['opencode'];
 };
 
 type SyncContext = {
@@ -150,13 +153,31 @@ export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: un
         model.modalities?.input?.includes('text') === true &&
         model.modalities?.output?.includes('text') === true
     )
-    .map(model => ({
-      id: model.id,
-      name: shortenDisplayName(model.name),
-      context_length: getNvidiaContextLengthOverride(model.id) ?? model.limit?.context,
-      max_completion_tokens: model.limit?.output,
-      input_modalities: model.modalities?.input,
-    }));
+    .map(model => {
+      const reasoningEfforts = getNvidiaReasoningEfforts(model.id);
+      return {
+        id: model.id,
+        name: shortenDisplayName(model.name),
+        context_length: getNvidiaContextLengthOverride(model.id) ?? model.limit?.context,
+        max_completion_tokens: model.limit?.output,
+        input_modalities: model.modalities?.input,
+        supported_parameters: [
+          'max_tokens',
+          'temperature',
+          'tools',
+          ...(reasoningEfforts ? ['reasoning'] : []),
+        ],
+        opencode: {
+          ai_sdk_provider: 'openai-compatible',
+          variants: Object.fromEntries(
+            (reasoningEfforts ?? []).map(effort => [
+              effort,
+              { reasoning: { enabled: effort !== 'none', effort } },
+            ])
+          ),
+        },
+      };
+    });
 }
 
 function modelsDevFetcher(
@@ -278,6 +299,8 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       flags: raw.input_modalities?.includes('image') ? ['vision'] : undefined,
       context_length,
       max_completion_tokens,
+      supported_parameters: raw.supported_parameters,
+      opencode: raw.opencode,
     });
   }
 

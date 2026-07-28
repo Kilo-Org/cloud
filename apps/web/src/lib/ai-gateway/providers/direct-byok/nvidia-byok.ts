@@ -34,6 +34,7 @@ export default {
 
     // NVIDIA rejects these with `Validation: Unsupported parameter(s)`.
     delete request.body.provider;
+    delete request.body.providerOptions;
     delete request.body.transforms;
     delete request.body.reasoning;
     delete request.body.safety_identifier;

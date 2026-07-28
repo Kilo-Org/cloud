@@ -102,6 +102,7 @@ const config: ExpoConfig = {
       {
         android: {
           enableMinifyInReleaseBuilds: true,
+          usePrecompiledHeaders: true,
         },
         ios: {
           ccacheEnabled: true,

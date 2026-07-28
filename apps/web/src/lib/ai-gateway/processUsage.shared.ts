@@ -91,8 +91,8 @@ export function isResponseInterruptedError(error: unknown): boolean {
 
 /**
  * Drains a ReadableStream of binary chunks, calling `onTextChunk` for each
- * decoded piece of text. Handles client aborts and upstream timeouts gracefully
- * and always releases the reader lock and ends `streamProcessingSpan`.
+ * decoded piece of text. Handles response body read failures gracefully and
+ * always releases the reader lock and ends `streamProcessingSpan`.
  *
  * Returns `true` if the stream was aborted before completion.
  */
@@ -106,15 +106,17 @@ export async function drainSseStream(
   let wasAborted = false;
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      let readResult: ReadableStreamReadResult<Uint8Array>;
+      try {
+        readResult = await reader.read();
+      } catch {
+        wasAborted = true;
+        break;
+      }
+
+      const { done, value } = readResult;
       if (done) break;
       onTextChunk(decoder.decode(value, { stream: true }));
-    }
-  } catch (error) {
-    if (isResponseInterruptedError(error)) {
-      wasAborted = true;
-    } else {
-      throw error;
     }
   } finally {
     reader.releaseLock();

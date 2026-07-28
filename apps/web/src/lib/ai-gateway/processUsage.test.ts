@@ -175,14 +175,28 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     await verifyApproval(resultString, approvalFilePath);
   });
 
-  test.each(['ResponseAborted', 'TimeoutError'])(
+  const interruptedStreamErrors: [name: string, error: Error][] = [
+    [
+      'ResponseAborted',
+      Object.assign(new Error('Response interrupted'), { name: 'ResponseAborted' }),
+    ],
+    ['TimeoutError', Object.assign(new Error('Response interrupted'), { name: 'TimeoutError' })],
+    [
+      'Undici body timeout',
+      new TypeError('terminated', {
+        cause: Object.assign(new Error('Body Timeout Error'), {
+          name: 'BodyTimeoutError',
+          code: 'UND_ERR_BODY_TIMEOUT',
+        }),
+      }),
+    ],
+  ];
+
+  test.each(interruptedStreamErrors)(
     'handles %s gracefully and returns partial data',
-    async errorName => {
+    async (_name, streamError) => {
       // Create a stream that emits some SSE data then fails.
       const partialSSEData = `data: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":" world"}}]}\n\n`;
-
-      const streamError = new Error('Response interrupted');
-      streamError.name = errorName;
 
       let pullCount = 0;
       const stream = new ReadableStream<Uint8Array>({
@@ -210,6 +224,19 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       expect(result.hasError).toBe(true);
     }
   );
+
+  test('does not swallow SSE parser errors', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: not-json\n\n'));
+        controller.close();
+      },
+    });
+
+    await expect(
+      parseMicrodollarUsageFromStream(stream, 'fake-user-id', undefined, 'openrouter', 200)
+    ).rejects.toThrow(SyntaxError);
+  });
 
   test.each([
     ['chat_completions', 'ResponseAborted'],

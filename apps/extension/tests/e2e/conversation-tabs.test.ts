@@ -10,6 +10,7 @@ import {
   startFixtureServer,
   waitForStoredConversationText,
 } from './extension-context-fixture';
+import { expectSelectedModelId, selectModelById } from './model-picker-e2e-helpers';
 
 const safeToolNames = [
   'get_page_snapshot',
@@ -267,7 +268,7 @@ test('conversation controls stay tied to the selected conversation', async () =>
 
     await expect(sidePanel.getByLabel('Target tab')).toContainText('First target tab');
     await sidePanel.getByLabel('Target tab').selectOption({ label: 'First target tab' });
-    await sidePanel.getByLabel('Model').selectOption('model-one');
+    await selectModelById(sidePanel, 'model-one');
     await sidePanel.getByLabel('Thinking effort').selectOption('low');
 
     await sidePanel.getByLabel('Message agent').fill('First settings');
@@ -277,12 +278,12 @@ test('conversation controls stay tied to the selected conversation', async () =>
     await sidePanel.getByLabel('New conversation').click();
     await expect(sidePanel.getByRole('tab', { selected: true })).toContainText('Conversation 2');
     await sidePanel.getByLabel('Target tab').selectOption({ label: 'Second target tab' });
-    await sidePanel.getByLabel('Model').selectOption('model-two');
+    await selectModelById(sidePanel, 'model-two');
     await sidePanel.getByLabel('Thinking effort').selectOption('high');
     await expect
       .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
       .toBe('Second target tab');
-    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-two');
+    await expectSelectedModelId(sidePanel, 'model-two');
     await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('high');
 
     await sidePanel.getByLabel('Message agent').fill('Second settings');
@@ -294,14 +295,14 @@ test('conversation controls stay tied to the selected conversation', async () =>
       .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
       .toBe('First target tab');
     await expect(sidePanel.getByLabel(/Safe mode/u)).toBeVisible();
-    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-one');
+    await expectSelectedModelId(sidePanel, 'model-one');
     await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('low');
 
     await sidePanel.getByRole('tab', { name: /Second settings/u }).click();
     await expect
       .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
       .toBe('Second target tab');
-    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-two');
+    await expectSelectedModelId(sidePanel, 'model-two');
     await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('high');
 
     expect(JSON.stringify(seenChatBodies[0])).toContain('First target tab');

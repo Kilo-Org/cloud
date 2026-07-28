@@ -880,6 +880,7 @@ export const AgentChatPanel = ({
 
       <footer className="border-t border-border bg-surface-raised px-4 py-2">
         <AgentFooterControls
+          auth={auth}
           contextDonut={contextDonut}
           inspectableTabs={inspectableTabs}
           isLoadingTabs={isLoadingTabs}
@@ -906,6 +907,7 @@ export const AgentChatPanel = ({
           onThinkingEffortChange={nextThinkingEffort => {
             updateActiveConversationSettings({ thinkingEffort: nextThinkingEffort });
           }}
+          organizationId={organizationId}
           selectedTabId={selectedTabId}
           tabDebuggerError={tabDebuggerError}
           thinkingEffort={thinkingEffort}

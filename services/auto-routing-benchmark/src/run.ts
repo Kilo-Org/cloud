@@ -25,12 +25,18 @@ import {
   getRunWithModels,
   getSummaries,
   insertRun,
+  listPendingCurrentProfiles,
+  listStaleRunningDeciderRunIds,
+  markProfilesFailedForRun,
+  markProfilesReadyForRun,
+  markProfilesRunningForRun,
   markRunCompleted,
   markRunFailed,
   markStaleRunsFailed,
   replaceModelSummaries,
   saveRoutingTable,
   upsertCaseResult,
+  type BenchmarkRunPurpose,
   type CaseResultRow,
   type PriorModelResult,
 } from './db';
@@ -144,13 +150,40 @@ async function enqueueRunMessages(
     try {
       await env.BENCH_QUEUE.sendBatch(messages.slice(i, i + QUEUE_SEND_BATCH_LIMIT));
     } catch (error) {
-      await markRunFailed(
-        env.BENCH_DB,
-        runId,
-        `enqueue failed after ${i} of ${messages.length} messages: ${formatError(error).error}`
-      ).catch(() => {});
+      const reason = `enqueue failed after ${i} of ${messages.length} messages: ${formatError(error).error}`;
+      await failRunAndDrain(env, runId, reason).catch(() => {});
       throw error;
     }
+  }
+}
+
+/**
+ * Mark a running run failed, transition any profile rows it claimed, and attempt
+ * to drain the oldest pending profile batch into the freed single decider slot.
+ */
+export async function failRunAndDrain(env: Env, runId: string, error: string): Promise<void> {
+  await markRunFailed(env.BENCH_DB, runId, error);
+  try {
+    await markProfilesFailedForRun(env.BENCH_DB, runId, error);
+  } catch (profileError) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_profile_fail_transition_error',
+        runId,
+        ...formatError(profileError),
+      })
+    );
+  }
+  try {
+    await drainPendingProfileBatch(env);
+  } catch (drainError) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_error',
+        afterRunId: runId,
+        ...formatError(drainError),
+      })
+    );
   }
 }
 
@@ -160,8 +193,44 @@ const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 // exhausted / dead-lettered). Called both before starting a run and when
 // listing runs, so a wedged run is recovered without depending on a new run
 // being started (the UI disables Start while a run shows 'running').
-export async function sweepStaleRuns(db: D1Database): Promise<void> {
-  await markStaleRunsFailed(db, new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString());
+// Also fails Benchmark-profile rows claimed by those stale runs so they do
+// not stay stuck in `running`. Drain is separate (needs Env for startRun).
+export async function sweepStaleRuns(db: D1Database): Promise<string[]> {
+  const olderThanIso = new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString();
+  // Capture ids before the bulk status flip so profile claims can be failed.
+  const staleIds = await listStaleRunningDeciderRunIds(db, olderThanIso).catch(
+    () => [] as string[]
+  );
+  await markStaleRunsFailed(db, olderThanIso);
+  for (const runId of staleIds) {
+    await markProfilesFailedForRun(db, runId, 'timed out').catch(() => {});
+  }
+  return staleIds;
+}
+
+/**
+ * Sweep stale runs and attempt the pending-profile drain. Used by the
+ * scheduled handler so a failed final queue message or platform run cannot
+ * strand pending profile work. Never throws for drain/slot contention.
+ */
+export async function sweepStaleRunsAndDrain(env: Env): Promise<{
+  staleRunIds: string[];
+  drained: { runId: string; entryCount: number } | null;
+}> {
+  const staleRunIds = await sweepStaleRuns(env.BENCH_DB);
+  let drained: { runId: string; entryCount: number } | null = null;
+  try {
+    drained = await drainPendingProfileBatch(env);
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_error',
+        afterSweep: true,
+        ...formatError(error),
+      })
+    );
+  }
+  return { staleRunIds, drained };
 }
 
 // Bump when grading logic, the CLI invocation/variant handling, the container
@@ -303,7 +372,7 @@ export class BenchmarkRunConfigError extends Error {
   }
 }
 
-function validateDeciderContainerBudget({
+export function validateDeciderContainerBudget({
   modelCount,
   repetitions,
   maxLiveContainers,
@@ -320,11 +389,34 @@ function validateDeciderContainerBudget({
   );
 }
 
+export type StartRunOptions = {
+  force?: boolean;
+  /**
+   * 'platform' (default): publish the default routing table / classifier winner.
+   * 'profile': measure an explicit Pool-entry snapshot for the global registry;
+   * never publishes platform artifacts.
+   */
+  purpose?: BenchmarkRunPurpose;
+  /**
+   * Explicit decider entry snapshot for profile runs. Required when
+   * purpose === 'profile'. Ignored for platform runs (entries come from config).
+   */
+  entries?: readonly RunModelEntry[];
+};
+
 export async function startRun(
   env: Env,
   kind: BenchmarkKind,
-  options: { force?: boolean } = {}
+  options: StartRunOptions = {}
 ): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
+  const purpose: BenchmarkRunPurpose = options.purpose ?? 'platform';
+  if (purpose === 'profile' && kind !== 'decider') {
+    throw new BenchmarkRunConfigError('profile runs must be decider kind');
+  }
+  if (purpose === 'profile' && (!options.entries || options.entries.length === 0)) {
+    throw new BenchmarkRunConfigError('profile runs require a non-empty entries snapshot');
+  }
+
   // Stale-run sweeper: fail dead 'running' runs first so a wedged run can't
   // block new ones and the admin panel shows the truth.
   await sweepStaleRuns(env.BENCH_DB);
@@ -337,6 +429,7 @@ export async function startRun(
   // One active run per kind. The unique partial index is the atomic backstop;
   // this pre-check turns the common case (a run already going) into a clean
   // RunAlreadyActiveError instead of an insert-constraint failure.
+  // Platform and profile share this single decider slot.
   const activeRun = await getRunningRun(env.BENCH_DB, kind);
   if (activeRun) {
     throw new RunAlreadyActiveError(kind, activeRun.id);
@@ -344,18 +437,21 @@ export async function startRun(
   const repetitions =
     kind === 'classifier' ? config.classifierRepetitions : config.deciderRepetitions;
 
-  // Platform config maps reasoningEffort → the stored variant value (today's
-  // CLI --variant value). Exact entries allow two variants of one model later.
+  // Platform: config maps reasoningEffort → stored variant. Profile: explicit
+  // snapshot (may include two variants of one model).
+  const profileEntries = options.entries;
   const modelEntries: RunModelEntry[] =
-    kind === 'classifier'
-      ? config.classifierModels.map(model => ({ model, variant: null }))
-      : config.deciderModels.map(m => ({
-          model: m.id,
-          variant:
-            m.variant !== undefined
-              ? (m.variant ?? null)
-              : variantFromReasoningEffort(m.reasoningEffort ?? null),
-        }));
+    purpose === 'profile' && profileEntries
+      ? normalizeRunModelEntries(profileEntries)
+      : kind === 'classifier'
+        ? config.classifierModels.map(model => ({ model, variant: null }))
+        : config.deciderModels.map(m => ({
+            model: m.id,
+            variant:
+              m.variant !== undefined
+                ? (m.variant ?? null)
+                : variantFromReasoningEffort(m.reasoningEffort ?? null),
+          }));
 
   const engineIdentity = computeEngineIdentity(kind);
 
@@ -365,9 +461,12 @@ export async function startRun(
   // benchmark identity — engine identity (dataset + grading/CLI version),
   // repetitions, AND exact variant — so a config/dataset/variant change
   // re-benchmarks instead of pairing current serving config with stale numbers.
-  const priorByPair = options.force
-    ? new Map<string, PriorModelResult>()
-    : await getLatestSummariesByModel(env.BENCH_DB, kind);
+  // Profile runs always re-measure the snapshot (no carry) so registry
+  // provenance points at a run that actually graded these entries.
+  const priorByPair =
+    options.force || purpose === 'profile'
+      ? new Map<string, PriorModelResult>()
+      : await getLatestSummariesByModel(env.BENCH_DB, kind);
   const isCarryable = (entry: RunModelEntry): boolean => {
     const prior = priorByPair.get(exactPairKey(entry.model, entry.variant));
     return (
@@ -396,18 +495,22 @@ export async function startRun(
   }
 
   const startedAt = new Date().toISOString();
-  const runId = `${kind}-${startedAt.replace(/[:.]/g, '-')}`;
+  // Distinguish profile run ids so ops logs and D1 rows are easy to filter.
+  const runId =
+    purpose === 'profile'
+      ? `profile-${startedAt.replace(/[:.]/g, '-')}`
+      : `${kind}-${startedAt.replace(/[:.]/g, '-')}`;
 
-  // Build run_models rows for ALL exact entries of this run's kind.
-  // Platform runs write variant AND keep reasoning_effort as a legacy mirror
-  // (same value). Profile-run rows (later slice) will write variant only.
+  // Build run_models rows for ALL exact entries of this run.
+  // Platform runs write variant AND keep reasoning_effort as a legacy mirror.
+  // Profile runs write variant only (reasoning_effort null).
   const enqueuedPairKeys = new Set(enqueuedEntries.map(e => exactPairKey(e.model, e.variant)));
   const runModelRows: RunModelRow[] = modelEntries.map(entry => ({
     run_id: runId,
     model: entry.model,
     variant: variantToStorage(entry.variant),
     enqueued: enqueuedPairKeys.has(exactPairKey(entry.model, entry.variant)),
-    reasoning_effort: entry.variant,
+    reasoning_effort: purpose === 'profile' ? null : entry.variant,
   }));
 
   try {
@@ -427,6 +530,7 @@ export async function startRun(
         classifier_max_p95_latency_ms:
           kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
         engine_identity: engineIdentity,
+        purpose,
       },
       runModelRows,
       carriedSummaries
@@ -442,11 +546,29 @@ export async function startRun(
     throw error;
   }
 
+  if (purpose === 'profile') {
+    try {
+      await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
+        engineIdentity,
+        repetitions,
+      });
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_profile_running_transition_error',
+          runId,
+          ...formatError(error),
+        })
+      );
+    }
+  }
+
   console.log(
     JSON.stringify({
       event: 'benchmark_run_started',
       runId,
       kind,
+      purpose,
       enqueuedModels: enqueuedEntries.map(e => e.model),
       skippedModels,
     })
@@ -468,6 +590,7 @@ export async function startRun(
       repetitions,
       classifierMaxP95LatencyMs: kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
       startedAt,
+      purpose,
     });
     return { runId, enqueuedModels: 0, skippedModels };
   }
@@ -493,6 +616,93 @@ export async function startRun(
   );
   await enqueueRunMessages(env, runId, messages);
   return { runId, enqueuedModels: enqueuedEntries.length, skippedModels };
+}
+
+/**
+ * After any decider run reaches a terminal state, claim the oldest pending
+ * profile batch that fits the container budget and start a profile run.
+ * No-ops when the decider slot is occupied or there is no pending work.
+ * Returns the started run id, or null.
+ */
+export async function drainPendingProfileBatch(
+  env: Env
+): Promise<{ runId: string; entryCount: number } | null> {
+  const config = await getBenchmarkConfig(env.BENCH_DB);
+  if (!config) return null;
+
+  const active = await getRunningRun(env.BENCH_DB, 'decider');
+  if (active) {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_skipped_slot_occupied',
+        activeRunId: active.id,
+      })
+    );
+    return null;
+  }
+
+  const engineIdentity = computeEngineIdentity('decider');
+  const repetitions = config.deciderRepetitions;
+  const pending = await listPendingCurrentProfiles(env.BENCH_DB, {
+    engineIdentity,
+    repetitions,
+  });
+  if (pending.length === 0) return null;
+
+  // Oldest-first (query already ordered by requested_at). Cap by container budget:
+  // modelCount * repetitions <= maxLiveContainers.
+  const maxLive = Math.min(config.maxConcurrency, DECIDER_CONTAINER_INSTANCE_CAP);
+  const maxEntries = Math.max(1, Math.floor(maxLive / Math.max(1, repetitions)));
+  const batch = pending.slice(0, maxEntries);
+  const entries: RunModelEntry[] = batch.map(row => ({
+    model: row.model,
+    variant: variantFromStorage(row.variant),
+  }));
+
+  try {
+    validateDeciderContainerBudget({
+      modelCount: entries.length,
+      repetitions,
+      maxLiveContainers: maxLive,
+    });
+  } catch (error) {
+    // Even a single entry can exceed the budget when repetitions are huge;
+    // leave pending and log — scheduled sweep will retry after config fix.
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_budget_exceeded',
+        entryCount: entries.length,
+        repetitions,
+        maxLive,
+        ...formatError(error),
+      })
+    );
+    return null;
+  }
+
+  try {
+    const result = await startRun(env, 'decider', { purpose: 'profile', entries });
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_started',
+        runId: result.runId,
+        entryCount: entries.length,
+        models: entries.map(e => e.model),
+      })
+    );
+    return { runId: result.runId, entryCount: entries.length };
+  } catch (error) {
+    if (error instanceof RunAlreadyActiveError) {
+      console.log(
+        JSON.stringify({
+          event: 'benchmark_profile_drain_skipped_slot_occupied',
+          activeRunId: error.activeRunId,
+        })
+      );
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
@@ -592,6 +802,7 @@ type RunState = {
   repetitions: number;
   classifierMaxP95LatencyMs: number | null;
   startedAt: string;
+  purpose: BenchmarkRunPurpose;
 };
 
 async function getRunState(env: Env, runId: string): Promise<RunState> {
@@ -610,6 +821,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     repetitions: run.repetitions,
     classifierMaxP95LatencyMs: run.classifier_max_p95_latency_ms,
     startedAt: run.started_at,
+    purpose: run.purpose === 'profile' ? 'profile' : 'platform',
   };
 }
 
@@ -959,6 +1171,42 @@ async function finalizeRunIfComplete(
   await replaceModelSummaries(env.BENCH_DB, runId, freshSummaries);
   await markRunCompleted(env.BENCH_DB, runId);
 
+  // Profile runs update the registry only — never publish platform artifacts,
+  // never touch the classifier winner, never clear platform KV keys.
+  if (state.purpose === 'profile') {
+    try {
+      await markProfilesReadyForRun(env.BENCH_DB, runId);
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_profile_ready_transition_error',
+          runId,
+          ...formatError(error),
+        })
+      );
+    }
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_profile_run_completed',
+        runId,
+        kind,
+        purpose: state.purpose,
+      })
+    );
+    try {
+      await drainPendingProfileBatch(env);
+    } catch (drainError) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_profile_drain_error',
+          afterRunId: runId,
+          ...formatError(drainError),
+        })
+      );
+    }
+    return;
+  }
+
   // Read back all summaries (fresh + carried) for publishing.
   const allSummaries = await getSummaries(env.BENCH_DB, runId);
 
@@ -1038,9 +1286,25 @@ async function finalizeRunIfComplete(
       event: 'benchmark_run_completed',
       runId,
       kind,
+      purpose: state.purpose,
       summaries: allSummaries,
     })
   );
+
+  // Free the single decider slot into the oldest pending profile batch.
+  if (kind === 'decider') {
+    try {
+      await drainPendingProfileBatch(env);
+    } catch (drainError) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_profile_drain_error',
+          afterRunId: runId,
+          ...formatError(drainError),
+        })
+      );
+    }
+  }
 }
 
 export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): BenchmarkModelSummary[] {

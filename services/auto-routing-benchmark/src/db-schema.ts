@@ -78,6 +78,10 @@ export const benchmarkRuns = sqliteTable(
     // dataset, grading, or CLI/image pinning re-benchmark instead of pairing
     // current serving config with measurements taken under different conditions.
     engine_identity: text('engine_identity').notNull().default(''),
+    // 'platform' (default): publishes the default routing table / classifier winner.
+    // 'profile': measures exact Pool entries for the global Benchmark-profile
+    // registry and never replaces the platform artifact.
+    purpose: text('purpose').notNull().default('platform'),
   },
   table => [
     // At most one running run per kind — the atomic backstop for the

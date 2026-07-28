@@ -125,6 +125,7 @@ describe('mapRunRow', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       engine_identity: 'v1:deadbeef',
+      purpose: 'platform',
     };
     const summaries: BenchmarkModelSummary[] = [
       {
@@ -168,6 +169,7 @@ describe('mapRunRow', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       engine_identity: 'v1:deadbeef',
+      purpose: 'platform',
     };
     const result = mapRunRow(runRow, []);
     expect(result.summaries).toEqual([]);

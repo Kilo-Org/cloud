@@ -92,6 +92,11 @@ vi.mock('./db', async importOriginal => {
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
+    listStaleRunningDeciderRunIds: vi.fn(),
+    listPendingCurrentProfiles: vi.fn(),
+    markProfilesFailedForRun: vi.fn(),
+    markProfilesRunningForRun: vi.fn(),
+    markProfilesReadyForRun: vi.fn(),
     getRunningRun: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
   };
@@ -115,7 +120,9 @@ import {
   getRunningRun,
   existsNewerCompletedRun,
   insertRun,
+  listPendingCurrentProfiles,
   listRuns,
+  listStaleRunningDeciderRunIds,
   markStaleRunsFailed,
   replaceConfig,
 } from './db';
@@ -185,6 +192,8 @@ beforeEach(() => {
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
+  vi.mocked(listStaleRunningDeciderRunIds).mockResolvedValue([]);
+  vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(registerProfiles).mockReset();
@@ -408,6 +417,7 @@ describe('POST /admin/runs', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: 1000,
       engine_identity: 'v1:deadbeef',
+      purpose: 'platform',
     });
 
     const res = await authedPost('/admin/runs', { kind: 'classifier' });

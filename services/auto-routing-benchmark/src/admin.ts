@@ -2,6 +2,7 @@ import * as z from 'zod';
 import {
   BenchmarkConfigSchema,
   BenchmarkProfileStatusesRequestSchema,
+  CustomRoutingTableRequestSchema,
   RegisterBenchmarkProfilesRequestSchema,
   resolveBenchmarkIdentity,
   StartBenchmarkRunRequestSchema,
@@ -11,6 +12,7 @@ import { zodJsonValidator } from '@kilocode/worker-utils';
 import type { Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
+import { assembleCustomRoutingTable } from './custom-routing-table';
 import {
   lookupProfileStatuses,
   ProfileConfigMissingError,
@@ -182,6 +184,35 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         return c.json(
           await lookupProfileStatuses(c.env.BENCH_DB, config, { entries: body.entries })
         );
+      } catch (error) {
+        if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
+      }
+    }
+  );
+
+  // Sparse custom routing table for ready/current pool entries only.
+  app.post(
+    '/admin/custom-routing-table',
+    zodJsonValidator(CustomRoutingTableRequestSchema, {
+      errorMessage: 'Invalid custom routing table request',
+    }),
+    async c => {
+      const body = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      if (!config) {
+        return c.json(
+          {
+            error:
+              'benchmark config not set: save it in the admin panel before assembling a custom routing table',
+          },
+          400
+        );
+      }
+      try {
+        return c.json(await assembleCustomRoutingTable(c.env.BENCH_DB, config, body.entries));
       } catch (error) {
         if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
           return c.json({ error: error.message }, 400);

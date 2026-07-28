@@ -50,6 +50,13 @@
       "when": 1785253984099,
       "tag": "0006_hard_blizzard",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785260908640,
+      "tag": "0007_complex_makkari",
+      "breakpoints": true
     }
   ]
 }

@@ -28,10 +28,99 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`) |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
-| `POST /admin/runs` | Start a run (`{kind, force}`); returns 409 if one of that kind is already running |
-| `GET /admin/routing-table` | Latest published routing table |
+| `POST /admin/runs` | Start a **platform** run (`{kind, force}`); returns 409 if one of that kind is already running |
+| `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
+| `POST /admin/profiles/register` | Atomically admit missing/stale/retried global Benchmark profiles for an owner (quota 10/24h) |
+| `POST /admin/profiles/status` | Current statuses for up to 10 exact Pool entries (may free-admit engine-drifted rows) |
+| `POST /admin/custom-routing-table` | Assemble a **sparse** custom table for ready/current entries only (`table: null` → balanced fallback) |
+
+## Owner pools and Benchmark profiles
+
+Owners (personal users or organizations) can constrain `kilo-auto/efficient` to
+1–10 exact `(model, canonical variant)` **Pool entries**. The pool itself lives
+in the auto-routing Durable Object; this worker owns **global Benchmark
+profiles** — per-route measurements for each exact pair under the current
+benchmark engine identity and decider repetitions.
+
+### Profile purpose runs vs platform runs
+
+| | Platform run | Profile run |
+|---|---|---|
+| Trigger | Admin `POST /admin/runs`, scheduled auto-decider sync | Single-slot drain of pending registry rows |
+| `benchmark_runs.purpose` | `platform` (default) | `profile` |
+| Model set | Saved admin config | Explicit entry snapshot from pending profiles |
+| On completion | Publishes platform routing table / classifier winner; clears platform KV keys | Marks claimed profiles `ready` (or `failed`); **never** replaces the platform artifact |
+| Slot | Shares the one-active-decider constraint | Same single slot; never preempts a platform run |
+
+Rollback: turning off owner pools (or clearing a pool) leaves the platform
+default table untouched — profile runs never wrote it.
+
+### Request ledger and admission
+
+`POST /admin/profiles/register` evaluates every submitted entry in one D1 batch:
+
+- Ready/current or already pending/running global profiles are reported without
+  charging quota.
+- Globally new, engine-stale, or explicitly retried-failed profiles are admitted
+  as `pending` while the owner has fewer than **10** charged admissions in the
+  rolling 24h window (`profile_request_events`). Over-limit → 429, nothing written.
+- Concurrent owners requesting the same exact pair + engine identity dedupe to
+  one global row.
+
+### Status transitions and drain
+
+```
+pending → running → ready
+                 ↘ failed (bounded failure_reason; Retry re-admits)
+```
+
+- **running**: set when a profile run claims the entries at `startRun`.
+- **ready**: set when that profile run completes successfully (`run_id`
+  provenance points at the measuring run).
+- **failed**: set when the run fails (enqueue, timeout sweep, etc.). Only rows
+  still pointing at that `run_id` transition — a newer pending/ready row is
+  never clobbered.
+
+Currency: a profile is current only when `engine_identity`, `repetitions`, and
+exact variant match the live decider engine. Stale rows are never returned as
+Ready or assembled into custom tables.
+
+**Single-slot drain** (after any decider terminal state — completion *or*
+failure — and when the scheduled handler has no platform start to claim):
+
+1. If a decider run is already active → log and leave pending rows alone.
+2. Else take pending current-engine rows oldest-`requested_at`-first, capped by
+   the existing container budget (`entries × repetitions ≤ maxConcurrency`).
+3. `startRun(purpose: 'profile', entries: snapshot)`.
+
+**Scheduled auto-decider sync ordering** (platform priority on a free slot):
+
+1. Sweep stale runs (cleanup only — not a slot claim).
+2. Sync auto-decider candidates from the web API.
+3. If models changed **and** a config exists → platform `startRun` claims the
+   free slot; **no** pending-profile drain this cycle (terminal transition
+   drains later). Profile work never preempts platform start.
+4. If no platform start (no change, or no config) → drain pending profiles now
+   so stranded work recovers.
+5. If the slot is already occupied → log/skip; leave pending rows untouched.
+
+Long waits stay `Benchmarking` in the UI; there is no second timeout state in v1.
+
+### Sparse custom routing tables
+
+`POST /admin/custom-routing-table` with 1–10 entries returns
+`CustomRoutingTableResponse`:
+
+- Candidates come only from **ready + current** profiles' provenance
+  `model_summaries` for that entry's exact pair **and** measuring `run_id`
+  (no cross-run leakage), ranked with the saved policy knobs via
+  `rankCandidates`.
+- Candidates carry exact `variant` (never `reasoningEffort`).
+- Route keys with no graded candidates are **omitted** (not empty arrays).
+- If no requested entry is ready/current → `{ table: null }` so the gateway
+  falls back to balanced. Never fabricate candidates.
 
 ## Local development
 

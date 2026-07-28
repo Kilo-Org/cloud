@@ -17,6 +17,14 @@ vi.mock('./db', async importOriginal => {
     replaceModelSummaries: vi.fn(),
     saveRoutingTable: vi.fn(),
     upsertCaseResult: vi.fn(),
+    listPendingCurrentProfiles: vi.fn(),
+    listStaleRunningDeciderRunIds: vi.fn(),
+    markProfilesFailedForRun: vi.fn(),
+    markProfilesReadyForRun: vi.fn(),
+    markProfilesRunningForRun: vi.fn(),
+    markStaleRunsFailed: vi.fn(),
+    getRunningRun: vi.fn(),
+    getLatestSummariesByModel: vi.fn(),
   };
 });
 
@@ -88,6 +96,7 @@ function mockRunSnapshot(
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       started_at: '2026-06-16T00:00:00.000Z',
+      purpose: 'platform',
     },
     models: models.map(m => ({
       enqueued: true,

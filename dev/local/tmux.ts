@@ -70,7 +70,7 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
         .join(' ')
     : '';
   const envPrefix = envArgs ? `${envArgs} ` : '';
-  execSync(`tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${repoRoot}`, {
+  execSync(`tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${escapeForShell(repoRoot)}`, {
     stdio: 'ignore',
   });
   for (const [key, value] of Object.entries(env ?? {})) {

@@ -2,7 +2,12 @@ import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { Bot, ChevronRight, Loader2 } from 'lucide-react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
-import { type KiloSessionId, type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type Part,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';

@@ -1,6 +1,7 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { toMicrodollars } from '../utils';
+import { errorExceptInTest } from '@/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
 import type {
   NotYetCostedUsageStats,
@@ -91,8 +92,8 @@ export function isResponseInterruptedError(error: unknown): boolean {
 
 /**
  * Drains a ReadableStream of binary chunks, calling `onTextChunk` for each
- * decoded piece of text. Handles client aborts and upstream timeouts gracefully
- * and always releases the reader lock and ends `streamProcessingSpan`.
+ * decoded piece of text. Handles stream processing failures gracefully and
+ * always releases the reader lock and ends `streamProcessingSpan`.
  *
  * Returns `true` if the stream was aborted before completion.
  */
@@ -111,11 +112,8 @@ export async function drainSseStream(
       onTextChunk(decoder.decode(value, { stream: true }));
     }
   } catch (error) {
-    if (isResponseInterruptedError(error)) {
-      wasAborted = true;
-    } else {
-      throw error;
-    }
+    errorExceptInTest('[processUsage] treating stream processing error as aborted', error);
+    wasAborted = true;
   } finally {
     reader.releaseLock();
     streamProcessingSpan.end();

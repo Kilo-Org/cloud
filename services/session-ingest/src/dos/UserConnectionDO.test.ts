@@ -3531,6 +3531,44 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
+    it('includes capabilities when the CLI attachment advertises them', () => {
+      const { doInstance, mockCtx } = setup();
+      // Hibernated attachment carries capabilities — same source
+      // getConnectedInstances already uses for instance/version.
+      const cliWs = createMockWs(['cli'], {
+        role: 'cli',
+        connectionId: 'cli-cap',
+        sessions: [],
+        instance: { name: 'laptop-cap', projectName: 'kilo' },
+        capabilities: { attachments: true },
+      });
+      mockCtx.addSocket(cliWs);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([
+        {
+          connectionId: 'cli-cap',
+          name: 'laptop-cap',
+          projectName: 'kilo',
+          capabilities: { attachments: true },
+        },
+      ]);
+    });
+
+    it('omits capabilities when the CLI attachment has none (legacy CLI)', () => {
+      const { doInstance, mockCtx } = setup();
+      addCliSocket(mockCtx, 'cli-legacy-cap', [], {
+        name: 'laptop-legacy',
+        projectName: 'kilo',
+      });
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([
+        { connectionId: 'cli-legacy-cap', name: 'laptop-legacy', projectName: 'kilo' },
+      ]);
+      expect(instances[0]).not.toHaveProperty('capabilities');
+    });
+
     it('persists `instance` in the WS attachment across heartbeats', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');

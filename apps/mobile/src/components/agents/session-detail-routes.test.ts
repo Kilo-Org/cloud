@@ -1,4 +1,4 @@
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 import {

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   type OrgListEntry,
   type OrgRole,
@@ -9,7 +9,7 @@ import {
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 const onMutationError = (error: { message: string }) => {
-  toast.error(error.message || 'Something went wrong');
+  announcingToast.error(error.message || 'Something went wrong');
 };
 
 type UseOrganizationMutationsOptions = {

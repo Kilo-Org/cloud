@@ -368,6 +368,7 @@ describe('router sessionId validation', () => {
               SESSION_INGEST: {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
+              CONTAINER_USAGE_METER: {} as TRPCContext['env']['CONTAINER_USAGE_METER'],
               R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
               CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
               GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
@@ -385,6 +386,7 @@ describe('router sessionId validation', () => {
 
           // Mock sandbox with deleteSession method
           mockSandbox = {
+            configureBilling: vi.fn().mockResolvedValue(undefined),
             deleteSession: vi.fn().mockResolvedValue(undefined),
           } as unknown as ReturnType<typeof getSandbox>;
 
@@ -799,6 +801,7 @@ describe('router sessionId validation', () => {
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
+            CONTAINER_USAGE_METER: {} as TRPCContext['env']['CONTAINER_USAGE_METER'],
             GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
             CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
@@ -917,6 +920,7 @@ describe('router sessionId validation', () => {
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
+            CONTAINER_USAGE_METER: {} as TRPCContext['env']['CONTAINER_USAGE_METER'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
             CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
             GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
@@ -1227,6 +1231,7 @@ describe('router sessionId validation', () => {
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
+            CONTAINER_USAGE_METER: {} as TRPCContext['env']['CONTAINER_USAGE_METER'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
             CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
             GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
@@ -1242,6 +1247,7 @@ describe('router sessionId validation', () => {
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
         vi.mocked(getSandbox).mockReturnValue({
+          configureBilling: vi.fn().mockResolvedValue(undefined),
           listProcesses: mockListProcesses,
         } as unknown as ReturnType<typeof getSandbox>);
         caller = appRouter.createCaller(mockContext);
@@ -1513,6 +1519,7 @@ describe('router sessionId validation', () => {
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
+            CONTAINER_USAGE_METER: {} as TRPCContext['env']['CONTAINER_USAGE_METER'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
             CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
             GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
@@ -1755,6 +1762,7 @@ describe('router question and permission controls', () => {
       },
     ]);
     vi.mocked(getSandbox).mockReturnValue({
+      configureBilling: vi.fn().mockResolvedValue(undefined),
       listProcesses,
       getSession,
       createSession,

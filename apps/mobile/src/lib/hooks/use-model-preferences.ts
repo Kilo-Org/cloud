@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner-native';
 
 import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
-type ModelPreferences = inferRouterOutputs<RootRouter>['modelPreferences']['get'];
+type ModelPreferences = inferRouterOutputs<MobileRouter>['modelPreferences']['get'];
 
 const onError = (error: { message: string }) => {
   toast.error(error.message || 'Something went wrong');

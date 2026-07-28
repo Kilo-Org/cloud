@@ -111,6 +111,55 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       message: expect.stringContaining(messageFragment),
     });
   });
+
+  test('includes the vercel request id in the JSON read error', async () => {
+    const result = await rewrite(
+      failingResponse('application/json', 'ResponseAborted'),
+      true,
+      null,
+      'iad1::iad1::request-id'
+    );
+
+    expect(result.status).toBe(503);
+    expect(await result.json()).toEqual({
+      error:
+        'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
+      error_type: 'upstream_disconnect',
+      message:
+        'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
+      vercel_request_id: 'iad1::iad1::request-id',
+    });
+  });
+
+  test('includes the vercel request id in the emitted stream error event', async () => {
+    const result = await rewrite(
+      failingResponse('text/event-stream', 'ResponseAborted'),
+      true,
+      null,
+      'iad1::iad1::request-id'
+    );
+    const events = dataObjects(await readOutputStream(result)) as {
+      error: { message: string; vercel_request_id?: string };
+    }[];
+
+    expect(events).toHaveLength(1);
+    expect(events[0].error.message).toBe(
+      'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)'
+    );
+    expect(events[0].error.vercel_request_id).toBe('iad1::iad1::request-id');
+  });
+
+  test('omits the request id suffix when no vercel request id is available', async () => {
+    const result = await rewrite(failingResponse('text/event-stream', 'ResponseAborted'));
+    const events = dataObjects(await readOutputStream(result)) as {
+      error: { message: string; vercel_request_id?: string };
+    }[];
+
+    expect(events[0].error.message).toBe(
+      'The upstream provider disconnected while sending the response.'
+    );
+    expect(events[0].error.vercel_request_id).toBeUndefined();
+  });
 });
 
 describe('rewriteModelResponse_ChatCompletions', () => {

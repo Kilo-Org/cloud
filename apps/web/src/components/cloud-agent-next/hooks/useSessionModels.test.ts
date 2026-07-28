@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import type { RemoteModelState } from '@/lib/cloud-agent-sdk';
+import type { RemoteModelState } from '@kilocode/cloud-agent-sdk';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import {
   buildSessionModels,

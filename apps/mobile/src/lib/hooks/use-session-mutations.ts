@@ -1,7 +1,7 @@
 import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { chainSave } from '@/lib/hooks/save-chain';
 import {
   mapStoredSessions,
@@ -13,7 +13,7 @@ import { useTRPC } from '@/lib/trpc';
 type SessionsListSnapshot = [QueryKey, SessionsListData | undefined][];
 
 const onError = (error: { message: string }) => {
-  toast.error(error.message || 'Something went wrong');
+  announcingToast.error(error.message || 'Something went wrong');
 };
 
 export function useSessionMutations() {

@@ -1,8 +1,12 @@
-import { type inferRouterInputs, type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import {
+  type inferRouterInputs,
+  type inferRouterOutputs,
+  type MobileRouter,
+} from '@kilocode/trpc/mobile';
 import { type Href } from 'expo-router';
 
-type RouterInputs = inferRouterInputs<RootRouter>;
-type RouterOutputs = inferRouterOutputs<RootRouter>;
+type RouterInputs = inferRouterInputs<MobileRouter>;
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 export type SecurityAgentConfig = RouterOutputs['securityAgent']['getConfig'];
 export type SecurityAgentConfigPatch = RouterInputs['securityAgent']['saveConfig'];

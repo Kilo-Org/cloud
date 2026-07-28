@@ -71,6 +71,11 @@ import {
   WorkspaceFilesystemPreparationError,
 } from '../../workspace-errors.js';
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgroup-env.js';
+import {
+  buildSandboxBillingInput,
+  configureSandboxBillingInput,
+  type SandboxBillingInput,
+} from '../../container-usage-context.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -155,6 +160,7 @@ function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string)
 
 export type CloudflareAgentSandboxDependencies = {
   resolveSandbox?: (sandboxId: SandboxId, options?: { sleepAfter?: number }) => SandboxInstance;
+  configureBilling?: (sandbox: SandboxInstance, input: SandboxBillingInput) => Promise<void>;
   sessionService?: SessionService;
   stopObservedWrappers?: typeof stopObservedWrappers;
   sleep?: (ms: number) => Promise<void>;
@@ -170,6 +176,10 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   private readonly stopObserved: typeof stopObservedWrappers;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly stopObservationDelaysMs: number[];
+  private readonly configureBilling: (
+    sandbox: SandboxInstance,
+    input: SandboxBillingInput
+  ) => Promise<void>;
   private sandboxIdPromise?: Promise<SandboxId>;
 
   constructor(
@@ -192,6 +202,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.stopObservationDelaysMs =
       dependencies.stopObservationDelaysMs ?? DEFAULT_STOP_OBSERVATION_DELAYS_MS;
+    this.configureBilling = dependencies.configureBilling ?? configureSandboxBillingInput;
   }
 
   private resolveSandboxId(): Promise<SandboxId> {
@@ -205,7 +216,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
             this.metadata.identity.sessionId,
             this.metadata.identity.botId,
             {
-              createdOnPlatform: this.metadata.identity.createdOnPlatform,
+              createdOnPlatform: this.metadata.identity.billingOrigin,
             }
           );
     }
@@ -213,7 +224,16 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   }
 
   private async getSandbox(options?: { sleepAfter?: number }): Promise<SandboxInstance> {
-    return this.resolveSandbox(await this.resolveSandboxId(), options);
+    const sandboxId = await this.resolveSandboxId();
+    const sandbox = this.resolveSandbox(sandboxId, options);
+    void this.configureBilling(sandbox, buildSandboxBillingInput(this.metadata, sandboxId)).catch(
+      error => {
+        logger
+          .withFields({ error: error instanceof Error ? error.message : String(error) })
+          .warn('Container usage shadow configuration deferred');
+      }
+    );
+    return sandbox;
   }
 
   private async workspaceHasGit(sandbox: SandboxInstance, workspacePath: string): Promise<boolean> {

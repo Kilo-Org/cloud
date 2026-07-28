@@ -5,11 +5,11 @@
 Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-specific code.
 
 - Backend, simulator, login, Maestro, remote CLI, logs, cleanup: follow [e2e/AGENTS.md](e2e/AGENTS.md). Start what you need yourself; never ask the user to start Metro or backend services.
-- Substantial mobile work: follow [.kilo/MOBILE_WORKFLOW.md](.kilo/MOBILE_WORKFLOW.md). Plans may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
+- Substantial mobile work: follow the kilo workflow in [.kilo_workflow/WORKFLOW.md](../../.kilo_workflow/WORKFLOW.md). Plans may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
 
 ## Stack
 
-- Expo SDK 55, React Native 0.83, React 19, strict TypeScript (`tsgo`)
+- Expo SDK 57, React Native 0.86, React 19, strict TypeScript (`tsgo`)
 - NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
 - Expo Router routes in `src/app/`
 - oxlint and oxfmt

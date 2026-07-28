@@ -1,4 +1,4 @@
-import type { PreparationAttempt, PreparationStepSnapshot } from '@/lib/cloud-agent-sdk';
+import type { PreparationAttempt, PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 import {
   extractTickerLines,
   findRunningSetupCommand,

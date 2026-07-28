@@ -68,6 +68,10 @@ vi.mock('sonner-native', () => ({
   toast: { error: (msg: string) => toastErrorMock(msg) },
 }));
 
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { error: (msg: string) => toastErrorMock(msg) },
+}));
+
 vi.mock('@/lib/hooks/save-chain', () => ({
   // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
   chainSave: (id: string, op: () => Promise<unknown>) => chainSaveMock(id, op),

@@ -1,25 +1,40 @@
+/* eslint-disable max-lines -- Share gate owns commit, destination admission, and CLI-spawn orchestration in one formSheet body. */
+import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Plus, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
+import { toast } from 'sonner-native';
 
-import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
+import {
+  getAgentSessionPath,
+  getSpawnedAgentSessionPath,
+} from '@/components/agents/session-detail-routes';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { setPendingShareNavigation } from '@/lib/share-navigation';
 import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-payload';
+import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
+import { useTRPC } from '@/lib/trpc';
 
 import {
   resolveShareDestinationAdmission,
   resolveShareHasFiles,
   type ShareDestinationAdmission,
 } from './share-cli-admission';
+import {
+  selectShareCliSpawnRows,
+  type ShareCliSpawnRow,
+  shouldCommitShareSpawnReady,
+} from './share-cli-spawn';
 import { selectShareDestinations, type ShareDestinationRow } from './share-destinations';
 import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
@@ -42,6 +57,7 @@ type ShareGateSheetProps = {
 export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const trpc = useTRPC();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   // Org-scoped stored page only (cloud-agent + cli). Active list is an
   // id/capability lookup — never a row source (no organizationId filter).
@@ -49,6 +65,21 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     createdOnPlatform: expandPlatformFilter(['cloud-agent', 'cli']),
     organizationId,
     enabled: orgLoaded,
+  });
+
+  const { spawn } = useRemoteInstanceSpawn();
+  const [spawningConnectionId, setSpawningConnectionId] = useState<string | null>(null);
+  // Per-attempt token so a stale spawn's finally cannot clear a newer lock
+  // (share replace mid-flight, or same-connection re-tap after replace).
+  const spawnAttemptRef = useRef(0);
+  const isSpawning = spawningConnectionId !== null;
+
+  const { data: instancesData, refetch: refetchInstances } = useQuery({
+    ...trpc.activeSessions.listInstances.queryOptions(undefined, {
+      refetchOnWindowFocus: true,
+      staleTime: 5000,
+    }),
+    enabled: orgLoaded && shouldShowRunOnSelector(organizationId),
   });
 
   // Committed id survives param replace + dismiss animation; only that id
@@ -61,11 +92,16 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   // When S1 replaces an open gate with a newer shareId, clear the older id
   // only if it was not committed. A committed previous id must survive the
-  // dismiss animation while a newer shareId is focused.
+  // dismiss animation while a newer shareId is focused. Also drop the spawn
+  // lock so a stale in-flight spawn cannot leave the new gate's commit
+  // affordances disabled until it settles.
   useEffect(() => {
     const previous = previousShareIdRef.current;
-    if (previous && previous !== shareId && previous !== committedShareIdRef.current) {
-      clearSharePayload(previous);
+    if (previous && previous !== shareId) {
+      if (previous !== committedShareIdRef.current) {
+        clearSharePayload(previous);
+      }
+      setSpawningConnectionId(null);
     }
     previousShareIdRef.current = shareId;
   }, [shareId]);
@@ -133,6 +169,17 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     ]
   );
 
+  const instanceRows = useMemo(
+    () =>
+      selectShareCliSpawnRows({
+        instances: instancesData?.instances ?? [],
+        organizationId,
+        orgLoaded,
+        gateShowsNewSession: state.showNewSession,
+      }),
+    [instancesData?.instances, organizationId, orgLoaded, state.showNewSession]
+  );
+
   const abandon = useCallback(() => {
     const id = ownedShareIdRef.current;
     // Committed ids survive every gate-side clear; delivery owns consumption.
@@ -173,16 +220,20 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   );
 
   const handleNewSession = useCallback(() => {
-    if (!shareId) {
+    if (!shareId || isSpawning) {
       return;
     }
     const base = getNewAgentSessionPath(organizationId);
     commit(appendShareId(base, shareId));
-  }, [commit, organizationId, shareId]);
+  }, [commit, isSpawning, organizationId, shareId]);
+
+  const commitEnabled = isShareCommitEnabled({ orgLoaded, validation });
+  const instanceRowsDisabled = !commitEnabled || isSpawning;
+  const newSessionDisabled = !commitEnabled || isSpawning;
 
   const handleSelectDestination = useCallback(
     (row: ShareDestinationRow) => {
-      if (!shareId) {
+      if (!shareId || isSpawning) {
         return;
       }
       const admission: ShareDestinationAdmission = resolveShareDestinationAdmission({
@@ -201,7 +252,72 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       const base = getAgentSessionPath(row.session_id, org) as string;
       commit(appendShareId(base, shareId));
     },
-    [attachmentsCapableBySessionId, commit, payload, shareId, validation]
+    [attachmentsCapableBySessionId, commit, isSpawning, payload, shareId, validation]
+  );
+
+  const handleSpawnInstance = useCallback(
+    (instance: ShareCliSpawnRow) => {
+      if (!shareId || !commitEnabled || isSpawning) {
+        return;
+      }
+
+      const admission = resolveShareDestinationAdmission({
+        createdOnPlatform: 'cli',
+        live: true,
+        attachmentsCapable: instance.capabilities?.attachments === true,
+        hasFiles: resolveShareHasFiles(validation, payload?.files.length ?? 0),
+      });
+      if (!admission.ok) {
+        Alert.alert(admission.title, admission.message);
+        return;
+      }
+
+      void (async () => {
+        spawnAttemptRef.current += 1;
+        const attempt = spawnAttemptRef.current;
+        setSpawningConnectionId(instance.connectionId);
+        try {
+          const outcome = await spawn(instance.connectionId);
+          // Gate has no "Run on" selection; ignore selection-reset flags.
+          const action = resolveRemoteSubmitOutcome({
+            outcome,
+            refetchedInstances: [],
+            selectedConnectionId: instance.connectionId,
+          });
+
+          if (action.kind === 'navigate') {
+            if (
+              !shouldCommitShareSpawnReady({
+                committedShareId: committedShareIdRef.current,
+                payloadStillStaged: peekSharePayload(shareId) !== null,
+              })
+            ) {
+              return;
+            }
+            commit(appendShareId(getSpawnedAgentSessionPath(action.sessionID) as string, shareId));
+            return;
+          }
+
+          if (action.kind === 'retryable') {
+            toast.error(action.toast);
+            try {
+              await refetchInstances();
+            } catch {
+              // Stay open with the staged payload; user can retry.
+            }
+            return;
+          }
+
+          toast.error(action.toast);
+        } finally {
+          // Only the attempt that still owns the lock may clear it.
+          if (spawnAttemptRef.current === attempt) {
+            setSpawningConnectionId(null);
+          }
+        }
+      })();
+    },
+    [commit, commitEnabled, isSpawning, payload, refetchInstances, shareId, spawn, validation]
   );
 
   const handleRetry = useCallback(() => {
@@ -212,7 +328,6 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const showTerminalMessage =
     state.kind === 'stale-share' || state.kind === 'non-retryable-classification';
   const previewPayload = payload !== null && state.kind !== 'stale-share' ? payload : null;
-  const commitEnabled = isShareCommitEnabled({ orgLoaded, validation });
 
   // Header block: title+close, preview, New session. collapsable={false} is
   // required so react-native-screens finds it as the formSheet header.
@@ -245,13 +360,13 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
       {showNewSession ? (
         <Pressable
-          onPress={commitEnabled ? handleNewSession : undefined}
-          disabled={!commitEnabled}
+          onPress={newSessionDisabled ? undefined : handleNewSession}
+          disabled={newSessionDisabled}
           accessibilityRole="button"
           accessibilityLabel="New session"
-          accessibilityState={{ disabled: !commitEnabled }}
+          accessibilityState={{ disabled: newSessionDisabled }}
           className={`flex-row items-center gap-3 border-t border-border px-4 py-3.5 ${
-            commitEnabled ? 'active:opacity-70' : 'opacity-50'
+            newSessionDisabled ? 'opacity-50' : 'active:opacity-70'
           }`}
         >
           <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
@@ -272,6 +387,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         destinations={destinations}
         onSelect={handleSelectDestination}
         onRetry={handleRetry}
+        instances={instanceRows}
+        spawningConnectionId={spawningConnectionId}
+        instanceRowsDisabled={instanceRowsDisabled}
+        destinationsDisabled={isSpawning}
+        onSpawnInstance={handleSpawnInstance}
       />
     </>
   );

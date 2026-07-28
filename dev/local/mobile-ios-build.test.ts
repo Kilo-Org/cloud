@@ -1741,87 +1741,40 @@ test('mobileRoot is resolved from import.meta.dirname, not process.cwd', () => {
   assert.doesNotMatch(actual, /apps\/mobile\/apps\/mobile/);
 });
 
-test('validateSimulatorClaim requires status ready and rejects preparing, invalid, legacy, and foreign', () => {
+test('validateSimulatorClaim enforces worktree ownership and rejects corrupt records', () => {
   const claimRoot = makeTempDir('claim-ready');
   const worktree = makeTempDir('wt');
   const other = makeTempDir('wt-other');
   const udid = 'UDID-ready';
   try {
-    // Ready claim owned by this worktree
+    // Claim owned by this worktree
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
       JSON.stringify({
         deviceId: udid,
         worktreeRoot: worktree,
-        claimId: 'c',
-        status: 'ready',
         claimedAt: new Date().toISOString(),
       })
     );
     assert.doesNotThrow(() => validateSimulatorClaim(udid, worktree, claimRoot));
 
-    // Same worktree but preparing
+    // Corrupt record (no worktreeRoot)
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
-      JSON.stringify({
-        deviceId: udid,
-        worktreeRoot: worktree,
-        claimId: 'c',
-        status: 'preparing',
-        claimedAt: new Date().toISOString(),
-      })
+      JSON.stringify({ deviceId: udid, claimedAt: new Date().toISOString() })
     );
-    assert.throws(
-      () => validateSimulatorClaim(udid, worktree, claimRoot),
-      /not ready|preparing|status/i
-    );
+    assert.throws(() => validateSimulatorClaim(udid, worktree, claimRoot), /corrupt/i);
 
-    // Invalid status
-    fs.writeFileSync(
-      path.join(claimRoot, `${udid}.json`),
-      JSON.stringify({
-        deviceId: udid,
-        worktreeRoot: worktree,
-        claimId: 'c',
-        status: 'invalid',
-        claimedAt: new Date().toISOString(),
-      })
-    );
-    assert.throws(
-      () => validateSimulatorClaim(udid, worktree, claimRoot),
-      /not ready|invalid|status/i
-    );
+    // Unparseable record
+    fs.writeFileSync(path.join(claimRoot, `${udid}.json`), 'not json');
+    assert.throws(() => validateSimulatorClaim(udid, worktree, claimRoot), /corrupt/i);
 
-    // Corrupt current record (missing claimId)
-    fs.writeFileSync(
-      path.join(claimRoot, `${udid}.json`),
-      JSON.stringify({
-        deviceId: udid,
-        worktreeRoot: worktree,
-        status: 'ready',
-        claimedAt: new Date().toISOString(),
-      })
-    );
-    assert.throws(() => validateSimulatorClaim(udid, worktree, claimRoot), /corrupt|claimId/i);
-
-    // Legacy claim (no status) is rejected for build cache
-    fs.writeFileSync(
-      path.join(claimRoot, `${udid}.json`),
-      JSON.stringify({ deviceId: udid, worktreeRoot: worktree })
-    );
-    assert.throws(
-      () => validateSimulatorClaim(udid, worktree, claimRoot),
-      /not ready|legacy|status/i
-    );
-
-    // Foreign ready claim
+    // Foreign claim
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
       JSON.stringify({
         deviceId: udid,
         worktreeRoot: other,
-        claimId: 'c',
-        status: 'ready',
         claimedAt: new Date().toISOString(),
       })
     );

@@ -150,6 +150,23 @@ function applyCapabilityFilters(
   return { filtered: maxContextFallback, reason: 'ok' };
 }
 
+// A route's accuracy is graded on 10 distinct benchmark cases
+// (datasets/decider-cases.ts, >=10 per taxonomy route; repetitions re-run the
+// same prompts and add no independent tasks). At n=10 the one-sided 95% Wilson
+// upper bound only drops below a 0.95 bar at an observed accuracy of ~0.837, so
+// pass/fail at 0.95 flips on binomial noise — and each flip ejects every session
+// parked on that model, paying a full prompt-cache rebuild for a difference the
+// benchmark cannot resolve. Keep a cost-mode incumbent inside the band instead.
+// This is a fixed band, not a per-route interval: replace it with a published
+// Wilson bound once the routing table carries per-route case counts. 0.10 is
+// deliberately inside the [0.0833, 0.1167) plateau where behaviour is identical
+// on the current table, and stricter than the n=10 boundary (~0.113), so it never
+// keeps a model a real interval would eject. Do not nudge it toward either edge:
+// published accuracies are toFixed(4) roundings of k/30, so 0.083 rounds the floor
+// above 26/30 and silently drops that entire tier of retained incumbents (not
+// the single largest group, which sits at 27/30 and is unaffected).
+const STICKY_ACCURACY_TOLERANCE = 0.1;
+
 export function computeDecision(
   classification: ClassifierOutput,
   table: RoutingTable | null,
@@ -190,9 +207,17 @@ export function computeDecision(
   // by a fresh pick from the eligible set, not kept.
   const incumbent =
     incumbentModel === null ? undefined : candidates.find(c => c.model === incumbentModel);
+  // Sticky eligibility, shared by the keep decision and the switchReason
+  // telemetry below so the two can never disagree. best_accuracy keeps the
+  // strict bar (that mode exists to buy accuracy); cost_per_accuracy keeps
+  // any incumbent inside the benchmark noise band.
+  const incumbentStickyEligible = (candidate: RankedCandidate): boolean =>
+    mode === 'best_accuracy'
+      ? candidate.meetsThreshold
+      : candidate.accuracy >= table.minAccuracy - STICKY_ACCURACY_TOLERANCE;
   const stickyIncumbent =
     incumbent &&
-    incumbent.meetsThreshold &&
+    incumbentStickyEligible(incumbent) &&
     incumbent.model !== freshPick.model &&
     ((mode === 'cost_per_accuracy' &&
       !(freshPick.avgCostUsd * table.switchCostFactor < incumbent.avgCostUsd)) ||
@@ -224,11 +249,11 @@ export function computeDecision(
     // 'cost': the incumbent was eligible but the mode's switch condition
     // (cost factor / accuracy gap) made the fresh pick worth it;
     // 'capability': the modality/context filters ejected it from the route;
-    // 'threshold': it is denied, off the route, or below the accuracy bar.
+    // 'threshold': it is denied, off the route, or outside the accuracy band.
     switchReason: !switched
       ? null
       : incumbent
-        ? incumbent.meetsThreshold
+        ? incumbentStickyEligible(incumbent)
           ? 'cost'
           : 'threshold'
         : routeCandidates.some(c => c.model === incumbentModel)

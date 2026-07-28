@@ -32,9 +32,11 @@ async function assetToPickedAttachment(asset: LocalAttachmentAsset): Promise<Pic
     fileSize: asset.fileSize,
   });
 
-  // expo-file-system's `File` is not a `Blob`, so XHR's `send(...)` cannot
-  // upload it. Materialize a real `Blob` from the file:// URI here so the
-  // upload PUT carries the correct body and matches the signed Content-Length.
+  // Materialize a real `Blob` from the file:// URI so the upload PUT carries
+  // the correct body and matches the signed Content-Length. expo/fetch (global
+  // since SDK 56) supports file:// on iOS (NativeResponse.swift) and Android
+  // (OkHttpFileUrlInterceptor.kt); File implements Blob but XHR still needs a
+  // store-backed Blob for the signed PUT.
   const response = await fetch(asset.uri);
   const blob = await response.blob();
 

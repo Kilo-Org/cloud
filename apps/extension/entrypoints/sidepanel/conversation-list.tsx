@@ -5,6 +5,7 @@ import type { CSSProperties, JSX } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { getConversationScrollKey } from '@/src/shared/agent-conversation';
 import type { GroupedConversationItem } from '@/src/shared/agent-conversation';
+import { LEGACY_CONVERSATION_GREETING } from '@/src/shared/agent-conversation-tabs';
 import { AgentConversationItemView } from './agent-conversation-events';
 
 const getConversationItemKey = (item: GroupedConversationItem): string =>
@@ -280,6 +281,9 @@ export const ConversationList = ({
         className="agent-conversation-scrollbar h-full overflow-y-auto px-4 py-4"
         ref={listRef}
       >
+        {items.length === 0 ? (
+          <p className="type-body text-foreground-muted">{LEGACY_CONVERSATION_GREETING}</p>
+        ) : null}
         <div className="relative w-full" style={getListSpacerStyle(totalSize)}>
           {virtualItems.map(virtualItem => {
             const item = items[virtualItem.index];

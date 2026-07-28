@@ -1,10 +1,14 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
+import {
+  type CloudStatus,
+  type KiloSessionId,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -24,10 +28,7 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
-import {
-  SessionContextCostFallback,
-  SessionContextMetrics,
-} from '@/components/agents/session-context-metrics';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
@@ -65,10 +66,6 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
-import {
-  SessionPlatformIcon,
-  sessionPlatformIconKind,
-} from '@/components/agents/session-platform-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
@@ -82,6 +79,7 @@ import {
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -92,8 +90,6 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { platformLabel } from '@/lib/platform-label';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -121,7 +117,6 @@ export function SessionDetailContent({
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
-  const colors = useThemeColors();
   const [childSession, setChildSession] = useState<{
     sessionId: KiloSessionId;
     title: string;
@@ -175,6 +170,8 @@ export function SessionDetailContent({
   const {
     isAnswering,
     isRespondingToPermission,
+    questionSubmissionError,
+    permissionSubmissionError,
     handleAnswerQuestion,
     handleRejectQuestion,
     handleRespondToPermission,
@@ -232,21 +229,6 @@ export function SessionDetailContent({
         (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
     };
   }, [contextInfo, sessionModels.options]);
-  const headerRight = contextInfo ? (
-    <SessionContextMetrics
-      info={contextInfo}
-      totalCostMicrodollars={totalMicrodollars}
-      onPress={() => {
-        setOpenContextSheetIdentity({
-          sessionId,
-          providerID: contextInfo.providerID,
-          modelID: contextInfo.modelID,
-        });
-      }}
-    />
-  ) : (
-    <SessionContextCostFallback totalCostMicrodollars={totalMicrodollars} />
-  );
   const sheetMountState = getContextSheetMountState(
     contextInfo,
     openContextSheetIdentity,
@@ -497,20 +479,53 @@ export function SessionDetailContent({
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const platform = isSessionLoaded ? (fetchedData.createdOnPlatform ?? null) : null;
-  const platformKind = sessionPlatformIconKind(platform);
-  const leadingAccessory =
-    platform != null && platformKind != null ? (
-      <View
-        accessibilityRole="image"
-        accessibilityLabel={platformLabel(platform)}
-        testID={`platform-icon-${platformKind}`}
-      >
-        <SessionPlatformIcon platform={platform} size={14} color={colors.mutedForeground} />
-      </View>
-    ) : null;
+  const headerRight = (
+    <SessionContextMetrics
+      info={contextInfo}
+      platform={platform}
+      totalCostMicrodollars={totalMicrodollars}
+      hasMessages={messages.length > 0}
+      onPress={
+        contextInfo
+          ? () => {
+              setOpenContextSheetIdentity({
+                sessionId,
+                providerID: contextInfo.providerID,
+                modelID: contextInfo.modelID,
+              });
+            }
+          : undefined
+      }
+    />
+  );
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+
+  // When a blocking question/permission card dismisses, hand screen-reader
+  // focus back to the transcript so the user does not get stranded on a
+  // node that no longer exists. We track the previous blocking kind and
+  // only fire on the non-none → none transition (i.e. the user satisfied
+  // the card), not on the very first mount.
+  const transcriptRef = useRef<RNText | null>(null);
+  const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
+  useEffect(() => {
+    const wasBlocking = previousBlockingInteractionRef.current !== 'none';
+    const isBlocking = blockingInteraction !== 'none';
+    previousBlockingInteractionRef.current = blockingInteraction;
+    if (!wasBlocking || isBlocking) {
+      return undefined;
+    }
+    if (moveA11yFocus(transcriptRef)) {
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      moveA11yFocus(transcriptRef);
+    }, 50);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [blockingInteraction]);
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
   const isComposerDisabled =
@@ -662,7 +677,6 @@ export function SessionDetailContent({
       <ScreenHeader
         title={rename.title}
         headerRight={headerRight}
-        leadingAccessory={leadingAccessory}
         {...(rename.isTitleInteractive
           ? {
               onTitlePress: rename.openModal,
@@ -749,7 +763,16 @@ export function SessionDetailContent({
   function renderKeyboardBody() {
     return (
       <>
-        <View className="flex-1">{renderContent()}</View>
+        <View className="flex-1">
+          <Text
+            ref={transcriptRef}
+            accessible
+            accessibilityLabel="Session transcript"
+            pointerEvents="none"
+            className="absolute inset-0 opacity-0"
+          />
+          {renderContent()}
+        </View>
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
@@ -770,6 +793,7 @@ export function SessionDetailContent({
 
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
+            key={activeQuestion.requestId}
             questions={activeQuestion.questions}
             onAnswer={answers => {
               void handleAnswerQuestion(answers);
@@ -778,11 +802,14 @@ export function SessionDetailContent({
               void handleRejectQuestion();
             }}
             isSubmitting={isAnswering}
+            requestId={activeQuestion.requestId}
+            submissionError={questionSubmissionError}
           />
         ) : null}
 
         {blockingInteraction === 'permission' && activePermission ? (
           <PermissionCard
+            key={activePermission.requestId}
             permission={activePermission.permission}
             patterns={activePermission.patterns}
             metadata={activePermission.metadata}
@@ -790,6 +817,8 @@ export function SessionDetailContent({
               void handleRespondToPermission(response);
             }}
             isSubmitting={isRespondingToPermission}
+            requestId={activePermission.requestId}
+            submissionError={permissionSubmissionError}
           />
         ) : null}
 

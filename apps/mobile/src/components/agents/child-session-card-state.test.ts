@@ -1,5 +1,10 @@
 /* eslint-disable max-lines -- test file with many fixtures */
-import { type KiloSessionId, type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type Part,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import {

@@ -1,13 +1,15 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import {
   convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
   passesVercelRoutingPercentage,
+  shouldRouteToVercel,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { OPENROUTER_GPT56_PROMO_MODEL_IDS } from '@/lib/ai-gateway/providers/openai';
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
@@ -152,5 +154,24 @@ describe('passesVercelRoutingPercentage', () => {
 
     expect(seedsInFinalBucket.some(seed => passesVercelRoutingPercentage(seed, 99.9))).toBe(true);
     expect(seedsInFinalBucket.some(seed => !passesVercelRoutingPercentage(seed, 99.9))).toBe(true);
+  });
+});
+
+describe('OpenRouter GPT-5.6 promotion', () => {
+  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('does not route %s to Vercel', async model => {
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model,
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await expect(shouldRouteToVercel(model, request, 'promo-test')).resolves.toBe(false);
+    expect(debugSpy).toHaveBeenCalledWith(
+      `[shouldRouteToVercel] routing ${model} to OpenRouter for the GPT-5.6 promotion`
+    );
+    debugSpy.mockRestore();
   });
 });

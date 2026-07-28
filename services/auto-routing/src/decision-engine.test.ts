@@ -316,6 +316,212 @@ describe('computeDecision', () => {
     });
   });
 
+  describe('benchmark noise band', () => {
+    // Every fixture below is taken verbatim from the live routing table
+    // (decider-2026-07-22T10-51-06-305Z, minAccuracy 0.95): accuracies are the
+    // published k/30 roundings and costs the published avgCostUsd. In
+    // cost_per_accuracy mode the fresh pick is candidates[0] after filtering,
+    // so each route array lists the named fresh pick first.
+    const liveClassification = (
+      taskType: ClassifierOutput['taskType'],
+      subtaskType: ClassifierOutput['subtaskType']
+    ): ClassifierOutput => ({ ...classification, taskType, subtaskType });
+
+    it('keeps the incumbent on a zero-passer route when it sits inside the band', () => {
+      // investigation/codebase_understanding has no threshold-meeting
+      // candidate. kimi-k2.7-code is less accurate AND ~1.16x more expensive
+      // per benchmark case than the fresh pick, yet it is kept: 0.8667 clears
+      // the 0.85 band floor, and 0.01094 * 3 is not less than 0.01272, so the
+      // cost condition does not fire either.
+      const zeroPasserTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'investigation/codebase_understanding': [
+            {
+              model: 'moonshotai/kimi-k3',
+              accuracy: 0.9333,
+              avgCostUsd: 0.01094,
+              meetsThreshold: false,
+            },
+            {
+              model: 'moonshotai/kimi-k2.7-code',
+              accuracy: 0.8667,
+              avgCostUsd: 0.01272,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('investigation', 'codebase_understanding'),
+        zeroPasserTable,
+        'moonshotai/kimi-k2.7-code'
+      );
+      expect(decision).toMatchObject({
+        model: 'moonshotai/kimi-k2.7-code',
+        sticky: true,
+        switchReason: null,
+      });
+    });
+
+    it('keeps an in-band incumbent when the route’s sole passer is far more expensive', () => {
+      // planning_design/technical_planning has exactly one passer,
+      // claude-sonnet-5 at $0.0394/case. Keeping inkling (0.9333, $0.0061)
+      // gives up +0.033 accuracy — one graded case out of thirty — and the
+      // cost escape cannot help here: 0.0394 * 3 = 0.1182 is not less than
+      // 0.0061, so the band is the only thing preventing the switch onto a
+      // model 6.5x more expensive.
+      const solePasserTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'planning_design/technical_planning': [
+            {
+              model: 'anthropic/claude-sonnet-5',
+              accuracy: 0.9667,
+              avgCostUsd: 0.0394,
+              meetsThreshold: true,
+            },
+            {
+              model: 'thinkingmachines/inkling',
+              accuracy: 0.9333,
+              avgCostUsd: 0.0061,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('planning_design', 'technical_planning'),
+        solePasserTable,
+        'thinkingmachines/inkling'
+      );
+      expect(decision).toMatchObject({
+        model: 'thinkingmachines/inkling',
+        sticky: true,
+        switchReason: null,
+      });
+    });
+
+    it('keeps a below-bar incumbent over a threshold-clearing fresh pick when the gap is 2/30 graded cases', () => {
+      // debugging/root_cause_analysis, the modal live case: the fresh pick
+      // clears the bar and costs the same to four decimal places
+      // ($0.00274548 vs $0.00274055), so the entire benefit of keeping
+      // kimi-k2.7-code is prompt-cache continuity. At n=10 distinct graded
+      // cases, 27/30 vs 29/30 is a difference the benchmark cannot resolve.
+      const modalTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'debugging/root_cause_analysis': [
+            {
+              model: 'minimax/minimax-m3',
+              accuracy: 0.9667,
+              avgCostUsd: 0.00275,
+              meetsThreshold: true,
+            },
+            {
+              model: 'moonshotai/kimi-k2.7-code',
+              accuracy: 0.9,
+              avgCostUsd: 0.00274,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('debugging', 'root_cause_analysis'),
+        modalTable,
+        'moonshotai/kimi-k2.7-code'
+      );
+      expect(decision).toMatchObject({
+        model: 'moonshotai/kimi-k2.7-code',
+        sticky: true,
+        switchReason: null,
+      });
+    });
+
+    it("labels an in-band incumbent's cost-driven ejection as switchReason 'cost', not 'threshold'", () => {
+      // planning_design/architecture_design: the incumbent is inside the
+      // band, so the old code would have ejected it as 'threshold'; the band
+      // makes it eligible, and the ejection is then caused by the unchanged
+      // cost condition: 0.00660620 * 3 = 0.01981860 < 0.03943792. Telemetry
+      // must therefore read 'cost' — otherwise the before/after measurement
+      // of this change reads its own relabels backwards.
+      const relabelTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'planning_design/architecture_design': [
+            {
+              model: 'thinkingmachines/inkling',
+              accuracy: 0.9,
+              avgCostUsd: 0.0066062,
+              meetsThreshold: false,
+            },
+            {
+              model: 'anthropic/claude-sonnet-5',
+              accuracy: 0.9,
+              avgCostUsd: 0.03943792,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('planning_design', 'architecture_design'),
+        relabelTable,
+        'anthropic/claude-sonnet-5'
+      );
+      expect(decision).toMatchObject({
+        model: 'thinkingmachines/inkling',
+        sticky: false,
+        switchReason: 'cost',
+      });
+    });
+
+    it('best_accuracy mode still ejects an in-band incumbent below the threshold', () => {
+      // Same route and incumbent as the sole-passer keep case above, with
+      // the mode flipped and the outcome inverted: the accuracy gap is
+      // 0.0334, below the 0.05 bestAccuracySwitchThreshold, so the gap
+      // condition alone would keep inkling — only best_accuracy still
+      // requiring meetsThreshold can eject it.
+      const solePasserTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'planning_design/technical_planning': [
+            {
+              model: 'anthropic/claude-sonnet-5',
+              accuracy: 0.9667,
+              avgCostUsd: 0.0394,
+              meetsThreshold: true,
+            },
+            {
+              model: 'thinkingmachines/inkling',
+              accuracy: 0.9333,
+              avgCostUsd: 0.0061,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('planning_design', 'technical_planning'),
+        solePasserTable,
+        'thinkingmachines/inkling',
+        new Set(),
+        'best_accuracy'
+      );
+      expect(decision).toMatchObject({
+        model: 'anthropic/claude-sonnet-5',
+        sticky: false,
+        switchReason: 'threshold',
+      });
+    });
+  });
+
   describe('capability filters', () => {
     const visionTable: RoutingTable = {
       ...table,

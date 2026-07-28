@@ -1,4 +1,4 @@
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 import { createRemoteSessionWithFeedback } from '@/components/agents/create-remote-session-with-feedback';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';

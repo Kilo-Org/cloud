@@ -1,4 +1,4 @@
-import type { ContextUsage } from '@/lib/cloud-agent-sdk/context-usage';
+import type { ContextUsage } from '@kilocode/cloud-agent-sdk/context-usage';
 
 type ModelContextLength = {
   id: string;

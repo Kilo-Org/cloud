@@ -1,10 +1,28 @@
 import { captureException } from '@sentry/nextjs';
 
 type FetchWithBackoffOptions = {
+  attemptTimeoutMs?: number;
   baseDelayMs?: number;
+  maxBackoffDelayMs?: number;
   maxDelayMs?: number;
   retryResponse?: (r: Response) => boolean;
 };
+
+async function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timeout);
+      signal?.removeEventListener('abort', onAbort);
+      reject(signal?.reason);
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  });
+}
 
 export async function fetchWithBackoff(
   input: Parameters<typeof fetch>[0],
@@ -12,6 +30,7 @@ export async function fetchWithBackoff(
   options?: FetchWithBackoffOptions
 ): Promise<Response> {
   const baseDelayMs = options?.baseDelayMs ?? 200;
+  const maxBackoffDelayMs = options?.maxBackoffDelayMs ?? Number.POSITIVE_INFINITY;
   const maxDelayMs = options?.maxDelayMs ?? 20000;
   const delayFactor = 1.5;
   const startedAt = performance.now();
@@ -21,7 +40,14 @@ export async function fetchWithBackoff(
   let nextDelay = baseDelayMs * (1 + (Math.random() - 0.5) / 10);
   while (true) {
     try {
-      const response = await fetch(input, init);
+      const attemptTimeoutSignal = options?.attemptTimeoutMs
+        ? AbortSignal.timeout(options.attemptTimeoutMs)
+        : undefined;
+      const signal =
+        init?.signal && attemptTimeoutSignal
+          ? AbortSignal.any([init.signal, attemptTimeoutSignal])
+          : (init?.signal ?? attemptTimeoutSignal);
+      const response = await fetch(input, signal ? { ...init, signal } : init);
       if (!retryResponse(response)) {
         return response;
       }
@@ -49,6 +75,9 @@ export async function fetchWithBackoff(
         return response;
       }
     } catch (err) {
+      if (init?.signal?.aborted) {
+        throw err;
+      }
       if (hasElapsed()) {
         captureException(err, {
           tags: { source: 'fetch_with_backoff' },
@@ -60,7 +89,7 @@ export async function fetchWithBackoff(
         throw err;
       }
     }
-    await new Promise(res => setTimeout(res, nextDelay));
-    nextDelay = nextDelay * delayFactor;
+    await delay(nextDelay, init?.signal ?? undefined);
+    nextDelay = Math.min(nextDelay * delayFactor, maxBackoffDelayMs);
   }
 }

@@ -20,7 +20,7 @@ The handoff defines your priority order, minimum complete outcome, optional work
 
 Before testing:
 
-1. Acquire a machine device slot with `.kilo_workflow/e2e-slot.sh acquire <your-tmux-session>` before starting a stack, booting a simulator or emulator, or running a native build. This is mandatory on every run — the machine is shared and unslotted device work overloads it. The command blocks until a slot frees; blocking is correct behavior, never a wedge to work around, and never a reason to proceed unslotted. Release it with `e2e-slot.sh release <your-tmux-session>` the moment your device phase ends, before you write your report.
+1. Acquire a machine device slot with `.kilo_workflow/e2e-slot.sh acquire <your-tmux-session>` before starting a stack, booting a simulator or emulator, or running a native build. The owner string is your own tmux session name (`tmux display-message -p '#S'`) — your dispatcher launched you in a dedicated session for exactly this reason; never pass a window name or a shared session name. This is mandatory on every run — the machine is shared and unslotted device work overloads it. The command blocks until a slot frees; blocking is correct behavior, never a wedge to work around, and never a reason to proceed unslotted.
 2. Read the learnings in `.kilo_workflow/learnings/` (including `learnings/system/`), then the surface-specific runbook, and follow it exactly for services, device claiming, builds, login, automation drivers, prompts, and cleanup — mobile: `apps/mobile/e2e/AGENTS.md`; web and services: `DEVELOPMENT.md` and the repository dev runner. Never bypass a helper script's preflight, install unvalidated builds, or guess selectors.
 3. Translate the plan's goals and acceptance criteria into observable flows; for user-facing features, cover the happy, retryable-unhappy, non-retryable-unhappy, and empty states.
 4. Record pre-existing services, listeners, devices, and tmux sessions so cleanup removes only resources you created. Never use a device claimed by another worktree.
@@ -39,7 +39,7 @@ During verification:
 - Temporary uncommitted edits may add backend mocks, fixtures, deterministic state controls, or test harnesses when needed to produce an acceptance state safely. Use the smallest localized change and record every touched file.
 - Exception: LLM and agent responses are never mocked. Drive a real model call on `kilo-auto/efficient` — never `kilo-auto/free`, which is rate-limited; if an `efficient` call stalls, retry on `efficient`. Use an LLM mock only when a real call cannot produce the required state (for example, a specific provider failure), and report each use with the mock named and justified.
 - Temporary edits must not change the behavior under test, bypass provenance or security checks, or fix or conceal a product failure. If producing a state would change the behavior being judged, report that state as blocked.
-- When you resolve an environment blocker, record it per the Learnings contract in `.kilo_workflow/WORKFLOW.md`: system-specific entries in `.kilo_workflow/learnings/system/`, everything else in `.kilo_workflow/learnings/` (symptom / cause / fix, findable filename; update an existing entry instead of duplicating it).
+- When you resolve an environment blocker, record it (symptom / cause / fix, findable filename; update an existing entry instead of duplicating it). System-specific entries (true only of this machine) go to the main checkout's `~/Projects/cloud/.kilo_workflow/learnings/system/` — outside your baseline-restore scope. Everything else goes to `$SCRATCH/learnings/` (never the repository — your baseline restore must stay byte-identical), listed in your report so the orchestrator can commit it.
 
 Classify every failure as exactly one of:
 
@@ -49,7 +49,7 @@ Classify every failure as exactly one of:
 
 Attempt one reasonable recovery for a test-environment failure. Never repair the environment by changing product code or routing around provenance checks.
 
-Before returning, for any reason: release your slot, then delete every temporary path you created and restore every edited tracked file byte-for-byte with its original mode. Compare the final porcelain status, binary worktree diff, binary index diff, and untracked hashes, modes, and symlink targets against the baseline. Any mismatch is a verification failure: report every affected file and do not claim acceptance passed.
+Before returning, for any reason, in this order: shut down every service, simulator, emulator, and process you started (a released slot with your stack still running overloads the next holder); then release your slot; then delete every temporary path you created and restore every edited tracked file byte-for-byte with its original mode. Compare the final porcelain status, binary worktree diff, binary index diff, and untracked hashes, modes, and symlink targets against the baseline. Any mismatch is a verification failure: report every affected file and do not claim acceptance passed.
 
 Return:
 
@@ -60,3 +60,5 @@ Return:
 - Cleanup performed, plus evidence that the final Git state exactly matches the pre-verification baseline
 - Learnings written or updated, if any
 - If stopping early: completed work, remaining work, failures, resources touched, checks run or deferred, and the safest next action
+
+End your report with exactly one sentinel line — `VERIFICATION PASSED.`, `VERIFICATION FAILED.`, `VERIFICATION BLOCKED.`, or `STOPPED EARLY.`; in repro mode, `REPRODUCED.` or `CANNOT REPRODUCE.` Your dispatcher treats a log without a sentinel as a void round — a crashed run, never a pass.

@@ -8,9 +8,11 @@ Fix: run the dispatch inside a tmux window, redirect rather than pipe, and appen
 
 ```bash
 cd "$WORKTREE"
-kilo run "$(cat msg.txt)" --model kilo/x-ai/grok-4.5 --variant high \
-  --agent plan-reviewer --file "$PLAN" > "$LOG" 2>&1
+env $(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /') \
+  kilo run "$(cat msg.txt)" --agent plan-reviewer --file "$PLAN" > "$LOG" 2>&1
 echo "EXITCODE=$?" >> "$LOG"
 ```
+
+Do not pass `--model`/`--variant` for role agents — their definitions in `.kilo/agent/` pin the model, and a flag that drifts from the definition silently disagrees with it.
 
 Keep the message positional **before** the flags: `--file` takes multiple values and swallows a trailing message as a path (`File not found`). Treat the run as done only when the tmux window is gone **or** the marker is the last line: `tail -1 "$LOG" | grep -q '^EXITCODE=[0-9]'`.

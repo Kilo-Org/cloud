@@ -42,4 +42,6 @@ Output findings first, ordered by severity. Each finding contains:
 
 If there are no actionable findings, return exactly `No findings.` followed by any residual testing risks. Do not praise the implementation or summarize before findings.
 
-If you must stop early, return: completed review scope, remaining scope, failures, files inspected, checks run or deferred, and the safest next action.
+If you must stop early, return: completed review scope, remaining scope, failures, files inspected, checks run or deferred, and the safest next action, ending with the exact line `STOPPED EARLY.`
+
+Your dispatcher treats a log without a verdict (`No findings.`, a findings list, or `STOPPED EARLY.`) as a void round — always end with one.

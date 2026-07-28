@@ -42,3 +42,5 @@ Return:
 - Suggested commit boundary and a concise commit message for the completed slice
 - Remaining risks, ambiguity, or unfinished work
 - If stopping early: completed work, remaining work, failures, files touched, checks run or deferred, and the safest next action
+
+End your report with exactly one sentinel line: `SLICE COMPLETE.` or `STOPPED EARLY.` Your dispatcher treats a log without a sentinel as a void round — a crashed run, never a pass.

@@ -165,6 +165,7 @@ pnpm dev:seed app:api-token <email>              # mint a bearer token (used by 
 One-time machine setup: `brew install maestro`. For MCP, use stdio command `maestro mcp`, then restart the agent session so its tools appear.
 
 - Maestro is the primary automation driver on both iOS and Android. Fall back to `xcrun simctl` (iOS) or repository-wrapped ADB (Android) only when Maestro cannot inspect or operate a native state, or when low-level device control is required. Setup still uses `simctl`/ADB for boot, install, dev-client URL reconnection, screenshots, shutdown, and cleanup.
+- With more than one simulator booted (parallel worktrees), always target by UDID: `maestro --device <udid>` — without it Maestro picks an arbitrary booted simulator and taps silently land on another worktree's device. The Maestro MCP tools mis-target the same way; prefer the CLI plus `simctl` screenshots when several simulators are up.
 - Inspect the screen before selecting elements; re-inspect after UI changes.
 - Never guess a selector from a visible label or screenshot. Copy the exact `txt` or `a11y` value from `maestro_inspect_screen` (`a11y` maps to Maestro `text:`). Maestro text matching is full-string regex, not substring.
 - Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before relying on these examples; the count and labels can change.
@@ -194,10 +195,11 @@ The helper resolves this worktree's stack ports, mints a token for the given use
 Run any one-off CLI command against the same prepared stack with `exec` instead of the interactive TUI:
 
 ```bash
-apps/mobile/e2e/remote-cli.sh exec remote              # enable the real-time relay
 apps/mobile/e2e/remote-cli.sh exec session list --pure # inspect sessions
 apps/mobile/e2e/remote-cli.sh exec run "say hello"     # non-interactive run
 ```
+
+The real-time relay (`remote`) blocks until SIGTERM — a one-shot `exec remote` exits and the relay dies with it. Run it persistently in its own `kilo-e2e-*` tmux window (or send `/remote` to the running TUI session) and keep it alive for the whole flow.
 
 Role agents reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
 

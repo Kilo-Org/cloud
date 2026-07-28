@@ -49,14 +49,14 @@ const chatCompletionStreamResponse = (events: unknown[]): string =>
 const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
 const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
 const chatCompletionsPath = '/api/gateway/v1/chat/completions';
-const dangerousToolNames = [
+export const safeToolNames = [
   'get_page_snapshot',
   'get_element_details',
   'find_in_page',
   'search_memories',
   'get_memory',
-  'eval',
 ];
+export const dangerousToolNames = [...safeToolNames, 'eval'];
 interface MockGatewayModel {
   readonly contextLength?: number;
   readonly hasUserByokAvailable?: boolean;
@@ -303,7 +303,7 @@ export const mockKiloApi = async (
     ];
 
     const toolNames =
-      options.toolNamesByCall?.[chatCompletionCalls - 1] ?? options.toolNames ?? dangerousToolNames;
+      options.toolNamesByCall?.[chatCompletionCalls - 1] ?? options.toolNames ?? safeToolNames;
 
     // Summarization calls use tool_choice: 'none' (tools: []); skip normal-turn assertions for them.
     const isSummarizationCall =

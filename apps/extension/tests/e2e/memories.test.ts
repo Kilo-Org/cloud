@@ -4,7 +4,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { mockKiloApi } from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import {
   extensionPath,
   launchExtensionContext,
@@ -15,16 +15,6 @@ import {
 
 const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
 const AGENT_MEMORIES_KEY = 'kiloAgentMemories';
-
-const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'search_memories',
-  'get_memory',
-] as const;
-
-const dangerousToolNames = [...safeToolNames, 'eval'] as const;
 
 const EMPTY_MEMORIES_MESSAGE =
   'No memories yet. Highlight text on any page, right-click, and choose Add to memory.';

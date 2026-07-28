@@ -37,7 +37,10 @@ SELF_WORKTREE=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null |
 # started by hand in a personal worktree is reported, never stopped.
 is_section_slug() { [[ "$1" =~ -[0-9a-f]{4}$ ]]; }
 
-stack_session() { echo "kilo-dev-$(basename "$1" | tr -c 'A-Za-z0-9_-' '_')"; }
+# `\n` stays in the preserved set on purpose: without it `tr` rewrites the
+# trailing newline `basename` emits into `_`, which `$(...)` can no longer
+# strip, and every session name comes back with a spurious trailing underscore.
+stack_session() { echo "kilo-dev-$(basename "$1" | tr -c 'A-Za-z0-9_-\n' '_')"; }
 
 # Is any held slot entitled to this stack session? The recorded worktree is the
 # real answer; the owner-name prefix is a fallback so slots written before

@@ -25,6 +25,7 @@ type UpstreamFetchFailureFamily =
 
 // Longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout.
 const TIMEOUT_MS = 15 * 60 * 1000;
+const GENERATION_FETCH_MAX_DELAY_MS = 5 * 60 * 1000;
 
 function getProviderTargetHost(apiUrl: string): string {
   try {
@@ -316,7 +317,11 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
           ...ATTRIBUTION_HEADERS,
         },
       },
-      { retryResponse: r => r.status >= 400 } // openrouter returns 404 when called too soon.
+      {
+        baseDelayMs: 5_000,
+        maxDelayMs: GENERATION_FETCH_MAX_DELAY_MS,
+        retryResponse: r => r.status >= 400,
+      }
     );
   } catch (error) {
     captureException(error, {

@@ -73,6 +73,15 @@ import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
+import {
+  GASTOWN_CONTAINER_SKU,
+  isContainerUsageMeteringEnabled,
+  isGastownBillingEnforced,
+  type ContainerRunPolicy,
+  type GastownBillingStatus,
+  type UsageActor,
+  type UsageContext,
+} from '../billing/container-usage.billing';
 import { BeadPriority } from '../types';
 import type {
   TownConfig,
@@ -275,6 +284,14 @@ export class TownDO extends DurableObject<Env> {
       getRigConfig: (rigId: string) => this.getRigConfig(rigId),
       resolveKilocodeToken: () => this.resolveKilocodeToken(),
       emitEvent: data => this.emitEvent(data),
+      prepareContainerBilling: async () => {
+        await this.prepareContainerBilling();
+        if (isContainerUsageMeteringEnabled(this.env)) {
+          await getTownContainerStub(this.env, this.townId).warmUp();
+          this._billingBlocked = false;
+          await this.ctx.storage.put('billing:blocked', false);
+        }
+      },
     };
   }
 
@@ -764,6 +781,9 @@ export class TownDO extends DurableObject<Env> {
     this._draining = (await this.ctx.storage.get<boolean>('town:draining')) ?? false;
     this._drainNonce = (await this.ctx.storage.get<string>('town:drainNonce')) ?? null;
     this._drainStartedAt = (await this.ctx.storage.get<number>('town:drainStartedAt')) ?? null;
+    this._billingBlocked = (await this.ctx.storage.get<boolean>('billing:blocked')) ?? false;
+    this._containerRunPolicy =
+      (await this.ctx.storage.get<ContainerRunPolicy>('container:runPolicy')) ?? 'automatic';
 
     // All tables are now initialized via beads.initBeadTables():
     // beads, bead_events, bead_dependencies, agent_metadata, review_metadata,
@@ -820,6 +840,8 @@ export class TownDO extends DurableObject<Env> {
   private _draining = false;
   private _drainNonce: string | null = null;
   private _drainStartedAt: number | null = null;
+  private _billingBlocked = false;
+  private _containerRunPolicy: ContainerRunPolicy = 'automatic';
   /** Instance UUID of the current container, set by the first heartbeat. */
   private _containerInstanceId: string | null = null;
 
@@ -930,7 +952,154 @@ export class TownDO extends DurableObject<Env> {
   async updateTownConfig(update: TownConfigUpdate): Promise<TownConfig> {
     const result = await config.updateTownConfig(this.ctx.storage, update);
     this._ownerUserId = result.owner_user_id;
+    await this.prepareContainerBilling(undefined, result);
     return result;
+  }
+
+  async getBillingStatus(): Promise<GastownBillingStatus> {
+    try {
+      if (isContainerUsageMeteringEnabled(this.env)) await this.prepareContainerBilling();
+      const status = await getTownContainerStub(this.env, this.townId).getBillingStatus();
+      await this.syncContainerRunPolicy(status.runPolicy);
+      return status;
+    } catch (error) {
+      // A read-only status query must never fail the dashboard. Fall back to a
+      // degraded status if billing setup or the container DO is unreachable.
+      logger.warn('billing: getBillingStatus failed, returning degraded', {
+        townId: this.townId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        enabled: isContainerUsageMeteringEnabled(this.env),
+        enforcing: isGastownBillingEnforced(this.env),
+        state: 'degraded',
+        runPolicy: this._containerRunPolicy,
+      };
+    }
+  }
+
+  async setContainerRunPolicy(policy: ContainerRunPolicy): Promise<GastownBillingStatus> {
+    const status = await getTownContainerStub(this.env, this.townId).setRunPolicy(policy);
+    await this.syncContainerRunPolicy(status.runPolicy);
+    return status;
+  }
+
+  private async syncContainerRunPolicy(policy: ContainerRunPolicy): Promise<void> {
+    if (this._containerRunPolicy === policy) return;
+    this._containerRunPolicy = policy;
+    await this.ctx.storage.put('container:runPolicy', policy);
+  }
+
+  private containerStartsBlocked(): boolean {
+    return this._billingBlocked || this._containerRunPolicy === 'paused_by_user';
+  }
+
+  private async prepareContainerBilling(
+    actor?: UsageActor,
+    providedConfig?: TownConfig
+  ): Promise<void> {
+    if (!isContainerUsageMeteringEnabled(this.env)) return;
+
+    const townConfig = providedConfig ?? (await this.getTownConfig());
+    const ownerId = townConfig.owner_id ?? townConfig.organization_id ?? townConfig.owner_user_id;
+    if (!ownerId) {
+      // A town without a resolvable billing owner (e.g. a freshly created town
+      // before its owner is set) simply isn't metered yet. Skip billing setup
+      // rather than throwing so unrelated config/token updates aren't broken.
+      logger.warn('billing: skipping container billing setup, town has no billing owner', {
+        townId: this.townId,
+      });
+      return;
+    }
+
+    const subject =
+      townConfig.owner_type === 'org'
+        ? ({ type: 'org', id: ownerId } as const)
+        : ({ type: 'user', id: ownerId } as const);
+    const useBotActor = !actor || (subject.type === 'user' && actor.id !== subject.id);
+    const billingActor = useBotActor
+      ? ({ type: 'bot', id: `gastown:${this.townId}` } as const)
+      : actor;
+    const context: UsageContext = {
+      service: 'gastown',
+      instanceId: getTownContainerDoId(this.env, this.townId),
+      sku: GASTOWN_CONTAINER_SKU,
+      subject,
+      actor: billingActor,
+      sessionId: this.townId,
+      metadata: {
+        townId: this.townId,
+        ...(actor && useBotActor ? { triggeredByUserId: actor.id } : {}),
+      },
+      ...(billingActor.type === 'bot' ? { onBehalfOf: subject } : {}),
+    };
+    const container = getTownContainerStub(this.env, this.townId);
+    await container.setBillingContext(context);
+    const estimatedHourlyCharge = await this.getBillingHourlyEstimate();
+    if (estimatedHourlyCharge !== undefined) {
+      await container.setBillingHourlyEstimate(estimatedHourlyCharge);
+    }
+  }
+
+  private async getBillingHourlyEstimate(): Promise<number | undefined> {
+    const storageKey = `billing:hourlyEstimate:${GASTOWN_CONTAINER_SKU}`;
+    const cached = await this.ctx.storage.get<number>(storageKey);
+    if (cached !== undefined) return cached;
+    if (!this.env.HYPERDRIVE) return undefined;
+
+    const { getSkuHourlyCharge } = await import('../billing/sku-rate.billing');
+    const estimate = await getSkuHourlyCharge(
+      this.env.HYPERDRIVE.connectionString,
+      GASTOWN_CONTAINER_SKU
+    );
+    if (estimate !== undefined) await this.ctx.storage.put(storageKey, estimate);
+    return estimate;
+  }
+
+  private async updateContainerBilling(): Promise<GastownBillingStatus> {
+    if (!isContainerUsageMeteringEnabled(this.env)) {
+      return {
+        enabled: false,
+        enforcing: false,
+        state: 'idle',
+        runPolicy: this._containerRunPolicy,
+      };
+    }
+
+    // Usage is always metered and reported. The blocked/graceful-stop reactions
+    // below are enforcement and only apply when GASTOWN_BILLING_ENABLED is on;
+    // with enforcement off we collect shadow usage without affecting the town.
+    await this.prepareContainerBilling();
+    const container = getTownContainerStub(this.env, this.townId);
+    const status = await container.recordUsageHeartbeat();
+    await this.syncContainerRunPolicy(status.runPolicy);
+
+    if (!isGastownBillingEnforced(this.env)) {
+      if (this._billingBlocked) {
+        this._billingBlocked = false;
+        await this.ctx.storage.put('billing:blocked', false);
+      }
+      return status;
+    }
+
+    const blocked =
+      status.runPolicy === 'automatic' &&
+      (status.state === 'blocked' || status.state === 'stopping');
+
+    if (blocked !== this._billingBlocked) {
+      this._billingBlocked = blocked;
+      await this.ctx.storage.put('billing:blocked', blocked);
+    }
+
+    if (status.state === 'stopping') {
+      await container.stopForBilling().catch(error => {
+        logger.warn('billing: graceful container stop failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+
+    return status;
   }
 
   /**
@@ -2743,25 +2912,33 @@ export class TownDO extends DurableObject<Env> {
   async sendMayorMessage(
     message: string,
     _model?: string,
-    uiContext?: string
+    uiContext?: string,
+    actorUserId?: string
   ): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
   }> {
     return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
-      this._sendMayorMessage(message, _model, uiContext)
+      this._sendMayorMessage(message, _model, uiContext, actorUserId)
     );
   }
 
   private async _sendMayorMessage(
     message: string,
     _model?: string,
-    uiContext?: string
+    uiContext?: string,
+    actorUserId?: string
   ): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
   }> {
     const townId = this.townId;
+    await this.prepareContainerBilling(actorUserId ? { type: 'user', id: actorUserId } : undefined);
+    if (isContainerUsageMeteringEnabled(this.env)) {
+      await getTownContainerStub(this.env, townId).warmUp();
+      this._billingBlocked = false;
+      await this.ctx.storage.put('billing:blocked', false);
+    }
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
     if (!mayor) {
@@ -2956,20 +3133,26 @@ export class TownDO extends DurableObject<Env> {
     };
   }
 
-  async ensureMayor(): Promise<{
+  async ensureMayor(actorUserId?: string): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
   }> {
     return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
-      this._ensureMayor()
+      this._ensureMayor(actorUserId)
     );
   }
 
-  private async _ensureMayor(): Promise<{
+  private async _ensureMayor(actorUserId?: string): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
   }> {
     const townId = this.townId;
+    await this.prepareContainerBilling(actorUserId ? { type: 'user', id: actorUserId } : undefined);
+    if (isContainerUsageMeteringEnabled(this.env)) {
+      await getTownContainerStub(this.env, townId).warmUp();
+      this._billingBlocked = false;
+      await this.ctx.storage.put('billing:blocked', false);
+    }
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
     if (!mayor) {
@@ -4144,8 +4327,30 @@ export class TownDO extends DurableObject<Env> {
     // Call once per tick — threaded to ensureContainerReady, maybeDispatchTriageAgent, and getAlarmStatus
     const rigList = rigs.listRigs(this.sql);
     const hasRigs = rigList.length > 0;
+    let billingStatus: GastownBillingStatus = {
+      enabled: false,
+      enforcing: false,
+      state: 'idle',
+      runPolicy: this._containerRunPolicy,
+    };
 
-    if (hasRigs) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
+      try {
+        billingStatus = await this.updateContainerBilling();
+      } catch (err) {
+        billingStatus = {
+          enabled: true,
+          enforcing: isGastownBillingEnforced(this.env),
+          state: 'degraded',
+          runPolicy: this._containerRunPolicy,
+        };
+        logger.warn('alarm: container billing update failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    if (hasRigs && !this.containerStartsBlocked()) {
       try {
         await this.ensureContainerReady(rigList);
       } catch (err) {
@@ -4198,7 +4403,7 @@ export class TownDO extends DurableObject<Env> {
           ),
         ]);
 
-      if (workingAgentRows.length > 0) {
+      if (workingAgentRows.length > 0 && !this.containerStartsBlocked()) {
         const statusChecks = workingAgentRows.map(async row => {
           try {
             const containerInfo = await dispatch.checkAgentContainerStatus(
@@ -4313,7 +4518,7 @@ export class TownDO extends DurableObject<Env> {
     const sideEffects: Array<() => Promise<void>> = [];
     try {
       const actions = reconciler.reconcile(this.sql, {
-        draining: this._draining,
+        draining: this._draining || this.containerStartsBlocked(),
         townConfig,
       });
       metrics.actionsEmitted = actions.length;
@@ -4453,11 +4658,15 @@ export class TownDO extends DurableObject<Env> {
           error: err instanceof Error ? err.message : String(err),
         })
       ),
-      this.maybeDispatchTriageAgent(cachedTriageCount, rigList).catch(err =>
-        logger.warn('alarm: maybeDispatchTriageAgent failed', {
-          error: err instanceof Error ? err.message : String(err),
-        })
-      ),
+      ...(this.containerStartsBlocked()
+        ? []
+        : [
+            this.maybeDispatchTriageAgent(cachedTriageCount, rigList).catch(err =>
+              logger.warn('alarm: maybeDispatchTriageAgent failed', {
+                error: err instanceof Error ? err.message : String(err),
+              })
+            ),
+          ]),
       // Prune processed reconciler events older than 7 days
       Promise.resolve().then(() => {
         try {
@@ -4487,6 +4696,7 @@ export class TownDO extends DurableObject<Env> {
         const snapshot = await this.getAlarmStatus({
           activeWork,
           triageCount: cachedTriageCount,
+          billingStatus,
         });
         this.broadcastAlarmStatus(snapshot);
       } catch (err) {
@@ -4546,12 +4756,18 @@ export class TownDO extends DurableObject<Env> {
   private async stopContainerIfIdle(): Promise<void> {
     await _stopContainerIfIdle({
       hasActiveWork: () => this.hasActiveWork(),
-      isDraining: () => this._draining,
+      isDraining: () => this._draining || this.containerStartsBlocked(),
       getMayor: () => agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null,
       getTownId: () => this.townId,
       getLastIdleStopAt: () => this.ctx.storage.get<number>('container:lastIdleStopAt'),
       setLastIdleStopAt: value => this.ctx.storage.put('container:lastIdleStopAt', value),
-      getContainerStub: townId => getTownContainerStub(this.env, townId),
+      getContainerStub: townId => {
+        const container = getTownContainerStub(this.env, townId);
+        return {
+          getState: () => container.getState(),
+          stop: () => container.stopForInactivity(),
+        };
+      },
       writeEventFn: data => writeEvent(this.env, data),
       now: () => Date.now(),
     });
@@ -4565,7 +4781,7 @@ export class TownDO extends DurableObject<Env> {
       townId,
       containerDoId: getTownContainerDoId(this.env, townId),
       outcome,
-      isDraining: () => this._draining,
+      isDraining: () => this._draining || this.containerStartsBlocked(),
       getConsecutiveHealthFailures: () =>
         this.ctx.storage.get<number>(CONTAINER_HEALTH_STORAGE_KEYS.consecutiveHealthFailures),
       setConsecutiveHealthFailures: value =>
@@ -4971,6 +5187,7 @@ export class TownDO extends DurableObject<Env> {
     cachedRigList?: rigs.RigRecord[],
     cachedActiveWork?: boolean
   ): Promise<void> {
+    if (this.containerStartsBlocked()) return;
     const rigList = cachedRigList ?? rigs.listRigs(this.sql);
     if (rigList.length === 0) return;
 
@@ -5263,7 +5480,11 @@ export class TownDO extends DurableObject<Env> {
    * Return a structured snapshot of the alarm loop and patrol state
    * for the dashboard Status tab.
    */
-  async getAlarmStatus(cached?: { activeWork?: boolean; triageCount?: number }): Promise<{
+  async getAlarmStatus(cached?: {
+    activeWork?: boolean;
+    triageCount?: number;
+    billingStatus?: GastownBillingStatus;
+  }): Promise<{
     alarm: {
       nextFireAt: string | null;
       intervalMs: number;
@@ -5298,6 +5519,7 @@ export class TownDO extends DurableObject<Env> {
     }>;
     draining?: boolean;
     drainStartedAt?: string;
+    billing: GastownBillingStatus;
   }> {
     const currentAlarm = await this.ctx.storage.getAlarm();
     const active = cached?.activeWork ?? this.hasActiveWork();
@@ -5420,6 +5642,20 @@ export class TownDO extends DurableObject<Env> {
       message: formatEventMessage(row),
     }));
 
+    const billing =
+      cached?.billingStatus ??
+      (isContainerUsageMeteringEnabled(this.env)
+        ? // getBillingStatus is guarded and falls back to a degraded status, so
+          // the Status tab never fails just because the container DO is
+          // momentarily unreachable.
+          await this.getBillingStatus()
+        : {
+            enabled: false,
+            enforcing: false,
+            state: 'idle' as const,
+            runPolicy: this._containerRunPolicy,
+          });
+
     return {
       alarm: {
         nextFireAt: currentAlarm ? new Date(Number(currentAlarm)).toISOString() : null,
@@ -5440,6 +5676,7 @@ export class TownDO extends DurableObject<Env> {
       drainStartedAt: this._drainStartedAt
         ? new Date(this._drainStartedAt).toISOString()
         : undefined,
+      billing,
     };
   }
 
@@ -5773,12 +6010,18 @@ export class TownDO extends DurableObject<Env> {
       console.warn(`${TOWN_LOG} destroy: agent cleanup failed`, err);
     }
 
-    // Destroy TownContainerDO (sends SIGKILL to container process, clears state)
+    // Attempt to settle usage before destroying container state, but never let
+    // a billing-settlement failure block storage teardown — otherwise the town
+    // would be left un-destroyable until the container/billing path recovers.
+    // The container DO force-closes stale intervals for reconciliation anyway.
+    const containerStub = getTownContainerStub(this.env, this.townId);
     try {
-      const containerStub = getTownContainerStub(this.env, this.townId);
-      await containerStub.destroy();
+      await containerStub.destroyWithBilling();
     } catch (err) {
-      console.warn(`${TOWN_LOG} destroy: container cleanup failed`, err);
+      console.warn(`${TOWN_LOG} destroy: container billing settlement failed`, err);
+      await containerStub.destroy().catch(destroyErr => {
+        console.warn(`${TOWN_LOG} destroy: container cleanup failed`, destroyErr);
+      });
     }
 
     await this.ctx.storage.deleteAlarm();

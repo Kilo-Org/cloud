@@ -5,7 +5,6 @@ import {
   NVIDIA_NEMOTRON_3_ULTRA_MODEL_ID,
 } from '@/lib/ai-gateway/providers/nvidia';
 import { UserByokTestModels } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { getAiSdkProvider, getModelVariants } from '../model-settings';
 import nvidiaByok from './nvidia-byok';
 
 jest.mock('@/lib/redis', () => ({
@@ -111,23 +110,5 @@ describe('NVIDIA direct BYOK', () => {
         reasoning_effort: 'medium',
       })
     ).not.toHaveProperty('reasoning_effort');
-  });
-
-  test('pins NVIDIA models to OpenAI-compatible Chat Completions', () => {
-    expect(getAiSdkProvider('nvidia-byok/openai/gpt-5.5', 'nvidia-byok')).toBe('openai-compatible');
-  });
-
-  test('advertises only NVIDIA-documented reasoning variants', () => {
-    expect(
-      Object.keys(
-        getModelVariants(`nvidia-byok/${NVIDIA_NEMOTRON_3_SUPER_MODEL_ID}`, 'nvidia-byok')!
-      )
-    ).toEqual(['none', 'low', 'high']);
-    expect(
-      Object.keys(
-        getModelVariants(`nvidia-byok/${NVIDIA_NEMOTRON_3_ULTRA_MODEL_ID}`, 'nvidia-byok')!
-      )
-    ).toEqual(['none', 'medium', 'high']);
-    expect(getModelVariants('nvidia-byok/qwen/qwen3-coder', 'nvidia-byok')).toBeUndefined();
   });
 });

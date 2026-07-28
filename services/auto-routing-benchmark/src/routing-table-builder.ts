@@ -33,18 +33,51 @@ export function buildRoutingTable(params: {
     deciderModels,
     summaries,
   } = params;
-  const modelConfigById = new Map(deciderModels.map(m => [m.id, m] as const));
+  // Prefer exact (model, variant) match so two variants of one model keep
+  // distinct snapshot rows. Legacy / platform: when the snapshot has exactly
+  // one row for the model (one effort per model), bind that row even if the
+  // summary omitted variant. Multiple snapshot rows without an exact match is
+  // corrupt — throw so buildRoutingTable fails and the caller keeps the
+  // previous published table. Emit reasoningEffort only — never variant — so
+  // the published PLATFORM artifact shape stays unchanged for rolling deploys.
+  const snapshotVariant = (m: BenchmarkDeciderModel): string | null =>
+    m.variant !== undefined ? (m.variant ?? null) : (m.reasoningEffort ?? null);
+
+  const findSnapshot = (
+    model: string,
+    variant: string | null | undefined
+  ): BenchmarkDeciderModel => {
+    const appVariant = variant ?? null;
+    const exact = deciderModels.find(m => m.id === model && snapshotVariant(m) === appVariant);
+    if (exact) return exact;
+    const forModel = deciderModels.filter(m => m.id === model);
+    const sole = forModel.length === 1 ? forModel[0] : undefined;
+    // Exactly one snapshot row for this model → platform/legacy shape.
+    if (sole) return sole;
+    throw new Error(
+      `no snapshot row for model ${model} variant ${JSON.stringify(appVariant)} (${forModel.length} rows for model)`
+    );
+  };
 
   const routeCandidates = (routeKey: TaxonomyRouteKey) =>
     rankCandidates(
       summaries
         .filter(s => s.routeKey === routeKey && s.cases > 0 && s.avgCostUsd !== null)
-        .map(s => ({
-          model: s.model,
-          accuracy: s.accuracy,
-          avgCostUsd: s.avgCostUsd ?? 0,
-          reasoningEffort: modelConfigById.get(s.model)?.reasoningEffort ?? null,
-        })),
+        .map(s => {
+          const cfg = findSnapshot(s.model, s.variant);
+          // Platform artifact: emit reasoningEffort from the run snapshot's
+          // effort key, NOT variant (custom sparse tables are a later slice).
+          const effort =
+            cfg?.reasoningEffort !== undefined && cfg.reasoningEffort !== null
+              ? cfg.reasoningEffort
+              : null;
+          return {
+            model: s.model,
+            accuracy: s.accuracy,
+            avgCostUsd: s.avgCostUsd ?? 0,
+            reasoningEffort: effort,
+          };
+        }),
       minAccuracy
     );
 

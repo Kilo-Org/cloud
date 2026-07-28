@@ -6,8 +6,8 @@ import type {
   RankedCandidate,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
+import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import { and, count, desc, eq, gt, inArray, lt, ne } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
@@ -24,7 +24,11 @@ import {
   runModels,
 } from './db-schema';
 import { pickClassifierWinner } from './winner';
-import { parsePersistedReasoningEffort } from './reasoning-effort';
+import {
+  parsePersistedReasoningEffort,
+  variantFromStorage,
+  variantToStorage,
+} from './reasoning-effort';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -34,13 +38,13 @@ export type ConfigAutoDeciderModelRow = typeof configAutoDeciderModels.$inferSel
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
 // D1 rejects statements with too many bound variables. A model summary insert
-// binds 12 values per row, so 8 rows keeps each INSERT below the 100-variable
-// ceiling while still batching the delete plus inserts together.
-const MODEL_SUMMARY_INSERT_BATCH_SIZE = 8;
+// binds 13 values per row (including variant), so 7 rows keeps each INSERT
+// below the 100-variable ceiling while still batching the delete plus inserts.
+const MODEL_SUMMARY_INSERT_BATCH_SIZE = 7;
 
-// Routing table candidates bind 8 values per row. Keep each INSERT comfortably
-// under D1's 100-variable ceiling; publishing is infrequent, so smaller
-// statements are preferable to risking a skipped routing-table update.
+// Routing table candidates bind 9 values per row (including variant). Keep each
+// INSERT comfortably under D1's 100-variable ceiling; publishing is infrequent,
+// so smaller statements are preferable to risking a skipped routing-table update.
 const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
 
 // ---------------------------------------------------------------------------
@@ -50,6 +54,7 @@ const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
 export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
   return {
     model: row.model,
+    variant: variantFromStorage(row.variant),
     routeKey: row.route_key as BenchmarkModelSummary['routeKey'],
     accuracy: row.accuracy,
     avgCostUsd: row.avg_cost_usd,
@@ -227,6 +232,7 @@ export async function insertRun(
         summaryChunk.map(s => ({
           run_id: run.id,
           model: s.model,
+          variant: variantToStorage(s.variant),
           route_key: s.routeKey,
           accuracy: s.accuracy,
           avg_cost_usd: s.avgCostUsd,
@@ -267,7 +273,13 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
     .insert(caseResults)
     .values(row)
     .onConflictDoUpdate({
-      target: [caseResults.run_id, caseResults.model, caseResults.case_id, caseResults.rep],
+      target: [
+        caseResults.run_id,
+        caseResults.model,
+        caseResults.variant,
+        caseResults.case_id,
+        caseResults.rep,
+      ],
       set: {
         route_key: row.route_key,
         score: row.score,
@@ -301,9 +313,17 @@ export async function getCaseResults(db: D1Database, runId: string): Promise<Cas
 
 export async function getExistingCaseResultIds(
   db: D1Database,
-  params: { runId: string; model: string; rep: number; caseIds: string[] }
+  params: {
+    runId: string;
+    model: string;
+    /** Application null form; stored as '' at the D1 boundary. */
+    variant?: string | null;
+    rep: number;
+    caseIds: string[];
+  }
 ): Promise<Set<string>> {
   if (params.caseIds.length === 0) return new Set();
+  const storedVariant = variantToStorage(params.variant);
   const rows = await drizzle(db)
     .select({ case_id: caseResults.case_id })
     .from(caseResults)
@@ -311,6 +331,7 @@ export async function getExistingCaseResultIds(
       and(
         eq(caseResults.run_id, params.runId),
         eq(caseResults.model, params.model),
+        eq(caseResults.variant, storedVariant),
         eq(caseResults.rep, params.rep),
         inArray(caseResults.case_id, params.caseIds)
       )
@@ -346,6 +367,7 @@ export async function replaceModelSummaries(
         summaryChunk.map(s => ({
           run_id: runId,
           model: s.model,
+          variant: variantToStorage(s.variant),
           route_key: s.routeKey,
           accuracy: s.accuracy,
           avg_cost_usd: s.avgCostUsd,
@@ -471,20 +493,34 @@ export async function markRunFailed(db: D1Database, runId: string, error: string
 // Latest summaries per model (for skip logic and classifier winner)
 // ---------------------------------------------------------------------------
 
-// What the most recent completed run measured for a model, plus the
-// benchmark identity it was measured under. startRun carries these summaries
-// into a new run only when the identity (engine + repetitions + the model's
-// reasoning_effort) still matches; otherwise the model is re-benchmarked.
+// What the most recent completed run measured for an exact Pool entry, plus
+// the benchmark identity it was measured under. startRun carries these
+// summaries into a new run only when the identity (engine + repetitions +
+// exact variant) still matches; otherwise the entry is re-benchmarked.
 export type PriorModelResult = {
   engineIdentity: string;
   repetitions: number;
+  /** Canonical variant (null = default). Prefer this for carry matching. */
+  variant: string | null;
+  /**
+   * Legacy effort mirror from run_models. Still exposed so older callers and
+   * legacy-row tests can inspect it; carry matching uses `variant`.
+   */
   reasoningEffort: string | null;
   summaries: BenchmarkModelSummary[];
 };
 
-// Latest summaries per model for a benchmark kind: for each model, all routes
-// from the most recent COMPLETED run that included it (mixing routes across
-// runs would pair incomparable numbers).
+/**
+ * Canonical map key for an exact (model, variant) pair. Uses the shared
+ * poolEntryKey contract helper so keys stay collision-safe.
+ */
+export function exactPairKey(model: string, variant: string | null | undefined): string {
+  return poolEntryKey({ model, variant: variant ?? null });
+}
+
+// Latest summaries per exact Pool entry for a benchmark kind: for each
+// (model, variant), all routes from the most recent COMPLETED run that
+// included that pair (mixing routes across runs would pair incomparable numbers).
 export async function getLatestSummariesByModel(
   db: D1Database,
   kind: BenchmarkKind
@@ -493,6 +529,7 @@ export async function getLatestSummariesByModel(
     .select({
       run_id: modelSummaries.run_id,
       model: modelSummaries.model,
+      variant: modelSummaries.variant,
       route_key: modelSummaries.route_key,
       accuracy: modelSummaries.accuracy,
       avg_cost_usd: modelSummaries.avg_cost_usd,
@@ -511,31 +548,41 @@ export async function getLatestSummariesByModel(
     .innerJoin(benchmarkRuns, eq(benchmarkRuns.id, modelSummaries.run_id))
     .leftJoin(
       runModels,
-      and(eq(runModels.run_id, modelSummaries.run_id), eq(runModels.model, modelSummaries.model))
+      and(
+        eq(runModels.run_id, modelSummaries.run_id),
+        eq(runModels.model, modelSummaries.model),
+        eq(runModels.variant, modelSummaries.variant)
+      )
     )
     .where(and(eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'completed')))
     .orderBy(desc(benchmarkRuns.started_at));
 
-  const latestRunByModel = new Map<string, string>();
+  const latestRunByPair = new Map<string, string>();
   for (const row of results) {
-    if (!latestRunByModel.has(row.model)) latestRunByModel.set(row.model, row.run_id);
+    const pairKey = exactPairKey(row.model, variantFromStorage(row.variant));
+    if (!latestRunByPair.has(pairKey)) latestRunByPair.set(pairKey, row.run_id);
   }
-  const byModel = new Map<string, PriorModelResult>();
+  const byPair = new Map<string, PriorModelResult>();
   for (const row of results) {
-    if (latestRunByModel.get(row.model) !== row.run_id) continue;
-    const existing = byModel.get(row.model);
+    const appVariant = variantFromStorage(row.variant);
+    const pairKey = exactPairKey(row.model, appVariant);
+    if (latestRunByPair.get(pairKey) !== row.run_id) continue;
+    const existing = byPair.get(pairKey);
     if (existing) {
       existing.summaries.push(mapSummaryRow(row));
     } else {
-      byModel.set(row.model, {
+      byPair.set(pairKey, {
         engineIdentity: row.engine_identity,
         repetitions: row.repetitions,
-        reasoningEffort: row.reasoning_effort,
+        variant: appVariant,
+        // Prefer the summary/run_models variant; fall back to legacy effort for
+        // rows migrated before variant was written independently.
+        reasoningEffort: row.reasoning_effort ?? appVariant,
         summaries: [mapSummaryRow(row)],
       });
     }
   }
-  return byModel;
+  return byPair;
 }
 
 // ---------------------------------------------------------------------------
@@ -562,6 +609,11 @@ export function routingTableToRows(
   const candidateRows: RoutingTableCandidateRow[] = [];
   for (const [routeKey, candidates] of Object.entries(table.routes)) {
     candidates.forEach((c, rank) => {
+      // Platform tables emit reasoningEffort only; mirror that effort key into
+      // the self-describing variant column ('' when null). Custom sparse tables
+      // (later slice) will emit variant and leave reasoning_effort null.
+      const effortKey = c.reasoningEffort ?? null;
+      const variantKey = c.variant ?? effortKey;
       candidateRows.push({
         run_id: table.version,
         route_key: routeKey,
@@ -570,7 +622,8 @@ export function routingTableToRows(
         accuracy: c.accuracy,
         avg_cost_usd: c.avgCostUsd,
         meets_threshold: c.meetsThreshold,
-        reasoning_effort: c.reasoningEffort ?? null,
+        reasoning_effort: effortKey,
+        variant: variantToStorage(variantKey),
       });
     });
   }
@@ -589,6 +642,8 @@ export function rowsToRoutingTable(
   });
   for (const row of sorted) {
     routeMap[row.route_key] ??= [];
+    // Platform artifact compatibility: keep reading reasoning_effort exactly
+    // as today so published JSON shape stays effort-based during rolling deploys.
     routeMap[row.route_key].push({
       model: row.model,
       accuracy: row.accuracy,

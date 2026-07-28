@@ -82,11 +82,15 @@ export const runModels = sqliteTable(
   {
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    // Application code converts '' ↔ null at the edges.
+    variant: text('variant').notNull().default(''),
     // enqueued=false means the model was skipped (had prior results).
     enqueued: integer('enqueued', { mode: 'boolean' }).notNull(),
+    // Legacy mirror of the platform effort key; kept for rollback/provenance.
     reasoning_effort: text('reasoning_effort'),
   },
-  table => [primaryKey({ columns: [table.run_id, table.model] })]
+  table => [primaryKey({ columns: [table.run_id, table.model, table.variant] })]
 );
 
 export const modelSummaries = sqliteTable(
@@ -94,6 +98,8 @@ export const modelSummaries = sqliteTable(
   {
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
     route_key: text('route_key').notNull(),
     accuracy: real('accuracy').notNull(),
     avg_cost_usd: real('avg_cost_usd'),
@@ -106,7 +112,7 @@ export const modelSummaries = sqliteTable(
     // carried=true rows are prior-run summaries copied in at startRun for skipped models.
     carried: integer('carried', { mode: 'boolean' }).notNull().default(false),
   },
-  table => [primaryKey({ columns: [table.run_id, table.model, table.route_key] })]
+  table => [primaryKey({ columns: [table.run_id, table.model, table.variant, table.route_key] })]
 );
 
 export const caseResults = sqliteTable(
@@ -114,6 +120,8 @@ export const caseResults = sqliteTable(
   {
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
     case_id: text('case_id').notNull(),
     route_key: text('route_key'),
     score: real('score').notNull(),
@@ -128,14 +136,16 @@ export const caseResults = sqliteTable(
     output_prefix: text('output_prefix'),
     event_count: integer('event_count'),
     last_event_types: text('last_event_types'),
-    // Repetition index (0-based); together with run_id/model/case_id forms the PK.
+    // Repetition index (0-based); together with run_id/model/variant/case_id forms the PK.
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
   // (count/fetch by run); no separate run_id index is needed.
-  table => [primaryKey({ columns: [table.run_id, table.model, table.case_id, table.rep] })]
+  table => [
+    primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),
+  ]
 );
 
 export const routingTables = sqliteTable('routing_tables', {
@@ -161,7 +171,10 @@ export const routingTableCandidates = sqliteTable(
     // cost signal, so every published candidate has one).
     avg_cost_usd: real('avg_cost_usd').notNull(),
     meets_threshold: integer('meets_threshold', { mode: 'boolean' }).notNull(),
+    // Legacy effort key; platform table JSON still reads this column.
     reasoning_effort: text('reasoning_effort'),
+    // Exact-pair identity mirror ('' = null). Keeps rows self-describing; no PK change.
+    variant: text('variant').notNull().default(''),
   },
   table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
 );

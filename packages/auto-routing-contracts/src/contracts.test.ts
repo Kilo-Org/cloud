@@ -15,6 +15,8 @@ import {
 import type { RoutingConstraints } from './index';
 import {
   BenchmarkConfigSchema,
+  BenchmarkDeciderModelSchema,
+  BenchmarkModelSummarySchema,
   BenchmarkProfileStatusesRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
@@ -487,6 +489,62 @@ describe('package root re-exports', () => {
 
   it('re-exports RoutingConstraintsSchema from the package root', () => {
     expect(RoutingConstraintsSchema.safeParse({}).success).toBe(true);
+  });
+});
+
+describe('BenchmarkModelSummarySchema variant field', () => {
+  const baseSummary = {
+    model: 'provider/model',
+    routeKey: '*' as const,
+    accuracy: 0.9,
+    avgCostUsd: 0.001,
+    avgLatencyMs: 100,
+    p50LatencyMs: 90,
+    p95LatencyMs: 120,
+    cases: 10,
+    errors: 0,
+  };
+
+  it('parses legacy summaries without variant', () => {
+    const parsed = BenchmarkModelSummarySchema.parse(baseSummary);
+    expect(parsed.variant).toBeUndefined();
+  });
+
+  it('parses optional nullable variant', () => {
+    expect(BenchmarkModelSummarySchema.parse({ ...baseSummary, variant: 'xhigh' }).variant).toBe(
+      'xhigh'
+    );
+    expect(BenchmarkModelSummarySchema.parse({ ...baseSummary, variant: null }).variant).toBeNull();
+  });
+});
+
+describe('BenchmarkDeciderModelSchema variant compatibility', () => {
+  it('parses legacy effort-only models', () => {
+    const parsed = BenchmarkDeciderModelSchema.parse({ id: 'm', reasoningEffort: 'high' });
+    expect(parsed).toMatchObject({ id: 'm', reasoningEffort: 'high' });
+    expect(parsed.variant).toBeUndefined();
+  });
+
+  it('parses variant-only models', () => {
+    const parsed = BenchmarkDeciderModelSchema.parse({ id: 'm', variant: 'xhigh' });
+    expect(parsed).toMatchObject({ id: 'm', variant: 'xhigh', reasoningEffort: null });
+  });
+
+  it('rejects both non-null variant and reasoningEffort', () => {
+    expect(
+      BenchmarkDeciderModelSchema.safeParse({
+        id: 'm',
+        variant: 'xhigh',
+        reasoningEffort: 'high',
+      }).success
+    ).toBe(false);
+  });
+
+  it('allows both null/absent (default effort null)', () => {
+    expect(BenchmarkDeciderModelSchema.parse({ id: 'm' })).toMatchObject({
+      id: 'm',
+      reasoningEffort: null,
+    });
   });
 });
 

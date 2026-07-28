@@ -18,13 +18,33 @@ const BenchmarkProfileOwnerTypeSchema = z.enum(['user', 'org']);
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
 
-export const BenchmarkDeciderModelSchema = z.object({
-  id: z.string().trim().min(1),
-  // Passed to the kilo CLI as --variant during the benchmark and carried into
-  // the routing table so serving uses the same effort the model was graded
-  // with. Null for models without (or not using) configurable reasoning.
-  reasoningEffort: ReasoningEffortSchema.nullable().default(null),
-});
+/**
+ * Decider model identity for a benchmark run. Platform/admin config still
+ * selects one legacy `reasoningEffort` per model. Profile runs (and exact
+ * Pool-entry identity) use canonical `variant`. Both non-null is malformed —
+ * same both-set rule as RankedCandidate / decisions.
+ */
+export const BenchmarkDeciderModelSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    // Canonical catalog variant key. Optional so platform admin config (effort
+    // only) still parses. Prefer this over reasoningEffort for new writers.
+    variant: z.string().trim().min(1).nullable().optional(),
+    // Passed to the kilo CLI as --variant during the benchmark and carried into
+    // the platform routing table so serving uses the same effort the model was
+    // graded with. Null for models without (or not using) configurable
+    // reasoning. Legacy; prefer `variant` when present.
+    reasoningEffort: ReasoningEffortSchema.nullable().default(null),
+  })
+  .superRefine((model, ctx) => {
+    if (model.variant != null && model.reasoningEffort != null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['variant'],
+        message: 'Decider model must not set both variant and reasoningEffort; emit variant only',
+      });
+    }
+  });
 export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
 export const AUTO_DECIDER_DEFAULT_MIN_COST_USD = 15;
@@ -164,6 +184,9 @@ export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;
 
 export const BenchmarkModelSummarySchema = z.object({
   model: z.string(),
+  // Exact-pair identity for summary rows. Optional so already-persisted run
+  // payloads and old admin-UI responses still parse. Null = default/no variant.
+  variant: z.string().trim().min(1).nullable().optional(),
   // '*' for classifier runs, otherwise "<taskType>/<subtaskType>".
   routeKey: z.union([TaxonomyRouteKeySchema, z.literal('*')]),
   accuracy: z.number(),

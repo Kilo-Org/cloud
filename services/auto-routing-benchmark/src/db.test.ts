@@ -1,18 +1,54 @@
 import { describe, it, expect } from 'vitest';
 import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
-import { mapRunRow, mapSummaryRow, routingTableToRows, rowsToRoutingTable } from './db';
+import {
+  exactPairKey,
+  mapRunRow,
+  mapSummaryRow,
+  routingTableToRows,
+  rowsToRoutingTable,
+} from './db';
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
+import {
+  variantFromReasoningEffort,
+  variantFromStorage,
+  variantToStorage,
+} from './reasoning-effort';
 
 // ---------------------------------------------------------------------------
 // mapSummaryRow
 // ---------------------------------------------------------------------------
+
+describe('variant storage helpers', () => {
+  it('round-trips null and empty as the D1 null/default convention', () => {
+    expect(variantToStorage(null)).toBe('');
+    expect(variantToStorage(undefined)).toBe('');
+    expect(variantToStorage('xhigh')).toBe('xhigh');
+    expect(variantFromStorage('')).toBeNull();
+    expect(variantFromStorage(null)).toBeNull();
+    expect(variantFromStorage('xhigh')).toBe('xhigh');
+  });
+
+  it('maps platform reasoningEffort to the stored variant value', () => {
+    expect(variantFromReasoningEffort('high')).toBe('high');
+    expect(variantFromReasoningEffort(null)).toBeNull();
+  });
+
+  it('exactPairKey distinguishes variants of the same model', () => {
+    expect(exactPairKey('m', 'a')).not.toBe(exactPairKey('m', 'b'));
+    // Application code normalizes '' → null before calling exactPairKey; the
+    // helper itself only coalesces nullish (undefined/null), not empty string.
+    expect(exactPairKey('m', null)).toBe(exactPairKey('m', undefined));
+    expect(exactPairKey('m', variantFromStorage(''))).toBe(exactPairKey('m', null));
+  });
+});
 
 describe('mapSummaryRow', () => {
   it('maps snake_case columns to camelCase BenchmarkModelSummary', () => {
     const row = {
       run_id: 'run-1',
       model: 'openai/gpt-4o',
+      variant: 'high',
       route_key: 'implementation/code_generation',
       accuracy: 0.92,
       avg_cost_usd: 0.0015,
@@ -27,6 +63,7 @@ describe('mapSummaryRow', () => {
     const result = mapSummaryRow(row);
     expect(result).toEqual<BenchmarkModelSummary>({
       model: 'openai/gpt-4o',
+      variant: 'high',
       routeKey: 'implementation/code_generation',
       accuracy: 0.92,
       avgCostUsd: 0.0015,
@@ -39,10 +76,11 @@ describe('mapSummaryRow', () => {
     });
   });
 
-  it('handles null avg_cost_usd and p50_latency_ms', () => {
+  it('maps stored empty variant to null', () => {
     const row = {
-      run_id: 'run-2',
-      model: 'anthropic/claude-3-haiku',
+      run_id: 'run-legacy',
+      model: 'openai/gpt-4o',
+      variant: '',
       route_key: '*',
       accuracy: 0.85,
       avg_cost_usd: null,
@@ -55,6 +93,7 @@ describe('mapSummaryRow', () => {
       carried: false,
     };
     const result = mapSummaryRow(row);
+    expect(result.variant).toBeNull();
     expect(result.avgCostUsd).toBeNull();
     expect(result.p50LatencyMs).toBeNull();
     expect(result.p95LatencyMs).toBeNull();
@@ -202,5 +241,32 @@ describe('rowsToRoutingTable', () => {
     const reassembled = rowsToRoutingTable(tableRow, shuffled);
     expect(reassembled.routes['implementation/code_generation']?.[0]?.model).toBe('model-a');
     expect(reassembled.routes['implementation/code_generation']?.[1]?.model).toBe('model-b');
+  });
+
+  it('platform candidate rows store variant mirror but reassemble without variant key', () => {
+    const withEffort: RoutingTable = {
+      ...sampleTable,
+      routes: {
+        'implementation/code_generation': [
+          {
+            model: 'model-a',
+            accuracy: 0.9,
+            avgCostUsd: 0.001,
+            meetsThreshold: true,
+            reasoningEffort: 'high',
+          },
+        ],
+      },
+    };
+    const { candidateRows } = routingTableToRows(withEffort, '2026-06-01T11:00:00.000Z');
+    expect(candidateRows[0]?.reasoning_effort).toBe('high');
+    expect(candidateRows[0]?.variant).toBe('high');
+    const reassembled = rowsToRoutingTable(
+      routingTableToRows(withEffort, '2026-06-01T11:00:00.000Z').tableRow,
+      candidateRows
+    );
+    const cand = reassembled.routes['implementation/code_generation']?.[0];
+    expect(cand?.reasoningEffort).toBe('high');
+    expect(cand && 'variant' in cand ? cand.variant : undefined).toBeUndefined();
   });
 });

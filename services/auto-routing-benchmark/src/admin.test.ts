@@ -97,6 +97,7 @@ vi.mock('./db', async importOriginal => {
 });
 
 import {
+  exactPairKey,
   getConfigRows,
   getClassifierWinner,
   getLatestRoutingTable,
@@ -480,10 +481,11 @@ describe('POST /admin/runs', () => {
     vi.mocked(getLatestSummariesByModel).mockResolvedValue(
       new Map([
         [
-          'vendor/a',
+          exactPairKey('vendor/a', null),
           {
             engineIdentity: computeEngineIdentity('decider'),
             repetitions: 1,
+            variant: null,
             reasoningEffort: null,
             summaries: [makeSummary('vendor/a')],
           },
@@ -504,15 +506,16 @@ describe('POST /admin/runs', () => {
       config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
       deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
     });
-    // Prior result was measured at reasoning_effort 'high'; current config runs
-    // it at null, so the carry is invalidated and the model is re-enqueued.
+    // Prior result was measured at variant 'high'; current config runs it at
+    // null, so the carry is invalidated and the model is re-enqueued.
     vi.mocked(getLatestSummariesByModel).mockResolvedValue(
       new Map([
         [
-          'vendor/a',
+          exactPairKey('vendor/a', 'high'),
           {
             engineIdentity: computeEngineIdentity('decider'),
             repetitions: 1,
+            variant: 'high',
             reasoningEffort: 'high',
             summaries: [makeSummary('vendor/a')],
           },
@@ -524,6 +527,69 @@ describe('POST /admin/runs', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
     expect(body.skippedModels).toEqual([]);
+    expect(body.enqueuedModels).toBe(1);
+  });
+
+  it('does not carry a prior summary when only the variant differs', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
+      deciderModels: [{ model: 'vendor/a', reasoning_effort: 'high' }],
+    });
+    // Same model/engine/reps but prior was measured at a different variant.
+    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
+      new Map([
+        [
+          exactPairKey('vendor/a', 'low'),
+          {
+            engineIdentity: computeEngineIdentity('decider'),
+            repetitions: 1,
+            variant: 'low',
+            reasoningEffort: 'low',
+            summaries: [makeSummary('vendor/a')],
+          },
+        ],
+      ])
+    );
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
+    expect(body.skippedModels).toEqual([]);
+    expect(body.enqueuedModels).toBe(1);
+  });
+
+  it('carries a prior summary when the exact pair matches (legacy effort key)', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
+      // vendor/b has no prior → stays enqueued so we do not hit the all-carried
+      // finalize path (which needs a real D1 client in unit tests).
+      deciderModels: [
+        { model: 'vendor/a', reasoning_effort: 'high' },
+        { model: 'vendor/b', reasoning_effort: null },
+      ],
+    });
+    // Legacy rows store variant from reasoning_effort; exact pair high matches.
+    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
+      new Map([
+        [
+          exactPairKey('vendor/a', 'high'),
+          {
+            engineIdentity: computeEngineIdentity('decider'),
+            repetitions: 1,
+            variant: 'high',
+            reasoningEffort: 'high',
+            summaries: [makeSummary('vendor/a')],
+          },
+        ],
+      ])
+    );
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
+    expect(body.skippedModels).toEqual(['vendor/a']);
     expect(body.enqueuedModels).toBe(1);
   });
 

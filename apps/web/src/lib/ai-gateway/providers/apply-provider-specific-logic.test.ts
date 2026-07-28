@@ -1,5 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
-import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_FALLBACK_MODEL_ID,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   applyGatewayModelsFallback,
   applyPreferredProvider,
@@ -19,27 +22,32 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
 }
 
 describe('applyGatewayModelsFallback', () => {
-  it.each<ProviderId>(['openrouter', 'vercel'])(
-    'sets Opus as the Fable fallback for the %s provider',
-    async providerId => {
-      const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
+  it.each([
+    ['openrouter', 'anthropic/claude-fable-5'],
+    ['vercel', 'anthropic/claude-fable-5'],
+    ['openrouter', CLAUDE_OPUS_CURRENT_MODEL_ID],
+    ['vercel', CLAUDE_OPUS_CURRENT_MODEL_ID],
+  ] satisfies [ProviderId, string][])(
+    'sets Opus 4.8 as the fallback for %s requests to %s',
+    async (providerId, requestedModel) => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
 
-      await applyGatewayModelsFallback(providerId, 'anthropic/claude-fable-5', request);
+      await applyGatewayModelsFallback(providerId, requestedModel, request);
 
-      expect(request.body.models).toEqual([
-        'anthropic/claude-fable-5',
-        CLAUDE_OPUS_CURRENT_MODEL_ID,
-      ]);
+      expect(request.body.models).toEqual([requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID]);
     }
   );
 
-  it('removes caller-provided fallbacks for Fable on other providers', async () => {
-    const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
+  it.each(['anthropic/claude-fable-5', CLAUDE_OPUS_CURRENT_MODEL_ID])(
+    'removes caller-provided fallbacks for %s on other providers',
+    async requestedModel => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
 
-    await applyGatewayModelsFallback('martian', 'anthropic/claude-fable-5', request);
+      await applyGatewayModelsFallback('martian', requestedModel, request);
 
-    expect(request.body.models).toBeUndefined();
-  });
+      expect(request.body.models).toBeUndefined();
+    }
+  );
 
   it('removes caller-provided fallbacks for other models', async () => {
     const request = makeRequest('openai/gpt-4o', ['caller/fallback']);

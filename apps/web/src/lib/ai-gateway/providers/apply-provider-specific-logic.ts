@@ -11,6 +11,7 @@ import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_FALLBACK_MODEL_ID,
   isClaudeModel,
   isFableModel,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
@@ -103,10 +104,10 @@ export async function applyGatewayModelsFallback(
 ) {
   if (
     !(await isFreeModel(requestedModel)) &&
-    isFableModel(requestedModel) &&
+    (isFableModel(requestedModel) || requestedModel === CLAUDE_OPUS_CURRENT_MODEL_ID) &&
     (providerId === 'openrouter' || providerId === 'vercel')
   ) {
-    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_CURRENT_MODEL_ID];
+    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID];
     return;
   }
 

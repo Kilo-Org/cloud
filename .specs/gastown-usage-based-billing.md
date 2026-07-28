@@ -461,10 +461,14 @@ Metering and enforcement are separately controlled:
 - **Announcement** — the default-off `GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` web flag MAY show advance
   notice; it MUST NOT alter backend billing behavior.
 
-The status object distinguishes these: `enabled` means metering is active (drives the run estimate
-and the automatic-start control), while `enforcing` gates cold-start/terminal blocking in the UI.
-Enforcement and announcement flags are always enabled in local development while retaining
-default-off production behavior; metering runs in development because the meter binding is present.
+The status object distinguishes these: `enabled` means metering is active (usage is reported and
+the run estimate is populated), while `enforcing` gates cold-start/terminal blocking in the UI.
+User-facing billing UI (the estimate pill, cost strings, and automatic-start control) is gated
+solely on the announcement flag (`GASTOWN_BILLING_ANNOUNCEMENT_ENABLED`). Neither `enabled` (shadow
+metering, on in production before launch) nor `enforcing` (backend enforcement) may reveal billing
+UI to users until billing is announced. Enforcement and announcement flags are always enabled in
+local development while retaining default-off production behavior; metering runs in development
+because the meter binding is present.
 
 Dashboards MUST expose awake seconds, base Cloudflare cost, customer charge, gross multiplier,
 unclosed intervals, SKU admission denials, RPC failures, graceful-stop duration, forced stops, and
@@ -502,6 +506,14 @@ counts of `warn` and `stop` verdicts.
    graceful-save window.
 
 ## Changelog
+
+### 2026-07-28 -- Gate user-facing billing UI on announcement, not metering
+
+- User-facing billing UI (estimate pill, cost strings, automatic-start control) is now gated solely
+  on the announcement flag (`GASTOWN_BILLING_ANNOUNCEMENT_ENABLED`), not on `billing.enabled` or
+  `billing.enforcing`. Because metering (`enabled`) is on in production for shadow data, keying the
+  UI off `enabled` surfaced billing estimates to users before launch. The status field `enabled`
+  remains metering-only; the web `TerminalBar` receives the announcement flag from the town layouts.
 
 ### 2026-07-24 -- Separate reporting from enforcement
 

@@ -1,2 +1,0 @@
-ALTER TABLE "cli_sessions_v2" ADD COLUMN "cloud_agent_family_id" text;--> statement-breakpoint
-CREATE INDEX "IDX_cli_sessions_v2_cloud_agent_family_id_kilo_user_id" ON "cli_sessions_v2" USING btree ("cloud_agent_family_id","kilo_user_id");

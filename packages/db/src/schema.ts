@@ -5579,10 +5579,6 @@ export const cli_sessions_v2 = pgTable(
     uniqueIndex('UQ_cli_sessions_v2_cloud_agent_session_id')
       .on(table.cloud_agent_session_id)
       .where(isNotNull(table.cloud_agent_session_id)),
-    index('IDX_cli_sessions_v2_cloud_agent_family_id_kilo_user_id').on(
-      table.cloud_agent_family_id,
-      table.kilo_user_id
-    ),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
     index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
     index('IDX_cli_sessions_v2_created_at').on(table.created_at),

@@ -1,0 +1,1 @@
+ALTER TABLE "cli_sessions_v2" ADD COLUMN "cloud_agent_family_id" text;

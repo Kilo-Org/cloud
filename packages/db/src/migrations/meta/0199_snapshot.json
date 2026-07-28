@@ -1,5 +1,5 @@
 {
-  "id": "1cece69e-aefd-41de-845d-b0698a1672e3",
+  "id": "0b5dce19-207f-400c-beca-b453cf5d2209",
   "prevId": "71c65daa-6bbc-413f-94d7-68cf95379e89",
   "version": "7",
   "dialect": "postgresql",
@@ -4259,27 +4259,6 @@
           ],
           "isUnique": true,
           "where": "\"cli_sessions_v2\".\"cloud_agent_session_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_cli_sessions_v2_cloud_agent_family_id_kilo_user_id": {
-          "name": "IDX_cli_sessions_v2_cloud_agent_family_id_kilo_user_id",
-          "columns": [
-            {
-              "expression": "cloud_agent_family_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

@@ -64,6 +64,91 @@ describe('classifyKiloCapabilityRequest', () => {
     ).toEqual({ success: false, reason: 'upstream_not_allowed' });
   });
 
+  describe('Cloud Agent family proxy', () => {
+    const rootSessionId = 'ses_12345678901234567890123456';
+    const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+
+    it('allows canonical child bootstrap for a versioned proxy', () => {
+      expect(
+        classifyKiloCapabilityRequest(
+          'https://ingest.kilosessions.ai/api/session',
+          targets,
+          rootSessionId,
+          {
+            requestMethod: 'POST',
+            bootstrapKiloSessionId: childSessionId,
+            sessionIngestProxyVersion: 1,
+          }
+        )
+      ).toEqual({
+        success: true,
+        routeClass: 'session_ingest',
+        sessionIngestFamilyProxy: true,
+      });
+    });
+
+    it('allows canonical child ingest for a versioned proxy', () => {
+      expect(
+        classifyKiloCapabilityRequest(
+          `https://ingest.kilosessions.ai/api/session/${childSessionId}/ingest`,
+          targets,
+          rootSessionId,
+          { requestMethod: 'POST', sessionIngestProxyVersion: 1 }
+        )
+      ).toEqual({
+        success: true,
+        routeClass: 'session_ingest',
+        sessionIngestFamilyProxy: true,
+      });
+    });
+
+    it.each([
+      ['missing proxy version', 'POST', childSessionId, undefined],
+      ['wrong bootstrap method', 'GET', childSessionId, 1],
+      ['noncanonical child ID', 'POST', 'ses_../../other-session-id', 1],
+    ] as const)('rejects child bootstrap with %s', (_description, method, childId, version) => {
+      expect(
+        classifyKiloCapabilityRequest(
+          'https://ingest.kilosessions.ai/api/session',
+          targets,
+          rootSessionId,
+          {
+            requestMethod: method,
+            bootstrapKiloSessionId: childId,
+            sessionIngestProxyVersion: version,
+          }
+        )
+      ).toEqual({ success: false, reason: 'upstream_not_allowed' });
+    });
+
+    it.each([
+      ['missing proxy version', 'POST', undefined],
+      ['wrong method', 'GET', 1],
+      ['child export', 'GET', 1],
+    ] as const)('rejects child session route with %s', (_description, method, version) => {
+      const operation = _description === 'child export' ? 'export' : 'ingest';
+      expect(
+        classifyKiloCapabilityRequest(
+          `https://ingest.kilosessions.ai/api/session/${childSessionId}/${operation}`,
+          targets,
+          rootSessionId,
+          { requestMethod: method, sessionIngestProxyVersion: version }
+        )
+      ).toEqual({ success: false, reason: 'upstream_not_allowed' });
+    });
+
+    it('keeps exact-root export on the legacy route classification', () => {
+      expect(
+        classifyKiloCapabilityRequest(
+          `https://ingest.kilosessions.ai/api/session/${rootSessionId}/export`,
+          targets,
+          rootSessionId,
+          { requestMethod: 'GET', sessionIngestProxyVersion: 1 }
+        )
+      ).toEqual({ success: true, routeClass: 'session_ingest' });
+    });
+  });
+
   it('allows percent-encoded characters in the query string', () => {
     expect(
       classifyKiloCapabilityRequest(

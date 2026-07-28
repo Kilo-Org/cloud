@@ -60,7 +60,10 @@ export async function requireCurrentSessionAccess(
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' });
   }
 
-  return session;
+  return {
+    kiloSessionId: session.kiloSessionId,
+    organizationId: session.organizationId,
+  };
 }
 
 export function projectSessionAccessHttpError(error: unknown): Response {

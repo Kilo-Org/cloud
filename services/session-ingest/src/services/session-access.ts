@@ -7,11 +7,13 @@ import { withDORetry } from '@kilocode/worker-utils';
 export type AccessibleKiloSession = {
   kiloSessionId: string;
   organizationId: string | null;
+  cloudAgentFamilyId: string | null;
 };
 
 type ResolveAccessibleKiloSessionParams = {
   kiloUserId: string;
   kiloSessionId: string;
+  expectedCloudAgentFamilyId?: string;
 };
 
 export async function resolveAccessibleKiloSession(
@@ -24,10 +26,15 @@ export async function resolveAccessibleKiloSession(
       sessionCache => sessionCache.getAccess(params.kiloSessionId),
       'SessionAccessCacheDO.getAccess'
     );
-    if (cached) {
+    if (
+      cached &&
+      (params.expectedCloudAgentFamilyId === undefined ||
+        cached.cloudAgentFamilyId === params.expectedCloudAgentFamilyId)
+    ) {
       return {
         kiloSessionId: cached.sessionId,
         organizationId: cached.organizationId,
+        cloudAgentFamilyId: cached.cloudAgentFamilyId,
       };
     }
   } catch {
@@ -39,14 +46,19 @@ export async function resolveAccessibleKiloSession(
   if (!session) {
     return null;
   }
+  const normalizedSession = {
+    ...session,
+    cloudAgentFamilyId: session.cloudAgentFamilyId ?? null,
+  };
 
   try {
     await withDORetry(
       () => getSessionAccessCacheDO(env, { kiloUserId: params.kiloUserId }),
       sessionCache =>
         sessionCache.putValidated({
-          sessionId: session.kiloSessionId,
-          organizationId: session.organizationId,
+          sessionId: normalizedSession.kiloSessionId,
+          organizationId: normalizedSession.organizationId,
+          cloudAgentFamilyId: normalizedSession.cloudAgentFamilyId,
         }),
       'SessionAccessCacheDO.putValidated'
     );
@@ -54,5 +66,5 @@ export async function resolveAccessibleKiloSession(
     // A failed cache write does not invalidate the authoritative database result.
   }
 
-  return session;
+  return normalizedSession;
 }

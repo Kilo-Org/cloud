@@ -38,6 +38,10 @@ vi.mock('./dos/SessionIngestDO', () => ({
 vi.mock('./dos/SessionAccessCacheDO', () => ({
   getSessionAccessCacheDO: vi.fn(),
 }));
+vi.mock('./session-events', () => ({
+  mapSessionEventRow: vi.fn(row => ({ id: row.session_id, updatedAt: row.updated_at })),
+  notifyUserSessionEvent: vi.fn(),
+}));
 
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
@@ -118,6 +122,89 @@ function makeRpc(db: ReturnType<typeof makeDbFakes>['db']) {
   } as unknown as ConstructorParameters<typeof SessionIngestRPC>[1];
   return new SessionIngestRPC(ctx, env);
 }
+
+function makeRootWriteDb(params: {
+  created?: Record<string, unknown>;
+  existing?: Record<string, unknown>;
+}) {
+  const values = vi.fn(() => insert);
+  const insert = {
+    values,
+    onConflictDoNothing: vi.fn(() => insert),
+    returning: vi.fn(async () => (params.created ? [params.created] : [])),
+  };
+  const select = {
+    from: vi.fn(() => select),
+    where: vi.fn(() => select),
+    limit: vi.fn(() => select),
+    for: vi.fn(async () => (params.existing ? [params.existing] : [])),
+  };
+  const update = {
+    set: vi.fn(() => update),
+    where: vi.fn(() => update),
+    returning: vi.fn(async () => (params.existing ? [params.existing] : [])),
+  };
+  const tx = {
+    insert: vi.fn(() => insert),
+    select: vi.fn(() => select),
+    update: vi.fn(() => update),
+  };
+  return {
+    db: { transaction: vi.fn(async callback => callback(tx)) },
+    values,
+  };
+}
+
+describe('createSessionForCloudAgent', () => {
+  const params = {
+    sessionId: 'ses_12345678901234567890123456',
+    kiloUserId: 'usr_test',
+    cloudAgentSessionId: 'cloud-agent-session-1',
+    organizationId: '11111111-1111-4111-8111-111111111111',
+    createdOnPlatform: 'cloud-agent',
+  };
+
+  it('creates a root with both Cloud Agent identity columns', async () => {
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_family_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.createSessionForCloudAgent(params);
+
+    expect(fake.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloud_agent_session_id: params.cloudAgentSessionId,
+        cloud_agent_family_id: params.cloudAgentSessionId,
+      })
+    );
+  });
+
+  it('refuses to claim an existing non-Cloud-Agent session as a root', async () => {
+    const fake = makeRootWriteDb({
+      existing: {
+        session_id: params.sessionId,
+        kilo_user_id: params.kiloUserId,
+        cloud_agent_session_id: null,
+        cloud_agent_family_id: null,
+        organization_id: null,
+        parent_session_id: null,
+      },
+    });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).rejects.toThrow(
+      'Cloud Agent root session identity conflict'
+    );
+  });
+});
 
 describe('Kilo SDK persisted identity schemas', () => {
   it('accepts generated message IDs and rejects non-message, slash-bearing, or NUL-bearing IDs', () => {

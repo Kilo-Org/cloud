@@ -14,11 +14,13 @@ describe('SessionAccessCacheDO integration', () => {
     await stub.putValidated({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: '11111111-1111-4111-8111-111111111111',
+      cloudAgentFamilyId: null,
     });
 
     await expect(stub.getAccess('ses_12345678901234567890123456')).resolves.toEqual({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: '11111111-1111-4111-8111-111111111111',
+      cloudAgentFamilyId: null,
     });
 
     await runInDurableObject(stub, async (_instance, state) => {
@@ -49,6 +51,7 @@ describe('SessionAccessCacheDO integration', () => {
     await stub.putValidated({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentFamilyId: null,
     });
 
     await expect(stub.has('ses_12345678901234567890123456')).resolves.toBe(true);
@@ -67,6 +70,7 @@ describe('SessionAccessCacheDO integration', () => {
     await stub.putValidated({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentFamilyId: null,
     });
 
     await runInDurableObject(stub, async (_instance, state) => {
@@ -80,6 +84,7 @@ describe('SessionAccessCacheDO integration', () => {
     await stub.putValidated({
       sessionId: 'ses_abcdefghijklmnopqrstuvwxyz',
       organizationId: null,
+      cloudAgentFamilyId: 'cloud-agent-family-1',
     });
 
     await runInDurableObject(stub, async (_instance, state) => {
@@ -95,10 +100,12 @@ describe('SessionAccessCacheDO integration', () => {
     await stub.putValidated({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: '11111111-1111-4111-8111-111111111111',
+      cloudAgentFamilyId: null,
     });
     await stub.putValidated({
       sessionId: 'ses_abcdefghijklmnopqrstuvwxyz',
       organizationId: '22222222-2222-4222-8222-222222222222',
+      cloudAgentFamilyId: 'cloud-agent-family-1',
     });
 
     await stub.invalidateOrganization('11111111-1111-4111-8111-111111111111');
@@ -107,6 +114,7 @@ describe('SessionAccessCacheDO integration', () => {
     await expect(stub.getAccess('ses_abcdefghijklmnopqrstuvwxyz')).resolves.toEqual({
       sessionId: 'ses_abcdefghijklmnopqrstuvwxyz',
       organizationId: '22222222-2222-4222-8222-222222222222',
+      cloudAgentFamilyId: 'cloud-agent-family-1',
     });
   });
 });

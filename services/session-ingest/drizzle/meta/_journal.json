@@ -36,6 +36,13 @@
       "when": 1784640634084,
       "tag": "0004_giant_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785197687848,
+      "tag": "0005_sudden_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

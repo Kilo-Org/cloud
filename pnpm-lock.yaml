@@ -2342,6 +2342,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../../packages/session-ingest-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

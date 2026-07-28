@@ -69,27 +69,30 @@ export async function applyMetadataChanges(
   let organizationIdWriteApplied = false;
 
   const notification = await db.transaction(async tx => {
+    const [currentRow] = await tx
+      .select({
+        status: cli_sessions_v2.status,
+        parentSessionId: cli_sessions_v2.parent_session_id,
+        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+        cloudAgentFamilyId: cli_sessions_v2.cloud_agent_family_id,
+      })
+      .from(cli_sessions_v2)
+      .where(
+        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+      )
+      .limit(1)
+      .for('update');
+    if (!currentRow) return null;
+    const cloudAgentFamilyId = currentRow.cloudAgentFamilyId;
+    const isCloudAgentFamilySession = cloudAgentFamilyId != null;
+
     const statusChange =
       status === undefined
         ? { changed: false, previousStatus: null }
-        : await (async () => {
-            const [statusRow] = await tx
-              .select({ status: cli_sessions_v2.status })
-              .from(cli_sessions_v2)
-              .where(
-                and(
-                  eq(cli_sessions_v2.session_id, sessionId),
-                  eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-                )
-              )
-              .limit(1)
-              .for('update');
-            if (!statusRow) return null;
-            const previousStatus = SessionStatusSchema.nullable().parse(statusRow.status);
+        : (() => {
+            const previousStatus = SessionStatusSchema.nullable().parse(currentRow.status);
             return { changed: status !== previousStatus, previousStatus };
           })();
-
-    if (!statusChange) return null;
 
     // Membership check only for non-null org claims; run on the same tx as the UPDATE.
     // Residual: SessionIngestDO.writeIngestMetaIfChanged records the claimed orgId in DO
@@ -100,7 +103,13 @@ export async function applyMetadataChanges(
     // value. Follow-up tracked in the PR body.
     if (mergedChanges.has('orgId')) {
       const organizationId = mergedChanges.get('orgId') ?? null;
-      if (organizationId !== null) {
+      if (isCloudAgentFamilySession) {
+        console.warn('Refusing organization_id metadata write for Cloud Agent family session', {
+          kiloUserId,
+          sessionId,
+        });
+        delete updates.organization_id;
+      } else if (organizationId !== null) {
         const authorized = await hasOrganizationAccess(tx, {
           kiloUserId,
           organizationId,
@@ -120,17 +129,6 @@ export async function applyMetadataChanges(
       }
     }
 
-    // Gate only the orgId contribution: a refused-only orgId must not count as a
-    // non-status change (no phantom session.updated). Keep parentSessionId and every
-    // other non-org key exactly as before — do not derive this from `updates` alone.
-    const changedNonStatus =
-      mergedChanges.has('title') ||
-      mergedChanges.has('platform') ||
-      organizationIdWriteApplied ||
-      mergedChanges.has('gitUrl') ||
-      mergedChanges.has('gitBranch') ||
-      parentSessionId !== undefined;
-
     if (Object.keys(updates).length > 0) {
       await tx
         .update(cli_sessions_v2)
@@ -143,8 +141,62 @@ export async function applyMetadataChanges(
         );
     }
 
+    let parentSessionIdWriteApplied = false;
     if (parentSessionId !== undefined) {
-      if (parentSessionId && parentSessionId !== sessionId) {
+      if (isCloudAgentFamilySession) {
+        if (currentRow.cloudAgentSessionId != null || parentSessionId === null) {
+          console.warn('Refusing invalid Cloud Agent family parent metadata write', {
+            kiloUserId,
+            sessionId,
+          });
+        } else if (
+          parentSessionId !== sessionId &&
+          parentSessionId !== currentRow.parentSessionId
+        ) {
+          const [parent] = await tx
+            .select({ sessionId: cli_sessions_v2.session_id })
+            .from(cli_sessions_v2)
+            .where(
+              and(
+                eq(cli_sessions_v2.session_id, parentSessionId),
+                eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+                eq(cli_sessions_v2.cloud_agent_family_id, cloudAgentFamilyId)
+              )
+            )
+            .limit(1);
+          const cycleResult = parent
+            ? await tx.execute<{ creates_cycle: boolean }>(sql`
+                WITH RECURSIVE descendants(session_id) AS (
+                  SELECT ${cli_sessions_v2.session_id}
+                  FROM ${cli_sessions_v2}
+                  WHERE ${cli_sessions_v2.parent_session_id} = ${sessionId}
+                    AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
+                  UNION
+                  SELECT child.session_id
+                  FROM ${cli_sessions_v2} child
+                  INNER JOIN descendants d ON child.parent_session_id = d.session_id
+                  WHERE child.kilo_user_id = ${kiloUserId}
+                )
+                SELECT EXISTS(
+                  SELECT 1 FROM descendants WHERE session_id = ${parentSessionId}
+                ) AS creates_cycle
+              `)
+            : null;
+          if (parent && !cycleResult?.rows[0]?.creates_cycle) {
+            await tx
+              .update(cli_sessions_v2)
+              .set({ parent_session_id: parentSessionId })
+              .where(
+                and(
+                  eq(cli_sessions_v2.session_id, sessionId),
+                  eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+                  sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
+                )
+              );
+            parentSessionIdWriteApplied = true;
+          }
+        }
+      } else if (parentSessionId && parentSessionId !== sessionId) {
         const parentRows = await tx
           .select({ session_id: cli_sessions_v2.session_id })
           .from(cli_sessions_v2)
@@ -167,6 +219,7 @@ export async function applyMetadataChanges(
                 sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
               )
             );
+          parentSessionIdWriteApplied = parentSessionId !== currentRow.parentSessionId;
         }
       } else if (parentSessionId === null) {
         await tx
@@ -179,8 +232,18 @@ export async function applyMetadataChanges(
               sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
             )
           );
+        parentSessionIdWriteApplied = currentRow.parentSessionId !== null;
       }
     }
+
+    // Refused org/parent claims must not emit phantom session.updated events.
+    const changedNonStatus =
+      mergedChanges.has('title') ||
+      mergedChanges.has('platform') ||
+      organizationIdWriteApplied ||
+      mergedChanges.has('gitUrl') ||
+      mergedChanges.has('gitBranch') ||
+      parentSessionIdWriteApplied;
 
     if (!changedNonStatus && !statusChange.changed) return null;
 

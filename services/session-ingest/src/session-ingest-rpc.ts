@@ -66,53 +66,77 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    * RPC method: create a cli_sessions_v2 record for a cloud-agent-next session.
    * Called via service binding from cloud-agent-next during session preparation.
    *
-   * Uses ON CONFLICT DO UPDATE to set cloud_agent_session_id (and organization_id
-   * if provided), matching the behavior previously in the backend routers.
+   * Concurrent retries are idempotent, but an existing session cannot be rebound
+   * to another Cloud Agent family.
    */
   async createSessionForCloudAgent(params: CreateSessionForCloudAgentParams): Promise<void> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
-    const existingRows = await db
-      .select()
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parsed.sessionId),
-          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
-        )
-      )
-      .limit(1);
-    const existingRow = existingRows[0];
-
-    const hasMeaningfulChange = existingRow
-      ? existingRow.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
-        (parsed.organizationId !== undefined &&
-          existingRow.organization_id !== parsed.organizationId)
-      : true;
-
-    const [persistedRow] = await db
-      .insert(cli_sessions_v2)
-      .values({
-        session_id: parsed.sessionId,
-        kilo_user_id: parsed.kiloUserId,
-        cloud_agent_session_id: parsed.cloudAgentSessionId,
-        organization_id: parsed.organizationId ?? null,
-        created_on_platform: parsed.createdOnPlatform,
-        ...(parsed.title !== undefined ? { title: parsed.title } : {}),
-        version: 0,
-      })
-      .onConflictDoUpdate({
-        target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
-        set: {
+    const { existingRow, persistedRow } = await db.transaction(async tx => {
+      const [created] = await tx
+        .insert(cli_sessions_v2)
+        .values({
+          session_id: parsed.sessionId,
+          kilo_user_id: parsed.kiloUserId,
           cloud_agent_session_id: parsed.cloudAgentSessionId,
+          cloud_agent_family_id: parsed.cloudAgentSessionId,
+          organization_id: parsed.organizationId ?? null,
+          created_on_platform: parsed.createdOnPlatform,
+          ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+          version: 0,
+        })
+        .onConflictDoNothing({
+          target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+        })
+        .returning();
+      if (created) return { existingRow: undefined, persistedRow: created };
+
+      const [existing] = await tx
+        .select()
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+          )
+        )
+        .limit(1)
+        .for('update');
+      if (
+        !existing ||
+        existing.parent_session_id !== null ||
+        existing.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
+        (existing.cloud_agent_family_id !== null &&
+          existing.cloud_agent_family_id !== parsed.cloudAgentSessionId)
+      ) {
+        throw new Error('Cloud Agent root session identity conflict');
+      }
+
+      const [updated] = await tx
+        .update(cli_sessions_v2)
+        .set({
+          cloud_agent_family_id: parsed.cloudAgentSessionId,
           ...(parsed.organizationId !== undefined
             ? { organization_id: parsed.organizationId }
             : {}),
-        },
-      })
-      .returning();
+        })
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+          )
+        )
+        .returning();
+      return { existingRow: existing, persistedRow: updated };
+    });
+
+    const hasMeaningfulChange = existingRow
+      ? existingRow.cloud_agent_family_id !== parsed.cloudAgentSessionId ||
+        (parsed.organizationId !== undefined &&
+          existingRow.organization_id !== parsed.organizationId)
+      : true;
 
     if (existingRow && hasMeaningfulChange && persistedRow) {
       try {

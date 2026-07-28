@@ -12,6 +12,7 @@ export const SESSION_ACCESS_CACHE_TTL_MS = 60_000;
 export type CachedSessionAccess = {
   sessionId: string;
   organizationId: string | null;
+  cloudAgentFamilyId: string | null;
 };
 
 /**
@@ -36,6 +37,7 @@ export class SessionAccessCacheDO extends DurableObject<Env> {
       .select({
         sessionId: sessions.session_id,
         organizationId: sessions.organization_id,
+        cloudAgentFamilyId: sessions.cloud_agent_family_id,
       })
       .from(sessions)
       .where(
@@ -67,12 +69,14 @@ export class SessionAccessCacheDO extends DurableObject<Env> {
       .values({
         session_id: access.sessionId,
         organization_id: access.organizationId,
+        cloud_agent_family_id: access.cloudAgentFamilyId,
         authorization_expires_at: authorizationExpiresAt,
       })
       .onConflictDoUpdate({
         target: sessions.session_id,
         set: {
           organization_id: access.organizationId,
+          cloud_agent_family_id: access.cloudAgentFamilyId,
           authorization_expires_at: authorizationExpiresAt,
         },
       })

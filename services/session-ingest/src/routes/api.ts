@@ -113,6 +113,7 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
           sessionCache.putValidated({
             sessionId: body.sessionId,
             organizationId: null,
+            cloudAgentFamilyId: null,
           }),
         'SessionAccessCacheDO.putValidated'
       );

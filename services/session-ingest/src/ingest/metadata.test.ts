@@ -114,6 +114,10 @@ type ApplyMetadataDbOptions = {
   parentExists?: boolean;
   initialStatus?: string | null;
   rowMissing?: boolean;
+  cloudAgentFamilyId?: string | null;
+  cloudAgentSessionId?: string | null;
+  parentSessionId?: string | null;
+  createsCycle?: boolean;
 };
 
 /**
@@ -161,7 +165,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
       if (options.parentExists !== undefined && !parentLookupDone) {
         parentLookupDone = true;
         queryLog.push('parent');
-        return options.parentExists ? [{ session_id: 'ses_parent' }] : [];
+        return options.parentExists ? [{ sessionId: 'ses_parent' }] : [];
       }
       queryLog.push('read-back');
       return options.rowMissing ? [] : [persistedSessionRow()];
@@ -172,7 +176,14 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
         queryLog.push('session-lock');
         const rows = options.rowMissing
           ? []
-          : ([{ status: options.initialStatus ?? 'idle' }] satisfies StatusRow[]);
+          : [
+              {
+                status: options.initialStatus ?? 'idle',
+                parentSessionId: options.parentSessionId ?? null,
+                cloudAgentFamilyId: options.cloudAgentFamilyId ?? null,
+                cloudAgentSessionId: options.cloudAgentSessionId ?? null,
+              },
+            ];
         settled = Promise.resolve(rows);
         return settled;
       }),
@@ -201,8 +212,11 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     })),
   }));
 
+  const execute = vi.fn(async () => ({
+    rows: [{ creates_cycle: options.createsCycle ?? false }],
+  }));
   const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ select, update: applyUpdate })
+    fn({ select, update: applyUpdate, execute })
   );
 
   return {
@@ -212,6 +226,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     updateSet,
     updateWhere,
     updateSets,
+    execute,
     queryLog,
     membershipQueryCount: () => queryLog.filter(k => k === 'membership').length,
   };
@@ -531,5 +546,69 @@ describe('applyMetadataChanges', () => {
     expect(written.created_on_platform).toBe('cli');
     expect(written.status).toBe('busy');
     expect(db.applyUpdate).toHaveBeenCalled();
+  });
+
+  it('refuses organization metadata changes for Cloud Agent family sessions', async () => {
+    const db = createApplyMetadataDb({ cloudAgentFamilyId: 'cloud-agent-family-1' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['orgId', '11111111-1111-4111-8111-111111111111'],
+        ['title', 'Still allowed'],
+      ])
+    );
+
+    expect(db.membershipQueryCount()).toBe(0);
+    expect(db.updateSets).toEqual([expect.objectContaining({ title: 'Still allowed' })]);
+    expect(db.updateSets[0]).not.toHaveProperty('organization_id');
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+  });
+
+  it('refuses to reparent a Cloud Agent root', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentFamilyId: 'cloud-agent-family-1',
+      cloudAgentSessionId: 'cloud-agent-family-1',
+      parentExists: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('allows a cycle-free same-family child reparent', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentFamilyId: 'cloud-agent-family-1',
+      parentSessionId: 'ses_root',
+      parentExists: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(db.updateSets).toContainEqual({ parent_session_id: 'ses_parent' });
+  });
+
+  it('refuses a same-family reparent that would create a cycle', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentFamilyId: 'cloud-agent-family-1',
+      parentSessionId: 'ses_root',
+      parentExists: true,
+      createsCycle: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 });

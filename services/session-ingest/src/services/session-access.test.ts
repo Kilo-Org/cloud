@@ -49,6 +49,7 @@ describe('resolveAccessibleKiloSession', () => {
     queryAccessibleKiloSessionMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentFamilyId: null,
     });
 
     await expect(
@@ -59,10 +60,12 @@ describe('resolveAccessibleKiloSession', () => {
     ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentFamilyId: null,
     });
     expect(sessionCache.putValidated).toHaveBeenCalledWith({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentFamilyId: null,
     });
   });
 
@@ -71,6 +74,7 @@ describe('resolveAccessibleKiloSession', () => {
     queryAccessibleKiloSessionMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentFamilyId: null,
     });
 
     await expect(
@@ -81,6 +85,7 @@ describe('resolveAccessibleKiloSession', () => {
     ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentFamilyId: null,
     });
   });
 
@@ -90,6 +95,7 @@ describe('resolveAccessibleKiloSession', () => {
     queryAccessibleKiloSessionMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentFamilyId: null,
     });
 
     await expect(
@@ -100,6 +106,7 @@ describe('resolveAccessibleKiloSession', () => {
     ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentFamilyId: null,
     });
   });
 
@@ -120,6 +127,7 @@ describe('resolveAccessibleKiloSession', () => {
     sessionCache.getAccess.mockResolvedValue({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentFamilyId: null,
     });
 
     await expect(
@@ -130,7 +138,57 @@ describe('resolveAccessibleKiloSession', () => {
     ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentFamilyId: null,
     });
     expect(queryAccessibleKiloSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('reuses cached access only when the asserted family marker matches', async () => {
+    sessionCache.getAccess.mockResolvedValue({
+      sessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org_current',
+      cloudAgentFamilyId: 'cloud-agent-family-1',
+    });
+
+    await expect(
+      resolveAccessibleKiloSession(env, {
+        kiloUserId: 'usr_member',
+        kiloSessionId: 'ses_12345678901234567890123456',
+        expectedCloudAgentFamilyId: 'cloud-agent-family-1',
+      })
+    ).resolves.toEqual({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org_current',
+      cloudAgentFamilyId: 'cloud-agent-family-1',
+    });
+    expect(queryAccessibleKiloSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to authoritative access for a stale family cache entry', async () => {
+    sessionCache.getAccess.mockResolvedValue({
+      sessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org_current',
+      cloudAgentFamilyId: null,
+    });
+    queryAccessibleKiloSessionMock.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org_current',
+      cloudAgentFamilyId: 'cloud-agent-family-1',
+    });
+
+    await resolveAccessibleKiloSession(env, {
+      kiloUserId: 'usr_member',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      expectedCloudAgentFamilyId: 'cloud-agent-family-1',
+    });
+
+    expect(queryAccessibleKiloSessionMock).toHaveBeenCalledWith(expect.anything(), {
+      kiloUserId: 'usr_member',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      expectedCloudAgentFamilyId: 'cloud-agent-family-1',
+    });
+    expect(sessionCache.putValidated).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentFamilyId: 'cloud-agent-family-1' })
+    );
   });
 });

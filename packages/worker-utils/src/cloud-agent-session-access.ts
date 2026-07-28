@@ -5,6 +5,7 @@ import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
 export type AccessibleSession = {
   kiloSessionId: string;
   organizationId: string | null;
+  cloudAgentFamilyId?: string | null;
 };
 
 /** Established name used by Cloud Agent consumers. */
@@ -21,6 +22,7 @@ type AccessibleCloudAgentSessionQuery = {
 type AccessibleKiloSessionQuery = {
   kiloUserId: string;
   kiloSessionId: string;
+  expectedCloudAgentFamilyId?: string;
 };
 
 type AccessibleSessionQuery = AccessibleCloudAgentSessionQuery | AccessibleKiloSessionQuery;
@@ -61,12 +63,20 @@ async function queryAccessibleSession(
     .select({
       kiloSessionId: cli_sessions_v2.session_id,
       organizationId: cli_sessions_v2.organization_id,
+      cloudAgentFamilyId: cli_sessions_v2.cloud_agent_family_id,
     })
     .from(cli_sessions_v2)
     .leftJoin(organization_memberships, membershipJoin)
     .leftJoin(organizations, organizationJoin)
     .where(
-      and(eq(cli_sessions_v2.kilo_user_id, query.kiloUserId), sessionCondition, scopeCondition)
+      and(
+        eq(cli_sessions_v2.kilo_user_id, query.kiloUserId),
+        sessionCondition,
+        scopeCondition,
+        'expectedCloudAgentFamilyId' in query && query.expectedCloudAgentFamilyId !== undefined
+          ? eq(cli_sessions_v2.cloud_agent_family_id, query.expectedCloudAgentFamilyId)
+          : undefined
+      )
     )
     .limit(1);
 

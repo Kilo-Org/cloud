@@ -212,6 +212,7 @@ describe('api routes', () => {
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentFamilyId: null,
     });
   });
 
@@ -400,6 +401,7 @@ describe('api routes', () => {
     expect(sessionCache.putValidated).toHaveBeenCalledWith({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentFamilyId: null,
     });
 
     const json = await res.json();

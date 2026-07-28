@@ -238,6 +238,7 @@ export type RedeemKiloSessionCapabilityParams = {
   requestMethod: string;
   requestUrl: string;
   bootstrapKiloSessionId?: string;
+  sessionIngestProxyVersion?: 1;
 };
 export type RedeemKiloSessionCapabilityFailureReason =
   | KiloSessionCapabilityFailureReason
@@ -245,7 +246,15 @@ export type RedeemKiloSessionCapabilityFailureReason =
   | 'invalid_upstream_url'
   | 'upstream_not_allowed';
 export type RedeemKiloSessionCapabilityResult =
-  | { success: true; authorization: string; routeClass: KiloCapabilityRouteClass }
+  | {
+      success: true;
+      authorization: string;
+      routeClass: KiloCapabilityRouteClass;
+      sessionIngestFamily?: {
+        cloudAgentSessionId: string;
+        rootKiloSessionId: string;
+      };
+    }
   | { success: false; reason: RedeemKiloSessionCapabilityFailureReason };
 
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
@@ -1154,6 +1163,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       {
         requestMethod: params.requestMethod,
         bootstrapKiloSessionId: params.bootstrapKiloSessionId,
+        sessionIngestProxyVersion: params.sessionIngestProxyVersion,
       }
     );
     if (!classification.success) {
@@ -1164,6 +1174,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       success: true,
       authorization: `Bearer ${claims.userToken}`,
       routeClass: classification.routeClass,
+      ...(classification.sessionIngestFamilyProxy
+        ? {
+            sessionIngestFamily: {
+              cloudAgentSessionId: claims.cloudAgentSessionId,
+              rootKiloSessionId: claims.kiloSessionId,
+            },
+          }
+        : {}),
     };
   }
 

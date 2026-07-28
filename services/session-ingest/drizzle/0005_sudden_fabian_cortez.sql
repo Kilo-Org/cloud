@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `cloud_agent_family_id` text;

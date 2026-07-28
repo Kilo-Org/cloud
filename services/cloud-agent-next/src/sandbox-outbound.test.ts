@@ -55,7 +55,8 @@ function createEnv(
   redeemGitHubSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
   redeemGitLabSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
   redeemKiloSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
-  logRejectedKiloUrls?: string
+  logRejectedKiloUrls?: string,
+  sessionIngestFetch: ReturnType<typeof vi.fn> = vi.fn(async () => new Response('forwarded'))
 ) {
   return {
     GIT_TOKEN_SERVICE: {
@@ -64,6 +65,8 @@ function createEnv(
       redeemKiloSessionCapability,
     },
     LOG_REJECTED_KILO_URLS: logRejectedKiloUrls,
+    INTERNAL_API_SECRET_PROD: { get: vi.fn(async () => 'trusted-internal-secret') },
+    SESSION_INGEST: { fetch: sessionIngestFetch },
   } as never;
 }
 
@@ -1028,6 +1031,7 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
       requestMethod: 'GET',
       requestUrl: 'https://api.kilo.ai/api/users/me',
       bootstrapKiloSessionId: undefined,
+      sessionIngestProxyVersion: 1,
     });
     const forwarded = forward.mock.calls[0]?.[0] as Request;
     expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_KILO_AUTHORIZATION);
@@ -1061,7 +1065,87 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
       requestMethod: 'POST',
       requestUrl: 'https://ingest.kilosessions.ai/api/session',
       bootstrapKiloSessionId: 'kilo-session-1',
+      sessionIngestProxyVersion: 1,
     });
+  });
+
+  it('routes family ingest through the internal binding and treats 404 as terminal', async () => {
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+      sessionIngestFamily: {
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        rootKiloSessionId: 'ses_12345678901234567890123456',
+      },
+    });
+    const familyFetch = vi.fn(
+      async (_request: Request) => new Response('not deployed', { status: 404 })
+    );
+    const publicFetch = vi.fn();
+    vi.stubGlobal('fetch', publicFetch);
+
+    const response = await handleOutbound(
+      new Request(
+        'https://ingest.kilosessions.ai/api/session/ses_abcdefghijklmnopqrstuvwxyz/ingest?v=2',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${KILO_CAPABILITY}`,
+            'Content-Type': 'application/json',
+            'X-Internal-Secret': 'forged',
+            'X-Kilo-Cloud-Agent-Session': 'forged',
+          },
+          body: JSON.stringify({ data: [] }),
+        }
+      ),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, familyFetch)
+    );
+
+    expect(response.status).toBe(404);
+    expect(publicFetch).not.toHaveBeenCalled();
+    expect(familyFetch).toHaveBeenCalledTimes(1);
+    const forwarded = familyFetch.mock.calls[0]?.[0] as Request;
+    expect(new URL(forwarded.url)).toMatchObject({
+      pathname: '/internal/cloud-agent/v1/session/ses_abcdefghijklmnopqrstuvwxyz/ingest',
+      search: '?v=2',
+    });
+    expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_KILO_AUTHORIZATION);
+    expect(forwarded.headers.get('X-Internal-Secret')).toBe('trusted-internal-secret');
+    expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('cloud-agent-session-1');
+    expect(forwarded.headers.get('X-Kilo-Root-Session')).toBe('ses_12345678901234567890123456');
+    await expect(forwarded.json()).resolves.toEqual({ data: [] });
+  });
+
+  it('keeps exact-root export on the public path', async () => {
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+    });
+    const familyFetch = vi.fn();
+    const publicFetch = vi.fn(async (_request: Request) => new Response('exported'));
+    vi.stubGlobal('fetch', publicFetch);
+
+    await handleOutbound(
+      new Request(
+        'https://ingest.kilosessions.ai/api/session/ses_12345678901234567890123456/export',
+        {
+          headers: {
+            Authorization: `Bearer ${KILO_CAPABILITY}`,
+            'X-Internal-Secret': 'forged',
+            'X-Kilo-Cloud-Agent-Session': 'forged',
+          },
+        }
+      ),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, familyFetch)
+    );
+
+    expect(publicFetch).toHaveBeenCalledTimes(1);
+    expect(familyFetch).not.toHaveBeenCalled();
+    const forwarded = publicFetch.mock.calls[0]?.[0] as Request;
+    expect(forwarded.headers.get('X-Internal-Secret')).toBeNull();
+    expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBeNull();
   });
 
   it('fails closed without logging a rejected Kilo URL by default', async () => {

@@ -69,6 +69,11 @@ default table untouched — profile runs never wrote it.
 - Concurrent owners requesting the same exact pair + engine identity dedupe to
   one global row.
 
+Admission is all-or-nothing and returns before the caller's Durable Object
+settings write. If that later write fails, the owner's previous pool is kept,
+admitted profiles stay pending globally, the single-slot drain still runs them,
+and a later retry reports them without re-charging quota.
+
 ### Status transitions and drain
 
 ```

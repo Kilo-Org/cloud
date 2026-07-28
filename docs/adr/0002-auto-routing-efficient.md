@@ -96,7 +96,9 @@ when no selected pair is ready or compatible.
 9. **Owner Efficient model pools are settings on the existing
    `kilo-auto/efficient` model**, not a new routing mode or virtual model ID.
    Mode and pool inherit independently (organization → personal → platform
-   default). Clearing a configured pool restores inheritance.
+   default). Clearing a configured pool restores inheritance. Owner mode and
+   pool are committed in one Durable Object storage transaction, so a mixed
+   save (one field set, the other cleared) can never half-apply.
 10. **Benchmark profiles are global and on-demand.** Profiles are keyed by exact
     Pool entry plus engine identity and are generated when an owner save admits
     missing/stale work. Admission is limited to 10 previously unbenchmarked or
@@ -168,6 +170,19 @@ fallbacks never re-anchor the session's model.
    target signals are a measured cost reduction versus balanced at
    non-inferior accuracy, and no regression in fallback rate. These live here, not
    in code, so changing them is a deliberate decision.
+5. **Deploy-order contract.** Production promotes the Vercel web deployment
+   *before* deploying workers, so every merge runs new web against old workers for
+   the worker build window. During that window, `GET /admin/routing-settings` 404s
+   on old workers; the web BFF synthesizes the settings response from the legacy
+   `/admin/routing-mode` route with `poolSupported: false` (no pool annotation),
+   and the Auto routing card hides pool controls and saves mode-only through the
+   legacy web mode route — mode-only at every worker version, never touching pool
+   keys. A settings PUT that 404s (mid-session worker rollback from a supported
+   UI) answers a retryable 503 `pool_temporarily_unavailable` for every body
+   shape; there is deliberately no legacy PUT fallback, because `pool: null` from
+   a supported UI is clear intent an old worker cannot honor (it would silently
+   preserve the pool), and a stale unsupported-UI body must never reach a new
+   worker's settings PUT (it would silently clear the pool).
 
 ### Rollback
 
@@ -184,8 +199,12 @@ revert:
 - **Stop benchmark activity**: pause/avoid triggering runs from the admin panel;
   in-flight queue jobs drain or fail into the DLQ (see the service README).
 - **Worker rollback**: redeploy the previous `auto-routing` / `auto-routing-bench`
-  worker versions. The D1 schema is additive; if a predeploy migration fails the
-  deploy fails before serving, leaving the prior version live.
+  worker versions. Migration 0005 rebuilds `case_results` / `model_summaries` /
+  `run_models` (generated rebuild SQL with backfill preserving legacy rows and
+  exact-pair keys; pre-pool worker code keeps reading them during the cutover
+  window); 0006/0007 are additive. Rollback of the workers therefore runs prior
+  code against the migrated schema; if the predeploy migration fails the deploy
+  fails before serving, leaving the prior version live.
 
 ## Consequences
 

@@ -331,6 +331,12 @@ export const cloudBillingSkusRouter = createTRPCRouter({
           sql<string>`coalesce(sum(${container_usage_segment.usage_seconds}::numeric * ${cloud_billing_sku.rate_cents_per_unit}), 0)::text`.mapWith(
             String
           ),
+        totalAcceptedSeconds:
+          sql<number>`sum(sum(${container_usage_segment.usage_seconds})) over ()`.mapWith(Number),
+        totalEstimatedCents:
+          sql<string>`sum(sum(${container_usage_segment.usage_seconds}::numeric * ${cloud_billing_sku.rate_cents_per_unit})) over ()::text`.mapWith(
+            String
+          ),
       })
       .from(container_usage_segment)
       .innerJoin(
@@ -363,40 +369,15 @@ export const cloudBillingSkusRouter = createTRPCRouter({
       estimatedCents: normalizeCloudBillingSkuRate(row.estimatedCents),
       intervals: row.intervals,
     }));
-    const [totals] = await db
-      .select({
-        acceptedSeconds:
-          sql<number>`coalesce(sum(${container_usage_segment.usage_seconds}), 0)`.mapWith(Number),
-        estimatedCents:
-          sql<string>`coalesce(sum(${container_usage_segment.usage_seconds}::numeric * ${cloud_billing_sku.rate_cents_per_unit}), 0)::text`.mapWith(
-            String
-          ),
-      })
-      .from(container_usage_segment)
-      .innerJoin(
-        container_usage_interval,
-        eq(container_usage_segment.interval_id, container_usage_interval.id)
-      )
-      .innerJoin(
-        cloud_billing_sku,
-        eq(container_usage_interval.cloud_billing_sku_id, cloud_billing_sku.id)
-      )
-      .where(
-        and(
-          eq(container_usage_interval.subject_type, input.subjectType),
-          eq(container_usage_interval.subject_id, input.subjectId),
-          sql`${container_usage_segment.received_at} >= ${input.start}`,
-          lt(container_usage_segment.received_at, input.end)
-        )
-      );
+    const totals = rows[0];
     return {
       subjectType: input.subjectType,
       subjectId: input.subjectId,
       start: input.start,
       end: input.end,
       items,
-      acceptedSeconds: totals?.acceptedSeconds ?? 0,
-      estimatedCents: normalizeCloudBillingSkuRate(totals?.estimatedCents ?? '0'),
+      acceptedSeconds: totals?.totalAcceptedSeconds ?? 0,
+      estimatedCents: normalizeCloudBillingSkuRate(totals?.totalEstimatedCents ?? '0'),
     };
   }),
 

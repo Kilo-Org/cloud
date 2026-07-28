@@ -2086,6 +2086,7 @@ const scenarios: FirefoxScenario[] = [
         await waitForTextMatch(session.driver, /The selected tab HTML length is [0-9]+\./u);
         await clickButtonByLabel(session.driver, 'New conversation');
         await waitForTextGone(session.driver, 'eval completed');
+        // Empty transcript state (not a seeded assistant message).
         await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
       }),
   },
@@ -2530,6 +2531,7 @@ const scenarios: FirefoxScenario[] = [
             await sendMessage(session.driver, 'Original tab');
             await waitForText(session.driver, 'Stop');
             await clickButtonByLabel(session.driver, 'New conversation');
+            // Empty transcript state on the new conversation tab.
             await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
             await clickButtonByText(session.driver, 'Original tab');
             await waitForText(session.driver, 'Stop');

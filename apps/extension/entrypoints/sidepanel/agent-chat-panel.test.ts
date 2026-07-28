@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { LEGACY_CONVERSATION_GREETING } from '@/src/shared/agent-conversation-tabs';
 
 // Agent-chat-panel transitively imports the WXT '#imports' virtual module; stub it so the graph loads under vitest.
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
@@ -98,6 +99,14 @@ describe('inspectable tab selection resolution', () => {
         selectedTabId: 99,
       })
     ).toBe(2);
+  });
+});
+
+describe('transcript empty-state copy', () => {
+  it('uses the shared legacy greeting string as the empty-state hint', () => {
+    // ConversationList renders LEGACY_CONVERSATION_GREETING when items.length === 0;
+    // The constant is the single source for both migration strip and empty UI.
+    expect(LEGACY_CONVERSATION_GREETING).toBe('Pick a tab and ask Kilo to inspect it.');
   });
 });
 

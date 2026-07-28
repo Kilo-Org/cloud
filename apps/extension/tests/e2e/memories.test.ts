@@ -300,11 +300,17 @@ test('memories can be saved from a pending draft and listed in settings', async 
 
     await setExtensionStorage(sidePanel, { [PENDING_DRAFT_KEY]: draft });
 
-    const card = sidePanel.getByRole('region', { name: 'Add to memory' });
+    const card = sidePanel.getByRole('dialog', { name: 'Add to memory' });
     await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute('aria-modal', 'true');
     await expect(card.getByText(draft.text)).toBeVisible();
 
-    await card.getByLabel('Memory note (optional)').fill('Ops note');
+    const noteField = card.getByLabel('Memory note (optional)');
+    await expect
+      .poll(() => noteField.evaluate(element => document.activeElement === element))
+      .toBe(true);
+
+    await noteField.fill('Ops note');
     await card.getByRole('button', { name: 'Save memory' }).click();
     await expect(card.getByText(CONFIRMATION_MESSAGE)).toBeVisible();
     await card.getByRole('button', { name: 'Done' }).click();
@@ -344,7 +350,7 @@ test('memories save card cancel discards the draft', async () => {
 
     await setExtensionStorage(sidePanel, { [PENDING_DRAFT_KEY]: draft });
 
-    const card = sidePanel.getByRole('region', { name: 'Add to memory' });
+    const card = sidePanel.getByRole('dialog', { name: 'Add to memory' });
     await expect(card).toBeVisible();
     await card.getByRole('button', { name: 'Cancel' }).click();
     await expect(card).toBeHidden();
@@ -565,14 +571,31 @@ test('memory full state blocks saving, recovers after delete', async () => {
       [PENDING_DRAFT_KEY]: draft,
     });
 
-    const card = sidePanel.getByRole('region', { name: 'Add to memory' });
+    const card = sidePanel.getByRole('dialog', { name: 'Add to memory' });
     await expect(card.getByText(FULL_MESSAGE)).toBeVisible();
     await expect(card.getByRole('button', { name: 'Manage memories' })).toBeVisible();
     await expect(card.getByRole('button', { name: 'Retry' })).toHaveCount(0);
 
+    // Settings (z-30) must open visibly above the floating card (z-[25]).
     await card.getByRole('button', { name: 'Manage memories' }).click();
+    const settingsPanel = sidePanel.getByRole('dialog', { name: 'Settings panel' });
+    await expect(settingsPanel).toBeVisible();
     const memoriesRegion = sidePanel.getByRole('region', { name: 'Memories' });
     await expect(memoriesRegion).toBeVisible();
+
+    const stacking = await sidePanel.evaluate(() => {
+      const settings = document.querySelector('[aria-label="Settings panel"]');
+      const memoryCard = document.querySelector('[aria-label="Add to memory"]');
+      if (!(settings instanceof HTMLElement) || !(memoryCard instanceof HTMLElement)) {
+        return null;
+      }
+
+      const settingsZ = Number.parseFloat(getComputedStyle(settings).zIndex);
+      const cardZ = Number.parseFloat(getComputedStyle(memoryCard).zIndex);
+      return { cardZ, settingsAboveCard: settingsZ > cardZ, settingsZ };
+    });
+    expect(stacking).not.toBeNull();
+    expect(stacking?.settingsAboveCard).toBe(true);
 
     const deletePreview = memoryListPreview('Full seed mem 199');
     const deleteLabel = `Delete memory "${deletePreview}"`;
@@ -580,9 +603,77 @@ test('memory full state blocks saving, recovers after delete', async () => {
     await expect(sidePanel.getByRole('button', { name: deleteLabel })).toHaveCount(0);
     await closeSettings(sidePanel);
 
+    // Pending draft remains intact after Settings closes.
+    await expect(card).toBeVisible();
     await expect(card.getByText(FULL_MESSAGE)).toBeHidden();
+    await expect(card.getByText(draft.text)).toBeVisible();
     await card.getByRole('button', { name: 'Save memory' }).click();
     await expect(card.getByText(CONFIRMATION_MESSAGE)).toBeVisible();
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('add-to-memory card floats over the conversation without shifting layout', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+    const sidePanel = await openAuthenticatedSidePanel(context, extensionId);
+    await sidePanel.setViewportSize({ height: 520, width: 320 });
+
+    const conversation = sidePanel.getByLabel('Agent conversation');
+    await expect(conversation).toBeVisible();
+
+    const before = await conversation.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      return { height: box.height, top: box.top };
+    });
+
+    const draft = makeDraft({ text: 'Overlay layout should not shrink conversation.' });
+    await setExtensionStorage(sidePanel, { [PENDING_DRAFT_KEY]: draft });
+
+    const card = sidePanel.getByRole('dialog', { name: 'Add to memory' });
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute('aria-modal', 'true');
+
+    const after = await conversation.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      return { height: box.height, top: box.top };
+    });
+
+    expect(Math.abs(after.top - before.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
+
+    const intersects = await sidePanel.evaluate(() => {
+      const cardEl = document.querySelector('[aria-label="Add to memory"]');
+      const conversationEl = document.querySelector('[aria-label="Agent conversation"]');
+      if (!(cardEl instanceof HTMLElement) || !(conversationEl instanceof HTMLElement)) {
+        return false;
+      }
+
+      // Prefer the inner raised card if present; otherwise the dialog root.
+      const surface =
+        cardEl.querySelector('.rounded-xl') instanceof HTMLElement
+          ? cardEl.querySelector('.rounded-xl')
+          : cardEl;
+      if (!(surface instanceof HTMLElement)) {
+        return false;
+      }
+
+      const cardBox = surface.getBoundingClientRect();
+      const conversationBox = conversationEl.getBoundingClientRect();
+      return !(
+        cardBox.right < conversationBox.left ||
+        cardBox.left > conversationBox.right ||
+        cardBox.bottom < conversationBox.top ||
+        cardBox.top > conversationBox.bottom
+      );
+    });
+    expect(intersects).toBe(true);
   } finally {
     await context.close();
     await fixture.close();

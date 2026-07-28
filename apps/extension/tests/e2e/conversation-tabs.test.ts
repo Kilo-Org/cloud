@@ -122,7 +122,15 @@ const conversationStoreWithTitle = (title: string): unknown => ({
   activeConversationId: 'conversation-1',
   conversations: [
     {
-      events: [],
+      // History only lists conversations with at least one user message.
+      events: [
+        {
+          id: `${title}-user`,
+          role: 'user',
+          text: title,
+          type: 'message',
+        },
+      ],
       id: 'conversation-1',
       title,
       updatedAt: '2026-06-24T10:00:00.000Z',
@@ -513,6 +521,34 @@ test('conversation tabs persist across side panel reloads', async () => {
   }
 });
 
+test('closing the sole empty tab discards an unsent draft', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    const messageInput = sidePanel.getByLabel('Message agent');
+    await expect(messageInput).toBeVisible();
+    await messageInput.fill('Unsent draft that must not survive close');
+    await expect(messageInput).toHaveValue('Unsent draft that must not survive close');
+
+    await sidePanel.getByLabel('Close Conversation 1').click();
+
+    await expect(sidePanel.getByLabel('Message agent')).toHaveValue('');
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('Pick a tab and ask Kilo to inspect it.')
+    ).toBeVisible();
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('closing a conversation removes only that tab', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -711,11 +747,19 @@ test('history virtualizes and pages large stored conversation lists', async () =
         activeConversationId: 'conversation-1',
         conversations: Array.from({ length: 250 }, (_value, index) => {
           const conversationNumber = index + 1;
+          const title = `Seeded conversation ${conversationNumber}`;
 
           return {
-            events: [],
+            events: [
+              {
+                id: `user-${conversationNumber}`,
+                role: 'user',
+                text: title,
+                type: 'message',
+              },
+            ],
             id: `conversation-${conversationNumber}`,
-            title: `Seeded conversation ${conversationNumber}`,
+            title,
             updatedAt: new Date(2026, 0, conversationNumber).toISOString(),
           };
         }),
@@ -850,7 +894,10 @@ test('conversation tab bar scrolls horizontally', async () => {
 
     await clickNewConversationTimes(sidePanel);
 
-    const tabBarState = await sidePanel.getByLabel('Conversation tabs').evaluate(element => ({
+    const tabList = sidePanel.getByLabel('Conversation tabs');
+    const newConversationButton = sidePanel.getByLabel('New conversation');
+
+    const tabBarState = await tabList.evaluate(element => ({
       clientWidth: element.clientWidth,
       overflowX: getComputedStyle(element).overflowX,
       scrollWidth: element.scrollWidth,
@@ -858,7 +905,36 @@ test('conversation tab bar scrolls horizontally', async () => {
 
     expect(tabBarState.overflowX).toBe('auto');
     expect(tabBarState.scrollWidth).toBeGreaterThan(tabBarState.clientWidth);
-    await expect(sidePanel.getByLabel('New conversation')).toBeVisible();
+
+    const assertNewConversationPinned = async (): Promise<void> => {
+      const geometry = await newConversationButton.evaluate(element => {
+        const rect = element.getBoundingClientRect();
+
+        return {
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+        };
+      });
+
+      expect(geometry.left).toBeGreaterThanOrEqual(0);
+      expect(geometry.top).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+      expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    };
+
+    await assertNewConversationPinned();
+
+    await tabList.evaluate(element => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect.poll(() => tabList.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+
+    await assertNewConversationPinned();
+    await expect(newConversationButton).toBeVisible();
   } finally {
     await context.close();
     await fixture.close();

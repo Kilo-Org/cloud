@@ -74,9 +74,7 @@ import { sanitizeTabContextText, sanitizeTabContextUrl } from '@/src/shared/tab-
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
-const createDefaultConversationEvents = (): AgentConversationEvent[] => [
-  createAssistantMessage('Pick a tab and ask Kilo to inspect it.'),
-];
+const emptyDefaultConversationEvents = (): AgentConversationEvent[] => [];
 
 interface ConversationRunState {
   readonly abort: AbortController;
@@ -146,7 +144,7 @@ export const AgentChatPanel = ({
 }): JSX.Element => {
   const store = useStore();
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
-    useStoredAgentConversations(createDefaultConversationEvents);
+    useStoredAgentConversations(emptyDefaultConversationEvents);
   const { memories } = useAgentMemories();
   const runningConversationIds = useAtomValue(runningConversationIdsAtom);
   const setRunningConversationIds = useSetAtom(runningConversationIdsAtom);
@@ -690,7 +688,7 @@ export const AgentChatPanel = ({
 
     conversationStoreRef.current = createNextStoredConversation(
       conversationStoreRef.current,
-      createDefaultConversationEvents(),
+      emptyDefaultConversationEvents(),
       settings
     );
     setConversationStore(conversationStoreRef.current);
@@ -762,9 +760,36 @@ export const AgentChatPanel = ({
       }
 
       abortConversationRun(conversationId);
-      setConversationStore(currentStore =>
-        closeStoredConversationTab(currentStore, conversationId, createDefaultConversationEvents())
+      const currentStore = conversationStoreRef.current;
+      const closedConversation = currentStore.conversations.find(
+        conversation => conversation.id === conversationId
       );
+      const wasEmpty =
+        closedConversation !== undefined && isStoredConversationEmpty(closedConversation);
+      const nextStore = closeStoredConversationTab(
+        currentStore,
+        conversationId,
+        emptyDefaultConversationEvents()
+      );
+      conversationStoreRef.current = nextStore;
+      setConversationStore(nextStore);
+
+      // Evict outside the state updater (StrictMode may double-invoke updaters).
+      // Empty closed tabs are deleted: always free their atoms, including when ensureOpen
+      // Recreates a fallback with the same id so drafts do not survive onto the fresh tab.
+      // Non-empty closed tabs keep drafts for History reopen.
+      const idsToEvict = new Set<string>();
+      if (wasEmpty) {
+        idsToEvict.add(conversationId);
+      }
+      for (const conversation of currentStore.conversations) {
+        if (!nextStore.conversations.some(next => next.id === conversation.id)) {
+          idsToEvict.add(conversation.id);
+        }
+      }
+      for (const id of idsToEvict) {
+        evictConversationAtoms(id);
+      }
     },
     [abortConversationRun, isConversationStoreLoaded, setConversationStore]
   );
@@ -784,7 +809,7 @@ export const AgentChatPanel = ({
 
       abortConversationRun(conversationId);
       setConversationStore(currentStore =>
-        deleteStoredConversation(currentStore, conversationId, createDefaultConversationEvents())
+        deleteStoredConversation(currentStore, conversationId, emptyDefaultConversationEvents())
       );
       // Free per-conversation atoms; a deleted conversation can never be reopened.
       evictConversationAtoms(conversationId);

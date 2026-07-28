@@ -268,6 +268,127 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(cloneCall).not.toContain('--filter=blob:none');
   });
 
+  it('uses a blobless partial clone for GitLab review sessions', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://gitlab.com/acme/repo.git',
+      token: 'gl-token',
+      platform: 'gitlab',
+    };
+    request.workspace.branchName = 'feature/login';
+
+    const gitCalls: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          gitCalls.push(args);
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(gitCalls.find(args => args[0] === 'clone')).toContain('--filter=blob:none');
+  });
+
+  it('keeps a full clone for review sessions on an unrecognized git platform', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    // A `git` source with no recognized platform has no lazy-fetch credential
+    // guarantee, so it must not use a partial clone.
+    request.repo = { kind: 'git', url: 'https://git.example.com/acme/repo.git', token: 't' };
+    request.workspace.branchName = 'feature/login';
+
+    const gitCalls: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          gitCalls.push(args);
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(gitCalls.find(args => args[0] === 'clone')).not.toContain('--filter=blob:none');
+  });
+
+  it('retries a full clone when the server rejects the blobless filter', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+
+    const cloneArgs: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            cloneArgs.push(args);
+            // Simulate a server that rejects the filter outright (not the
+            // warn-and-continue degradation).
+            if (args.includes('--filter=blob:none')) {
+              return { stdout: '', stderr: 'fatal: filter blob:none not supported', exitCode: 128 };
+            }
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return { stdout: '', stderr: '', exitCode: 0 };
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(cloneArgs.length).toBe(2);
+    expect(cloneArgs[0]).toContain('--filter=blob:none');
+    expect(cloneArgs[1]).not.toContain('--filter=blob:none');
+  });
+
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];

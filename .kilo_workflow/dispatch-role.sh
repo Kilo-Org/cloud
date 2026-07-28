@@ -24,9 +24,12 @@ shift 6
 
 NAME="$SECTION-$ROLE-$LABEL"
 LOG="$SCRATCH/$ROLE-$LABEL.log"
-# `|| true`: with no KILO_*/OPENCODE* vars set (a non-kilo dispatcher), grep
-# exits 1 and pipefail would abort the script before the tmux launch.
-STRIP=$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /' | tr '\n' ' ' || true)
+# The strip list must be computed INSIDE the new pane, not here: tmux panes
+# inherit the tmux SERVER environment, so vars absent from this dispatcher's
+# env can still reach the child (see learnings/nested-kilo-run-env-poisoning.md).
+# The escaped \$(...) below survives into the pane's shell and evaluates there;
+# `|| true` keeps an empty match from failing under the pane's shell.
+STRIP='$(env | grep -oE "^(KILO|OPENCODE)[A-Za-z0-9_]*" | sed "s/^/-u /" | tr "\n" " " || true)'
 
 CMD="cd $(printf '%q' "$WT") && env $STRIP kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME")"
 for arg in "$@"; do CMD+=" $(printf '%q' "$arg")"; done

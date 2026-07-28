@@ -52,6 +52,10 @@ fi
 if [ "$ROLE" = "e2e-verifier" ] || [ -z "$CALLER_SESSION" ]; then
   tmux new-session -d -s "$NAME" "$CMD"
 else
-  tmux new-window -d -t "$CALLER_SESSION" -n "$NAME" "$CMD"
+  # Target "<session>:" (trailing colon = next free index). A bare session
+  # target makes tmux compute the new index itself, and that computation can
+  # land on an occupied slot — observed as `create window failed: index 1 in
+  # use` on a two-window session whose active window is 0 (tmux 3.7b).
+  tmux new-window -d -t "$CALLER_SESSION:" -n "$NAME" "$CMD"
 fi
 echo "$LOG"

@@ -7,6 +7,10 @@ export type AccessibleSession = {
   organizationId: string | null;
 };
 
+export type AccessibleKiloSession = AccessibleSession & {
+  cloudAgentSessionScopeId: string | null;
+};
+
 /** Established name used by Cloud Agent consumers. */
 export type AccessibleCloudAgentSession = AccessibleSession;
 
@@ -21,6 +25,7 @@ type AccessibleCloudAgentSessionQuery = {
 type AccessibleKiloSessionQuery = {
   kiloUserId: string;
   kiloSessionId: string;
+  expectedCloudAgentSessionScopeId?: string;
 };
 
 type AccessibleSessionQuery = AccessibleCloudAgentSessionQuery | AccessibleKiloSessionQuery;
@@ -28,7 +33,7 @@ type AccessibleSessionQuery = AccessibleCloudAgentSessionQuery | AccessibleKiloS
 async function queryAccessibleSession(
   db: SessionAccessDb,
   query: AccessibleSessionQuery
-): Promise<AccessibleSession | null> {
+): Promise<AccessibleKiloSession | null> {
   const membershipJoin = and(
     eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
     eq(organization_memberships.kilo_user_id, query.kiloUserId)
@@ -61,12 +66,21 @@ async function queryAccessibleSession(
     .select({
       kiloSessionId: cli_sessions_v2.session_id,
       organizationId: cli_sessions_v2.organization_id,
+      cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
     })
     .from(cli_sessions_v2)
     .leftJoin(organization_memberships, membershipJoin)
     .leftJoin(organizations, organizationJoin)
     .where(
-      and(eq(cli_sessions_v2.kilo_user_id, query.kiloUserId), sessionCondition, scopeCondition)
+      and(
+        eq(cli_sessions_v2.kilo_user_id, query.kiloUserId),
+        sessionCondition,
+        scopeCondition,
+        'expectedCloudAgentSessionScopeId' in query &&
+          query.expectedCloudAgentSessionScopeId !== undefined
+          ? eq(cli_sessions_v2.cloud_agent_session_scope_id, query.expectedCloudAgentSessionScopeId)
+          : undefined
+      )
     )
     .limit(1);
 
@@ -77,12 +91,25 @@ export async function queryAccessibleCloudAgentSession(
   db: SessionAccessDb,
   query: AccessibleCloudAgentSessionQuery
 ): Promise<AccessibleCloudAgentSession | null> {
-  return queryAccessibleSession(db, query);
+  const session = await queryAccessibleSession(db, query);
+  return session
+    ? { kiloSessionId: session.kiloSessionId, organizationId: session.organizationId }
+    : null;
 }
 
 export async function queryAccessibleKiloSession(
   db: SessionAccessDb,
   query: AccessibleKiloSessionQuery
 ): Promise<AccessibleSession | null> {
+  const session = await queryAccessibleSession(db, query);
+  return session
+    ? { kiloSessionId: session.kiloSessionId, organizationId: session.organizationId }
+    : null;
+}
+
+export async function queryAccessibleKiloSessionWithSessionScope(
+  db: SessionAccessDb,
+  query: AccessibleKiloSessionQuery
+): Promise<AccessibleKiloSession | null> {
   return queryAccessibleSession(db, query);
 }

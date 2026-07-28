@@ -32,26 +32,138 @@ describe('selectPinnedActiveSessions', () => {
   it('does not dedup against stored pages (returns actives regardless)', () => {
     // The helper intentionally has no stored-sessions parameter. The
     // exclusivity contract lives on the history side (Task 3); the pinned
-    // set is always driven solely by filters and the active input.
+    // set is driven by the search query, the platform/project filters, and the active input.
     const actives: ActiveSession[] = [makeActive({ id: 'a1' }), makeActive({ id: 'a2' })];
     const result = selectPinnedActiveSessions({
       activeSessions: actives,
       projectFilter: [],
       platformFilter: [],
+      searchQuery: '',
     });
     expect(result).toEqual(actives);
   });
 
-  it('has no search parameter (search is ignored by construction)', () => {
-    // Compile-time assertion: selectPinnedActiveSessions must not accept
-    // a `search` key. If one is added later, @ts-expect-error stops firing
-    // and typecheck fails.
-    selectPinnedActiveSessions({
-      activeSessions: [],
-      projectFilter: [],
-      platformFilter: [],
-      // @ts-expect-error — search must not be a param of selectPinnedActiveSessions
-      search: 'anything',
+  describe('search rules', () => {
+    it('empty query performs no narrowing', () => {
+      const a = makeActive({ id: 'a', title: 'Fix login' });
+      const b = makeActive({ id: 'b', title: 'Other work' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [a, b],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: '',
+      });
+      expect(result).toEqual([a, b]);
+    });
+
+    it('whitespace-only query performs no narrowing', () => {
+      const a = makeActive({ id: 'a', title: 'Fix login' });
+      const b = makeActive({ id: 'b', title: 'Other work' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [a, b],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: '   ',
+      });
+      expect(result).toEqual([a, b]);
+    });
+
+    it('matches a title substring mid-string', () => {
+      const match = makeActive({ id: 'm', title: 'Fix login bug' });
+      const other = makeActive({ id: 'o', title: 'Deploy release' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [match, other],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'login',
+      });
+      expect(result.map(s => s.id)).toEqual(['m']);
+    });
+
+    it('title match is case-insensitive both ways', () => {
+      const lower = makeActive({ id: 'lower', title: 'Fix login bug' });
+      const upper = makeActive({ id: 'upper', title: 'FIX LOGIN BUG' });
+      expect(
+        selectPinnedActiveSessions({
+          activeSessions: [lower],
+          projectFilter: [],
+          platformFilter: [],
+          searchQuery: 'LOGIN',
+        }).map(s => s.id)
+      ).toEqual(['lower']);
+      expect(
+        selectPinnedActiveSessions({
+          activeSessions: [upper],
+          projectFilter: [],
+          platformFilter: [],
+          searchQuery: 'fix',
+        }).map(s => s.id)
+      ).toEqual(['upper']);
+    });
+
+    it('matches a session id substring, case-insensitively', () => {
+      const match = makeActive({ id: 'ses-ABC123', title: 'Unrelated title' });
+      const other = makeActive({ id: 'ses-xyz', title: 'Also unrelated' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [match, other],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'abc123',
+      });
+      expect(result.map(s => s.id)).toEqual(['ses-ABC123']);
+    });
+
+    it('excludes sessions matching neither title nor id', () => {
+      const a = makeActive({ id: 'ses-a', title: 'Fix login' });
+      const b = makeActive({ id: 'ses-b', title: 'Deploy' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [a, b],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'zzz',
+      });
+      expect(result).toEqual([]);
+    });
+
+    it('applies the text query in conjunction with platform and project filters', () => {
+      const pass = makeActive({
+        id: 'pass',
+        title: 'Fix login bug',
+        gitUrl: 'git@github.com:org/repo.git',
+        createdOnPlatform: 'cli',
+      });
+      const wrongPlatform = makeActive({
+        id: 'wrongPlatform',
+        title: 'Fix login bug',
+        gitUrl: 'git@github.com:org/repo.git',
+        createdOnPlatform: 'slack',
+      });
+      const wrongProject = makeActive({
+        id: 'wrongProject',
+        title: 'Fix login bug',
+        gitUrl: 'git@github.com:org/other.git',
+        createdOnPlatform: 'cli',
+      });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [pass, wrongPlatform, wrongProject],
+        projectFilter: ['git@github.com:org/repo.git'],
+        platformFilter: ['cli'],
+        searchQuery: 'login',
+      });
+      expect(result.map(s => s.id)).toEqual(['pass']);
+    });
+
+    it('treats LIKE metacharacters literally (parity with server position() search)', () => {
+      const percent = makeActive({ id: 'pct', title: '100% done' });
+      const noPercent = makeActive({ id: 'nop', title: '1000 done' });
+      expect(
+        selectPinnedActiveSessions({
+          activeSessions: [percent, noPercent],
+          projectFilter: [],
+          platformFilter: [],
+          searchQuery: '100%',
+        }).map(s => s.id)
+      ).toEqual(['pct']);
     });
   });
 
@@ -63,6 +175,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [withUrl, withoutUrl],
         projectFilter: ['git@github.com:org/repo.git'],
         platformFilter: [],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['with']);
     });
@@ -74,6 +187,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [match, other],
         projectFilter: ['git@github.com:org/repo.git'],
         platformFilter: [],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['match']);
     });
@@ -86,6 +200,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [a, b, c],
         projectFilter: [],
         platformFilter: [],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['a', 'b', 'c']);
     });
@@ -99,6 +214,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [cli, slack],
         projectFilter: [],
         platformFilter: ['cli'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['cli']);
     });
@@ -110,6 +226,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [web, ca],
         projectFilter: [],
         platformFilter: ['cloud-agent'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id).toSorted()).toEqual(['ca', 'web']);
     });
@@ -122,6 +239,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [vscode, am, slack],
         projectFilter: [],
         platformFilter: ['extension'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id).toSorted()).toEqual(['am', 'vscode']);
     });
@@ -132,6 +250,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [weird],
         projectFilter: [],
         platformFilter: ['other'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['weird']);
     });
@@ -142,6 +261,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [cli],
         projectFilter: [],
         platformFilter: ['other'],
+        searchQuery: '',
       });
       expect(result).toEqual([]);
     });
@@ -154,6 +274,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [cli, weird, vscode],
         projectFilter: [],
         platformFilter: ['cli', 'other'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id).toSorted()).toEqual(['cli', 'weird']);
     });
@@ -165,6 +286,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [unknown, cli],
         projectFilter: [],
         platformFilter: ['cli'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['cli']);
     });
@@ -176,6 +298,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [unknown, cli],
         projectFilter: [],
         platformFilter: [],
+        searchQuery: '',
       });
       expect(result.map(s => s.id).toSorted()).toEqual(['cli', 'unknown']);
     });
@@ -201,6 +324,7 @@ describe('selectPinnedActiveSessions', () => {
       activeSessions: [pass, wrongProject, wrongPlatform],
       projectFilter: ['git@github.com:org/repo.git'],
       platformFilter: ['cli'],
+      searchQuery: '',
     });
     expect(result.map(s => s.id)).toEqual(['pass']);
   });

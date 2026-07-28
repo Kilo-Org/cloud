@@ -47,7 +47,7 @@ pnpm dev:status --json
 
 Rules:
 
-- Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts.
+- Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts. If the automatic offset lands on an occupied port, use a per-command prefix — see `.kilo_workflow/learnings/worktree-port-offset-airplay-collision.md`.
 - The `dev:env` step creates the JWT Secrets Store binding. Without it, session-ingest looks healthy but rejects every session request.
 - Secrets Store state is local to each Worker directory. `dev:start` refreshes every source-backed secret for its service graph before launching Workers; a secret-creation failure is fatal, not something to retry past.
 - `event-service` is required for presence and notification behavior.

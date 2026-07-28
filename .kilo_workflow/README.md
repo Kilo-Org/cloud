@@ -45,6 +45,7 @@ A section routinely takes hours of unattended machine time. The human cost is mi
 |---|---|
 | [`WORKFLOW.md`](WORKFLOW.md) | The canonical spec — roles, loops, gates, dispatch commands |
 | [`dispatch-role.sh`](dispatch-role.sh) | Launches a kilo role agent in tmux with a clean environment and logged exit code |
+| [`steer.sh`](steer.sh) | Delivers a message to a running interactive session (starter, planner, orchestrator) and confirms it was submitted |
 | [`e2e-slot.sh`](e2e-slot.sh) | Machine-global semaphore (default 3) capping concurrent device/stack E2E phases; agents are never capped |
 | [`learnings/`](learnings/) | Environment blockers and fixes, one file each, committed via PRs so every future run inherits them; `learnings/system/` is gitignored machine-local state |
 

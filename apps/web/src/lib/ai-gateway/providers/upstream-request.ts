@@ -12,6 +12,7 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
+import { withRequestId } from '@/lib/ai-gateway/request-id';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -137,14 +138,6 @@ function classifyUpstreamFetchFailure({
     default:
       return 'unknown';
   }
-}
-
-/**
- * The Vercel request id makes a reported error traceable to the invocation that
- * produced it, so it is appended to the message when the platform provided one.
- */
-function withRequestId(message: string, vercelRequestId: string | null | undefined): string {
-  return vercelRequestId ? `${message} (request id: ${vercelRequestId})` : message;
 }
 
 /**

@@ -209,6 +209,32 @@ describe('admin.cloudBillingSkus usage records', () => {
     await insertUsageInterval({ id: 'interval-b', subjectId: 'subject-1' });
     await insertUsageInterval({ id: 'interval-a', subjectId: 'subject-1' });
     await insertUsageInterval({ id: 'interval-other', subjectId: 'subject-2' });
+    await db.insert(container_usage_segment).values([
+      {
+        interval_id: 'interval-b',
+        seq: 1,
+        idempotency_key: 'interval-b-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+      {
+        interval_id: 'interval-a',
+        seq: 1,
+        idempotency_key: 'interval-a-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+      {
+        interval_id: 'interval-other',
+        seq: 1,
+        idempotency_key: 'interval-other-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+    ]);
     const caller = await createCallerForUser(admin.id);
     const first = await caller.admin.cloudBillingSkus.searchUsageIntervals({
       search: {

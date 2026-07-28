@@ -5,7 +5,7 @@
   "responseContent": "hi",
   "inference_provider": "openai",
   "finish_reason": "completed",
-  "upstream_id": null,
+  "upstream_id": "req_869e7f2d33124834a2d0a7fb0a271c1a",
   "latency": null,
   "moderation_latency": null,
   "generation_time": null,

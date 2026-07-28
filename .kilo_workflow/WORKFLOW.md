@@ -261,16 +261,19 @@ The machine is shared by parallel workflows, and unslotted device or stack work 
 
 ```bash
 .kilo_workflow/e2e-slot.sh acquire <tmux-session>   # blocks until a slot frees
-.kilo_workflow/e2e-slot.sh status                   # current holders
+.kilo_workflow/e2e-slot.sh status                   # holders, their worktrees, stack coverage
 .kilo_workflow/e2e-slot.sh release <tmux-session>   # the moment the device phase ends
+.kilo_workflow/e2e-slot.sh stacks [--reap]          # stacks running with no slot
 ```
+
+**A slot and a dev stack are the same resource.** The slot is what entitles a worktree to run a stack, and a stack must never outlive it: `release` stops the releasing worktree's stack, and reclaiming a dead holder's slot stops its stack too. So a later round re-acquires and starts a fresh stack rather than inheriting one — that restart is the price of the cap. A stack up with no slot is a defect, not a shortcut; `stacks` lists them and `stacks --reap` stops the workflow-owned ones (a stack with no section run id in its name was started by hand and is only reported). Five live stacks on this host drove the load average past 300 and made every emulator boot and native build time out, which reads as flaky devices rather than as over-subscription.
 
 - Slot state lives in `$HOME/.cache/kilo-e2e-slots`, machine-global by design: every copy of the script — any worktree, any repository — contends for the same slots, and the script has no overrides by design. When working in a repository without the script (a sibling like `~/Projects/kilocode`), invoke it by absolute path from a cloud worktree.
 - This holds on every run, not only when another workflow is visibly active, and a stack that is already up is not an exemption.
 - `acquire` blocking is correct behavior, never a wedge to route around and never a reason to start device work unslotted. If an acquire is still blocked after about 45 minutes, the dispatcher inspects `status` for a wedged foreign holder and reports a blocker instead of waiting forever.
 - The slot caps load, not data: postgres and redis containers are shared across worktrees. Keep test data keyed to this worktree's accounts (the runbooks' per-worktree defaults) and never wipe shared state.
-- Release immediately when the device/stack phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them.
-- Slots are owned by tmux session name and reclaimed automatically when the session dies. A holder that is alive but wedged belongs to its own workflow's monitor — never kill another session to free a slot; if the queue is starved by a foreign wedge, report a blocker to the user instead.
+- Release immediately when the device/stack phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them — and since release takes the stack with it, do not release mid-round while you still need the services.
+- Slots are owned by tmux session name, record the worktree that took them, and are reclaimed automatically when the session dies. A holder that is alive but wedged belongs to its own workflow's monitor — never kill another session to free a slot; if the queue is starved by a foreign wedge, report a blocker to the user instead.
 - The orchestrator is accountable: every device-phase handoff states the slot rule, and a role agent that reports device work with no acquire gets re-dispatched.
 
 ## Feature-State Matrix

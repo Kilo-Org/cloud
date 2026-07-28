@@ -24,7 +24,9 @@ shift 6
 
 NAME="$SECTION-$ROLE-$LABEL"
 LOG="$SCRATCH/$ROLE-$LABEL.log"
-STRIP=$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /' | tr '\n' ' ')
+# `|| true`: with no KILO_*/OPENCODE* vars set (a non-kilo dispatcher), grep
+# exits 1 and pipefail would abort the script before the tmux launch.
+STRIP=$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /' | tr '\n' ' ' || true)
 
 CMD="cd $(printf '%q' "$WT") && env $STRIP kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME")"
 for arg in "$@"; do CMD+=" $(printf '%q' "$arg")"; done

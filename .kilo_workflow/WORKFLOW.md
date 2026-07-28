@@ -59,7 +59,7 @@ What the script encodes (details in `learnings/`):
 - Full `KILO_*`/`OPENCODE*` env strip — a dispatcher running inside kilo poisons nested runs otherwise (see `learnings/nested-kilo-run-env-poisoning.md`).
 - Output redirected, never piped (`| tee` makes `$?` report the pipe's exit, not kilo's), with `EXITCODE=$?` appended as the log's last line.
 
-Wait event-driven: the run is done when the tmux window/session is gone or `tail -1 "$LOG"` matches `^EXITCODE=[0-9]`.
+Wait event-driven: the run is done when the tmux window/session is gone or `tail -1 "$LOG"` matches `^EXITCODE=[0-9]`. The role's sentinel is then the line **above** the marker — check it with `tail -2 "$LOG" | head -1`, never by grepping the whole log (agents quote sentinel strings when reading this document, and a mid-log match false-passes).
 - **Void rounds:** every role definition requires a fixed sentinel as the log's **last report line** (reviewers: `No findings.`, `FINDINGS: <n>`, or `STOPPED EARLY.`; implementer: `SLICE COMPLETE.`/`STOPPED EARLY.`; verifier: `VERIFICATION PASSED.`/`VERIFICATION FAILED.`/`VERIFICATION BLOCKED.`/`REPRODUCED.`/`CANNOT REPRODUCE.`/`STOPPED EARLY.`). A round without its sentinel is void, never a pass, regardless of exit code — kilo runs can die mid-stream and still exit 0. Discard it and dispatch a fresh session. `STOPPED EARLY.` is not void but not success either: re-dispatch with a continuation handoff; it counts toward the loop's round cap.
 - After a reviewer round, the reviewed slice's owned paths must match the dispatcher's pre-round snapshot (other slices' implementers may legitimately be editing theirs); after an implementer round no new commits may exist. A violation voids the round.
 - Void rounds count toward the loop's round cap, and three consecutive void rounds are an infrastructure blocker (auth wedge, provider outage — see `learnings/kilo-paid-model-auth-wedge.md`), never something to redispatch through.
@@ -78,7 +78,7 @@ When a loop iteration fails, escalate in order:
 
 Progress means new root-cause information, a smaller reproduction, fewer reviewer findings, or a previously failing check now passing. The same error under the same theory twice is not progress. Never loop indefinitely.
 
-The ladder and the loop round caps work together, not against each other: every dispatch — steered, restructured, or `STOPPED EARLY.` — counts as a round, a cap is a ceiling and never a budget (the ladder usually ends a loop well before it), and at the cap the steering and restructure rungs are spent — the only remaining moves are takeover or BLOCKED.
+The ladder and the loop round caps work together, not against each other. One round = one full iteration of the loop's body (in the implementer loop, an implementer dispatch plus its reviewer dispatch; in single-role loops, one dispatch) — and every attempted round counts, whether steered, restructured, void, or `STOPPED EARLY.` A cap is a ceiling and never a budget (the ladder usually ends a loop well before it), and at the cap the steering and restructure rungs are spent — the only remaining moves are takeover or BLOCKED.
 
 ### Handoff Requirements
 
@@ -111,7 +111,7 @@ The session the user invokes the workflow from is the starter, running on the ha
 ```bash
 # kilo planner (the planner agent definition pins permissions; the model is the user's pick):
 tmux new-window -t <session> -n <section>-planner -c <worktree> \
-  "env \$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /') \
+  "env \$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /' || true) \
    kilo run 'Plan the work in the attached brief.' --agent planner \
    --interactive --model <planner-model> --variant high --title '<section> planner' --file $SCRATCH/brief.md"
 # claude planner:
@@ -154,13 +154,13 @@ Steps:
 
 For defect work, dispatch a fresh `e2e-verifier` in repro mode on the unmodified baseline before writing the draft plan. Repro mode is not a CLI flag: the dispatch is the normal `--agent e2e-verifier` dispatch (own tmux session, label `r0` — see Dispatching), and the handoff text assigns repro mode, which the verifier definition recognizes. Its assignment: reproduce the reported issue — fix nothing — and return exact reproduction steps, evidence, and a failure classification. A confirmed reproduction feeds the plan, and the confirmed repro flow passing becomes an acceptance criterion the final verifier must rerun.
 
-`Cannot reproduce` is a blocker, not a license to fix an unconfirmed bug. Hands-on: return the evidence to the user and ask how to proceed. Hands-off: stop with a blocker report — no plan, no orchestrator.
+A `CANNOT REPRODUCE.` sentinel is a blocker, not a license to fix an unconfirmed bug. Hands-on: return the evidence to the user and ask how to proceed. Hands-off: stop with a BLOCKED report — no plan, no orchestrator.
 
 ### Launching the Orchestrator
 
 ```bash
 tmux new-window -t <session> -n <section>-orchestrator -c <worktree> \
-  "env \$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /') \
+  "env \$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /' || true) \
    kilo run 'Execute the approved plan in the attached handoff. Own implementation through the completion gate.' \
    --agent orchestrator --interactive \
    --title '<section> orchestrator' --file $SCRATCH/handoff.md"

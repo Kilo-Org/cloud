@@ -1,8 +1,16 @@
 /**
- * Canonical "which repositories can this owner target" set, shared by the settings UI (the dialog
- * that builds conversion links) and the server route that authorizes the chosen repo. Both derive
- * from the same inputs — the integration's fetched repository list plus any manually-added legacy
- * entries — so the UI-offered list can't drift out of sync with the server-enforced allowlist.
+ * Repository-list builders shared by the code review settings UI and the REVIEW.md conversion route.
+ *
+ * Two callers with DIFFERENT inputs, on purpose:
+ * - The general settings repo list (`ReviewConfigForm.selectableRepositories`) passes the fetched
+ *   integration repos PLUS manually-added legacy entries.
+ * - The conversion dialog and the server route's allowlist pass the fetched integration repos ONLY
+ *   (manually-added entries are unverified client input and must not authorize a billable action).
+ *
+ * The sync guarantee is scoped to the CONVERSION path: the dialog and the route both build from the
+ * fetched list only, via these helpers, so a repo the dialog offers is always one the route allows.
+ * If manually-added entries are ever added back to the server-side allowlist, add them to the
+ * conversion dialog's list too (or drop this guarantee), or the two will diverge.
  */
 
 export type FetchedRepository = {

@@ -44,16 +44,36 @@ type SearchRequest =
       skuId?: string;
     }
   | {
-      kind: SearchKind;
+      kind: 'interval';
       value: string;
       status?: 'open' | 'closed';
       closeReason?: CloseReason;
       skuId?: string;
+    }
+  | {
+      kind: 'user' | 'org';
+      value: string;
+      status?: 'open' | 'closed';
+      closeReason?: CloseReason;
+      skuId?: string;
+      summaryStart?: string;
+      summaryEnd?: string;
     };
 type Cursor = { startedAt: string; id: string };
+type UsageSummaryRequest = {
+  subjectType: 'user' | 'org';
+  subjectId: string;
+  start: string;
+  end: string;
+};
 
 function formatTimestamp(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—';
+}
+
+function toDateTimeLocalValue(value: Date): string {
+  const offset = value.getTimezoneOffset() * 60_000;
+  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function adminSubjectHref(type: 'user' | 'org', id: string): string {
@@ -200,6 +220,12 @@ export default function UsageRecordsContent() {
   const [cursor, setCursor] = useState<Cursor | undefined>();
   const [previousCursors, setPreviousCursors] = useState<Array<Cursor | undefined>>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [summaryStart, setSummaryStart] = useState(() =>
+    toDateTimeLocalValue(new Date(Date.now() - 24 * 60 * 60 * 1_000))
+  );
+  const [summaryEnd, setSummaryEnd] = useState(() => toDateTimeLocalValue(new Date()));
+  const [summaryRequest, setSummaryRequest] = useState<UsageSummaryRequest | null>(null);
+  const [summaryInputError, setSummaryInputError] = useState<string | null>(null);
 
   const input = {
     search:
@@ -211,6 +237,8 @@ export default function UsageRecordsContent() {
               kind: 'subject',
               subjectType: submitted.kind,
               subjectId: submitted.value,
+              start: submitted.summaryStart ?? '',
+              end: submitted.summaryEnd ?? '',
             } as const),
     status: submitted.status,
     closeReason: submitted.closeReason,
@@ -219,6 +247,17 @@ export default function UsageRecordsContent() {
     limit: submitted.kind === 'recent' ? 10 : 25,
   };
   const results = useQuery(trpc.admin.cloudBillingSkus.searchUsageIntervals.queryOptions(input));
+  const summary = useQuery({
+    ...trpc.admin.cloudBillingSkus.getUsageSummary.queryOptions(
+      summaryRequest ?? {
+        subjectType: 'user',
+        subjectId: 'not-submitted',
+        start: new Date(0).toISOString(),
+        end: new Date(1).toISOString(),
+      }
+    ),
+    enabled: summaryRequest !== null,
+  });
   const rows = results.data?.items ?? [];
 
   const resetResultNavigation = () => {
@@ -263,20 +302,67 @@ export default function UsageRecordsContent() {
               event.preventDefault();
               const trimmed = value.trim();
               if (!trimmed) return;
+              let summaryWindow: { summaryStart?: string; summaryEnd?: string } = {};
+              if (kind === 'user' || kind === 'org') {
+                const start = new Date(summaryStart);
+                const end = new Date(summaryEnd);
+                const windowMs = end.getTime() - start.getTime();
+                if (
+                  Number.isNaN(start.getTime()) ||
+                  Number.isNaN(end.getTime()) ||
+                  windowMs <= 0 ||
+                  windowMs > 31 * 24 * 60 * 60 * 1_000
+                ) {
+                  setSummaryInputError('Choose a valid window of no more than 31 days.');
+                  return;
+                }
+                summaryWindow = {
+                  summaryStart: start.toISOString(),
+                  summaryEnd: end.toISOString(),
+                };
+              }
               const next: SearchRequest = {
                 kind,
                 value: trimmed,
                 status: status === 'all' ? undefined : status,
                 closeReason: closeReason === 'all' ? undefined : closeReason,
                 skuId: skuId === 'all' ? undefined : skuId,
+                ...summaryWindow,
               };
+              const submittedValue = submitted.kind === 'recent' ? undefined : submitted.value;
+              const nextValue = next.kind === 'recent' ? undefined : next.value;
+              const nextSummaryStart =
+                next.kind === 'user' || next.kind === 'org' ? next.summaryStart : undefined;
+              const nextSummaryEnd =
+                next.kind === 'user' || next.kind === 'org' ? next.summaryEnd : undefined;
+              const submittedSummaryStart =
+                submitted.kind === 'user' || submitted.kind === 'org'
+                  ? submitted.summaryStart
+                  : undefined;
+              const submittedSummaryEnd =
+                submitted.kind === 'user' || submitted.kind === 'org'
+                  ? submitted.summaryEnd
+                  : undefined;
               const unchanged =
                 cursor === undefined &&
                 submitted.kind === next.kind &&
-                submitted.value === next.value &&
+                submittedValue === nextValue &&
                 submitted.status === next.status &&
                 submitted.closeReason === next.closeReason &&
-                submitted.skuId === next.skuId;
+                submitted.skuId === next.skuId &&
+                submittedSummaryStart === nextSummaryStart &&
+                submittedSummaryEnd === nextSummaryEnd;
+              setSummaryInputError(null);
+              setSummaryRequest(
+                next.kind === 'user' || next.kind === 'org'
+                  ? {
+                      subjectType: next.kind,
+                      subjectId: next.value,
+                      start: next.summaryStart ?? '',
+                      end: next.summaryEnd ?? '',
+                    }
+                  : null
+              );
               setSubmitted(next);
               resetResultNavigation();
               if (unchanged) void results.refetch();
@@ -295,6 +381,47 @@ export default function UsageRecordsContent() {
                 </SelectContent>
               </Select>
             </div>
+            {(kind === 'user' || kind === 'org') && (
+              <div className="space-y-1.5 lg:col-span-3 xl:col-span-2">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="usage-summary-start">Window start</Label>
+                    <Input
+                      id="usage-summary-start"
+                      type="datetime-local"
+                      value={summaryStart}
+                      max={summaryEnd}
+                      aria-describedby={
+                        summaryInputError ? 'usage-summary-window-error' : undefined
+                      }
+                      onChange={event => setSummaryStart(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="usage-summary-end">Window end</Label>
+                    <Input
+                      id="usage-summary-end"
+                      type="datetime-local"
+                      value={summaryEnd}
+                      min={summaryStart}
+                      aria-describedby={
+                        summaryInputError ? 'usage-summary-window-error' : undefined
+                      }
+                      onChange={event => setSummaryEnd(event.target.value)}
+                    />
+                  </div>
+                </div>
+                {summaryInputError && (
+                  <p
+                    id="usage-summary-window-error"
+                    className="text-destructive type-label"
+                    role="alert"
+                  >
+                    {summaryInputError}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="usage-search-value">Exact value</Label>
               <Input
@@ -411,6 +538,113 @@ export default function UsageRecordsContent() {
           </form>
         </CardContent>
       </Card>
+
+      {(submitted.kind === 'user' || submitted.kind === 'org') && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Usage summary</CardTitle>
+            <CardDescription>
+              Accepted seconds and shadow estimated cents for this exact subject. This does not
+              debit credits.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {summaryRequest && (
+              <p className="text-muted-foreground break-all type-label">
+                {summaryRequest.subjectType} {summaryRequest.subjectId} ·{' '}
+                {formatTimestamp(summaryRequest.start)} to {formatTimestamp(summaryRequest.end)} ·
+                window is [start, end)
+              </p>
+            )}
+
+            {summary.isFetching && (
+              <p className="text-muted-foreground type-body" role="status" aria-live="polite">
+                Calculating usage summary...
+              </p>
+            )}
+
+            {summary.isError && (
+              <Alert variant="destructive">
+                <AlertTitle>Usage summary could not be calculated</AlertTitle>
+                <AlertDescription className="space-y-3">
+                  <p>{summary.error.message}</p>
+                  {summary.error.data?.code !== 'BAD_REQUEST' && (
+                    <Button variant="outline" size="sm" onClick={() => void summary.refetch()}>
+                      Retry
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {summary.isSuccess && (
+              <div className="space-y-3" aria-live="polite">
+                <p className="text-muted-foreground type-label">
+                  {summary.data.acceptedSeconds.toLocaleString()} accepted seconds across{' '}
+                  {summary.data.items
+                    .reduce((total, item) => total + item.intervals, 0)
+                    .toLocaleString()}{' '}
+                  interval
+                  {summary.data.items.reduce((total, item) => total + item.intervals, 0) === 1
+                    ? ''
+                    : 's'}
+                </p>
+                {summary.data.items.length === 0 ? (
+                  <p className="text-muted-foreground type-body">
+                    No accepted usage was recorded in this window.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <Table>
+                      <caption className="sr-only">
+                        Usage summary for {summary.data.subjectType} {summary.data.subjectId} from{' '}
+                        {formatTimestamp(summary.data.start)} to {formatTimestamp(summary.data.end)}
+                      </caption>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Accepted seconds</TableHead>
+                          <TableHead>Rate</TableHead>
+                          <TableHead>Estimated cents</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {summary.data.items.map(item => (
+                          <TableRow key={item.skuId}>
+                            <TableCell>
+                              <code className="type-code">{item.skuId}</code>
+                              <p className="text-muted-foreground type-label">{item.skuName}</p>
+                            </TableCell>
+                            <TableCell className="tabular-nums type-code">
+                              {item.acceptedSeconds.toLocaleString()}s
+                            </TableCell>
+                            <TableCell className="tabular-nums type-code">
+                              {item.rateCentsPerSecond} cents/s
+                            </TableCell>
+                            <TableCell className="tabular-nums type-code">
+                              {item.estimatedCents} cents
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow>
+                          <TableCell className="font-medium">Total</TableCell>
+                          <TableCell className="tabular-nums font-medium type-code">
+                            {summary.data.acceptedSeconds.toLocaleString()}s
+                          </TableCell>
+                          <TableCell />
+                          <TableCell className="tabular-nums font-medium type-code">
+                            {summary.data.estimatedCents} cents
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {results.isError && (
         <Alert variant="destructive">

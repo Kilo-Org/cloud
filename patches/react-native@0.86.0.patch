@@ -1,0 +1,16 @@
+diff --git a/sdks/.hermesv1version b/sdks/.hermesv1version
+index 676ac3ce21eee398d556e9eda10b4d29d75ef837..4bc6fc0b5fde2a737c04fd4b2c117f3ab6591626 100644
+--- a/sdks/.hermesv1version
++++ b/sdks/.hermesv1version
+@@ -1 +1 @@
+-hermes-v250829098.0.14
+\ No newline at end of file
++hermes-v250829098.0.16
+diff --git a/sdks/hermes-engine/version.properties b/sdks/hermes-engine/version.properties
+index e1934540e892f21f8ec40055cd73324603358224..42ecd7854681db772d3ef7b44ef17dceb4cd9298 100644
+--- a/sdks/hermes-engine/version.properties
++++ b/sdks/hermes-engine/version.properties
+@@ -1,2 +1,2 @@
+ HERMES_VERSION_NAME=0.17.0
+-HERMES_V1_VERSION_NAME=250829098.0.14
++HERMES_V1_VERSION_NAME=250829098.0.16

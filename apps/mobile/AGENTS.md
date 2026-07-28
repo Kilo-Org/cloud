@@ -33,6 +33,7 @@ git diff --check
 
 - Install with `npx expo install <package>` (or `--dev`), never `pnpm add`.
 - After dependency changes, run `pnpx expo-doctor` and fix every issue.
+- Hermes V1 pin: root `patches/react-native@0.86.0.patch` + `hermes-compiler` override pin `250829098.0.16` because RN 0.86.0 ships the memory-regressed `.0.14`. Delete both when moving to RN ≥ **0.86.2** (or 0.87). After pulling, bust local native caches once — wrappers key on an `@expo/fingerprint` of `apps/mobile` only, so warm `~/Library/Caches/Kilo/mobile-{android,ios}-builds` keep pre-patch binaries; delete `entries/<key>` for the key from `pnpm dev:mobile:android fingerprint` / `pnpm dev:mobile:ios fingerprint`. EAS/CI build clean. Do not re-attempt worklets Bundle Mode while NativeWind remaps `react-native` ([reanimated#9817](https://github.com/software-mansion/react-native-reanimated/issues/9817), [SWM post](https://swmansion.com/blog/how-worklets-bundle-mode-accidentally-fixed-Hermes-v1-memory-regression/)).
 - `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
 
   ```bash

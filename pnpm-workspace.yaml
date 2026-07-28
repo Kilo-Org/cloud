@@ -111,6 +111,9 @@ overrides:
   lightningcss: 1.30.1
   axios: 1.16.1
   fast-uri: 3.1.2
+  # Pin Hermes V1 compiler with the engine fixed by patches/react-native@0.86.0.patch.
+  # Delete with that patch when moving to react-native ≥ 0.86.2 (or 0.87).
+  hermes-compiler: 250829098.0.16
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
@@ -127,6 +130,7 @@ packageExtensions:
 patchedDependencies:
   expo-server-sdk: patches/expo-server-sdk.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
+  react-native@0.86.0: patches/react-native@0.86.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

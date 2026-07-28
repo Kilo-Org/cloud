@@ -25,8 +25,7 @@ type UpstreamFetchFailureFamily =
 
 // Longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout.
 const TIMEOUT_MS = 15 * 60 * 1000;
-const GENERATION_FETCH_TIMEOUT_MS = 5 * 60 * 1000;
-const GENERATION_INITIAL_DELAY_MS = 1_000;
+const GENERATION_FETCH_MAX_DELAY_MS = 5 * 60 * 1000;
 
 function getProviderTargetHost(apiUrl: string): string {
   try {
@@ -304,12 +303,12 @@ export async function upstreamRequest({
 }
 
 export async function fetchGeneration(messageId: string, provider: Provider) {
-  const timeoutSignal = AbortSignal.timeout(GENERATION_FETCH_TIMEOUT_MS);
-
+  // We have to delay, openrouter doesn't have the cost immediately
+  await new Promise(res => setTimeout(res, 200));
+  //ref: https://openrouter.ai/docs/api-reference/get-a-generation
+  let response: Response;
   try {
-    // Generation cost metadata is not available immediately after inference completes.
-    await new Promise(res => setTimeout(res, GENERATION_INITIAL_DELAY_MS));
-    const response = await fetchWithBackoff(
+    response = await fetchWithBackoff(
       `${provider.apiUrl}/generation?id=${messageId}`,
       {
         method: 'GET',
@@ -317,40 +316,13 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
           Authorization: `Bearer ${provider.apiKey}`,
           ...ATTRIBUTION_HEADERS,
         },
-        signal: timeoutSignal,
       },
       {
-        attemptTimeoutMs: 10_000,
-        baseDelayMs: 2_000,
-        maxBackoffDelayMs: 15_000,
-        maxDelayMs: GENERATION_FETCH_TIMEOUT_MS - GENERATION_INITIAL_DELAY_MS,
-        retryResponse: r =>
-          r.status === 404 ||
-          r.status === 408 ||
-          r.status === 425 ||
-          r.status === 429 ||
-          r.status >= 500,
+        baseDelayMs: 5_000,
+        maxDelayMs: GENERATION_FETCH_MAX_DELAY_MS,
+        retryResponse: r => r.status >= 400,
       }
     );
-
-    if (!response.ok) {
-      const responseText = await response.text();
-      captureMessage(`Failed to fetch generation metadata`, {
-        level: 'info',
-        tags: { source: `${provider.id}_generation_fetch` },
-        extra: {
-          messageId,
-          status: response.status,
-          statusText: response.statusText,
-          responseText,
-        },
-      });
-      return;
-    }
-
-    debugSaveProxyResponseStream(response, `-${messageId}.log.generation.json`);
-
-    return (await response.json()) as OpenRouterGeneration;
   } catch (error) {
     captureException(error, {
       level: 'info',
@@ -359,4 +331,23 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
     });
     return;
   }
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    captureMessage(`Timed out fetching openrouter generation`, {
+      level: 'info',
+      tags: { source: `${provider.id}_generation_fetch` },
+      extra: {
+        messageId,
+        status: response.status,
+        statusText: response.statusText,
+        responseText,
+      },
+    });
+    return;
+  }
+
+  debugSaveProxyResponseStream(response, `-${messageId}.log.generation.json`);
+
+  return (await response.json()) as OpenRouterGeneration;
 }

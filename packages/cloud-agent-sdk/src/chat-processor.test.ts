@@ -149,9 +149,7 @@ describe('createChatProcessor', () => {
       const onImageAttachment = jest.fn();
       const processor = createChatProcessor(storage, { onImageAttachment });
       const url = 'data:image/png;base64,AAA';
-      const part = makeCompletedToolPart('part-tool', 'msg-1', [
-        makeAttachment('image/png', url),
-      ]);
+      const part = makeCompletedToolPart('part-tool', 'msg-1', [makeAttachment('image/png', url)]);
 
       processor.process({ type: 'message.part.updated', part });
 
@@ -199,9 +197,7 @@ describe('createChatProcessor', () => {
       const storage = createMemoryStorage();
       const onImageAttachment = jest.fn();
       const processor = createChatProcessor(storage, { onImageAttachment });
-      const part = makeCompletedToolPart('part-tool', 'msg-1', [
-        makeAttachment('image/png', ''),
-      ]);
+      const part = makeCompletedToolPart('part-tool', 'msg-1', [makeAttachment('image/png', '')]);
 
       processor.process({ type: 'message.part.updated', part });
 

@@ -631,41 +631,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     </AlertDescription>
                   </Alert>
                 )}
-                {selectedProvider ===
-                  DirectUserByokInferenceProviderIdSchema.enum['nvidia-byok'] && (
-                  <Alert>
-                    <Info className="size-4" />
-                    <AlertDescription>
-                      <p>
-                        Requests send prompts and model outputs to NVIDIA&apos;s hosted API Catalog
-                        under your NVIDIA agreement. NVIDIA limits Developer Program endpoints to
-                        prototyping, research, development, and testing; serving production end
-                        users may require NVIDIA AI Enterprise licensing.
-                      </p>
-                      <p className="mt-1">
-                        Review the{' '}
-                        <a
-                          href="https://docs.api.nvidia.com/nim/docs/api-quickstart"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-link hover:text-link-hover underline underline-offset-4"
-                        >
-                          API Catalog quickstart
-                        </a>{' '}
-                        and{' '}
-                        <a
-                          href="https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-link hover:text-link-hover underline underline-offset-4"
-                        >
-                          NVIDIA API Trial Terms
-                        </a>
-                        .
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-                )}
                 {editingKeyId ? (
                   <Alert>
                     <Lock className="size-4" />

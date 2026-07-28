@@ -7,8 +7,8 @@ export const NVIDIA_NEMOTRON_3_ULTRA_MODEL_ID = 'nvidia/nemotron-3-ultra-550b-a5
 
 export type NvidiaReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'max';
 
-// Verified against NVIDIA's hosted endpoints. Models absent here must not receive
-// reasoning controls: gpt-oss and Llama models return 400 for efforts they do not accept.
+// Models absent here must not receive reasoning controls; NVIDIA returns 400 for
+// efforts a model does not accept.
 const NVIDIA_REASONING_EFFORTS_BY_MODEL: Readonly<
   Record<string, ReadonlyArray<NvidiaReasoningEffort>>
 > = {
@@ -20,10 +20,7 @@ const NVIDIA_REASONING_EFFORTS_BY_MODEL: Readonly<
   'openai/gpt-oss-120b': ['low', 'medium', 'high'],
 };
 
-// Models NVIDIA lists as tool-capable but whose hosted endpoints reject Kilo's
-// agent requests. Verified with live requests containing tools and a system message:
-// Gemma 2/3n reject `tools` or automatic tool choice, Sarvam-M reports tool use as
-// unsupported, and Qwen3.5 397B returns a missing-function error.
+// Listed as tool-capable, but these endpoints reject requests containing tools.
 const NVIDIA_UNSUPPORTED_MODEL_IDS: ReadonlySet<string> = new Set([
   'google/gemma-2-2b-it',
   'google/gemma-3n-e2b-it',
@@ -32,8 +29,7 @@ const NVIDIA_UNSUPPORTED_MODEL_IDS: ReadonlySet<string> = new Set([
   'sarvamai/sarvam-m',
 ]);
 
-// NVIDIA serves these models with a smaller context window than the model metadata
-// advertises, so requests sized from catalog metadata alone would be rejected.
+// NVIDIA serves these with a smaller context window than the catalog advertises.
 const NVIDIA_CONTEXT_LENGTH_OVERRIDES: Readonly<Record<string, number>> = {
   'nvidia/nemotron-mini-4b-instruct': 4096,
   'meta/llama-3.2-90b-vision-instruct': 32768,

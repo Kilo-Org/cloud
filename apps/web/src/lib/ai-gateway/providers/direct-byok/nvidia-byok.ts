@@ -29,19 +29,14 @@ export default {
         delete request.body.reasoning_effort;
       }
     } else {
-      // NVIDIA rejects reasoning controls on models that do not document them.
       delete request.body.reasoning_effort;
     }
 
+    // NVIDIA rejects these with `Validation: Unsupported parameter(s)`.
     delete request.body.provider;
-    delete request.body.providerOptions;
     delete request.body.transforms;
     delete request.body.reasoning;
-    delete request.body.include_reasoning;
-    // NVIDIA validates unknown fields and rejects the gateway's caller-attribution
-    // and cache-hint parameters.
     delete request.body.safety_identifier;
-    delete request.body.user;
     delete request.body.prompt_cache_key;
   },
   models: cachedEnhancedDirectByokModelList({

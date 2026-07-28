@@ -176,6 +176,8 @@ function modelsDevFetcher(
   };
 }
 
+// models.dev has the capabilities but lists models NVIDIA no longer hosts, which return
+// `410 Gone`. NVIDIA's list has the availability but no capabilities.
 const nvidiaFetcher: ProviderFetcher = {
   providerId: 'nvidia-byok',
   async fetch(ctx) {
@@ -192,7 +194,7 @@ const nvidiaFetcher: ProviderFetcher = {
     }
     const models = parseNvidiaProviderModels(await response.json(), entry);
     if (models.length === 0) {
-      // Throwing keeps the last successful catalog instead of publishing an empty list.
+      // Keeps the last successful catalog instead of publishing an empty list.
       throw new Error('NVIDIA catalog intersection produced no supported models');
     }
     return models;

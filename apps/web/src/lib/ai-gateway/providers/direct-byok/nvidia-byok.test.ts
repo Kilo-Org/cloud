@@ -46,7 +46,8 @@ describe('NVIDIA direct BYOK', () => {
       providerOptions: { gateway: {} },
       transforms: ['middle-out'],
       reasoning: { effort: 'low' },
-      include_reasoning: true,
+      safety_identifier: 'user-hash',
+      prompt_cache_key: 'task-hash',
       temperature: 0.5,
     });
 
@@ -56,22 +57,9 @@ describe('NVIDIA direct BYOK', () => {
       temperature: 0.5,
     });
     expect(body).not.toHaveProperty('provider');
-    expect(body).not.toHaveProperty('providerOptions');
     expect(body).not.toHaveProperty('transforms');
     expect(body).not.toHaveProperty('reasoning');
-    expect(body).not.toHaveProperty('include_reasoning');
-  });
-
-  test('removes gateway attribution and cache-hint fields NVIDIA rejects', () => {
-    const body = transform({
-      model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID,
-      safety_identifier: 'user-hash',
-      user: 'user-hash',
-      prompt_cache_key: 'task-hash',
-    });
-
     expect(body).not.toHaveProperty('safety_identifier');
-    expect(body).not.toHaveProperty('user');
     expect(body).not.toHaveProperty('prompt_cache_key');
   });
 

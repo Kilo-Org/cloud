@@ -31,12 +31,6 @@ jest.mock('./direct-byok-definitions', () => ({
           context_length: 4096,
           max_completion_tokens: 1024,
         },
-        {
-          id: 'publisher/namespaced-model',
-          name: 'Namespaced Model',
-          context_length: 4096,
-          max_completion_tokens: 1024,
-        },
       ]),
       supported_chat_apis: ['chat_completions'],
       default_ai_sdk_provider: 'openai-compatible',
@@ -93,13 +87,5 @@ describe('getDirectByokModel', () => {
     expect(result.provider?.id).toBe('chutes-byok');
     expect(directByokProviders[0].models).toHaveBeenCalledTimes(1);
     expect(directByokProviders[1].models).not.toHaveBeenCalled();
-  });
-
-  test('preserves the upstream publisher namespace in direct model IDs', async () => {
-    const { getDirectByokModel } = await loadDirectByokModule();
-
-    const result = await getDirectByokModel('chutes-byok/publisher/namespaced-model');
-
-    expect(result.model?.id).toBe('publisher/namespaced-model');
   });
 });

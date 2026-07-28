@@ -85,24 +85,13 @@ export function extractVercelIsByok(
 }
 
 export function isResponseInterruptedError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  if ('name' in error && (error.name === 'ResponseAborted' || error.name === 'TimeoutError')) {
-    return true;
-  }
-
-  if (!('cause' in error)) return false;
-  const cause = error.cause;
-  return (
-    typeof cause === 'object' &&
-    cause !== null &&
-    'code' in cause &&
-    cause.code === 'UND_ERR_BODY_TIMEOUT'
-  );
+  if (typeof error !== 'object' || error === null || !('name' in error)) return false;
+  return error.name === 'ResponseAborted' || error.name === 'TimeoutError';
 }
 
 /**
  * Drains a ReadableStream of binary chunks, calling `onTextChunk` for each
- * decoded piece of text. Handles response body read failures gracefully and
+ * decoded piece of text. Handles stream processing failures gracefully and
  * always releases the reader lock and ends `streamProcessingSpan`.
  *
  * Returns `true` if the stream was aborted before completion.
@@ -117,21 +106,13 @@ export async function drainSseStream(
   let wasAborted = false;
   try {
     while (true) {
-      let readResult: ReadableStreamReadResult<Uint8Array>;
-      try {
-        readResult = await reader.read();
-      } catch (error) {
-        if (!isResponseInterruptedError(error)) {
-          captureException(error, { tags: { source: 'usage_stream_read' } });
-        }
-        wasAborted = true;
-        break;
-      }
-
-      const { done, value } = readResult;
+      const { done, value } = await reader.read();
       if (done) break;
       onTextChunk(decoder.decode(value, { stream: true }));
     }
+  } catch (error) {
+    captureException(error, { tags: { source: 'usage_stream_processing' } });
+    wasAborted = true;
   } finally {
     reader.releaseLock();
     streamProcessingSpan.end();

@@ -226,7 +226,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     }
   );
 
-  test('does not swallow SSE parser errors', async () => {
+  test('handles SSE parser errors as aborted streams', async () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new TextEncoder().encode('data: not-json\n\n'));
@@ -234,9 +234,15 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       },
     });
 
-    await expect(
-      parseMicrodollarUsageFromStream(stream, 'fake-user-id', undefined, 'openrouter', 200)
-    ).rejects.toThrow(SyntaxError);
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.hasError).toBe(true);
   });
 
   test.each([

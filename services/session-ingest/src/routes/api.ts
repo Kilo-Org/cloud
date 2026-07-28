@@ -209,19 +209,22 @@ api.delete('/session/:sessionId', async c => {
     );
 
   await db.transaction(async tx => {
-    // Family metadata mutations lock root before child. Match that ordering so
-    // root deletion cannot hold a child while waiting for the same root.
-    await tx
-      .select({ sessionId: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parsed.data),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+    if (accessibleSession.cloudAgentFamilyId !== null) {
+      // Bootstrap and metadata mutations lock the family root before children.
+      // Match that order even when deleting a subtree rooted at a child.
+      await tx
+        .select({ sessionId: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.cloud_agent_session_id, accessibleSession.cloudAgentFamilyId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            isNull(cli_sessions_v2.parent_session_id)
+          )
         )
-      )
-      .limit(1)
-      .for('update');
+        .limit(1)
+        .for('update');
+    }
     for (const sessionId of orderedSessionIds) {
       await tx
         .delete(cli_sessions_v2)

@@ -1334,6 +1334,11 @@ describe('api routes', () => {
     const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
+      kiloSessionId: parentSessionId,
+      organizationId: null,
+      cloudAgentFamilyId: 'cloud-agent-family-1',
+    });
     // Recursive CTE
     fns.executeResult.mockResolvedValueOnce({
       rows: [

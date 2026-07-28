@@ -252,7 +252,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // gastown
   'cloudflare-gastown': {
     group: 'gastown',
-    dependsOn: ['postgres', 'cloudflare-git-token-service', 'nextjs'],
+    dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
     dir: 'services/gastown',
   },
   'cloudflare-wasteland': {

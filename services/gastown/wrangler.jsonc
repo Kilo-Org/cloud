@@ -74,6 +74,7 @@
     "KILO_API_URL": "https://api.kilo.ai",
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
     "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
+    "GASTOWN_BILLING_ENABLED": "false",
   },
 
   // Hyperdrive binding for Postgres (user lookups, token generation)
@@ -103,6 +104,11 @@
       "binding": "WASTELAND_SERVICE",
       "service": "wasteland",
       "entrypoint": "WastelandRPCEntrypoint",
+    },
+    {
+      "binding": "CONTAINER_USAGE",
+      "service": "container-usage-meter",
+      "entrypoint": "ContainerUsageMeter",
     },
   ],
 
@@ -134,6 +140,7 @@
         "KILO_API_URL": "http://192.168.65.254:3000",
         "GASTOWN_API_URL": "http://192.168.65.254:8803",
         "WASTELAND_API_URL": "http://192.168.65.254:8788",
+        "GASTOWN_BILLING_ENABLED": "true",
       },
       "containers": [
         {
@@ -154,6 +161,13 @@
           { "name": "AGENT", "class_name": "AgentDO" },
         ],
       },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
       "services": [
         {
           "binding": "GIT_TOKEN_SERVICE",
@@ -167,6 +181,11 @@
           // (above) uses the plain "wasteland" service name.
           "service": "wasteland-dev",
           "entrypoint": "WastelandRPCEntrypoint",
+        },
+        {
+          "binding": "CONTAINER_USAGE",
+          "service": "container-usage-meter",
+          "entrypoint": "ContainerUsageMeter",
         },
       ],
       "ai": { "binding": "AI" },

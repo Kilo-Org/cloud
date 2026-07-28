@@ -58,6 +58,7 @@ import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
 import { ReviewMdConversionDialog } from './ReviewMdConversionDialog';
+import { buildSelectableRepositories } from '@/lib/code-reviews/core/selectable-repositories';
 import {
   RepositoryModelOverrides,
   type RepositoryModelOverrideValue,
@@ -299,20 +300,16 @@ export function ReviewConfigForm({
     [selectedModel]
   );
 
-  const selectableRepositories = useMemo(() => {
-    const cachedRepositories = (repositoriesData?.repositories ?? []).map(repo => ({
-      id: repo.id,
-      name: repo.name,
-      full_name: repo.fullName,
-      private: repo.private,
-    }));
-    const cachedRepositoryIds = new Set(cachedRepositories.map(repo => repo.id));
-    const legacyRepositories = (configData?.manuallyAddedRepositories ?? []).filter(
-      repo => !cachedRepositoryIds.has(repo.id)
-    );
-
-    return [...cachedRepositories, ...legacyRepositories];
-  }, [configData?.manuallyAddedRepositories, repositoriesData?.repositories]);
+  // Shared with the server route's conversion allowlist so the offered list and the enforced list
+  // derive from the same inputs and can't desync.
+  const selectableRepositories = useMemo(
+    () =>
+      buildSelectableRepositories(
+        repositoriesData?.repositories ?? [],
+        configData?.manuallyAddedRepositories ?? []
+      ),
+    [configData?.manuallyAddedRepositories, repositoriesData?.repositories]
+  );
 
   // Reset thinking effort when the model changes and the current selection is invalid
   useEffect(() => {
@@ -994,16 +991,31 @@ export function ReviewConfigForm({
                   </Link>
                 </p>
                 {conversionUiEnabled && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setConversionDialogOpen(true)}
-                    disabled={!customInstructions.trim()}
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Help me automate the conversion
-                  </Button>
+                  <div className="space-y-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConversionDialogOpen(true)}
+                      // The conversion reads the SAVED config server-side, so gate on the persisted
+                      // value and block while there are unsaved edits (otherwise the agent would run
+                      // on stale text or fail with no instructions).
+                      disabled={
+                        !configData?.customInstructions?.trim() ||
+                        customInstructions !== (configData?.customInstructions ?? '')
+                      }
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Help me automate the conversion
+                    </Button>
+                    {configData?.customInstructions?.trim() &&
+                      customInstructions !== (configData?.customInstructions ?? '') && (
+                        <p className="text-muted-foreground text-sm">
+                          Save your changes first. The conversion uses your saved Custom
+                          Instructions.
+                        </p>
+                      )}
+                  </div>
                 )}
               </div>
             )}

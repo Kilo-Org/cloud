@@ -32,6 +32,7 @@ import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { buildReviewMdConversionPrompt } from '@/lib/code-reviews/prompts/review-md-conversion-prompt';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { redisClient } from '@/lib/redis';
+import { buildAllowedRepositoryFullNames } from '@/lib/code-reviews/core/selectable-repositories';
 
 const createCaller = createCallerFactory(rootRouter);
 
@@ -53,15 +54,22 @@ const QuerySchema = z.object({
 });
 
 /**
- * Per-actor abuse cap: a fixed window in Redis keyed by the org (or user for personal). Fails OPEN
- * on any Redis error (per redis.ts guidance) so a transient outage never blocks legitimate use.
+ * Per-actor abuse cap: a Redis fixed window keyed by the acting USER (scoped by org, so one member
+ * cannot drain a shared bucket for co-members) and by the window bucket. Embedding the bucket in the
+ * key makes the window self-healing: even if `expire` fails after `incr`, the key rotates on the
+ * next window rather than counting up forever. Fails OPEN on any Redis error (per redis.ts guidance).
+ * Callers MUST invoke this only after membership is proven, so an unauthorized org id can never
+ * touch that org's counter.
  */
-async function isConversionRateLimited(ownerKey: string): Promise<boolean> {
+async function isConversionRateLimited(ownerScope: string, userId: string): Promise<boolean> {
   try {
-    const key = `review-md-conversion:${ownerKey}`;
+    const windowMs = REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS * 1000;
+    const bucket = Math.floor(Date.now() / windowMs);
+    const key = `review-md-conversion:${ownerScope}:${userId}:${bucket}`;
     const count = await redisClient.incr(key);
     if (count === 1) {
-      await redisClient.expire(key, REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS);
+      // Best-effort TTL cleanup; correctness does not depend on it (the key rotates per window).
+      await redisClient.expire(key, REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS * 2);
     }
     return count > REVIEW_MD_CONVERSION_RATE_LIMIT;
   } catch {
@@ -110,11 +118,13 @@ export async function GET(request: NextRequest) {
 
   const { platform, repo, organizationId } = parsed.data;
 
-  // CSRF defense for this mutating, credit-spending GET: reject cross-site navigations. Legitimate
-  // starts come from the settings dialog on the same origin (`same-origin`/`same-site`); a user
-  // typing the URL or using a bookmark sends `none`, which we allow. Browsers that omit the header
-  // are allowed too (fail open) — the feature flag and repo allowlist bound the residual exposure.
-  if (request.headers.get('sec-fetch-site') === 'cross-site') {
+  // CSRF defense for this mutating, credit-spending GET. Fail CLOSED: allow only same-origin dialog
+  // clicks (`same-origin`/`same-site`) and deliberate direct navigation (`none`, e.g. typing the URL
+  // or a bookmark). A `cross-site` value OR a MISSING header (older browsers, embedded webviews,
+  // header-stripping proxies) is rejected, since a forged top-level navigation carries the session
+  // cookie and would otherwise start a billable session.
+  const secFetchSite = request.headers.get('sec-fetch-site');
+  if (secFetchSite !== 'same-origin' && secFetchSite !== 'same-site' && secFetchSite !== 'none') {
     return redirectToError(organizationId, 'invalid_conversion_request');
   }
 
@@ -144,11 +154,6 @@ export async function GET(request: NextRequest) {
     return redirectToError(organizationId, 'conversion_not_available');
   }
 
-  // Abuse cap independent of model/credits — free-model sessions otherwise skip balance backpressure.
-  if (await isConversionRateLimited(organizationId ?? userId)) {
-    return redirectToError(organizationId, 'conversion_rate_limited');
-  }
-
   try {
     // Reading through the same org-scoped procedure the settings page uses means
     // membership is enforced here for free — a non-member never reaches
@@ -156,6 +161,13 @@ export async function GET(request: NextRequest) {
     const config = organizationId
       ? await caller.organizations.reviewAgent.getReviewConfig({ organizationId, platform })
       : await caller.personalReviewAgent.getReviewConfig({ platform });
+
+    // Abuse cap — AFTER membership is proven above, so an arbitrary org UUID can't touch that org's
+    // counter. Keyed per-user within the org scope; enforced regardless of model/credits since
+    // free-model sessions otherwise skip balance backpressure.
+    if (await isConversionRateLimited(organizationId ?? 'personal', userId)) {
+      return redirectToError(organizationId, 'conversion_rate_limited');
+    }
 
     // Authorize the repo: it must be one the caller's integration actually exposes (the same list
     // the dialog is built from). The worker enforces installation scope as well, but validating
@@ -174,10 +186,10 @@ export async function GET(request: NextRequest) {
         ? await caller.personalReviewAgent.listGitLabRepositories({ forceRefresh: false })
         : await caller.personalReviewAgent.listGitHubRepositories({ forceRefresh: false });
 
-    const allowedRepoFullNames = new Set<string>([
-      ...repositoryList.repositories.map(entry => entry.fullName),
-      ...(config.manuallyAddedRepositories ?? []).map(entry => entry.full_name),
-    ]);
+    const allowedRepoFullNames = buildAllowedRepositoryFullNames(
+      repositoryList.repositories,
+      config.manuallyAddedRepositories ?? []
+    );
     if (!allowedRepoFullNames.has(repo)) {
       return redirectToError(organizationId, 'repository_not_allowed');
     }
@@ -193,6 +205,8 @@ export async function GET(request: NextRequest) {
         platform,
         repoFullName: repo,
         customInstructions,
+        // Unguessable marker token so the untrusted instructions cannot close their own block.
+        nonce: crypto.randomUUID(),
       }),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: config.modelSlug || PRIMARY_DEFAULT_MODEL,

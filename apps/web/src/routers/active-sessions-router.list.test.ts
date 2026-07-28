@@ -605,7 +605,7 @@ describe('active-sessions-router.list', () => {
       // Capture the real select before any spy replaces it. Filtered org
       // calls run ensureOrganizationAccess first (two selects); only the
       // enrichment select must throw.
-      const originalSelect = db.select.bind(db);
+      const originalSelect = db.select;
 
       // Unfiltered: best-effort unenriched passthrough (same contract as the
       // existing enrichment-failure test). No auth selects → first select is
@@ -645,9 +645,10 @@ describe('active-sessions-router.list', () => {
 
       // Org filter: ensureOrganizationAccess issues two selects, then
       // enrichment is the third. Pass the auth selects through.
-      const orgSelectSpy = jest.spyOn(db, 'select').mockImplementation((...args: never[]) => {
+      const orgSelectSpy = jest.spyOn(db, 'select');
+      orgSelectSpy.mockImplementation(fields => {
         if (orgSelectSpy.mock.calls.length <= 2) {
-          return (originalSelect as (...a: never[]) => unknown)(...args);
+          return Reflect.apply(originalSelect, db, fields === undefined ? [] : [fields]);
         }
         throw new Error('synthetic enrichment db failure org');
       });

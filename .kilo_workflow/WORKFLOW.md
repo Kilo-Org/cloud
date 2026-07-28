@@ -68,6 +68,26 @@ Role boundaries — reviewers never modify the tree, the implementer never commi
 
 While a role agent runs, its dispatcher checks on it about every 7 minutes and unsticks infrastructure failures only: a wedged or crashed kilo CLI, a dead tmux window, a hung service the agent cannot restart itself. Product, logic, or review problems are not stuck states — route those through the escalation ladder.
 
+### Steering a Live Interactive Session
+
+Worker roles are steered by re-dispatching them (see Escalation). The interactive sessions — starter, planner, orchestrator — are steered in place with [`steer.sh`](steer.sh), never with hand-assembled `tmux send-keys`:
+
+```bash
+.kilo_workflow/steer.sh <section>-orchestrator "Scope change: drop slice 4; commit what holds and open the PR."
+printf '%s' "$AMENDMENT" | .kilo_workflow/steer.sh <section>-orchestrator -   # long or multi-line text via stdin
+```
+
+It prints `running` when the session took the message immediately and `queued` when the message is waiting behind the active turn; either way it is delivered. A non-zero exit means it is **not** delivered — inspect the target rather than sending a second copy. What the script encodes (details in `learnings/steering-a-running-kilo-session.md`):
+
+- Enter as its own keystroke after the text. A trailing `Enter` in the same `send-keys` call submits short messages but is swallowed by long ones, which then sit unsent in the composer — the "wedged" session that is really an undelivered message.
+- Bracketed paste, so a multi-line message stays one prompt. An unbracketed paste submits at every newline, and the first fragment gets acted on before the rest arrives.
+- A refusal to paste into a pane that is not running the kilo CLI — a mistargeted steer executes in a shell.
+- Delivery confirmed from the pane, never assumed.
+
+**`N queued` in the footer is delivery working, not a wedge.** Queued messages land one at a time at turn boundaries, in order, and a session that chains tool calls for tens of minutes holds the whole queue that entire time. Never kill, relaunch, or escalate on a queue count; a wedge needs its own evidence (frozen build timer, stream or api error, dead process — see Planner Monitor Mode). `Escape` does not flush the queue.
+
+Because delivery is ordered and turn-paced, a correction cannot overtake what it corrects: send ONE consolidated, self-contained message per change, never a drip of add-then-retract. When a change must take effect before the current turn ends, kill the session and relaunch it fresh with an updated handoff — faster than waiting on the queue, and it cannot half-apply. Everything a session needs at launch belongs in its launch message and handoff; steering a live one is the exception, not the channel.
+
 ### Escalation
 
 When a loop iteration fails, escalate in order:
@@ -182,7 +202,7 @@ A dead orchestrator window is not automatically a crash — check the scratch di
 - Scratch present with `$SCRATCH/final-report.md` → BLOCKED; relay the report to the user and close yourself. Leave the scratch directory alone — it is the blocker's evidence, and its presence is what distinguishes BLOCKED from COMPLETE for anyone who looks later.
 - Scratch present with no final report → a crash; relaunch with a continuation handoff.
 
-A live session waiting on a hands-on user answer is not wedged — read the pane before declaring a wedge. Long kilo runs die on provider stream stalls, and `--interactive` sessions can wedge on provider errors. Relaunch a dead or wedged orchestrator as a **fresh session** (never `--continue`) with a continuation handoff. After three consecutive relaunches with no new progress, stop and write the BLOCKED report yourself — the same rule bounds the starter's planner relaunches: the original handoff plus everything observably done so far — commits, PR state, passed rounds, held resources — assembled from `git log`, the PR, and the dispatch logs, so the new session verifies rather than redoes. See `learnings/kilo-interactive-orchestrator-wedges-relaunch.md`.
+A live session waiting on a hands-on user answer is not wedged, and neither is one holding queued steers (see Steering a Live Interactive Session) — read the pane before declaring a wedge. Long kilo runs die on provider stream stalls, and `--interactive` sessions can wedge on provider errors. Relaunch a dead or wedged orchestrator as a **fresh session** (never `--continue`) with a continuation handoff. After three consecutive relaunches with no new progress, stop and write the BLOCKED report yourself — the same rule bounds the starter's planner relaunches: the original handoff plus everything observably done so far — commits, PR state, passed rounds, held resources — assembled from `git log`, the PR, and the dispatch logs, so the new session verifies rather than redoes. See `learnings/kilo-interactive-orchestrator-wedges-relaunch.md`.
 
 ### 2.1 Plan Reviewer
 

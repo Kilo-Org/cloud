@@ -297,7 +297,7 @@ export default function UsageRecordsContent() {
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[8rem_minmax(16rem,1fr)_7rem_9rem_8rem] xl:items-start xl:gap-3"
+            className="space-y-4"
             onSubmit={event => {
               event.preventDefault();
               const trimmed = value.trim();
@@ -368,215 +368,167 @@ export default function UsageRecordsContent() {
               if (unchanged) void results.refetch();
             }}
           >
-            <div className="space-y-1.5 xl:col-start-1 xl:row-start-1">
-              <Label htmlFor="usage-search-kind">Search by</Label>
-              <Select value={kind} onValueChange={next => setKind(next as SearchKind)}>
-                <SelectTrigger id="usage-search-kind" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="interval">Interval ID</SelectItem>
-                  <SelectItem value="user">User ID</SelectItem>
-                  <SelectItem value="org">Organization ID</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5 lg:col-span-1 xl:col-start-2 xl:row-start-1">
-              <Label htmlFor="usage-search-value">Exact value</Label>
-              <Input
-                id="usage-search-value"
-                value={value}
-                required
-                maxLength={kind === 'interval' ? 512 : 256}
-                placeholder={kind === 'interval' ? 'service:instance:startEpochMs' : 'Exact ID'}
-                onChange={event => setValue(event.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5 xl:col-start-3 xl:row-start-1">
-              <Label htmlFor="usage-search-status">Status</Label>
-              <Select
-                value={status}
-                onValueChange={next => {
-                  const selected = next as typeof status;
-                  setStatus(selected);
-                  if (selected === 'open' && closeReason !== 'all') {
+            {/* Primary bar: what to search for, and the actions that trigger it. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="w-full space-y-1.5 sm:w-40 sm:shrink-0">
+                <Label htmlFor="usage-search-kind">Search by</Label>
+                <Select value={kind} onValueChange={next => setKind(next as SearchKind)}>
+                  <SelectTrigger id="usage-search-kind" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="interval">Interval ID</SelectItem>
+                    <SelectItem value="user">User ID</SelectItem>
+                    <SelectItem value="org">Organization ID</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full flex-1 space-y-1.5">
+                <Label htmlFor="usage-search-value">Exact value</Label>
+                <Input
+                  id="usage-search-value"
+                  value={value}
+                  required
+                  maxLength={kind === 'interval' ? 512 : 256}
+                  placeholder={kind === 'interval' ? 'service:instance:startEpochMs' : 'Exact ID'}
+                  onChange={event => setValue(event.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                <Button type="submit" disabled={results.isFetching || !value.trim()}>
+                  <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setValue('');
+                    setStatus('all');
                     setCloseReason('all');
-                  }
-                }}
-              >
-                <SelectTrigger id="usage-search-status" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any status</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5 xl:col-start-4 xl:row-start-1">
-              <Label htmlFor="usage-search-close-reason">Close reason</Label>
-              <Select
-                value={closeReason}
-                onValueChange={next => {
-                  const selected = next as typeof closeReason;
-                  const selectedReason = selected === 'all' ? undefined : selected;
-                  if (selectedReason && status === 'open') setStatus('closed');
-                  setCloseReason(selected);
-                }}
-              >
-                <SelectTrigger id="usage-search-close-reason" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any reason</SelectItem>
-                  <SelectItem value="exit">Exit</SelectItem>
-                  <SelectItem value="runtime_signal">Runtime signal</SelectItem>
-                  <SelectItem value="activity_expired">Activity expired</SelectItem>
-                  <SelectItem value="unconfirmed">Unconfirmed (15m timeout)</SelectItem>
-                  <SelectItem value="superseded">Superseded</SelectItem>
-                  <SelectItem value="reconciled">Reconciled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5 xl:col-start-5 xl:row-start-1">
-              <Label htmlFor="usage-search-sku">SKU</Label>
-              <Select
-                value={skuId}
-                onValueChange={selected => {
-                  setSkuId(selected);
-                }}
-              >
-                <SelectTrigger id="usage-search-sku" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any SKU</SelectItem>
-                  {(catalog.data ?? []).map(sku => (
-                    <SelectItem key={sku.id} value={sku.id}>
-                      {sku.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {(kind === 'user' || kind === 'org') && (
-              <div className="lg:col-span-2 xl:col-span-5 xl:row-start-2">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-end">
-                  <div className="space-y-1.5 xl:w-84">
-                    <Label>Usage window</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="usage-summary-start" className="sr-only">
-                          Window start
-                        </Label>
-                        <Input
-                          id="usage-summary-start"
-                          type="datetime-local"
-                          value={summaryStart}
-                          max={summaryEnd}
-                          aria-describedby={
-                            summaryInputError ? 'usage-summary-window-error' : undefined
-                          }
-                          onChange={event => setSummaryStart(event.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="usage-summary-end" className="sr-only">
-                          Window end
-                        </Label>
-                        <Input
-                          id="usage-summary-end"
-                          type="datetime-local"
-                          value={summaryEnd}
-                          min={summaryStart}
-                          aria-describedby={
-                            summaryInputError ? 'usage-summary-window-error' : undefined
-                          }
-                          onChange={event => setSummaryEnd(event.target.value)}
-                        />
-                      </div>
-                    </div>
-                    {summaryInputError && (
-                      <p
-                        id="usage-summary-window-error"
-                        className="text-destructive type-label"
-                        role="alert"
-                      >
-                        {summaryInputError}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5 xl:w-44">
-                    <Label className="invisible" aria-hidden="true">
-                      Actions
-                    </Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={results.isFetching || !value.trim()}
-                      >
-                        <Search className="size-4" />{' '}
-                        {results.isFetching ? 'Searching...' : 'Search'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => {
-                          setValue('');
-                          setStatus('all');
-                          setCloseReason('all');
-                          setSkuId('all');
-                          setSummaryInputError(null);
-                          setSummaryRequest(null);
-                          setSubmitted({ kind: 'recent' });
-                          replaceCloseReasonParam(undefined);
-                          resetResultNavigation();
-                        }}
-                      >
-                        Reset
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                    setSkuId('all');
+                    setSummaryInputError(null);
+                    setSummaryRequest(null);
+                    setSubmitted({ kind: 'recent' });
+                    replaceCloseReasonParam(undefined);
+                    resetResultNavigation();
+                  }}
+                >
+                  Reset
+                </Button>
               </div>
-            )}
-            {kind === 'interval' && (
-              <div className="space-y-1.5 lg:col-span-2 xl:col-span-5 xl:row-start-2 xl:ml-auto xl:w-44">
-                <Label className="invisible" aria-hidden="true">
-                  Actions
-                </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={results.isFetching || !value.trim()}
-                  >
-                    <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setValue('');
-                      setStatus('all');
+            </div>
+
+            {/* Filters: narrow the search above. Wraps freely; never forces the actions off-card. */}
+            <div className="flex flex-wrap items-end gap-4 border-t border-border pt-4">
+              <div className="w-36 space-y-1.5">
+                <Label htmlFor="usage-search-status">Status</Label>
+                <Select
+                  value={status}
+                  onValueChange={next => {
+                    const selected = next as typeof status;
+                    setStatus(selected);
+                    if (selected === 'open' && closeReason !== 'all') {
                       setCloseReason('all');
-                      setSkuId('all');
-                      setSummaryInputError(null);
-                      setSummaryRequest(null);
-                      setSubmitted({ kind: 'recent' });
-                      replaceCloseReasonParam(undefined);
-                      resetResultNavigation();
-                    }}
-                  >
-                    Reset
-                  </Button>
-                </div>
+                    }
+                  }}
+                >
+                  <SelectTrigger id="usage-search-status" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any status</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              <div className="w-44 space-y-1.5">
+                <Label htmlFor="usage-search-close-reason">Close reason</Label>
+                <Select
+                  value={closeReason}
+                  onValueChange={next => {
+                    const selected = next as typeof closeReason;
+                    const selectedReason = selected === 'all' ? undefined : selected;
+                    if (selectedReason && status === 'open') setStatus('closed');
+                    setCloseReason(selected);
+                  }}
+                >
+                  <SelectTrigger id="usage-search-close-reason" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any reason</SelectItem>
+                    <SelectItem value="exit">Exit</SelectItem>
+                    <SelectItem value="runtime_signal">Runtime signal</SelectItem>
+                    <SelectItem value="activity_expired">Activity expired</SelectItem>
+                    <SelectItem value="unconfirmed">Unconfirmed (15m timeout)</SelectItem>
+                    <SelectItem value="superseded">Superseded</SelectItem>
+                    <SelectItem value="reconciled">Reconciled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-40 space-y-1.5">
+                <Label htmlFor="usage-search-sku">SKU</Label>
+                <Select
+                  value={skuId}
+                  onValueChange={selected => {
+                    setSkuId(selected);
+                  }}
+                >
+                  <SelectTrigger id="usage-search-sku" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any SKU</SelectItem>
+                    {(catalog.data ?? []).map(sku => (
+                      <SelectItem key={sku.id} value={sku.id}>
+                        {sku.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(kind === 'user' || kind === 'org') && (
+                <div className="w-full space-y-1.5 sm:w-auto">
+                  <Label>Usage window</Label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      id="usage-summary-start"
+                      type="datetime-local"
+                      aria-label="Window start"
+                      value={summaryStart}
+                      max={summaryEnd}
+                      aria-describedby={
+                        summaryInputError ? 'usage-summary-window-error' : undefined
+                      }
+                      className="w-full sm:w-[9.5rem]"
+                      onChange={event => setSummaryStart(event.target.value)}
+                    />
+                    <Input
+                      id="usage-summary-end"
+                      type="datetime-local"
+                      aria-label="Window end"
+                      value={summaryEnd}
+                      min={summaryStart}
+                      aria-describedby={
+                        summaryInputError ? 'usage-summary-window-error' : undefined
+                      }
+                      className="w-full sm:w-[9.5rem]"
+                      onChange={event => setSummaryEnd(event.target.value)}
+                    />
+                  </div>
+                  {summaryInputError && (
+                    <p
+                      id="usage-summary-window-error"
+                      className="text-destructive type-label"
+                      role="alert"
+                    >
+                      {summaryInputError}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>

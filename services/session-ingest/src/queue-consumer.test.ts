@@ -945,9 +945,25 @@ describe('queue organization changes', () => {
       status: null,
       status_updated_at: null,
     };
-    // loadSession → membership join (authorized) → read-back after org write.
+    // loadSession → metadata initial read → metadata lock → membership → read-back.
     const selectResults: unknown[][] = [
       [{ session_id: sessionId }],
+      [
+        {
+          status: null,
+          parentSessionId: null,
+          cloudAgentSessionId: null,
+          cloudAgentFamilyId: null,
+        },
+      ],
+      [
+        {
+          status: null,
+          parentSessionId: null,
+          cloudAgentSessionId: null,
+          cloudAgentFamilyId: null,
+        },
+      ],
       [{ id: 'mem_1' }],
       [persistedSession],
     ];
@@ -1048,7 +1064,22 @@ describe('queue status notifications', () => {
     };
     const selectResults: unknown[][] = [
       [{ session_id: persistedSession.session_id, status: 'idle' }],
-      [{ status: 'busy' }],
+      [
+        {
+          status: 'busy',
+          parentSessionId: null,
+          cloudAgentSessionId: null,
+          cloudAgentFamilyId: null,
+        },
+      ],
+      [
+        {
+          status: 'busy',
+          parentSessionId: null,
+          cloudAgentSessionId: null,
+          cloudAgentFamilyId: null,
+        },
+      ],
       [persistedSession],
     ];
     const selectResult = vi.fn(async () => selectResults.shift() ?? []);

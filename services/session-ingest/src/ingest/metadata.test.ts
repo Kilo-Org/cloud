@@ -138,8 +138,20 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
   // Named without the substring "update" so oxlint drizzle rules do not flag test spies.
   const applyUpdate = vi.fn(() => ({ set: updateSet }));
 
-  const queryLog: Array<'session-lock' | 'membership' | 'parent' | 'read-back'> = [];
+  const queryLog: Array<
+    'session-initial' | 'session-lock' | 'membership' | 'parent' | 'read-back'
+  > = [];
+  let initialReadDone = false;
   let parentLookupDone = false;
+
+  function currentSessionState() {
+    return {
+      status: options.initialStatus ?? 'idle',
+      parentSessionId: options.parentSessionId ?? null,
+      cloudAgentFamilyId: options.cloudAgentFamilyId ?? null,
+      cloudAgentSessionId: options.cloudAgentSessionId ?? null,
+    };
+  }
 
   function persistedSessionRow() {
     return {
@@ -162,6 +174,11 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     let settled: Promise<unknown[]> | undefined;
 
     const resolveWithoutFor = () => {
+      if (!initialReadDone) {
+        initialReadDone = true;
+        queryLog.push('session-initial');
+        return options.rowMissing ? [] : [currentSessionState()];
+      }
       if (options.parentExists !== undefined && !parentLookupDone) {
         parentLookupDone = true;
         queryLog.push('parent');
@@ -174,16 +191,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     const thenable = {
       for: vi.fn(() => {
         queryLog.push('session-lock');
-        const rows = options.rowMissing
-          ? []
-          : [
-              {
-                status: options.initialStatus ?? 'idle',
-                parentSessionId: options.parentSessionId ?? null,
-                cloudAgentFamilyId: options.cloudAgentFamilyId ?? null,
-                cloudAgentSessionId: options.cloudAgentSessionId ?? null,
-              },
-            ];
+        const rows = options.rowMissing ? [] : [currentSessionState()];
         settled = Promise.resolve(rows);
         return settled;
       }),

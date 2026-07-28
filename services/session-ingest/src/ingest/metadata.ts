@@ -69,19 +69,45 @@ export async function applyMetadataChanges(
   let organizationIdWriteApplied = false;
 
   const notification = await db.transaction(async tx => {
-    const [currentRow] = await tx
-      .select({
-        status: cli_sessions_v2.status,
-        parentSessionId: cli_sessions_v2.parent_session_id,
-        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
-        cloudAgentFamilyId: cli_sessions_v2.cloud_agent_family_id,
-      })
-      .from(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      )
-      .limit(1)
-      .for('update');
+    const selectCurrentRow = () =>
+      tx
+        .select({
+          status: cli_sessions_v2.status,
+          parentSessionId: cli_sessions_v2.parent_session_id,
+          cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+          cloudAgentFamilyId: cli_sessions_v2.cloud_agent_family_id,
+        })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        )
+        .limit(1);
+
+    const [initialRow] = await selectCurrentRow();
+    if (!initialRow) return null;
+
+    let familyRootLocked = false;
+    if (parentSessionId !== undefined && initialRow.cloudAgentFamilyId != null) {
+      const [familyRoot] = await tx
+        .select({ sessionId: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            eq(cli_sessions_v2.cloud_agent_session_id, initialRow.cloudAgentFamilyId),
+            eq(cli_sessions_v2.cloud_agent_family_id, initialRow.cloudAgentFamilyId),
+            sql`${cli_sessions_v2.parent_session_id} IS NULL`
+          )
+        )
+        .limit(1)
+        .for('update');
+      familyRootLocked = familyRoot !== undefined;
+    }
+
+    const [currentRow] = await selectCurrentRow().for('update');
     if (!currentRow) return null;
     const cloudAgentFamilyId = currentRow.cloudAgentFamilyId;
     const isCloudAgentFamilySession = cloudAgentFamilyId != null;
@@ -160,22 +186,7 @@ export async function applyMetadataChanges(
           parentSessionId !== sessionId &&
           parentSessionId !== currentRow.parentSessionId
         ) {
-          // Lock the common root so concurrent reparent operations in one family
-          // serialize before checking ancestry and writing the graph.
-          const [familyRoot] = await tx
-            .select({ sessionId: cli_sessions_v2.session_id })
-            .from(cli_sessions_v2)
-            .where(
-              and(
-                eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-                eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentFamilyId),
-                eq(cli_sessions_v2.cloud_agent_family_id, cloudAgentFamilyId),
-                sql`${cli_sessions_v2.parent_session_id} IS NULL`
-              )
-            )
-            .limit(1)
-            .for('update');
-          if (familyRoot) {
+          if (familyRootLocked) {
             const [parent] = await tx
               .select({ sessionId: cli_sessions_v2.session_id })
               .from(cli_sessions_v2)

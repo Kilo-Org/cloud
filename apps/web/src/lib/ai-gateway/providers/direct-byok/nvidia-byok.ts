@@ -1,9 +1,6 @@
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
-import {
-  getNvidiaReasoningEfforts,
-  isNvidiaReasoningEffort,
-} from '@/lib/ai-gateway/providers/nvidia';
+import { getNvidiaReasoningEfforts } from '@/lib/ai-gateway/providers/nvidia';
 
 export default {
   id: 'nvidia-byok',
@@ -17,14 +14,16 @@ export default {
     }
 
     const model = request.body.model;
-    if (getNvidiaReasoningEfforts(model)) {
+    const reasoningEfforts = getNvidiaReasoningEfforts(model);
+    if (reasoningEfforts) {
       const requestedEffort =
         request.body.reasoning?.enabled === false
           ? 'none'
           : (request.body.reasoning_effort ?? request.body.reasoning?.effort);
+      const supportedEffort = reasoningEfforts.find(effort => effort === requestedEffort);
 
-      if (isNvidiaReasoningEffort(model, requestedEffort)) {
-        request.body.reasoning_effort = requestedEffort;
+      if (supportedEffort) {
+        (request.body as { reasoning_effort?: string }).reasoning_effort = supportedEffort;
       } else {
         delete request.body.reasoning_effort;
       }
@@ -39,8 +38,7 @@ export default {
     delete request.body.reasoning;
     delete request.body.safety_identifier;
     delete request.body.prompt_cache_key;
-    // Advertised in `supported_parameters` for every direct BYOK model, but not part of
-    // the typed request.
+    // Older clients may still send this untyped OpenRouter field.
     delete (request.body as { include_reasoning?: boolean }).include_reasoning;
   },
   models: cachedEnhancedDirectByokModelList({

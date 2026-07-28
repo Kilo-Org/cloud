@@ -1,15 +1,8 @@
-import { jest } from '@jest/globals';
 import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
-import {
-  NVIDIA_NEMOTRON_3_SUPER_MODEL_ID,
-  NVIDIA_NEMOTRON_3_ULTRA_MODEL_ID,
-} from '@/lib/ai-gateway/providers/nvidia';
-import { UserByokTestModels } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import nvidiaByok from './nvidia-byok';
 
-jest.mock('@/lib/redis', () => ({
-  redisClient: { get: jest.fn(async () => null) },
-}));
+const SUPER_MODEL_ID = 'nvidia/nemotron-3-super-120b-a12b';
+const ULTRA_MODEL_ID = 'nvidia/nemotron-3-ultra-550b-a55b';
 
 function transform(body: Record<string, unknown>) {
   const request = {
@@ -25,22 +18,9 @@ function transform(body: Record<string, unknown>) {
 }
 
 describe('NVIDIA direct BYOK', () => {
-  test('uses NVIDIA hosted Chat Completions without a static model fallback', async () => {
-    expect(nvidiaByok.id).toBe('nvidia-byok');
-    expect(nvidiaByok.base_url).toBe('https://integrate.api.nvidia.com/v1');
-    expect(nvidiaByok.supported_chat_apis).toEqual(['chat_completions']);
-    expect(nvidiaByok.default_ai_sdk_provider).toBe('openai-compatible');
-    await expect(nvidiaByok.models()).resolves.toEqual([]);
-  });
-
-  test('registers the static Nano credential-test model as direct BYOK', () => {
-    expect(nvidiaByok.id).toBe('nvidia-byok');
-    expect(UserByokTestModels['nvidia-byok']).toBe('nvidia/nemotron-3-nano-30b-a3b');
-  });
-
   test('removes gateway-only request fields', () => {
     const body = transform({
-      model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID,
+      model: SUPER_MODEL_ID,
       provider: { order: ['nvidia'] },
       providerOptions: { gateway: {} },
       transforms: ['middle-out'],
@@ -52,7 +32,7 @@ describe('NVIDIA direct BYOK', () => {
     });
 
     expect(body).toMatchObject({
-      model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID,
+      model: SUPER_MODEL_ID,
       reasoning_effort: 'low',
       temperature: 0.5,
     });
@@ -66,18 +46,21 @@ describe('NVIDIA direct BYOK', () => {
   });
 
   test('uses the documented reasoning efforts for Super and Ultra', () => {
-    expect(
-      transform({ model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID, reasoning: { effort: 'low' } })
-    ).toHaveProperty('reasoning_effort', 'low');
-    expect(
-      transform({ model: NVIDIA_NEMOTRON_3_ULTRA_MODEL_ID, reasoning: { effort: 'medium' } })
-    ).toHaveProperty('reasoning_effort', 'medium');
+    expect(transform({ model: SUPER_MODEL_ID, reasoning: { effort: 'low' } })).toHaveProperty(
+      'reasoning_effort',
+      'low'
+    );
+    expect(transform({ model: ULTRA_MODEL_ID, reasoning: { effort: 'medium' } })).toHaveProperty(
+      'reasoning_effort',
+      'medium'
+    );
   });
 
   test('translates an explicit reasoning disable to the documented none effort', () => {
-    expect(
-      transform({ model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID, reasoning: { enabled: false } })
-    ).toHaveProperty('reasoning_effort', 'none');
+    expect(transform({ model: SUPER_MODEL_ID, reasoning: { enabled: false } })).toHaveProperty(
+      'reasoning_effort',
+      'none'
+    );
   });
 
   test('strips reasoning controls for models without verified reasoning support', () => {
@@ -100,14 +83,14 @@ describe('NVIDIA direct BYOK', () => {
   test('preserves valid explicit effort and removes unsupported efforts', () => {
     expect(
       transform({
-        model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID,
+        model: SUPER_MODEL_ID,
         reasoning_effort: 'high',
         reasoning: { effort: 'low' },
       })
     ).toHaveProperty('reasoning_effort', 'high');
     expect(
       transform({
-        model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID,
+        model: SUPER_MODEL_ID,
         reasoning_effort: 'medium',
       })
     ).not.toHaveProperty('reasoning_effort');

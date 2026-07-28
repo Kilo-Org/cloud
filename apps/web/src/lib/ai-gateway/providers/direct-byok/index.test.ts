@@ -61,13 +61,10 @@ jest.mock('./direct-byok-definitions', () => ({
           context_length: 4096,
           max_completion_tokens: 1024,
           supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning'],
-          opencode: {
-            ai_sdk_provider: 'openai-compatible',
-            variants: {
-              none: { reasoning: { enabled: false, effort: 'none' } },
-              high: { reasoning: { enabled: true, effort: 'high' } },
-              max: { reasoning: { enabled: true, effort: 'max' } },
-            },
+          variants: {
+            none: { reasoning: { enabled: false, effort: 'none' } },
+            high: { reasoning: { enabled: true, effort: 'high' } },
+            max: { reasoning: { enabled: true, effort: 'max' } },
           },
         },
       ]),
@@ -115,7 +112,11 @@ describe('getDirectByokModel', () => {
 
   test('uses per-model metadata before generic model-name defaults', async () => {
     const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
+    const { getModelVariants } = await import('@/lib/ai-gateway/providers/model-settings');
     jest.mocked(getBYOKforUser).mockResolvedValue([{ providerId: 'nvidia-byok' }] as never);
+    jest.mocked(getModelVariants).mockReturnValue({
+      xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+    });
     const { getDirectByokModelsForUser } = await import('.');
 
     const models = await getDirectByokModelsForUser('user-id');

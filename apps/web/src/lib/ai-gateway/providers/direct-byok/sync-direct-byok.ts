@@ -2,11 +2,7 @@ import * as z from 'zod';
 import { type DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { redisClient } from '@/lib/redis';
-import {
-  getNvidiaContextLengthOverride,
-  getNvidiaReasoningEfforts,
-  isNvidiaSupportedModel,
-} from '@/lib/ai-gateway/providers/nvidia';
+import { getNvidiaReasoningEfforts } from '@/lib/ai-gateway/providers/nvidia';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
@@ -55,10 +51,6 @@ const ModelsDevProviderSchema = z.object({
 
 const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
 
-const NvidiaModelsResponseSchema = z.object({
-  data: z.array(z.object({ id: z.string() })),
-});
-
 type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
 type RawModel = {
@@ -68,7 +60,7 @@ type RawModel = {
   max_completion_tokens?: number;
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
   supported_parameters?: string[];
-  opencode?: DirectByokModel['opencode'];
+  variants?: DirectByokModel['variants'];
 };
 
 type SyncContext = {
@@ -137,9 +129,22 @@ export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
     }));
 }
 
+const NVIDIA_BLOCKED_MODEL_IDS = new Set([
+  'google/gemma-2-2b-it',
+  'google/gemma-3n-e2b-it',
+  'google/gemma-3n-e4b-it',
+  'qwen/qwen3.5-397b-a17b',
+  'sarvamai/sarvam-m',
+]);
+
+const NVIDIA_CONTEXT_LENGTH_OVERRIDES: Readonly<Record<string, number>> = {
+  'nvidia/nemotron-mini-4b-instruct': 4096,
+  'meta/llama-3.2-90b-vision-instruct': 32768,
+};
+
 export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: unknown): RawModel[] {
   const liveModelIds = new Set(
-    NvidiaModelsResponseSchema.parse(liveEntry).data.map(model => model.id)
+    OpenAICompatibleModelsResponseSchema.parse(liveEntry).data.map(model => model.id)
   );
   const provider = ModelsDevProviderSchema.parse(modelsDevEntry);
 
@@ -147,7 +152,7 @@ export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: un
     .filter(
       model =>
         liveModelIds.has(model.id) &&
-        isNvidiaSupportedModel(model.id) &&
+        !NVIDIA_BLOCKED_MODEL_IDS.has(model.id) &&
         model.status !== 'deprecated' &&
         model.tool_call === true &&
         model.modalities?.input?.includes('text') === true &&
@@ -158,7 +163,7 @@ export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: un
       return {
         id: model.id,
         name: shortenDisplayName(model.name),
-        context_length: getNvidiaContextLengthOverride(model.id) ?? model.limit?.context,
+        context_length: NVIDIA_CONTEXT_LENGTH_OVERRIDES[model.id] ?? model.limit?.context,
         max_completion_tokens: model.limit?.output,
         input_modalities: model.modalities?.input,
         supported_parameters: [
@@ -167,15 +172,12 @@ export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: un
           'tools',
           ...(reasoningEfforts ? ['reasoning'] : []),
         ],
-        opencode: {
-          ai_sdk_provider: 'openai-compatible',
-          variants: Object.fromEntries(
-            (reasoningEfforts ?? []).map(effort => [
-              effort,
-              { reasoning: { enabled: effort !== 'none', effort } },
-            ])
-          ),
-        },
+        variants: Object.fromEntries(
+          (reasoningEfforts ?? []).map(effort => [
+            effort,
+            { reasoning: { enabled: effort !== 'none', effort } },
+          ])
+        ),
       };
     });
 }
@@ -213,12 +215,7 @@ const nvidiaFetcher: ProviderFetcher = {
     if (!entry) {
       throw new Error('models.dev catalog missing nvidia entry');
     }
-    const models = parseNvidiaProviderModels(await response.json(), entry);
-    if (models.length === 0) {
-      // Keeps the last successful catalog instead of publishing an empty list.
-      throw new Error('NVIDIA catalog intersection produced no supported models');
-    }
-    return models;
+    return parseNvidiaProviderModels(await response.json(), entry);
   },
 };
 
@@ -300,7 +297,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       context_length,
       max_completion_tokens,
       supported_parameters: raw.supported_parameters,
-      opencode: raw.opencode,
+      variants: raw.variants,
     });
   }
 

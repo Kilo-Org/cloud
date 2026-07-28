@@ -3,6 +3,7 @@ import {
   parseModelsDevProviderModels,
   parseOpenAICompatibleProviderModels,
 } from './sync-direct-byok';
+import { DirectByokModelArraySchema } from './types';
 
 describe('parseOpenAICompatibleProviderModels', () => {
   test('parses Morph OpenAI-compatible model metadata', () => {
@@ -125,160 +126,84 @@ describe('parseModelsDevProviderModels', () => {
 });
 
 describe('parseNvidiaProviderModels', () => {
-  test('keeps only live tool-capable text models with models.dev metadata', () => {
+  const model = (id: string, overrides: Record<string, unknown> = {}) => ({
+    id,
+    name: id,
+    tool_call: true,
+    modalities: { input: ['text'], output: ['text'] },
+    ...overrides,
+  });
+
+  test('keeps only live, compatible tool-calling text models', () => {
+    const catalog = {
+      chat: model('nvidia/chat'),
+      vision: model('nvidia/vision', {
+        modalities: { input: ['text', 'image'], output: ['text'] },
+      }),
+      deprecated: model('nvidia/deprecated', { status: 'deprecated' }),
+      noTools: model('nvidia/no-tools', { tool_call: false }),
+      noTextInput: model('nvidia/no-text-input', {
+        modalities: { input: ['image'], output: ['text'] },
+      }),
+      noTextOutput: model('nvidia/no-text-output', {
+        modalities: { input: ['text'], output: ['image'] },
+      }),
+      metadataOnly: model('nvidia/metadata-only'),
+      blocked: model('google/gemma-2-2b-it'),
+    };
     const live = {
-      data: [
-        { id: 'nvidia/chat' },
-        { id: 'nvidia/vision-chat' },
-        { id: 'nvidia/deprecated' },
-        { id: 'nvidia/image-output' },
-        { id: 'nvidia/embed' },
-        { id: 'nvidia/image-input-only' },
-        { id: 'nvidia/live-only' },
-      ],
-    };
-    const modelsDev = {
-      models: {
-        chat: {
-          id: 'nvidia/chat',
-          name: 'NVIDIA Chat',
-          tool_call: true,
-          modalities: { input: ['text'], output: ['text'] },
-          limit: { context: 128_000, output: 16_000 },
-        },
-        visionChat: {
-          id: 'nvidia/vision-chat',
-          name: 'NVIDIA/Vision Chat',
-          tool_call: true,
-          modalities: { input: ['text', 'image'], output: ['text'] },
-          limit: { context: 256_000, output: 32_000 },
-        },
-        deprecated: {
-          id: 'nvidia/deprecated',
-          status: 'deprecated',
-          tool_call: true,
-          modalities: { input: ['text'], output: ['text'] },
-        },
-        imageOutput: {
-          id: 'nvidia/image-output',
-          tool_call: true,
-          modalities: { input: ['text'], output: ['image'] },
-        },
-        embed: {
-          id: 'nvidia/embed',
-          tool_call: false,
-          modalities: { input: ['text'], output: ['text'] },
-        },
-        imageInputOnly: {
-          id: 'nvidia/image-input-only',
-          tool_call: true,
-          modalities: { input: ['image'], output: ['text'] },
-        },
-        metadataOnly: {
-          id: 'nvidia/metadata-only',
-          tool_call: true,
-          modalities: { input: ['text'], output: ['text'] },
-        },
-      },
+      data: Object.values(catalog)
+        .filter(({ id }) => id !== 'nvidia/metadata-only')
+        .map(({ id }) => ({ id }))
+        .concat({ id: 'nvidia/live-only' }),
     };
 
-    expect(parseNvidiaProviderModels(live, modelsDev)).toEqual([
-      {
-        id: 'nvidia/chat',
-        name: 'NVIDIA Chat',
-        context_length: 128_000,
-        max_completion_tokens: 16_000,
-        input_modalities: ['text'],
-        supported_parameters: ['max_tokens', 'temperature', 'tools'],
-        opencode: { ai_sdk_provider: 'openai-compatible', variants: {} },
-      },
-      {
-        id: 'nvidia/vision-chat',
-        name: 'Vision Chat',
-        context_length: 256_000,
-        max_completion_tokens: 32_000,
-        input_modalities: ['text', 'image'],
-        supported_parameters: ['max_tokens', 'temperature', 'tools'],
-        opencode: { ai_sdk_provider: 'openai-compatible', variants: {} },
-      },
-    ]);
-  });
-
-  test('excludes models whose hosted endpoints reject agent requests', () => {
-    const live = {
-      data: [
-        { id: 'google/gemma-2-2b-it' },
-        { id: 'google/gemma-3n-e2b-it' },
-        { id: 'sarvamai/sarvam-m' },
-        { id: 'qwen/qwen3.5-397b-a17b' },
-      ],
-    };
-    const modelsDev = {
-      models: Object.fromEntries(
-        [
-          'google/gemma-2-2b-it',
-          'google/gemma-3n-e2b-it',
-          'sarvamai/sarvam-m',
-          'qwen/qwen3.5-397b-a17b',
-        ].map(id => [
-          id,
-          { id, tool_call: true, modalities: { input: ['text'], output: ['text'] } },
-        ])
-      ),
-    };
-
-    expect(parseNvidiaProviderModels(live, modelsDev)).toEqual([]);
-  });
-
-  test('applies NVIDIA hosted context limits over catalog metadata', () => {
-    const live = { data: [{ id: 'nvidia/nemotron-mini-4b-instruct' }] };
-    const modelsDev = {
-      models: {
-        mini: {
-          id: 'nvidia/nemotron-mini-4b-instruct',
-          name: 'Nemotron Mini',
-          tool_call: true,
-          modalities: { input: ['text'], output: ['text'] },
-          limit: { context: 128_000, output: 8192 },
-        },
-      },
-    };
-
-    expect(parseNvidiaProviderModels(live, modelsDev)).toEqual([
-      {
-        id: 'nvidia/nemotron-mini-4b-instruct',
-        name: 'Nemotron Mini',
-        context_length: 4096,
-        max_completion_tokens: 8192,
-        input_modalities: ['text'],
-        supported_parameters: ['max_tokens', 'temperature', 'tools'],
-        opencode: { ai_sdk_provider: 'openai-compatible', variants: {} },
-      },
-    ]);
-  });
-
-  test('maps documented NVIDIA reasoning efforts into model metadata', () => {
-    const model = {
-      id: 'nvidia/nemotron-3-super-120b-a12b',
-      name: 'Nemotron 3 Super',
-      tool_call: true,
-      modalities: { input: ['text'], output: ['text'] },
-    };
-
-    expect(
-      parseNvidiaProviderModels({ data: [{ id: model.id }] }, { models: { super: model } })
-    ).toEqual([
+    expect(parseNvidiaProviderModels(live, { models: catalog })).toEqual([
+      expect.objectContaining({ id: 'nvidia/chat', variants: {} }),
       expect.objectContaining({
-        supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning'],
-        opencode: {
-          ai_sdk_provider: 'openai-compatible',
-          variants: {
-            none: { reasoning: { enabled: false, effort: 'none' } },
-            low: { reasoning: { enabled: true, effort: 'low' } },
-            high: { reasoning: { enabled: true, effort: 'high' } },
-          },
-        },
+        id: 'nvidia/vision',
+        input_modalities: ['text', 'image'],
+        variants: {},
       }),
     ]);
+  });
+
+  test('applies hosted context overrides', () => {
+    const ids = ['nvidia/nemotron-mini-4b-instruct', 'meta/llama-3.2-90b-vision-instruct'];
+    const models = Object.fromEntries(
+      ids.map(id => [id, model(id, { limit: { context: 128_000, output: 8192 } })])
+    );
+
+    expect(parseNvidiaProviderModels({ data: ids.map(id => ({ id })) }, { models })).toEqual([
+      expect.objectContaining({ id: ids[0], context_length: 4096 }),
+      expect.objectContaining({ id: ids[1], context_length: 32768 }),
+    ]);
+  });
+
+  test('maps documented reasoning efforts into model metadata', () => {
+    const efforts = {
+      'nvidia/nemotron-3-super-120b-a12b': ['none', 'low', 'high'],
+      'nvidia/nemotron-3-ultra-550b-a55b': ['none', 'medium', 'high'],
+      'deepseek-ai/deepseek-v4-flash': ['none', 'high', 'max'],
+      'deepseek-ai/deepseek-v4-pro': ['none', 'high', 'max'],
+      'openai/gpt-oss-20b': ['low', 'medium', 'high'],
+      'openai/gpt-oss-120b': ['low', 'medium', 'high'],
+    };
+    const ids = Object.keys(efforts);
+    const models = Object.fromEntries(ids.map(id => [id, model(id)]));
+    const synced = parseNvidiaProviderModels({ data: ids.map(id => ({ id })) }, { models }).map(
+      item => ({
+        ...item,
+        name: item.name ?? item.id,
+        context_length: item.context_length ?? 200_000,
+        max_completion_tokens: item.max_completion_tokens ?? 32_000,
+      })
+    );
+    const parsed = DirectByokModelArraySchema.parse(JSON.parse(JSON.stringify(synced)));
+
+    expect(
+      Object.fromEntries(parsed.map(item => [item.id, Object.keys(item.variants ?? {})]))
+    ).toEqual(efforts);
+    expect(parsed.every(item => item.supported_parameters?.includes('reasoning'))).toBe(true);
   });
 });

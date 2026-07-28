@@ -2,62 +2,23 @@ export function isFreeNemotronModel(model: string) {
   return model.includes('nemotron') && model.endsWith(':free');
 }
 
-export const NVIDIA_NEMOTRON_3_SUPER_MODEL_ID = 'nvidia/nemotron-3-super-120b-a12b';
-export const NVIDIA_NEMOTRON_3_ULTRA_MODEL_ID = 'nvidia/nemotron-3-ultra-550b-a55b';
-
-export type NvidiaReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'max';
+type NvidiaReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'max';
 
 // Models absent here must not receive reasoning controls; NVIDIA returns 400 for
 // efforts a model does not accept.
 const NVIDIA_REASONING_EFFORTS_BY_MODEL: Readonly<
   Record<string, ReadonlyArray<NvidiaReasoningEffort>>
 > = {
-  [NVIDIA_NEMOTRON_3_SUPER_MODEL_ID]: ['none', 'low', 'high'],
-  [NVIDIA_NEMOTRON_3_ULTRA_MODEL_ID]: ['none', 'medium', 'high'],
+  'nvidia/nemotron-3-super-120b-a12b': ['none', 'low', 'high'],
+  'nvidia/nemotron-3-ultra-550b-a55b': ['none', 'medium', 'high'],
   'deepseek-ai/deepseek-v4-flash': ['none', 'high', 'max'],
   'deepseek-ai/deepseek-v4-pro': ['none', 'high', 'max'],
   'openai/gpt-oss-20b': ['low', 'medium', 'high'],
   'openai/gpt-oss-120b': ['low', 'medium', 'high'],
 };
 
-// Listed as tool-capable, but these endpoints reject requests containing tools.
-const NVIDIA_UNSUPPORTED_MODEL_IDS: ReadonlySet<string> = new Set([
-  'google/gemma-2-2b-it',
-  'google/gemma-3n-e2b-it',
-  'google/gemma-3n-e4b-it',
-  'qwen/qwen3.5-397b-a17b',
-  'sarvamai/sarvam-m',
-]);
-
-// NVIDIA serves these with a smaller context window than the catalog advertises.
-const NVIDIA_CONTEXT_LENGTH_OVERRIDES: Readonly<Record<string, number>> = {
-  'nvidia/nemotron-mini-4b-instruct': 4096,
-  'meta/llama-3.2-90b-vision-instruct': 32768,
-};
-
-export function isNvidiaSupportedModel(model: string) {
-  return !NVIDIA_UNSUPPORTED_MODEL_IDS.has(model);
-}
-
-export function getNvidiaContextLengthOverride(model: string) {
-  return NVIDIA_CONTEXT_LENGTH_OVERRIDES[model];
-}
-
 export function getNvidiaReasoningEfforts(model: string) {
-  const upstreamModel = model.startsWith('nvidia-byok/')
-    ? model.slice('nvidia-byok/'.length)
-    : model;
-  return NVIDIA_REASONING_EFFORTS_BY_MODEL[upstreamModel];
-}
-
-export function isNvidiaReasoningEffort(
-  model: string,
-  effort: unknown
-): effort is NvidiaReasoningEffort {
-  return (
-    typeof effort === 'string' &&
-    getNvidiaReasoningEfforts(model)?.some(candidate => candidate === effort) === true
-  );
+  return NVIDIA_REASONING_EFFORTS_BY_MODEL[model];
 }
 
 export const NVIDIA_TRIAL_TOS =

@@ -66,8 +66,7 @@ function convertModel(
     hasUserByokAvailable: true,
     opencode: {
       ai_sdk_provider: getAiSdkProvider(id, provider.id) ?? provider.default_ai_sdk_provider,
-      variants: getModelVariants(id),
-      ...model.opencode,
+      variants: model.variants ?? getModelVariants(id),
     } satisfies OpenCodeSettings,
   };
 }

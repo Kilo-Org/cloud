@@ -253,7 +253,7 @@ Verifies that the goals of the plan are met by the new implementation. It starts
 
 #### Real LLM Responses
 
-Any step where an agent or LLM must actually respond — cloud-agent sessions, chat flows, acceptance states — uses real model calls on `kilo-auto/efficient` (the in-app id; `kilo/kilo-auto/*` are the same models as CLI ids), always. If an `efficient` call stalls or errors, retry on `efficient`; never switch models. LLM mocking (fake-llm or otherwise) is prohibited unless a real call cannot produce the required state; each use must be named and justified in the handoff and the PR. Two standing exceptions qualify: forcing a specific provider failure, and deterministic local cloud-agent turns per `learnings/mobile-cloud-agent-deterministic-turns-fake-llm.md`.
+Any step where an agent or LLM must actually respond — cloud-agent sessions, chat flows, acceptance states — uses real model calls on `kilo-auto/efficient` (the in-app id; `kilo/kilo-auto/*` are the same models as CLI ids), always. If an `efficient` call stalls or errors, retry on `efficient`; never switch models. LLM mocking (fake-llm or otherwise) is prohibited unless a real call cannot produce the required state; each use must be named and justified in the handoff and the PR. Two standing exceptions qualify: forcing a specific provider failure, and deterministic local cloud-agent turns.
 
 ## E2E Slots
 

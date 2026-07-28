@@ -2,7 +2,7 @@
 export const SHARE_TO_NEW_REMOTE_SESSION_ALERT = {
   title: "Can't share to a new remote session",
   message:
-    "A session started on a remote CLI can't receive shared text or files. Start a cloud session, or share again and pick the running CLI session.",
+    "A session started on a remote CLI can't receive shared text or files from this screen. Start a cloud session, or open the share sheet and pick a connected CLI to start a new session there.",
 } as const;
 
 /**

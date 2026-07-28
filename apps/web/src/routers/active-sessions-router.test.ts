@@ -113,6 +113,55 @@ describe('active-sessions-router', () => {
       expect(result).toEqual({ instances: [] });
     });
 
+    it('passes through capabilities when the worker advertises them', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            instances: [
+              {
+                connectionId: 'cli-cap',
+                name: 'laptop-cap',
+                projectName: 'kilo',
+                capabilities: { attachments: true },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.listInstances();
+      expect(result).toEqual({
+        instances: [
+          {
+            connectionId: 'cli-cap',
+            name: 'laptop-cap',
+            projectName: 'kilo',
+            capabilities: { attachments: true },
+          },
+        ],
+      });
+    });
+
+    it('keeps capabilities absent when the worker omits them (legacy CLI)', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            instances: [{ connectionId: 'cli-legacy', name: 'laptop-legacy', projectName: 'kilo' }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.listInstances();
+      expect(result).toEqual({
+        instances: [{ connectionId: 'cli-legacy', name: 'laptop-legacy', projectName: 'kilo' }],
+      });
+      expect(result.instances[0]).not.toHaveProperty('capabilities');
+    });
+
     it('throws a TRPCError when the upstream worker returns a non-2xx response', async () => {
       jest
         .spyOn(global, 'fetch')

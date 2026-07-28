@@ -38,6 +38,12 @@ const connectedInstanceSchema = z.object({
   name: z.string(),
   projectName: z.string(),
   version: z.string().optional(),
+  /**
+   * Capabilities advertised by this connected CLI instance. Omitted when the
+   * CLI's latest attachment did not include a capabilities object (legacy CLI
+   * or a build that predates the field).
+   */
+  capabilities: z.object({ attachments: z.boolean().optional() }).optional(),
 });
 
 const connectedInstancesResponseSchema = z.object({

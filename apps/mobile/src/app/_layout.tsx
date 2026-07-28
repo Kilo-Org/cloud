@@ -10,13 +10,13 @@ import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 // font bytes. The per-weight subpaths pull only the two used `.ttf` files.
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
-import { ThemeProvider } from '@react-navigation/native';
 import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';
 import { useFonts } from 'expo-font';
 import {
   type Href,
   Slot,
+  ThemeProvider,
   useGlobalSearchParams,
   useNavigationContainerRef,
   usePathname,

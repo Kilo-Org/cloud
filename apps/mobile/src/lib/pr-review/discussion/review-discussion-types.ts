@@ -53,7 +53,7 @@ export const REVIEW_REACTION_CONTENTS: readonly ReviewReactionContent[] = [
 // than silently drifting from a hand-copied shape (apps/mobile/AGENTS.md).
 // `reactions[].content` is typed as a plain `string` by tRPC; we narrow it to
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
-export type ReviewThreadsPage = RouterOutputs['githubPrReview']['listReviewThreads'];
+type ReviewThreadsPage = RouterOutputs['githubPrReview']['listReviewThreads'];
 export type ReviewThread = ReviewThreadsPage['threads'][number];
 export type ReviewComment = ReviewThread['comments'][number];
 /** Conversation (issue) comments share the review-comment DTO shape. */

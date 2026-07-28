@@ -1,28 +1,29 @@
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { ContextUsageRing } from './context-usage-ring';
 import {
   type ContextTone,
-  getArcFraction,
-  getContextTone,
-  getHeaderSummary,
+  getHeaderPillContent,
   getMetricsAccessibilityLabel,
 } from './context-usage-display';
-import { formatSessionTotalCost } from './session-list-helpers';
-import { formatSpokenCost } from './session-row-accessibility-label';
+import { SessionPlatformIcon } from './session-platform-icon';
 
 type SessionContextMetricsProps = {
-  info: SessionContextInfo;
+  info: SessionContextInfo | undefined;
+  platform: string | null | undefined;
   totalCostMicrodollars: number | null;
-  onPress: () => void;
+  hasMessages: boolean;
+  onPress?: () => void;
 };
 
 const RING_SIZE = 28;
 const RING_STROKE = 3;
+const GLYPH_SIZE = 14;
 
 const TONE_TEXT_CLASS: Record<ContextTone, string> = {
   destructive: 'text-destructive',
@@ -37,69 +38,83 @@ function toneTextClass(tone: ContextTone): string {
 
 export function SessionContextMetrics({
   info,
+  platform,
   totalCostMicrodollars,
+  hasMessages,
   onPress,
 }: Readonly<SessionContextMetricsProps>) {
-  const summary = getHeaderSummary(info, totalCostMicrodollars);
-  if (!summary) {
-    return null;
+  const colors = useThemeColors();
+  const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages });
+  // Single source for element kind and a11y affordance wording so a future
+  // caller with interactive content but no onPress cannot advertise a tap.
+  const pressable = content.interactive && onPress != null;
+  const accessibilityLabel = getMetricsAccessibilityLabel({
+    info,
+    totalCostMicrodollars,
+    platform,
+    interactive: pressable,
+  });
+
+  // Exactly 44pt via h-[44px]. rem-scaled h-11 measured ~38.7pt on device with
+  // NativeWind 5 preview (rem ≈ 14px here), so an arbitrary px value is required
+  // for the 44pt minimum touch target; height is identical in every pill state.
+  const pillClassName =
+    'h-[44px] flex-row items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5';
+
+  const body = (
+    <>
+      <View className="h-7 w-7 items-center justify-center">
+        <View className="absolute inset-0">
+          <ContextUsageRing
+            size={RING_SIZE}
+            strokeWidth={RING_STROKE}
+            arcFraction={content.arcFraction}
+            tone={content.tone}
+          />
+        </View>
+        <SessionPlatformIcon platform={platform} size={GLYPH_SIZE} color={colors.mutedForeground} />
+      </View>
+      {content.primary != null ? (
+        <View className="flex-row items-baseline gap-1">
+          <Text className={cn('text-xs font-semibold tabular-nums', toneTextClass(content.tone))}>
+            {content.primary}
+          </Text>
+          {content.hasCost && content.secondary ? (
+            <Text
+              className="text-xs tabular-nums text-muted-foreground"
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              {content.secondary}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+    </>
+  );
+
+  if (pressable) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        hitSlop={8}
+        className={cn(pillClassName, 'active:opacity-70')}
+        testID="session-context-metrics"
+      >
+        {body}
+      </Pressable>
+    );
   }
-  const tone = getContextTone(info.percentage);
-  const arcFraction = getArcFraction(info.percentage);
-  const accessibilityLabel = getMetricsAccessibilityLabel(info, totalCostMicrodollars);
 
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      hitSlop={8}
-      // 44pt minimum touch target without losing the compact single-line rhythm.
-      className={cn(
-        'min-h-11 flex-row items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1.5 active:opacity-70'
-      )}
+    <View
+      accessibilityLabel={accessibilityLabel || undefined}
+      className={pillClassName}
       testID="session-context-metrics"
     >
-      <ContextUsageRing
-        size={RING_SIZE}
-        strokeWidth={RING_STROKE}
-        arcFraction={arcFraction}
-        tone={tone}
-      />
-      <View className="flex-row items-baseline gap-1">
-        <Text className={cn('text-xs font-semibold tabular-nums', toneTextClass(tone))}>
-          {summary.primary}
-        </Text>
-        {summary.hasCost && summary.secondary ? (
-          <Text
-            className="text-xs tabular-nums text-muted-foreground"
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          >
-            {summary.secondary}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
-
-// Preserves the positive-cost header text when no completed context usage
-// exists. Marked noninteractive; VoiceOver reads the humanized cost.
-export function SessionContextCostFallback({
-  totalCostMicrodollars,
-}: Readonly<{ totalCostMicrodollars: number | null }>) {
-  const visible = formatSessionTotalCost(totalCostMicrodollars);
-  if (visible === null) {
-    return null;
-  }
-  const spoken = formatSpokenCost(totalCostMicrodollars);
-  return (
-    <Text
-      className="text-sm text-muted-foreground"
-      accessibilityLabel={spoken ? `Session cost ${spoken}` : undefined}
-    >
-      {visible}
-    </Text>
+      {body}
+    </View>
   );
 }

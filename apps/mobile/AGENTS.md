@@ -9,7 +9,7 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Stack
 
-- Expo SDK 55, React Native 0.83, React 19, strict TypeScript (`tsgo`)
+- Expo SDK 57, React Native 0.86, React 19, strict TypeScript (`tsgo`)
 - NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
 - Expo Router routes in `src/app/`
 - oxlint and oxfmt

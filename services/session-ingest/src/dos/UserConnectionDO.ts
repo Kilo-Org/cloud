@@ -62,6 +62,10 @@ export type ConnectedInstanceRow = {
   name: string;
   projectName: string;
   version?: string;
+  // Latest capabilities from the CLI socket attachment. Omitted when the
+  // attachment has no capabilities (legacy CLI / pre-field build) so the
+  // response stays byte-identical for those clients.
+  capabilities?: ConnectionCapabilities;
 };
 
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
@@ -1007,6 +1011,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         name: att.instance.name,
         projectName: att.instance.projectName,
         ...(att.instance.version ? { version: att.instance.version } : {}),
+        ...(att.capabilities ? { capabilities: att.capabilities } : {}),
       });
     }
     return { instances };

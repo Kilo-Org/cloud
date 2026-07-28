@@ -27,7 +27,7 @@ export type AttachmentEnabledProps = {
   onSend: MessageInputContentBlocksOnSend;
 };
 
-export type AttachmentUnavailableProps = {
+type AttachmentUnavailableProps = {
   client?: never;
   conversationId?: never;
   hasAttachmentsCapability?: false;

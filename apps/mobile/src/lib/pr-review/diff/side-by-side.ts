@@ -20,7 +20,7 @@
 
 import { type ParsedDiffLine, type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 
-export type SideBySideCell = {
+type SideBySideCell = {
   line: ParsedDiffLine;
 };
 

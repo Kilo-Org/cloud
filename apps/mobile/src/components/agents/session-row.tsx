@@ -17,10 +17,9 @@ import {
   composeStoredSessionVisibleMeta,
   formatMeta,
   formatSessionTotalCost,
-  repoNameFromGitUrl,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
-import { SessionPlatformIcon, sessionPlatformIconKind } from './session-platform-icon';
+import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import {
   formatSpokenCost,
   formatSpokenTimeAgo,
@@ -185,8 +184,13 @@ export function StoredSessionRow({
 
   // Platform icon only on the Agents list variant. Home cards stay
   // byte-identical (platformIcon defaults to undefined).
-  const platformIconKind =
-    variant === 'list' ? sessionPlatformIconKind(session.created_on_platform) : null;
+  const { iconKind: platformIconKind, spokenPlatform: a11yPlatform } =
+    selectRowPlatformPresentation({
+      platform: session.created_on_platform,
+      variant,
+      needsInput,
+      gitUrl: session.git_url,
+    });
   const platformIcon =
     platformIconKind != null ? (
       <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
@@ -197,14 +201,6 @@ export function StoredSessionRow({
         />
       </View>
     ) : undefined;
-
-  // Speak the platform only when an icon is shown, not needs-input, AND the
-  // eyebrow badge is a repo name (otherwise the badge already speaks the
-  // platform label and appending would be redundant).
-  const a11yPlatform =
-    platformIconKind != null && !needsInput && repoNameFromGitUrl(session.git_url) != null
-      ? session.created_on_platform
-      : undefined;
 
   return (
     <>

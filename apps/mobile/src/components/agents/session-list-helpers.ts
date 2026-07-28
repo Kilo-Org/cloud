@@ -150,12 +150,13 @@ export function remoteAgentLabel(createdOnPlatform: string | undefined): string 
 }
 
 /**
- * Pinned-tray meta line for an active session. Mirrors `formatMeta` when an
- * `updatedAt` timestamp is available, otherwise falls back to the uppercased
- * status string (matches the legacy RemoteSessionRow behavior).
+ * Pinned-tray meta line for an active session. Returns the relative timestamp
+ * when `updatedAt` is present; otherwise `undefined` so `SessionRow` renders
+ * the live dot alone. Never the CLI status — status words in the timestamp
+ * slot were a defect (BUSY/IDLE/RETRY).
  */
-export function remoteMeta(session: { status: string; updatedAt?: string }): string {
-  return session.updatedAt ? formatMeta(session.updatedAt) : session.status.toUpperCase();
+export function remoteMeta(session: { updatedAt?: string }): string | undefined {
+  return session.updatedAt ? formatMeta(session.updatedAt) : undefined;
 }
 
 /**

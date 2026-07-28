@@ -10,7 +10,10 @@ This machine is shared by parallel workflows. Before starting a stack, booting a
 .kilo_workflow/e2e-slot.sh acquire <your-tmux-session>   # blocks until a slot frees
 .kilo_workflow/e2e-slot.sh status                        # current holders
 .kilo_workflow/e2e-slot.sh release <your-tmux-session>   # the moment the device phase ends
+.kilo_workflow/e2e-slot.sh stacks                        # any stack running with no slot
 ```
+
+A slot and this worktree's dev stack are one resource: the slot is what entitles you to the stack, and `release` stops the stack with it. Release when your device phase is genuinely over, not partway through a round you still need services for.
 
 - Default 3 slots, machine-global, owned by tmux session name; a dead session's slot is reclaimed automatically, so a crash cannot wedge the queue.
 - `acquire` blocking is correct behavior, not a hang and not a wedge. Wait for it. Never start device work unslotted because the queue was busy, because your phase looks small, or because a stack is already up.
@@ -259,6 +262,8 @@ apps/mobile/e2e/login.sh <serial>
 
 `build` installs a validated cached APK when the Android native fingerprint and toolchain match. Never install an APK from another output path or invoke Gradle directly. Reinstall via `build <serial>` only when the native fingerprint changed, never to reset app state.
 
+`build` reads the generated Android project, and `apps/mobile/android/` is git-ignored — a fresh worktree has none. Run `npx expo prebuild --platform android` in `apps/mobile` once before the first `build`; it is codegen only, needs no wrapper, and a missing project is the one failure `build` cannot fix itself.
+
 `login.sh` and `logout.sh` accept an iOS simulator UDID or an Android ADB serial. On Android, `login.sh`'s shared preflight verifies the claim, applies both `adb reverse` mappings (the `nextjs` service's API port and the `mobile` service's Metro port, both from `pnpm dev:status --json` — there is no service named `metro`), and opens the dev-client deep link itself. On the primary path no manual reverse or `am start` is needed.
 
 ### Mid-test recovery
@@ -305,7 +310,7 @@ Clean up only resources you started. The remote CLI session and its disposable i
 tmux kill-session -t "$ANDROID_SESSION"      # if created
 rm -f "$LOGIN_LOG"                           # if created
 rm -f "$EMULATOR_LOG"                        # if created
-pnpm dev:stop                                # only if you started this worktree's stack
+pnpm dev:stop                                # only if the slot release below did not already stop it
 xcrun simctl shutdown <udid>                 # only if you booted it
 pnpm dev:mobile:simulator release <udid>     # every simulator you claimed
 pnpm dev:mobile:android release <serial>     # every Android device you claimed

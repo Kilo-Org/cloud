@@ -45,14 +45,14 @@ test('serializes stale Android claim replacement with concurrent claim attempts'
   let attemptedConcurrentClaim = false;
 
   try {
-    const claim = claimAndroidDevice(serial, firstWorktree, {
+    const claim = claimAndroidDevice(serial, firstWorktree, 'boot-id-of-live-emulator', {
       fileOperations: {
         readFileSync: (candidate, encoding) => {
           const value = fs.readFileSync(candidate, encoding);
           if (candidate === filePath && !attemptedConcurrentClaim) {
             attemptedConcurrentClaim = true;
             assert.throws(
-              () => claimAndroidDevice(serial, secondWorktree),
+              () => claimAndroidDevice(serial, secondWorktree, 'boot-id-of-live-emulator'),
               /claim is being updated concurrently/
             );
           }
@@ -72,16 +72,89 @@ test('serializes stale Android claim replacement with concurrent claim attempts'
   }
 });
 
+test('reclaims a serial whose emulator instance is gone, even from a live worktree', () => {
+  const serial = `test-recycled-${process.pid}-${Date.now()}`;
+  const deadInstanceWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-dead-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-live-'));
+  const filePath = path.join(os.tmpdir(), 'kilo-mobile-android-claims', `${serial}.json`);
+
+  try {
+    claimAndroidDevice(serial, deadInstanceWorktree, 'boot-id-of-dead-emulator');
+
+    // Same serial, new emulator instance: the old claim names a worktree that
+    // still exists, so only the boot id can tell the port was recycled.
+    const claim = claimAndroidDevice(serial, worktreeRoot, 'boot-id-of-live-emulator');
+
+    assert.equal(claim.worktreeRoot, worktreeRoot);
+    assert.equal(claim.bootId, 'boot-id-of-live-emulator');
+    assert.equal(JSON.parse(fs.readFileSync(filePath, 'utf8')).worktreeRoot, worktreeRoot);
+  } finally {
+    fs.rmSync(filePath, { force: true });
+    fs.rmSync(`${filePath}.lock`, { recursive: true, force: true });
+    fs.rmSync(deadInstanceWorktree, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('reclaims a serial from a legacy claim that predates boot ids', () => {
+  const serial = `test-legacy-${process.pid}-${Date.now()}`;
+  const otherWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-other-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-live-'));
+  const filePath = path.join(os.tmpdir(), 'kilo-mobile-android-claims', `${serial}.json`);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify({
+      serial,
+      worktreeRoot: otherWorktree,
+      claimedAt: new Date().toISOString(),
+      claimId: 'legacy',
+      status: 'ready',
+    })
+  );
+
+  try {
+    const claim = claimAndroidDevice(serial, worktreeRoot, 'boot-id-of-live-emulator');
+    assert.equal(claim.worktreeRoot, worktreeRoot);
+  } finally {
+    fs.rmSync(filePath, { force: true });
+    fs.rmSync(`${filePath}.lock`, { recursive: true, force: true });
+    fs.rmSync(otherWorktree, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('refreshes an own claim when the emulator instance changed', () => {
+  const serial = `test-reboot-${process.pid}-${Date.now()}`;
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const filePath = path.join(os.tmpdir(), 'kilo-mobile-android-claims', `${serial}.json`);
+
+  try {
+    const first = claimAndroidDevice(serial, worktreeRoot, 'boot-id-one');
+    const second = claimAndroidDevice(serial, worktreeRoot, 'boot-id-one');
+    assert.equal(second.claimId, first.claimId);
+
+    const rebooted = claimAndroidDevice(serial, worktreeRoot, 'boot-id-two');
+    assert.equal(rebooted.bootId, 'boot-id-two');
+    assert.equal(JSON.parse(fs.readFileSync(filePath, 'utf8')).bootId, 'boot-id-two');
+  } finally {
+    fs.rmSync(filePath, { force: true });
+    fs.rmSync(`${filePath}.lock`, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
 test('preserves an active Android claim owned by another worktree', () => {
   const serial = `test-active-${process.pid}-${Date.now()}`;
   const firstWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-one-'));
   const secondWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-two-'));
+  const bootId = 'boot-id-of-live-emulator';
 
   try {
-    claimAndroidDevice(serial, firstWorktree);
+    claimAndroidDevice(serial, firstWorktree, bootId);
 
     assert.throws(
-      () => claimAndroidDevice(serial, secondWorktree),
+      () => claimAndroidDevice(serial, secondWorktree, bootId),
       new RegExp(`claimed by ${firstWorktree}`)
     );
     assert.throws(
@@ -109,7 +182,7 @@ test('recovers an orphaned Android claim mutation lock', () => {
   fs.utimesSync(mutationLockPath, settledTime, settledTime);
 
   try {
-    const claim = claimAndroidDevice(serial, worktreeRoot);
+    const claim = claimAndroidDevice(serial, worktreeRoot, 'boot-id-of-live-emulator');
     assert.equal(claim.worktreeRoot, worktreeRoot);
     releaseAndroidDevice(serial, worktreeRoot);
   } finally {
@@ -125,7 +198,7 @@ test('creates an explicit ready Android claim', () => {
   const filePath = path.join(os.tmpdir(), 'kilo-mobile-android-claims', `${serial}.json`);
 
   try {
-    const claim = claimAndroidDevice(serial, worktreeRoot);
+    const claim = claimAndroidDevice(serial, worktreeRoot, 'boot-id-of-live-emulator');
     assert.equal(claim.status, 'ready');
     assert.equal(typeof claim.claimId, 'string');
     assert.ok(claim.claimId.length > 0);
@@ -148,7 +221,7 @@ test('upgrades a same-worktree legacy Android claim to ready', () => {
   );
 
   try {
-    const claim = claimAndroidDevice(serial, worktreeRoot);
+    const claim = claimAndroidDevice(serial, worktreeRoot, 'boot-id-of-live-emulator');
     assert.equal(claim.status, 'ready');
     assert.equal(JSON.parse(fs.readFileSync(filePath, 'utf8')).status, 'ready');
   } finally {

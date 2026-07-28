@@ -19,6 +19,7 @@ const serviceMocks = vi.hoisted(() => ({
   hasGitLabProjectCredentialCandidates: vi.fn(),
   listBitbucketRepositories: vi.fn(),
   resolveBitbucketToken: vi.fn(),
+  resolveBitbucketCapabilitySubject: vi.fn(),
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -93,6 +94,7 @@ vi.mock('./gitlab-credential-broker-handler.js', async importOriginal => {
 vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
   listBitbucketRepositories: serviceMocks.listBitbucketRepositories,
   resolveBitbucketToken: serviceMocks.resolveBitbucketToken,
+  resolveBitbucketCapabilitySubject: serviceMocks.resolveBitbucketCapabilitySubject,
 }));
 
 import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
@@ -334,6 +336,115 @@ function createService(): GitTokenRPCEntrypoint {
     } as unknown as CloudflareEnv
   );
 }
+
+describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
+  const subject = {
+    integrationId: '123e4567-e89b-12d3-a456-426614174022',
+    workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+    workspaceSlug: 'acme',
+    repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    repositoryFullName: 'acme/widgets',
+    token: 'ATCT-runtime-token',
+  };
+  const issueParams = {
+    userId: 'user-1',
+    orgId: '123e4567-e89b-12d3-a456-426614174030',
+    outboundContainerId: 'outbound-container-1',
+    workspaceUuid: subject.workspaceUuid,
+    repositoryUuid: subject.repositoryUuid,
+    repositoryUrl: 'https://bitbucket.org/acme/widgets.git',
+  };
+
+  beforeEach(() => {
+    serviceMocks.resolveBitbucketCapabilitySubject
+      .mockReset()
+      .mockResolvedValue({ success: true, subject });
+  });
+
+  async function issueCapability(): Promise<string> {
+    const result = await createService().issueBitbucketSessionCapability(issueParams);
+    if (!result.success) throw new Error(`issue failed: ${result.reason}`);
+    return result.capability;
+  }
+
+  it('issues an opaque capability and the canonical git URL', async () => {
+    const result = await createService().issueBitbucketSessionCapability(issueParams);
+    expect(result).toEqual({
+      success: true,
+      capability: expect.stringMatching(/^kbb1\./),
+      gitUrl: 'https://bitbucket.org/acme/widgets.git',
+    });
+    if (result.success) {
+      expect(result.capability).not.toContain(subject.token);
+    }
+  });
+
+  it('propagates a resolution failure from issue', async () => {
+    serviceMocks.resolveBitbucketCapabilitySubject
+      .mockReset()
+      .mockResolvedValue({ success: false, reason: 'reconnect_required' });
+    await expect(createService().issueBitbucketSessionCapability(issueParams)).resolves.toEqual({
+      success: false,
+      reason: 'reconnect_required',
+    });
+  });
+
+  it('redeems a valid capability into an injected Basic auth header', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: {
+        authorization: `Basic ${Buffer.from('x-token-auth:ATCT-runtime-token').toString('base64')}`,
+      },
+    });
+  });
+
+  it('rejects redemption from a different container', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'other-container',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
+  });
+
+  it('rejects redemption for a different repository', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/other.git/git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
+  });
+
+  it('rejects redemption when the token was rotated after issue', async () => {
+    const capability = await issueCapability();
+    serviceMocks.resolveBitbucketCapabilitySubject
+      .mockReset()
+      .mockResolvedValue({ success: true, subject: { ...subject, token: 'ATCT-rotated' } });
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+  });
+});
 
 describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {
   it('requires an organization before invoking the reachable V1 resolver', async () => {

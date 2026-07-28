@@ -81,7 +81,11 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
-  if (isOpenRouterGpt56PromoModel(model.id)) return name + ' (50% off)';
+  const discount = model.pricing.discount;
+  if (isOpenRouterGpt56PromoModel(model.id) && discount !== undefined && discount > 0) {
+    const percentage = Number((discount * 100).toFixed(2));
+    return `${name} (${percentage}% off)`;
+  }
   const promptPrice = Number.parseFloat(model.pricing.prompt);
   const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
   if (isExpensive) return name + ' ($$$$)';

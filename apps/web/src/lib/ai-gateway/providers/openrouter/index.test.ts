@@ -159,9 +159,17 @@ describe('formatName', () => {
       id: modelId,
       created: recentlyCreated,
       expiration_date: '2026-07-01',
-      pricing: { prompt: '0.00001', completion: '0' },
+      pricing: { prompt: '0.00001', completion: '0', discount: 0.5 },
     });
     expect(formatName(model, 0)).toBe('Test Model (50% off)');
+  });
+
+  it('takes the promo percentage from endpoint metadata', () => {
+    const model = buildModel({
+      id: OPENROUTER_GPT56_PROMO_MODEL_IDS[0],
+      pricing: { prompt: '0.00001', completion: '0', discount: 0.375 },
+    });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (37.5% off)');
   });
 });
 

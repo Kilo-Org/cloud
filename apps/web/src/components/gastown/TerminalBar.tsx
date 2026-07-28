@@ -628,9 +628,7 @@ function TabBar({
   // paused by the user stays interactive so they can resume it.
   const showBilling =
     billing !== undefined &&
-    (billingAnnouncementEnabled ||
-      billing.enforcing ||
-      billing.runPolicy === 'paused_by_user');
+    (billingAnnouncementEnabled || billing.enforcing || billing.runPolicy === 'paused_by_user');
 
   return (
     <div

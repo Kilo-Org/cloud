@@ -582,6 +582,20 @@ describe('applyMetadataChanges', () => {
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
+  it('refuses to reparent a legacy Cloud Agent root before family-marker healing', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentFamilyId: null,
+      cloudAgentSessionId: 'cloud-agent-family-1',
+      parentExists: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
   it('allows a cycle-free same-family child reparent', async () => {
     const db = createApplyMetadataDb({
       cloudAgentFamilyId: 'cloud-agent-family-1',
@@ -592,6 +606,7 @@ describe('applyMetadataChanges', () => {
 
     await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
 
+    expect(db.queryLog.filter(entry => entry === 'session-lock')).toHaveLength(2);
     expect(db.execute).toHaveBeenCalledTimes(1);
     expect(db.updateSets).toContainEqual({ parent_session_id: 'ses_parent' });
   });

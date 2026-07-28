@@ -115,6 +115,25 @@ describe('Cloud Agent family routes', () => {
     workerUtils.hasOrganizationAccess.mockResolvedValue(true);
   });
 
+  it('rejects an incomplete or invalid family assertion before database access', async () => {
+    const { db } = makeDb([], []);
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const headers = assertionHeaders();
+    headers[cloudAgentFamilyHeaders.protocolVersion] = '2';
+
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sessionId: childSessionId }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
   it('atomically heals the root and creates a family child', async () => {
     const child = persistedRow();
     const { db, insertedValues, updateSets } = makeDb(

@@ -67,7 +67,7 @@ function createEnv(
     LOG_REJECTED_KILO_URLS: logRejectedKiloUrls,
     INTERNAL_API_SECRET_PROD: { get: vi.fn(async () => 'trusted-internal-secret') },
     SESSION_INGEST: { fetch: sessionIngestFetch },
-  } as never;
+  } as unknown as Cloudflare.Env;
 }
 
 function handleOutbound(request: Request, env: Cloudflare.Env): Promise<Response> {
@@ -1146,6 +1146,37 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
     const forwarded = publicFetch.mock.calls[0]?.[0] as Request;
     expect(forwarded.headers.get('X-Internal-Secret')).toBeNull();
     expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBeNull();
+  });
+
+  it('fails closed when family claims are present but the internal proxy is unavailable', async () => {
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+      sessionIngestFamily: {
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        rootKiloSessionId: 'ses_12345678901234567890123456',
+      },
+    });
+    const publicFetch = vi.fn();
+    vi.stubGlobal('fetch', publicFetch);
+    const baseEnv = createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability);
+    const env = { ...baseEnv, SESSION_INGEST: undefined } as never;
+
+    const response = await handleOutbound(
+      new Request(
+        'https://ingest.kilosessions.ai/api/session/ses_abcdefghijklmnopqrstuvwxyz/ingest',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
+          body: JSON.stringify({ data: [] }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(502);
+    expect(publicFetch).not.toHaveBeenCalled();
   });
 
   it('fails closed without logging a rejected Kilo URL by default', async () => {

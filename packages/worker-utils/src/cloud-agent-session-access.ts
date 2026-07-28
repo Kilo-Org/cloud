@@ -5,7 +5,10 @@ import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
 export type AccessibleSession = {
   kiloSessionId: string;
   organizationId: string | null;
-  cloudAgentFamilyId?: string | null;
+};
+
+export type AccessibleKiloSession = AccessibleSession & {
+  cloudAgentFamilyId: string | null;
 };
 
 /** Established name used by Cloud Agent consumers. */
@@ -30,7 +33,7 @@ type AccessibleSessionQuery = AccessibleCloudAgentSessionQuery | AccessibleKiloS
 async function queryAccessibleSession(
   db: SessionAccessDb,
   query: AccessibleSessionQuery
-): Promise<AccessibleSession | null> {
+): Promise<AccessibleKiloSession | null> {
   const membershipJoin = and(
     eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
     eq(organization_memberships.kilo_user_id, query.kiloUserId)
@@ -87,12 +90,25 @@ export async function queryAccessibleCloudAgentSession(
   db: SessionAccessDb,
   query: AccessibleCloudAgentSessionQuery
 ): Promise<AccessibleCloudAgentSession | null> {
-  return queryAccessibleSession(db, query);
+  const session = await queryAccessibleSession(db, query);
+  return session
+    ? { kiloSessionId: session.kiloSessionId, organizationId: session.organizationId }
+    : null;
 }
 
 export async function queryAccessibleKiloSession(
   db: SessionAccessDb,
   query: AccessibleKiloSessionQuery
 ): Promise<AccessibleSession | null> {
+  const session = await queryAccessibleSession(db, query);
+  return session
+    ? { kiloSessionId: session.kiloSessionId, organizationId: session.organizationId }
+    : null;
+}
+
+export async function queryAccessibleKiloSessionWithFamily(
+  db: SessionAccessDb,
+  query: AccessibleKiloSessionQuery
+): Promise<AccessibleKiloSession | null> {
   return queryAccessibleSession(db, query);
 }

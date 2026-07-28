@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { queryAccessibleKiloSessionMock, sessionCache } = vi.hoisted(() => ({
-  queryAccessibleKiloSessionMock: vi.fn(),
+const { queryAccessibleKiloSessionWithFamilyMock, sessionCache } = vi.hoisted(() => ({
+  queryAccessibleKiloSessionWithFamilyMock: vi.fn(),
   sessionCache: {
     getAccess: vi.fn(),
     putValidated: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('@kilocode/db/client', () => ({
 }));
 
 vi.mock('@kilocode/worker-utils/cloud-agent-session-access', () => ({
-  queryAccessibleKiloSession: queryAccessibleKiloSessionMock,
+  queryAccessibleKiloSessionWithFamily: queryAccessibleKiloSessionWithFamilyMock,
 }));
 
 vi.mock('../dos/SessionAccessCacheDO', () => ({
@@ -33,7 +33,7 @@ describe('resolveAccessibleKiloSession', () => {
 
   it('denies a session when the user no longer has current access', async () => {
     sessionCache.getAccess.mockResolvedValue(null);
-    queryAccessibleKiloSessionMock.mockResolvedValue(null);
+    queryAccessibleKiloSessionWithFamilyMock.mockResolvedValue(null);
 
     await expect(
       resolveAccessibleKiloSession(env, {
@@ -46,7 +46,7 @@ describe('resolveAccessibleKiloSession', () => {
 
   it('caches an authoritative current organization access result', async () => {
     sessionCache.getAccess.mockResolvedValue(null);
-    queryAccessibleKiloSessionMock.mockResolvedValue({
+    queryAccessibleKiloSessionWithFamilyMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
       cloudAgentFamilyId: null,
@@ -71,7 +71,7 @@ describe('resolveAccessibleKiloSession', () => {
 
   it('falls back to authoritative access when the cache is unavailable', async () => {
     sessionCache.getAccess.mockRejectedValue(new Error('cache unavailable'));
-    queryAccessibleKiloSessionMock.mockResolvedValue({
+    queryAccessibleKiloSessionWithFamilyMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
       cloudAgentFamilyId: null,
@@ -92,7 +92,7 @@ describe('resolveAccessibleKiloSession', () => {
   it('allows authoritative access when the cache write fails', async () => {
     sessionCache.getAccess.mockResolvedValue(null);
     sessionCache.putValidated.mockRejectedValue(new Error('cache unavailable'));
-    queryAccessibleKiloSessionMock.mockResolvedValue({
+    queryAccessibleKiloSessionWithFamilyMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
       cloudAgentFamilyId: null,
@@ -112,7 +112,7 @@ describe('resolveAccessibleKiloSession', () => {
 
   it('propagates authoritative lookup failures', async () => {
     sessionCache.getAccess.mockResolvedValue(null);
-    queryAccessibleKiloSessionMock.mockRejectedValue(new Error('database unavailable'));
+    queryAccessibleKiloSessionWithFamilyMock.mockRejectedValue(new Error('database unavailable'));
 
     await expect(
       resolveAccessibleKiloSession(env, {
@@ -140,7 +140,7 @@ describe('resolveAccessibleKiloSession', () => {
       organizationId: 'org_current',
       cloudAgentFamilyId: null,
     });
-    expect(queryAccessibleKiloSessionMock).not.toHaveBeenCalled();
+    expect(queryAccessibleKiloSessionWithFamilyMock).not.toHaveBeenCalled();
   });
 
   it('reuses cached access only when the asserted family marker matches', async () => {
@@ -161,7 +161,7 @@ describe('resolveAccessibleKiloSession', () => {
       organizationId: 'org_current',
       cloudAgentFamilyId: 'cloud-agent-family-1',
     });
-    expect(queryAccessibleKiloSessionMock).not.toHaveBeenCalled();
+    expect(queryAccessibleKiloSessionWithFamilyMock).not.toHaveBeenCalled();
   });
 
   it('falls back to authoritative access for a stale family cache entry', async () => {
@@ -170,7 +170,7 @@ describe('resolveAccessibleKiloSession', () => {
       organizationId: 'org_current',
       cloudAgentFamilyId: null,
     });
-    queryAccessibleKiloSessionMock.mockResolvedValue({
+    queryAccessibleKiloSessionWithFamilyMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
       cloudAgentFamilyId: 'cloud-agent-family-1',
@@ -182,7 +182,7 @@ describe('resolveAccessibleKiloSession', () => {
       expectedCloudAgentFamilyId: 'cloud-agent-family-1',
     });
 
-    expect(queryAccessibleKiloSessionMock).toHaveBeenCalledWith(expect.anything(), {
+    expect(queryAccessibleKiloSessionWithFamilyMock).toHaveBeenCalledWith(expect.anything(), {
       kiloUserId: 'usr_member',
       kiloSessionId: 'ses_12345678901234567890123456',
       expectedCloudAgentFamilyId: 'cloud-agent-family-1',

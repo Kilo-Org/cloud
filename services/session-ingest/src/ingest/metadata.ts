@@ -85,6 +85,8 @@ export async function applyMetadataChanges(
     if (!currentRow) return null;
     const cloudAgentFamilyId = currentRow.cloudAgentFamilyId;
     const isCloudAgentFamilySession = cloudAgentFamilyId != null;
+    const isCloudAgentManagedSession =
+      isCloudAgentFamilySession || currentRow.cloudAgentSessionId != null;
 
     const statusChange =
       status === undefined
@@ -103,7 +105,7 @@ export async function applyMetadataChanges(
     // value. Follow-up tracked in the PR body.
     if (mergedChanges.has('orgId')) {
       const organizationId = mergedChanges.get('orgId') ?? null;
-      if (isCloudAgentFamilySession) {
+      if (isCloudAgentManagedSession) {
         console.warn('Refusing organization_id metadata write for Cloud Agent family session', {
           kiloUserId,
           sessionId,
@@ -143,8 +145,13 @@ export async function applyMetadataChanges(
 
     let parentSessionIdWriteApplied = false;
     if (parentSessionId !== undefined) {
-      if (isCloudAgentFamilySession) {
-        if (currentRow.cloudAgentSessionId != null || parentSessionId === null) {
+      if (currentRow.cloudAgentSessionId != null) {
+        console.warn('Refusing Cloud Agent root parent metadata write', {
+          kiloUserId,
+          sessionId,
+        });
+      } else if (isCloudAgentFamilySession) {
+        if (parentSessionId === null) {
           console.warn('Refusing invalid Cloud Agent family parent metadata write', {
             kiloUserId,
             sessionId,
@@ -153,47 +160,64 @@ export async function applyMetadataChanges(
           parentSessionId !== sessionId &&
           parentSessionId !== currentRow.parentSessionId
         ) {
-          const [parent] = await tx
+          // Lock the common root so concurrent reparent operations in one family
+          // serialize before checking ancestry and writing the graph.
+          const [familyRoot] = await tx
             .select({ sessionId: cli_sessions_v2.session_id })
             .from(cli_sessions_v2)
             .where(
               and(
-                eq(cli_sessions_v2.session_id, parentSessionId),
                 eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-                eq(cli_sessions_v2.cloud_agent_family_id, cloudAgentFamilyId)
+                eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentFamilyId),
+                eq(cli_sessions_v2.cloud_agent_family_id, cloudAgentFamilyId),
+                sql`${cli_sessions_v2.parent_session_id} IS NULL`
               )
             )
-            .limit(1);
-          const cycleResult = parent
-            ? await tx.execute<{ creates_cycle: boolean }>(sql`
-                WITH RECURSIVE descendants(session_id) AS (
-                  SELECT ${cli_sessions_v2.session_id}
-                  FROM ${cli_sessions_v2}
-                  WHERE ${cli_sessions_v2.parent_session_id} = ${sessionId}
-                    AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
-                  UNION
-                  SELECT child.session_id
-                  FROM ${cli_sessions_v2} child
-                  INNER JOIN descendants d ON child.parent_session_id = d.session_id
-                  WHERE child.kilo_user_id = ${kiloUserId}
-                )
-                SELECT EXISTS(
-                  SELECT 1 FROM descendants WHERE session_id = ${parentSessionId}
-                ) AS creates_cycle
-              `)
-            : null;
-          if (parent && !cycleResult?.rows[0]?.creates_cycle) {
-            await tx
-              .update(cli_sessions_v2)
-              .set({ parent_session_id: parentSessionId })
+            .limit(1)
+            .for('update');
+          if (familyRoot) {
+            const [parent] = await tx
+              .select({ sessionId: cli_sessions_v2.session_id })
+              .from(cli_sessions_v2)
               .where(
                 and(
-                  eq(cli_sessions_v2.session_id, sessionId),
+                  eq(cli_sessions_v2.session_id, parentSessionId),
                   eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-                  sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
+                  eq(cli_sessions_v2.cloud_agent_family_id, cloudAgentFamilyId)
                 )
-              );
-            parentSessionIdWriteApplied = true;
+              )
+              .limit(1);
+            const cycleResult = parent
+              ? await tx.execute<{ creates_cycle: boolean }>(sql`
+                  WITH RECURSIVE descendants(session_id) AS (
+                    SELECT ${cli_sessions_v2.session_id}
+                    FROM ${cli_sessions_v2}
+                    WHERE ${cli_sessions_v2.parent_session_id} = ${sessionId}
+                      AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
+                    UNION
+                    SELECT child.session_id
+                    FROM ${cli_sessions_v2} child
+                    INNER JOIN descendants d ON child.parent_session_id = d.session_id
+                    WHERE child.kilo_user_id = ${kiloUserId}
+                  )
+                  SELECT EXISTS(
+                    SELECT 1 FROM descendants WHERE session_id = ${parentSessionId}
+                  ) AS creates_cycle
+                `)
+              : null;
+            if (parent && !cycleResult?.rows[0]?.creates_cycle) {
+              await tx
+                .update(cli_sessions_v2)
+                .set({ parent_session_id: parentSessionId })
+                .where(
+                  and(
+                    eq(cli_sessions_v2.session_id, sessionId),
+                    eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+                    sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
+                  )
+                );
+              parentSessionIdWriteApplied = true;
+            }
           }
         }
       } else if (parentSessionId && parentSessionId !== sessionId) {

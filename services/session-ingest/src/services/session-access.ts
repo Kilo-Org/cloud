@@ -1,5 +1,5 @@
 import { getWorkerDb } from '@kilocode/db/client';
-import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-session-access';
+import { queryAccessibleKiloSessionWithFamily } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { Env } from '../env';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { withDORetry } from '@kilocode/worker-utils';
@@ -42,7 +42,7 @@ export async function resolveAccessibleKiloSession(
   }
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-  const session = await queryAccessibleKiloSession(db, params);
+  const session = await queryAccessibleKiloSessionWithFamily(db, params);
   if (!session) {
     return null;
   }

@@ -9,6 +9,7 @@ import {
   portOffset,
   resolveGroups,
   resolveSessionNextAuthUrl,
+  resolveTargets,
 } from './services';
 
 test('uses an automatic port offset for secondary worktrees by default', () => {
@@ -98,6 +99,37 @@ test('keeps auto routing package dev script compatible with local launcher flags
   assert.equal(scriptFlags.filter(part => part === '--env').length, 0);
   assert.equal(scriptFlags.filter(part => part === '-e').length, 0);
   assert.equal(launcherFlags.filter(part => part === '--ip').length, 1);
+});
+
+test('starts the container usage meter whenever Gastown starts', () => {
+  // Gastown's TownContainerDO binds container-usage-meter via a service binding,
+  // which only connects when the meter is registered in the same local Wrangler
+  // dev registry. Starting Gastown must therefore always launch the meter.
+  const gastownTargets = resolveTargets(['gastown']);
+  assert.ok(
+    gastownTargets.includes('container-usage-meter'),
+    `expected container-usage-meter in gastown start targets, got: ${gastownTargets.join(', ')}`
+  );
+
+  const meter = getService('container-usage-meter');
+  assert.equal(meter.type, 'worker');
+  assert.equal(meter.dir, 'services/container-usage-meter');
+  assert.equal(meter.port, 8813 + portOffset);
+});
+
+test('binds the container usage meter under its unsuffixed Wrangler name', () => {
+  // Gastown binds CONTAINER_USAGE to service "container-usage-meter" with no
+  // "-dev" suffix. The meter's dev script must not pass --env (which would
+  // register it as a different name) and must accept the launcher's flags.
+  const meter = getService('container-usage-meter');
+  const packageJson = JSON.parse(fs.readFileSync(`${meter.dir}/package.json`, 'utf-8')) as {
+    scripts?: { dev?: string };
+  };
+  const scriptFlags = packageJson.scripts?.dev?.split(/\s+/) ?? [];
+
+  assert.equal(scriptFlags.filter(part => part === '--env').length, 0);
+  assert.equal(scriptFlags.filter(part => part === '-e').length, 0);
+  assert.equal(meter.command.filter(part => part === '--ip').length, 1);
 });
 
 test('starts Storybook with Storybook v10 port flags', () => {

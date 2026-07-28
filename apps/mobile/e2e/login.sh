@@ -47,10 +47,30 @@ latest_email() {
 
 before="$(latest_email)"
 
-echo "==> signing out and requesting sign-in code for $EMAIL"
-if ! maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"; then
-  echo "==> retrying launch and sign-in request once after a dev-client startup failure"
+request_code() {
   maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"
+}
+
+# Say which half broke, so nobody reads Maestro's generic "could be a real
+# regression" advice as a product-bug lead.
+diagnose_request() {
+  local now
+  now="$(latest_email)"
+  if [ -n "$now" ] && [ "$now" != "$before" ]; then
+    echo "==> the backend DID email a code: the request worked, the app never reached the code screen" >&2
+  else
+    echo "==> no code email for $EMAIL in $OUTBOX: the app never reached POST /api/auth/native/otp," >&2
+    echo "    so the submit press did not fire (preflight already proved the backend is up)" >&2
+  fi
+}
+
+echo "==> signing out and requesting sign-in code for $EMAIL"
+if ! request_code; then
+  # One cold relaunch clears both known first-attempt failures: a half-started
+  # dev client, and an email field left dirty by an earlier run.
+  echo "==> retrying launch and sign-in request once after a cold relaunch"
+  maestro --device "$DEVICE" test "$SCRIPT_DIR/flows/open-app.yaml" || true
+  request_code || { diagnose_request; exit 1; }
 fi
 
 # Wait for a newer outbox email than we had before (the send is async).
@@ -65,7 +85,7 @@ for _ in $(seq 1 120); do
 done
 
 if [ -z "$code" ]; then
-  echo "==> no new sign-in code received" >&2
+  echo "==> reached the code screen, but no new code email for $EMAIL landed in $OUTBOX within 30s" >&2
   exit 1
 fi
 

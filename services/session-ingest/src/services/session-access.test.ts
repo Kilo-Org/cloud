@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { queryAccessibleKiloSessionMock, sessionCache } = vi.hoisted(() => ({
-  queryAccessibleKiloSessionMock: vi.fn(),
+const { queryAccessibleKiloSessionWithSessionScopeMock, sessionCache } = vi.hoisted(() => ({
+  queryAccessibleKiloSessionWithSessionScopeMock: vi.fn(),
   sessionCache: {
     getAccess: vi.fn(),
     putValidated: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('@kilocode/db/client', () => ({
 }));
 
 vi.mock('@kilocode/worker-utils/cloud-agent-session-access', () => ({
-  queryAccessibleKiloSession: queryAccessibleKiloSessionMock,
+  queryAccessibleKiloSessionWithSessionScope: queryAccessibleKiloSessionWithSessionScopeMock,
 }));
 
 vi.mock('../dos/SessionAccessCacheDO', () => ({
@@ -33,7 +33,7 @@ describe('resolveAccessibleKiloSession', () => {
 
   it('denies a session when the user no longer has current access', async () => {
     sessionCache.getAccess.mockResolvedValue(null);
-    queryAccessibleKiloSessionMock.mockResolvedValue(null);
+    queryAccessibleKiloSessionWithSessionScopeMock.mockResolvedValue(null);
 
     await expect(
       resolveAccessibleKiloSession(env, {
@@ -46,9 +46,10 @@ describe('resolveAccessibleKiloSession', () => {
 
   it('caches an authoritative current organization access result', async () => {
     sessionCache.getAccess.mockResolvedValue(null);
-    queryAccessibleKiloSessionMock.mockResolvedValue({
+    queryAccessibleKiloSessionWithSessionScopeMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentSessionScopeId: null,
     });
 
     await expect(
@@ -59,18 +60,21 @@ describe('resolveAccessibleKiloSession', () => {
     ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentSessionScopeId: null,
     });
     expect(sessionCache.putValidated).toHaveBeenCalledWith({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentSessionScopeId: null,
     });
   });
 
   it('falls back to authoritative access when the cache is unavailable', async () => {
     sessionCache.getAccess.mockRejectedValue(new Error('cache unavailable'));
-    queryAccessibleKiloSessionMock.mockResolvedValue({
+    queryAccessibleKiloSessionWithSessionScopeMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentSessionScopeId: null,
     });
 
     await expect(
@@ -81,15 +85,17 @@ describe('resolveAccessibleKiloSession', () => {
     ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentSessionScopeId: null,
     });
   });
 
   it('allows authoritative access when the cache write fails', async () => {
     sessionCache.getAccess.mockResolvedValue(null);
     sessionCache.putValidated.mockRejectedValue(new Error('cache unavailable'));
-    queryAccessibleKiloSessionMock.mockResolvedValue({
+    queryAccessibleKiloSessionWithSessionScopeMock.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentSessionScopeId: null,
     });
 
     await expect(
@@ -100,12 +106,15 @@ describe('resolveAccessibleKiloSession', () => {
     ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentSessionScopeId: null,
     });
   });
 
   it('propagates authoritative lookup failures', async () => {
     sessionCache.getAccess.mockResolvedValue(null);
-    queryAccessibleKiloSessionMock.mockRejectedValue(new Error('database unavailable'));
+    queryAccessibleKiloSessionWithSessionScopeMock.mockRejectedValue(
+      new Error('database unavailable')
+    );
 
     await expect(
       resolveAccessibleKiloSession(env, {
@@ -120,6 +129,7 @@ describe('resolveAccessibleKiloSession', () => {
     sessionCache.getAccess.mockResolvedValue({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentSessionScopeId: null,
     });
 
     await expect(
@@ -130,7 +140,57 @@ describe('resolveAccessibleKiloSession', () => {
     ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: 'org_current',
+      cloudAgentSessionScopeId: null,
     });
-    expect(queryAccessibleKiloSessionMock).not.toHaveBeenCalled();
+    expect(queryAccessibleKiloSessionWithSessionScopeMock).not.toHaveBeenCalled();
+  });
+
+  it('reuses cached access only when the asserted session scope matches', async () => {
+    sessionCache.getAccess.mockResolvedValue({
+      sessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org_current',
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+    });
+
+    await expect(
+      resolveAccessibleKiloSession(env, {
+        kiloUserId: 'usr_member',
+        kiloSessionId: 'ses_12345678901234567890123456',
+        expectedCloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+      })
+    ).resolves.toEqual({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org_current',
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+    });
+    expect(queryAccessibleKiloSessionWithSessionScopeMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to authoritative access for a stale session scope cache entry', async () => {
+    sessionCache.getAccess.mockResolvedValue({
+      sessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org_current',
+      cloudAgentSessionScopeId: null,
+    });
+    queryAccessibleKiloSessionWithSessionScopeMock.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org_current',
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+    });
+
+    await resolveAccessibleKiloSession(env, {
+      kiloUserId: 'usr_member',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      expectedCloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+    });
+
+    expect(queryAccessibleKiloSessionWithSessionScopeMock).toHaveBeenCalledWith(expect.anything(), {
+      kiloUserId: 'usr_member',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      expectedCloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+    });
+    expect(sessionCache.putValidated).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionScopeId: 'cloud-agent-session-scope-1' })
+    );
   });
 });

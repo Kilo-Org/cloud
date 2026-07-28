@@ -35,7 +35,9 @@ reap() {
     if [ -z "$owner" ]; then
       # An ownerless slot may be mid-acquire (mkdir landed, owner write
       # hasn't) — only reap it once it is old enough to be a real orphan.
-      age=$(( now - $(stat -f %m "$s" 2>/dev/null || echo "$now") ))
+      # stat -f %m is BSD/macOS; stat -c %Y is GNU/Linux.
+      mtime=$(stat -f %m "$s" 2>/dev/null || stat -c %Y "$s" 2>/dev/null || echo "$now")
+      age=$(( now - mtime ))
       [ "$age" -gt 60 ] && rm -rf "$s"
       continue
     fi

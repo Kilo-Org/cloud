@@ -43,6 +43,13 @@
       "when": 1785248685068,
       "tag": "0005_fuzzy_senator_kelly",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785253984099,
+      "tag": "0006_hard_blizzard",
+      "breakpoints": true
     }
   ]
 }

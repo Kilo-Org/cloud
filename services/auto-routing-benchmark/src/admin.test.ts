@@ -9,6 +9,7 @@ import {
 import { app } from './index';
 import { computeEngineIdentity } from './run';
 import type * as DbModule from './db';
+import type * as ProfilesModule from './profiles';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 
 function makeSummary(model: string): BenchmarkModelSummary {
@@ -96,6 +97,15 @@ vi.mock('./db', async importOriginal => {
   };
 });
 
+vi.mock('./profiles', async importOriginal => {
+  const actual = await importOriginal<typeof ProfilesModule>();
+  return {
+    ...actual,
+    registerProfiles: vi.fn(),
+    lookupProfileStatuses: vi.fn(),
+  };
+});
+
 import {
   exactPairKey,
   getConfigRows,
@@ -109,6 +119,7 @@ import {
   markStaleRunsFailed,
   replaceConfig,
 } from './db';
+import { lookupProfileStatuses, ProfileQuotaExceededError, registerProfiles } from './profiles';
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn();
@@ -176,6 +187,8 @@ beforeEach(() => {
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
+  vi.mocked(registerProfiles).mockReset();
+  vi.mocked(lookupProfileStatuses).mockReset();
   queueSendBatch.mockResolvedValue(undefined);
 });
 
@@ -748,5 +761,116 @@ describe('GET /admin/classifier-winner', () => {
     const res = await authedGet('/admin/classifier-winner');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ winner });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /admin/profiles/register + /admin/profiles/status
+// ---------------------------------------------------------------------------
+
+describe('POST /admin/profiles/register', () => {
+  it('returns 400 when benchmark config is not set', async () => {
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b', variant: null }],
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('benchmark config not set'),
+    });
+    expect(registerProfiles).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for malformed body', async () => {
+    // Validation fails before the handler reads config — do not queue a
+    // mockResolvedValueOnce here or it will leak into later tests.
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [],
+    });
+    expect(res.status).toBe(400);
+    expect(registerProfiles).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 with statuses on successful admission', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(registerProfiles).mockResolvedValueOnce({
+      statuses: [
+        { entry: { model: 'a/b', variant: null }, status: 'pending', failureReason: null },
+      ],
+    });
+
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'a/b', variant: null }],
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      statuses: [
+        { entry: { model: 'a/b', variant: null }, status: 'pending', failureReason: null },
+      ],
+    });
+    expect(registerProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ deciderRepetitions: 1 }),
+      expect.objectContaining({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries: [{ model: 'a/b', variant: null }],
+        retryEntries: [{ model: 'a/b', variant: null }],
+      })
+    );
+  });
+
+  it('returns 429 with retryAt when quota is exceeded', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(registerProfiles).mockRejectedValueOnce(
+      new ProfileQuotaExceededError({
+        error:
+          'Profile benchmark request limit reached. New benchmarks can be requested after 2026-07-29T12:00:00.000Z.',
+        retryAt: '2026-07-29T12:00:00.000Z',
+      })
+    );
+
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'org',
+      ownerId: 'o1',
+      entries: [{ model: 'a/b', variant: 'xhigh' }],
+    });
+    expect(res.status).toBe(429);
+    await expect(res.json()).resolves.toEqual({
+      error:
+        'Profile benchmark request limit reached. New benchmarks can be requested after 2026-07-29T12:00:00.000Z.',
+      retryAt: '2026-07-29T12:00:00.000Z',
+    });
+  });
+});
+
+describe('POST /admin/profiles/status', () => {
+  it('returns 400 when benchmark config is not set', async () => {
+    const res = await authedPost('/admin/profiles/status', {
+      entries: [{ model: 'a/b', variant: null }],
+    });
+    expect(res.status).toBe(400);
+    expect(lookupProfileStatuses).not.toHaveBeenCalled();
+  });
+
+  it('returns current statuses', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({
+      statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
+    });
+
+    const res = await authedPost('/admin/profiles/status', {
+      entries: [{ model: 'a/b', variant: null }],
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
+    });
   });
 });

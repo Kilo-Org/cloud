@@ -609,6 +609,43 @@ describe('owner pool settings wire contracts', () => {
     });
     expect(parsed.poolStatuses).toHaveLength(1);
   });
+
+  it('accepts optional retryEntries that are a subset of pool by poolEntryKey', () => {
+    const pool = [
+      { model: 'a/b', variant: null as string | null },
+      { model: 'c/d', variant: 'xhigh' as string | null },
+    ];
+    const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: 'cost_per_accuracy',
+      pool,
+      retryEntries: [{ model: 'c/d', variant: 'xhigh' }],
+    });
+    expect(parsed.retryEntries).toEqual([{ model: 'c/d', variant: 'xhigh' }]);
+  });
+
+  it('rejects retryEntries that are not in pool', () => {
+    const result = UpdateAutoRoutingSettingsRequestSchema.safeParse({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: null,
+      pool: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'other/model', variant: 'max' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects retryEntries when pool is null', () => {
+    const result = UpdateAutoRoutingSettingsRequestSchema.safeParse({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: null,
+      pool: null,
+      retryEntries: [{ model: 'a/b', variant: null }],
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('benchmark profile request entry bounds', () => {
@@ -641,5 +678,37 @@ describe('benchmark profile request entry bounds', () => {
     expect(
       BenchmarkProfileStatusesRequestSchema.safeParse({ entries: eleven.slice(0, 1) }).success
     ).toBe(true);
+  });
+
+  it('accepts optional retryEntries that are a subset of entries', () => {
+    const entries = [
+      { model: 'a/b', variant: null as string | null },
+      { model: 'c/d', variant: 'xhigh' as string | null },
+    ];
+    expect(
+      RegisterBenchmarkProfilesRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries,
+      }).success
+    ).toBe(true);
+    expect(
+      RegisterBenchmarkProfilesRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries,
+        retryEntries: [{ model: 'a/b', variant: null }],
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects retryEntries that are not in entries', () => {
+    const result = RegisterBenchmarkProfilesRequestSchema.safeParse({
+      ownerType: 'org',
+      ownerId: 'o1',
+      entries: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'other/model', variant: 'max' }],
+    });
+    expect(result.success).toBe(false);
   });
 });

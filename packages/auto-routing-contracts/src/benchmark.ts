@@ -3,6 +3,7 @@ import {
   CustomRoutingTableSchema,
   EfficientModelPoolSchema,
   PoolEntrySchema,
+  poolEntryKey,
   RoutingTableSchema,
 } from './routing-table';
 import { ReasoningEffortSchema } from './reasoning';
@@ -272,11 +273,30 @@ export const BenchmarkProfileEntryStatusSchema = z.object({
 });
 export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntryStatusSchema>;
 
-export const RegisterBenchmarkProfilesRequestSchema = z.object({
-  ownerType: BenchmarkProfileOwnerTypeSchema,
-  ownerId: z.string().trim().min(1),
-  entries: EfficientModelPoolSchema,
-});
+export const RegisterBenchmarkProfilesRequestSchema = z
+  .object({
+    ownerType: BenchmarkProfileOwnerTypeSchema,
+    ownerId: z.string().trim().min(1),
+    entries: EfficientModelPoolSchema,
+    // Subset of `entries` the owner explicitly retries after a terminal failure.
+    // Absent/empty means no explicit retries (failed current profiles are reported
+    // without re-admission).
+    retryEntries: z.array(PoolEntrySchema).optional(),
+  })
+  .superRefine((request, ctx) => {
+    if (!request.retryEntries || request.retryEntries.length === 0) return;
+    const entryKeys = new Set(request.entries.map(poolEntryKey));
+    request.retryEntries.forEach((entry, index) => {
+      const key = poolEntryKey(entry);
+      if (!entryKeys.has(key)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['retryEntries', index],
+          message: `retryEntry must appear in entries: ${key}`,
+        });
+      }
+    });
+  });
 export type RegisterBenchmarkProfilesRequest = z.infer<
   typeof RegisterBenchmarkProfilesRequestSchema
 >;

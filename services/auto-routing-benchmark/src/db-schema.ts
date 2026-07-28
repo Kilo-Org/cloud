@@ -1,6 +1,18 @@
 import { sql } from 'drizzle-orm';
-import { integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { BenchmarkKind, BenchmarkRunStatus } from '@kilocode/auto-routing-contracts';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
+import type {
+  BenchmarkKind,
+  BenchmarkProfileStatus,
+  BenchmarkRunStatus,
+} from '@kilocode/auto-routing-contracts';
 
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
 // via wrangler d1 migrations apply.
@@ -177,4 +189,59 @@ export const routingTableCandidates = sqliteTable(
     variant: text('variant').notNull().default(''),
   },
   table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
+);
+
+/**
+ * Global Benchmark-profile registry: one current row per exact Pool entry per
+ * engine identity + repetitions. Old-engine rows remain as history; currency
+ * is decided by matching the live decider engine identity and repetitions.
+ */
+export const benchmarkProfiles = sqliteTable(
+  'benchmark_profiles',
+  {
+    model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    status: text('status').$type<BenchmarkProfileStatus>().notNull(),
+    // Provenance of the run that measured / is measuring this profile.
+    run_id: text('run_id'),
+    failure_reason: text('failure_reason'),
+    requested_at: text('requested_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+    completed_at: text('completed_at'),
+  },
+  table => [
+    primaryKey({
+      columns: [table.model, table.variant, table.engine_identity, table.repetitions],
+    }),
+  ]
+);
+
+/**
+ * Rolling owner admission ledger for the 24h profile request quota. One row
+ * per charged admission (new under current engine, or explicit failed retry).
+ * Stale engine-drift re-admissions are free and do not insert here.
+ */
+export const profileRequestEvents = sqliteTable(
+  'profile_request_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    owner_type: text('owner_type').notNull(),
+    owner_id: text('owner_id').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    admitted_at: text('admitted_at').notNull(),
+  },
+  table => [
+    // Lookup window: count an owner's admissions in the preceding 24 hours.
+    index('IDX_profile_request_events_owner_admitted').on(
+      table.owner_type,
+      table.owner_id,
+      table.admitted_at
+    ),
+  ]
 );

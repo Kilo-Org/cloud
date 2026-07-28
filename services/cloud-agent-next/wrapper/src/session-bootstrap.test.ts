@@ -186,108 +186,22 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(authFile).not.toContain('wrapper-dispatch-ticket');
   });
 
-  it('shallow-clones and fetches only the reviewed branch for code review sessions', async () => {
+  it('uses a blobless partial clone for GitHub/GitLab code review sessions', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.env.KILO_PLATFORM = 'code-review';
     request.materialized.setupCommands = [];
-    request.repo = {
-      kind: 'git',
-      url: 'https://bitbucket.org/acme/repo.git',
-      token: 'bb-token',
-      platform: 'bitbucket',
-    };
-    request.workspace.branchName = 'feature/login';
 
-    const gitCalls: Array<{ args: string[]; opts?: { hardTimeoutMs?: number } }> = [];
-    await prepareWrapperBootstrapWorkspace(
-      request,
-      mock(() => {}),
-      {
-        git: async (args, opts) => {
-          gitCalls.push({ args, opts: opts as { hardTimeoutMs?: number } });
-          if (args[0] === 'clone') {
-            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
-              recursive: true,
-            });
-          }
-          if (args[0] === 'rev-parse') {
-            // The targeted fetch populates the remote-tracking ref for the
-            // reviewed branch; the local branch does not exist yet.
-            return {
-              stdout: '',
-              stderr: '',
-              exitCode: args.includes('origin/feature/login') ? 0 : 1,
-            };
-          }
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-        restoreSession: async () => ({
-          ok: true,
-          downloaded: false,
-          imported: true,
-          diffs: { applied: 0, skipped: 0, total: 0 },
-        }),
-      }
-    );
-
-    const cloneCall = gitCalls.find(call => call.args[0] === 'clone');
-    expect(cloneCall?.args).toEqual([
-      'clone',
-      '--progress',
-      '--depth',
-      '1',
-      'https://x-token-auth:bb-token@bitbucket.org/acme/repo.git',
-      request.workspace.workspacePath,
-    ]);
-    expect(cloneCall?.opts?.hardTimeoutMs).toBe(600_000);
-    // A shallow clone is single-branch, so the fetch must use an explicit
-    // refspec to create refs/remotes/origin/<branch>; a bare fetch would only
-    // update FETCH_HEAD and the reviewed tree would never be checked out.
-    expect(
-      gitCalls.some(
-        call =>
-          call.args.join(' ') ===
-          'fetch --progress --depth 1 origin +feature/login:refs/remotes/origin/feature/login'
-      )
-    ).toBe(true);
-    // The reviewed tree is checked out from the fetched remote-tracking ref, not
-    // created off the default branch.
-    expect(
-      gitCalls.some(
-        call => call.args.join(' ') === 'checkout --progress -B feature/login origin/feature/login'
-      )
-    ).toBe(true);
-    // The all-refs, full-history fetch must not run for a review session.
-    expect(gitCalls.some(call => call.args.join(' ') === 'fetch --progress origin')).toBe(false);
-  });
-
-  it('falls back to a full clone when the shallow clone fails', async () => {
-    const request = makeRequest(tmpDir);
-    request.materialized.env.KILO_PLATFORM = 'code-review';
-    request.materialized.setupCommands = [];
-    request.repo = {
-      kind: 'git',
-      url: 'https://bitbucket.org/acme/repo.git',
-      token: 'bb-token',
-      platform: 'bitbucket',
-    };
-    request.workspace.branchName = 'feature/login';
-
-    const cloneArgs: string[][] = [];
+    const gitCalls: string[][] = [];
     await prepareWrapperBootstrapWorkspace(
       request,
       mock(() => {}),
       {
         git: async args => {
+          gitCalls.push(args);
           if (args[0] === 'clone') {
-            cloneArgs.push(args);
-            if (args.includes('--depth')) {
-              return { stdout: '', stderr: 'shallow not supported', exitCode: 1 };
-            }
             await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
               recursive: true,
             });
-            return { stdout: '', stderr: '', exitCode: 0 };
           }
           if (args[0] === 'rev-parse') {
             return { stdout: '', stderr: '', exitCode: 1 };
@@ -303,9 +217,55 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       }
     );
 
-    expect(cloneArgs.length).toBe(2);
-    expect(cloneArgs[0]).toContain('--depth');
-    expect(cloneArgs[1]).not.toContain('--depth');
+    // Full history is retained (no --depth); only file blobs are deferred, so
+    // incremental `git diff` and merge-base keep working.
+    const cloneCall = gitCalls.find(args => args[0] === 'clone');
+    expect(cloneCall).toContain('--filter=blob:none');
+    expect(cloneCall).not.toContain('--depth');
+  });
+
+  it('keeps a full clone (no blobless filter) for Bitbucket review sessions', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://bitbucket.org/acme/repo.git',
+      token: 'bb-token',
+      platform: 'bitbucket',
+    };
+    request.workspace.branchName = 'feature/login';
+
+    const gitCalls: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          gitCalls.push(args);
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    // Bitbucket's origin is credential-stripped after bootstrap, so a deferred
+    // blob could never be lazily fetched — it keeps a normal full clone.
+    const cloneCall = gitCalls.find(args => args[0] === 'clone');
+    expect(cloneCall).not.toContain('--filter=blob:none');
   });
 
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {

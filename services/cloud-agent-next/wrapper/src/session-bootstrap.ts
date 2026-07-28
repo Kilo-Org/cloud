@@ -25,9 +25,6 @@ import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-erro
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
 const LONG_COMMAND_HARD_TIMEOUT_MS = 300_000;
-// Cloud code-review clones may fall back to a full clone on large repositories;
-// give the git clone/fetch steps extra headroom in review sessions only.
-const REVIEW_GIT_HARD_TIMEOUT_MS = 10 * 60_000;
 // Setup commands may legitimately stay silent for minutes (piped tools often
 // buffer), unlike git commands which run with --progress, so they get a more
 // lenient silence watchdog.
@@ -248,13 +245,12 @@ function longGitOptions(
   progress: BootstrapProgress | undefined,
   step: 'cloning' | 'branch',
   progressPrefix: string,
-  cwd?: string,
-  hardTimeoutMs: number = LONG_COMMAND_HARD_TIMEOUT_MS
+  cwd?: string
 ): ProcessOptions {
   return {
     cwd,
     inactivityTimeoutMs: LONG_COMMAND_INACTIVITY_TIMEOUT_MS,
-    hardTimeoutMs,
+    hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
     onOutput: gitProgressReporter(progress, step, progressPrefix),
   };
 }
@@ -340,6 +336,15 @@ function isCodeReviewSession(request: WrapperSessionReadyRequest): boolean {
   return request.materialized.env.KILO_PLATFORM === 'code-review';
 }
 
+function isBitbucketReviewSession(
+  request: WrapperSessionReadyRequest
+): request is WrapperSessionReadyRequest & {
+  repo: Extract<NonNullable<WrapperSessionReadyRequest['repo']>, { kind: 'git' }>;
+} {
+  const repo = request.repo;
+  return isCodeReviewSession(request) && repo?.kind === 'git' && repo.platform === 'bitbucket';
+}
+
 async function cloneRepository(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner,
@@ -354,37 +359,30 @@ async function cloneRepository(
   const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
   const platform = repo.kind === 'git' ? repo.platform : 'github';
   const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
-
-  // Cloud code review reads the diff from the provider API (bb/gh pr diff) and
-  // only needs the head working tree, never git history. A shallow clone keeps
-  // clone time bounded by the working tree instead of full history, which on
-  // large repositories otherwise exceeds the clone hard timeout. Any failure
-  // retries a full clone so a review is never lost to the optimization.
-  const reviewSession = isCodeReviewSession(request);
-  const shallow = reviewSession || repo.shallow === true;
-  const hardTimeoutMs = reviewSession ? REVIEW_GIT_HARD_TIMEOUT_MS : LONG_COMMAND_HARD_TIMEOUT_MS;
-
-  const runClone = async (useShallow: boolean): Promise<ExecResult> => {
-    await removePath(request.workspace.workspacePath, signal);
-    await fs.mkdir(path.dirname(request.workspace.workspacePath), { recursive: true });
-    const args = ['clone', '--progress'];
-    if (useShallow) {
-      args.push('--depth', '1');
-    }
-    args.push(repoUrl, request.workspace.workspacePath);
-    return runGit(
-      args,
-      longGitOptions(progress, 'cloning', 'Cloning repository...', undefined, hardTimeoutMs)
-    );
-  };
-
-  let result = await runClone(shallow);
-  if (result.exitCode !== 0 && shallow) {
-    logToFile(
-      `bootstrap shallow clone failed; retrying full clone kiloSessionId=${request.kiloSessionId}`
-    );
-    result = await runClone(false);
+  const args = ['clone', '--progress'];
+  if (repo.shallow) {
+    args.push('--depth', '1');
   }
+  // GitHub/GitLab code review reads changed files from the working tree and gets
+  // the PR diff from the provider API or a local `git diff <prev>..HEAD`. It needs
+  // the full commit graph but not every historical file blob, so a blobless
+  // partial clone keeps the clone bounded by the current working tree (git fetches
+  // blobs lazily on demand) instead of full history, which on large repositories
+  // otherwise exceeds the clone timeout. Full history is retained, so incremental
+  // diffs and merge-base still work; remotes without partial-clone support ignore
+  // the filter and perform a normal full clone, so no fallback is needed.
+  // Bitbucket is excluded: its origin is credential-stripped after bootstrap (no
+  // outbound credential injection), so a deferred blob could never be fetched. It
+  // keeps a normal full clone.
+  if (isCodeReviewSession(request) && !isBitbucketReviewSession(request)) {
+    args.push('--filter=blob:none');
+  }
+  args.push(repoUrl, request.workspace.workspacePath);
+
+  await removePath(request.workspace.workspacePath, signal);
+  await fs.mkdir(path.dirname(request.workspace.workspacePath), { recursive: true });
+
+  const result = await runGit(args, longGitOptions(progress, 'cloning', 'Cloning repository...'));
   if (result.exitCode !== 0) {
     throw gitOperationError(result, 'clone');
   }
@@ -465,39 +463,10 @@ async function prepareBranch(
     return;
   }
 
-  const reviewSession = isCodeReviewSession(request);
-  const hardTimeoutMs = reviewSession ? REVIEW_GIT_HARD_TIMEOUT_MS : LONG_COMMAND_HARD_TIMEOUT_MS;
-
-  // Cloud code review only needs the reviewed branch, so fetch just that branch
-  // instead of every ref with full history. A shallow clone is single-branch
-  // (`--depth 1` implies `--single-branch`), so its configured refspec covers
-  // only the default branch; an explicit `+<branch>:refs/remotes/origin/<branch>`
-  // refspec is required to populate the remote-tracking ref the checkout below
-  // relies on, since a bare `git fetch origin <branch>` would only update
-  // FETCH_HEAD. Fall back to a full-depth fetch of the same branch on failure so
-  // a review is never lost to the optimization.
-  let fetchResult: ExecResult;
-  if (reviewSession || request.repo?.shallow === true) {
-    const branchRefspec = `+${branchName}:refs/remotes/origin/${branchName}`;
-    fetchResult = await runGit(
-      ['fetch', '--progress', '--depth', '1', 'origin', branchRefspec],
-      longGitOptions(progress, 'branch', 'Fetching branch...', workspacePath, hardTimeoutMs)
-    );
-    if (fetchResult.exitCode !== 0) {
-      logToFile(
-        `bootstrap shallow branch fetch failed; retrying full fetch kiloSessionId=${request.kiloSessionId}`
-      );
-      fetchResult = await runGit(
-        ['fetch', '--progress', 'origin', branchRefspec],
-        longGitOptions(progress, 'branch', 'Fetching branch...', workspacePath, hardTimeoutMs)
-      );
-    }
-  } else {
-    fetchResult = await runGit(
-      ['fetch', '--progress', 'origin'],
-      longGitOptions(progress, 'branch', 'Fetching repository...', workspacePath, hardTimeoutMs)
-    );
-  }
+  const fetchResult = await runGit(
+    ['fetch', '--progress', 'origin'],
+    longGitOptions(progress, 'branch', 'Fetching repository...', workspacePath)
+  );
   if (fetchResult.exitCode !== 0) {
     throw gitOperationError(fetchResult, 'checkout');
   }
@@ -546,15 +515,13 @@ async function sanitizeBitbucketCodeReviewRemote(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
 ): Promise<boolean> {
-  const repo = request.repo;
-  if (
-    repo?.kind !== 'git' ||
-    repo.platform !== 'bitbucket' ||
-    request.materialized.env.KILO_PLATFORM !== 'code-review'
-  ) {
+  // Single source of truth with the blobless-skip check in cloneRepository: the
+  // filter is skipped for exactly this session type because this function strips
+  // origin credentials, which would break a partial clone's later blob fetches.
+  if (!isBitbucketReviewSession(request)) {
     return false;
   }
-  const canonicalUrl = new URL(repo.url);
+  const canonicalUrl = new URL(request.repo.url);
   canonicalUrl.username = '';
   canonicalUrl.password = '';
   const result = await runGit(['remote', 'set-url', 'origin', canonicalUrl.toString()], {

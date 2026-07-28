@@ -14,7 +14,7 @@ This machine is shared by parallel workflows. Before starting a stack, booting a
 
 - Default 3 slots, machine-global, owned by tmux session name; a dead session's slot is reclaimed automatically, so a crash cannot wedge the queue.
 - `acquire` blocking is correct behavior, not a hang and not a wedge. Wait for it. Never start device work unslotted because the queue was busy, because your phase looks small, or because a stack is already up.
-- Acquiring is idempotent per session; every device phase (repro gate, prewarm, each E2E round) needs a slot.
+- Acquiring is idempotent per session; every device phase (repro gate, each E2E round) needs a slot.
 - Release as soon as the device phase ends. Planning, implementation, review, checks, and CI waits are uncapped — never hold a slot through them.
 
 ## Fresh Worktree Quickstart
@@ -93,11 +93,10 @@ Pinned surface only: REST pull/repo/check-runs/statuses plus GraphQL ops `PrRevi
 Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the claim command prefers an unclaimed shutdown iPhone and boots it:
 
 ```bash
-pnpm dev:mobile:simulator claim [udid] --phase prewarm   # prewarm verifier
-pnpm dev:mobile:simulator claim [udid] --phase verify    # fresh acceptance verifier reclaims the same device
+pnpm dev:mobile:simulator claim [udid]   # idempotent per worktree
 ```
 
-The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename> - <phase>` and restores the original name on release. Never call `xcrun simctl rename` yourself.
+The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. A claim is stale — and silently reclaimable — once its owning worktree is deleted; release explicitly anyway.
 
 Install a validated cached native build. A compatible fingerprint skips rebuilding; a cache miss serializes through the host-wide native compiler semaphore. Never install an arbitrary DerivedData app or run a separate Expo native build:
 

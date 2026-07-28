@@ -297,7 +297,7 @@ export default function UsageRecordsContent() {
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 lg:items-start xl:grid-cols-[8rem_minmax(11rem,1fr)_minmax(20rem,1.5fr)_7rem_9rem_9rem_auto] xl:gap-3"
+            className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[8rem_minmax(16rem,1fr)_7rem_9rem_8rem] xl:items-start xl:gap-3"
             onSubmit={event => {
               event.preventDefault();
               const trimmed = value.trim();
@@ -368,7 +368,7 @@ export default function UsageRecordsContent() {
               if (unchanged) void results.refetch();
             }}
           >
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 xl:col-start-1 xl:row-start-1">
               <Label htmlFor="usage-search-kind">Search by</Label>
               <Select value={kind} onValueChange={next => setKind(next as SearchKind)}>
                 <SelectTrigger id="usage-search-kind" className="w-full">
@@ -381,7 +381,7 @@ export default function UsageRecordsContent() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 lg:col-span-1 xl:col-start-2 xl:row-start-1">
               <Label htmlFor="usage-search-value">Exact value</Label>
               <Input
                 id="usage-search-value"
@@ -392,7 +392,7 @@ export default function UsageRecordsContent() {
                 onChange={event => setValue(event.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 xl:col-start-3 xl:row-start-1">
               <Label htmlFor="usage-search-status">Status</Label>
               <Select
                 value={status}
@@ -424,7 +424,7 @@ export default function UsageRecordsContent() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 xl:col-start-4 xl:row-start-1">
               <Label htmlFor="usage-search-close-reason">Close reason</Label>
               <Select
                 value={closeReason}
@@ -456,7 +456,7 @@ export default function UsageRecordsContent() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 xl:col-start-5 xl:row-start-1">
               <Label htmlFor="usage-search-sku">SKU</Label>
               <Select
                 value={skuId}
@@ -483,7 +483,7 @@ export default function UsageRecordsContent() {
               </Select>
             </div>
             {(kind === 'user' || kind === 'org') && (
-              <div className="space-y-1.5 md:col-span-2 lg:col-span-2 xl:col-span-1">
+              <div className="space-y-1.5 lg:col-span-2 xl:col-span-4 xl:col-start-1 xl:row-start-2">
                 <Label>Usage window</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
@@ -528,14 +528,14 @@ export default function UsageRecordsContent() {
                 )}
               </div>
             )}
-            <div className="space-y-1.5 md:col-span-2 lg:col-span-1">
+            <div className="space-y-1.5 lg:col-span-2 xl:col-span-1 xl:col-start-5 xl:row-start-2">
               <Label className="invisible" aria-hidden="true">
                 Actions
               </Label>
-              <div className="grid grid-cols-2 gap-2 xl:flex">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="submit"
-                  className="w-full xl:w-auto"
+                  className="w-full"
                   disabled={results.isFetching || !value.trim()}
                 >
                   <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
@@ -543,7 +543,7 @@ export default function UsageRecordsContent() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full xl:w-auto"
+                  className="w-full"
                   onClick={() => {
                     setValue('');
                     setStatus('all');

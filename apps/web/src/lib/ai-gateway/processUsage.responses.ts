@@ -17,6 +17,7 @@ import {
   computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelIsByok,
+  extractVercelUpstreamId,
 } from '@/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 
@@ -210,7 +211,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
     responseContent,
     inference_provider,
     finish_reason,
-    upstream_id: null,
+    upstream_id: extractVercelUpstreamId(providerMetadata),
     latency: null,
     moderation_latency: null,
     generation_time: null,
@@ -240,7 +241,7 @@ export function parseResponsesMicrodollarUsageFromString(
     model: responseJson?.model ?? null,
     responseContent: responseJson?.output ? extractResponseContent(responseJson.output) : '',
     inference_provider,
-    upstream_id: null,
+    upstream_id: extractVercelUpstreamId(providerMetadata),
     finish_reason: responseJson?.status ?? null,
     latency: null,
     moderation_latency: null,

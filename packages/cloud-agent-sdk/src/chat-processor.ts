@@ -1,7 +1,7 @@
 import { stripPartContentIfFile } from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
-import type { UserMessage, TextPart, Part, ToolPart } from '@kilocode/app-shared/opencode';
+import type { UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
 
 type ChatProcessor = {
   process(event: ChatEvent): void;
@@ -37,7 +37,7 @@ function emitImageAttachmentsBeforeStrip(
   onImageAttachment: NonNullable<ChatProcessorOptions['onImageAttachment']>
 ): void {
   if (part.type !== 'tool') return;
-  const toolPart = part as ToolPart;
+  const toolPart = part;
   if (toolPart.state.status !== 'completed' || !toolPart.state.attachments) return;
 
   for (const attachment of toolPart.state.attachments) {

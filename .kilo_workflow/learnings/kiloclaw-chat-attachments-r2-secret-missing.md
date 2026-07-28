@@ -1,5 +1,13 @@
 # KiloClaw chat attachment uploads fail locally: R2 media secrets absent machine-wide
 
+> **RESOLVED 2026-07-28 (r2):** the `R2_*_KILOCHAT_MEDIA` pair now exists in the Secrets Store and
+> `dev:start` provisions it from that canonical source like any source-backed secret
+> (`⊕ secret: R2_ACCESS_KEY_ID_KILOCHAT_MEDIA @from …`); verified in the local secrets-store KV and
+> end-to-end (`/v1/attachments/init 200`, chip `ready`, send 201). Everything below is the historical
+> r1 record — the "no canonical source" claim is stale. If the symptom ever recurs, first check whether
+> the store lost the pair again, then whether the worktree's `.wrangler/state` secrets KV is stale
+> (re-run `dev:start`).
+
 Symptom: mobile E2E on the KiloClaw chat composer (`chat/[sandbox-id]/[conversation-id]`): picking an under-limit
 file adds a chip that immediately goes to `failed` (a11y `Retry upload for <name>`); kilo-chat logs
 `POST /v1/attachments/init 500` with `Error: Secret "R2_ACCESS_KEY_ID_KILOCHAT_MEDIA" not found`.

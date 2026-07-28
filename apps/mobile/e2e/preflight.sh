@@ -51,7 +51,9 @@ if ! grep -Fq "Starting project at $REPO_ROOT/apps/mobile" <<<"$MOBILE_LOG"; the
   printf 'Metro does not belong to this worktree: %s\n' "$REPO_ROOT" >&2
   exit 1
 fi
-if ! grep -Eq 'iOS Bundled|Starting Metro Bundler' <<<"$MOBILE_LOG"; then
+# "Starting Metro Bundler" scrolls out of the captured window on a long-lived
+# stack, leaving the per-platform bundle lines as the only readiness evidence.
+if ! grep -Eq '(iOS|Android) Bundled|Starting Metro Bundler' <<<"$MOBILE_LOG"; then
   printf 'Metro has not reached a usable state for %s\n' "$REPO_ROOT" >&2
   exit 1
 fi
@@ -79,7 +81,7 @@ NODE
 METRO_URL="http://${MOBILE_HOST}:${METRO_PORT}"
 MANIFEST="$(mktemp)"
 trap 'rm -f "$SESSION_PROBE" "$MANIFEST"' EXIT
-curl -sS -H 'expo-platform: ios' -H 'expo-protocol-version: 1' \
+curl -sS -H "expo-platform: $PLATFORM" -H 'expo-protocol-version: 1' \
   -H 'accept: application/expo+json,application/json' "$METRO_URL" >"$MANIFEST"
 node - "$MANIFEST" "http://${MOBILE_HOST}:${EXPECTED_API_PORT}" "$REPO_ROOT" <<'NODE'
 const fs = require('node:fs');

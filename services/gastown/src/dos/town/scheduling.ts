@@ -36,6 +36,7 @@ type SchedulingContext = {
   getRigConfig: (rigId: string) => Promise<RigConfig | null>;
   resolveKilocodeToken: () => Promise<string | undefined>;
   emitEvent: (data: Omit<GastownEventData, 'userId' | 'delivery'>) => void;
+  prepareContainerBilling: () => Promise<void>;
 };
 
 type RigConfig = {
@@ -77,6 +78,7 @@ export async function dispatchAgent(
 
     const townConfig = await ctx.getTownConfig();
     const kilocodeToken = await ctx.resolveKilocodeToken();
+    await ctx.prepareContainerBilling();
 
     const convoyId = beadOps.getConvoyForBead(ctx.sql, bead.bead_id);
     const convoyFeatureBranch = convoyId ? beadOps.getConvoyFeatureBranch(ctx.sql, convoyId) : null;

@@ -55,7 +55,7 @@ The cwd/worktree is always the **cloud** worktree, even when the slice edits a s
 
 What the script encodes (details in `learnings/`):
 
-- tmux wrapping — harness command timeouts kill bare long runs. The `e2e-verifier` gets its **own tmux session** (E2E slots are owned and auto-reclaimed by session name; a window-named owner leaks or shares slots); other roles run as windows in the dispatcher's session. Names are `<section>-<role>-<label>`, logs `$SCRATCH/<role>-<label>.log`.
+- tmux wrapping — harness command timeouts kill bare long runs. The `e2e-verifier` gets its **own tmux session** (E2E slots are owned and auto-reclaimed by session name; a window-named owner leaks or shares slots); other roles run as windows in the dispatcher's session, resolved through `$TMUX_PANE`. A dispatcher that is not itself inside tmux has no such session, so its roles get their own sessions too — never a guessed one. Names are `<section>-<role>-<label>`, logs `$SCRATCH/<role>-<label>.log`.
 - Full `KILO_*`/`OPENCODE*` env strip — a dispatcher running inside kilo poisons nested runs otherwise (see `learnings/nested-kilo-run-env-poisoning.md`).
 - Output redirected, never piped (`| tee` makes `$?` report the pipe's exit, not kilo's), with `EXITCODE=$?` appended as the log's last line.
 
@@ -67,6 +67,26 @@ Wait event-driven: the run is done when the tmux window/session is gone or `tail
 Role boundaries — reviewers never modify the tree, the implementer never commits, no role dispatches agents — are enforced by instruction, not permission. This is deliberate: permission deny lists caused void review rounds (a reviewer whose blocked command made it exit with no verdict, which read as a pass) and takeover churn. The single exception is `task: deny` in the definitions — blocking agent dispatch costs nothing and cannot void a round. The workflow otherwise trades enforcement for reliable rounds and accepts that a misbehaving agent can do what it was told not to; do not "fix" this by re-adding deny lists.
 
 While a role agent runs, its dispatcher checks on it about every 7 minutes and unsticks infrastructure failures only: a wedged or crashed kilo CLI, a dead tmux window, a hung service the agent cannot restart itself. Product, logic, or review problems are not stuck states — route those through the escalation ladder.
+
+### Steering a Live Interactive Session
+
+Worker roles are steered by re-dispatching them (see Escalation). The interactive sessions — starter, planner, orchestrator — are steered in place with [`steer.sh`](steer.sh), never with hand-assembled `tmux send-keys`:
+
+```bash
+.kilo_workflow/steer.sh <section>-orchestrator "Scope change: drop slice 4; commit what holds and open the PR."
+printf '%s' "$AMENDMENT" | .kilo_workflow/steer.sh <section>-orchestrator -   # long or multi-line text via stdin
+```
+
+It prints `running` when the session took the message immediately and `queued` when the message is waiting behind the active turn; either way it is delivered. A non-zero exit means it is **not** delivered — inspect the target rather than sending a second copy. What the script encodes (details in `learnings/steering-a-running-kilo-session.md`):
+
+- Enter as its own keystroke after the text. A trailing `Enter` in the same `send-keys` call submits short messages but is swallowed by long ones, which then sit unsent in the composer — the "wedged" session that is really an undelivered message.
+- Bracketed paste, so a multi-line message stays one prompt. An unbracketed paste submits at every newline, and the first fragment gets acted on before the rest arrives.
+- A refusal to paste into a pane that is not running the kilo CLI — a mistargeted steer executes in a shell.
+- Delivery confirmed from the pane, never assumed.
+
+**`N queued` in the footer is delivery working, not a wedge.** Queued messages land one at a time at turn boundaries, in order, and a session that chains tool calls for tens of minutes holds the whole queue that entire time. Never kill, relaunch, or escalate on a queue count; a wedge needs its own evidence (frozen build timer, stream or api error, dead process — see Planner Monitor Mode). `Escape` does not flush the queue.
+
+Because delivery is ordered and turn-paced, a correction cannot overtake what it corrects: send ONE consolidated, self-contained message per change, never a drip of add-then-retract. When a change must take effect before the current turn ends, kill the session and relaunch it fresh with an updated handoff — faster than waiting on the queue, and it cannot half-apply. Everything a session needs at launch belongs in its launch message and handoff; steering a live one is the exception, not the channel.
 
 ### Escalation
 
@@ -106,7 +126,7 @@ The session the user invokes the workflow from is the starter, running on the ha
 2. Explore the relevant parts of the codebase.
 3. Interrogate the requirements — in `hands on` mode by grilling the user one question at a time, in `hands off` mode by grilling itself and answering from repository evidence, recording material assumptions. Always drive toward the simplest solution that achieves the user's goals, and challenge the request itself: "should we even do this?", "why not do this instead?", "we could achieve the same thing simpler, like this".
 4. Divide the finalized work into related, **disjoint** sections — no two sections may touch the same files or contracts.
-5. For each section: create the dedicated worktree and scratch directory (Ground Rules), write the section brief to `$SCRATCH/brief.md` — the work, the mode, acceptance criteria and constraints gathered so far, the requesting human's GitHub handle for PR assignment, the worktree path, and the scratch path — and launch a planner in a new tmux window on the planner harness and model. `<session>` is the starter's own tmux session (`tmux display-message -p '#S'`), and the `$SCRATCH` value must be expanded by the launching shell (double-quote the tmux command string; the tmux server does not know the variable):
+5. For each section: create the dedicated worktree and scratch directory (Ground Rules), write the section brief to `$SCRATCH/brief.md` — the work, the mode, acceptance criteria and constraints gathered so far, the requesting human's GitHub handle for PR assignment, the worktree path, and the scratch path — and launch a planner in a new tmux window on the planner harness and model. `<session>` is the starter's own tmux session, resolved through its own pane — `tmux display-message -p -t "$TMUX_PANE" '#S'`; never the untargeted `tmux display-message -p '#S'`, which answers with the tmux **server's** current session (the most recently active one) and silently files the window under an unrelated section. A starter that is not itself inside tmux has no such session and `$TMUX_PANE` is unset: launch the planner with `tmux new-session -d -s <section>-planner` instead of guessing a target. The `$SCRATCH` value must be expanded by the launching shell (double-quote the tmux command string; the tmux server does not know the variable):
 
 ```bash
 # kilo planner (the planner agent definition pins permissions; the model is the user's pick):
@@ -180,7 +200,7 @@ A dead orchestrator window is not automatically a crash — check the scratch di
 - Scratch present with `$SCRATCH/final-report.md` → BLOCKED; relay the report to the user and close yourself. Leave the scratch directory alone — it is the blocker's evidence, and its presence is what distinguishes BLOCKED from COMPLETE for anyone who looks later.
 - Scratch present with no final report → a crash; relaunch with a continuation handoff.
 
-A live session waiting on a hands-on user answer is not wedged — read the pane before declaring a wedge. Long kilo runs die on provider stream stalls, and `--interactive` sessions can wedge on provider errors. Relaunch a dead or wedged orchestrator as a **fresh session** (never `--continue`) with a continuation handoff. After three consecutive relaunches with no new progress, stop and write the BLOCKED report yourself — the same rule bounds the starter's planner relaunches: the original handoff plus everything observably done so far — commits, PR state, passed rounds, held resources — assembled from `git log`, the PR, and the dispatch logs, so the new session verifies rather than redoes. See `learnings/kilo-interactive-orchestrator-wedges-relaunch.md`.
+A live session waiting on a hands-on user answer is not wedged, and neither is one holding queued steers (see Steering a Live Interactive Session) — read the pane before declaring a wedge. Long kilo runs die on provider stream stalls, and `--interactive` sessions can wedge on provider errors. Relaunch a dead or wedged orchestrator as a **fresh session** (never `--continue`) with a continuation handoff. After three consecutive relaunches with no new progress, stop and write the BLOCKED report yourself — the same rule bounds the starter's planner relaunches: the original handoff plus everything observably done so far — commits, PR state, passed rounds, held resources — assembled from `git log`, the PR, and the dispatch logs, so the new session verifies rather than redoes. See `learnings/kilo-interactive-orchestrator-wedges-relaunch.md`.
 
 ### 2.1 Plan Reviewer
 
@@ -197,7 +217,7 @@ The orchestrator drives the plan to completion. It is the expensive model steeri
 5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it — assign it to the requesting human, and request reviews per repository convention (cloud: `eshurakov`, `jeanduplessis`; kilocode: additionally `marius-kilocode`, `chrarnoldus`). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
 6. Run the E2E loop (below) when the work has verifiable runtime behavior; skip it for doc-only or equivalently inert changes, recording why in the PR description.
 7. Run the Kilobot loop (below).
-8. When both loops are clean, verify the completion gate, then shut the section down. The PR is the deliverable; everything else closes.
+8. When both loops are clean, verify the completion gate, label the PR `human-ready` (`gh pr edit <n> --add-label human-ready`) as the last act before teardown, then shut the section down. The PR is the deliverable; everything else closes.
 
 Two terminal states, distinguished by what remains on disk:
 
@@ -236,6 +256,7 @@ The work is complete only when every item holds:
 - No generated fixture remains, tracked or untracked; every verifier temporary edit is restored
 - Every resource this run started is shut down or released; resources the run did not start stay running
 - New committed learnings are included in the PR
+- The PR carries the `human-ready` label, added only after every item above holds
 
 A PR waiting on required human review is COMPLETE — the workflow never approves or merges its own PR. A gate item that can never hold is BLOCKED (see step 8), never a reason to loop forever or fake completion.
 
@@ -261,16 +282,19 @@ The machine is shared by parallel workflows, and unslotted device or stack work 
 
 ```bash
 .kilo_workflow/e2e-slot.sh acquire <tmux-session>   # blocks until a slot frees
-.kilo_workflow/e2e-slot.sh status                   # current holders
+.kilo_workflow/e2e-slot.sh status                   # holders, their worktrees, stack coverage
 .kilo_workflow/e2e-slot.sh release <tmux-session>   # the moment the device phase ends
+.kilo_workflow/e2e-slot.sh stacks [--reap]          # stacks running with no slot
 ```
+
+**A slot and a dev stack are the same resource.** The slot is what entitles a worktree to run a stack, and a stack must never outlive it: `release` stops the releasing worktree's stack, and reclaiming a dead holder's slot stops its stack too. So a later round re-acquires and starts a fresh stack rather than inheriting one — that restart is the price of the cap. A stack up with no slot is a defect, not a shortcut; `stacks` lists them and `stacks --reap` stops the workflow-owned ones (a stack with no section run id in its name was started by hand and is only reported). Five live stacks on this host drove the load average past 300 and made every emulator boot and native build time out, which reads as flaky devices rather than as over-subscription.
 
 - Slot state lives in `$HOME/.cache/kilo-e2e-slots`, machine-global by design: every copy of the script — any worktree, any repository — contends for the same slots, and the script has no overrides by design. When working in a repository without the script (a sibling like `~/Projects/kilocode`), invoke it by absolute path from a cloud worktree.
 - This holds on every run, not only when another workflow is visibly active, and a stack that is already up is not an exemption.
 - `acquire` blocking is correct behavior, never a wedge to route around and never a reason to start device work unslotted. If an acquire is still blocked after about 45 minutes, the dispatcher inspects `status` for a wedged foreign holder and reports a blocker instead of waiting forever.
 - The slot caps load, not data: postgres and redis containers are shared across worktrees. Keep test data keyed to this worktree's accounts (the runbooks' per-worktree defaults) and never wipe shared state.
-- Release immediately when the device/stack phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them.
-- Slots are owned by tmux session name and reclaimed automatically when the session dies. A holder that is alive but wedged belongs to its own workflow's monitor — never kill another session to free a slot; if the queue is starved by a foreign wedge, report a blocker to the user instead.
+- Release immediately when the device/stack phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them — and since release takes the stack with it, do not release mid-round while you still need the services.
+- Slots are owned by tmux session name, record the worktree that took them, and are reclaimed automatically when the session dies. A holder that is alive but wedged belongs to its own workflow's monitor — never kill another session to free a slot; if the queue is starved by a foreign wedge, report a blocker to the user instead.
 - The orchestrator is accountable: every device-phase handoff states the slot rule, and a role agent that reports device work with no acquire gets re-dispatched.
 
 ## Feature-State Matrix

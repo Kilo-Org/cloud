@@ -93,6 +93,10 @@ export function ReviewMdConversionDialog({
             Custom Instructions into REVIEW.md, merging with the file if one already exists, and
             opens a {platform === 'gitlab' ? 'merge request' : 'pull request'} for you to review.
           </DialogDescription>
+          <p className="text-muted-foreground text-sm">
+            Heads up: each repository you convert starts a billable cloud agent session that uses
+            your Kilo credits, the same as any other cloud agent run.
+          </p>
         </DialogHeader>
 
         {sortedRepositories.length === 0 ? (

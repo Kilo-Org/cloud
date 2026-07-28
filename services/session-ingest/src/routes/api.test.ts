@@ -1355,6 +1355,7 @@ describe('api routes', () => {
         git_url: null,
         git_branch: null,
         created_on_platform: null,
+        cloud_agent_family_id: 'cloud-agent-family-1',
       },
       {
         session_id: childSessionId,
@@ -1363,6 +1364,7 @@ describe('api routes', () => {
         git_url: null,
         git_branch: null,
         created_on_platform: null,
+        cloud_agent_family_id: 'cloud-agent-family-1',
       },
     ]);
 

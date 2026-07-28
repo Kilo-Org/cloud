@@ -207,9 +207,12 @@ api.delete('/session/:sessionId', async c => {
         eq(cli_sessions_v2.kilo_user_id, kiloUserId)
       )
     );
+  const deletionFamilyId = deletedRows.find(
+    row => row.session_id === parsed.data
+  )?.cloud_agent_family_id;
 
   await db.transaction(async tx => {
-    if (accessibleSession.cloudAgentFamilyId !== null) {
+    if (deletionFamilyId) {
       // Bootstrap and metadata mutations lock the family root before children.
       // Match that order even when deleting a subtree rooted at a child.
       await tx
@@ -217,7 +220,7 @@ api.delete('/session/:sessionId', async c => {
         .from(cli_sessions_v2)
         .where(
           and(
-            eq(cli_sessions_v2.cloud_agent_session_id, accessibleSession.cloudAgentFamilyId),
+            eq(cli_sessions_v2.cloud_agent_session_id, deletionFamilyId),
             eq(cli_sessions_v2.kilo_user_id, kiloUserId),
             isNull(cli_sessions_v2.parent_session_id)
           )

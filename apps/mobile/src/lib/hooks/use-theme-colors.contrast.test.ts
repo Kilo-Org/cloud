@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
 
 vi.mock('react-native', () => ({ useColorScheme: () => 'light' }));
-vi.mock('@react-navigation/native', () => ({ DarkTheme: {}, DefaultTheme: {} }));
+vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
 
 // These are the actual static hex values shipped in
 // `src/lib/hooks/use-theme-colors.ts`. The contrast assertions below fail if

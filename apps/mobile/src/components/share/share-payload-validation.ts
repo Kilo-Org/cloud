@@ -5,7 +5,7 @@ import {
 } from '@/lib/agent-attachments/validate';
 import { type SharePayload } from '@/lib/share-payload';
 
-export type ClassificationReason = 'empty' | 'denied' | 'too-large' | 'unreadable';
+type ClassificationReason = 'empty' | 'denied' | 'too-large' | 'unreadable';
 
 export type RejectedNote = {
   name: string;

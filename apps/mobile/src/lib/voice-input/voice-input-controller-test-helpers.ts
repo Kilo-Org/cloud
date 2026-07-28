@@ -19,7 +19,7 @@ export type VoiceInputNativeControls = {
   permissionRestricted: boolean;
 };
 
-export type VoiceInputNativeMocks = {
+type VoiceInputNativeMocks = {
   abort: Mock<() => void>;
   getPermissions: Mock<() => Promise<VoiceInputNativePermission>>;
   requestPermissions: Mock<() => Promise<VoiceInputNativePermission>>;

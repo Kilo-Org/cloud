@@ -32,8 +32,8 @@ export function resolveOwnerVoiceInputView(
   };
 }
 
-export type VoiceInputControlIcon = 'microphone' | 'stop';
-export type VoiceInputAccessibilityLabel = 'Start voice input' | 'Stop voice input';
+type VoiceInputControlIcon = 'microphone' | 'stop';
+type VoiceInputAccessibilityLabel = 'Start voice input' | 'Stop voice input';
 
 export type VoiceInputControlState = {
   accessibilityLabel: VoiceInputAccessibilityLabel;

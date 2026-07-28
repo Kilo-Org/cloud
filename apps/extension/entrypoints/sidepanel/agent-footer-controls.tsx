@@ -2,9 +2,11 @@ import { useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { Shield, TriangleAlert } from 'lucide-react';
 import { getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
+import type { StoredAuth } from '@/src/shared/auth';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import type { InspectableTab } from '@/src/shared/tab-debugger';
+import { ModelPicker } from './model-picker';
 
 const modeOptions = [
   { label: 'Safe', value: 'safe' },
@@ -129,6 +131,7 @@ const ModeControl = ({
 };
 
 export const AgentFooterControls = ({
+  auth,
   contextDonut,
   inspectableTabs,
   isLoadingTabs,
@@ -145,11 +148,13 @@ export const AgentFooterControls = ({
   onRetryModels,
   onSelectedTabChange,
   onThinkingEffortChange,
+  organizationId,
   selectedTabId,
   tabDebuggerError,
   thinkingEffort,
   thinkingOptions,
 }: {
+  auth: StoredAuth;
   contextDonut?: ReactNode;
   inspectableTabs: InspectableTab[];
   isLoadingTabs: boolean;
@@ -166,6 +171,7 @@ export const AgentFooterControls = ({
   onRetryModels: () => Promise<void>;
   onSelectedTabChange: (tabId: number) => void;
   onThinkingEffortChange: (thinkingEffort: string) => void;
+  organizationId: string | undefined;
   selectedTabId: number | undefined;
   tabDebuggerError: string | undefined;
   thinkingEffort: string;
@@ -217,23 +223,14 @@ export const AgentFooterControls = ({
           mode={mode}
           onChange={onModeChange}
         />
-        <CompactSelectControl
-          ariaLabel="Model"
-          className="flex-1 pl-2 pr-6"
+        <ModelPicker
+          auth={auth}
           disabled={isConversationControlDisabled || isModelSelectDisabled}
-          onChange={onModelChange}
-          value={model}
-        >
-          {modelOptions.length === 0 ? (
-            <option value="">Loading models...</option>
-          ) : (
-            modelOptions.map(option => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))
-          )}
-        </CompactSelectControl>
+          model={model}
+          modelOptions={modelOptions}
+          onModelChange={onModelChange}
+          organizationId={organizationId}
+        />
         <CompactSelectControl
           ariaLabel="Thinking effort"
           className="w-24 pl-2 pr-6"

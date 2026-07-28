@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import { createAssistantMessage, createUserMessage } from './agent-conversation';
 import {
@@ -8,6 +9,7 @@ import {
   deleteStoredConversation,
   getSortedStoredConversationHistory,
   getStoredConversationTitle,
+  LEGACY_CONVERSATION_GREETING,
   openStoredConversation,
   normalizeStoredConversations,
   updateActiveStoredConversationEvents,
@@ -68,16 +70,36 @@ describe('agent conversation tabs', () => {
     ).toBe('Summarize this article');
   });
 
-  it('closes a conversation tab without deleting it from history', () => {
-    const store = createNextStoredConversation(createDefaultStoredConversations());
+  describe('closeStoredConversationTab empty deletion', () => {
+    it('removes an empty conversation from storage when its tab is closed', () => {
+      const store = createNextStoredConversation(createDefaultStoredConversations());
 
-    const updatedStore = closeStoredConversationTab(store, 'conversation-2');
+      const updatedStore = closeStoredConversationTab(store, 'conversation-2');
 
-    expect(updatedStore.conversations.map(conversation => conversation.id)).toStrictEqual([
-      'conversation-1',
-      'conversation-2',
-    ]);
-    expect(updatedStore.openConversationIds).toStrictEqual(['conversation-1']);
+      expect(updatedStore.conversations.map(conversation => conversation.id)).toStrictEqual([
+        'conversation-1',
+      ]);
+      expect(updatedStore.openConversationIds).toStrictEqual(['conversation-1']);
+    });
+
+    it('keeps a non-empty conversation in history when its tab is closed', () => {
+      const withUserMessage = updateActiveStoredConversationEvents(
+        createDefaultStoredConversations(),
+        [createUserMessage('Keep me in history')]
+      );
+      const store = createNextStoredConversation(withUserMessage);
+      // Conversation-1 has a user message; close it while conversation-2 (empty) stays open.
+      const updatedStore = closeStoredConversationTab(store, 'conversation-1');
+
+      expect(updatedStore.conversations.map(conversation => conversation.id)).toStrictEqual([
+        'conversation-1',
+        'conversation-2',
+      ]);
+      expect(updatedStore.openConversationIds).toStrictEqual(['conversation-2']);
+      expect(
+        getSortedStoredConversationHistory(updatedStore).map(conversation => conversation.id)
+      ).toStrictEqual(['conversation-1']);
+    });
   });
 
   it('deletes a conversation from history', () => {
@@ -91,31 +113,39 @@ describe('agent conversation tabs', () => {
     expect(updatedStore.openConversationIds).toStrictEqual(['conversation-1']);
   });
 
-  it('sorts history by updated time', () => {
-    const store = normalizeStoredConversations({
-      store: {
-        activeConversationId: 'conversation-1',
-        conversations: [
-          {
-            events: [],
-            id: 'conversation-1',
-            title: 'Older',
-            updatedAt: '2026-06-24T10:00:00.000Z',
-          },
-          {
-            events: [],
-            id: 'conversation-2',
-            title: 'Newer',
-            updatedAt: '2026-06-24T11:00:00.000Z',
-          },
-        ],
-        openConversationIds: ['conversation-1'],
-      },
-    });
+  describe('sorted stored conversation history', () => {
+    it('returns only conversations with a user message, sorted by updated time', () => {
+      const store = normalizeStoredConversations({
+        store: {
+          activeConversationId: 'conversation-1',
+          conversations: [
+            {
+              events: [createUserMessage('Older user message')],
+              id: 'conversation-1',
+              title: 'Older',
+              updatedAt: '2026-06-24T10:00:00.000Z',
+            },
+            {
+              events: [createUserMessage('Newer user message')],
+              id: 'conversation-2',
+              title: 'Newer',
+              updatedAt: '2026-06-24T11:00:00.000Z',
+            },
+            {
+              events: [],
+              id: 'conversation-3',
+              title: 'Empty open',
+              updatedAt: '2026-06-24T12:00:00.000Z',
+            },
+          ],
+          openConversationIds: ['conversation-1', 'conversation-3'],
+        },
+      });
 
-    expect(
-      getSortedStoredConversationHistory(store).map(conversation => conversation.id)
-    ).toStrictEqual(['conversation-2', 'conversation-1']);
+      expect(
+        getSortedStoredConversationHistory(store).map(conversation => conversation.id)
+      ).toStrictEqual(['conversation-2', 'conversation-1']);
+    });
   });
 
   it('reuses an empty active tab when opening a closed history conversation', () => {
@@ -124,7 +154,7 @@ describe('agent conversation tabs', () => {
         activeConversationId: 'conversation-1',
         conversations: [
           {
-            events: [createAssistantMessage('Pick a tab and ask Kilo to inspect it.')],
+            events: [],
             id: 'conversation-1',
             title: 'Conversation 1',
             updatedAt: '2026-06-24T10:00:00.000Z',
@@ -151,5 +181,123 @@ describe('agent conversation tabs', () => {
     expect(updatedStore.conversations.map(conversation => conversation.id)).toStrictEqual([
       'conversation-2',
     ]);
+  });
+
+  describe('legacy greeting strip (A2.4)', () => {
+    it('strips a leading legacy greeting from a modern stored conversation', () => {
+      const laterUser = createUserMessage('After greeting');
+      const store = normalizeStoredConversations({
+        store: {
+          activeConversationId: 'conversation-1',
+          conversations: [
+            {
+              events: [createAssistantMessage(LEGACY_CONVERSATION_GREETING), laterUser],
+              id: 'conversation-1',
+              title: 'Conversation 1',
+              updatedAt: '2026-06-24T10:00:00.000Z',
+            },
+          ],
+          openConversationIds: ['conversation-1'],
+        },
+      });
+
+      expect(store.conversations[0]?.events).toStrictEqual([laterUser]);
+    });
+
+    it('strips a leading legacy greeting from legacyEvents-only input', () => {
+      const laterAssistant = createAssistantMessage('Real reply');
+      const store = normalizeStoredConversations({
+        legacyEvents: [createAssistantMessage(LEGACY_CONVERSATION_GREETING), laterAssistant],
+      });
+
+      expect(store.conversations[0]?.events).toStrictEqual([laterAssistant]);
+    });
+
+    it('never strips a user message with the same greeting text', () => {
+      const userGreeting = createUserMessage(LEGACY_CONVERSATION_GREETING);
+      const store = normalizeStoredConversations({
+        store: {
+          activeConversationId: 'conversation-1',
+          conversations: [
+            {
+              events: [userGreeting],
+              id: 'conversation-1',
+              title: 'Conversation 1',
+              updatedAt: '2026-06-24T10:00:00.000Z',
+            },
+          ],
+          openConversationIds: ['conversation-1'],
+        },
+      });
+
+      expect(store.conversations[0]?.events).toStrictEqual([userGreeting]);
+    });
+  });
+
+  describe('empty non-open conversation cleanup (A4.6)', () => {
+    it('drops empty conversations that are not open during normalize', () => {
+      const store = normalizeStoredConversations({
+        store: {
+          activeConversationId: 'conversation-1',
+          conversations: [
+            {
+              events: [createUserMessage('Keep open')],
+              id: 'conversation-1',
+              title: 'Open',
+              updatedAt: '2026-06-24T10:00:00.000Z',
+            },
+            {
+              events: [],
+              id: 'conversation-2',
+              title: 'Empty closed',
+              updatedAt: '2026-06-24T11:00:00.000Z',
+            },
+            {
+              events: [createAssistantMessage(LEGACY_CONVERSATION_GREETING)],
+              id: 'conversation-3',
+              title: 'Greeting-only closed',
+              updatedAt: '2026-06-24T12:00:00.000Z',
+            },
+          ],
+          openConversationIds: ['conversation-1'],
+        },
+      });
+
+      expect(store.conversations.map(conversation => conversation.id)).toStrictEqual([
+        'conversation-1',
+      ]);
+    });
+
+    it('keeps empty conversations that are still open', () => {
+      const store = normalizeStoredConversations({
+        store: {
+          activeConversationId: 'conversation-1',
+          conversations: [
+            {
+              events: [],
+              id: 'conversation-1',
+              title: 'Empty open',
+              updatedAt: '2026-06-24T10:00:00.000Z',
+            },
+          ],
+          openConversationIds: ['conversation-1'],
+        },
+      });
+
+      expect(store.conversations.map(conversation => conversation.id)).toStrictEqual([
+        'conversation-1',
+      ]);
+      expect(store.conversations[0]?.events).toStrictEqual([]);
+    });
+  });
+
+  it('creates new conversations with zero events', () => {
+    const store = createDefaultStoredConversations();
+
+    expect(store.conversations[0]?.events).toStrictEqual([]);
+
+    const next = createNextStoredConversation(store);
+
+    expect(next.conversations[1]?.events).toStrictEqual([]);
   });
 });

@@ -639,6 +639,32 @@ test('release-all powers off every device this worktree booted and skips foreign
   assert.equal(fs.existsSync(path.join(lockRoot, 'THEIRS.json')), true);
 });
 
+test('release-all releases every other device before reporting one failure', () => {
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  for (const deviceId of ['UDID-A', 'UDID-B']) {
+    fs.writeFileSync(
+      path.join(lockRoot, `${deviceId}.json`),
+      JSON.stringify({ deviceId, worktreeRoot, bootedByClaim: true })
+    );
+  }
+
+  assert.throws(
+    () =>
+      releaseWorktreeSimulators({
+        lockRoot,
+        worktreeRoot,
+        shutdown: deviceId => {
+          if (deviceId === 'UDID-A') throw new Error('stuck device');
+        },
+      }),
+    /stuck device/
+  );
+  // The wedged device keeps its claim; the healthy one is still handed back.
+  assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-A.json')), true);
+  assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-B.json')), false);
+});
+
 test('release-all is a no-op when the claim directory does not exist', () => {
   const worktreeRoot = tempDir('worktree-');
   const { shutdown, calls: shutdowns } = recordingShutdown();

@@ -464,14 +464,28 @@ function releaseWorktreeSimulators(args: {
     throw error;
   }
   const released: string[] = [];
+  const failures: Error[] = [];
   for (const entry of entries) {
     if (!entry.endsWith('.json')) continue;
     const deviceId = entry.slice(0, -'.json'.length);
     // `readClaim` discards corrupt records and claims whose worktree is gone,
     // so an unreadable claim simply is not ours to release.
     if (readClaim(args.lockRoot, deviceId)?.worktreeRoot !== args.worktreeRoot) continue;
-    releaseSimulator({ ...args, deviceId });
-    released.push(deviceId);
+    // Every claim gets its attempt before anything is reported. One device
+    // that will not power off must not strand the rest of the worktree's
+    // devices, which is the leak this whole path exists to prevent.
+    try {
+      releaseSimulator({ ...args, deviceId });
+      released.push(deviceId);
+    } catch (error) {
+      failures.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `Released ${released.length === 0 ? 'no simulator' : released.join(' ')}; ${failures.length} failed: ${failures.map(failure => failure.message).join('; ')}`
+    );
   }
   return released;
 }

@@ -52,6 +52,13 @@ type TerminalBarProps = {
   townId: string;
   /** Override base path for org-scoped routes (e.g. /organizations/[id]/gastown/[townId]) */
   basePath?: string;
+  /**
+   * Whether user-facing billing UI (estimate pill, cost strings, automatic-start
+   * control) may be shown. Driven by GASTOWN_BILLING_ANNOUNCEMENT_ENABLED. This is
+   * intentionally separate from `billing.enabled`, which only reflects shadow
+   * metering and is on in production before billing is announced to users.
+   */
+  billingAnnouncementEnabled?: boolean;
 };
 
 type BillingStatus = GastownOutputs['gastown']['getBillingStatus'];
@@ -61,7 +68,11 @@ type BillingStatus = GastownOutputs['gastown']['getBillingStatus'];
  * Agent terminal tabs are opened/closed via TerminalBarContext.
  * Can be positioned at bottom/top/right/left with drag-to-resize.
  */
-export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarProps) {
+export function TerminalBar({
+  townId,
+  basePath: basePathOverride,
+  billingAnnouncementEnabled = false,
+}: TerminalBarProps) {
   const trpc = useGastownTRPC();
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const { state: sidebarState, isMobile } = useSidebar();
@@ -378,6 +389,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               setPosition={setPosition}
               closeTab={closeTab}
               billing={billing}
+              billingAnnouncementEnabled={billingAnnouncementEnabled}
               townId={townId}
             />
             <TerminalContent
@@ -416,6 +428,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               setPosition={setPosition}
               closeTab={closeTab}
               billing={billing}
+              billingAnnouncementEnabled={billingAnnouncementEnabled}
               townId={townId}
             />
             {!collapsed && (
@@ -452,6 +465,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               setPosition={setPosition}
               closeTab={closeTab}
               billing={billing}
+              billingAnnouncementEnabled={billingAnnouncementEnabled}
               townId={townId}
             />
             <TerminalContent
@@ -480,6 +494,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               setPosition={setPosition}
               closeTab={closeTab}
               billing={billing}
+              billingAnnouncementEnabled={billingAnnouncementEnabled}
               townId={townId}
             />
             <TerminalContent
@@ -529,6 +544,7 @@ function TabBar({
   setPosition,
   closeTab,
   billing,
+  billingAnnouncementEnabled,
   townId,
 }: {
   allTabs: TabDef[];
@@ -542,6 +558,7 @@ function TabBar({
   setPosition: (position: TerminalPosition) => void;
   closeTab: (tabId: string) => void;
   billing?: BillingStatus;
+  billingAnnouncementEnabled: boolean;
   townId: string;
 }) {
   const borderClass = horizontal ? 'border-b border-white/[0.06]' : 'border-r border-white/[0.06]';
@@ -605,6 +622,15 @@ function TabBar({
   const showRunCostTooltip =
     billing?.estimatedRunCharge !== undefined &&
     (billing.state === 'running' || billing.state === 'warning' || billing.state === 'stopping');
+  // Whether to surface user-facing billing UI. `billing.enabled` only reflects
+  // shadow metering (on in production before launch), so it must NOT gate what
+  // users see. Show billing UI once it is announced or enforced. A town already
+  // paused by the user stays interactive so they can resume it.
+  const showBilling =
+    billing !== undefined &&
+    (billingAnnouncementEnabled ||
+      billing.enforcing ||
+      billing.runPolicy === 'paused_by_user');
 
   return (
     <div
@@ -692,7 +718,7 @@ function TabBar({
         {billingAnnouncement}
       </span>
 
-      {horizontal && billing && (billing.enabled || billing.runPolicy === 'paused_by_user') && (
+      {horizontal && billing && showBilling && (
         <div
           className={`mr-2 flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] tabular-nums ${
             billing.state === 'warning'
@@ -747,7 +773,7 @@ function TabBar({
         </div>
       )}
 
-      {!horizontal && billing && (billing.enabled || billing.runPolicy === 'paused_by_user') && (
+      {!horizontal && billing && showBilling && (
         <div className="flex justify-center py-2" title="Allow automatic container starts">
           <Switch
             checked={billing.runPolicy === 'automatic'}

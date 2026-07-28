@@ -5,7 +5,7 @@
 Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-specific code.
 
 - Backend, simulator, login, Maestro, remote CLI, logs, cleanup: follow [e2e/AGENTS.md](e2e/AGENTS.md). Start what you need yourself; never ask the user to start Metro or backend services.
-- Substantial mobile work: follow [.kilo/MOBILE_WORKFLOW.md](.kilo/MOBILE_WORKFLOW.md). Plans may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
+- Substantial mobile work: follow the kilo workflow in [.kilo_workflow/WORKFLOW.md](../../.kilo_workflow/WORKFLOW.md). Plans may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
 
 ## Stack
 

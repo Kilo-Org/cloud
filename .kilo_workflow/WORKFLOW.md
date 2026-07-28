@@ -152,7 +152,7 @@ The orchestrator drives the plan to completion. It is the expensive model steeri
 
 1. Ingest the handoff and read the learnings.
 2. Segment the plan into slices with disjoint write sets so parallel implementers cannot collide. Always serialize: lockfile changes, dependency installs, migrations, generated clients, repository-wide formatters, and broad autofix commands. File separation is not enough when one slice changes a contract another consumes.
-3. Dispatch ready independent slices to parallel `implementer`s — at most 2–3 concurrent. Loop per slice: implementer implements, then a fresh `impl-reviewer` reviews the slice diff; triage remarks (untrusted), route valid ones through a repair dispatch. Exit the loop when a fresh reviewer has no remarks.
+3. Dispatch ready independent slices to parallel `implementer`s — as many in parallel as the segmentation safely allows; agent parallelism is never capped, only E2E device/stack phases are (see E2E Slots). Loop per slice: implementer implements, then a fresh `impl-reviewer` reviews the slice diff; triage remarks (untrusted), route valid ones through a repair dispatch. Exit the loop when a fresh reviewer has no remarks.
 4. Create small logical commits at slice boundaries.
 5. Create the PR — description with human-readable **what / why / how** sections — and assign it to the requesting human. CI and Kilobot start running concurrently with E2E.
 6. Run the E2E loop (below) when the work has verifiable runtime behavior; skip it, recording why, for doc-only or equivalently inert changes.
@@ -212,7 +212,7 @@ Any step where an agent or LLM must actually respond — cloud-agent sessions, c
 
 ## E2E Slots
 
-The machine is shared by parallel workflows, and unslotted device or stack work overloads it. Every phase that drives a simulator, emulator, local backend stack, browser fleet, or native build — the repro gate and every E2E round — runs inside a slot from [`e2e-slot.sh`](e2e-slot.sh) (default 3, machine-global):
+The machine is shared by parallel workflows, and unslotted device or stack work overloads it. Only E2E runs are capped — agents themselves are never capped. Every phase that drives a simulator, emulator, local backend stack, browser fleet, or native build — the repro gate and every E2E round — runs inside a slot from [`e2e-slot.sh`](e2e-slot.sh) (default 3, machine-global):
 
 ```bash
 .kilo_workflow/e2e-slot.sh acquire <tmux-session>   # blocks until a slot frees
@@ -244,7 +244,7 @@ Never collapse retryable and non-retryable failures into one generic error state
 Environment blockers and their fixes — broken local stacks, credential traps, simulator quirks, tool wedges — recorded so future runs do not rediscover them. Product bugs never go in learnings.
 
 - Format: **symptom / cause / fix**, a few lines each, in a file whose name makes it findable from the symptom (for example `kilo-run-exits-0-without-verdict.md`).
-- System-specific learnings (true only of this machine: installed tools, local ports, OS quirks) go to `.kilo_workflow/learnings/system/`, which is gitignored (only its `.gitkeep` is committed).
+- System-specific learnings (true only of this machine: installed tools, local ports, OS quirks) go to `.kilo_workflow/learnings/system/`, which is gitignored (only its `.gitkeep` is committed). `pnpm dev:worktree:prepare` copies the main worktree's `learnings/system/` into a fresh worktree so machine-local knowledge carries over.
 - Everything else goes to `.kilo_workflow/learnings/` directly and is committed — the orchestrator includes new learnings in the run's PR.
 - Read before writing: when an existing entry covers the blocker, update it instead of appending a duplicate.
 - Every role records blockers it resolves, immediately after resolving them.

@@ -7,9 +7,9 @@ Interactive verification against a local backend. Run commands from the reposito
 This machine is shared by parallel workflows. Before starting a stack, booting a simulator or emulator, or running a native build — on every run, whether or not you can see another workflow active — acquire a slot:
 
 ```bash
-apps/mobile/.kilo/e2e-slot.sh acquire <your-tmux-session>   # blocks until a slot frees
-apps/mobile/.kilo/e2e-slot.sh status                        # current holders
-apps/mobile/.kilo/e2e-slot.sh release <your-tmux-session>   # the moment the device phase ends
+.kilo_workflow/e2e-slot.sh acquire <your-tmux-session>   # blocks until a slot frees
+.kilo_workflow/e2e-slot.sh status                        # current holders
+.kilo_workflow/e2e-slot.sh release <your-tmux-session>   # the moment the device phase ends
 ```
 
 - Default 3 slots, machine-global, owned by tmux session name; a dead session's slot is reclaimed automatically, so a crash cannot wedge the queue.
@@ -306,7 +306,7 @@ pnpm dev:stop                                # only if you started this worktree
 xcrun simctl shutdown <udid>                 # only if you booted it
 pnpm dev:mobile:simulator release <udid>     # every simulator you claimed
 pnpm dev:mobile:android release <serial>     # every Android device you claimed
-apps/mobile/.kilo/e2e-slot.sh release <tmux-session>   # always, as soon as the device phase ends
+.kilo_workflow/e2e-slot.sh release <tmux-session>   # always, as soon as the device phase ends
 ```
 
 Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, shut down a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.

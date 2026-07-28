@@ -32,10 +32,13 @@ export default {
       delete request.body.reasoning_effort;
     }
 
-    // NVIDIA rejects these with `Validation: Unsupported parameter(s)`.
+    // NVIDIA rejects these with `Validation: Unsupported parameter(s)`. We advertise
+    // `reasoning` and `include_reasoning` for every direct BYOK model, so both are
+    // removed here rather than narrowing what NVIDIA models report as supported.
     delete request.body.provider;
     delete request.body.transforms;
     delete request.body.reasoning;
+    delete request.body.include_reasoning;
     delete request.body.safety_identifier;
     delete request.body.prompt_cache_key;
   },

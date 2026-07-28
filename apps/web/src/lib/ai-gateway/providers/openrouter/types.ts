@@ -86,6 +86,9 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
 
     // https://platform.minimax.io/docs/api-reference/text-openai-api#4-important-note
     reasoning_split?: boolean;
+
+    // Advertised in `supported_parameters`, so clients may send it.
+    include_reasoning?: boolean;
   };
 
 export type MessageWithReasoning = {

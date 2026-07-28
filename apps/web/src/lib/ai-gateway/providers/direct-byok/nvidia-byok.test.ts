@@ -46,6 +46,7 @@ describe('NVIDIA direct BYOK', () => {
       providerOptions: { gateway: {} },
       transforms: ['middle-out'],
       reasoning: { effort: 'low' },
+      include_reasoning: true,
       safety_identifier: 'user-hash',
       prompt_cache_key: 'task-hash',
       temperature: 0.5,
@@ -59,6 +60,7 @@ describe('NVIDIA direct BYOK', () => {
     expect(body).not.toHaveProperty('provider');
     expect(body).not.toHaveProperty('transforms');
     expect(body).not.toHaveProperty('reasoning');
+    expect(body).not.toHaveProperty('include_reasoning');
     expect(body).not.toHaveProperty('safety_identifier');
     expect(body).not.toHaveProperty('prompt_cache_key');
   });

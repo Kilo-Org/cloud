@@ -622,13 +622,12 @@ function TabBar({
   const showRunCostTooltip =
     billing?.estimatedRunCharge !== undefined &&
     (billing.state === 'running' || billing.state === 'warning' || billing.state === 'stopping');
-  // Whether to surface user-facing billing UI. `billing.enabled` only reflects
-  // shadow metering (on in production before launch), so it must NOT gate what
-  // users see. Show billing UI once it is announced or enforced. A town already
-  // paused by the user stays interactive so they can resume it.
-  const showBilling =
-    billing !== undefined &&
-    (billingAnnouncementEnabled || billing.enforcing || billing.runPolicy === 'paused_by_user');
+  // Whether to surface user-facing billing UI (estimate pill, cost strings,
+  // automatic-start control). Gated solely on the announcement flag. `billing.enabled`
+  // reflects shadow metering (on in production before launch) and `billing.enforcing`
+  // reflects backend enforcement; neither should reveal billing UI to users until
+  // billing is announced.
+  const showBilling = billing !== undefined && billingAnnouncementEnabled;
 
   return (
     <div

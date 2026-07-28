@@ -64,7 +64,7 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 
   async setSettings(settings: AutoRoutingOwnerSettings): Promise<void> {
-    // Mode and pool commit or fail together via multi-key storage ops.
+    // Mode and pool commit or fail together in one storage transaction.
     // setMode/setPool stay single-key for individual callers.
     const toPut: Record<string, unknown> = {};
     const toDelete: string[] = [];
@@ -78,16 +78,17 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
     } else {
       toPut[POOL_STORAGE_KEY] = settings.pool;
     }
-    const ops: Promise<unknown>[] = [];
-    if (Object.keys(toPut).length > 0) {
-      ops.push(this.ctx.storage.put(toPut));
+    if (Object.keys(toPut).length === 0 && toDelete.length === 0) {
+      return;
     }
-    if (toDelete.length > 0) {
-      ops.push(this.ctx.storage.delete(toDelete));
-    }
-    if (ops.length > 0) {
-      await Promise.all(ops);
-    }
+    await this.ctx.storage.transaction(async (txn) => {
+      if (Object.keys(toPut).length > 0) {
+        await txn.put(toPut);
+      }
+      if (toDelete.length > 0) {
+        await txn.delete(toDelete);
+      }
+    });
   }
 }
 

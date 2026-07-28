@@ -70,31 +70,69 @@ function makeEnv(
   return { env, modes, pools, stubs, idFromName, get };
 }
 
+function applyPut(
+  target: Map<string, unknown>,
+  keyOrEntries: string | Record<string, unknown>,
+  value?: unknown
+) {
+  if (typeof keyOrEntries === 'string') {
+    target.set(keyOrEntries, value);
+    return;
+  }
+  for (const [key, entryValue] of Object.entries(keyOrEntries)) {
+    target.set(key, entryValue);
+  }
+}
+
+function applyDelete(target: Map<string, unknown>, keyOrKeys: string | string[]) {
+  if (typeof keyOrKeys === 'string') {
+    target.delete(keyOrKeys);
+    return;
+  }
+  for (const key of keyOrKeys) {
+    target.delete(key);
+  }
+}
+
 function createFakeStorage() {
   const entries = new Map<string, unknown>();
 
-  return {
+  const storage = {
     entries,
     get: async (key: string) => entries.get(key),
     put: async (keyOrEntries: string | Record<string, unknown>, value?: unknown) => {
-      if (typeof keyOrEntries === 'string') {
-        entries.set(keyOrEntries, value);
-        return;
-      }
-      for (const [key, entryValue] of Object.entries(keyOrEntries)) {
-        entries.set(key, entryValue);
-      }
+      applyPut(entries, keyOrEntries, value);
     },
     delete: async (keyOrKeys: string | string[]) => {
-      if (typeof keyOrKeys === 'string') {
-        entries.delete(keyOrKeys);
-        return;
+      applyDelete(entries, keyOrKeys);
+    },
+    transaction: async <T>(
+      callback: (txn: {
+        put: (keyOrEntries: string | Record<string, unknown>, value?: unknown) => Promise<void>;
+        delete: (keyOrKeys: string | string[]) => Promise<void>;
+        get: (key: string) => Promise<unknown>;
+      }) => Promise<T>
+    ): Promise<T> => {
+      const shadow = new Map(entries);
+      const txn = {
+        get: async (key: string) => shadow.get(key),
+        put: async (keyOrEntries: string | Record<string, unknown>, value?: unknown) => {
+          applyPut(shadow, keyOrEntries, value);
+        },
+        delete: async (keyOrKeys: string | string[]) => {
+          applyDelete(shadow, keyOrKeys);
+        },
+      };
+      const result = await callback(txn);
+      entries.clear();
+      for (const [key, value] of shadow) {
+        entries.set(key, value);
       }
-      for (const key of keyOrKeys) {
-        entries.delete(key);
-      }
+      return result;
     },
   };
+
+  return storage;
 }
 
 function createModeDO() {
@@ -150,26 +188,84 @@ describe('AutoRoutingModeConfigDO', () => {
 
   it('commits mode and pool via one multi-key put and paired multi-key delete', async () => {
     const { modeDO, storage } = createModeDO();
-    const putSpy = vi.spyOn(storage, 'put');
-    const deleteSpy = vi.spyOn(storage, 'delete');
+    const putCalls: unknown[] = [];
+    const deleteCalls: unknown[] = [];
+    const originalTransaction = storage.transaction.bind(storage);
+    const transactionSpy = vi.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
+      originalTransaction(async (txn) => {
+        const put = txn.put.bind(txn);
+        const del = txn.delete.bind(txn);
+        txn.put = async (keyOrEntries, value?) => {
+          putCalls.push(keyOrEntries);
+          return put(keyOrEntries, value);
+        };
+        txn.delete = async (keyOrKeys) => {
+          deleteCalls.push(keyOrKeys);
+          return del(keyOrKeys);
+        };
+        return callback(txn);
+      })
+    );
 
     await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL });
-    expect(putSpy).toHaveBeenCalledTimes(1);
-    expect(putSpy).toHaveBeenCalledWith({ mode: 'best_accuracy', pool: SAMPLE_POOL });
-    expect(deleteSpy).not.toHaveBeenCalled();
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
+    expect(putCalls).toEqual([{ mode: 'best_accuracy', pool: SAMPLE_POOL }]);
+    expect(deleteCalls).toEqual([]);
 
-    putSpy.mockClear();
-    deleteSpy.mockClear();
+    putCalls.length = 0;
+    deleteCalls.length = 0;
+    transactionSpy.mockClear();
     await modeDO.setSettings({ mode: null, pool: null });
-    expect(deleteSpy).toHaveBeenCalledTimes(1);
-    expect(deleteSpy).toHaveBeenCalledWith(['mode', 'pool']);
-    expect(putSpy).not.toHaveBeenCalled();
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
+    expect(deleteCalls).toEqual([['mode', 'pool']]);
+    expect(putCalls).toEqual([]);
 
-    putSpy.mockClear();
-    deleteSpy.mockClear();
+    putCalls.length = 0;
+    deleteCalls.length = 0;
+    transactionSpy.mockClear();
     await modeDO.setSettings({ mode: 'cost_per_accuracy', pool: null });
-    expect(putSpy).toHaveBeenCalledWith({ mode: 'cost_per_accuracy' });
-    expect(deleteSpy).toHaveBeenCalledWith(['pool']);
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
+    expect(putCalls).toEqual([{ mode: 'cost_per_accuracy' }]);
+    expect(deleteCalls).toEqual([['pool']]);
+  });
+
+  it('rolls back mode and pool when a transactional delete fails', async () => {
+    const { modeDO, storage } = createModeDO();
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL });
+
+    const originalTransaction = storage.transaction.bind(storage);
+    vi.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
+      originalTransaction(async (txn) => {
+        txn.delete = async () => {
+          throw new Error('delete failed');
+        };
+        return callback(txn);
+      })
+    );
+
+    await expect(modeDO.setSettings({ mode: 'cost_per_accuracy', pool: null })).rejects.toThrow(
+      'delete failed'
+    );
+    expect(storage.entries.get('mode')).toBe('best_accuracy');
+    expect(storage.entries.get('pool')).toEqual(SAMPLE_POOL);
+    await expect(modeDO.getSettings()).resolves.toEqual({
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+    });
+  });
+
+  it('atomically commits a mixed mode write and pool delete', async () => {
+    const { modeDO, storage } = createModeDO();
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL });
+
+    await modeDO.setSettings({ mode: 'cost_per_accuracy', pool: null });
+
+    expect(storage.entries.get('mode')).toBe('cost_per_accuracy');
+    expect(storage.entries.has('pool')).toBe(false);
+    await expect(modeDO.getSettings()).resolves.toEqual({
+      mode: 'cost_per_accuracy',
+      pool: null,
+    });
   });
 });
 

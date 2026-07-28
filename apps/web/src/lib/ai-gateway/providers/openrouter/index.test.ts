@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals
 import {
   formatName,
   getEnhancedOpenRouterModels,
+  getModelDisplayPricing,
   getOpenRouterTranscriptionModels,
   shouldSuppressOpenRouterModel,
   undoPricingDiscount,
@@ -19,6 +20,7 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import { OPENROUTER_GPT56_PROMO_MODEL_IDS } from '@/lib/ai-gateway/providers/openai';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -150,6 +152,11 @@ describe('formatName', () => {
     });
     expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model ($$$$)');
   });
+
+  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('labels %s as 50% off', modelId => {
+    const model = buildModel({ id: modelId, created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (50% off)');
+  });
 });
 
 describe('undoPricingDiscount', () => {
@@ -188,6 +195,31 @@ describe('undoPricingDiscount', () => {
       discount: 1,
     });
     expect(result).toEqual({ prompt: '0.000001', completion: '0.000005' });
+  });
+});
+
+describe('OpenRouter GPT-5.6 promotion', () => {
+  const discountedPricing = {
+    prompt: '0.000001',
+    completion: '0.000004',
+    input_cache_read: '0.0000001',
+    discount: 0.5,
+  };
+
+  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('preserves discounted pricing for %s', modelId => {
+    expect(getModelDisplayPricing(modelId, discountedPricing)).toEqual({
+      prompt: '0.000001',
+      completion: '0.000004',
+      input_cache_read: '0.0000001',
+    });
+  });
+
+  it('continues to undo endpoint discounts for other models', () => {
+    expect(getModelDisplayPricing('openai/gpt-5.6-sol', discountedPricing)).toEqual({
+      prompt: '0.000002000000',
+      completion: '0.000008000000',
+      input_cache_read: '0.000000200000',
+    });
   });
 });
 

@@ -28,6 +28,7 @@ import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/t
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
+import { isOpenRouterGpt56PromoModel } from '@/lib/ai-gateway/providers/openai';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -82,11 +83,12 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
       : model.name;
   const promptPrice = Number.parseFloat(model.pricing.prompt);
   const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
-  if (isExpensive) return name + ' ($$$$)';
-  if (name.endsWith(')')) return name;
+  const promoSuffix = isOpenRouterGpt56PromoModel(model.id) ? ' (50% off)' : '';
+  if (isExpensive) return name + ' ($$$$)' + promoSuffix;
+  if (name.endsWith(')')) return name + promoSuffix;
   const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
-  if (isNew) return name + ' (new)';
+  if (isNew) return name + ' (new)' + promoSuffix;
   if (model.expiration_date) {
     const expirationDate = new Date(model.expiration_date);
     if (expirationDate <= addMonths(new Date(), 1)) {
@@ -95,10 +97,10 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
         day: 'numeric',
         timeZone: 'UTC',
       });
-      return name + ' (retires ' + suffix + ')';
+      return name + ' (retires ' + suffix + ')' + promoSuffix;
     }
   }
-  return name;
+  return name + promoSuffix;
 }
 
 type EndpointPricing = NonNullable<StoredModel['endpoints'][number]['pricing']>;
@@ -116,6 +118,22 @@ export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
     }
   }
   return result;
+}
+
+function preserveDiscountedPricing(pricing: EndpointPricing): EndpointPricing {
+  const prices = { ...pricing };
+  delete prices.discount;
+  return prices;
+}
+
+export function getModelDisplayPricing(
+  modelId: string,
+  pricing: EndpointPricing | undefined
+): EndpointPricing | undefined {
+  if (!pricing) return undefined;
+  return isOpenRouterGpt56PromoModel(modelId)
+    ? preserveDiscountedPricing(pricing)
+    : undoPricingDiscount(pricing);
 }
 
 export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
@@ -151,7 +169,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
                 normalizeInferenceProviderId(e.tag) ===
                 normalizeInferenceProviderId(preferredProvider)
             )?.pricing);
-        const pricing = rawPricing ? undoPricingDiscount(rawPricing) : rawPricing;
+        const pricing = getModelDisplayPricing(model.id, rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
         return {
           ...model,

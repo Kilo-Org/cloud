@@ -16,3 +16,18 @@ export const GPT_CURRENT_VERCEL_MODEL_ID = GPT_CURRENT_MODEL_ID;
 export const GPT_MINI_CURRENT_MODEL_ID = 'openai/gpt-5.4-mini';
 
 export const GPT_MINI_CURRENT_VERCEL_MODEL_ID = GPT_MINI_CURRENT_MODEL_ID;
+
+export const ENABLE_OPENROUTER_GPT56_PROMO = true;
+
+export const OPENROUTER_GPT56_PROMO_MODEL_IDS = [
+  'openai/gpt-5.6-terra',
+  'openai/gpt-5.6-terra-pro',
+  'openai/gpt-5.6-luna',
+  'openai/gpt-5.6-luna-pro',
+] as const;
+
+const openRouterGpt56PromoModels: ReadonlySet<string> = new Set(OPENROUTER_GPT56_PROMO_MODEL_IDS);
+
+export function isOpenRouterGpt56PromoModel(modelId: string): boolean {
+  return ENABLE_OPENROUTER_GPT56_PROMO && openRouterGpt56PromoModels.has(modelId);
+}

@@ -1,4 +1,11 @@
-import type { FilePart, Message, Part, TextPart, UserMessage } from '@kilocode/app-shared/opencode';
+import type {
+  FilePart,
+  Message,
+  Part,
+  TextPart,
+  ToolPart,
+  UserMessage,
+} from '@kilocode/app-shared/opencode';
 import { createChatProcessor } from './chat-processor';
 import type { ChatEvent } from './normalizer';
 import { createMemoryStorage } from './storage/memory';
@@ -59,6 +66,42 @@ function makeFilePart(id: string, messageID: string, sessionID = 'ses-1') {
   } satisfies FilePart;
 }
 
+function makeCompletedToolPart(
+  id: string,
+  messageID: string,
+  attachments: FilePart[],
+  sessionID = 'ses-1'
+) {
+  return {
+    id,
+    sessionID,
+    messageID,
+    type: 'tool' as const,
+    callID: `call-${id}`,
+    tool: 'read',
+    state: {
+      status: 'completed' as const,
+      input: { filePath: '/shot.png' },
+      output: 'Image read successfully',
+      title: 'read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+      attachments,
+    },
+  } satisfies ToolPart;
+}
+
+function makeAttachment(mime: string, url: string): FilePart {
+  return {
+    id: 'att-1',
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'file',
+    mime,
+    url,
+  };
+}
+
 describe('createChatProcessor', () => {
   describe('message.updated', () => {
     it('upserts message info into storage', () => {
@@ -99,6 +142,89 @@ describe('createChatProcessor', () => {
       const storedFile = stored[0] satisfies Part as FilePart;
       expect(storedFile.url).toBe('');
       expect(storedFile.source?.text.value).toBe('');
+    });
+
+    it('calls onImageAttachment with partId, mime, and dataUrl for image attachments', () => {
+      const storage = createMemoryStorage();
+      const onImageAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onImageAttachment });
+      const url = 'data:image/png;base64,AAA';
+      const part = makeCompletedToolPart('part-tool', 'msg-1', [
+        makeAttachment('image/png', url),
+      ]);
+
+      processor.process({ type: 'message.part.updated', part });
+
+      expect(onImageAttachment).toHaveBeenCalledTimes(1);
+      expect(onImageAttachment).toHaveBeenCalledWith('part-tool', 'image/png', url);
+    });
+
+    it('still strips image attachment urls when a sink is supplied', () => {
+      const storage = createMemoryStorage();
+      const onImageAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onImageAttachment });
+      const part = makeCompletedToolPart('part-tool', 'msg-1', [
+        makeAttachment('image/png', 'data:image/png;base64,AAA'),
+      ]);
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      const storedTool = stored[0] satisfies Part as ToolPart;
+      expect(storedTool.state.status).toBe('completed');
+      if (storedTool.state.status !== 'completed') return;
+      expect(storedTool.state.attachments?.[0]?.url).toBe('');
+      expect(onImageAttachment).toHaveBeenCalled();
+    });
+
+    it('does not call onImageAttachment for non-image attachments', () => {
+      const storage = createMemoryStorage();
+      const onImageAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onImageAttachment });
+      const part = makeCompletedToolPart('part-tool', 'msg-1', [
+        makeAttachment('application/pdf', 'data:application/pdf;base64,AAA'),
+      ]);
+
+      processor.process({ type: 'message.part.updated', part });
+
+      expect(onImageAttachment).not.toHaveBeenCalled();
+      const stored = storage.getParts('msg-1');
+      const storedTool = stored[0] satisfies Part as ToolPart;
+      if (storedTool.state.status !== 'completed') return;
+      expect(storedTool.state.attachments?.[0]?.url).toBe('');
+    });
+
+    it('does not call onImageAttachment when attachment url is blank', () => {
+      const storage = createMemoryStorage();
+      const onImageAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onImageAttachment });
+      const part = makeCompletedToolPart('part-tool', 'msg-1', [
+        makeAttachment('image/png', ''),
+      ]);
+
+      processor.process({ type: 'message.part.updated', part });
+
+      expect(onImageAttachment).not.toHaveBeenCalled();
+    });
+
+    it('continues processing when onImageAttachment throws', () => {
+      const storage = createMemoryStorage();
+      const onImageAttachment = jest.fn(() => {
+        throw new Error('sink failed');
+      });
+      const processor = createChatProcessor(storage, { onImageAttachment });
+      const part = makeCompletedToolPart('part-tool', 'msg-1', [
+        makeAttachment('image/png', 'data:image/png;base64,AAA'),
+      ]);
+
+      expect(() => processor.process({ type: 'message.part.updated', part })).not.toThrow();
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      const storedTool = stored[0] satisfies Part as ToolPart;
+      if (storedTool.state.status !== 'completed') return;
+      expect(storedTool.state.attachments?.[0]?.url).toBe('');
     });
 
     it('does not replace text with empty non-synthetic part', () => {

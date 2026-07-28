@@ -191,15 +191,15 @@ describe('AutoRoutingModeConfigDO', () => {
     const putCalls: unknown[] = [];
     const deleteCalls: unknown[] = [];
     const originalTransaction = storage.transaction.bind(storage);
-    const transactionSpy = vi.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
-      originalTransaction(async (txn) => {
+    const transactionSpy = vi.spyOn(storage, 'transaction').mockImplementation(async callback =>
+      originalTransaction(async txn => {
         const put = txn.put.bind(txn);
         const del = txn.delete.bind(txn);
         txn.put = async (keyOrEntries, value?) => {
           putCalls.push(keyOrEntries);
           return put(keyOrEntries, value);
         };
-        txn.delete = async (keyOrKeys) => {
+        txn.delete = async keyOrKeys => {
           deleteCalls.push(keyOrKeys);
           return del(keyOrKeys);
         };
@@ -234,8 +234,8 @@ describe('AutoRoutingModeConfigDO', () => {
     await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL });
 
     const originalTransaction = storage.transaction.bind(storage);
-    vi.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
-      originalTransaction(async (txn) => {
+    vi.spyOn(storage, 'transaction').mockImplementation(async callback =>
+      originalTransaction(async txn => {
         txn.delete = async () => {
           throw new Error('delete failed');
         };

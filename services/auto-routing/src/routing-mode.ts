@@ -81,7 +81,7 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
     if (Object.keys(toPut).length === 0 && toDelete.length === 0) {
       return;
     }
-    await this.ctx.storage.transaction(async (txn) => {
+    await this.ctx.storage.transaction(async txn => {
       if (Object.keys(toPut).length > 0) {
         await txn.put(toPut);
       }

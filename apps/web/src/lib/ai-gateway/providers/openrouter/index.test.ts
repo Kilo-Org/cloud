@@ -153,9 +153,15 @@ describe('formatName', () => {
     expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model ($$$$)');
   });
 
-  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('labels %s as 50% off', modelId => {
-    const model = buildModel({ id: modelId, created: 0 });
-    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (50% off)');
+  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('prefers the 50% off marker for %s', modelId => {
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({
+      id: modelId,
+      created: recentlyCreated,
+      expiration_date: '2026-07-01',
+      pricing: { prompt: '0.00001', completion: '0' },
+    });
+    expect(formatName(model, 0)).toBe('Test Model (50% off)');
   });
 });
 

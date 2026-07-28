@@ -81,14 +81,14 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
+  if (isOpenRouterGpt56PromoModel(model.id)) return name + ' (50% off)';
   const promptPrice = Number.parseFloat(model.pricing.prompt);
   const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
-  const promoSuffix = isOpenRouterGpt56PromoModel(model.id) ? ' (50% off)' : '';
-  if (isExpensive) return name + ' ($$$$)' + promoSuffix;
-  if (name.endsWith(')')) return name + promoSuffix;
+  if (isExpensive) return name + ' ($$$$)';
+  if (name.endsWith(')')) return name;
   const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
-  if (isNew) return name + ' (new)' + promoSuffix;
+  if (isNew) return name + ' (new)';
   if (model.expiration_date) {
     const expirationDate = new Date(model.expiration_date);
     if (expirationDate <= addMonths(new Date(), 1)) {
@@ -97,10 +97,10 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
         day: 'numeric',
         timeZone: 'UTC',
       });
-      return name + ' (retires ' + suffix + ')' + promoSuffix;
+      return name + ' (retires ' + suffix + ')';
     }
   }
-  return name + promoSuffix;
+  return name;
 }
 
 type EndpointPricing = NonNullable<StoredModel['endpoints'][number]['pricing']>;

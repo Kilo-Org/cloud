@@ -48,6 +48,17 @@ reap() {
 case "${1:?usage: acquire|release|status <tmux-session>}" in
   acquire)
     who=${2:?tmux session name required}
+    # Reject an owner that is not a live session — a window name, or a session
+    # name misread from the untargeted `display-message -p '#S'`. Such a slot is
+    # reapable the moment it is written, so it gets handed to a second workflow
+    # while this one still drives a device, and the machine silently
+    # over-subscribes. Skip the check only when tmux cannot answer at all.
+    if alive=$(tmux list-sessions -F '#{session_name}' 2>/dev/null); then
+      if ! printf '%s\n' "$alive" | grep -qxF -- "$who"; then
+        echo "no live tmux session named '$who' — own the slot with your own session name, not a window name" >&2
+        exit 1
+      fi
+    fi
     # already holding one? idempotent.
     for s in "$DIR"/slot-*; do
       [ -d "$s" ] && [ "$(cat "$s/owner" 2>/dev/null)" = "$who" ] && { echo "already holding $(basename "$s")"; exit 0; }

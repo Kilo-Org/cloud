@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { BenchmarkProfileEntryStatusSchema } from './benchmark';
 import { NormalizedClassifierInputSchema } from './input';
 import { ReasoningEffortSchema } from './reasoning';
-import { EfficientModelPoolSchema } from './routing-table';
+import { EfficientModelPoolSchema, PoolEntrySchema, poolEntryKey } from './routing-table';
 import {
   ClassifierSubtaskTypeSchema,
   ClassifierTaskTypeSchema,
@@ -214,6 +214,30 @@ export type AutoRoutingModeResponse = z.infer<typeof AutoRoutingModeResponseSche
 export const UpdateAutoRoutingSettingsRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
   mode: AutoRoutingModeSchema.nullable(),
   pool: EfficientModelPoolSchema.nullable(),
+  // Subset of `pool` the owner explicitly retries after a terminal failure.
+  // Forwarded to benchmark profile registration when present.
+  retryEntries: z.array(PoolEntrySchema).optional(),
+}).superRefine((request, ctx) => {
+  if (!request.retryEntries || request.retryEntries.length === 0) return;
+  if (request.pool === null) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['retryEntries'],
+      message: 'retryEntries require a non-null pool',
+    });
+    return;
+  }
+  const entryKeys = new Set(request.pool.map(poolEntryKey));
+  request.retryEntries.forEach((entry, index) => {
+    const key = poolEntryKey(entry);
+    if (!entryKeys.has(key)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['retryEntries', index],
+        message: `retryEntry must appear in pool: ${key}`,
+      });
+    }
+  });
 });
 export type UpdateAutoRoutingSettingsRequest = z.infer<
   typeof UpdateAutoRoutingSettingsRequestSchema

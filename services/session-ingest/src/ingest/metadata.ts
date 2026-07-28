@@ -86,25 +86,26 @@ export async function applyMetadataChanges(
         )
         .limit(1);
 
-    const [initialRow] = await selectCurrentRow();
-    if (!initialRow) return null;
-
     let familyRootLocked = false;
-    if (parentSessionId !== undefined && initialRow.cloudAgentFamilyId != null) {
-      const [familyRoot] = await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            eq(cli_sessions_v2.cloud_agent_session_id, initialRow.cloudAgentFamilyId),
-            eq(cli_sessions_v2.cloud_agent_family_id, initialRow.cloudAgentFamilyId),
-            sql`${cli_sessions_v2.parent_session_id} IS NULL`
+    if (parentSessionId !== undefined) {
+      const [initialRow] = await selectCurrentRow();
+      if (!initialRow) return null;
+      if (initialRow.cloudAgentFamilyId != null) {
+        const [familyRoot] = await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              eq(cli_sessions_v2.cloud_agent_session_id, initialRow.cloudAgentFamilyId),
+              eq(cli_sessions_v2.cloud_agent_family_id, initialRow.cloudAgentFamilyId),
+              sql`${cli_sessions_v2.parent_session_id} IS NULL`
+            )
           )
-        )
-        .limit(1)
-        .for('update');
-      familyRootLocked = familyRoot !== undefined;
+          .limit(1)
+          .for('update');
+        familyRootLocked = familyRoot !== undefined;
+      }
     }
 
     const [currentRow] = await selectCurrentRow().for('update');

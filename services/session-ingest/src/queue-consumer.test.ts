@@ -945,17 +945,9 @@ describe('queue organization changes', () => {
       status: null,
       status_updated_at: null,
     };
-    // loadSession → metadata initial read → metadata lock → membership → read-back.
+    // loadSession → metadata lock → membership → read-back.
     const selectResults: unknown[][] = [
       [{ session_id: sessionId }],
-      [
-        {
-          status: null,
-          parentSessionId: null,
-          cloudAgentSessionId: null,
-          cloudAgentFamilyId: null,
-        },
-      ],
       [
         {
           status: null,
@@ -1064,14 +1056,6 @@ describe('queue status notifications', () => {
     };
     const selectResults: unknown[][] = [
       [{ session_id: persistedSession.session_id, status: 'idle' }],
-      [
-        {
-          status: 'busy',
-          parentSessionId: null,
-          cloudAgentSessionId: null,
-          cloudAgentFamilyId: null,
-        },
-      ],
       [
         {
           status: 'busy',

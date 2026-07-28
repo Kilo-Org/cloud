@@ -138,6 +138,7 @@ function makeDbFakes() {
     leftJoin: vi.fn(() => select),
     where: vi.fn((_condition: unknown) => select),
     limit: vi.fn(() => select),
+    for: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
   };
 
@@ -191,6 +192,7 @@ function makeDbFakes() {
       insertResult,
       select: selectFn,
       selectWhere: select.where,
+      selectFor: select.for,
       update: updateFn,
       updateSet,
       updateWhere,
@@ -1394,6 +1396,7 @@ describe('api routes', () => {
       '"cli_sessions_v2"."session_id" in ($1, $2) and "cli_sessions_v2"."kilo_user_id" = $3'
     );
     expect(deletedRowsQuery.params).toEqual([childSessionId, parentSessionId, 'usr_test']);
+    expect(fns.selectFor).toHaveBeenCalledWith('update');
 
     expect(fns.deleteWhere).toHaveBeenCalledTimes(2);
     const deletedSessionParams = fns.deleteWhere.mock.calls.map(([predicate]) => {

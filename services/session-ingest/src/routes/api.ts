@@ -209,6 +209,19 @@ api.delete('/session/:sessionId', async c => {
     );
 
   await db.transaction(async tx => {
+    // Family metadata mutations lock root before child. Match that ordering so
+    // root deletion cannot hold a child while waiting for the same root.
+    await tx
+      .select({ sessionId: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1)
+      .for('update');
     for (const sessionId of orderedSessionIds) {
       await tx
         .delete(cli_sessions_v2)

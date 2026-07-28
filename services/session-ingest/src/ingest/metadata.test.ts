@@ -190,6 +190,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
 
     const thenable = {
       for: vi.fn(() => {
+        initialReadDone = true;
         queryLog.push('session-lock');
         const rows = options.rowMissing ? [] : [currentSessionState()];
         settled = Promise.resolve(rows);

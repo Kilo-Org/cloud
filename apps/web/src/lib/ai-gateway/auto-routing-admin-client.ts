@@ -114,7 +114,16 @@ async function fetchAutoRoutingSettingsAdmin(
     },
   });
 
-  const body: unknown = await response.json();
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return {
+      status: 502,
+      body: { error: 'Invalid worker settings response' },
+    };
+  }
+
   if (!response.ok) {
     if (response.status === 429) {
       const quota = BenchmarkProfileQuotaErrorSchema.safeParse(body);
@@ -131,9 +140,17 @@ async function fetchAutoRoutingSettingsAdmin(
     };
   }
 
+  const parsed = AutoRoutingSettingsResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    return {
+      status: 502,
+      body: { error: 'Invalid worker settings response' },
+    };
+  }
+
   return {
     status: response.status,
-    body: AutoRoutingSettingsResponseSchema.parse(body),
+    body: parsed.data,
   };
 }
 

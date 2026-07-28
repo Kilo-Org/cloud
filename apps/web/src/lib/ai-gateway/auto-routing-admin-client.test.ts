@@ -229,4 +229,54 @@ describe('auto routing admin client', () => {
       body: quotaBody,
     });
   });
+
+  it('returns 502 for 2xx bodies that fail settings schema validation', async () => {
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ unexpected: true }),
+    });
+
+    await expect(getAutoRoutingSettings({ ownerType: 'user', ownerId: 'user-1' })).resolves.toEqual(
+      {
+        status: 502,
+        body: { error: 'Invalid worker settings response' },
+      }
+    );
+  });
+
+  it('returns 502 for 2xx non-JSON bodies without throwing', async () => {
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON')),
+    });
+
+    await expect(
+      updateAutoRoutingSettings({
+        ownerType: 'user',
+        ownerId: 'user-1',
+        mode: null,
+        pool: null,
+      })
+    ).resolves.toEqual({
+      status: 502,
+      body: { error: 'Invalid worker settings response' },
+    });
+  });
+
+  it('passes through non-2xx worker error bodies', async () => {
+    mockFetch.mockResolvedValue({
+      status: 404,
+      ok: false,
+      json: () => Promise.resolve({ error: 'Settings not found' }),
+    });
+
+    await expect(getAutoRoutingSettings({ ownerType: 'user', ownerId: 'user-1' })).resolves.toEqual(
+      {
+        status: 404,
+        body: { error: 'Settings not found' },
+      }
+    );
+  });
 });

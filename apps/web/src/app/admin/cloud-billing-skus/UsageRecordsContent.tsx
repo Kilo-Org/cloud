@@ -398,20 +398,10 @@ export default function UsageRecordsContent() {
                 value={status}
                 onValueChange={next => {
                   const selected = next as typeof status;
-                  const selectedStatus = selected === 'all' ? undefined : selected;
-                  const selectedCloseReason =
-                    selected === 'open' ? undefined : submitted.closeReason;
                   setStatus(selected);
                   if (selected === 'open' && closeReason !== 'all') {
                     setCloseReason('all');
-                    replaceCloseReasonParam(undefined);
                   }
-                  setSubmitted(current => ({
-                    ...current,
-                    status: selectedStatus,
-                    closeReason: selectedCloseReason,
-                  }));
-                  resetResultNavigation();
                 }}
               >
                 <SelectTrigger id="usage-search-status" className="w-full">
@@ -433,13 +423,6 @@ export default function UsageRecordsContent() {
                   const selectedReason = selected === 'all' ? undefined : selected;
                   if (selectedReason && status === 'open') setStatus('closed');
                   setCloseReason(selected);
-                  replaceCloseReasonParam(selectedReason);
-                  setSubmitted(current => ({
-                    ...current,
-                    status: selectedReason && current.status === 'open' ? 'closed' : current.status,
-                    closeReason: selectedReason,
-                  }));
-                  resetResultNavigation();
                 }}
               >
                 <SelectTrigger id="usage-search-close-reason" className="w-full">
@@ -462,11 +445,6 @@ export default function UsageRecordsContent() {
                 value={skuId}
                 onValueChange={selected => {
                   setSkuId(selected);
-                  setSubmitted(current => ({
-                    ...current,
-                    skuId: selected === 'all' ? undefined : selected,
-                  }));
-                  resetResultNavigation();
                 }}
               >
                 <SelectTrigger id="usage-search-sku" className="w-full">
@@ -483,83 +461,122 @@ export default function UsageRecordsContent() {
               </Select>
             </div>
             {(kind === 'user' || kind === 'org') && (
-              <div className="space-y-1.5 lg:col-span-2 xl:col-span-4 xl:col-start-1 xl:row-start-2">
-                <Label>Usage window</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="usage-summary-start" className="sr-only">
-                      Window start
-                    </Label>
-                    <Input
-                      id="usage-summary-start"
-                      type="datetime-local"
-                      value={summaryStart}
-                      max={summaryEnd}
-                      aria-describedby={
-                        summaryInputError ? 'usage-summary-window-error' : undefined
-                      }
-                      onChange={event => setSummaryStart(event.target.value)}
-                    />
+              <div className="lg:col-span-2 xl:col-span-5 xl:row-start-2">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-end">
+                  <div className="space-y-1.5 xl:w-84">
+                    <Label>Usage window</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="usage-summary-start" className="sr-only">
+                          Window start
+                        </Label>
+                        <Input
+                          id="usage-summary-start"
+                          type="datetime-local"
+                          value={summaryStart}
+                          max={summaryEnd}
+                          aria-describedby={
+                            summaryInputError ? 'usage-summary-window-error' : undefined
+                          }
+                          onChange={event => setSummaryStart(event.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="usage-summary-end" className="sr-only">
+                          Window end
+                        </Label>
+                        <Input
+                          id="usage-summary-end"
+                          type="datetime-local"
+                          value={summaryEnd}
+                          min={summaryStart}
+                          aria-describedby={
+                            summaryInputError ? 'usage-summary-window-error' : undefined
+                          }
+                          onChange={event => setSummaryEnd(event.target.value)}
+                        />
+                      </div>
+                    </div>
+                    {summaryInputError && (
+                      <p
+                        id="usage-summary-window-error"
+                        className="text-destructive type-label"
+                        role="alert"
+                      >
+                        {summaryInputError}
+                      </p>
+                    )}
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="usage-summary-end" className="sr-only">
-                      Window end
+                  <div className="space-y-1.5 xl:w-44">
+                    <Label className="invisible" aria-hidden="true">
+                      Actions
                     </Label>
-                    <Input
-                      id="usage-summary-end"
-                      type="datetime-local"
-                      value={summaryEnd}
-                      min={summaryStart}
-                      aria-describedby={
-                        summaryInputError ? 'usage-summary-window-error' : undefined
-                      }
-                      onChange={event => setSummaryEnd(event.target.value)}
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={results.isFetching || !value.trim()}
+                      >
+                        <Search className="size-4" />{' '}
+                        {results.isFetching ? 'Searching...' : 'Search'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          setValue('');
+                          setStatus('all');
+                          setCloseReason('all');
+                          setSkuId('all');
+                          setSummaryInputError(null);
+                          setSummaryRequest(null);
+                          setSubmitted({ kind: 'recent' });
+                          replaceCloseReasonParam(undefined);
+                          resetResultNavigation();
+                        }}
+                      >
+                        Reset
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                {summaryInputError && (
-                  <p
-                    id="usage-summary-window-error"
-                    className="text-destructive type-label"
-                    role="alert"
-                  >
-                    {summaryInputError}
-                  </p>
-                )}
               </div>
             )}
-            <div className="space-y-1.5 lg:col-span-2 xl:col-span-1 xl:col-start-5 xl:row-start-2">
-              <Label className="invisible" aria-hidden="true">
-                Actions
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={results.isFetching || !value.trim()}
-                >
-                  <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setValue('');
-                    setStatus('all');
-                    setCloseReason('all');
-                    setSkuId('all');
-                    setSummaryInputError(null);
-                    setSummaryRequest(null);
-                    setSubmitted({ kind: 'recent' });
-                    replaceCloseReasonParam(undefined);
-                    resetResultNavigation();
-                  }}
-                >
-                  Reset
-                </Button>
+            {kind === 'interval' && (
+              <div className="space-y-1.5 lg:col-span-2 xl:col-span-5 xl:row-start-2 xl:ml-auto xl:w-44">
+                <Label className="invisible" aria-hidden="true">
+                  Actions
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={results.isFetching || !value.trim()}
+                  >
+                    <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setValue('');
+                      setStatus('all');
+                      setCloseReason('all');
+                      setSkuId('all');
+                      setSummaryInputError(null);
+                      setSummaryRequest(null);
+                      setSubmitted({ kind: 'recent' });
+                      replaceCloseReasonParam(undefined);
+                      resetResultNavigation();
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </form>
         </CardContent>
       </Card>

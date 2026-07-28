@@ -1,7 +1,12 @@
 /* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
+import {
+  dangerousToolNames,
+  mockKiloApi,
+  readSidePanelScrollState,
+  safeToolNames,
+} from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -16,14 +21,6 @@ import {
   releaseConversationStoreHydration,
   requireTwoOptionLabels,
 } from './tab-selection-e2e-helpers';
-
-const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'search_memories',
-  'get_memory',
-];
 
 test('fresh conversation shows the empty-state hint without a CTA button', async () => {
   const fixture = await startFixtureServer();
@@ -227,6 +224,7 @@ test('assistant messages render markdown', async () => {
           ],
         },
       ],
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

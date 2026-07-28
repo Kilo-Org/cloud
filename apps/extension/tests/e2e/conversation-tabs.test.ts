@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -12,13 +12,6 @@ import {
 } from './extension-context-fixture';
 import { expectSelectedModelId, selectModelById } from './model-picker-e2e-helpers';
 
-const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'search_memories',
-  'get_memory',
-];
 const getSelectedOptionText = (page: Page, label: string): Promise<string> =>
   page.getByLabel(label).evaluate(element => {
     if (!(element instanceof HTMLSelectElement)) {

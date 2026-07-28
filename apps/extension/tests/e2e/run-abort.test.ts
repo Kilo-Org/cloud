@@ -7,6 +7,7 @@ import {
   startFixtureServer,
 } from './extension-context-fixture';
 import {
+  dangerousToolNames,
   installChatCompletionAbortObserver,
   mockKiloApi,
   wasChatCompletionAborted,
@@ -73,6 +74,7 @@ test('closing the selected tab aborts a running request', async () => {
   try {
     await mockKiloApi(context, {
       beforeFirstCompletion: () => pendingCompletion,
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

@@ -5,7 +5,7 @@ import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { expectEvalToolBoxNoHorizontalOverflow } from './eval-overflow-fixture';
-import { mockKiloApi } from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi } from './kilo-api-fixture';
 import {
   extensionPath,
   launchExtensionContext,
@@ -104,7 +104,7 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
   const seenChatBodies: { messages?: { role?: string }[] }[] = [];
 
   try {
-    await mockKiloApi(context, { seenChatBodies });
+    await mockKiloApi(context, { seenChatBodies, toolNames: dangerousToolNames });
 
     const page = await context.newPage();
     await page.goto(fixture.url);
@@ -181,6 +181,7 @@ test('running conversation can be stopped', async () => {
   try {
     await mockKiloApi(context, {
       beforeFirstCompletion: () => pendingCompletion,
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();
@@ -287,7 +288,7 @@ test('conversation survives side panel reload', async () => {
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
   try {
-    await mockKiloApi(context);
+    await mockKiloApi(context, { toolNames: dangerousToolNames });
 
     const page = await context.newPage();
     await page.goto(fixture.url);

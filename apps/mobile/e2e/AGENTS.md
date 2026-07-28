@@ -7,14 +7,14 @@ Interactive verification against a local backend. Run commands from the reposito
 This machine is shared by parallel workflows. Before starting a stack, booting a simulator or emulator, or running a native build — on every run, whether or not you can see another workflow active — acquire a slot:
 
 ```bash
-apps/mobile/.kilo/e2e-slot.sh acquire <your-tmux-session>   # blocks until a slot frees
-apps/mobile/.kilo/e2e-slot.sh status                        # current holders
-apps/mobile/.kilo/e2e-slot.sh release <your-tmux-session>   # the moment the device phase ends
+.kilo_workflow/e2e-slot.sh acquire <your-tmux-session>   # blocks until a slot frees
+.kilo_workflow/e2e-slot.sh status                        # current holders
+.kilo_workflow/e2e-slot.sh release <your-tmux-session>   # the moment the device phase ends
 ```
 
 - Default 3 slots, machine-global, owned by tmux session name; a dead session's slot is reclaimed automatically, so a crash cannot wedge the queue.
 - `acquire` blocking is correct behavior, not a hang and not a wedge. Wait for it. Never start device work unslotted because the queue was busy, because your phase looks small, or because a stack is already up.
-- Acquiring is idempotent per session; every device phase (repro gate, prewarm, each E2E round) needs a slot.
+- Acquiring is idempotent per session; every device phase (repro gate, each E2E round) needs a slot.
 - Release as soon as the device phase ends. Planning, implementation, review, checks, and CI waits are uncapped — never hold a slot through them.
 
 ## Fresh Worktree Quickstart
@@ -47,7 +47,7 @@ pnpm dev:status --json
 
 Rules:
 
-- Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts.
+- Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts. If the automatic offset lands on an occupied port, use a per-command prefix — see `.kilo_workflow/learnings/worktree-port-offset-airplay-collision.md`.
 - The `dev:env` step creates the JWT Secrets Store binding. Without it, session-ingest looks healthy but rejects every session request.
 - Secrets Store state is local to each Worker directory. `dev:start` refreshes every source-backed secret for its service graph before launching Workers; a secret-creation failure is fatal, not something to retry past.
 - `event-service` is required for presence and notification behavior.
@@ -93,11 +93,10 @@ Pinned surface only: REST pull/repo/check-runs/statuses plus GraphQL ops `PrRevi
 Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the claim command prefers an unclaimed shutdown iPhone and boots it:
 
 ```bash
-pnpm dev:mobile:simulator claim [udid] --phase prewarm   # prewarm verifier
-pnpm dev:mobile:simulator claim [udid] --phase verify    # fresh acceptance verifier reclaims the same device
+pnpm dev:mobile:simulator claim [udid]   # idempotent per worktree
 ```
 
-The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename> - <phase>` and restores the original name on release. Never call `xcrun simctl rename` yourself.
+The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. A claim is stale — and silently reclaimable — once its owning worktree is deleted; release explicitly anyway.
 
 Install a validated cached native build. A compatible fingerprint skips rebuilding; a cache miss serializes through the host-wide native compiler semaphore. Never install an arbitrary DerivedData app or run a separate Expo native build:
 
@@ -166,6 +165,7 @@ pnpm dev:seed app:api-token <email>              # mint a bearer token (used by 
 One-time machine setup: `brew install maestro`. For MCP, use stdio command `maestro mcp`, then restart the agent session so its tools appear.
 
 - Maestro is the primary automation driver on both iOS and Android. Fall back to `xcrun simctl` (iOS) or repository-wrapped ADB (Android) only when Maestro cannot inspect or operate a native state, or when low-level device control is required. Setup still uses `simctl`/ADB for boot, install, dev-client URL reconnection, screenshots, shutdown, and cleanup.
+- With more than one simulator booted (parallel worktrees), always target by UDID: `maestro --device <udid>` — without it Maestro picks an arbitrary booted simulator and taps silently land on another worktree's device. The Maestro MCP tools mis-target the same way; prefer the CLI plus `simctl` screenshots when several simulators are up.
 - Inspect the screen before selecting elements; re-inspect after UI changes.
 - Never guess a selector from a visible label or screenshot. Copy the exact `txt` or `a11y` value from `maestro_inspect_screen` (`a11y` maps to Maestro `text:`). Maestro text matching is full-string regex, not substring.
 - Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before relying on these examples; the count and labels can change.
@@ -195,10 +195,11 @@ The helper resolves this worktree's stack ports, mints a token for the given use
 Run any one-off CLI command against the same prepared stack with `exec` instead of the interactive TUI:
 
 ```bash
-apps/mobile/e2e/remote-cli.sh exec remote              # enable the real-time relay
 apps/mobile/e2e/remote-cli.sh exec session list --pure # inspect sessions
 apps/mobile/e2e/remote-cli.sh exec run "say hello"     # non-interactive run
 ```
+
+The real-time relay (`remote`) blocks until SIGTERM — a one-shot `exec remote` exits and the relay dies with it. Run it persistently in its own `kilo-e2e-*` tmux window (or send `/remote` to the running TUI session) and keep it alive for the whole flow.
 
 Role agents reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
 
@@ -306,7 +307,7 @@ pnpm dev:stop                                # only if you started this worktree
 xcrun simctl shutdown <udid>                 # only if you booted it
 pnpm dev:mobile:simulator release <udid>     # every simulator you claimed
 pnpm dev:mobile:android release <serial>     # every Android device you claimed
-apps/mobile/.kilo/e2e-slot.sh release <tmux-session>   # always, as soon as the device phase ends
+.kilo_workflow/e2e-slot.sh release <tmux-session>   # always, as soon as the device phase ends
 ```
 
 Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, shut down a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.

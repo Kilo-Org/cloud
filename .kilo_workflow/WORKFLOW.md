@@ -329,14 +329,13 @@ Environment blockers and their fixes — broken local stacks, credential traps, 
 
 Every GitHub issue comment, PR comment, review comment, review body, and thread reply written by this workflow begins exactly with `(bot) `, including replies to Kilobot and rejections of findings. Only the PR title and PR description carry no prefix.
 
-GitHub's public API and `gh pr comment` cannot upload attachments. Use the pinned
-[`gh-image`](https://github.com/drogers0/gh-image) extension, which performs the same
+GitHub's public API and `gh pr comment` cannot upload attachments. Use the repository's
+checksum-pinned wrapper around the security-reviewed
+[`gh-image`](https://github.com/drogers0/gh-image) v1.2.0 binary. It performs the same
 repository-scoped upload as GitHub's comment box and prints ready-to-paste Markdown:
 
 ```bash
-gh extension list | grep -q '^gh image' ||
-  gh extension install drogers0/gh-image --pin v1.2.0
-gh image "$SCREENSHOT" --repo <owner/repo>
+.kilo_workflow/upload-pr-attachment.sh "$SCREENSHOT" --repo <owner/repo>
 # ![screenshot.png](https://github.com/user-attachments/assets/<id>)
 ```
 
@@ -345,6 +344,10 @@ later), then fetch the PR body/comments with `gh` and verify the
 `github.com/user-attachments/` URL is present. `gh-image` uses an existing GitHub browser
 session because a normal `gh` API token cannot authorize this undocumented upload endpoint.
 It may trigger a one-time OS keychain approval; never print, pass on the command line, commit,
-or place its `user_session` cookie in a handoff. A missing browser session is a completion
+or place its `user_session` cookie in a handoff; never invoke `gh-image` directly. The wrapper
+verifies the reviewed release digest before every execution and blocks every supported explicit
+token path. Its audit and residual risks are recorded in
+`learnings/gh-image-unverified-release-binary.md`. A missing browser session is a completion
 blocker for UI work, not a reason to commit screenshots into the product repository or use an
-unrelated public image host.
+unrelated public image host. Any version change requires a fresh security review and new committed
+digests.

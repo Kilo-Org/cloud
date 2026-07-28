@@ -176,13 +176,20 @@ export function AgentSessionListScreen() {
   // `isSearchPending` drives a lightweight inline indicator instead.
   const effectiveSearchQuery = isSearchPending ? '' : searchQuery;
 
-  // Pinned "Active now" tray. Free-text search is intentionally NOT a
-  // narrowing input here — the tray persists while the user types. The
-  // helper applies only the platform/project filters so the tray never
-  // shows a session the user has explicitly filtered out.
+  // Pinned "Active now" tray. The committed effective search query narrows
+  // the tray together with the history data source (blank while the first
+  // fetch for the text is pending), in conjunction with the platform/project
+  // filters, so the tray never shows a session the user has searched or
+  // filtered away.
   const pinnedActive = useMemo(
-    () => selectPinnedActiveSessions({ activeSessions, projectFilter, platformFilter }),
-    [activeSessions, platformFilter, projectFilter]
+    () =>
+      selectPinnedActiveSessions({
+        activeSessions,
+        projectFilter,
+        platformFilter,
+        searchQuery: effectiveSearchQuery,
+      }),
+    [activeSessions, effectiveSearchQuery, platformFilter, projectFilter]
   );
   const hasPinnedActive = pinnedActive.length > 0;
 

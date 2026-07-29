@@ -133,7 +133,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
-        variants: {},
+        variants: undefined,
       },
       {
         id: 'unknown-status',
@@ -142,7 +142,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
-        variants: {},
+        variants: undefined,
       },
     ]);
   });
@@ -161,8 +161,8 @@ describe('parseModelsDevProviderModels', () => {
     expect(models[0]).toMatchObject({
       id: 'future-control',
       flags: ['reasoning'],
-      variants: {},
     });
+    expect(models[0].variants).toBeUndefined();
   });
 
   test('excludes models missing from the provider model list', () => {

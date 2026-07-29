@@ -128,7 +128,7 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
 
 function modelsDevReasoningOptionsToVariants(
   options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>>
-): NonNullable<OpenCodeSettings['variants']> {
+): OpenCodeSettings['variants'] {
   const hasToggle = options.some(option => option.type === 'toggle');
   const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};
   for (const option of options) {
@@ -150,7 +150,7 @@ function modelsDevReasoningOptionsToVariants(
   if (hasToggle) {
     return REASONING_VARIANTS_BINARY;
   }
-  return {};
+  return undefined;
 }
 
 export function parseModelsDevProviderModels(

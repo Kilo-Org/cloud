@@ -155,16 +155,19 @@ export function PrReviewDiscussionTab({
         const generation = settleGenerationRef.current;
         settleThreadIdRef.current = thread.threadId;
         void (async () => {
-          // scrollToIndex targets contentOffset = layout.y + firstItemOffset + viewOffset.
-          // Clip math uses absolute coords (layout.y + firstItemOffset); without a negative
-          // viewOffset the firstItemOffset is applied twice and the row parks above the
-          // list's visible top (under the screen chrome). viewOffset: -F yields
-          // contentOffset = layout.y so absolute offset equals rowTop.
+          // Settle target, verified on-device (iOS, calibrated ±1.3pt — E2E r3):
+          // maintainVisibleContentPosition anchors the first FULLY visible row, and a
+          // row parked at the visible top edge still loses the anchor to the next row —
+          // the expansion then scrolls the list by the full expansion height and the
+          // tapped header flies off screen. viewOffset: +firstItemOffset parks the row
+          // ~|firstItemOffset| below the viewport top (fully inside the visible region,
+          // with rows above it visible), so a row above stays the anchor and the
+          // post-expand adjustment measures ≈ 0; the header never leaves the screen.
           const firstItemOffset = listRef.current?.getFirstItemOffset() ?? 0;
           await listRef.current?.scrollToIndex({
             index,
             viewPosition: 0,
-            viewOffset: -firstItemOffset,
+            viewOffset: firstItemOffset,
             animated: true,
           });
           if (settleGenerationRef.current === generation) {

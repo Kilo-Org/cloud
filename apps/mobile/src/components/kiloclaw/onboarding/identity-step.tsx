@@ -282,7 +282,7 @@ export function IdentityStep({
             <BotAvatar emoji={selectedEmoji} size={24} color={colors.foreground} />
           </Pressable>
           <TextInput
-            className="h-14 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-6 text-foreground"
+            className="h-14 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-[normal] text-foreground"
             placeholder="Name your bot"
             placeholderTextColor={colors.mutedForeground}
             defaultValue={initialName}
@@ -390,7 +390,7 @@ export function IdentityStep({
         <View className="flex-row items-center gap-2">
           <TextInput
             key={locationInputKey}
-            className="h-11 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-6 text-foreground"
+            className="h-11 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-[normal] text-foreground"
             placeholder="City or region (optional)"
             placeholderTextColor={colors.mutedForeground}
             defaultValue={locationDefaultValue}

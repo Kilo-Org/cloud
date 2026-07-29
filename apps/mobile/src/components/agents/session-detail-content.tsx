@@ -478,11 +478,9 @@ export function SessionDetailContent({
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
-  const platform = isSessionLoaded ? (fetchedData.createdOnPlatform ?? null) : null;
   const headerRight = (
     <SessionContextMetrics
       info={contextInfo}
-      platform={platform}
       totalCostMicrodollars={totalMicrodollars}
       hasMessages={messages.length > 0}
       onPress={

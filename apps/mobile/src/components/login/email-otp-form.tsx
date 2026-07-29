@@ -32,7 +32,7 @@ export function EmailOtpForm({
         Enter the code sent to {email}
       </Text>
       <TextInput
-        className="h-12 rounded-md border border-input bg-background px-3 text-lg leading-5 tracking-widest text-foreground"
+        className="h-12 rounded-md border border-input bg-background px-3 text-lg leading-[normal] tracking-widest text-foreground"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above

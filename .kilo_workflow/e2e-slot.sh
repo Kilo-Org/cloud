@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # Device/stack slot semaphore for parallel workflows.
 #
-# A slot and a dev stack are the same resource: a slot is what entitles a
-# worktree to run a stack, a device, or a native build. A stack must never
-# outlive the slot that started it — five live stacks on a 14-core host push the
-# load past the point where emulator boots and native builds time out, which
-# reads as flaky devices rather than as over-subscription. Planning,
-# implementation, review, and CI waits need neither, and are unlimited.
+# A slot, a dev stack, and a claimed device are the same resource: a slot is
+# what entitles a worktree to run a stack, a device, or a native build. Neither
+# a stack nor a device may outlive the slot that started it — five live stacks
+# on a 14-core host push the load past the point where emulator boots and native
+# builds time out, which reads as flaky devices rather than as
+# over-subscription, and a simulator left booted keeps burning CPU under every
+# section that follows. Planning, implementation, review, and CI waits need
+# neither, and are unlimited.
 #
 #   e2e-slot.sh acquire <tmux-session>   # blocks until a slot is free, then holds it
-#   e2e-slot.sh release <tmux-session>   # frees the slot AND stops the worktree's stack
+#   e2e-slot.sh release <tmux-session>   # frees the slot AND hands back the worktree's stack and simulators
 #   e2e-slot.sh status                   # who holds what, for how long, with stack coverage
 #   e2e-slot.sh stacks [--reap]          # stacks with no slot; --reap stops them
 #
@@ -47,9 +49,9 @@ stack_session() { echo "kilo-dev-$(basename "$1" | tr -c 'A-Za-z0-9_-\n' '_')"; 
 # worktrees were recorded never make a live stack look abandoned.
 stack_is_covered() {
   # Every name here is local: this function loops over slots reassigning `wt`,
-  # and its caller `stop_stack` still needs its own `wt` afterwards to know
-  # which worktree to stop. Without `local` the caller's value is clobbered and
-  # the wrong section's stack gets stopped.
+  # and its caller `release_worktree_resources` still needs its own `wt`
+  # afterwards to know which worktree to tear down. Without `local` the caller's
+  # value is clobbered and the wrong section's stack gets stopped.
   local sess=$1 s wt owner
   for s in "$DIR"/slot-*; do
     [ -d "$s" ] || continue
@@ -61,16 +63,26 @@ stack_is_covered() {
   return 1
 }
 
-# Stop a worktree's stack, but only once no remaining slot covers it — a section
-# can hold a second slot for a concurrent phase.
-stop_stack() {
+# Hand back everything a slot entitled a worktree to hold — its dev stack and
+# every simulator it claimed — but only once no remaining slot covers it: a
+# section can hold a second slot for a concurrent phase.
+release_worktree_resources() {
   local wt=$1 sess
   [ -n "$wt" ] && [ -d "$wt" ] || return 0
   sess=$(stack_session "$wt")
   stack_is_covered "$sess" && return 0
-  tmux has-session -t "$sess" 2>/dev/null || return 0
-  echo "stopping dev stack for $wt"
-  (cd "$wt" && pnpm dev:stop)
+  if tmux has-session -t "$sess" 2>/dev/null; then
+    echo "stopping dev stack for $wt"
+    (cd "$wt" && pnpm dev:stop)
+  fi
+  # Devices go back whether or not a stack is up — a round can drive a claimed
+  # simulator without one. Doing it here rather than trusting the runbook's
+  # per-UDID `release` is the whole point: an agent that ends its device phase
+  # without releasing each simulator by hand used to leave them booted for the
+  # rest of the day. `release-all` only touches this worktree's own claims, and
+  # only powers off devices its own claims booted.
+  echo "releasing simulators claimed by $wt"
+  (cd "$wt" && pnpm dev:mobile:simulator release-all)
 }
 
 reap() {
@@ -93,11 +105,12 @@ reap() {
       continue
     fi
     if ! printf '%s\n' "$alive" | grep -qxF -- "$owner"; then
-      # The owner is gone, so the slot AND the stack it entitled are both
-      # reclaimable. Nothing is using a stack whose session died.
+      # The owner is gone, so the slot and everything it entitled — stack and
+      # claimed devices — are all reclaimable. Nothing is using a stack or a
+      # simulator whose session died.
       wt=$(cat "$s/worktree" 2>/dev/null || echo)
       rm -rf "$s"
-      stop_stack "$wt"
+      release_worktree_resources "$wt"
     fi
   done
 }
@@ -151,9 +164,11 @@ case "${1:?usage: acquire|release|status <tmux-session>}" in
       wt=$(cat "$s/worktree" 2>/dev/null || echo)
       rm -rf "$s"
       echo "released $(basename "$s")"
-      # The stack goes with the slot. A later round acquires again and starts a
-      # fresh one; leaving it up is what pushes the host past three stacks.
-      stop_stack "$wt"
+      # The stack and the claimed simulators go with the slot. A later round
+      # acquires again and starts a fresh stack and claims a device again;
+      # leaving them up is what pushes the host past three stacks and strands
+      # booted simulators.
+      release_worktree_resources "$wt"
     done
     exit 0
     ;;
@@ -198,8 +213,8 @@ case "${1:?usage: acquire|release|status <tmux-session>}" in
       wt=$(git worktree list --porcelain | sed -n 's/^worktree //p' | while read -r p; do
         [ "$(basename "$p")" = "$slug" ] && echo "$p"; done | head -1)
       [ -n "$wt" ] || { echo "$sess: no worktree on disk, leaving its session alone"; continue; }
-      echo "stopping $sess ($wt)"
-      (cd "$wt" && pnpm dev:stop)
+      echo "reaping $sess ($wt)"
+      release_worktree_resources "$wt"
     done
     ;;
   *) echo "usage: $0 acquire|release|status|stacks <tmux-session>" >&2; exit 1 ;;

@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { GET } from './route';
+import { GET as openRouterV1GET } from '@/app/api/openrouter/v1/models/[provider]/[model]/endpoints/route';
+import { GET as gatewayV1GET } from '@/app/api/gateway/v1/models/[provider]/[model]/endpoints/route';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
@@ -17,6 +19,11 @@ function request(modelId: string) {
 }
 
 describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
+  test('uses the canonical handler for versioned routes', () => {
+    expect(openRouterV1GET).toBe(GET);
+    expect(gatewayV1GET).toBe(GET);
+  });
+
   test('undoes discounts for every priced endpoint without adding missing fields', async () => {
     const model = {
       id: 'deepseek/deepseek-v4-pro',
@@ -41,6 +48,9 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe(
+      'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
+    );
     await expect(response.json()).resolves.toEqual({
       data: {
         id: model.id,
@@ -69,6 +79,9 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
 
     expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe(
+      'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
+    );
     await expect(response.json()).resolves.toEqual({
       error: { message: 'Not Found', code: 404 },
     });
@@ -83,6 +96,9 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
 
     expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe(
+      'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
+    );
     await expect(response.json()).resolves.toEqual({
       error: { message: 'Not Found', code: 404 },
     });

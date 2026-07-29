@@ -483,6 +483,7 @@ export function SessionDetailContent({
       info={contextInfo}
       totalCostMicrodollars={totalMicrodollars}
       hasMessages={messages.length > 0}
+      loading={shouldShowLoading}
       onPress={
         contextInfo
           ? () => {

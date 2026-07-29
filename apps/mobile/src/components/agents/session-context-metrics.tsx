@@ -16,6 +16,11 @@ type SessionContextMetricsProps = {
   totalCostMicrodollars: number | null;
   hasMessages: boolean;
   onPress?: () => void;
+  /**
+   * Hide the pill while the session page loads; the layout box stays reserved so the header does not
+   * shift.
+   */
+  loading?: boolean;
 };
 
 const RING_SIZE = 28;
@@ -37,11 +42,12 @@ export function SessionContextMetrics({
   totalCostMicrodollars,
   hasMessages,
   onPress,
+  loading = false,
 }: Readonly<SessionContextMetricsProps>) {
   const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages });
   // Single source for element kind and a11y affordance wording so a future
   // caller with interactive content but no onPress cannot advertise a tap.
-  const pressable = content.interactive && onPress != null;
+  const pressable = !loading && content.interactive && onPress != null;
   const accessibilityLabel = getMetricsAccessibilityLabel({
     info,
     totalCostMicrodollars,
@@ -52,20 +58,16 @@ export function SessionContextMetrics({
   // NativeWind 5 preview (rem ≈ 14px here), so an arbitrary px value is required
   // for the 44pt minimum touch target; height is identical in every pill state.
   const pillClassName =
-    'h-[44px] flex-row items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5';
+    'h-[44px] flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 
   const body = (
     <>
-      <View className="h-7 w-7 items-center justify-center">
-        <View className="absolute inset-0">
-          <ContextUsageRing
-            size={RING_SIZE}
-            strokeWidth={RING_STROKE}
-            arcFraction={content.arcFraction}
-            tone={content.tone}
-          />
-        </View>
-      </View>
+      <ContextUsageRing
+        size={RING_SIZE}
+        strokeWidth={RING_STROKE}
+        arcFraction={content.arcFraction}
+        tone={content.tone}
+      />
       {content.primary != null ? (
         <View className="flex-row items-baseline gap-1">
           <Text className={cn('text-xs font-semibold tabular-nums', toneTextClass(content.tone))}>
@@ -103,7 +105,10 @@ export function SessionContextMetrics({
   return (
     <View
       accessibilityLabel={accessibilityLabel || undefined}
-      className={pillClassName}
+      {...(loading
+        ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+        : {})}
+      className={cn(pillClassName, loading && 'opacity-0')}
       testID="session-context-metrics"
     >
       {body}

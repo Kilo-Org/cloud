@@ -88,6 +88,7 @@ export default function SessionDetailScreen() {
               info={undefined}
               totalCostMicrodollars={null}
               hasMessages={false}
+              loading
             />
           }
         />

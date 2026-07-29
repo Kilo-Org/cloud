@@ -1804,7 +1804,9 @@ test('validateSimulatorClaim enforces worktree ownership and rejects corrupt rec
 
 test('defaultIsLockActive requires both pidAlive and processIdentity match', () => {
   const aliveRecord: LockRecord = { key: 'k', pid: 1, identity: 'a', startedAt: '' };
-  const deadRecord: LockRecord = { key: 'k', pid: 2, identity: 'b', startedAt: '' };
+  // PID 9999999 exceeds the max PID on macOS (99998) and Linux (2^22), so the
+  // default probe reports it dead on both — a low "dead" pid is alive on Linux.
+  const deadRecord: LockRecord = { key: 'k', pid: 9999999, identity: 'b', startedAt: '' };
 
   // Both probes agree: active
   let active = defaultIsLockActive({

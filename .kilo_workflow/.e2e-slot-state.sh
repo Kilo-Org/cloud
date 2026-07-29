@@ -35,7 +35,9 @@ reap() {
 
     # mkdir wins the slot before acquire publishes its owner. Only clear an
     # ownerless directory once it is old enough to be an interrupted acquire.
-    modified=$(stat -f %m "$slot" 2>/dev/null || stat -c %Y "$slot" 2>/dev/null || echo "$now")
+    # GNU first: on GNU stat, `-f` means --file-system and exits 0 with mount
+    # info, so a BSD-first probe never falls through. BSD stat rejects `-c`.
+    modified=$(stat -c %Y "$slot" 2>/dev/null || stat -f %m "$slot" 2>/dev/null || echo "$now")
     age=$((now - modified))
     [ "$age" -gt 60 ] && rm -rf "$slot"
   done

@@ -17,7 +17,6 @@
 
 import * as Haptics from 'expo-haptics';
 import { Check, CheckCheck, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
@@ -45,12 +44,19 @@ type DiscussionThreadProps = {
   readonly repo: string;
   readonly number: number;
   readonly thread: ReviewThread;
+  /** Controlled by the Discussion tab (keyed by threadId). */
+  readonly expanded: boolean;
+  readonly onToggleExpand: () => void;
 };
 
-export function DiscussionThread({ owner, repo, number, thread }: Readonly<DiscussionThreadProps>) {
-  // Resolved threads start collapsed; active threads start expanded.
-  const [expanded, setExpanded] = useState(!thread.isResolved);
-
+export function DiscussionThread({
+  owner,
+  repo,
+  number,
+  thread,
+  expanded,
+  onToggleExpand,
+}: Readonly<DiscussionThreadProps>) {
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
   const addReaction = useAddReactionMutation(thread.threadId);
@@ -98,9 +104,7 @@ export function DiscussionThread({ owner, repo, number, thread }: Readonly<Discu
         commentCount={thread.comments.length}
         firstTimestamp={firstComment?.createdAt ?? null}
         expanded={expanded}
-        onToggleExpand={() => {
-          setExpanded(prev => !prev);
-        }}
+        onToggleExpand={onToggleExpand}
         onToggleResolve={onToggleResolve}
         resolveDisabled={isResolving}
       />

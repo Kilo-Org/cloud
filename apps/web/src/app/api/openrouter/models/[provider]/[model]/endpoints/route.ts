@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter';
+import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
 import { applyCustomPricingToPricing } from '@/lib/ai-gateway/custom-pricing';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 

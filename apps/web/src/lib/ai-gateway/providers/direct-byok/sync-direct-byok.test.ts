@@ -59,40 +59,49 @@ describe('parseOpenAICompatibleProviderModels', () => {
 
 describe('parseModelsDevProviderModels', () => {
   test('excludes deprecated and non-text-output models while retaining other statuses', () => {
-    const models = parseModelsDevProviderModels({
-      models: {
-        stable: {
-          id: 'stable',
-          name: 'provider/stable',
-          reasoning: true,
-          limit: { context: 128_000, output: 32_000 },
-          modalities: { input: ['text', 'image'], output: ['text'] },
-        },
-        alpha: {
-          id: 'alpha',
-          status: 'alpha',
-        },
-        beta: {
-          id: 'beta',
-          status: 'beta',
-          reasoning: false,
-        },
-        unknownStatus: {
-          id: 'unknown-status',
-          status: 'active',
-        },
-        deprecated: {
-          id: 'mimo-v2-omni',
-          name: 'MiMo V2 Omni',
-          status: 'deprecated',
-        },
-        imageOnly: {
-          id: 'wan2.7-image',
-          name: 'Wan2.7 Image',
-          modalities: { input: ['text'], output: ['image'] },
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          stable: {
+            id: 'stable',
+            name: 'provider/stable',
+            reasoning: true,
+            reasoning_options: [
+              { type: 'toggle' },
+              { type: 'effort', values: ['high', 'max', 'default', null] },
+            ],
+            limit: { context: 128_000, output: 32_000 },
+            modalities: { input: ['text', 'image'], output: ['text'] },
+          },
+          alpha: {
+            id: 'alpha',
+            status: 'alpha',
+            reasoning: true,
+            reasoning_options: [{ type: 'toggle' }],
+          },
+          beta: {
+            id: 'beta',
+            status: 'beta',
+            reasoning: false,
+          },
+          unknownStatus: {
+            id: 'unknown-status',
+            status: 'active',
+          },
+          deprecated: {
+            id: 'mimo-v2-omni',
+            name: 'MiMo V2 Omni',
+            status: 'deprecated',
+          },
+          imageOnly: {
+            id: 'wan2.7-image',
+            name: 'Wan2.7 Image',
+            modalities: { input: ['text'], output: ['image'] },
+          },
         },
       },
-    });
+      'alibaba-token-plan'
+    );
 
     expect(models).toEqual([
       {
@@ -102,6 +111,11 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: 32_000,
         input_modalities: ['text', 'image'],
         flags: ['reasoning'],
+        variants: {
+          none: { reasoning: { enabled: false, effort: 'none' } },
+          high: { reasoning: { enabled: true, effort: 'high' } },
+          max: { reasoning: { enabled: true, effort: 'max' } },
+        },
       },
       {
         id: 'alpha',
@@ -109,7 +123,11 @@ describe('parseModelsDevProviderModels', () => {
         context_length: undefined,
         max_completion_tokens: undefined,
         input_modalities: undefined,
-        flags: undefined,
+        flags: ['reasoning'],
+        variants: {
+          instant: { reasoning: { enabled: false, effort: 'none' } },
+          thinking: { reasoning: { enabled: true, effort: 'high' } },
+        },
       },
       {
         id: 'beta',
@@ -118,6 +136,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
+        variants: undefined,
       },
       {
         id: 'unknown-status',
@@ -126,8 +145,71 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
+        variants: undefined,
       },
     ]);
+  });
+
+  test('ignores reasoning option types that are not supported locally', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          futureControl: {
+            id: 'future-control',
+            reasoning: true,
+            reasoning_options: [{ type: 'budget_tokens', min: 0, max: 32_000 }],
+          },
+        },
+      },
+      'alibaba-token-plan'
+    );
+
+    expect(models[0]).toMatchObject({
+      id: 'future-control',
+      flags: ['reasoning'],
+    });
+    expect(models[0].variants).toBeUndefined();
+  });
+
+  test('sets verbosity from effort for Anthropic-backed models', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          qwen: {
+            id: 'qwen-test',
+            reasoning: true,
+            reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['low', 'high'] }],
+          },
+        },
+      },
+      'opencode-go'
+    );
+
+    expect(models[0].variants).toEqual({
+      none: { reasoning: { enabled: false, effort: 'none' } },
+      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+    });
+  });
+
+  test('sets verbosity on fallback variants for Anthropic-backed models', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          qwen: {
+            id: 'qwen-test',
+            reasoning: true,
+            reasoning_options: [{ type: 'toggle' }, { type: 'budget_tokens', max: 32_000 }],
+          },
+        },
+      },
+      'opencode-go'
+    );
+
+    expect(models[0].variants).toEqual({
+      instant: { reasoning: { enabled: false, effort: 'none' } },
+      thinking: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+    });
   });
 
   test('excludes models missing from the provider model list', () => {
@@ -138,6 +220,7 @@ describe('parseModelsDevProviderModels', () => {
           removed: { id: 'removed', limit: { context: 64_000 } },
         },
       },
+      'alibaba-token-plan',
       new Set(['available', 'provider-only'])
     );
 

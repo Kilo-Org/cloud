@@ -758,20 +758,10 @@ export async function rewriteModelResponse(
     );
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(
-      response,
-      requiresCostRemoval,
-      capture,
-      vercelRequestId
-    );
+    return rewriteModelResponse_Responses(response, requiresCostRemoval, capture, vercelRequestId);
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(
-      response,
-      requiresCostRemoval,
-      capture,
-      vercelRequestId
-    );
+    return rewriteModelResponse_Messages(response, requiresCostRemoval, capture, vercelRequestId);
   }
 
   const error = new Error(`implementation error: unrecognized API kind ${kind}`);

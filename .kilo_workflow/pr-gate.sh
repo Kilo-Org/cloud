@@ -18,8 +18,9 @@
 #
 # Prints the facts, then `GATE FAIL: ...` lines for every mechanical item
 # that does not hold (exit 1), or `GATE OK (mechanical items)` (exit 0).
-# Bot comments are printed only when they postdate the head commit — read the
-# newest one's verdict yourself; wording drifts, never string-match it. A
+# Bot comments are printed only when their activity postdates the head commit
+# (Kilobot edits its standing summary, so updated_at, not created_at) — read
+# the newest one's verdict yourself; wording drifts, never string-match it. A
 # `(bot) Kilobot posted no approving summary...` waiver comment posted after
 # the head satisfies the bot-summary item per the Kilobot loop's waiver rule.
 set -euo pipefail
@@ -42,14 +43,17 @@ done
 DEADLINE=$(( $(date +%s) + WAIT ))
 while :; do
   DATA=$(gh pr view "$PR" --repo "$REPO" \
-    --json headRefOid,mergeable,mergeStateStatus,statusCheckRollup,assignees,labels,comments)
+    --json headRefOid,mergeable,mergeStateStatus,statusCheckRollup,assignees,labels)
   HEAD_OID=$(jq -r '.headRefOid' <<<"$DATA")
   HEAD_TIME=$(gh api "repos/$REPO/commits/$HEAD_OID" --jq '.commit.committer.date')
-  HEAD_EPOCH=$(jq -nr --arg t "$HEAD_TIME" '$t | fromdateiso8601')
-  BOTCOMMENTS=$(jq -r --argjson t "$HEAD_EPOCH" --arg bot "$BOT" --arg waiver "$WAIVER" \
-    '[.comments[] | select((.author.login == $bot or .body == $waiver)
-      and (.createdAt | fromdateiso8601) > $t)
-      | "\(.author.login) @ \(.createdAt): \(.body | gsub("\\s+"; " ") | .[0:200])"] | .[]' <<<"$DATA")
+  # Kilobot EDITS its standing summary comment instead of posting anew, so a
+  # createdAt filter never sees later approvals. The REST `since` parameter
+  # filters by updated_at — exactly "bot activity postdating the head".
+  # REST logins carry the [bot] suffix gh pr view normalizes away.
+  COMMENTS=$(gh api "repos/$REPO/issues/$PR/comments?since=$HEAD_TIME&per_page=100")
+  BOTCOMMENTS=$(jq -r --arg bot "$BOT" --arg waiver "$WAIVER" \
+    '[.[] | select((.user.login == $bot or .user.login == ($bot + "[bot]") or .body == $waiver))
+      | "\(.user.login) @ \(.updated_at): \(.body | gsub("\\s+"; " ") | .[0:200])"] | .[]' <<<"$COMMENTS")
   [ -n "$BOTCOMMENTS" ] && break
   [ "$(date +%s)" -ge "$DEADLINE" ] && break
   sleep 120

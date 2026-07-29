@@ -454,11 +454,14 @@ test('PR gate rejects a bot comment older than the current head', () => {
     path.join(bin, 'gh'),
     `#!/bin/sh
 if [ "$1 $2" = "pr view" ]; then
-  printf '%s\n' '{"headRefOid":"abc","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","conclusion":"SUCCESS"}],"assignees":[{"login":"igor"}],"labels":[],"comments":[{"author":{"login":"kilo-code-bot"},"createdAt":"2026-01-01T00:00:00Z","body":"approved"}]}'
-elif [ "$1" = api ] && [ "$2" = "repos/Kilo-Org/cloud/commits/abc" ]; then
-  printf '%s\n' '2026-01-02T00:00:00Z'
-elif [ "$1 $2" = "api graphql" ]; then
-  printf '%s\n' '{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}'
+  printf '%s\n' '{"headRefOid":"abc","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","conclusion":"SUCCESS"}],"assignees":[{"login":"igor"}],"labels":[]}'
+elif [ "$1" = api ]; then
+  case "$2" in
+    repos/Kilo-Org/cloud/commits/abc) printf '%s\n' '2026-01-02T00:00:00Z' ;;
+    repos/Kilo-Org/cloud/issues/1/comments?*) printf '%s\n' '[]' ;;
+    graphql) printf '%s\n' '{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}' ;;
+    *) exit 1 ;;
+  esac
 else
   exit 1
 fi
@@ -472,6 +475,46 @@ fi
     assert.equal(result.status, 1, result.stderr);
     assert.match(result.stdout, /bot comments after head commit: NONE/);
     assert.match(result.stdout, /no kilo-code-bot summary/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('PR gate sees a bot summary edited after the current head', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-pr-gate-edit-test-'));
+  const workflow = path.join(root, '.kilo_workflow');
+  const bin = path.join(root, 'bin');
+  fs.mkdirSync(workflow);
+  fs.mkdirSync(bin);
+  for (const script of ['pr-gate.sh', 'pr-threads.sh']) {
+    fs.copyFileSync(path.join(repoRoot, '.kilo_workflow', script), path.join(workflow, script));
+    fs.chmodSync(path.join(workflow, script), 0o755);
+  }
+  executable(
+    path.join(bin, 'gh'),
+    `#!/bin/sh
+if [ "$1 $2" = "pr view" ]; then
+  printf '%s\n' '{"headRefOid":"abc","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","conclusion":"SUCCESS"}],"assignees":[{"login":"igor"}],"labels":[]}'
+elif [ "$1" = api ]; then
+  case "$2" in
+    repos/Kilo-Org/cloud/commits/abc) printf '%s\n' '2026-01-02T00:00:00Z' ;;
+    repos/Kilo-Org/cloud/issues/1/comments?*) printf '%s\n' '[{"user":{"login":"kilo-code-bot[bot]"},"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-02T00:10:00Z","body":"Recommendation: Merge"}]' ;;
+    graphql) printf '%s\n' '{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}' ;;
+    *) exit 1 ;;
+  esac
+else
+  exit 1
+fi
+`
+  );
+  try {
+    const result = spawnSync(path.join(workflow, 'pr-gate.sh'), ['Kilo-Org/cloud', '1'], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    });
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.match(result.stdout, /GATE OK/);
+    assert.match(result.stdout, /kilo-code-bot\[bot\] @ 2026-01-02T00:10:00Z/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

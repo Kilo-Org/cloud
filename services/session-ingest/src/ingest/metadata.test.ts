@@ -114,6 +114,13 @@ type ApplyMetadataDbOptions = {
   parentExists?: boolean;
   initialStatus?: string | null;
   rowMissing?: boolean;
+  cloudAgentSessionScopeId?: string | null;
+  cloudAgentSessionId?: string | null;
+  parentSessionId?: string | null;
+  createsCycle?: boolean;
+  scopeRootMissing?: boolean;
+  /** Title stored on the row before applyMetadataChanges runs. Defaults to the creation placeholder (NULL). */
+  initialTitle?: string | null;
 };
 
 /**
@@ -134,8 +141,22 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
   // Named without the substring "update" so oxlint drizzle rules do not flag test spies.
   const applyUpdate = vi.fn(() => ({ set: updateSet }));
 
-  const queryLog: Array<'session-lock' | 'membership' | 'parent' | 'read-back'> = [];
+  const queryLog: Array<
+    'session-initial' | 'session-lock' | 'membership' | 'parent' | 'read-back'
+  > = [];
+  let initialReadDone = false;
   let parentLookupDone = false;
+  let lockCount = 0;
+
+  function currentSessionState() {
+    return {
+      title: options.initialTitle ?? null,
+      status: options.initialStatus ?? 'idle',
+      parentSessionId: options.parentSessionId ?? null,
+      cloudAgentSessionScopeId: options.cloudAgentSessionScopeId ?? null,
+      cloudAgentSessionId: options.cloudAgentSessionId ?? null,
+    };
+  }
 
   function persistedSessionRow() {
     return {
@@ -158,10 +179,15 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     let settled: Promise<unknown[]> | undefined;
 
     const resolveWithoutFor = () => {
+      if (!initialReadDone) {
+        initialReadDone = true;
+        queryLog.push('session-initial');
+        return options.rowMissing ? [] : [currentSessionState()];
+      }
       if (options.parentExists !== undefined && !parentLookupDone) {
         parentLookupDone = true;
         queryLog.push('parent');
-        return options.parentExists ? [{ session_id: 'ses_parent' }] : [];
+        return options.parentExists ? [{ sessionId: 'ses_parent' }] : [];
       }
       queryLog.push('read-back');
       return options.rowMissing ? [] : [persistedSessionRow()];
@@ -169,10 +195,13 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
 
     const thenable = {
       for: vi.fn(() => {
+        lockCount += 1;
+        initialReadDone = true;
         queryLog.push('session-lock');
-        const rows = options.rowMissing
-          ? []
-          : ([{ status: options.initialStatus ?? 'idle' }] satisfies StatusRow[]);
+        const rows =
+          options.rowMissing || (options.scopeRootMissing && lockCount === 1)
+            ? []
+            : [currentSessionState()];
         settled = Promise.resolve(rows);
         return settled;
       }),
@@ -201,8 +230,11 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     })),
   }));
 
+  const execute = vi.fn(async () => ({
+    rows: [{ creates_cycle: options.createsCycle ?? false }],
+  }));
   const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ select, update: applyUpdate })
+    fn({ select, update: applyUpdate, execute })
   );
 
   return {
@@ -212,6 +244,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     updateSet,
     updateWhere,
     updateSets,
+    execute,
     queryLog,
     membershipQueryCount: () => queryLog.filter(k => k === 'membership').length,
   };
@@ -531,5 +564,189 @@ describe('applyMetadataChanges', () => {
     expect(written.created_on_platform).toBe('cli');
     expect(written.status).toBe('busy');
     expect(db.applyUpdate).toHaveBeenCalled();
+  });
+
+  it('refuses organization metadata changes for Cloud Agent session-scoped sessions', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['orgId', '11111111-1111-4111-8111-111111111111'],
+        ['title', 'Still allowed'],
+      ])
+    );
+
+    expect(db.membershipQueryCount()).toBe(0);
+    expect(db.updateSets).toEqual([expect.objectContaining({ title: 'Still allowed' })]);
+    expect(db.updateSets[0]).not.toHaveProperty('organization_id');
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+  });
+
+  it('refuses organization metadata changes for uncontained Cloud Agent roots', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionScopeId: null,
+      cloudAgentSessionId: 'cloud-agent-session-1',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['orgId', '11111111-1111-4111-8111-111111111111'],
+        ['title', 'Still allowed'],
+      ])
+    );
+
+    expect(db.membershipQueryCount()).toBe(0);
+    expect(db.updateSets).toEqual([expect.objectContaining({ title: 'Still allowed' })]);
+    expect(db.updateSets[0]).not.toHaveProperty('organization_id');
+  });
+
+  it('refuses to reparent a Cloud Agent root', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+      cloudAgentSessionId: 'cloud-agent-session-scope-1',
+      parentExists: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('refuses to reparent a legacy Cloud Agent root before session scope healing', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionScopeId: null,
+      cloudAgentSessionId: 'cloud-agent-session-scope-1',
+      parentExists: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('allows a cycle-free child reparent within the same session scope', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+      parentSessionId: 'ses_root',
+      parentExists: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(db.queryLog.filter(entry => entry === 'session-lock')).toHaveLength(2);
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(db.updateSets).toContainEqual({ parent_session_id: 'ses_parent' });
+  });
+
+  it('refuses a same-scope reparent that would create a cycle', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+      parentSessionId: 'ses_root',
+      parentExists: true,
+      createsCycle: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  describe('agent-generated title vs. user rename race', () => {
+    it('applies the agent-generated title when the row still has the creation placeholder (NULL)', async () => {
+      const db = createApplyMetadataDb({ initialTitle: null });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['title', 'Agent title']]));
+
+      expect(db.updateSets).toEqual([expect.objectContaining({ title: 'Agent title' })]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    });
+
+    it('skips the agent-generated title write when the user already renamed the session', async () => {
+      const db = createApplyMetadataDb({ initialTitle: 'User chosen title' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const warnSpy = vi.mocked(console.warn);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['title', 'Agent title']]));
+
+      // Title write is dropped entirely; no update statement is issued for a title-only batch.
+      expect(db.applyUpdate).not.toHaveBeenCalled();
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Skipping agent-generated title write; title is no longer the placeholder',
+        expect.objectContaining({ kiloUserId: 'usr_1', sessionId: 'ses_1' })
+      );
+    });
+
+    it('still applies other metadata fields when the title write is skipped due to a prior user rename', async () => {
+      const db = createApplyMetadataDb({ initialTitle: 'User chosen title' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['title', 'Agent title'],
+          ['platform', 'cli'],
+          ['status', 'busy'],
+        ])
+      );
+
+      expect(db.updateSets).toEqual([
+        expect.objectContaining({
+          created_on_platform: 'cli',
+          status: 'busy',
+        }),
+      ]);
+      const written = db.updateSets[0] as Record<string, unknown>;
+      expect(written).not.toHaveProperty('title');
+    });
+  });
+
+  it('logs when a session scope root is missing during reparent', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+      parentSessionId: 'ses_root',
+      parentExists: true,
+      scopeRootMissing: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']]));
+
+    expect(console.warn).toHaveBeenCalledWith(
+      'Refusing Cloud Agent reparent without a session scope root',
+      expect.objectContaining({
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+      })
+    );
+    expect(db.updateSets).toEqual([]);
   });
 });

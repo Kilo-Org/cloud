@@ -1,9 +1,11 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 
 import { sortActiveSessionsByCreatedAt } from '@/lib/active-session-order';
+import { filterActiveSessionsByOrganization } from '@/lib/active-sessions-live';
 import {
+  buildActiveSessionsInput,
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
@@ -18,7 +20,7 @@ import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-s
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 export type StoredSession = RouterOutputs['cliSessionsV2']['list']['cliSessions'][number];
 
@@ -92,8 +94,12 @@ function useActiveSessions(options?: UseAgentSessionsOptions) {
   // the source of truth. When the socket is down, fall back to the 10s
   // interval so a transient outage still updates the tray.
   const wsConnected = useUserWebConnectionState();
+  const input = useMemo(
+    () => buildActiveSessionsInput(options?.organizationId),
+    [options?.organizationId]
+  );
   return useQuery(
-    trpc.activeSessions.list.queryOptions(undefined, {
+    trpc.activeSessions.list.queryOptions(input, {
       refetchInterval: wsConnected ? false : 10_000,
       staleTime: 5000,
       enabled: options?.enabled,
@@ -174,9 +180,18 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     return sessions;
   }, [stored.data]);
 
+  // The server already filters by context; this covers the window where a WS
+  // heartbeat has introduced a row the client has not enriched yet (see
+  // `filterActiveSessionsByOrganization`).
   const activeSessions = useMemo(
-    () => sortActiveSessionsByCreatedAt(active.data?.sessions ?? []),
-    [active.data]
+    () =>
+      sortActiveSessionsByCreatedAt(
+        filterActiveSessionsByOrganization(
+          active.data?.sessions ?? [],
+          options?.organizationId ?? null
+        )
+      ),
+    [active.data, options?.organizationId]
   );
 
   const activeSessionIds = useMemo(() => new Set(activeSessions.map(s => s.id)), [activeSessions]);

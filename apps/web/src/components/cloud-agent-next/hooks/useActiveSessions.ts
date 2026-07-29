@@ -10,7 +10,7 @@ import {
   heartbeatDataSchema,
   sessionsListDataSchema,
   type ActiveSessionWithConnectionData,
-} from '@/lib/cloud-agent-sdk/schemas';
+} from '@kilocode/cloud-agent-sdk/schemas';
 import { useUserWebConnection } from '../CloudAgentProvider';
 
 export type ActiveSession = ActiveSessionWithConnectionData;
@@ -51,12 +51,29 @@ function getCliConnectionPayload(value: unknown): CliConnectionPayload | null {
   return parsed.data;
 }
 
+/**
+ * The title is DB-authoritative (`activeSessions.list` enriches it from
+ * cli_sessions_v2); WS rows carry the CLI's own title, which stays stale
+ * forever after a cloud rename. Keep what the last fetch put in the cache for
+ * ids we already know; a brand-new id still shows its CLI title immediately.
+ */
+function preserveCachedTitles(
+  currentSessions: ActiveSession[],
+  incoming: ActiveSession[]
+): ActiveSession[] {
+  const titleById = new Map(currentSessions.map(session => [session.id, session.title]));
+  return incoming.map(session => ({
+    ...session,
+    title: titleById.get(session.id) ?? session.title,
+  }));
+}
+
 export function applyActiveSessionsHeartbeat(
   currentSessions: ActiveSession[],
   payload: RootHeartbeatPayload
 ): ActiveSession[] {
   return [
-    ...payload.sessions,
+    ...preserveCachedTitles(currentSessions, payload.sessions),
     ...currentSessions.filter(session => session.connectionId !== payload.connectionId),
   ];
 }
@@ -115,7 +132,9 @@ export function useActiveSessions(): {
     return sharedConnection.onSystemEvent(event => {
       if (event.event === 'sessions.list') {
         const sessions = getRootSessionsFromListPayload(event.data);
-        if (sessions) updateCachedSessions(() => sessions);
+        if (sessions) {
+          updateCachedSessions(current => preserveCachedTitles(current, sessions));
+        }
       }
       if (event.event === 'sessions.heartbeat') {
         const payload = getRootSessionsFromHeartbeatPayload(event.data);

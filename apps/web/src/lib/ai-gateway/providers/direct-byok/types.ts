@@ -4,7 +4,7 @@ import type { GatewayChatApiKind, TransformRequestContext } from '@/lib/ai-gatew
 import type { CustomLlmProvider } from '@kilocode/db';
 import { OpenCodeVariantSchema } from '@kilocode/db/schema-types';
 
-export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision']);
+export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 
@@ -14,7 +14,6 @@ export const DirectByokModelSchema = z.object({
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  supported_parameters: z.array(z.string()).optional(),
   variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
 });
 
@@ -28,7 +27,7 @@ export type DirectByokProvider = {
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
   supported_chat_apis: ReadonlyArray<GatewayChatApiKind>;
   default_ai_sdk_provider: CustomLlmProvider;
-  transformRequest(context: TransformRequestContext): void;
+  transformRequest(context: TransformRequestContext, model: DirectByokModel): void;
 };
 
 export const COMPATIBLE_USER_AGENT = 'Kilo-Code/5.12';

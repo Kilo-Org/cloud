@@ -158,7 +158,7 @@ export function ModelPickerContent() {
                 autoCorrect={false}
                 clearButtonMode="while-editing"
                 returnKeyType="search"
-                className="h-8 flex-1 p-0 text-base leading-5 text-foreground"
+                className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
                 onChangeText={setSearch}
               />
             </View>

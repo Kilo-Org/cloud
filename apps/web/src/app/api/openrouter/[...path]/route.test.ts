@@ -57,9 +57,12 @@ jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
 }));
 jest.mock('@/lib/rewriteModelResponse', () => {
   const actual = jest.requireActual('@/lib/rewriteModelResponse');
+  const { wrapInSafeNextResponse } = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
   return {
     ...actual,
-    rewriteModelResponse: jest.fn(async () => null),
+    // Mirror the production passthrough; these tests exercise the route, not
+    // the response rewrite.
+    rewriteModelResponse: jest.fn(async (response: Response) => wrapInSafeNextResponse(response)),
   };
 });
 jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {

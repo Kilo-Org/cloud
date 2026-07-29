@@ -12,6 +12,7 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
+import { withRequestId } from '@/lib/ai-gateway/request-id';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -24,6 +25,7 @@ type UpstreamFetchFailureFamily =
 
 // Longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout.
 const TIMEOUT_MS = 15 * 60 * 1000;
+const GENERATION_FETCH_MAX_DELAY_MS = 5 * 60 * 1000;
 
 function getProviderTargetHost(apiUrl: string): string {
   try {
@@ -146,32 +148,41 @@ function classifyUpstreamFetchFailure({
  * 499 mirrors the nginx convention so these cancellations do not show up as
  * upstream 5xx failures.
  */
-function clientDisconnectResponse() {
-  const error =
-    'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.';
+function clientDisconnectResponse(vercelRequestId: string | null | undefined) {
+  const error = withRequestId(
+    'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
+    vercelRequestId
+  );
   return NextResponse.json(
     {
       error,
       error_type: ProxyErrorType.client_disconnect,
       message: error,
+      ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
     },
     { status: 499 }
   );
 }
 
-function upstreamFetchFailureResponse(failureFamily: UpstreamFetchFailureFamily) {
-  const error =
+function upstreamFetchFailureResponse(
+  failureFamily: UpstreamFetchFailureFamily,
+  vercelRequestId: string | null | undefined
+) {
+  const error = withRequestId(
     failureFamily === 'request_timeout' ||
-    failureFamily === 'headers_timeout' ||
-    failureFamily === 'connect_timeout' ||
-    failureFamily === 'read_timeout'
+      failureFamily === 'headers_timeout' ||
+      failureFamily === 'connect_timeout' ||
+      failureFamily === 'read_timeout'
       ? 'The upstream provider did not send response headers before the gateway timeout.'
-      : 'The upstream provider closed the connection before sending a response.';
+      : 'The upstream provider closed the connection before sending a response.',
+    vercelRequestId
+  );
   return NextResponse.json(
     {
       error,
       error_type: ProxyErrorType.upstream_disconnect,
       message: error,
+      ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
     },
     { status: 503 }
   );
@@ -185,6 +196,7 @@ export async function upstreamRequest({
   extraHeaders,
   provider,
   signal,
+  vercelRequestId,
 }: {
   path: string;
   search: string;
@@ -193,6 +205,8 @@ export async function upstreamRequest({
   extraHeaders: Record<string, string>;
   provider: Provider;
   signal?: AbortSignal;
+  /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
+  vercelRequestId?: string | null;
 }): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
@@ -210,7 +224,8 @@ export async function upstreamRequest({
   const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
   const onTimeoutAbort = () => {
     errorExceptInTest(
-      `[upstreamRequest] gateway timeout after ${TIMEOUT_MS}ms waiting for upstream response headers`
+      `[upstreamRequest] gateway timeout after ${TIMEOUT_MS}ms waiting for upstream response headers`,
+      { vercelRequestId: vercelRequestId ?? '<none>' }
     );
   };
   timeoutSignal.addEventListener('abort', onTimeoutAbort);
@@ -253,6 +268,7 @@ export async function upstreamRequest({
         failureFamily,
         errorName,
         errorMessage,
+        ...(vercelRequestId && { vercelRequestId }),
         ...(causeCode && { causeCode }),
         ...(causeName && { causeName }),
         ...(causeMessage && { causeMessage }),
@@ -280,8 +296,8 @@ export async function upstreamRequest({
     return {
       type: 'error',
       response: causedByClientDisconnect
-        ? clientDisconnectResponse()
-        : upstreamFetchFailureResponse(failureFamily ?? 'unknown'),
+        ? clientDisconnectResponse(vercelRequestId)
+        : upstreamFetchFailureResponse(failureFamily ?? 'unknown', vercelRequestId),
     };
   }
 }
@@ -301,7 +317,11 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
           ...ATTRIBUTION_HEADERS,
         },
       },
-      { retryResponse: r => r.status >= 400 } // openrouter returns 404 when called too soon.
+      {
+        baseDelayMs: 5_000,
+        maxDelayMs: GENERATION_FETCH_MAX_DELAY_MS,
+        retryResponse: r => r.status >= 400,
+      }
     );
   } catch (error) {
     captureException(error, {

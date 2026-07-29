@@ -1,6 +1,18 @@
-import { ATTACHMENT_MAX_BYTES, formatFileSize } from '@kilocode/kilo-chat';
+import { formatFileSize } from '@kilocode/kilo-chat';
 
-export const MESSAGE_ATTACHMENT_MAX_COUNT = 10;
+const MESSAGE_ATTACHMENT_MAX_COUNT = 10;
+
+/**
+ * Mobile-only per-attachment byte cap, deliberately far below the shared
+ * `ATTACHMENT_MAX_BYTES` (100 MiB). Picking an attachment materializes the
+ * whole file twice — once as a JS `ArrayBuffer`, once as a `ByteArray` in
+ * React Native's blob store on the Java heap — and up to
+ * `MESSAGE_ATTACHMENT_MAX_COUNT` of them stay resident until the message is
+ * sent. 10 MiB keeps the worst case (10 files) at ~100 MiB, inside an Android
+ * heap growth limit of ~268 MB. The shared constant governs the server and the
+ * web client and is intentionally left alone.
+ */
+export const MOBILE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 const DEFAULT_ATTACHMENT_FILENAME = 'Attachment';
 const DEFAULT_ATTACHMENT_MIME_TYPE = 'application/octet-stream';
@@ -21,7 +33,7 @@ export type NativeAttachmentSelection = {
   fileSize?: number | null;
 };
 
-type MessageAttachment = {
+export type MessageAttachment = {
   uri: string;
   filename: string;
   mimeType: string;
@@ -31,7 +43,7 @@ type MessageAttachment = {
 
 type RejectedMessageAttachment = {
   attachment: MessageAttachment;
-  reason: 'too-large';
+  reason: 'too-large' | 'unreadable';
   toast: string;
 };
 
@@ -40,14 +52,6 @@ type AttachmentSelectionResult = {
   rejected: RejectedMessageAttachment[];
   truncatedCount: number;
   toast?: string;
-};
-
-type AddFilesWithinCapacityInput<TInput> = {
-  inputs: readonly TInput[];
-  capacity: number;
-  addFile: (input: TInput) => string | null;
-  onAcceptedFile?: (input: TInput, tempId: string) => void;
-  onLimitExceeded: () => void;
 };
 
 export function getAttachmentActionSheetConfig(): AttachmentActionSheetConfig {
@@ -80,53 +84,38 @@ export function buildAttachmentLimitToast(): string {
 }
 
 export function buildAttachmentSizeRejectionToast(filename: string): string {
-  return `${filename} exceeds the ${formatFileSize(ATTACHMENT_MAX_BYTES)} attachment limit.`;
+  return `${filename} exceeds the ${formatFileSize(MOBILE_ATTACHMENT_MAX_BYTES)} attachment limit.`;
 }
 
-export function addFilesWithinAttachmentCapacity<TInput>({
-  inputs,
-  capacity,
-  addFile,
-  onAcceptedFile,
-  onLimitExceeded,
-}: AddFilesWithinCapacityInput<TInput>) {
-  const maxAccepted = Math.max(capacity, 0);
-  let acceptedCount = 0;
-  let limitExceeded = false;
-
-  for (const input of inputs) {
-    if (acceptedCount >= maxAccepted) {
-      limitExceeded = true;
-    } else {
-      const tempId = addFile(input);
-      if (tempId !== null) {
-        acceptedCount += 1;
-        onAcceptedFile?.(input, tempId);
-      }
-    }
-  }
-
-  if (limitExceeded) {
-    onLimitExceeded();
-  }
+export function buildAttachmentUnreadableToast(filename: string): string {
+  return `Couldn't read ${filename}.`;
 }
 
 export function selectAllowedAttachments({
-  existing,
+  existingCount,
   selected,
 }: {
-  existing: readonly MessageAttachment[];
-  selected: readonly NativeAttachmentSelection[];
+  existingCount: number;
+  selected: readonly MessageAttachment[];
 }): AttachmentSelectionResult {
-  const capacity = Math.max(MESSAGE_ATTACHMENT_MAX_COUNT - existing.length, 0);
+  const capacity = Math.max(MESSAGE_ATTACHMENT_MAX_COUNT - existingCount, 0);
   const accepted: MessageAttachment[] = [];
   const rejected: RejectedMessageAttachment[] = [];
   let truncatedCount = 0;
 
-  for (const selection of selected) {
-    const attachment = normalizeAttachmentSelection(selection);
-
-    if (attachment.size > ATTACHMENT_MAX_BYTES) {
+  for (const attachment of selected) {
+    if (attachment.size <= 0) {
+      // Fail closed: `sizeFromSelection` collapses a missing, null, non-finite
+      // or negative size to 0, and materializing a file we could not measure is
+      // exactly the unbounded read this gate exists to prevent. A genuinely
+      // empty file is also not worth uploading — the cloud-agent path rejects
+      // `size <= 0` for the same reason (`lib/agent-attachments/validate.ts`).
+      rejected.push({
+        attachment,
+        reason: 'unreadable',
+        toast: buildAttachmentUnreadableToast(attachment.filename),
+      });
+    } else if (attachment.size > MOBILE_ATTACHMENT_MAX_BYTES) {
       rejected.push({
         attachment,
         reason: 'too-large',

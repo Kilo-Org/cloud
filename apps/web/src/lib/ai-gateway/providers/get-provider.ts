@@ -81,7 +81,7 @@ async function checkDirectBYOK(
       supportedChatApis: directByok.supported_chat_apis,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
-        directByok.transformRequest(context);
+        directByok.transformRequest(context, directByokModel);
       },
     } satisfies Provider,
     userByok,

@@ -13,7 +13,7 @@ export default {
       {
         id: 'qwen3.7-plus',
         name: 'Qwen3.7 Plus',
-        flags: ['vision'],
+        flags: ['vision', 'reasoning'],
         context_length: 1_000_000,
         max_completion_tokens: 64_000,
       },

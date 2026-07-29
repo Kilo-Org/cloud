@@ -37,7 +37,7 @@ catalog:
   ulid: 3.0.2
   vitest: 4.1.6
   workers-tagged-logger: 1.0.0
-  wrangler: 4.98.0
+  wrangler: 4.112.0
   zod: 4.4.3
 
 minimumReleaseAge: 6842
@@ -117,12 +117,16 @@ packageExtensions:
   '@sentry/react-native':
     dependencies:
       '@expo/config-plugins': '*'
+      # SDK 57 (RN 0.86): metro is no longer in react-native's own dep tree, so
+      # @sentry/react-native/metro's vendored `require('metro/...')` has no
+      # resolution path. Pin the exact metro the SDK 57 graph already uses.
+      metro: 0.84.4
   expo-share-intent:
     dependencies:
       '@expo/plist': '*'
 patchedDependencies:
   expo-server-sdk: patches/expo-server-sdk.patch
-  react-native-appsflyer@6.17.9: patches/react-native-appsflyer@6.17.9.patch
+  react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

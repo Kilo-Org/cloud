@@ -8,7 +8,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, GitBranch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
+import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
@@ -59,7 +59,7 @@ import type {
   MessageDeliveryState,
   PreparationAttempt,
   StoredMessage,
-} from '@/lib/cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
 

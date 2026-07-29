@@ -17,6 +17,12 @@ vi.mock('sonner-native', () => ({
   toast: { error: (...args: unknown[]) => toastError(...args) },
 }));
 
+// Mocked at the single a11y import surface so the suite never pulls the
+// Flow-typed `react-native` entry into the node vitest env.
+vi.mock('@/lib/a11y/announce', () => ({
+  announceForA11y: vi.fn(),
+}));
+
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: (...args: unknown[]) => captureEvent(...args),
   PERMISSION_RESPONDED_EVENT: 'permission_responded',
@@ -200,7 +206,7 @@ describe('useInteractionHandlers attention ack', () => {
         isAcked: isAttentionAcked('kilo-session-1', 'R1'),
       })
     ).toBe(true);
-    expect(toastError).toHaveBeenCalledWith('Failed to submit answer');
+    expect(toastError).toHaveBeenCalledWith('Failed to submit answer. Please try again.');
     expect(captureEvent).not.toHaveBeenCalled();
   });
 
@@ -221,7 +227,7 @@ describe('useInteractionHandlers attention ack', () => {
     await render().handleRejectQuestion();
 
     expect(isAttentionAcked('kilo-session-1', 'R1')).toBe(false);
-    expect(toastError).toHaveBeenCalledWith('Failed to skip question');
+    expect(toastError).toHaveBeenCalledWith('Failed to skip question. Please try again.');
     expect(captureEvent).not.toHaveBeenCalled();
   });
 
@@ -242,7 +248,7 @@ describe('useInteractionHandlers attention ack', () => {
     await render().handleRespondToPermission('reject');
 
     expect(isAttentionAcked('kilo-session-1', 'R1')).toBe(false);
-    expect(toastError).toHaveBeenCalledWith('Failed to respond to permission request');
+    expect(toastError).toHaveBeenCalledWith('Failed to respond to permission. Please try again.');
     expect(captureEvent).not.toHaveBeenCalled();
   });
 

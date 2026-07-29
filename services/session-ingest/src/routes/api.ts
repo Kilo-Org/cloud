@@ -113,6 +113,7 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
           sessionCache.putValidated({
             sessionId: body.sessionId,
             organizationId: null,
+            cloudAgentSessionScopeId: null,
           }),
         'SessionAccessCacheDO.putValidated'
       );
@@ -206,8 +207,27 @@ api.delete('/session/:sessionId', async c => {
         eq(cli_sessions_v2.kilo_user_id, kiloUserId)
       )
     );
+  const deletionSessionScopeId = deletedRows.find(
+    row => row.session_id === parsed.data
+  )?.cloud_agent_session_scope_id;
 
   await db.transaction(async tx => {
+    if (deletionSessionScopeId) {
+      // Bootstrap and metadata mutations lock the session scope root before children.
+      // Match that order even when deleting a subtree rooted at a child.
+      await tx
+        .select({ sessionId: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            isNull(cli_sessions_v2.parent_session_id)
+          )
+        )
+        .limit(1)
+        .for('update');
+    }
     for (const sessionId of orderedSessionIds) {
       await tx
         .delete(cli_sessions_v2)

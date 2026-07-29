@@ -6,7 +6,6 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
-import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
 type CachedEnhancedModelListOptions = {
   providerId: DirectUserByokInferenceProviderId;
@@ -36,9 +35,9 @@ function enhanceDirectByokModelList({
 }: {
   recommendedModels: ReadonlyArray<DirectByokModel>;
   remainingModels: ReadonlyArray<DirectByokModel>;
-  variants?: Record<string, OpenCodeVariant>;
 }): ReadonlyArray<DirectByokModel> {
   const seenIds = new Set<string>();
+  const syncedModels = new Map(remainingModels.map(model => [model.id, model]));
   return [...recommendedModels, ...remainingModels]
     .filter(model => (seenIds.has(model.id) ? false : (seenIds.add(model.id), true)))
     .map(model => {
@@ -47,6 +46,7 @@ function enhanceDirectByokModelList({
       return {
         ...model,
         flags: flags.size > 0 ? [...flags] : undefined,
+        variants: model.variants ?? syncedModels.get(model.id)?.variants,
       };
     });
 }

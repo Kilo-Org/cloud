@@ -8,13 +8,20 @@ jest.mock('node:child_process', () => ({ execFile: jest.fn() }));
 
 const execFileMock = jest.mocked(execFile);
 let temporaryDirectory: string;
+const originalOpenBrowser = process.env.LOCAL_EMAIL_OPEN_BROWSER;
 
 beforeEach(async () => {
   temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'kilo-email-outbox-'));
+  delete process.env.LOCAL_EMAIL_OPEN_BROWSER;
 });
 
 afterEach(async () => {
   execFileMock.mockReset();
+  if (originalOpenBrowser === undefined) {
+    delete process.env.LOCAL_EMAIL_OPEN_BROWSER;
+  } else {
+    process.env.LOCAL_EMAIL_OPEN_BROWSER = originalOpenBrowser;
+  }
   await rm(temporaryDirectory, { recursive: true, force: true });
 });
 
@@ -72,6 +79,22 @@ describe('local email outbox', () => {
         temporaryDirectory
       )
     ).resolves.toEqual(expect.stringMatching(/\.html$/));
+  });
+
+  it('does not open the captured email when LOCAL_EMAIL_OPEN_BROWSER is false', async () => {
+    process.env.LOCAL_EMAIL_OPEN_BROWSER = 'false';
+
+    const filePath = await writeEmailToLocalOutbox(
+      {
+        to: 'developer@example.com',
+        subject: 'Local test',
+        html: '<p>Body</p>',
+      },
+      temporaryDirectory
+    );
+
+    expect(filePath).toMatch(/\.html$/);
+    expect(execFileMock).not.toHaveBeenCalled();
   });
 
   it('escapes metadata before adding it to the captured HTML', async () => {

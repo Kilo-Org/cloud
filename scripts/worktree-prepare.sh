@@ -103,6 +103,13 @@ if [ "$MAIN_WORKTREE_REALPATH" != "$CURRENT_WORKTREE_REALPATH" ] &&
   cp "$MAIN_WORKTREE/apps/mobile/.env.local" ./apps/mobile/.env.local
 fi
 
+if [ "$MAIN_WORKTREE_REALPATH" != "$CURRENT_WORKTREE_REALPATH" ] &&
+  [ -d "$MAIN_WORKTREE/.kilo_workflow/learnings/system" ]; then
+  echo "==> Copying machine-local workflow learnings from main worktree…"
+  mkdir -p .kilo_workflow/learnings/system
+  cp -R "$MAIN_WORKTREE/.kilo_workflow/learnings/system/." .kilo_workflow/learnings/system/
+fi
+
 if command -v direnv >/dev/null 2>&1 && [ -f apps/mobile/.envrc ]; then
   echo "==> Authorizing this worktree's mobile direnv config…"
   direnv allow ./apps/mobile

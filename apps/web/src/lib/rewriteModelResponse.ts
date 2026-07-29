@@ -1,5 +1,6 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
+import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
@@ -9,6 +10,7 @@ import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-l
 import { db } from '@/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { withRequestId } from '@/lib/ai-gateway/request-id';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
@@ -155,7 +157,9 @@ export async function logUnrewrittenResponse(
 
 type ResponseReadError = {
   errorType: 'timeout' | 'upstream_disconnect';
+  /** Already carries the request id suffix when one is available. */
   message: string;
+  vercelRequestId?: string;
 };
 
 const STREAM_PROGRESS_LOG_INTERVAL_MS = 30_000;
@@ -178,7 +182,10 @@ function createStreamProgressLogger() {
   };
 }
 
-function getResponseReadError(error: unknown): ResponseReadError | null {
+function getResponseReadError(
+  error: unknown,
+  vercelRequestId: string | null | undefined
+): ResponseReadError | null {
   if (typeof error !== 'object' || error === null || !('name' in error)) {
     return null;
   }
@@ -186,14 +193,22 @@ function getResponseReadError(error: unknown): ResponseReadError | null {
   if (error.name === 'ResponseAborted') {
     return {
       errorType: 'upstream_disconnect',
-      message: 'The upstream provider disconnected while sending the response.',
+      message: withRequestId(
+        'The upstream provider disconnected while sending the response.',
+        vercelRequestId
+      ),
+      vercelRequestId: vercelRequestId ?? undefined,
     };
   }
 
   if (error.name === 'TimeoutError') {
     return {
       errorType: 'timeout',
-      message: 'The upstream provider timed out while sending the response.',
+      message: withRequestId(
+        'The upstream provider timed out while sending the response.',
+        vercelRequestId
+      ),
+      vercelRequestId: vercelRequestId ?? undefined,
     };
   }
 
@@ -203,12 +218,13 @@ function getResponseReadError(error: unknown): ResponseReadError | null {
 async function readResponseText(
   response: Response,
   headers: Headers,
-  capture?: RequestLogCapture | null
+  vercelRequestId: string | null | undefined,
+  capture: RequestLogCapture | null
 ): Promise<{ text: string } | { error: unknown; errorResponse: NextResponse }> {
   try {
     return { text: await response.text() };
   } catch (error) {
-    const responseReadError = getResponseReadError(error);
+    const responseReadError = getResponseReadError(error, vercelRequestId);
     if (!responseReadError) {
       // Settle the capture so the after() callback awaiting it does not hang
       // and the request is still logged (without a response body).
@@ -223,6 +239,9 @@ async function readResponseText(
           error: responseReadError.message,
           error_type: responseReadError.errorType,
           message: responseReadError.message,
+          ...(responseReadError.vercelRequestId && {
+            vercel_request_id: responseReadError.vercelRequestId,
+          }),
         },
         { status: 503, headers }
       ),
@@ -237,7 +256,8 @@ async function rewriteSseStream(
   doneReceived: () => boolean,
   serializeError: (error: ResponseReadError) => string,
   onFinally: () => void,
-  capture?: RequestLogCapture | null
+  vercelRequestId: string | null | undefined,
+  capture: RequestLogCapture | null
 ) {
   const decoder = new TextDecoder();
   // Accumulate the raw upstream text for request logging while the stream is
@@ -270,13 +290,16 @@ async function rewriteSseStream(
       parser.feed(chunk);
     }
   } catch (error) {
-    const responseReadError = getResponseReadError(error);
+    const responseReadError = getResponseReadError(error, vercelRequestId);
     if (!responseReadError) {
       settleReadError(error);
       throw error;
     }
 
-    errorExceptInTest('[rewriteModelResponse] emitting stream error event', responseReadError);
+    errorExceptInTest('[rewriteModelResponse] emitting stream error event', {
+      ...responseReadError,
+      vercelRequestId: vercelRequestId ?? '<none>',
+    });
     settleReadError(error);
     controller.enqueue(serializeError(responseReadError));
     controller.close();
@@ -301,15 +324,16 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
 
 export async function rewriteModelResponse_ChatCompletions(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
     // Read the body text once to avoid "Response body object should not be
     // disturbed or locked" errors that occur when `.clone().json()` fails.
-    const textResult = await readResponseText(response, headers, capture);
+    const textResult = await readResponseText(response, headers, vercelRequestId, capture);
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -405,10 +429,14 @@ export async function rewriteModelResponse_ChatCompletions(
               code: 503,
               message: responseReadError.message,
               type: responseReadError.errorType,
+              ...(responseReadError.vercelRequestId && {
+                vercel_request_id: responseReadError.vercelRequestId,
+              }),
             },
           }) +
           '\n\n',
         progress.stop,
+        vercelRequestId,
         capture
       );
     },
@@ -451,13 +479,14 @@ function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
 
 export async function rewriteModelResponse_Messages(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(response, headers, capture);
+    const textResult = await readResponseText(response, headers, vercelRequestId, capture);
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -555,10 +584,14 @@ export async function rewriteModelResponse_Messages(
               type: 'api_error',
               message: responseReadError.message,
               error_type: responseReadError.errorType,
+              ...(responseReadError.vercelRequestId && {
+                vercel_request_id: responseReadError.vercelRequestId,
+              }),
             },
           }) +
           '\n\n',
         progress.stop,
+        vercelRequestId,
         capture
       );
     },
@@ -582,13 +615,14 @@ type ResponsesApiEvent = {
 
 export async function rewriteModelResponse_Responses(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(response, headers, capture);
+    const textResult = await readResponseText(response, headers, vercelRequestId, capture);
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -678,10 +712,14 @@ export async function rewriteModelResponse_Responses(
               type: responseReadError.errorType,
               code: responseReadError.errorType === 'timeout' ? '504' : '503',
               message: responseReadError.message,
+              ...(responseReadError.vercelRequestId && {
+                vercel_request_id: responseReadError.vercelRequestId,
+              }),
             },
           }) +
           '\n\n',
         progress.stop,
+        vercelRequestId,
         capture
       );
     },
@@ -703,31 +741,30 @@ export async function rewriteModelResponse(
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
   logging: RequestLoggingParams
-): Promise<NextResponse | null> {
+): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
-  const isFreeModelRequiringCostRemoval =
-    (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
-
-  // When request logging is enabled the response has to be processed anyway
-  // so the body can be captured for the request log in a single pass, so the
-  // rewrite is not skipped in that case.
-  if (!isFreeModelRequiringCostRemoval && !capture) {
-    console.debug('[rewriteModelResponse] skipping rewrite for %s', model);
-    return null;
-  }
+  const requiresCostRemoval =
+    (providerId === 'openrouter' || providerId === 'vercel') &&
+    (isKiloExclusiveFreeModel(model) || getCustomPricing(model) !== undefined);
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
+  const { vercel_request_id: vercelRequestId } = logging;
   if (kind === 'chat_completions') {
-    return rewriteModelResponse_ChatCompletions(response, isFreeModelRequiringCostRemoval, capture);
+    return rewriteModelResponse_ChatCompletions(
+      response,
+      requiresCostRemoval,
+      capture,
+      vercelRequestId
+    );
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(response, isFreeModelRequiringCostRemoval, capture);
+    return rewriteModelResponse_Responses(response, requiresCostRemoval, capture, vercelRequestId);
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(response, isFreeModelRequiringCostRemoval, capture);
+    return rewriteModelResponse_Messages(response, requiresCostRemoval, capture, vercelRequestId);
   }
 
-  console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);
-  capture?.setReadError(new Error('response was not processed'));
-  return null;
+  const error = new Error(`implementation error: unrecognized API kind ${kind}`);
+  capture?.setReadError(error);
+  throw error;
 }

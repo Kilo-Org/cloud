@@ -1,4 +1,5 @@
 import {
+  CLOUD_AGENT_ASSISTANT_FAILURE_REASONS,
   CLOUD_AGENT_FAILURE_CODES,
   WORKSPACE_FAILURE_SUBTYPES,
 } from '@kilocode/worker-utils/cloud-agent-failure';
@@ -53,6 +54,42 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     expect(terminalReasonFromCloudAgentFailure({ code: 'wrapper_error_after_activity' })).toBe(
       'wrapper_failed'
     );
+  });
+
+  it('splits rate limiting by whose key was throttled', () => {
+    const rateLimited = { code: 'assistant_error', assistantReason: 'rate_limited' } as const;
+
+    expect(terminalReasonFromCloudAgentFailure({ ...rateLimited, providerOwnership: 'byok' })).toBe(
+      'assistant_rate_limited_byok'
+    );
+    expect(
+      terminalReasonFromCloudAgentFailure({ ...rateLimited, providerOwnership: 'managed' })
+    ).toBe('assistant_rate_limited_managed');
+    expect(
+      terminalReasonFromCloudAgentFailure({ ...rateLimited, providerOwnership: 'unknown' })
+    ).toBe('assistant_rate_limited');
+    expect(terminalReasonFromCloudAgentFailure(rateLimited)).toBe('assistant_rate_limited');
+  });
+
+  it('prefers the structured assistant reason over the safe message', () => {
+    // A message that would map elsewhere via the legacy text path must not win.
+    expect(
+      terminalReasonFromCloudAgentFailure({
+        code: 'assistant_error',
+        assistantReason: 'provider_unavailable',
+        message: 'Assistant request was rate limited',
+      })
+    ).toBe('assistant_unavailable');
+  });
+
+  it('resolves every assistant reason to a valid terminal reason', () => {
+    const valid = new Set<string>(CODE_REVIEW_TERMINAL_REASONS);
+    const resolved = CLOUD_AGENT_ASSISTANT_FAILURE_REASONS.map(assistantReason => [
+      assistantReason,
+      terminalReasonFromCloudAgentFailure({ code: 'assistant_error', assistantReason }),
+    ]);
+
+    expect(resolved.filter(([, reason]) => !valid.has(reason as string))).toEqual([]);
   });
 
   it('splits assistant failures by their safe message', () => {

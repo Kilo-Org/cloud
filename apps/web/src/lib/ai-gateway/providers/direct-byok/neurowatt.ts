@@ -13,6 +13,7 @@ export default {
       {
         id: 'moonshotai/Kimi-K2.6',
         name: 'Kimi-K2.6',
+        flags: ['reasoning'],
         context_length: 262144,
         max_completion_tokens: 32000,
       },

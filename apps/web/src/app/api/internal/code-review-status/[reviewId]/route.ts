@@ -62,6 +62,7 @@ import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
 import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
+import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
@@ -482,6 +483,14 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
     terminalReason === 'interrupted' ||
+    // The customer's own provider quota is exhausted, so an immediate retry
+    // burns a second review against the same closed door. hasKnownUnretryableFailureMessage
+    // below already tries to catch this, but only by matching the raw '[BYOK] Your
+    // API key has hit its rate limit...' text, which safe-failure projection
+    // replaces with 'Assistant request was rate limited' before the callback ever
+    // sees it. That check has therefore never fired; the structured reason makes
+    // the existing intent actually work.
+    terminalReason === 'assistant_rate_limited_byok' ||
     isCodeReviewActionRequiredReason(terminalReason)
   );
 }
@@ -777,6 +786,13 @@ function mapStatusToCheckRun(
   const actionRequiredCopy = actionRequiredReason
     ? getCodeReviewActionRequiredCopy(actionRequiredReason)
     : null;
+  // Notification only. Unlike actionRequiredCopy this does not change the
+  // conclusion to 'action_required' and does not disable Code Reviewer: a
+  // provider rate limit is transient and there is nothing to reconfigure.
+  const terminalReasonCopy =
+    reviewStatus === 'failed' && !actionRequiredCopy && !billingFailure
+      ? getCodeReviewTerminalReasonCopy(terminalReason)
+      : null;
 
   const conclusionMap: Record<string, CheckRunConclusion> = {
     completed: reviewFailed ? 'failure' : 'success',
@@ -791,7 +807,7 @@ function mapStatusToCheckRun(
       ? actionRequiredCopy.checkTitle
       : billingFailure
         ? 'Insufficient credits to run review'
-        : 'Kilo Code Review failed',
+        : (terminalReasonCopy?.checkTitle ?? 'Kilo Code Review failed'),
     cancelled: modelNotFoundCancellation
       ? MODEL_NOT_FOUND_CHECK_TITLE
       : 'Kilo Code Review cancelled',
@@ -806,9 +822,8 @@ function mapStatusToCheckRun(
       ? actionRequiredCopy.checkSummary
       : billingFailure
         ? 'Review could not start because the account has insufficient credits.'
-        : errorMessage
-          ? `Review failed: ${errorMessage}`
-          : 'Review failed.',
+        : (terminalReasonCopy?.checkSummary ??
+          (errorMessage ? `Review failed: ${errorMessage}` : 'Review failed.')),
     cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
   };
 
@@ -867,6 +882,10 @@ function getGitLabStatusDescription(
       : null;
   if (actionRequiredReason) {
     return getCodeReviewActionRequiredCopy(actionRequiredReason).gitlabDescription;
+  }
+  if (reviewStatus === 'failed') {
+    const terminalReasonCopy = getCodeReviewTerminalReasonCopy(terminalReason);
+    if (terminalReasonCopy) return terminalReasonCopy.checkSummary;
   }
   if (reviewStatus === 'failed' && errorMessage) {
     const desc = `Review failed: ${errorMessage}`;

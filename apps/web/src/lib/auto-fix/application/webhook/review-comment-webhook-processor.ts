@@ -30,9 +30,8 @@ import type {
   PullRequestReviewCommentPayload,
   GitHubAuthorAssociation,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
-
-const KILO_MENTION_PATTERN = /@kilo\b/i;
-const FIX_KEYWORD_PATTERN = /\b(fix|patch)\b/i;
+import { parseFixCommand } from '@kilocode/app-shared/code-review';
+import { isLikelyKiloBotActor } from '@/lib/code-reviews/review-memory/github-feedback';
 
 /**
  * author_association values that imply write access.
@@ -65,14 +64,35 @@ export class ReviewCommentWebhookProcessor {
       return;
     }
 
+    // 0. Ignore comments authored by Kilo itself.
+    //    Every inline review comment Kilo posts ends with the advertised
+    //    "Reply with `@kilocode-bot fix it` …" footer, which parseFixCommand
+    //    (below) admits as a fix request. Without this guard the bot processes
+    //    its own comment, fails the author write-access check (a GitHub App
+    //    bot is not a repo collaborator), and reacts with a thumbs-down (-1)
+    //    on its own review comment. The sibling review-memory consumer of this
+    //    same webhook guards identically (see github-feedback.ts).
+    if (isLikelyKiloBotActor(comment.user.login)) {
+      logExceptInTest('[ReviewCommentWebhookProcessor] Ignoring Kilo bot-authored comment', {
+        commentId: comment.id,
+        author: comment.user.login,
+      });
+      return;
+    }
+
     logExceptInTest('[ReviewCommentWebhookProcessor] Processing review comment', {
       repoFullName: repository.full_name,
       prNumber: pull_request.number,
       commentId: comment.id,
     });
 
-    // 1. Check if comment body contains @kilo and a fix keyword
-    if (!KILO_MENTION_PATTERN.test(comment.body) || !FIX_KEYWORD_PATTERN.test(comment.body)) {
+    // 1. Check if comment body contains @kilo and a fix keyword.
+    //    Admission is delegated to the shared parseFixCommand so the
+    //    product-advertised "@kilocode-bot fix it" footer command and
+    //    the existing "@kilo … fix" shorthand both admit (and a
+    //    mention-only or fix-only body still rejects). See
+    //    @kilocode/app-shared/code-review/mention-command.ts.
+    if (!parseFixCommand(comment.body)) {
       logExceptInTest('[ReviewCommentWebhookProcessor] No @kilo fix mention found', {
         commentId: comment.id,
       });

@@ -209,20 +209,178 @@ describe('admin.cloudBillingSkus usage records', () => {
     await insertUsageInterval({ id: 'interval-b', subjectId: 'subject-1' });
     await insertUsageInterval({ id: 'interval-a', subjectId: 'subject-1' });
     await insertUsageInterval({ id: 'interval-other', subjectId: 'subject-2' });
+    await db.insert(container_usage_segment).values([
+      {
+        interval_id: 'interval-b',
+        seq: 1,
+        idempotency_key: 'interval-b-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+      {
+        interval_id: 'interval-a',
+        seq: 1,
+        idempotency_key: 'interval-a-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+      {
+        interval_id: 'interval-other',
+        seq: 1,
+        idempotency_key: 'interval-other-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+    ]);
     const caller = await createCallerForUser(admin.id);
     const first = await caller.admin.cloudBillingSkus.searchUsageIntervals({
-      search: { kind: 'subject', subjectType: 'user', subjectId: 'subject-1' },
+      search: {
+        kind: 'subject',
+        subjectType: 'user',
+        subjectId: 'subject-1',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      },
       limit: 1,
     });
     expect(first.items.map(item => item.id)).toEqual(['interval-b']);
     expect(first.nextCursor).not.toBeNull();
     if (!first.nextCursor) throw new Error('Expected an interval cursor');
     const second = await caller.admin.cloudBillingSkus.searchUsageIntervals({
-      search: { kind: 'subject', subjectType: 'user', subjectId: 'subject-1' },
+      search: {
+        kind: 'subject',
+        subjectType: 'user',
+        subjectId: 'subject-1',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      },
       limit: 1,
       cursor: first.nextCursor,
     });
     expect(second.items.map(item => item.id)).toEqual(['interval-a']);
+  });
+
+  it('summarizes only an exact subject and bounded activity window by SKU', async () => {
+    await db.insert(cloud_billing_sku).values({
+      ...validInput('usage-summary-sku'),
+      rate_cents_per_unit: '0.125',
+      created_by_user_id: admin.id,
+    });
+    await insertUsageInterval({
+      id: 'summary-in-window',
+      subjectId: 'summary-subject',
+      startedAt: '2026-07-22T10:00:00.000Z',
+    });
+    await db
+      .update(container_usage_interval)
+      .set({ cloud_billing_sku_id: 'usage-summary-sku', confirmed_seconds: 999 })
+      .where(eq(container_usage_interval.id, 'summary-in-window'));
+    await db.insert(container_usage_segment).values([
+      {
+        interval_id: 'summary-in-window',
+        seq: 1,
+        idempotency_key: 'summary-start-boundary',
+        reported_seconds: 12,
+        usage_seconds: 12,
+        received_at: '2026-07-22T09:00:00.000Z',
+      },
+      {
+        interval_id: 'summary-in-window',
+        seq: 2,
+        idempotency_key: 'summary-end-boundary',
+        reported_seconds: 100,
+        usage_seconds: 100,
+        received_at: '2026-07-22T11:00:00.000Z',
+      },
+    ]);
+    await insertUsageInterval({
+      id: 'summary-other-subject',
+      subjectId: 'other-subject',
+      startedAt: '2026-07-22T10:00:00.000Z',
+    });
+    await db
+      .update(container_usage_interval)
+      .set({ confirmed_seconds: 999 })
+      .where(eq(container_usage_interval.id, 'summary-other-subject'));
+    await db.insert(container_usage_segment).values({
+      interval_id: 'summary-other-subject',
+      seq: 1,
+      idempotency_key: 'summary-other-subject',
+      reported_seconds: 999,
+      usage_seconds: 999,
+      received_at: '2026-07-22T10:00:00.000Z',
+    });
+    await insertUsageInterval({
+      id: 'summary-outside-window',
+      subjectId: 'summary-subject',
+      startedAt: '2026-07-23T10:00:00.000Z',
+    });
+    await db
+      .update(container_usage_interval)
+      .set({ confirmed_seconds: 999 })
+      .where(eq(container_usage_interval.id, 'summary-outside-window'));
+    await db.insert(container_usage_segment).values({
+      interval_id: 'summary-outside-window',
+      seq: 1,
+      idempotency_key: 'summary-outside-window',
+      reported_seconds: 999,
+      usage_seconds: 999,
+      received_at: '2026-07-23T10:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const summary = await caller.admin.cloudBillingSkus.getUsageSummary({
+      subjectType: 'user',
+      subjectId: 'summary-subject',
+      start: '2026-07-22T09:00:00.000Z',
+      end: '2026-07-22T11:00:00.000Z',
+    });
+
+    expect(summary).toMatchObject({
+      acceptedSeconds: 12,
+      estimatedCents: '1.5',
+      items: [
+        {
+          skuId: 'usage-summary-sku',
+          acceptedSeconds: 12,
+          estimatedCents: '1.5',
+          intervals: 1,
+        },
+      ],
+    });
+
+    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    await expect(
+      nonAdminCaller.admin.cloudBillingSkus.getUsageSummary({
+        subjectType: 'user',
+        subjectId: 'summary-subject',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('rejects invalid and oversized usage summary windows', async () => {
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.cloudBillingSkus.getUsageSummary({
+        subjectType: 'user',
+        subjectId: 'summary-subject',
+        start: '2026-07-22T11:00:00.000Z',
+        end: '2026-07-22T10:00:00.000Z',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      caller.admin.cloudBillingSkus.getUsageSummary({
+        subjectType: 'user',
+        subjectId: 'summary-subject',
+        start: '2026-06-01T00:00:00.000Z',
+        end: '2026-07-03T00:00:00.000Z',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('returns ordered, safe segment details and rejects unknown intervals', async () => {

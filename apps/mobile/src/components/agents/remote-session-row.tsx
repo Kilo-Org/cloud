@@ -1,8 +1,9 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect } from 'react';
-import { ActionSheetIOS, Alert, Platform, Pressable } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, Pressable, View } from 'react-native';
 
 import { SessionRow } from '@/components/ui/session-row';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import {
   isAttentionAcked,
@@ -11,6 +12,7 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { remoteMeta, remoteSessionEyebrowLabel } from './session-list-helpers';
+import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { type RowVariant } from './session-row';
 import { copySessionId } from './session-row-actions';
 import {
@@ -33,6 +35,7 @@ export function RemoteSessionRow({
   variant = 'list',
   interactive = true,
 }: Readonly<RemoteSessionRowProps>) {
+  const colors = useThemeColors();
   const title = session.title.length > 0 ? session.title : 'Untitled session';
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);
@@ -50,17 +53,27 @@ export function RemoteSessionRow({
 
   // Spoken meta mirrors the visible meta the row renders. When `needsInput`
   // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it. The remote row's `live` eyebrow (`live-and-meta`)
-  // renders the timestamp when `updatedAt` is present, otherwise the
-  // uppercased status. For speech we expand the timestamp via
-  // `formatSpokenTimeAgo` and lowercase/underscore-strip the status so
-  // VoiceOver doesn't read it letter-by-letter.
-  let spokenMeta: string | null = null;
-  if (!needsInput) {
-    spokenMeta = session.updatedAt
-      ? formatSpokenTimeAgo(session.updatedAt)
-      : session.status.toLowerCase().replaceAll('_', ' ');
-  }
+  // so the label omits it. Otherwise announce the relative timestamp only
+  // when `updatedAt` is present — never the CLI status (same as `remoteMeta`).
+  const spokenMeta =
+    !needsInput && session.updatedAt ? formatSpokenTimeAgo(session.updatedAt) : null;
+
+  const { iconKind: platformIconKind, spokenPlatform } = selectRowPlatformPresentation({
+    platform: session.createdOnPlatform,
+    variant,
+    needsInput,
+    gitUrl: session.gitUrl,
+  });
+  const platformIcon =
+    platformIconKind != null ? (
+      <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
+        <SessionPlatformIcon
+          platform={session.createdOnPlatform}
+          size={12}
+          color={colors.mutedSoft}
+        />
+      </View>
+    ) : undefined;
 
   const handleLongPress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -96,6 +109,7 @@ export function RemoteSessionRow({
         needsInput,
         badge: agentLabel,
         meta: spokenMeta,
+        platform: spokenPlatform,
       })}
       className="active:opacity-70"
     >
@@ -107,6 +121,7 @@ export function RemoteSessionRow({
         live
         needsInput={needsInput}
         metaWhileLive
+        platformIcon={platformIcon}
         stripMode={variant === 'card' ? 'edge' : 'inline'}
         last={variant === 'card' ? true : undefined}
         className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}

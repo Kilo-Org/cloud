@@ -8,6 +8,7 @@ import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStream
 import { CouncilGovernancePanel } from '@/components/code-reviews/CouncilGovernancePanel';
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import { getCodeReviewJobsHref } from '@/lib/code-reviews/code-review-links';
+import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import { ExternalLink, GitPullRequest, Loader2, ArrowLeft, RotateCcw, Ban } from 'lucide-react';
 import { getCodeReviewStatusIcon } from '@/components/code-reviews/code-review-status-icons';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -118,15 +119,25 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
     status === 'cancelled' &&
     (review.terminal_reason === 'superseded' ||
       review.error_message?.toLowerCase().includes('superseded'));
-  const reviewMessage = review.error_message
+  // Reasons with customer-facing copy render muted rather than destructive: the
+  // cause is stated plainly and there is nothing broken on our side to alarm
+  // about. Checked before the raw error_message so the friendlier text wins.
+  const terminalReasonCopy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
+  const reviewMessage = terminalReasonCopy
     ? {
-        label: isSupersededCancellation ? 'Cancelled' : 'Error',
-        message: isSupersededCancellation ? 'Superseded by a newer push.' : review.error_message,
-        className: isSupersededCancellation
-          ? 'border-border bg-muted/30 text-muted-foreground'
-          : 'border-destructive/30 bg-destructive/10 text-destructive',
+        label: terminalReasonCopy.label,
+        message: terminalReasonCopy.message,
+        className: 'border-border bg-muted/30 text-muted-foreground',
       }
-    : null;
+    : review.error_message
+      ? {
+          label: isSupersededCancellation ? 'Cancelled' : 'Error',
+          message: isSupersededCancellation ? 'Superseded by a newer push.' : review.error_message,
+          className: isSupersededCancellation
+            ? 'border-border bg-muted/30 text-muted-foreground'
+            : 'border-destructive/30 bg-destructive/10 text-destructive',
+        }
+      : null;
   return (
     <PageContainer>
       {/* Back link */}

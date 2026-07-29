@@ -47,7 +47,6 @@ import {
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
-  wrapInSafeNextResponse,
   forbiddenFreeModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
@@ -255,6 +254,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // non-kilocode clients). `taskId` still wins when both are present.
   const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
   const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
+  // Vercel's per-invocation request id. Logged on the disconnect and upstream
+  // failure paths so a client disconnect can be correlated with the upstream
+  // error it causes, and with the platform logs for the same invocation.
+  const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
 
   const logClientDisconnect = () => {
     // The request signal is forwarded to the upstream fetch and to the response
@@ -269,6 +272,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         elapsed_ms: Math.round(performance.now() - requestStartedAt),
         client_request_id: clientRequestId,
         session_id: taskId ?? sessionHeader,
+        vercel_request_id: vercelRequestId,
       }
     );
   };
@@ -881,6 +885,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     extraHeaders,
     provider: effectiveProviderContext.provider,
     signal: request.signal,
+    vercelRequestId,
   });
   if (upstreamResult.type === 'error') {
     return upstreamResult.response;
@@ -968,7 +973,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user: maybeUser,
     organization_id: organizationId || null,
     session_id: usageContext.session_id,
-    vercel_request_id: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+    vercel_request_id: vercelRequestId,
     request: requestBodyParsed,
   };
 
@@ -991,16 +996,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  const rewrittenResponse = await rewriteModelResponse(
+  return await rewriteModelResponse(
     response,
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,
     requestBodyParsed.kind,
     requestLogging
   );
-  if (rewrittenResponse) {
-    return rewrittenResponse;
-  }
-
-  return wrapInSafeNextResponse(response);
 }

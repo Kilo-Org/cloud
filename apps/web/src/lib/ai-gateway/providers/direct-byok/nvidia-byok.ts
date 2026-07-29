@@ -7,7 +7,7 @@ export default {
   base_url: 'https://integrate.api.nvidia.com/v1',
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
-  transformRequest(context) {
+  transformRequest(context, model) {
     const { request } = context;
     if (request.kind !== 'chat_completions') {
       return;
@@ -18,8 +18,16 @@ export default {
         ? 'none'
         : (request.body.reasoning_effort ?? request.body.reasoning?.effort);
     const parsedReasoningEffort = ReasoningEffortSchema.safeParse(reasoningEffort);
-    if (parsedReasoningEffort.success) {
-      (request.body as { reasoning_effort?: string }).reasoning_effort = parsedReasoningEffort.data;
+    const supportedReasoningEfforts = new Set(
+      Object.values(model.variants ?? {}).flatMap(variant =>
+        variant.reasoning?.effort ? [variant.reasoning.effort] : []
+      )
+    );
+    if (
+      parsedReasoningEffort.success &&
+      supportedReasoningEfforts.has(parsedReasoningEffort.data)
+    ) {
+      request.body.reasoning_effort = parsedReasoningEffort.data;
     } else {
       delete request.body.reasoning_effort;
     }
@@ -31,11 +39,17 @@ export default {
     delete request.body.reasoning;
     delete request.body.safety_identifier;
     delete request.body.prompt_cache_key;
-    // Older clients may still send this untyped OpenRouter field.
-    delete (request.body as { include_reasoning?: boolean }).include_reasoning;
   },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'nvidia-byok',
-    recommendedModels: [],
+    recommendedModels: [
+      {
+        id: 'nvidia/nemotron-3-nano-30b-a3b',
+        name: 'Nemotron 3 Nano 30B A3B',
+        flags: ['reasoning'],
+        context_length: 131072,
+        max_completion_tokens: 131072,
+      },
+    ],
   }),
 } satisfies DirectByokProvider;

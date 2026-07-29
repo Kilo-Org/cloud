@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
-import { type UserWebConnection } from 'cloud-agent-sdk';
+import { type UserWebConnection } from '@kilocode/cloud-agent-sdk';
 // kilocode_change - K1/C2: `createUserWebConnection` must come from its
 // narrow subpath, not the `cloud-agent-sdk` barrel. The barrel's index.ts
 // also re-exports web-only transport code that imports a web-app `@/...`
@@ -8,7 +8,7 @@ import { type UserWebConnection } from 'cloud-agent-sdk';
 // actually imported this provider (and thus the barrel) at runtime until
 // the `kilo remote` spawn hook test did. See the matching
 // vitest.config.ts aliases for the full explanation.
-import { createUserWebConnection } from 'cloud-agent-sdk/user-web-connection';
+import { createUserWebConnection } from '@kilocode/cloud-agent-sdk/user-web-connection';
 
 import { SESSION_INGEST_WS_URL } from '@/lib/config';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';

@@ -100,6 +100,12 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   sandbox_connection: 'Sandbox Connection',
   container_shutdown: 'Container Shutdown',
   assistant_rate_limited: 'Rate Limited',
+  // Named by owner rather than by the internal `providerOwnership` value.
+  // "managed key" required knowing that 'managed' means Kilo's own credential,
+  // which is the wrong thing to have to recall while triaging: one of these
+  // should page us and the other should not.
+  assistant_rate_limited_byok: 'Rate Limited (customer key)',
+  assistant_rate_limited_managed: 'Rate Limited (Kilo key)',
   assistant_unavailable: 'Assistant Unavailable',
   assistant_timeout: 'Assistant Timeout',
   assistant_unauthorized: 'Assistant Unauthorized',
@@ -140,16 +146,32 @@ function buildErrorCategoryExpr(terminalReasonColumn: PgColumn, errorMessageColu
       sql`WHEN ${terminalReasonColumn} = ${literal(reason)} THEN ${literal(label)}`
   );
 
+  // Bare HTTP status codes need word boundaries. `LIKE '%429%'` matches the
+  // digits anywhere, so a session id, byte count, duration or timestamp
+  // containing 429 was bucketed as Rate Limited, and '%500%' caught things like
+  // "5000 tokens". `\y` is the Postgres regex word boundary, so 429 matches in
+  // "HTTP 429" but not in "4290", "14290" or "req_429abc".
+  // Inlined for the same reason as the reason labels above: this expression is
+  // used in both SELECT and GROUP BY, and bound parameters are renumbered by
+  // position, so Postgres would stop treating the two as the same expression.
+  // The pattern is built from a number literal, so there is nothing to escape.
+  const httpStatus = (code: number) => sql`${errorMessageColumn} ~ ${sql.raw(`'\\y${code}\\y'`)}`;
+  const anyHttpStatus = (...codes: number[]) =>
+    sql.join(
+      codes.map(code => httpStatus(code)),
+      sql.raw(' OR ')
+    );
+
   return sql<string>`CASE
   ${sql.join(reasonCases, sql.raw(' '))}
   WHEN ${errorMessageColumn} LIKE '%sandbox storage full%' OR ${errorMessageColumn} LIKE '%admission rejected%' OR ${errorMessageColumn} LIKE '%storage full%' THEN 'Sandbox Capacity'
   WHEN ${errorMessageColumn} LIKE '%connect to the sandbox%' OR ${errorMessageColumn} LIKE '%Sandbox connection failed%' OR ${errorMessageColumn} LIKE '%container shut down%' THEN 'Sandbox Connection'
-  WHEN ${errorMessageColumn} LIKE '%rate limit%' OR ${errorMessageColumn} LIKE '%Rate limit%' OR ${errorMessageColumn} LIKE '%429%' THEN 'Rate Limited'
+  WHEN ${errorMessageColumn} ILIKE '%rate limit%' OR ${anyHttpStatus(429)} THEN 'Rate Limited'
   WHEN ${errorMessageColumn} LIKE '%timeout%' OR ${errorMessageColumn} LIKE '%Timeout%' OR ${errorMessageColumn} LIKE '%ETIMEDOUT%' OR ${errorMessageColumn} LIKE '%timed out%' THEN 'Timeout'
   WHEN ${errorMessageColumn} LIKE '%context window%' OR ${errorMessageColumn} LIKE '%token limit%' OR ${errorMessageColumn} LIKE '%too large%' OR ${errorMessageColumn} LIKE '%maximum context length%' THEN 'Context Window Exceeded'
-  WHEN ${errorMessageColumn} LIKE '%authentication%' OR ${errorMessageColumn} LIKE '%401%' OR ${errorMessageColumn} LIKE '%403%' OR ${errorMessageColumn} LIKE '%permission%' THEN 'Auth / Permission Error'
-  WHEN ${errorMessageColumn} LIKE '%not found%' OR ${errorMessageColumn} LIKE '%404%' THEN 'Not Found'
-  WHEN ${errorMessageColumn} LIKE '%500%' OR ${errorMessageColumn} LIKE '%502%' OR ${errorMessageColumn} LIKE '%503%' OR ${errorMessageColumn} LIKE '%internal server%' OR ${errorMessageColumn} LIKE '%Internal Server%' THEN 'Upstream Server Error'
+  WHEN ${errorMessageColumn} ILIKE '%authentication%' OR ${errorMessageColumn} ILIKE '%permission%' OR ${anyHttpStatus(401, 403)} THEN 'Auth / Permission Error'
+  WHEN ${errorMessageColumn} ILIKE '%not found%' OR ${anyHttpStatus(404)} THEN 'Not Found'
+  WHEN ${errorMessageColumn} ILIKE '%internal server%' OR ${anyHttpStatus(500, 502, 503)} THEN 'Upstream Server Error'
   WHEN ${errorMessageColumn} LIKE '%ECONNREFUSED%' OR ${errorMessageColumn} LIKE '%ECONNRESET%' OR ${errorMessageColumn} LIKE '%socket hang up%' OR ${errorMessageColumn} LIKE '%network%' THEN 'Network Error'
   WHEN ${errorMessageColumn} LIKE '%parse%' OR ${errorMessageColumn} LIKE '%JSON%' OR ${errorMessageColumn} LIKE '%unexpected token%' THEN 'Parse Error'
   WHEN ${errorMessageColumn} LIKE '%could not be delivered%' THEN 'Delivery Failure'

@@ -117,6 +117,70 @@ describe('upstreamRequest timeout', () => {
     });
   });
 
+  it('includes the vercel request id in the error message and failure metadata', async () => {
+    const resetCause = Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
+
+    const result = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+      vercelRequestId: 'iad1::iad1::request-id',
+    });
+
+    expect(result.type).toBe('error');
+    if (result.type !== 'error') throw new Error('expected an error result');
+    await expect(result.response.json()).resolves.toEqual({
+      error:
+        'The upstream provider closed the connection before sending a response. (request id: iad1::iad1::request-id)',
+      error_type: 'upstream_disconnect',
+      message:
+        'The upstream provider closed the connection before sending a response. (request id: iad1::iad1::request-id)',
+      vercel_request_id: 'iad1::iad1::request-id',
+    });
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        extra: expect.objectContaining({ vercelRequestId: 'iad1::iad1::request-id' }),
+      })
+    );
+  });
+
+  it('includes the vercel request id when the client disconnects', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+      signal: controller.signal,
+      vercelRequestId: 'iad1::iad1::request-id',
+    });
+
+    expect(result.type).toBe('error');
+    if (result.type !== 'error') throw new Error('expected an error result');
+    expect(result.response.status).toBe(499);
+    await expect(result.response.json()).resolves.toMatchObject({
+      error_type: 'client_disconnect',
+      vercel_request_id: 'iad1::iad1::request-id',
+    });
+  });
+
   it('classifies request timeout aborts separately', async () => {
     const timeoutError = new DOMException(
       'The operation was aborted due to timeout',

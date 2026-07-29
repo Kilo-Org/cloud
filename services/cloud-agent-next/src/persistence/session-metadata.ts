@@ -36,6 +36,7 @@ const MetadataIdentitySchema = z
     orgId: z.string().optional(),
     botId: z.string().optional(),
     createdOnPlatform: z.string().max(100).optional(),
+    billingOrigin: z.string().max(100).optional(),
   })
   .strip();
 
@@ -201,6 +202,7 @@ const CredentialContainmentSchema = z
   .object({
     github: z.boolean(),
     gitlab: z.boolean(),
+    bitbucket: z.boolean().optional(),
     kilocode: z.boolean(),
   })
   .strip();
@@ -313,7 +315,7 @@ export function getEffectiveCredentialContainment(
 
 export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {
   const containment = getEffectiveCredentialContainment(metadata);
-  return containment.github || containment.gitlab || containment.kilocode;
+  return containment.github || containment.gitlab || containment.bitbucket || containment.kilocode;
 }
 
 export function getSandboxProvider(metadata: SessionMetadata): AgentSandboxProvider {

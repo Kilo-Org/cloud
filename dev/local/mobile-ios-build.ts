@@ -643,8 +643,7 @@ function defaultProcessIdentity(pid: number): string | undefined {
 
 // Read-only validation of a claim recorded by the simulator
 // wrapper. Accepts the caller's current worktree as the exclusive
-// owner; any other recorded worktree (including legacy claims without
-// `status`) is rejected.
+// owner; any other recorded worktree is rejected.
 export function validateSimulatorClaim(
   udid: string,
   worktreeRoot: string,
@@ -675,19 +674,6 @@ export function validateSimulatorClaim(
   }
   if (o.worktreeRoot !== worktreeRoot) {
     throw new Error(`Simulator ${udid} is claimed by ${o.worktreeRoot}`);
-  }
-  // For the build cache we require a current-format ready claim. A
-  // preparing claim (same worktree or not) cannot be used to install
-  // an app; legacy claims (no status) are also rejected — the E2E
-  // simulator wrapper must reclaim/upgrade them first.
-  if (typeof o.status !== 'string' || o.status !== 'ready') {
-    throw new Error(`Simulator ${udid} is not ready for build (status=${String(o.status)})`);
-  }
-  if (typeof o.claimId !== 'string' || o.claimId.length === 0) {
-    throw new Error(`Simulator ${udid} claim is corrupt`);
-  }
-  if (typeof o.claimedAt !== 'string' || Number.isNaN(Date.parse(o.claimedAt))) {
-    throw new Error(`Simulator ${udid} claim is corrupt`);
   }
 }
 

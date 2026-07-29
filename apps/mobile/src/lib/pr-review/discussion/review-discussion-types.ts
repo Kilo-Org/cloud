@@ -20,7 +20,7 @@
 // unit-tested in plain Node and reused by the diff viewer if it later
 // wants to compute its own indicators from the same cache.
 
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
 import { parseTimestamp } from '@/lib/utils';
 
@@ -52,8 +52,8 @@ export const REVIEW_REACTION_CONTENTS: readonly ReviewReactionContent[] = [
 // backend contract change (fields, nullability) is type-checked here rather
 // than silently drifting from a hand-copied shape (apps/mobile/AGENTS.md).
 // `reactions[].content` is typed as a plain `string` by tRPC; we narrow it to
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-export type ReviewThreadsPage = RouterOutputs['githubPrReview']['listReviewThreads'];
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+type ReviewThreadsPage = RouterOutputs['githubPrReview']['listReviewThreads'];
 export type ReviewThread = ReviewThreadsPage['threads'][number];
 export type ReviewComment = ReviewThread['comments'][number];
 /** Conversation (issue) comments share the review-comment DTO shape. */

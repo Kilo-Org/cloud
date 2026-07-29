@@ -118,7 +118,7 @@ when they appear in all capitals.
 | `GET /.well-known/oauth-authorization-server/mcp-connect/...` | Worker discovery alias | Path-aware compatibility alias for clients that start discovery from one scoped connect URL; redirects to app canonical metadata. |
 | `POST /api/mcp-gateway/oauth/register` | App | Dynamic client registration. |
 | `POST /api/mcp-gateway/oauth/register/resource/{scope}/{owner_id}/{config_id}/{route_key}` | App | Resource-specific registration after route eligibility discovery. |
-| `GET|PUT|DELETE /api/mcp-gateway/oauth/register/{client_id}` | App | Registration management authorized by registration token. |
+| `GET | PUT | DELETE /api/mcp-gateway/oauth/register/{client_id}` | App | Registration management authorized by registration token. |
 | `GET /api/mcp-gateway/oauth/authorize` | App | Generic authorization-code flow; requires `resource`. |
 | `GET /api/mcp-gateway/oauth/authorize/{scope}/{owner_id}/{config_id}/{route_key}` | App | Route-specific authorization-code flow. |
 | `POST /api/mcp-gateway/oauth/token` | App | Authorization-code and refresh-token exchange. |

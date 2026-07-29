@@ -5,7 +5,7 @@ This reference is for agent behavior inside Cloud UI work. It is not product cod
 ## Modes
 
 | Mode | Do | Done when |
-| --- | --- | --- |
+|---|---|---|
 | Shape | Clarify a flow, hierarchy, states, and tradeoffs. Do not edit. | The recommendation is concrete enough to implement. |
 | Implement | Make the smallest coherent Cloud code change. | Changed code matches the overlay or recipe, or calls out a gap. |
 | Review | Inspect code/screens and report findings. Do not edit. | Findings cite paths, severity, rule, fix, and relevant interaction or responsive gaps. |

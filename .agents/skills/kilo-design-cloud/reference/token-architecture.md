@@ -23,7 +23,7 @@ The playground sits outside this product-consumption path. It previews and edits
 ## Product Artifact Names
 
 | Product surface | Generated artifact |
-| --- | --- |
+|---|---|
 | Cloud | `src/tokens.cloud.ts` |
 | Landing | `src/tokens.landing.css` |
 | VS Code, JetBrains, CLI/ANSI | `src/tokens.extension-host-map.md` |
@@ -31,7 +31,7 @@ The playground sits outside this product-consumption path. It previews and edits
 ## Naming Discipline
 
 | Prefer | Avoid |
-| --- | --- |
+|---|---|
 | primary action | yellow button |
 | muted foreground | gray text |
 | raised surface | dark card |

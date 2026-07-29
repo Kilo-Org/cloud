@@ -29,7 +29,7 @@ Completion criterion: the answer or change names the loaded overlay/recipe, foll
 ## Recipe Router
 
 | Prompt or file signal | Load |
-| --- | --- |
+|---|---|
 | primary action, CTA, button hierarchy, blue button drift | `patterns/cloud-web/primary-actions.md` |
 | tabs, segmented navigation, Radix tabs, active tab state | `patterns/cloud-web/tabs.md` |
 | tokens, globals.css, semantic mapping | `reference/token-architecture.md`; record that Cloud token adoption is `VVV-130` |

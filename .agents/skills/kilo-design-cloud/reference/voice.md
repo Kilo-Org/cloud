@@ -24,7 +24,7 @@ Kilo Cloud voice is clear, technical, calm, and direct.
 ## Examples
 
 | Weak | Better |
-| --- | --- |
+|---|---|
 | Submit | Create workspace |
 | OK | Save changes |
 | Yes | Delete project |

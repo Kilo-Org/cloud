@@ -11,7 +11,7 @@ Cloud is the pilot product for Kilo's agent-consumable design system. It is a de
 ## Code Sources To Read First
 
 | Concern | Cloud path |
-| --- | --- |
+|---|---|
 | Base theme and Tailwind tokens | `apps/web/src/app/globals.css` |
 | Font variables | `apps/web/src/app/layout.tsx` |
 | shadcn config | `apps/web/components.json` |
@@ -23,7 +23,7 @@ Cloud is the pilot product for Kilo's agent-consumable design system. It is a de
 Use semantic roles, not raw values:
 
 | Role | Cloud token |
-| --- | --- |
+|---|---|
 | Page background | `--background` / `bg-background` |
 | Default text | `--foreground` / `text-foreground` |
 | Raised surface | `--card`, `--popover` |

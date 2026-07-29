@@ -149,7 +149,7 @@
     "monaco-editor": "0.55.1",
     "motion": "12.36.0",
     "next": "16.2.6",
-    "next-auth": "4.24.14",
+    "next-auth": "4.24.15",
     "openai": "6.29.0",
     "p-limit": "catalog:",
     "posthog-js": "1.360.2",

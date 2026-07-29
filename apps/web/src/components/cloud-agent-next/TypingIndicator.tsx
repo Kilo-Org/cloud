@@ -9,9 +9,9 @@ export function TypingIndicator() {
         <Bot className="h-4 w-4" />
       </div>
       <div className="mt-2 flex gap-1">
-        <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.3s]" />
-        <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.15s]" />
-        <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400" />
+        <div className="motion-reduce:bg-gray-400 motion-reduce:opacity-40 h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.3s]" />
+        <div className="motion-reduce:bg-gray-400 motion-reduce:opacity-40 h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.15s]" />
+        <div className="motion-reduce:bg-gray-400 motion-reduce:opacity-40 h-2 w-2 animate-bounce rounded-full bg-gray-400" />
       </div>
     </div>
   );

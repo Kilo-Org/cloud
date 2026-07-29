@@ -54,7 +54,9 @@ function convertModel(
       is_moderated: false,
     },
     per_request_limits: null,
-    supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
+    supported_parameters: ['max_tokens', 'temperature', 'tools'].concat(
+      model.flags?.includes('reasoning') ? ['reasoning'] : []
+    ),
     default_parameters: {},
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,

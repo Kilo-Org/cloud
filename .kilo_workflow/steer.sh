@@ -42,16 +42,21 @@ pane() { tmux capture-pane -pJ -t "$TARGET"; }
 # The footer renders `<n> queued`; absent means nothing is waiting.
 queued() { pane | grep -oE '[0-9]+ queued' | tail -1 | cut -d' ' -f1 || true; }
 # First line of the message, whitespace-collapsed, as the needle for the
-# submitted `›`-prefixed echo in the scrollback.
+# submitted `›`-prefixed echo in the scrollback. `--` everywhere the needle is
+# passed: a message starting with a dash otherwise reads as a grep option.
 needle=$(printf '%s' "${MSG%%$'\n'*}" | tr -s '[:space:]' ' ' | cut -c1-60)
 # Still unsent: the needle is on screen on a line the scrollback could not have
 # written — a submitted message is only ever echoed `›`-prefixed.
-composed() { pane | grep -F "$needle" | grep -qv '^›'; }
+composed() { pane | grep -F -- "$needle" | grep -qv '^›'; }
+# Count of already-submitted echoes of this needle, taken BEFORE pasting: a
+# prior identical steer in the scrollback must not vouch for this one.
+submitted() { pane | grep -cF -- "› $needle" || true; }
 # Per-invocation buffer: the tmux server's buffers are shared, so a fixed name
 # lets two sections steering at once paste each other's message.
 BUF=kilo-steer-$$
 
 before=$(queued); before=${before:-0}
+sub_before=$(submitted)
 
 # load-buffer + paste-buffer, not send-keys: the message travels as data, so a
 # literal `Enter`, `;` or `C-c` in the text cannot be read as a key name. `-p`
@@ -73,9 +78,10 @@ for attempt in 1 2 3; do
     sleep 1
     now=$(queued); now=${now:-0}
     if [ "$now" -gt "$before" ]; then echo "queued"; exit 0; fi
-    # Submitted and started: the scrollback echoes it as a user message. Match
-    # only lines the composer cannot produce, so unsent text is never a pass.
-    if pane | grep -qF "› $needle"; then echo "running"; exit 0; fi
+    # Submitted and started: the scrollback echoes it as a user message. The
+    # count must EXCEED the pre-paste count — matching alone would let an
+    # earlier identical steer vouch for this one.
+    if [ "$(submitted)" -gt "$sub_before" ]; then echo "running"; exit 0; fi
   done
 done
 

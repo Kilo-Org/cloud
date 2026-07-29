@@ -47,9 +47,12 @@ A section routinely takes hours of unattended machine time. The human cost is mi
 | [`dispatch-role.sh`](dispatch-role.sh) | Launches a kilo role agent in tmux with a clean environment and logged exit code |
 | [`await-role.sh`](await-role.sh) | Waits on a dispatched agent's log and reports the round's outcome: DONE with its verdict, VOID, STALLED, or RUNNING |
 | [`launch-interactive.sh`](launch-interactive.sh) | Launches an interactive session (planner, orchestrator) in tmux with a clean environment and a live TTY |
+| [`await-interactive.sh`](await-interactive.sh) | Watches an interactive session for the monitor: COMPLETED, BLOCKED, DEAD, QUIET, or RUNNING |
 | [`steer.sh`](steer.sh) | Delivers a message to a running interactive session (starter, planner, orchestrator) and confirms it was submitted |
 | [`e2e-slot.sh`](e2e-slot.sh) | Machine-global semaphore (default 3) capping concurrent device/stack E2E phases; agents are never capped |
-| [`slice-diff.sh`](slice-diff.sh) | Emits one slice's diff for review plus a snapshot fingerprint that catches tree/commit violations after a round |
+| [`slice-diff.sh`](slice-diff.sh) | Emits one slice's diff for review plus a snapshot fingerprint; `--check` judges the round for violations |
+| [`baseline.sh`](baseline.sh) | Records a worktree's exact git state and later proves the E2E verifier's byte-identical restore |
+| [`pr-gate.sh`](pr-gate.sh) | Checks the completion gate's mechanical items against one head SHA (CI, threads, assignee, bot summary) |
 | [`pr-threads.sh`](pr-threads.sh) | Lists, replies to, and resolves PR review threads (GraphQL plumbing for the Kilobot loop) |
 | [`pick-reviewers.sh`](pick-reviewers.sh) | Ranks reviewer candidates for a PR from file history and the requester's past reviewers |
 | [`upload-pr-attachment.sh`](upload-pr-attachment.sh) | Uploads a screenshot to GitHub `user-attachments` via the checksum-pinned, security-reviewed `gh-image` binary |

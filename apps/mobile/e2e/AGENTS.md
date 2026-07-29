@@ -224,7 +224,7 @@ Do not conclude Android is unavailable from `command -v adb` or the inherited `P
 pnpm dev:mobile:android doctor
 ```
 
-Use the wrappers for all Android tooling, including the Expo/Gradle build, so the resolved SDK/JDK environment is applied. Ordered glue: acquire e2e slot → launch emulator → bounded boot wait (serial discovered at visibility) → `claim` → `build` → `login.sh`. Never unbounded `adb wait-for-device`. Never put manual `adb reverse` or dev-client `am start` on the primary path — `login.sh` preflight does both.
+Use the wrappers for all Android tooling, including the Expo/Gradle build, so the resolved SDK/JDK environment is applied. Ordered glue: acquire e2e slot → launch emulator → `claim` at first adb visibility → bounded boot wait → `build` → `login.sh`. Claim the moment the serial is visible, before waiting for boot — adb serials are host-global, and a concurrent worktree's polling loop can claim your fresh emulator during the boot wait (see `mobile-android-emulator-claims.md`). Never unbounded `adb wait-for-device`. Never put manual `adb reverse` or dev-client `am start` on the primary path — `login.sh` preflight does both.
 
 ### Launch and GPU policy
 
@@ -244,7 +244,7 @@ tmux new-session -d -s "$ANDROID_SESSION" -c "$PWD" \
 From the moment of launch, poll about every 15 s until the envelope expires. Cold boot on an idle host ≈ 1–3 minutes; under parallel-workflow load allow up to 8 minutes before declaring the attempt failed (relaunch-rule bounds, not SLAs). Each poll, check in order:
 
 1. **Liveness** — `pgrep -f "qemu.*<avd-name>"` still prints a PID. If empty, the attempt failed with the process-death signal.
-2. **Visibility** — device appears with state `device` in `pnpm dev:mobile:android adb devices -l` (this is where the serial is discovered; a single local emulator is `emulator-5554`).
+2. **Visibility** — device appears with state `device` in `pnpm dev:mobile:android adb devices -l` (this is where the serial is discovered; a single local emulator is `emulator-5554`). Claim it immediately: `pnpm dev:mobile:android claim <serial>` — do not wait for readiness first.
 3. **Readiness** — once visible, `pnpm dev:mobile:android adb -s <serial> shell getprop sys.boot_completed` prints `1`.
 
 Device visibility is not readiness. Never gate on `adb devices` output alone, and never wait on any one stage without the liveness check.
@@ -253,10 +253,11 @@ Device visibility is not readiness. Never gate on `adb devices` output alone, an
 
 On failure: `tmux kill-session -t "$ANDROID_SESSION" 2>/dev/null` (session may already be gone if the emulator exited), then confirm the emulator process is actually gone — `pgrep -f "qemu.*<avd-name>"` prints nothing. If it survives: with a known serial, `pnpm dev:mobile:android adb -s <serial> emu kill`; with no serial yet (process died or never became visible to adb), `pkill -f "qemu.*<avd-name>"`. Re-check `pgrep` either way — a surviving emulator holds the AVD lock and dooms any relaunch. Then relaunch once per the GPU policy with the same envelope. If the second attempt also fails to boot, stop and return a test-environment blocker with the tail of `$EMULATOR_LOG` (survives session death; never a third launch, never an early give-up).
 
-### Claim, build, login
+### Build and login
+
+The claim already happened at adb visibility (claim is idempotent — re-running it is harmless):
 
 ```bash
-pnpm dev:mobile:android claim <serial>
 pnpm dev:mobile:android build <serial>   # validated cached APK only
 apps/mobile/e2e/login.sh <serial>
 ```

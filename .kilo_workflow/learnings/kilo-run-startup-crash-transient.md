@@ -25,9 +25,9 @@ Before redispatching, rule out the look-alikes that will NOT clear on retry:
 - **Disk full** — the classic cause of SQLite write failures: `df -h /Users`.
 - **Auth genuinely wedged** — `PAID_MODEL_AUTH_REQUIRED` needs an interactive `kilo auth login`.
   If the logged credential payload has a future `exp`, auth is not the problem.
-- **Poisoned env / known-bad CLI** — a run inheriting a parent kilo's `KILO_*` env hits
-  `Session not found` deterministically (see `nested-kilo-run-env-poisoning.md`); CLI
-  7.4.13–7.4.15 had a fresh-database `Session not found` bug on macOS, fixed in 7.4.16.
+- **Poisoned env / known-bad CLI** — a run inheriting a parent kilo's `KILO_*`/`OPENCODE*` env
+  hits `Session not found` deterministically (the launch scripts strip these; a hand launch must
+  too); CLI 7.4.13–7.4.15 had a fresh-database `Session not found` bug on macOS, fixed in 7.4.16.
 
 Handling notes: the crash log's `params` can include the OAuth **refresh JWT** — redact
 `eyJ[A-Za-z0-9_.-]+` before keeping any of it as evidence. Never delete
@@ -35,5 +35,4 @@ Handling notes: the crash log's `params` can include the OAuth **refresh JWT** �
 workflow's `kilo run` to free a lock. Three consecutive void rounds with this signature is an
 infrastructure blocker to report, not something to keep redispatching through.
 
-Distinct from `kilo-run-exits-0-without-verdict.md` (mid-run provider stream stall, exit 0 after
-real work) and `kilo-provider-model-not-found-transient.md` (gateway catalog blip, also exit 1).
+Distinct from the mid-run provider stream stall (exit 0 after real work, reported VOID by `await-role.sh`) and from `kilo-provider-model-not-found-transient.md` (gateway catalog blip, also exit 1).

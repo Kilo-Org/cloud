@@ -7,9 +7,10 @@
 #   pick-reviewers.sh <owner/repo> <requesting-handle> <file> [file...]
 #
 # Run from the repository the files live in (uses git log). Prints
-# "<count> <login>" lines, most frequent first, bots and the requesting human
-# already dropped. No output at all means no history — request nobody and say
-# so in one line in the PR description.
+# "<count> <login>" lines, most frequent first — each login counted once per
+# PR it reviewed, bots and the requesting human dropped. No output at all
+# (exit 0) means no history — request nobody and say so in one line in the PR
+# description.
 set -euo pipefail
 
 REPO=${1:?owner/repo} HANDLE=${2:?requesting GitHub handle}
@@ -21,7 +22,12 @@ PRS=$(
     for f in "$@"; do
       git log -10 --format='%H' -- "$f"
     done | sort -u | while read -r sha; do
-      gh api "repos/$REPO/commits/$sha/pulls" --jq '.[].number' 2>/dev/null || true
+      # Not every commit has a PR (unpushed or direct-pushed) — that is data,
+      # not an error. On failure gh prints the error BODY to stdout, so the
+      # output must be discarded with the failure, not passed through.
+      if out=$(gh api "repos/$REPO/commits/$sha/pulls" --jq '.[].number' 2>/dev/null); then
+        printf '%s\n' "$out"
+      fi
     done
     gh pr list --repo "$REPO" --author "$HANDLE" --state merged --limit 10 \
       --json number --jq '.[].number'
@@ -29,6 +35,16 @@ PRS=$(
 )
 
 [ -n "$PRS" ] || exit 0
-for n in $PRS; do
-  gh pr view "$n" --repo "$REPO" --json reviews --jq '.reviews[].author.login' 2>/dev/null || true
-done | grep -viE 'bot' | grep -vxF "$HANDLE" | sort | uniq -c | sort -rn | awk '{print $1, $2}'
+RESULT=$(
+  for n in $PRS; do
+    # One vote per login per PR — several review submissions on one PR are
+    # still one relationship. Failures propagate; a half-counted ranking is
+    # worse than none.
+    gh pr view "$n" --repo "$REPO" --json reviews \
+      --jq '[.reviews[].author.login] | unique | .[]'
+  done \
+    | grep -viE '(^|[-_/])bot([-_[]|$)|\[bot\]$' \
+    | grep -vixF -- "$HANDLE" \
+    | sort | uniq -c | sort -rn | awk '{print $1, $2}' || true
+)
+[ -z "$RESULT" ] || echo "$RESULT"

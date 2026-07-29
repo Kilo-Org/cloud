@@ -7,13 +7,13 @@
 #     never piped or redirected; use --log to attach `tmux pipe-pane` logging.
 #   - Full KILO_*/OPENCODE* env strip, computed inside the new pane — the tmux
 #     SERVER's environment can poison children even when the caller's is clean
-#     (see learnings/nested-kilo-run-env-poisoning.md).
+#     — a child kilo inheriting KILO_*/OPENCODE* misattaches sessions and auth.
 #   - The caller's session is resolved through $TMUX_PANE. An untargeted
 #     `tmux display-message -p '#S'` answers with the server's most recently
 #     active session and files the window under an unrelated section. Outside
 #     tmux, the launch gets its own session.
 #   - The window target carries a trailing colon so tmux cannot prefix-match a
-#     window name (see learnings/tmux-new-window-index-in-use-name-prefix-collision.md).
+#     window name and fail with "create window failed: index N in use".
 #
 #   launch-interactive.sh <name> <worktree> [--log <file>] <command> [args...]
 #

@@ -10,8 +10,8 @@
 # section that follows. Planning, implementation, review, and CI waits need
 # neither, and are unlimited.
 #
-#   e2e-slot.sh acquire [tmux-session]   # blocks until a slot is free, then holds it
-#   e2e-slot.sh release [tmux-session]   # frees the slot AND hands back the worktree's stack and simulators
+#   e2e-slot.sh acquire                  # blocks until a slot is free, then holds it
+#   e2e-slot.sh release [tmux-session]   # frees the slot AND hands back the worktree's stack and devices
 #   e2e-slot.sh status                   # who holds what, for how long, with stack coverage
 #   e2e-slot.sh stacks [--reap]          # stacks with no slot; --reap stops them
 #
@@ -19,12 +19,12 @@
 # If that tmux session no longer exists the slot is stale and is reclaimed
 # automatically — no heartbeats to maintain.
 #
-# acquire/release resolve the CALLER'S OWN tmux session when no name is given —
-# through $TMUX_PANE, never the untargeted `display-message -p '#S'`, which
-# answers with the server's most recently active session and hands your slot an
-# owner that can die while you still drive a device. Passing a name is for
-# operators cleaning up a dead holder, not for owning a slot under a session
-# that is not yours.
+# acquire/release resolve the CALLER'S OWN tmux session — through $TMUX_PANE,
+# never the untargeted `display-message -p '#S'`, which answers with the
+# server's most recently active session and hands your slot an owner that can
+# die while you still drive a device. acquire accepts no name at all; release
+# accepts one only so an operator can clean up after a holder that is already
+# dead.
 #
 # State is machine-global on purpose: every worktree's copy of this script must
 # contend for the same slots, so the state dir never lives next to the script.
@@ -62,6 +62,10 @@ stack_is_covered() {
   local sess=$1 s wt owner
   for s in "$DIR"/slot-*; do
     [ -d "$s" ] || continue
+    # A slot mid-release no longer entitles its worktree to anything — without
+    # this, a release would see its own still-present slot as coverage and
+    # skip the teardown it exists to perform.
+    [ -f "$s/releasing" ] && continue
     wt=$(cat "$s/worktree" 2>/dev/null || echo)
     [ -n "$wt" ] && [ "$(stack_session "$wt")" = "$sess" ] && return 0
     owner=$(cat "$s/owner" 2>/dev/null || echo)
@@ -74,13 +78,13 @@ stack_is_covered() {
 # every simulator it claimed — but only once no remaining slot covers it: a
 # section can hold a second slot for a concurrent phase.
 release_worktree_resources() {
-  local wt=$1 sess
+  local wt=$1 sess rc=0 c serial
   [ -n "$wt" ] && [ -d "$wt" ] || return 0
   sess=$(stack_session "$wt")
   stack_is_covered "$sess" && return 0
   if tmux has-session -t "$sess" 2>/dev/null; then
     echo "stopping dev stack for $wt"
-    (cd "$wt" && pnpm dev:stop)
+    (cd "$wt" && pnpm dev:stop) || rc=1
   fi
   # Devices go back whether or not a stack is up — a round can drive a claimed
   # simulator without one. Doing it here rather than trusting the runbook's
@@ -89,7 +93,19 @@ release_worktree_resources() {
   # rest of the day. `release-all` only touches this worktree's own claims, and
   # only powers off devices its own claims booted.
   echo "releasing simulators claimed by $wt"
-  (cd "$wt" && pnpm dev:mobile:simulator release-all)
+  (cd "$wt" && pnpm dev:mobile:simulator release-all) || rc=1
+  # Android claims are per-serial files; drop this worktree's so dead sections
+  # never wedge a serial. The claim records no boot provenance, so the emulator
+  # process itself is left alone — powering off a device we may not have booted
+  # is worse than leaking one (known gap until Android claims record it).
+  for c in "${TMPDIR:-/tmp}/kilo-mobile-android-claims"/*.json; do
+    [ -f "$c" ] || continue
+    grep -qF "\"worktreeRoot\":\"$wt\"" "$c" 2>/dev/null || continue
+    serial=$(basename "$c" .json)
+    echo "releasing android claim $serial held by $wt"
+    (cd "$wt" && pnpm dev:mobile:android release "$serial") || rc=1
+  done
+  return "$rc"
 }
 
 reap() {
@@ -113,11 +129,13 @@ reap() {
     fi
     if ! printf '%s\n' "$alive" | grep -qxF -- "$owner"; then
       # The owner is gone, so the slot and everything it entitled — stack and
-      # claimed devices — are all reclaimable. Nothing is using a stack or a
-      # simulator whose session died.
+      # claimed devices — are all reclaimable. Tear down BEFORE freeing the
+      # slot (the `releasing` marker takes it out of coverage), so a new
+      # acquirer can never run alongside the dead holder's still-live stack.
       wt=$(cat "$s/worktree" 2>/dev/null || echo)
+      touch "$s/releasing"
+      release_worktree_resources "$wt" || true
       rm -rf "$s"
-      release_worktree_resources "$wt"
     fi
   done
 }
@@ -140,7 +158,14 @@ self_session() {
 
 case "${1:?usage: acquire|release|status|stacks [tmux-session]}" in
   acquire)
-    who=${2:-$(self_session)}
+    # No explicit owner, ever: a slot acquired under any session but the
+    # caller's own gets reclaimed on the wrong lifetime (or never), which is
+    # exactly the leak the self-resolution exists to prevent.
+    [ -z "${2:-}" ] || {
+      echo "acquire takes no session name — run it from the session that will own the slot; it resolves the name itself" >&2
+      exit 1
+    }
+    who=$(self_session)
     [ -n "$who" ] || {
       echo "not inside a tmux session — a slot owner must be a live tmux session so a dead holder can be reclaimed; run from your own session (your dispatcher should have launched you in one)" >&2
       exit 1
@@ -164,11 +189,17 @@ case "${1:?usage: acquire|release|status|stacks [tmux-session]}" in
       reap
       for i in $(seq 1 "$TOTAL"); do
         if mkdir "$DIR/slot-$i" 2>/dev/null; then
-          printf '%s' "$who" > "$DIR/slot-$i/owner"
-          printf '%s' "$SELF_WORKTREE" > "$DIR/slot-$i/worktree"
-          date -u +%Y-%m-%dT%H:%M:%SZ > "$DIR/slot-$i/since"
-          echo "acquired slot-$i for ${SELF_WORKTREE:-unknown worktree}"
-          exit 0
+          # A partially written slot is worse than no slot: the reaper would
+          # hand it to someone else while this caller drives a device.
+          if printf '%s' "$who" > "$DIR/slot-$i/owner" &&
+             printf '%s' "$SELF_WORKTREE" > "$DIR/slot-$i/worktree" &&
+             date -u +%Y-%m-%dT%H:%M:%SZ > "$DIR/slot-$i/since"; then
+            echo "acquired slot-$i for ${SELF_WORKTREE:-unknown worktree}"
+            exit 0
+          fi
+          rm -rf "$DIR/slot-$i"
+          echo "failed to record slot ownership in $DIR (disk full?)" >&2
+          exit 1
         fi
       done
       echo "all $TOTAL device slots busy; retrying in ${POLL}s: $(ls -1 "$DIR" 2>/dev/null | tr '\n' ' ')" >&2
@@ -178,19 +209,23 @@ case "${1:?usage: acquire|release|status|stacks [tmux-session]}" in
   release)
     who=${2:-$(self_session)}
     [ -n "$who" ] || { echo "not inside tmux and no session name given" >&2; exit 1; }
+    fail=0
     for s in "$DIR"/slot-*; do
       [ -d "$s" ] || continue
       [ "$(cat "$s/owner" 2>/dev/null)" = "$who" ] || continue
       wt=$(cat "$s/worktree" 2>/dev/null || echo)
+      # Tear down first, free the slot last: the `releasing` marker takes this
+      # slot out of coverage so the teardown runs, while the still-occupied
+      # slot directory keeps a new acquirer from starting a stack alongside
+      # the one being stopped. The stack and the claimed devices go with the
+      # slot; a later round acquires, starts, and claims fresh.
+      touch "$s/releasing"
+      release_worktree_resources "$wt" || fail=1
       rm -rf "$s"
       echo "released $(basename "$s")"
-      # The stack and the claimed simulators go with the slot. A later round
-      # acquires again and starts a fresh stack and claims a device again;
-      # leaving them up is what pushes the host past three stacks and strands
-      # booted simulators.
-      release_worktree_resources "$wt"
     done
-    exit 0
+    [ "$fail" -eq 0 ] || echo "release: teardown reported errors above — verify with status and dev:status" >&2
+    exit "$fail"
     ;;
   status)
     reap

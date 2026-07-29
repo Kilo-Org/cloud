@@ -3,7 +3,6 @@ import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google'
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
-import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrokModel, isGrok42Model, isGrok45Model } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
@@ -64,11 +63,6 @@ const REASONING_VARIANTS_CLAUDE = {
   max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
 } as const;
 
-export const REASONING_VARIANTS_SEED = {
-  none: { reasoning: { enabled: false, effort: 'minimal' } },
-  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
-} as const;
-
 export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
   instant: REASONING_VARIANTS_BINARY.instant,
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
@@ -113,9 +107,6 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   ) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (model === seed_20_code_free_model.public_id) {
-    return REASONING_VARIANTS_SEED;
-  }
   if (model.startsWith('inception/mercury-2')) {
     return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
   }
@@ -135,9 +126,6 @@ export function getAiSdkProvider(
   model: string,
   directProviderId: DirectUserByokInferenceProviderId | null
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
-  if (seed_20_code_free_model.public_id === model) {
-    return 'openai-compatible';
-  }
   if (directProviderId === 'morph-byok') {
     return 'openai-compatible';
   }

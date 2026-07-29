@@ -8,7 +8,6 @@ import {
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
-import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import {
   findKiloExclusiveModel,
@@ -32,6 +31,15 @@ const disabledPaidModel = {
   internal_id: 'vendor/disabled-paid-model-internal',
   display_name: 'Disabled Paid Kilo Model',
   status: 'disabled',
+} satisfies KiloExclusiveModel;
+
+const disabledFreeModel = {
+  ...qwen36_plus_stealth_model,
+  public_id: 'vendor/disabled-free-model',
+  internal_id: 'vendor/disabled-free-model-internal',
+  display_name: 'Disabled Free Kilo Model',
+  status: 'disabled',
+  pricing: null,
 } satisfies KiloExclusiveModel;
 
 function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
@@ -178,9 +186,9 @@ describe('shouldSuppressOpenRouterModel', () => {
   });
 
   it('suppresses disabled free Kilo-exclusive models from OpenRouter', () => {
-    expect(seed_20_code_free_model.status).toBe('disabled');
-    expect(seed_20_code_free_model.pricing).toBeNull();
-    expect(shouldSuppressOpenRouterModel(seed_20_code_free_model)).toBe(true);
+    expect(disabledFreeModel.status).toBe('disabled');
+    expect(disabledFreeModel.pricing).toBeNull();
+    expect(shouldSuppressOpenRouterModel(disabledFreeModel)).toBe(true);
   });
 
   it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {

@@ -129,4 +129,19 @@ describe('parseModelsDevProviderModels', () => {
       },
     ]);
   });
+
+  test('excludes models missing from the provider model list', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          available: { id: 'available', limit: { context: 128_000 } },
+          removed: { id: 'removed', limit: { context: 64_000 } },
+        },
+      },
+      new Set(['available', 'provider-only'])
+    );
+
+    expect(models.map(model => model.id)).toEqual(['available']);
+    expect(models[0].context_length).toBe(128_000);
+  });
 });

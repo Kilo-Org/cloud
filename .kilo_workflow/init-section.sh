@@ -40,9 +40,9 @@ canonical_repo() {
 
 preflight_worktree() {
   local repo=$1 path=$2
-  [ ! -e "$path" ] || { echo "init-section: target already exists: $path" >&2; exit 1; }
+  [ ! -e "$path" ] || { echo "init-section: target already exists: $path — remove it (git worktree remove --force $path; git branch -D $SECTION) or it was not created by init-section and cannot be repaired by hand" >&2; exit 1; }
   ! git -C "$repo" show-ref --verify --quiet "refs/heads/$SECTION" ||
-    { echo "init-section: branch already exists in $repo: $SECTION" >&2; exit 1; }
+    { echo "init-section: branch already exists in $repo: $SECTION — delete it (git branch -D $SECTION) if it is stale" >&2; exit 1; }
 }
 
 add_worktree() {

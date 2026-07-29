@@ -33,7 +33,6 @@ git diff --check
 
 - Install with `npx expo install <package>` (or `--dev`), never `pnpm add`.
 - After dependency changes, run `pnpx expo-doctor` and fix every issue.
-- Hermes V1 memory regression: RN 0.86.0 ships `250829098.0.14`, which allocates ~512 KB metadata per unique worklet (fixed in `.0.15+`). A pin to `250829098.0.16` (root patch + `hermes-compiler` override) was tried in PR #4837 and measured on one emulator boot, three cold-start iterations per arm, debug dev-client: median TOTAL PSS 881.7 MB (`.0.14`) vs 901.7 MB (`.0.16`), median Native Heap 608.7 MB vs 608.6 MB — no reduction at a frozen ≥15 MB gate, so the pin was dropped. Take the fix via RN ≥ **0.86.2** (or 0.87), and re-measure after upgrading if the regression matters. Do not re-attempt worklets Bundle Mode while NativeWind remaps `react-native` ([reanimated#9817](https://github.com/software-mansion/react-native-reanimated/issues/9817), [SWM post](https://swmansion.com/blog/how-worklets-bundle-mode-accidentally-fixed-Hermes-v1-memory-regression/)).
 - `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
 
   ```bash

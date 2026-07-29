@@ -81,7 +81,11 @@ case "${1:?internal usage: $0 acquire|release|status|_held}" in
       for number in $(seq 1 "$TOTAL"); do
         slot="$DIR/slot-$number"
         if mkdir "$slot" 2>/dev/null; then
-          worktree=$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)
+          # Resolve via this script's own location, never the caller's CWD:
+          # invoked by absolute path from a sibling repository (WORKFLOW.md),
+          # a bare rev-parse would record the sibling's root and break the
+          # status report's UNACCOUNTED matching.
+          worktree=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || pwd -P)
           if printf '%s' "$worktree" > "$slot/worktree" &&
              date -u +%Y-%m-%dT%H:%M:%SZ > "$slot/since" &&
              printf '%s' "$owner" > "$slot/owner"; then

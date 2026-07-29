@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Reap dead slot owners, list live holders, then report known resources whose
-# worktree has no slot. Reporting is read-only and always exits 0 — UNACCOUNTED
-# lines in the output are the finding; the owning workflow cleans up.
+# worktree has no slot. Reporting is read-only and exits 0 — UNACCOUNTED lines
+# in the output are the finding; the owning workflow cleans up. Passing any
+# argument is a usage error (exit 1).
 set -euo pipefail
 HERE=$(dirname "$0")
 "$HERE/.e2e-slot-state.sh" status "$@"

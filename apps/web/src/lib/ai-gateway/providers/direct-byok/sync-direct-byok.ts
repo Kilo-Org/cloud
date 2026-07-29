@@ -215,7 +215,11 @@ const nvidiaFetcher: ProviderFetcher = {
     if (!entry) {
       throw new Error('models.dev catalog missing nvidia entry');
     }
-    return parseNvidiaProviderModels(await response.json(), entry);
+    const models = parseNvidiaProviderModels(await response.json(), entry);
+    if (models.length === 0) {
+      throw new Error('NVIDIA catalog intersection produced no supported models');
+    }
+    return models;
   },
 };
 

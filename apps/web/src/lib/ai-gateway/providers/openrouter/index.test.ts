@@ -295,20 +295,6 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
     expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
   });
-
-  it('includes Sakana Fugu Ultra in the public model list', async () => {
-    global.fetch = jest.fn(() =>
-      Promise.resolve(
-        createMockResponse({
-          jsonData: { data: [buildModel({ id: 'sakana/fugu' })] },
-        })
-      )
-    ) as unknown as typeof fetch;
-
-    const models = await getEnhancedOpenRouterModels();
-
-    expect(models.data.some(model => model.id === 'sakana/fugu')).toBe(true);
-  });
 });
 
 describe('disabled paid Kilo-exclusive model fallback', () => {

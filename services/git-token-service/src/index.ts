@@ -548,6 +548,11 @@ function validateBitbucketCapabilityUpstream(
   requestUrl: string,
   repositoryFullName: string
 ): { failure: RedeemBitbucketSessionCapabilityFailureReason | null } {
+  // Bitbucket smart-HTTP repo paths are /<workspace>/<repo>.git with literal
+  // slashes and never carry an encoded slash, so reject %2f outright. This guard
+  // deliberately differs from validateGitLabCapabilityUpstream, which must allow
+  // %2f because GitLab addresses projects by encoded path (e.g.
+  // /api/v4/projects/group%2Fproject); do not "reconcile" the two.
   if (/%2f|%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
     return { failure: 'invalid_upstream_url' };
   }

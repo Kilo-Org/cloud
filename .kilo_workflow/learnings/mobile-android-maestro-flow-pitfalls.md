@@ -5,8 +5,8 @@ code does not reveal.
 
 Cause/fix (three independent traps, all hit in the hermes-mem baseline round):
 1. `maestro test` exits 0 even when a flow assertion FAILED (observed on
-   maestro 2.7.0, Android). Never trust the exit code; grep the log for
-   `FAILED` after every run.
+   maestro 2.7.0, Android). `apps/mobile/e2e/maestro.sh` checks the JUnit result
+   and returns nonzero; always use it.
 2. Maestro text matching is full-string regex: the Agents list search field is
    `Search sessions...` (with ellipsis), so `visible: 'Search sessions'` never
    matches. Use `Search sessions.*` (and generally re-dump and copy exact
@@ -19,6 +19,6 @@ Cause/fix (three independent traps, all hit in the hermes-mem baseline round):
    after settle, and 60-120 s waits for list/transcript asserts. `dumpsys
    meminfo` itself can hit its 10 s service timeout under load — retry it.
 
-Screenshots: `adb exec-out screencap -p > "$SCRATCH/shot.png"` writes wherever
-you point it — no `~/.maestro/tests` hunt like on iOS
+Screenshots: `pnpm dev:mobile:android adb -s <serial> exec-out screencap -p >
+"$SCRATCH/shot.png"` writes wherever you point it — no `~/.maestro/tests` hunt like on iOS
 (`maestro-takescreenshot-output-dir.md`).

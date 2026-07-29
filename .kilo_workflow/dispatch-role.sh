@@ -13,9 +13,8 @@
 # Prints the log path. Wait on it with await-role.sh, never a hand-rolled
 # loop — it reports DONE with the role's sentinel, VOID, STALLED, or RUNNING.
 #
-# The e2e-verifier gets its own tmux session (device slots are owned and
-# auto-reaped by session name); every other role runs as a window in the
-# caller's session, or in its own session when the caller is not inside tmux.
+# Roles run as windows in the caller's session, or in their own session when
+# the caller is not inside tmux.
 set -euo pipefail
 
 ROLE=${1:?role} SECTION=${2:?section} LABEL=${3:?label} WT=${4:?worktree} SCRATCH=${5:?scratch} MSG=${6:?message}
@@ -47,15 +46,27 @@ while [ $# -gt 0 ]; do
       ;;
     --file)
       [ -f "${2:-}" ] || { echo "dispatch-role: --file path does not exist: '${2:-}'" >&2; exit 1; }
-      FILES+=("--file" "$2")
+      FILE_PATH=$(cd "$(dirname "$2")" && pwd -P)/$(basename "$2")
+      FILES+=("--file" "$FILE_PATH")
       shift 2
       ;;
     *) echo "dispatch-role: only --mode repro and --file <path> are accepted after the message, got '$1'" >&2; exit 1 ;;
   esac
 done
 
-NAME="$SECTION-$ROLE-$LABEL"
-LOG="$SCRATCH/$ROLE-$LABEL.log"
+# The caller supplies a human round label; the script supplies the dispatch id.
+# That makes parallel reviewers and same-label retries mechanically distinct,
+# so an old .exit file can never vouch for a new run.
+TOKEN=$(mktemp "$SCRATCH/.dispatch-XXXXXX")
+DISPATCH_ID=${TOKEN##*-}
+rm "$TOKEN"
+NAME="$SECTION-$ROLE-$LABEL-$DISPATCH_ID"
+LOG="$SCRATCH/$ROLE-$LABEL-$DISPATCH_ID.log"
+ROLE_SCRATCH=$SCRATCH
+if [ "$ROLE" = "e2e-verifier" ]; then
+  ROLE_SCRATCH="$SCRATCH/e2e-$LABEL-$DISPATCH_ID"
+  mkdir "$ROLE_SCRATCH"
+fi
 # The strip list must be computed INSIDE the new pane, not here: tmux panes
 # inherit the tmux SERVER environment, so vars absent from this dispatcher's
 # env can still reach the child and poison a nested kilo run.
@@ -66,7 +77,7 @@ STRIP='$(env | grep -oE "^(KILO|OPENCODE)[A-Za-z0-9_]*" | sed "s/^/-u /" | tr "\
 # Redirection below means an attached pane shows nothing at all. Say so in the
 # pane itself — a blank window reads as a dead agent otherwise. This prints to
 # the terminal only, never into the log, so the EXITCODE contract is untouched.
-CMD="echo $(printf '%q' "$NAME: output goes to $LOG — this pane stays blank by design; watch with: tail -f $LOG") && cd $(printf '%q' "$WT") && env $STRIP kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME")"
+CMD="echo $(printf '%q' "$NAME: output goes to $LOG — this pane stays blank by design; watch with: tail -f $LOG") && cd $(printf '%q' "$WT") && env $STRIP SCRATCH=$(printf '%q' "$ROLE_SCRATCH") kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME") --auto"
 for arg in "${FILES[@]+"${FILES[@]}"}"; do CMD+=" $(printf '%q' "$arg")"; done
 # The wrapper-owned exit file is what proves the run ENDED: the in-log
 # EXITCODE marker is convenient for humans but shares the stream with agent
@@ -84,26 +95,9 @@ if [ -n "${TMUX_PANE:-}" ]; then
   CALLER_SESSION=$(tmux display-message -p -t "$TMUX_PANE" '#S' 2>/dev/null || true)
 fi
 
-# Machine-global launch spacing: concurrent kilo startups race the shared
-# SQLite credential/session stores and crash (void rounds). ~3s apart is
-# enough; the mkdir mutex makes the read-modify-write of the timestamp safe.
-GATE="$HOME/.cache/kilo-launch-gate"
-mkdir -p "$GATE"
-while :; do
-  if mkdir "$GATE/lock" 2>/dev/null; then
-    NOW=$(date +%s)
-    LAST=$(cat "$GATE/last" 2>/dev/null || echo 0)
-    if [ $(( NOW - LAST )) -ge 3 ]; then
-      echo "$NOW" > "$GATE/last"
-      rmdir "$GATE/lock"
-      break
-    fi
-    rmdir "$GATE/lock"
-  fi
-  sleep 1
-done
+"$(dirname "$0")/launch-gate.sh"
 
-if [ "$ROLE" = "e2e-verifier" ] || [ -z "$CALLER_SESSION" ]; then
+if [ -z "$CALLER_SESSION" ]; then
   tmux new-session -d -s "$NAME" "$CMD"
   TARGET=$NAME
 else
@@ -112,10 +106,12 @@ else
   # named <section> collides with the planner/orchestrator window named
   # <section>-planner — new-window then fails with "create window failed:
   # index N in use".
-  TARGET=$(tmux new-window -d -P -F '#{session_name}:#{window_index}' -t "$CALLER_SESSION:" -n "$NAME" "$CMD")
+  # Window indexes are renumbered when an earlier window exits. The stable
+  # @<window-id> keeps await/kill aimed at this dispatch for its whole life.
+  TARGET=$(tmux new-window -d -P -F '#{window_id}' -t "$CALLER_SESSION:" -n "$NAME" "$CMD")
 fi
 # Sidecar for await-role.sh: which sentinel contract applies (role + repro
 # vs verify for the e2e-verifier) and which tmux target to pronounce dead.
 # Same path plus .meta, so dispatchers only ever hand around the log path.
-printf 'role=%s\nmode=%s\ntmux=%s\n' "$ROLE" "$MODE" "$TARGET" > "$LOG.meta"
+printf 'role=%s\nmode=%s\ntmux=%s\nscratch=%s\n' "$ROLE" "$MODE" "$TARGET" "$ROLE_SCRATCH" > "$LOG.meta"
 echo "$LOG"

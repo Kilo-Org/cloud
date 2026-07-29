@@ -28,7 +28,3 @@ survives the request-bot-status escalation (e.g. seed the KILOCLAW_INSTANCE DO s
 `deliverChatWebhook` does not throw definitively, or a fake-bot harness answering
 `bot.status_request`). Report the criterion unverified with evidence; never the tool-card
 viewer as a proxy.
-
-If the stack gets stopped out from under a round (a foreign release, a reaped slot), recover
-per `dev-stack-died-mid-round-restart-in-place.md` — DO state persists, so the seeded rows
-survive a restart.

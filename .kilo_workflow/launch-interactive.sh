@@ -38,23 +38,7 @@ shift 2
 [ -d "$WT" ] || { echo "launch-interactive: no such worktree: $WT" >&2; exit 1; }
 touch "$LOGFILE" 2>/dev/null || { echo "launch-interactive: cannot write log file $LOGFILE" >&2; exit 1; }
 
-# Machine-global launch spacing: concurrent kilo startups race the shared
-# SQLite credential/session stores and crash. Same gate as dispatch-role.sh.
-GATE="$HOME/.cache/kilo-launch-gate"
-mkdir -p "$GATE"
-while :; do
-  if mkdir "$GATE/lock" 2>/dev/null; then
-    NOW=$(date +%s)
-    LAST=$(cat "$GATE/last" 2>/dev/null || echo 0)
-    if [ $(( NOW - LAST )) -ge 3 ]; then
-      echo "$NOW" > "$GATE/last"
-      rmdir "$GATE/lock"
-      break
-    fi
-    rmdir "$GATE/lock"
-  fi
-  sleep 1
-done
+"$(dirname "$0")/launch-gate.sh"
 
 STRIP='$(env | grep -oE "^(KILO|OPENCODE)[A-Za-z0-9_]*" | sed "s/^/-u /" | tr "\n" " " || true)'
 CMD="env $STRIP"
@@ -66,7 +50,9 @@ if [ -n "${TMUX_PANE:-}" ]; then
 fi
 
 if [ -n "$CALLER_SESSION" ]; then
-  TARGET=$(tmux new-window -d -P -F '#{session_name}:#{window_index}' -t "$CALLER_SESSION:" -n "$NAME" -c "$WT" "$CMD")
+  # Window indexes are renumbered when an earlier window exits. The stable
+  # @<window-id> keeps monitoring and steering aimed at this session.
+  TARGET=$(tmux new-window -d -P -F '#{window_id}' -t "$CALLER_SESSION:" -n "$NAME" -c "$WT" "$CMD")
 else
   tmux new-session -d -s "$NAME" -c "$WT" "$CMD"
   TARGET=$NAME

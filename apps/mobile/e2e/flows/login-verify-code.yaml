@@ -3,7 +3,7 @@
 # Enters OTP on the "Enter the code" screen and lands on Home. Assumes
 # login-request-code.yaml already reached that screen.
 #
-#   maestro --device <udid> test -e OTP=123456 e2e/flows/login-verify-code.yaml
+#   apps/mobile/e2e/maestro.sh <udid> test -e OTP=123456 e2e/flows/login-verify-code.yaml
 #
 # Prefer the one-shot wrapper e2e/login.sh. See e2e/AGENTS.md.
 appId: com.kilocode.kiloapp

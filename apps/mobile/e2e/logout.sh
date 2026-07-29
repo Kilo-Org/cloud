@@ -11,5 +11,8 @@ set -euo pipefail
 DEVICE="${1:?usage: logout.sh <device-udid>}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+if [ "${KILO_MAESTRO_LOCKED:-}" != "1" ]; then
+  exec "$SCRIPT_DIR/maestro.sh" "$DEVICE" --exec "$0" "$@"
+fi
 "$SCRIPT_DIR/preflight.sh" "$DEVICE"
-maestro --device "$DEVICE" test "$SCRIPT_DIR/flows/logout.yaml"
+"$SCRIPT_DIR/maestro.sh" "$DEVICE" test "$SCRIPT_DIR/flows/logout.yaml"

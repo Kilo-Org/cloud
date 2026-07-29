@@ -81,6 +81,12 @@ test('login polls the local outbox without one-second latency', () => {
   assert.match(login, /sleep 0\.25/);
 });
 
+test('parallel platform logins default to separate accounts', () => {
+  const login = fs.readFileSync('apps/mobile/e2e/login.sh', 'utf8');
+  assert.match(login, /emulator-\*\) PLATFORM=android/);
+  assert.match(login, /e2e-mobile-\$\{WORKTREE_SLUG\}-\$\{PLATFORM\}@example\.com/);
+});
+
 test('shared launch prompt grace periods total at most five seconds', () => {
   const settle = fs.readFileSync('apps/mobile/e2e/flows/settle-app.yaml', 'utf8');
   const openApp = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
@@ -94,12 +100,13 @@ test('shared launch prompt grace periods total at most five seconds', () => {
 
 test('settle flow handles the exact iOS external-app prompt within existing waits', () => {
   const flow = fs.readFileSync('apps/mobile/e2e/flows/settle-app.yaml', 'utf8');
-  const promptGuardIndex = flow.indexOf(`visible: 'Open this page in "Kilo"\\?'`);
-  const openActionIndex = flow.indexOf("tapOn: 'Open'", promptGuardIndex);
   const finalReadyWaitIndex = flow.lastIndexOf('- extendedWaitUntil:');
   const waitBlocks = [...flow.matchAll(/- extendedWaitUntil:\n[\s\S]*?(?=\n- |$)/g)].map(
     match => match[0]
   );
+  const secondWaitEnd = flow.indexOf(waitBlocks[1]) + waitBlocks[1].length;
+  const promptGuardIndex = flow.indexOf('- runFlow:', secondWaitEnd);
+  const openActionIndex = flow.indexOf("tapOn: 'Open'", promptGuardIndex);
   const timeouts = [...flow.matchAll(/timeout: (\d+)/g)].map(match => Number(match[1]));
 
   assert.match(
@@ -114,6 +121,11 @@ test('settle flow handles the exact iOS external-app prompt within existing wait
   );
   assert.match(waitBlocks[1], /timeout: 3000\n\s+optional: true/);
   assert.ok(promptGuardIndex > flow.indexOf(waitBlocks[1]), 'settle-app should guard Open');
+  assert.match(
+    flow.slice(promptGuardIndex, openActionIndex),
+    /Open this page in "Kilo"\\\?/,
+    'settle-app should guard Open with the exact prompt'
+  );
   assert.ok(openActionIndex > promptGuardIndex, 'settle-app should tap the exact Open action');
 
   const promptChain = [

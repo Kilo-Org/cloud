@@ -4,7 +4,7 @@
 # code" screen. The 6-digit code is emailed to the local outbox
 # (dev/logs/emails/); read it there and pass it to login-verify-code.yaml.
 #
-#   maestro --device <udid> test -e EMAIL=e2e-mobile@example.com \
+#   apps/mobile/e2e/maestro.sh <udid> test -e EMAIL=e2e-mobile@example.com \
 #     e2e/flows/login-request-code.yaml
 #
 # EMAIL is required (-e). Do NOT add it as a flow-level `env:` default — a

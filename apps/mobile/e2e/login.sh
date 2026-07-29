@@ -8,10 +8,9 @@
 # Usage:
 #   e2e/login.sh <device-udid> [email]
 #
-# When no email is given, defaults to a per-worktree-unique address
-# (e2e-mobile-<worktree-basename>@example.com) so concurrent worktrees never
-# share a backend user. It is stable within a worktree, so repeat logins reuse
-# the same seeded account.
+# When no email is given, defaults to a per-worktree, per-platform address
+# (e2e-mobile-<worktree-basename>-<ios|android>@example.com), so parallel
+# platform shards and concurrent worktrees never share a backend user.
 #
 # Env overrides:
 #   OUTBOX   outbox dir (default: <repo-root>/dev/logs/emails)
@@ -26,9 +25,15 @@ REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 OUTBOX="${OUTBOX:-$REPO_ROOT/dev/logs/emails}"
 
 WORKTREE_SLUG="$(basename "$REPO_ROOT" | tr -cs 'a-zA-Z0-9' '-' | sed 's/^-*//;s/-*$//' | tr 'A-Z' 'a-z')"
-EMAIL="${2:-e2e-mobile-${WORKTREE_SLUG}@example.com}"
+case "$DEVICE" in
+  emulator-*) PLATFORM=android ;;
+  *) PLATFORM=ios ;;
+esac
+EMAIL="${2:-e2e-mobile-${WORKTREE_SLUG}-${PLATFORM}@example.com}"
 
-"$SCRIPT_DIR/preflight.sh" "$DEVICE"
+if [ "${KILO_MAESTRO_LOCKED:-}" != "1" ]; then
+  exec "$SCRIPT_DIR/maestro.sh" "$DEVICE" --exec "$0" "$@"
+fi
 
 # Newest sign-in-code email for EMAIL, or empty.
 latest_email() {
@@ -47,28 +52,23 @@ latest_email() {
 
 # Two parallel logins with the same email invalidate each other's OTP: a
 # second code request voids the first code, so the first verify 401s. Hold a
-# per-worktree+email mutex from the outbox snapshot through code verification
-# (device prep above stays parallel). Same mkdir-lock pattern as maestro.sh;
-# a dead holder's lock is reclaimed, a live one is polled every 2s.
-LOCK="${TMPDIR:-/tmp}/kilo-otp-locks/${WORKTREE_SLUG}-${EMAIL}"
-mkdir -p "$(dirname "$LOCK")"
-while ! mkdir "$LOCK" 2>/dev/null; do
-  holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
-  if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
-    mv "$LOCK" "$LOCK.stale.$$" 2>/dev/null && rm -rf "$LOCK.stale.$$"
-    continue
-  fi
-  sleep 2
-done
-trap 'rm -rf "$LOCK"' EXIT
-echo $$ >"$LOCK/pid"
+# email mutex from the outbox snapshot through code verification. OTP
+# invalidation is keyed by normalized email, not worktree.
+EMAIL_KEY=$(printf '%s' "$EMAIL" | tr '[:upper:]' '[:lower:]' | shasum -a 256 | cut -d' ' -f1)
+LOCK="${TMPDIR:-/tmp}/kilo-otp-locks/$EMAIL_KEY"
+if [ "${KILO_OTP_LOCKED:-}" != "1" ]; then
+  exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
+    --wait 1200 "$LOCK" -- env KILO_MAESTRO_LOCKED=1 KILO_OTP_LOCKED=1 "$0" "$@"
+fi
+
+"$SCRIPT_DIR/preflight.sh" "$DEVICE"
 
 # Snapshot inside the lock: an email another login produced while we waited
 # must count as "old", or we would read its already-consumed code.
 before="$(latest_email)"
 
 request_code() {
-  maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"
+  "$SCRIPT_DIR/maestro.sh" "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"
 }
 
 # Say which half broke, so nobody reads Maestro's generic "could be a real
@@ -89,7 +89,7 @@ if ! request_code; then
   # One cold relaunch clears both known first-attempt failures: a half-started
   # dev client, and an email field left dirty by an earlier run.
   echo "==> retrying launch and sign-in request once after a cold relaunch"
-  maestro --device "$DEVICE" test "$SCRIPT_DIR/flows/open-app.yaml" || true
+  "$SCRIPT_DIR/maestro.sh" "$DEVICE" test "$SCRIPT_DIR/flows/open-app.yaml" || true
   request_code || { diagnose_request; exit 1; }
 fi
 
@@ -110,5 +110,5 @@ if [ -z "$code" ]; then
 fi
 
 echo "==> verifying sign-in code"
-maestro --device "$DEVICE" test -e "OTP=$code" "$SCRIPT_DIR/flows/login-verify-code.yaml"
+"$SCRIPT_DIR/maestro.sh" "$DEVICE" test -e "OTP=$code" "$SCRIPT_DIR/flows/login-verify-code.yaml"
 echo "==> signed in"

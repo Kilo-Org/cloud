@@ -306,6 +306,14 @@ export function computePortOffset(args: {
 // auto-probed away from the hash default.
 export function readPersistedPortOffset(repoRoot: string): number | undefined {
   try {
+    const value = Number(
+      fs.readFileSync(path.join(repoRoot, 'dev', 'logs', 'port-offset'), 'utf-8').trim()
+    );
+    if (Number.isInteger(value) && value >= 0) return value;
+  } catch {
+    // A stack started before the dedicated file may still have a manifest.
+  }
+  try {
     const raw = JSON.parse(
       fs.readFileSync(path.join(repoRoot, 'dev', 'logs', 'manifest.json'), 'utf-8')
     );
@@ -313,6 +321,24 @@ export function readPersistedPortOffset(repoRoot: string): number | undefined {
     return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
   } catch {
     return undefined;
+  }
+}
+
+export function writePersistedPortOffset(repoRoot: string, value: number): void {
+  const logs = path.join(repoRoot, 'dev', 'logs');
+  fs.mkdirSync(logs, { recursive: true });
+  const target = path.join(logs, 'port-offset');
+  const temp = `${target}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, `${value}\n`);
+  fs.renameSync(temp, target);
+}
+
+export function clearDevLogs(repoRoot: string): void {
+  const logs = path.join(repoRoot, 'dev', 'logs');
+  fs.mkdirSync(logs, { recursive: true });
+  for (const entry of fs.readdirSync(logs)) {
+    if (entry === 'port-offset' || entry === 'start.lock') continue;
+    fs.rmSync(path.join(logs, entry), { recursive: true, force: true });
   }
 }
 
@@ -686,21 +712,6 @@ export function candidatePortOffsets(start: number): number[] {
     if (offset !== start) candidates.push(offset);
   }
   return candidates;
-}
-
-// Probe candidate offsets until one whose full computed port set is free is
-// found, applying it via applyPortOffset and returning it. Restores the
-// starting offset and returns undefined when every candidate is occupied.
-export async function findFreePortOffset(
-  hasConflicts: () => Promise<boolean>
-): Promise<number | undefined> {
-  const start = portOffset;
-  for (const candidate of candidatePortOffsets(start)) {
-    applyPortOffset(candidate);
-    if (!(await hasConflicts())) return candidate;
-  }
-  applyPortOffset(start);
-  return undefined;
 }
 
 export function resolveTransitiveDeps(targets: string[]): string[] {

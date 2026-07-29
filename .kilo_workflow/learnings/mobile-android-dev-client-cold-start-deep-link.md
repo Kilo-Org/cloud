@@ -1,6 +1,6 @@
 # Android dev client: cold starts need the deep link, and the reload outlasts flow budgets
 
-Symptom: after `adb shell am force-stop com.kilocode.kiloapp`, relaunching with
+Symptom: after wrapped ADB `shell am force-stop com.kilocode.kiloapp`, relaunching with
 `am start -n com.kilocode.kiloapp/.MainActivity` lands on the Expo dev-client launcher
 ("Development Build", server URL list) instead of the app; `monkey -p ... LAUNCHER 1` fails
 outright. Separately, `apps/mobile/e2e/login.sh <serial>` fails its settle assert
@@ -18,7 +18,8 @@ status-bar clock.
 
 Fix:
 
-- Always relaunch via the deep link, with `adb reverse tcp:$API_PORT` / `tcp:$METRO_PORT` set
+- Always relaunch via the deep link, with the repository wrapper's `adb -s <serial> reverse
+  tcp:$API_PORT` / `tcp:$METRO_PORT` set
   first. A blank white screen + zero-text dump within ~60s of a cold start means LOADING, not a
   rendering defect — wait and re-dump before classifying (contrast: the iOS transparency defect
   shows static text on screen while the interactive subtree is missing for 60s+).

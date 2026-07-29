@@ -66,4 +66,8 @@ if [ "$MODE" = "reviewer" ] && [ "$NOWLINE" != "$EXPECT" ]; then
   echo "VIOLATION: the reviewer modified the owned paths (working-tree bytes changed) — the round is void"
   exit 1
 fi
+if [ "$MODE" = "implementer" ] && [ "$NOWLINE" = "$EXPECT" ]; then
+  echo "VIOLATION: the implementer reported completion without changing the owned paths — the round is void"
+  exit 1
+fi
 echo "OK"

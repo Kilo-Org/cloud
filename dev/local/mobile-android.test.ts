@@ -5,11 +5,108 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  androidEmulatorSession,
   claimAndroidDevice,
+  commandMatchesRecordedEmulator,
+  findAvailableEmulatorPort,
+  isValidEmulatorRecord,
+  parseEmulatorStartArgs,
+  processOwnsListeningPort,
   readGradleWrapperVersion,
   releaseAndroidDevice,
+  releaseWorktreeAndroidDevices,
   resolveAndroidEnvironment,
+  signalProcessIfPresent,
 } from './mobile-android';
+
+test('allocates the first free even emulator console port', () => {
+  const occupied = new Set([5554, 5556]);
+  assert.equal(
+    findAvailableEmulatorPort(port => occupied.has(port)),
+    5558
+  );
+});
+
+test('recognizes the qemu process image that replaces the emulator launcher', () => {
+  const emulator = '/opt/android/emulator/emulator';
+  const command =
+    '/opt/android/emulator/qemu/darwin-aarch64/qemu-system-aarch64-headless -avd Pixel_9 -port 5554';
+  assert.equal(commandMatchesRecordedEmulator(command, emulator, 'Pixel_9', 5554), true);
+  assert.equal(commandMatchesRecordedEmulator(command, emulator, 'Pixel_8', 5554), false);
+  assert.equal(commandMatchesRecordedEmulator(command, emulator, 'Pixel_9', 5556), false);
+  assert.equal(commandMatchesRecordedEmulator(command, emulator, 'Pixel', 5554), false);
+  assert.equal(
+    commandMatchesRecordedEmulator(
+      command.replace('-port 5554', '-port 55546'),
+      emulator,
+      'Pixel_9',
+      5554
+    ),
+    false
+  );
+});
+
+test('records an emulator only when its process owns the console port', () => {
+  assert.equal(
+    processOwnsListeningPort(5554, 123, () => [123]),
+    true
+  );
+  assert.equal(
+    processOwnsListeningPort(5554, 123, () => [456]),
+    false
+  );
+});
+
+test('sanitizes Android emulator tmux targets derived from worktree names', () => {
+  assert.equal(androidEmulatorSession('/tmp/cloud-4.2'), 'kilo-e2e-android-cloud-4_2');
+  assert.equal(androidEmulatorSession('/tmp/foo:bar[dev]'), 'kilo-e2e-android-foo_bar_dev_');
+});
+
+test('accepts only the exact wrapper-owned emulator record', () => {
+  const worktreeRoot = '/tmp/cloud-4.2';
+  const session = androidEmulatorSession(worktreeRoot);
+  const record = {
+    avd: 'Pixel_9',
+    gpu: 'host',
+    log: '/tmp/emulator.log',
+    pid: 123,
+    pidFile: path.join(os.tmpdir(), `${session}.pid`),
+    port: 5554,
+    serial: 'emulator-5554',
+    session,
+    worktreeRoot,
+  };
+  assert.equal(isValidEmulatorRecord(record, worktreeRoot), true);
+  assert.equal(isValidEmulatorRecord({ ...record, port: 5556 }, worktreeRoot), false);
+  assert.equal(
+    isValidEmulatorRecord({ ...record, worktreeRoot: '/tmp/foreign' }, worktreeRoot),
+    false
+  );
+});
+
+test('rejects emulator-start when the flag appears where the AVD name belongs', () => {
+  assert.throws(() => parseEmulatorStartArgs(['--gpu', 'host', 'Pixel_9']), /Usage:/);
+  assert.deepEqual(parseEmulatorStartArgs(['Pixel_9', '--gpu', 'host']), {
+    avd: 'Pixel_9',
+    gpu: 'host',
+  });
+});
+
+test('treats a process that disappears before its signal as stopped', () => {
+  const gone = Object.assign(new Error('gone'), { code: 'ESRCH' });
+  assert.doesNotThrow(() =>
+    signalProcessIfPresent(123, 'SIGTERM', () => {
+      throw gone;
+    })
+  );
+  assert.throws(
+    () =>
+      signalProcessIfPresent(123, 'SIGTERM', () => {
+        throw Object.assign(new Error('denied'), { code: 'EPERM' });
+      }),
+    /denied/
+  );
+});
 
 test('skips a partial Android SDK root when a later root has all required tools', () => {
   const env = resolveAndroidEnvironment({
@@ -207,6 +304,31 @@ test('creates an explicit ready Android claim', () => {
     fs.rmSync(filePath, { force: true });
     fs.rmSync(`${filePath}.lock`, { recursive: true, force: true });
     fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('releases every Android claim owned by one worktree and preserves foreign claims', () => {
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-own-'));
+  const foreignWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-foreign-'));
+  const ownSerials = [`test-own-a-${process.pid}`, `test-own-b-${process.pid}`];
+  const foreignSerial = `test-foreign-${process.pid}`;
+  try {
+    for (const serial of ownSerials) claimAndroidDevice(serial, worktreeRoot, `boot-${serial}`);
+    claimAndroidDevice(foreignSerial, foreignWorktree, `boot-${foreignSerial}`);
+
+    assert.deepEqual(releaseWorktreeAndroidDevices(worktreeRoot).sort(), ownSerials.sort());
+    const claimRoot = path.join(os.tmpdir(), 'kilo-mobile-android-claims');
+    for (const serial of ownSerials)
+      assert.equal(fs.existsSync(path.join(claimRoot, `${serial}.json`)), false);
+    assert.equal(fs.existsSync(path.join(claimRoot, `${foreignSerial}.json`)), true);
+  } finally {
+    const claimRoot = path.join(os.tmpdir(), 'kilo-mobile-android-claims');
+    for (const serial of [...ownSerials, foreignSerial]) {
+      fs.rmSync(path.join(claimRoot, `${serial}.json`), { force: true });
+      fs.rmSync(path.join(claimRoot, `${serial}.json.lock`), { recursive: true, force: true });
+    }
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+    fs.rmSync(foreignWorktree, { recursive: true, force: true });
   }
 });
 

@@ -2,7 +2,7 @@
 #
 # Idempotent: if the app is already signed out, it just lands on the login page.
 #
-#   maestro --device <udid> test e2e/flows/logout.yaml
+#   apps/mobile/e2e/maestro.sh <udid> test e2e/flows/logout.yaml
 #
 # See e2e/AGENTS.md for the full workflow.
 appId: com.kilocode.kiloapp

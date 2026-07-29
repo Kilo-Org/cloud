@@ -5,10 +5,9 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
-  applyPortOffset,
   candidatePortOffsets,
+  clearDevLogs,
   computePortOffset,
-  findFreePortOffset,
   getAlwaysOnGroupIds,
   getService,
   portOffset,
@@ -16,6 +15,7 @@ import {
   resolveGroups,
   resolveSessionNextAuthUrl,
   resolveTargets,
+  writePersistedPortOffset,
 } from './services';
 
 test('uses an automatic port offset for secondary worktrees by default', () => {
@@ -81,6 +81,33 @@ test('reads the persisted offset back from the running-stack manifest', () => {
   }
 });
 
+test('persists the selected offset before a stack manifest exists', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-port-offset-'));
+  try {
+    writePersistedPortOffset(dir, 900);
+    assert.equal(readPersistedPortOffset(dir), 900);
+    assert.equal(fs.readFileSync(path.join(dir, 'dev/logs/port-offset'), 'utf8'), '900\n');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('log cleanup preserves startup coordination state', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-log-cleanup-'));
+  const logs = path.join(dir, 'dev/logs');
+  try {
+    fs.mkdirSync(path.join(logs, 'start.lock'), { recursive: true });
+    fs.writeFileSync(path.join(logs, 'port-offset'), '900\n');
+    fs.writeFileSync(path.join(logs, 'service.log'), 'old\n');
+    clearDevLogs(dir);
+    assert.equal(fs.readFileSync(path.join(logs, 'port-offset'), 'utf8'), '900\n');
+    assert.ok(fs.existsSync(path.join(logs, 'start.lock')));
+    assert.ok(!fs.existsSync(path.join(logs, 'service.log')));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('candidate offsets step by 100 and wrap within the valid range', () => {
   const candidates = candidatePortOffsets(4900);
   assert.equal(candidates[0], 5000);
@@ -88,31 +115,6 @@ test('candidate offsets step by 100 and wrap within the valid range', () => {
   assert.equal(candidates.length, 49);
   assert.ok(!candidates.includes(4900));
   assert.ok(!candidates.includes(0));
-});
-
-test('applies the first free candidate offset when ports collide', async () => {
-  const original = portOffset;
-  const candidates = candidatePortOffsets(original);
-  const occupiedOffsets = new Set([original, candidates[0], candidates[1]]);
-  try {
-    const chosen = await findFreePortOffset(async () => occupiedOffsets.has(portOffset));
-    assert.equal(chosen, candidates[2]);
-    assert.equal(portOffset, candidates[2]);
-    const worker = getService('auto-routing');
-    assert.equal(worker.port, 8810 + candidates[2]);
-    assert.ok(worker.command.includes(String(worker.port)));
-  } finally {
-    applyPortOffset(original);
-  }
-});
-
-test('restores the original offset when every candidate is occupied', async () => {
-  const original = portOffset;
-  const originalPort = getService('auto-routing').port;
-  const chosen = await findFreePortOffset(async () => true);
-  assert.equal(chosen, undefined);
-  assert.equal(portOffset, original);
-  assert.equal(getService('auto-routing').port, originalPort);
 });
 
 test('points NEXTAUTH_URL at the offset port when the web app runs without a tunnel', () => {

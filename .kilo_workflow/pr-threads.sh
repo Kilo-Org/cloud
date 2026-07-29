@@ -63,21 +63,34 @@ read_body() {
 # valid REST reply target), and its existing comment bodies (so a retried
 # `close` never posts the same reply twice).
 thread_info() {
-  gh api graphql -f query='query($id:ID!){node(id:$id){
-    ... on PullRequestReviewThread{
-      pullRequest{number}
-      repository{nameWithOwner}
-      comments(first:100){nodes{databaseId body}}}}}' -f id="$1"
+  local id=$1 after="" page repo="" pr="" first="" bodies='[]'
+  while :; do
+    page=$(gh api graphql -f query='query($id:ID!,$after:String){node(id:$id){
+      ... on PullRequestReviewThread{
+        pullRequest{number}
+        repository{nameWithOwner}
+        comments(first:100,after:$after){
+          pageInfo{hasNextPage endCursor}
+          nodes{databaseId body}}}}}' -f id="$id" ${after:+-f after="$after"})
+    [ -n "$repo" ] || repo=$(jq -r '.data.node.repository.nameWithOwner' <<<"$page")
+    [ -n "$pr" ] || pr=$(jq -r '.data.node.pullRequest.number' <<<"$page")
+    [ -n "$first" ] || first=$(jq -r '.data.node.comments.nodes[0].databaseId' <<<"$page")
+    bodies=$(jq -cn --argjson a "$bodies" --argjson b "$(jq '[.data.node.comments.nodes[].body]' <<<"$page")" '$a + $b')
+    [ "$(jq -r '.data.node.comments.pageInfo.hasNextPage' <<<"$page")" = "true" ] || break
+    after=$(jq -r '.data.node.comments.pageInfo.endCursor' <<<"$page")
+  done
+  jq -cn --arg repo "$repo" --argjson pr "$pr" --argjson first "$first" --argjson bodies "$bodies" \
+    '{repo:$repo,pr:$pr,first:$first,bodies:$bodies}'
 }
 
 do_reply() {
   local thread=$1 body=$2 info repo pr comment
   info=$(thread_info "$thread")
-  repo=$(jq -r '.data.node.repository.nameWithOwner' <<<"$info")
+  repo=$(jq -r '.repo' <<<"$info")
   [ "$repo" = "$REPO" ] || { echo "pr-threads: thread $thread belongs to $repo, not $REPO" >&2; exit 1; }
-  pr=$(jq -r '.data.node.pullRequest.number' <<<"$info")
-  comment=$(jq -r '.data.node.comments.nodes[0].databaseId' <<<"$info")
-  if jq -e --arg b "$body" '.data.node.comments.nodes[] | select(.body == $b)' <<<"$info" >/dev/null; then
+  pr=$(jq -r '.pr' <<<"$info")
+  comment=$(jq -r '.first' <<<"$info")
+  if jq -e --arg b "$body" '.bodies[] | select(. == $b)' <<<"$info" >/dev/null; then
     echo "reply already posted; not repeating it"
     return 0
   fi
@@ -85,7 +98,10 @@ do_reply() {
 }
 
 do_resolve() {
-  local thread=$1 resolved
+  local thread=$1 info repo resolved
+  info=$(thread_info "$thread")
+  repo=$(jq -r '.repo' <<<"$info")
+  [ "$repo" = "$REPO" ] || { echo "pr-threads: thread $thread belongs to $repo, not $REPO" >&2; exit 1; }
   resolved=$(gh api graphql \
     -f query='mutation($t:ID!){resolveReviewThread(input:{threadId:$t}){thread{isResolved}}}' \
     -f t="$thread" --jq '.data.resolveReviewThread.thread.isResolved')

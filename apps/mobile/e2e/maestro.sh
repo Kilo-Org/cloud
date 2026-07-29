@@ -1,41 +1,44 @@
 #!/usr/bin/env bash
-# Serializes Maestro invocations per device. Maestro's device driver
-# (XCUITest on iOS, uiautomator on Android) is single-tenant: two concurrent
-# `maestro test`/`maestro hierarchy` processes against the same UDID/serial
-# interleave taps and captures, and flows fail in ways that look like product
-# defects. This wrapper takes a per-device mutex, then execs maestro.
-#
-# Usage: maestro.sh <device> <maestro-args...>
-#   e.g. maestro.sh <udid> test -e EMAIL=x flows/login-request-code.yaml
-#
-# Lock: atomic mkdir under ${TMPDIR:-/tmp}/kilo-maestro-locks/<device>, holder
-# PID recorded inside, released by the EXIT trap when maestro ends. A held
-# lock with a live holder is polled every 2s; a dead holder's is reclaimed.
+# Serialize Maestro per device and turn its JUnit result into a trustworthy exit
+# code. `--exec` holds the same device lock around a multi-command helper.
 set -euo pipefail
 
 DEVICE="${1:?usage: maestro.sh <device> <maestro-args...>}"
 shift
-
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 LOCK="${TMPDIR:-/tmp}/kilo-maestro-locks/$DEVICE"
-mkdir -p "$(dirname "$LOCK")"
 
-while ! mkdir "$LOCK" 2>/dev/null; do
-  holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
-  if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
-    # Holder is dead: reclaim. mv is atomic, so two reclaimers cannot delete
-    # a lock a third process just acquired.
-    mv "$LOCK" "$LOCK.stale.$$" 2>/dev/null && rm -rf "$LOCK.stale.$$"
-    continue
-  fi
-  sleep 2
-done
-trap 'rm -rf "$LOCK"' EXIT
-echo $$ >"$LOCK/pid"
+if [ "${KILO_MAESTRO_LOCKED:-}" != "1" ]; then
+  exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
+    --wait 1200 "$LOCK" -- env KILO_MAESTRO_LOCKED=1 "$0" "$DEVICE" "$@"
+fi
 
-# Run maestro as a child (no exec): the EXIT trap then releases the lock the
-# moment maestro ends, instead of leaving a dead-PID lock for the next waiter
-# to reclaim — which PID reuse could make look live forever.
+if [ "${1:-}" = "--exec" ]; then
+  shift
+  [ $# -gt 0 ] || { echo "maestro.sh: --exec needs a command" >&2; exit 1; }
+  exec "$@"
+fi
+
+if [ "${1:-}" != "test" ]; then
+  exec maestro --device "$DEVICE" "$@"
+fi
+
+REPORT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/kilo-maestro-report.XXXXXX")
+trap 'rm -rf "$REPORT_DIR"' EXIT
+REPORT="$REPORT_DIR/junit.xml"
 set +e
-maestro --device "$DEVICE" "$@"
+maestro --device "$DEVICE" "$@" --format JUNIT --output "$REPORT"
 rc=$?
+set -e
+
+if [ "$rc" -eq 0 ]; then
+  if [ ! -s "$REPORT" ]; then
+    echo "maestro.sh: test exited 0 without a JUnit report" >&2
+    rc=1
+  elif grep -Eq '<(failure|error)([ >])|(failures|errors)="[1-9][0-9]*"' "$REPORT"; then
+    echo "maestro.sh: JUnit reports a failed assertion" >&2
+    rc=1
+  fi
+fi
 exit "$rc"

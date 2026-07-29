@@ -7,7 +7,7 @@ Cause: Maestro taps an element's **centre**, and iOS delivers any touch inside `
 Verify it in two commands, both cheap:
 
 ```bash
-maestro --device <udid> hierarchy        # control centre vs the keyboard window's top bound
+apps/mobile/e2e/maestro.sh <udid> hierarchy  # control centre vs the keyboard window's top bound
 grep -E "Tapping [0-9]" ~/.maestro/tests/<run>/<flow>/logs/device-xctest.log
 grep -A2 "Sending UIEvent" ~/.maestro/tests/<run>/<flow>/logs/device-simulator.log
 ```

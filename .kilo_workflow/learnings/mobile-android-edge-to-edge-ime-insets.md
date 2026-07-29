@@ -19,7 +19,7 @@ already up observes 0 and wrongly concludes the spacer is inert.
 
 How to verify (no code changes):
 
-- `adb shell dumpsys window windows` (the single-subcommand form — full `dumpsys window`
+- `pnpm dev:mobile:android adb -s <serial> shell dumpsys window windows` (the single-subcommand form — full `dumpsys window`
   abbreviates per-window entries and omits `Frames:`/`mFullConfiguration`). Compare the
   app's `winConfig={ mBounds / mAppBounds }` before/after IME: identical rects = no OS resize.
 - `dumpsys window | grep "type=ime frame"` gives the authoritative keyboard top/height

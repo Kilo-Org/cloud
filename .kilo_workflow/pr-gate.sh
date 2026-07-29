@@ -28,6 +28,7 @@ REPO=${1:?owner/repo} PR=${2:?pr number}
 shift 2
 [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "repository must be owner/repo" >&2; exit 1; }
 ASSIGNEE="" LABEL="" BOT="kilo-code-bot" WAIT=0
+WAIVER="(bot) Kilobot posted no approving summary on this head after two retriggers"
 while [ $# -gt 0 ]; do
   case $1 in
     --assignee) ASSIGNEE=${2:?}; shift 2 ;;
@@ -44,8 +45,10 @@ while :; do
     --json headRefOid,mergeable,mergeStateStatus,statusCheckRollup,assignees,labels,comments)
   HEAD_OID=$(jq -r '.headRefOid' <<<"$DATA")
   HEAD_TIME=$(gh api "repos/$REPO/commits/$HEAD_OID" --jq '.commit.committer.date')
-  BOTCOMMENTS=$(jq -r --arg t "$HEAD_TIME" --arg bot "$BOT" \
-    '[.comments[] | select((.author.login == $bot or (.body | startswith("(bot) "))) and .createdAt > $t)
+  HEAD_EPOCH=$(jq -nr --arg t "$HEAD_TIME" '$t | fromdateiso8601')
+  BOTCOMMENTS=$(jq -r --argjson t "$HEAD_EPOCH" --arg bot "$BOT" --arg waiver "$WAIVER" \
+    '[.comments[] | select((.author.login == $bot or .body == $waiver)
+      and (.createdAt | fromdateiso8601) > $t)
       | "\(.author.login) @ \(.createdAt): \(.body | gsub("\\s+"; " ") | .[0:200])"] | .[]' <<<"$DATA")
   [ -n "$BOTCOMMENTS" ] && break
   [ "$(date +%s)" -ge "$DEADLINE" ] && break
@@ -61,7 +64,15 @@ BAD_CHECKS=$(jq -r '[.statusCheckRollup[]? | select((.conclusion // .state // "P
   | ($c | ascii_upcase) as $u
   | ($u == "SUCCESS" or $u == "NEUTRAL" or $u == "SKIPPED") | not)
   | "\(.name // .context): \(.conclusion // .state // "PENDING")"] | .[]' <<<"$DATA")
-[ -n "$BAD_CHECKS" ] && { echo "checks not green:"; sed 's/^/  /' <<<"$BAD_CHECKS"; } || echo "checks: all green"
+CHECK_COUNT=$(jq -r '(.statusCheckRollup // []) | length' <<<"$DATA")
+if [ "$CHECK_COUNT" -eq 0 ]; then
+  echo "checks: NONE REGISTERED"
+elif [ -n "$BAD_CHECKS" ]; then
+  echo "checks not green:"
+  sed 's/^/  /' <<<"$BAD_CHECKS"
+else
+  echo "checks: all green"
+fi
 
 # Any failure to ENUMERATE threads must fail the gate — a half-paginated
 # thread list reading as "0 unresolved" is exactly the false pass to avoid.
@@ -90,6 +101,7 @@ case $MERGEABLE in
   *) gate_fail "not mergeable ($MERGEABLE — resolve conflicts by merging origin/main)" ;;
 esac
 [ -z "$BAD_CHECKS" ] || gate_fail "CI checks not green on head"
+[ "$CHECK_COUNT" -gt 0 ] || gate_fail "no CI checks registered on head — wait for GitHub to enqueue them"
 [ "$THREADS_OK" -eq 1 ] || gate_fail "could not enumerate review threads — fix that before trusting any thread count"
 [ "$THREADS_OK" -eq 1 ] && [ "$UNRESOLVED" != "0" ] && gate_fail "$UNRESOLVED unresolved review thread(s)"
 if [ -n "$ASSIGNEE" ]; then

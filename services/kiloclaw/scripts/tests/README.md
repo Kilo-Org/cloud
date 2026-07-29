@@ -21,11 +21,16 @@ bash services/kiloclaw/scripts/tests/openclaw-upgrade-validate.sh
 > must be set — the token alone does not carry org scope. Note that exporting
 > `KILOCODE_API_KEY` (the line above) means the smoke can no longer read the org id
 > out of your Kilo CLI config the way it does for a CLI-sourced token, so set it
-> explicitly. Get it wrong and the live turn fails deep in the gateway as
-> `402 add credits`, a websocket `1008` close, or "provider rejected the request
-> schema" — none of which name the real cause, and all of which look like a broken
-> image. The smoke now preflights this and refuses to run rather than let you
-> debug the wrong thing.
+> explicitly. Get it wrong and the live turn fails with `402 Add credits to
+> continue`, which reads as a broken image rather than a credential problem. The
+> smoke now preflights this and refuses to run rather than let you debug the wrong
+> thing.
+>
+> Note that a websocket `1008` close on the live turn is a *different* problem and
+> not a credential one: it is OpenClaw's own in-container gateway refusing the
+> CLI's device scope upgrade (`operator.read` to `operator.write`) with
+> `pairing required`. The smoke now prints the close reason so the two are not
+> confused.
 
 It runs a preflight (Docker, bump branch, clean tree, grype, credential) then:
 

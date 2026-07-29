@@ -326,7 +326,10 @@ test('E2E lifecycle scripts take, start, stop, and free one slot', () => {
       'exit 1\n'
   );
   fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\nprintf '%s\\n' '${repoRoot}'\n`);
-  fs.writeFileSync(path.join(bin, 'pnpm'), '#!/bin/sh\nprintf "%s: %s\\n" "$PWD" "$*" >> "$COMMAND_LOG"\n');
+  fs.writeFileSync(
+    path.join(bin, 'pnpm'),
+    '#!/bin/sh\nprintf "%s: %s\\n" "$PWD" "$*" >> "$COMMAND_LOG"\n'
+  );
   for (const command of ['tmux', 'git', 'pnpm']) fs.chmodSync(path.join(bin, command), 0o755);
   const env = {
     ...process.env,

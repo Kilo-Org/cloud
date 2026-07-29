@@ -1,28 +1,30 @@
-# mobile: D3 drag-cancel race (7b) — Maestro tap→swipe turnaround loses to the ~300-600ms settle window on Android
+# mobile: D3 drag-cancel race (7b) — iOS drag NEVER lands mid-settle with Maestro; Android adb combined instrument works
 
-Symptom: verifying "drag the list mid-settle cancels the deferred expand" (D3 guard): tap
-a top-clipped thread's expander, then swipe. On iOS the drag lands in time and the expand
-is cancelled. On Android the thread expands anyway, repeatedly — looks like a platform
-defect and is not.
+Symptom: verifying "drag the list mid-settle cancels the deferred expand" (D3 guard). Tap a
+top-clipped thread's expander, then swipe. The thread expands anyway. On iOS this is NOT a
+product defect and NOT (as an earlier version of this learning claimed) a drag that "lands
+in time".
 
-Cause: the deferred expand fires ~300-600ms after the tap (scrollToIndex animation ~300ms
-plus promise resolution). Maestro's per-step turnaround (tap command completes, next swipe
-command starts) is ~500-800ms on Android, so the drag always begins after the expand.
+Cause, measured on-device 2026-07-29 (pr-review-d957 r4, iOS 26.5 sim): the deferred settle
+completes in **~316ms** (scrollToIndex animated park + promise resolution). Maestro's
+tap→swipe turnaround in ONE flow file is **~700ms+** on iOS. The drag's `onScrollBeginDrag`
+arrives ~400ms AFTER the expansion applied; the "failure" is the product correctly
+expanding post-settle and the drag then scrolling the expanded list. r2's iOS 7b "pass" was
+the same artifact (the cancel verdict was luck, not mechanism).
 
-Fix / instruments, fastest first:
-1. One `adb shell` call with both events — `input tap x y && input swipe ...` (~30ms gap) —
-   but only with UNclamped control bounds (see
-   mobile-android-a11y-bounds-clamped-to-viewport.md); a tap on a clamped sliver misses.
-2. `maestro test <tap-only-flow> && adb shell input swipe ...` — still ~500ms, too slow.
-3. The same-thread retap (flow 7a) proves generation-cancellation lands mid-settle on
-   Android: if a second tap supersedes cleanly (exactly one expand, no collapse), the
-   cancel mechanism works on the platform; combine with iOS 7b for the drag path before
-   classifying an Android 7b expansion as a product failure.
+Decisive readout (use it again): temporary `console.log` in `invalidateSettle(source)` and
+around the scrollToIndex await in `pr-review-discussion-tab.tsx` (byte-restored after) —
+Metro captures `[D3R4] begin gen N` / `resolved gen N current M match <bool>` /
+`invalidateSettle from drag|retap at <epochMs>`. `match false` = cancel won;
+`invalidate` timestamp after `resolved` = instrument too slow.
 
-UPDATE 2026-07-29 (pr-review-d957 r2): instrument 1 CONFIRMED working — first honest
-attempt with `adb shell "input tap 423 479 && input swipe 540 1400 540 1100 250"` on an
-UNclamped control (control top 458 > edge 444) cancelled the expand; the thread stayed
-collapsed (verified by re-exposing the card and reading `Expand thread`, not just its
-bounds band, which is ambiguous while clamped). r1's three failures used clamped-sliver
-targets, which the learning already flags. To unclamp, ADB-nudge down in ~50px steps until
-the control's reported top clears the clamp edge.
+Working instruments:
+1. **Android only**: one `adb shell "input tap x y && input swipe 540 1400 540 1100 250"`
+   (~30-50ms gap) on an UNclamped control (top > a11y clamp edge, e.g. y=444 on pixel9
+   API35). Confirmed again in r4: drag landed 51ms into the settle, `match false`, thread
+   stayed collapsed.
+2. iOS: NO sanctioned instrument lands mid-settle (simctl has no touch injection; a second
+   concurrent Maestro process wedges the driver). Report iOS 7b as instrument-blocked with
+   the trace, and rely on (a) the wiring trace (`invalidateSettle from drag` DOES fire for
+   real drags) plus (b) Android 7b for the cancel verdict. Do NOT classify an iOS expansion
+   after a Maestro tap→swipe as a product failure without the trace.

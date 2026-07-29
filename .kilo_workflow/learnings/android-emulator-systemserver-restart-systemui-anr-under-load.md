@@ -18,8 +18,3 @@ app process, adb reverse mappings, login session, and conversation state all sur
 (never consume a launch attempt for this). Afterwards Maestro, which also wedges under the load
 (`maestro hierarchy` empty/timing out, `maestro test` never writing its first log line), works again.
 
-**Related:** plain `pnpm dev:stop` (runbook-mandated when the slot release leaves the stack up) tears down
-the SHARED `kiloclaw-docker-tcp` socat on 127.0.0.1:23750 even though `e2e-slot.sh release` first prints
-"Leaving Docker infrastructure running". After cleanup, 23750 having no listener is expected; the next
-`dev:start` recreates it on demand. Do not "repair" it by hand (never create a socat you did not start).
-The KiloClaw sandbox container itself survives both the release and dev:stop.

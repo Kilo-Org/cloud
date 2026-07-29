@@ -4,7 +4,7 @@
 #
 #   steer.sh <tmux-target> <message>     # message text, or - to read stdin
 #
-# Traps this exists for (see learnings/steering-a-running-kilo-session.md):
+# Traps this exists for (reproduced against kilo 7.4.16):
 #
 #   1. `tmux send-keys -t <t> "$MSG" Enter` submits short messages but NOT long
 #      ones — kilo's composer reads a large chunk as a paste and swallows the

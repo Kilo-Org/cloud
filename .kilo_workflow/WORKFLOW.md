@@ -77,7 +77,7 @@ Worker roles are steered by re-dispatching them (see Escalation). The interactiv
 printf '%s' "$AMENDMENT" | .kilo_workflow/steer.sh <section>-orchestrator -   # long or multi-line text via stdin
 ```
 
-It prints `running` when the session took the message immediately and `queued` when the message is waiting behind the active turn; either way it is delivered. A non-zero exit means it is **not** delivered — inspect the target rather than sending a second copy. What the script encodes (details in `learnings/steering-a-running-kilo-session.md`):
+It prints `running` when the session took the message immediately and `queued` when the message is waiting behind the active turn; either way it is delivered. A non-zero exit means it is **not** delivered — inspect the target rather than sending a second copy. What the script encodes (details in its header comments):
 
 - Enter as its own keystroke after the text. A trailing `Enter` in the same `send-keys` call submits short messages but is swallowed by long ones, which then sit unsent in the composer — the "wedged" session that is really an undelivered message.
 - Bracketed paste, so a multi-line message stays one prompt. An unbracketed paste submits at every newline, and the first fragment gets acted on before the rest arrives.
@@ -194,7 +194,7 @@ The `orchestrator` agent definition pins the model and permissions, so the launc
 
 After the handoff the planner stops all hands-on work. It has exactly one job — relaunch or unstick the orchestrator when infrastructure fails (a crashed kilo CLI, a dead tmux window, a hung service). Product, logic, design, and review problems are the orchestrator's, handled by its escalation ladder. Check about every 30 minutes; react immediately when the orchestrator's process exits.
 
-A monitor never kills a live dispatch on a judgment call, never edits the worktree, and never writes to another role's dispatch log — a forged `EXITCODE` line corrupts the dispatcher's void-round detection, the exact signal the contract keys on. Before concluding an orchestrator is misbehaving, read its evidence: its pane scrollback (`tmux capture-pane -t <window> -p -S -`), its scratch directory, and the git log. The orchestrator's handoff may route user questions to its own interactive session, so an answer the monitor never saw can exist there (see `learnings/monitor-must-read-orchestrator-scrollback-before-intervening.md`). The only kill-worthy states are the infrastructure failures named above.
+A monitor never kills a live dispatch on a judgment call, never edits the worktree, and never writes to another role's dispatch log — a forged `EXITCODE` line corrupts the dispatcher's void-round detection, the exact signal the contract keys on. Before concluding an orchestrator is misbehaving, read its evidence: its pane scrollback (`tmux capture-pane -t <window> -p -S -`), its scratch directory, and the git log. The orchestrator's handoff may route user questions to its own interactive session, so an answer the monitor never saw can exist there — a monitor once killed a healthy implementer and forged its `EXITCODE` line because it never read the scrollback where the user had already answered. The only kill-worthy states are the infrastructure failures named above.
 
 A dead orchestrator window is not automatically a crash — check the scratch directory:
 

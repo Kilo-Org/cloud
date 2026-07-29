@@ -39,6 +39,6 @@ Escalate to an infrastructure blocker — and never a model substitution — onl
 redispatches keep failing with this signature, which would mean the model really is gone. Three
 consecutive void rounds is the standing threshold.
 
-Related: `kilo-run-crashes-on-credential-write.md` (startup crash, exit 1, credential write),
+Related: `kilo-run-startup-crash-transient.md` (startup crash, exit 1, credential write),
 `kilo-run-exits-0-without-verdict.md` (mid-run stream stall, exit 0). All three are void rounds
 with different causes; only this one is provider-side.

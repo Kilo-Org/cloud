@@ -23,6 +23,3 @@ LocationServicesEnabled -bool false`, then restart the daemon
 `getCurrentPositionAsync` rejects into the same catch a timeout would. Restore with `-bool true` +
 SIGTERM. On-device evidence of the 10 s race itself is not obtainable on a simulator — cover it by
 unit test and record the substitution in the report.
-
-Related: Maestro point taps reject decimal percentages (`NumberFormatException: For input string:
-"34.4"`) — use absolute coordinates ("201,301") or integer percents.

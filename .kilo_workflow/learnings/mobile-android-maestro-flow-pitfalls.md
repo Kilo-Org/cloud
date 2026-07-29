@@ -18,3 +18,7 @@ Cause/fix (three independent traps, all hit in the hermes-mem baseline round):
    `.*isn.t responding.*` → `tapOn: 'Wait'` handler after the launch wait and
    after settle, and 60-120 s waits for list/transcript asserts. `dumpsys
    meminfo` itself can hit its 10 s service timeout under load — retry it.
+
+Screenshots: `adb exec-out screencap -p > "$SCRATCH/shot.png"` writes wherever
+you point it — no `~/.maestro/tests` hunt like on iOS
+(`maestro-takescreenshot-output-dir.md`).

@@ -29,12 +29,6 @@ survives the request-bot-status escalation (e.g. seed the KILOCLAW_INSTANCE DO s
 `bot.status_request`). Report the criterion unverified with evidence; never the tool-card
 viewer as a proxy.
 
-Related (r2 environment incident, corrected by the orchestrator): the seeding phase held an
-e2e slot via a `sleep` placeholder tmux session; the placeholder **died mid-run** (cause
-unidentified), the slot reaper reclaimed the slot for a foreign workflow, and the
-now-uncovered dev stack was later stopped while the verifier's next round was queued.
-Recovery: the r2 verifier re-ran one sanctioned `pnpm dev:start --no-attach mobile
-cloud-agent-next kiloclaw event-service` after acquiring its own slot — ports are
-deterministic per worktree, and miniflare DO state persisted. Orchestrators: keep the
-placeholder slot until ALL rounds finish, and treat a slot-owning placeholder as a monitored
-dispatch — its silent death cascades to the stack it covers.
+If the stack gets stopped out from under a round (a foreign release, a reaped slot), recover
+per `dev-stack-died-mid-round-restart-in-place.md` — DO state persists, so the seeded rows
+survive a restart.

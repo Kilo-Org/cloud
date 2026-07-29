@@ -11,7 +11,6 @@ import {
   ScrollView,
   View,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -185,27 +184,19 @@ export function LoginScreen() {
             <Text className="text-center text-lg">Welcome to Kilo Code</Text>
           </View>
 
-          {/* Nested parent layout + child entering animations parked a remounted
-              branch at ~zero opacity once on iOS (r0 logout→login remount repro);
-              un-nesting is a mechanism-class mitigation for an intermittent
-              defect, not a proven fix. */}
-          <Animated.View className="w-full max-w-sm gap-3">
+          {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
+              iOS logout→login remounts washed out at ~50% alpha for 3+ minutes,
+              recovering only on relaunch — so these branches render without
+              animation; status swaps are instant. */}
+          <View className="w-full max-w-sm gap-3">
             {status === 'idle' && (
-              <Animated.View
-                className="w-full gap-3"
-                entering={FadeIn.duration(200)}
-                exiting={FadeOut.duration(150)}
-              >
+              <View className="w-full gap-3">
                 <IdleAuth start={start} />
-              </Animated.View>
+              </View>
             )}
 
             {status === 'pending' && code && (
-              <Animated.View
-                className="w-full items-center gap-4"
-                entering={FadeIn.duration(200)}
-                exiting={FadeOut.duration(150)}
-              >
+              <View className="w-full items-center gap-4">
                 <Text variant="muted" className="text-center">
                   Your sign-in code:
                 </Text>
@@ -250,15 +241,11 @@ export function LoginScreen() {
                 <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
                   <Text>Cancel</Text>
                 </Button>
-              </Animated.View>
+              </View>
             )}
 
             {status === 'pending' && !code && (
-              <Animated.View
-                className="w-full items-center gap-3"
-                entering={FadeIn.duration(200)}
-                exiting={FadeOut.duration(150)}
-              >
+              <View className="w-full items-center gap-3">
                 <ActivityIndicator size="small" color={colors.mutedForeground} />
                 <Text variant="muted" className="text-center">
                   Starting sign in...
@@ -266,22 +253,18 @@ export function LoginScreen() {
                 <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
                   <Text>Cancel</Text>
                 </Button>
-              </Animated.View>
+              </View>
             )}
 
             {(status === 'denied' || status === 'expired' || status === 'error') && (
-              <Animated.View
-                className="w-full gap-3"
-                entering={FadeIn.duration(200)}
-                exiting={FadeOut.duration(150)}
-              >
+              <View className="w-full gap-3">
                 <Text className="text-center text-sm text-destructive">
                   {errorMessage(status, error)}
                 </Text>
                 <IdleAuth start={start} />
-              </Animated.View>
+              </View>
             )}
-          </Animated.View>
+          </View>
         </ScrollView>
       </View>
     </KeyboardAvoidingView>

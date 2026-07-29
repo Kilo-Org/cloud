@@ -126,9 +126,9 @@ describe('getDirectByokModel', () => {
     const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
     const { getModelVariants } = await import('@/lib/ai-gateway/providers/model-settings');
     const fallback = { thinking: { reasoning: { enabled: true, effort: 'high' as const } } };
-    jest.mocked(getBYOKforUser).mockResolvedValueOnce([
-      { providerId: 'chutes-byok', decryptedAPIKey: 'test-key' },
-    ]);
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
     jest.mocked(getModelVariants).mockReturnValue(fallback);
 
     const models = await getDirectByokModelsForUser('user-id');

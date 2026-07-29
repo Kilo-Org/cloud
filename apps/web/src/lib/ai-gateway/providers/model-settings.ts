@@ -105,12 +105,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isKimiModel(model)) {
     return REASONING_VARIANTS_MAX_HIGH_LOW;
   }
-  if (
-    isMinimaxModel(model) ||
-    isGrok42Model(model) ||
-    isQwenModel(model) ||
-    isGemmaModel(model)
-  ) {
+  if (isMinimaxModel(model) || isGrok42Model(model) || isQwenModel(model) || isGemmaModel(model)) {
     return REASONING_VARIANTS_BINARY;
   }
   if (model === seed_20_code_free_model.public_id) {

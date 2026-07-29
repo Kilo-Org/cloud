@@ -136,10 +136,6 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
   return model.status !== 'disabled' || model.pricing === null;
 }
 
-const unavailableModels = [
-  'sakana/fugu', // this model is not available in the EU
-];
-
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
@@ -152,8 +148,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
           !isForbiddenFreeModel(model.id) &&
-          !model.id.endsWith(':batch') &&
-          !unavailableModels.some(unavailableId => model.id.includes(unavailableId))
+          !model.id.endsWith(':batch')
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);

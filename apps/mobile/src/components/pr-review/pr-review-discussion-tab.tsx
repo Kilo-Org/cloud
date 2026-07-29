@@ -95,6 +95,7 @@ export function PrReviewDiscussionTab({
     });
 
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
+  const [suppressContentPosition, setSuppressContentPosition] = useState(false);
   const expansionRef = useRef(expansion);
   const listRef = useRef<FlashListRef<DiscussionListItem>>(null);
   const settleGenerationRef = useRef(0);
@@ -172,7 +173,21 @@ export function PrReviewDiscussionTab({
           });
           if (settleGenerationRef.current === generation) {
             settleThreadIdRef.current = null;
+            // Suppress maintainVisibleContentPosition for exactly the expand
+            // commit. Measured across E2E rounds r1-r4: every top-clipped
+            // flight equals the expansion height — the post-expand native
+            // mVCP adjustment, not a settle-target error. The settle only
+            // has to make the row fully visible; with mVCP disabled at this
+            // one commit the +expansion-height adjustment cannot fire,
+            // whatever the anchor-boundary geometry (Android parks nearer
+            // the visible edge than iOS). Re-enabled on a timeout; the
+            // load-more insertion protection (why mVCP stays on for this
+            // list) is unaffected outside this ~150ms window.
+            setSuppressContentPosition(true);
             applyExpansion(expandThread(expansionRef.current, thread.threadId));
+            setTimeout(() => {
+              setSuppressContentPosition(false);
+            }, 150);
           }
         })();
         return;
@@ -272,6 +287,7 @@ export function PrReviewDiscussionTab({
       listItems={listItems}
       listRef={listRef}
       expansion={expansion}
+      suppressContentPosition={suppressContentPosition}
       onToggleExpand={handleToggleExpand}
       onScrollBeginDrag={invalidateSettle}
       hasNextPage={query.hasNextPage}

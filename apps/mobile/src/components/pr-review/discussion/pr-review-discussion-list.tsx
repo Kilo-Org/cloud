@@ -28,6 +28,7 @@ type PrReviewDiscussionListProps = {
   readonly listItems: readonly DiscussionListItem[];
   readonly listRef: RefObject<FlashListRef<DiscussionListItem> | null>;
   readonly expansion: Record<string, boolean>;
+  readonly suppressContentPosition: boolean;
   readonly onToggleExpand: (thread: ReviewThread, index: number) => void;
   readonly onScrollBeginDrag: () => void;
   readonly hasNextPage: boolean;
@@ -44,6 +45,7 @@ export function PrReviewDiscussionList({
   listItems,
   listRef,
   expansion,
+  suppressContentPosition,
   onToggleExpand,
   onScrollBeginDrag,
   hasNextPage,
@@ -60,6 +62,9 @@ export function PrReviewDiscussionList({
       keyExtractor={keyForItem}
       getItemType={item => item.kind}
       onScrollBeginDrag={onScrollBeginDrag}
+      // Stays enabled (load-more inserts rows mid-list); the tab disables it
+      // only for the exact commit of a deferred expand — see its comment.
+      maintainVisibleContentPosition={{ disabled: suppressContentPosition }}
       renderItem={({ item, index }) => {
         if (item.kind === 'comment') {
           return (

@@ -162,17 +162,32 @@ describe('parseNvidiaProviderModels', () => {
     ]);
   });
 
-  test('maps documented reasoning efforts into model metadata', () => {
-    const efforts = {
-      'nvidia/nemotron-3-super-120b-a12b': ['none', 'low', 'high'],
-      'nvidia/nemotron-3-ultra-550b-a55b': ['none', 'medium', 'high'],
+  test('maps models.dev effort options into model metadata', () => {
+    const reasoningOptions = {
+      'nvidia/nemotron-3-super-120b-a12b': { type: 'toggle' },
+      'nvidia/nemotron-3-ultra-550b-a55b': { type: 'toggle' },
+      'deepseek-ai/deepseek-v4-flash': {
+        type: 'effort',
+        values: ['none', 'high', 'max', 'default', null, 'unsupported'],
+      },
+      'deepseek-ai/deepseek-v4-pro': { type: 'effort', values: ['none', 'high', 'max'] },
+      'openai/gpt-oss-20b': { type: 'effort', values: ['low', 'medium', 'high'] },
+      'openai/gpt-oss-120b': { type: 'effort', values: ['low', 'medium', 'high'] },
+    };
+    const expectedVariants = {
+      'nvidia/nemotron-3-super-120b-a12b': [],
+      'nvidia/nemotron-3-ultra-550b-a55b': [],
       'deepseek-ai/deepseek-v4-flash': ['none', 'high', 'max'],
       'deepseek-ai/deepseek-v4-pro': ['none', 'high', 'max'],
       'openai/gpt-oss-20b': ['low', 'medium', 'high'],
       'openai/gpt-oss-120b': ['low', 'medium', 'high'],
     };
-    const ids = Object.keys(efforts);
-    const models = Object.fromEntries(ids.map(id => [id, model(id)]));
+    const models = Object.fromEntries(
+      Object.entries(reasoningOptions).map(([id, option]) => [
+        id,
+        model(id, { reasoning_options: [option] }),
+      ])
+    );
     const synced = parseNvidiaProviderModels({ models }).map(item => ({
       ...item,
       name: item.name ?? item.id,
@@ -183,7 +198,11 @@ describe('parseNvidiaProviderModels', () => {
 
     expect(
       Object.fromEntries(parsed.map(item => [item.id, Object.keys(item.variants ?? {})]))
-    ).toEqual(efforts);
-    expect(parsed.every(item => item.supported_parameters?.includes('reasoning'))).toBe(true);
+    ).toEqual(expectedVariants);
+    for (const item of parsed) {
+      expect(item.supported_parameters?.includes('reasoning')).toBe(
+        expectedVariants[item.id as keyof typeof expectedVariants].length > 0
+      );
+    }
   });
 });

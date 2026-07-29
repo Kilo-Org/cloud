@@ -2,8 +2,8 @@ import * as z from 'zod';
 import { type DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { redisClient } from '@/lib/redis';
-import { getNvidiaReasoningEfforts } from '@/lib/ai-gateway/providers/nvidia';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
+import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -43,11 +43,21 @@ const ModelsDevModelSchema = z.object({
     })
     .optional(),
   tool_call: z.boolean().optional(),
+  reasoning_options: z
+    .array(
+      z.object({
+        type: z.string(),
+        values: z.array(z.unknown()).optional(),
+      })
+    )
+    .optional(),
 });
 
 const ModelsDevProviderSchema = z.object({
   models: z.record(z.string(), ModelsDevModelSchema),
 });
+
+type ModelsDevModel = z.infer<typeof ModelsDevModelSchema>;
 
 const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
 
@@ -129,6 +139,23 @@ export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
     }));
 }
 
+function getModelsDevReasoningVariants(
+  model: ModelsDevModel
+): NonNullable<DirectByokModel['variants']> {
+  const effortValues = model.reasoning_options?.find(option => option.type === 'effort')?.values;
+  if (effortValues) {
+    return Object.fromEntries(
+      effortValues.flatMap(value => {
+        const effort = ReasoningEffortSchema.safeParse(value);
+        return effort.success
+          ? [[effort.data, { reasoning: { enabled: effort.data !== 'none', effort: effort.data } }]]
+          : [];
+      })
+    );
+  }
+  return {};
+}
+
 export function parseNvidiaProviderModels(entry: unknown): RawModel[] {
   const provider = ModelsDevProviderSchema.parse(entry);
 
@@ -141,7 +168,7 @@ export function parseNvidiaProviderModels(entry: unknown): RawModel[] {
         model.modalities?.output?.includes('text') === true
     )
     .map(model => {
-      const reasoningEfforts = getNvidiaReasoningEfforts(model.id);
+      const variants = getModelsDevReasoningVariants(model);
       return {
         id: model.id,
         name: shortenDisplayName(model.name),
@@ -152,14 +179,9 @@ export function parseNvidiaProviderModels(entry: unknown): RawModel[] {
           'max_tokens',
           'temperature',
           'tools',
-          ...(reasoningEfforts ? ['reasoning'] : []),
+          ...(Object.keys(variants).length > 0 ? ['reasoning'] : []),
         ],
-        variants: Object.fromEntries(
-          (reasoningEfforts ?? []).map(effort => [
-            effort,
-            { reasoning: { enabled: effort !== 'none', effort } },
-          ])
-        ),
+        variants,
       };
     });
 }

@@ -1,6 +1,6 @@
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
-import { getNvidiaReasoningEfforts } from '@/lib/ai-gateway/providers/nvidia';
+import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 
 export default {
   id: 'nvidia-byok',
@@ -13,20 +13,13 @@ export default {
       return;
     }
 
-    const model = request.body.model;
-    const reasoningEfforts = getNvidiaReasoningEfforts(model);
-    if (reasoningEfforts) {
-      const requestedEffort =
-        request.body.reasoning?.enabled === false
-          ? 'none'
-          : (request.body.reasoning_effort ?? request.body.reasoning?.effort);
-      const supportedEffort = reasoningEfforts.find(effort => effort === requestedEffort);
-
-      if (supportedEffort) {
-        (request.body as { reasoning_effort?: string }).reasoning_effort = supportedEffort;
-      } else {
-        delete request.body.reasoning_effort;
-      }
+    const reasoningEffort =
+      request.body.reasoning?.enabled === false
+        ? 'none'
+        : (request.body.reasoning_effort ?? request.body.reasoning?.effort);
+    const parsedReasoningEffort = ReasoningEffortSchema.safeParse(reasoningEffort);
+    if (parsedReasoningEffort.success) {
+      (request.body as { reasoning_effort?: string }).reasoning_effort = parsedReasoningEffort.data;
     } else {
       delete request.body.reasoning_effort;
     }

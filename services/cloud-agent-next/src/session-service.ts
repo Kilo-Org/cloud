@@ -1819,9 +1819,19 @@ export class SessionService {
           repositoryUrl: git.url,
         });
         if (!result.success) {
-          throw ExecutionError.workspaceSetupFailed(
-            `Bitbucket session capability issuance failed (${result.reason})`
-          );
+          // Mirror the non-containment branch: fail fast (non-retryable) with an
+          // actionable message for permanent, user-fixable reasons; only retry
+          // transient ones. capability_configuration_error is a server-side
+          // misconfiguration, treated as transient like service_not_configured.
+          const reconnect = result.reason === 'reconnect_required' ? ' Reconnect Bitbucket.' : '';
+          const message = `Bitbucket session capability issuance failed (${result.reason}).${reconnect}`;
+          if (
+            result.reason === 'capability_configuration_error' ||
+            isTemporaryManagedBitbucketTokenFailure(result.reason)
+          ) {
+            throw ExecutionError.workspaceSetupFailed(message);
+          }
+          throw ExecutionError.invalidRequest(message);
         }
         gitToken = result.value.capability;
         bitbucketTokenManaged = true;

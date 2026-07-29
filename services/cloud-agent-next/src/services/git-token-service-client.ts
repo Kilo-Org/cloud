@@ -363,7 +363,10 @@ export async function issueCloudAgentBitbucketSessionCapability(
   }
 ): Promise<
   | { success: true; value: ResolvedCloudAgentBitbucketCapability }
-  | { success: false; reason: string }
+  | {
+      success: false;
+      reason: ManagedBitbucketTokenFailureReason | 'capability_configuration_error';
+    }
 > {
   if (!env.GIT_TOKEN_SERVICE?.issueBitbucketSessionCapability) {
     return { success: false, reason: 'service_not_configured' };

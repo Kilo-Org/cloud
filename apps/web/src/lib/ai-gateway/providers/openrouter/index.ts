@@ -132,6 +132,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
           !isForbiddenFreeModel(model.id) &&
+          !model.id.endsWith(':batch') &&
           !unavailableModels.some(unavailableId => model.id.includes(unavailableId))
       )
       .map(model => {

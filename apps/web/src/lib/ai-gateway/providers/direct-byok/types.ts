@@ -3,7 +3,7 @@ import type { DirectByokProviderMetaId } from '@/lib/ai-gateway/providers/direct
 import type { GatewayChatApiKind, TransformRequestContext } from '@/lib/ai-gateway/providers/types';
 import type { CustomLlmProvider } from '@kilocode/db';
 
-export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision']);
+export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 

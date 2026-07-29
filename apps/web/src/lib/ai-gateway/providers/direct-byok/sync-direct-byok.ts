@@ -6,8 +6,16 @@ import {
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
-import { ReasoningEffortSchema, type OpenCodeSettings } from '@kilocode/db/schema-types';
-import { REASONING_VARIANTS_BINARY } from '@/lib/ai-gateway/providers/model-settings';
+import {
+  ReasoningEffortSchema,
+  VerbositySchema,
+  type OpenCodeSettings,
+} from '@kilocode/db/schema-types';
+import {
+  getAiSdkProvider,
+  getModelVariants,
+  REASONING_VARIANTS_BINARY,
+} from '@/lib/ai-gateway/providers/model-settings';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -153,8 +161,23 @@ function modelsDevReasoningOptionsToVariants(
   return undefined;
 }
 
+function addAnthropicVariantVerbosity(
+  variants: OpenCodeSettings['variants'],
+  aiSdkProvider: OpenCodeSettings['ai_sdk_provider']
+): OpenCodeSettings['variants'] {
+  if (aiSdkProvider !== 'anthropic' || !variants) return variants;
+
+  return Object.fromEntries(
+    Object.entries(variants).map(([name, variant]) => {
+      const verbosity = VerbositySchema.safeParse(variant.reasoning?.effort);
+      return [name, verbosity.success ? { ...variant, verbosity: verbosity.data } : variant];
+    })
+  );
+}
+
 export function parseModelsDevProviderModels(
   entry: unknown,
+  providerId: DirectUserByokInferenceProviderId,
   availableModelIds?: ReadonlySet<string>
 ): RawModel[] {
   const provider = ModelsDevProviderSchema.parse(entry);
@@ -165,15 +188,22 @@ export function parseModelsDevProviderModels(
         (!model.modalities?.output || model.modalities.output.includes('text')) &&
         (!availableModelIds || availableModelIds.has(model.id))
     )
-    .map(model => ({
-      id: model.id,
-      name: shortenDisplayName(model.name),
-      context_length: model.limit?.context,
-      max_completion_tokens: model.limit?.output,
-      input_modalities: model.modalities?.input,
-      flags: model.reasoning ? ['reasoning'] : undefined,
-      variants: modelsDevReasoningOptionsToVariants(model.reasoning_options ?? []),
-    }));
+    .map(model => {
+      const modelId = `${providerId}/${model.id}`.toLowerCase();
+      const aiSdkProvider = getAiSdkProvider(modelId, providerId);
+      const variants =
+        modelsDevReasoningOptionsToVariants(model.reasoning_options ?? []) ??
+        getModelVariants(modelId);
+      return {
+        id: model.id,
+        name: shortenDisplayName(model.name),
+        context_length: model.limit?.context,
+        max_completion_tokens: model.limit?.output,
+        input_modalities: model.modalities?.input,
+        flags: model.reasoning ? ['reasoning'] : undefined,
+        variants: addAnthropicVariantVerbosity(variants, aiSdkProvider),
+      };
+    });
 }
 
 function modelsDevFetcher(
@@ -190,7 +220,7 @@ function modelsDevFetcher(
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
       }
       if (!availableModelsUrl) {
-        return parseModelsDevProviderModels(entry);
+        return parseModelsDevProviderModels(entry, providerId);
       }
       const response = await fetch(availableModelsUrl);
       if (!response.ok) {
@@ -203,7 +233,7 @@ function modelsDevFetcher(
           model => model.id
         )
       );
-      return parseModelsDevProviderModels(entry, availableModelIds);
+      return parseModelsDevProviderModels(entry, providerId, availableModelIds);
     },
   };
 }

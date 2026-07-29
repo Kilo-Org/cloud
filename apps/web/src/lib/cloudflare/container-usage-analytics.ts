@@ -46,7 +46,6 @@ export type ContainerUsageAnalyticsRawResponse = {
 export type ContainerUsageAnalyticsRow = {
   applicationId: string;
   instanceId: string;
-  hasUsage: true;
   usage: {
     cpuTimeSec: number;
     allocatedMemory: number;
@@ -228,6 +227,7 @@ async function postGraphql(args: {
   variables: Record<string, unknown>;
   retainedBytes: { value: number };
 }): Promise<unknown> {
+  // Error messages must never include the bearer token, response body, or request headers.
   let response: Response;
   try {
     response = await args.fetchImpl(GRAPHQL_URL, {
@@ -411,6 +411,9 @@ export async function queryContainerUsageAnalytics(
   }
 
   const timeWindows = windows(effectiveStartMs, endMs, settings.maxDuration);
+  // Leave one row of headroom: one row per requested ID is complete, while a full
+  // page means an extra application row may have truncated the response. A complete
+  // multi-application ID can therefore be conservatively marked partial.
   const idBatches = batches(
     instanceIds,
     Math.min(MAX_INSTANCE_BATCH_SIZE, settings.maxPageSize - 1)
@@ -481,7 +484,6 @@ export async function queryContainerUsageAnalytics(
           rows.set(key, {
             applicationId: group.dimensions.applicationId,
             instanceId: group.dimensions.instanceId,
-            hasUsage: true,
             usage: { ...group.sum },
           });
         }

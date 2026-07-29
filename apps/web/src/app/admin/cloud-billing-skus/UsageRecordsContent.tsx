@@ -28,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useTRPC } from '@/lib/trpc/utils';
+import type { ReconciliationStatus } from '@/routers/admin/cloud-billing-skus-router';
 
 type SearchKind = 'interval' | 'user' | 'org';
 type CloseReason =
@@ -78,7 +79,11 @@ function formatProviderNumber(value: number | null): string {
     : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-function reconciliationStatusLabel(status: string): string {
+function assertNever(value: never): never {
+  throw new Error(`Unexpected reconciliation status: ${value}`);
+}
+
+function reconciliationStatusLabel(status: ReconciliationStatus): string {
   switch (status) {
     case 'matched':
       return 'Matched';
@@ -88,17 +93,42 @@ function reconciliationStatusLabel(status: string): string {
       return 'Ambiguous application';
     case 'provider_partial':
       return 'Provider partial';
-    default:
+    case 'comparison_unavailable':
       return 'Comparison unavailable';
   }
+  return assertNever(status);
 }
 
-function reconciliationStatusVariant(status: string) {
-  if (status === 'matched') return 'new' as const;
-  if (status === 'missing_from_cloudflare') return 'destructive' as const;
-  if (status === 'ambiguous_application') return 'beta' as const;
-  if (status === 'provider_partial') return 'secondary-outline' as const;
-  return 'secondary' as const;
+function reconciliationStatusVariant(status: ReconciliationStatus) {
+  switch (status) {
+    case 'matched':
+      return 'new' as const;
+    case 'missing_from_cloudflare':
+      return 'destructive' as const;
+    case 'ambiguous_application':
+      return 'beta' as const;
+    case 'provider_partial':
+      return 'secondary-outline' as const;
+    case 'comparison_unavailable':
+      return 'secondary' as const;
+  }
+  return assertNever(status);
+}
+
+function sameSummaryRequest(
+  first: UsageSummaryRequest | null | undefined,
+  second: UsageSummaryRequest | null | undefined
+): boolean {
+  return (
+    first !== null &&
+    first !== undefined &&
+    second !== null &&
+    second !== undefined &&
+    first.subjectType === second.subjectType &&
+    first.subjectId === second.subjectId &&
+    first.start === second.start &&
+    first.end === second.end
+  );
 }
 
 function formatDifference(seconds: number | null, percent: number | null): string {
@@ -303,9 +333,15 @@ export default function UsageRecordsContent() {
     ),
     enabled: summaryRequest !== null,
   });
+  // This read is intentionally imperative: Cloudflare must only be queried after an admin click.
   const reconciliation = useMutation(
     trpc.admin.cloudBillingSkus.reconcileUsageWithCloudflare.mutationOptions()
   );
+  const resetReconciliation = reconciliation.reset;
+  const reconciliationMatchesSummary = sameSummaryRequest(reconciliation.variables, summaryRequest);
+  const reconciliationErrorCode = reconciliation.error?.data?.code;
+  const reconciliationCanRetry =
+    reconciliationErrorCode !== 'BAD_REQUEST' && reconciliationErrorCode !== 'PRECONDITION_FAILED';
   const rows = results.data?.items ?? [];
 
   const resetResultNavigation = () => {
@@ -333,6 +369,12 @@ export default function UsageRecordsContent() {
     });
     resetResultNavigation();
   }, [urlCloseReason]);
+
+  useEffect(() => {
+    resetReconciliation();
+    setRawResponseOpen(false);
+    setRawCopyStatus('idle');
+  }, [summaryRequest, resetReconciliation]);
 
   return (
     <div className="space-y-6">
@@ -728,25 +770,27 @@ export default function UsageRecordsContent() {
                   </Button>
                 </div>
 
-                {reconciliation.isError && (
+                {reconciliationMatchesSummary && reconciliation.isError && (
                   <Alert variant="destructive">
                     <AlertTitle>Cloudflare reconciliation could not be completed</AlertTitle>
                     <AlertDescription className="space-y-3">
                       <p>{reconciliation.error.message}</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={reconciliation.isPending}
-                        onClick={() => reconciliation.mutate(summaryRequest)}
-                      >
-                        Retry reconciliation
-                      </Button>
+                      {reconciliationCanRetry && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={reconciliation.isPending}
+                          onClick={() => reconciliation.mutate(summaryRequest)}
+                        >
+                          Retry reconciliation
+                        </Button>
+                      )}
                     </AlertDescription>
                   </Alert>
                 )}
 
-                {reconciliation.isSuccess && (
+                {reconciliationMatchesSummary && reconciliation.isSuccess && (
                   <div className="space-y-4" aria-live="polite">
                     {reconciliation.data.rows.length === 0 ? (
                       <p className="text-muted-foreground type-body">
@@ -842,7 +886,9 @@ export default function UsageRecordsContent() {
                             </TableHeader>
                             <TableBody>
                               {reconciliation.data.rows.map(row => (
-                                <TableRow key={`${row.instanceId}:${row.services.join(',')}`}>
+                                <TableRow
+                                  key={`${row.providerInstanceId ?? 'unmapped'}:${row.meterInstanceIds.join(',')}:${row.services.join(',')}`}
+                                >
                                   <TableCell>
                                     <code className="block max-w-56 break-all type-code">
                                       {row.instanceId}
@@ -905,7 +951,13 @@ export default function UsageRecordsContent() {
                         </div>
 
                         {reconciliation.data.provider.rawResponses.length > 0 && (
-                          <Collapsible open={rawResponseOpen} onOpenChange={setRawResponseOpen}>
+                          <Collapsible
+                            open={rawResponseOpen}
+                            onOpenChange={open => {
+                              setRawResponseOpen(open);
+                              setRawCopyStatus('idle');
+                            }}
+                          >
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                               <CollapsibleTrigger asChild>
                                 <Button type="button" variant="outline" size="sm">

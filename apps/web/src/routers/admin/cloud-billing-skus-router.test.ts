@@ -528,7 +528,6 @@ describe('admin.cloudBillingSkus usage records', () => {
           applicationId:
             instanceId === 'cloud-physical-id' ? 'observed-cloud-app' : 'observed-gastown-app',
           instanceId,
-          hasUsage: true,
           usage: {
             cpuTimeSec: instanceId === 'cloud-physical-id' ? 3 : 4,
             allocatedMemory: 12 * 1024 ** 3 * 30,
@@ -653,19 +652,16 @@ describe('admin.cloudBillingSkus usage records', () => {
           {
             applicationId: 'app-gastown',
             instanceId: 'ambiguous-id',
-            hasUsage: true,
             usage: { cpuTimeSec: 1, allocatedMemory: 2, allocatedDisk: 3, txBytes: 4 },
           },
           {
             applicationId: 'app-other',
             instanceId: 'ambiguous-id',
-            hasUsage: true,
             usage: { cpuTimeSec: 10, allocatedMemory: 20, allocatedDisk: 30, txBytes: 40 },
           },
           {
             applicationId: 'app-gastown',
             instanceId: 'partial-id',
-            hasUsage: true,
             usage: { cpuTimeSec: 0, allocatedMemory: 0, allocatedDisk: 0, txBytes: 0 },
           },
         ],
@@ -766,7 +762,6 @@ describe('admin.cloudBillingSkus usage records', () => {
         {
           applicationId: 'app-gastown',
           instanceId: 'capacity-instance',
-          hasUsage: true,
           usage: {
             cpuTimeSec: 1,
             allocatedMemory: 12 * 1024 ** 3 * 10,

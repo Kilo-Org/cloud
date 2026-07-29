@@ -203,7 +203,7 @@ function postgresErrorCode(error: unknown): string | undefined {
   return undefined;
 }
 
-type ReconciliationStatus =
+export type ReconciliationStatus =
   | 'matched'
   | 'missing_from_cloudflare'
   | 'ambiguous_application'
@@ -272,6 +272,22 @@ function provisionedCapacityForService(service: string): ProvisionedCapacity | n
     default:
       return null;
   }
+}
+
+function sharedProvisionedCapacity(services: Set<string>): ProvisionedCapacity | null {
+  let shared: ProvisionedCapacity | null = null;
+  for (const service of services) {
+    const capacity = provisionedCapacityForService(service);
+    if (!capacity) return null;
+    if (
+      shared &&
+      (shared.memoryBytes !== capacity.memoryBytes || shared.diskBytes !== capacity.diskBytes)
+    ) {
+      return null;
+    }
+    shared = capacity;
+  }
+  return shared;
 }
 
 function addMeterReconciliationRow(
@@ -343,7 +359,7 @@ function normalizedReconciliationRows(
     const providerApplicationIds = candidates.map(candidate => candidate.applicationId).sort();
     let status: ReconciliationStatus;
     let statusDetail: string;
-    let matchedProvider = null as ContainerUsageAnalyticsResult['rows'][number] | null;
+    let matchedProvider: ContainerUsageAnalyticsResult['rows'][number] | null = null;
     let providerComparisonSeconds: number | null = null;
     let providerMemorySeconds: number | null = null;
     let providerDiskSeconds: number | null = null;
@@ -365,36 +381,23 @@ function normalizedReconciliationRows(
       status = 'ambiguous_application';
       statusDetail = 'Multiple Cloudflare applications returned this physical instance ID.';
     } else if (
-      !candidates[0]?.hasUsage ||
-      (meter.providerInstanceId !== null && partialUsageInstanceIds.has(meter.providerInstanceId))
+      meter.providerInstanceId !== null &&
+      partialUsageInstanceIds.has(meter.providerInstanceId)
     ) {
       status = 'provider_partial';
       statusDetail = 'Cloudflare returned only part of the required provider data.';
     } else {
       matchedProvider = candidates[0] ?? null;
-      const provisionedCapacities = [
-        ...new Set(
-          [...meter.services]
-            .map(provisionedCapacityForService)
-            .filter((value): value is ProvisionedCapacity => value !== null)
-            .map(value => `${value.memoryBytes}:${value.diskBytes}`)
-        ),
-      ];
-      const [memoryBytesValue, diskBytesValue] = provisionedCapacities[0]
-        ?.split(':')
-        .map(Number) ?? [undefined, undefined];
-      if (
-        provisionedCapacities.length !== 1 ||
-        memoryBytesValue === undefined ||
-        diskBytesValue === undefined
-      ) {
+      const provisionedCapacity = sharedProvisionedCapacity(meter.services);
+      if (!provisionedCapacity) {
         status = 'comparison_unavailable';
         statusDetail = 'The recorded service has no single verified provisioned-capacity mapping.';
       } else {
-        provisionedMemoryBytes = memoryBytesValue;
-        provisionedDiskBytes = diskBytesValue;
-        providerMemorySeconds = matchedProvider.usage.allocatedMemory / memoryBytesValue;
-        providerDiskSeconds = matchedProvider.usage.allocatedDisk / diskBytesValue;
+        provisionedMemoryBytes = provisionedCapacity.memoryBytes;
+        provisionedDiskBytes = provisionedCapacity.diskBytes;
+        providerMemorySeconds =
+          matchedProvider.usage.allocatedMemory / provisionedCapacity.memoryBytes;
+        providerDiskSeconds = matchedProvider.usage.allocatedDisk / provisionedCapacity.diskBytes;
         const capacityCrossCheckDifference = Math.abs(providerMemorySeconds - providerDiskSeconds);
         const capacityCrossCheckScale = Math.max(1, providerMemorySeconds, providerDiskSeconds);
         if (
@@ -432,14 +435,10 @@ function normalizedReconciliationRows(
       provisionedDiskBytes,
       differenceSeconds,
       differencePercent,
-      providerCpuTimeSec: matchedProvider?.hasUsage ? matchedProvider.usage.cpuTimeSec : null,
-      providerAllocatedMemoryByteSeconds: matchedProvider?.hasUsage
-        ? matchedProvider.usage.allocatedMemory
-        : null,
-      providerAllocatedDiskByteSeconds: matchedProvider?.hasUsage
-        ? matchedProvider.usage.allocatedDisk
-        : null,
-      providerTxBytes: matchedProvider?.hasUsage ? matchedProvider.usage.txBytes : null,
+      providerCpuTimeSec: matchedProvider?.usage.cpuTimeSec ?? null,
+      providerAllocatedMemoryByteSeconds: matchedProvider?.usage.allocatedMemory ?? null,
+      providerAllocatedDiskByteSeconds: matchedProvider?.usage.allocatedDisk ?? null,
+      providerTxBytes: matchedProvider?.usage.txBytes ?? null,
       status,
       statusDetail,
     };

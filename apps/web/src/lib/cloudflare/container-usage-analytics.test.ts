@@ -132,7 +132,6 @@ describe('queryContainerUsageAnalytics', () => {
       {
         applicationId: 'observed-app',
         instanceId: 'instance-1',
-        hasUsage: true,
         usage: providerRow.sum,
       },
     ]);

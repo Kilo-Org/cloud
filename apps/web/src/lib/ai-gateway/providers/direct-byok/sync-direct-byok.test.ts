@@ -134,7 +134,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
-        variants: undefined,
+        variants: {},
       },
       {
         id: 'unknown-status',
@@ -143,7 +143,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
-        variants: undefined,
+        variants: {},
       },
     ]);
   });

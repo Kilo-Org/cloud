@@ -132,12 +132,10 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
 
 function modelsDevReasoningOptionsToVariants(
   options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>> | undefined
-): OpenCodeSettings['variants'] {
-  if (!options) return undefined;
-
-  const hasToggle = options.some(option => option.type === 'toggle');
+): NonNullable<OpenCodeSettings['variants']> {
+  const hasToggle = options?.some(option => option.type === 'toggle') ?? false;
   const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};
-  for (const option of options) {
+  for (const option of options ?? []) {
     if (option.type !== 'effort') continue;
     for (const value of option.values) {
       const effort = ReasoningEffortSchema.safeParse(value);
@@ -159,7 +157,7 @@ function modelsDevReasoningOptionsToVariants(
       thinking: { reasoning: { enabled: true, effort: 'high' } },
     };
   }
-  return undefined;
+  return {};
 }
 
 export function parseModelsDevProviderModels(

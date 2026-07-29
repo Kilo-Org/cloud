@@ -199,6 +199,8 @@ export function BeadBoard({
   selectedBeadId,
   agentNameById,
 }: BeadBoardProps) {
+  const shouldReduce = useReducedMotion();
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
@@ -214,8 +216,6 @@ export function BeadBoard({
       </div>
     );
   }
-
-  const shouldReduce = useReducedMotion();
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">

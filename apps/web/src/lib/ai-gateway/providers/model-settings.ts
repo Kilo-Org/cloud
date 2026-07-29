@@ -17,7 +17,6 @@ import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
-import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
 
 const REASONING_VARIANTS_THINKING_ONLY = {
   thinking: { reasoning: { enabled: true, effort: 'high' } },
@@ -136,10 +135,7 @@ export function getAiSdkProvider(
   model: string,
   directProviderId: DirectUserByokInferenceProviderId | null
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
-  if (
-    seed_20_code_free_model.public_id === model ||
-    kat_coder_pro_v2_5_free_model.public_id === model
-  ) {
+  if (seed_20_code_free_model.public_id === model) {
     return 'openai-compatible';
   }
   if (directProviderId === 'morph-byok') {

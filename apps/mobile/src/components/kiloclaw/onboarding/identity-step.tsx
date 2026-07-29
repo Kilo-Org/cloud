@@ -206,8 +206,10 @@ export function IdentityStep({
           status: 'error',
         });
       }
-    } catch (error) {
-      Sentry.captureException(error);
+    } catch {
+      // Expected user-environment outcomes (GPS timeout, location services off,
+      // permission failure). The user is told via locationFeedback below, and
+      // there is nothing a developer could act on, so nothing is reported.
       setLocationFeedback({
         message: 'Could not get your location. Enter it manually.',
         status: 'error',

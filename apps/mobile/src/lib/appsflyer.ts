@@ -76,17 +76,13 @@ async function settlePurchaseConnectorCreate(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-function -- AppsFlyer SDK requires a success callback
+// eslint-disable-next-line @typescript-eslint/no-empty-function -- AppsFlyer SDK callbacks are required arguments
 function noop() {}
 
 function drainPendingEvents() {
   for (const event of pendingEvents) {
-    appsFlyer.logEvent(
-      event.name,
-      event.values,
-      noop,
-      handleError(`AppsFlyer event "${event.name}" failed`)
-    );
+    // Error callback is `noop` for the same reason as in trackEvent below.
+    appsFlyer.logEvent(event.name, event.values, noop, noop);
   }
   pendingEvents.length = 0;
 }
@@ -150,5 +146,10 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
     return;
   }
 
-  appsFlyer.logEvent(name, eventValues, noop, handleError(`AppsFlyer event "${name}" failed`));
+  // A logEvent delivery failure is a transport failure (offline, DNS-blocked,
+  // ad-blocker, corporate proxy) that the SDK retries itself and no developer
+  // can act on, so it is not reported. Actionable AppsFlyer failures — a bad
+  // dev key or app id, or a broken purchase connector — still reach Sentry
+  // through initSdk's and the connector's error callbacks.
+  appsFlyer.logEvent(name, eventValues, noop, noop);
 }

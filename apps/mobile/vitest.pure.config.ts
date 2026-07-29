@@ -29,6 +29,7 @@ export default defineProject({
       'src/lib/voice-input/**/*.test.ts',
       'src/components/**/*.test.ts',
       'src/components/pr-review/**/*.test.tsx',
+      'src/components/kiloclaw/**/*.test.tsx',
     ],
   },
 });

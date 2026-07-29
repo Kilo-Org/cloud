@@ -84,6 +84,14 @@ function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricin
   };
 }
 
+export function applyCustomPricingToPricing(
+  modelId: string,
+  pricing: OpenRouterModel['pricing']
+): OpenRouterModel['pricing'] {
+  const customPricing = getCustomPricing(modelId);
+  return customPricing ? applyPricing(pricing, customPricing.pricing[0].pricing) : pricing;
+}
+
 export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
   const customPricing = getCustomPricing(model.id);
   if (!customPricing) return model;

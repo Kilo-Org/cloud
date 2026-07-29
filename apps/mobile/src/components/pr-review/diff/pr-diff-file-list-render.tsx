@@ -18,6 +18,7 @@ import {
   HunkSideBySideHeader,
   SideBySideRow,
 } from '@/components/pr-review/diff/pr-diff-side-by-side-row';
+import { collapseOnMarkViewed } from '@/lib/pr-review/diff/collapse-on-mark-viewed';
 import { type ExpandSeparatorItem, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { sideForDiffLineType } from '@/lib/pr-review/diff-selection';
@@ -89,6 +90,7 @@ export function useDiffRenderItem({
               }}
               onToggleViewed={() => {
                 void viewed.toggle(item.file.path);
+                setExpanded(prev => collapseOnMarkViewed(prev, item.file.path, item.viewed));
               }}
             />
           );
@@ -101,6 +103,7 @@ export function useDiffRenderItem({
               githubUrl={item.githubUrl}
               onToggleViewed={() => {
                 void viewed.toggle(item.file.path);
+                setExpanded(prev => collapseOnMarkViewed(prev, item.file.path, item.viewed));
               }}
             />
           );

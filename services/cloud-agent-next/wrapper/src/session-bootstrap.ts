@@ -152,6 +152,7 @@ export type BootstrapProgress = {
 
 export type WrapperBootstrapResult = {
   workspaceWasWarm: boolean;
+  restoredFromBackup: boolean;
   /** Absent when the workspace was warm and no clone ran. */
   clone?: WrapperCloneTelemetry;
 };
@@ -455,8 +456,28 @@ async function cloneRepository(
   if (result.exitCode !== 0) {
     throw gitOperationError(result, 'clone');
   }
+  // A server without partial-clone support commonly ignores `--filter=blob:none`
+  // outright (exit 0, full clone) rather than rejecting it, so a successful
+  // blobless attempt does not guarantee the filter took effect. git records an
+  // accepted filter by marking the remote as a promisor remote; confirm that
+  // before reporting `mode: 'blobless'` so silently-full clones aren't
+  // misclassified as partial.
+  let filterHonored = false;
+  if (useBlobless && !filterRejected) {
+    const promisorCheck = await runGit(['config', '--get', 'remote.origin.promisor'], {
+      cwd: request.workspace.workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+    });
+    filterHonored = promisorCheck.exitCode === 0 && promisorCheck.stdout.trim() === 'true';
+  }
   const cloneTelemetry: WrapperCloneTelemetry = {
-    mode: !useBlobless ? 'full' : filterRejected ? 'blobless_fallback' : 'blobless',
+    mode: !useBlobless
+      ? 'full'
+      : filterRejected
+        ? 'blobless_fallback'
+        : filterHonored
+          ? 'blobless'
+          : 'full',
     attempts,
     filterRejected,
     durationMs: Date.now() - startedAt,
@@ -1215,7 +1236,11 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       `bootstrap workspace ready kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap}`
     );
     progress?.('kilo_server', 'Starting Kilo...');
-    return { workspaceWasWarm, ...(cloneTelemetry ? { clone: cloneTelemetry } : {}) };
+    return {
+      workspaceWasWarm,
+      restoredFromBackup,
+      ...(cloneTelemetry ? { clone: cloneTelemetry } : {}),
+    };
   } catch (error) {
     if (error instanceof RestoredWorkspaceReconciliationError) {
       if (workspaceNeedsBootstrap) {

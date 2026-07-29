@@ -416,6 +416,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
           if (args[0] === 'rev-parse') {
             return { stdout: '', stderr: '', exitCode: 1 };
           }
+          if (args[0] === 'config' && args.includes('remote.origin.promisor')) {
+            return { stdout: 'true\n', stderr: '', exitCode: 0 };
+          }
           return { stdout: '', stderr: '', exitCode: 0 };
         },
         restoreSession: async () => ({
@@ -435,6 +438,45 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(result.clone?.shallow).toBe(false);
     expect(result.clone?.totalObjects).toBe(1234);
     expect(result.clone?.receivedBytes).toBe(1.5 * 1024 * 1024);
+  });
+
+  it('downgrades to full mode when a blobless clone succeeds but the server silently ignored the filter', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return { stdout: '', stderr: '', exitCode: 0 };
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          if (args[0] === 'config' && args.includes('remote.origin.promisor')) {
+            // Server ignored --filter=blob:none: no promisor remote was configured.
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(result.clone?.mode).toBe('full');
+    expect(result.clone?.attempts).toBe(1);
+    expect(result.clone?.filterRejected).toBe(false);
   });
 
   it('reports blobless_fallback telemetry when the server rejects the filter', async () => {

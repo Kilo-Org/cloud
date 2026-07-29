@@ -151,8 +151,11 @@ export type WrapperWorkspaceReady = {
 
 /**
  * How the repository clone was performed.
- * - `full`: ordinary clone (no partial-clone filter requested)
- * - `blobless`: `--filter=blob:none` clone succeeded
+ * - `full`: ordinary clone (no partial-clone filter requested), or a blobless
+ *   attempt that the remote silently ignored (no rejection, but the filter
+ *   never took effect, e.g. no promisor remote configured after clone)
+ * - `blobless`: `--filter=blob:none` clone succeeded and was confirmed active
+ *   (the remote registered as a promisor remote)
  * - `blobless_fallback`: blobless was rejected by the remote, retried as a full clone
  */
 export type WrapperCloneMode = 'full' | 'blobless' | 'blobless_fallback';
@@ -185,6 +188,15 @@ export type WrapperCloneTelemetry = {
  */
 export type WrapperBootstrapTelemetry = {
   workspaceWasWarm: boolean;
+  /**
+   * True when the workspace was populated from an R2 backup rather than
+   * genuinely reused from a prior bootstrap. A restored workspace still
+   * reports `workspaceWasWarm: true` (the bootstrap marker is included in
+   * the backup archive), so this disambiguates "reused as-is" from
+   * "restored over the network," which otherwise inflates apparent
+   * sandbox-reuse rates.
+   */
+  restoredFromBackup: boolean;
   clone?: WrapperCloneTelemetry;
 };
 

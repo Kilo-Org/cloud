@@ -852,10 +852,11 @@ async function main() {
           branchName: request.workspace.branchName,
           kiloSessionId: request.kiloSessionId,
         },
-        telemetry: {
-          workspaceWasWarm: bootstrapResult.workspaceWasWarm,
-          ...(bootstrapResult.clone ? { clone: bootstrapResult.clone } : {}),
-        },
+        // Forward the bootstrap result as-is: `WrapperBootstrapResult` and
+        // `WrapperBootstrapTelemetry` are kept structurally identical on
+        // purpose so this can't silently drop a field one type gains but the
+        // other doesn't.
+        telemetry: bootstrapResult,
       };
     } catch (error) {
       if (request.preparation) {

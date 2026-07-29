@@ -129,30 +129,12 @@ export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
     }));
 }
 
-const NVIDIA_BLOCKED_MODEL_IDS = new Set([
-  'google/gemma-2-2b-it',
-  'google/gemma-3n-e2b-it',
-  'google/gemma-3n-e4b-it',
-  'qwen/qwen3.5-397b-a17b',
-  'sarvamai/sarvam-m',
-]);
-
-const NVIDIA_CONTEXT_LENGTH_OVERRIDES: Readonly<Record<string, number>> = {
-  'nvidia/nemotron-mini-4b-instruct': 4096,
-  'meta/llama-3.2-90b-vision-instruct': 32768,
-};
-
-export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: unknown): RawModel[] {
-  const liveModelIds = new Set(
-    OpenAICompatibleModelsResponseSchema.parse(liveEntry).data.map(model => model.id)
-  );
-  const provider = ModelsDevProviderSchema.parse(modelsDevEntry);
+export function parseNvidiaProviderModels(entry: unknown): RawModel[] {
+  const provider = ModelsDevProviderSchema.parse(entry);
 
   return Object.values(provider.models)
     .filter(
       model =>
-        liveModelIds.has(model.id) &&
-        !NVIDIA_BLOCKED_MODEL_IDS.has(model.id) &&
         model.status !== 'deprecated' &&
         model.tool_call === true &&
         model.modalities?.input?.includes('text') === true &&
@@ -163,7 +145,7 @@ export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: un
       return {
         id: model.id,
         name: shortenDisplayName(model.name),
-        context_length: NVIDIA_CONTEXT_LENGTH_OVERRIDES[model.id] ?? model.limit?.context,
+        context_length: model.limit?.context,
         max_completion_tokens: model.limit?.output,
         input_modalities: model.modalities?.input,
         supported_parameters: [
@@ -184,7 +166,8 @@ export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: un
 
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
-  catalogKey: string
+  catalogKey: string,
+  parseEntry: (entry: unknown) => RawModel[] = parseModelsDevProviderModels
 ): ProviderFetcher {
   return {
     providerId,
@@ -194,34 +177,10 @@ function modelsDevFetcher(
       if (!entry) {
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
       }
-      return parseModelsDevProviderModels(entry);
+      return parseEntry(entry);
     },
   };
 }
-
-// models.dev has the capabilities but lists models NVIDIA no longer hosts, which return
-// `410 Gone`. NVIDIA's list has the availability but no capabilities.
-const nvidiaFetcher: ProviderFetcher = {
-  providerId: 'nvidia-byok',
-  async fetch(ctx) {
-    const [response, catalog] = await Promise.all([
-      fetch('https://integrate.api.nvidia.com/v1/models'),
-      ctx.getModelsDevCatalog(),
-    ]);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch NVIDIA models: ${response.status} ${response.statusText}`);
-    }
-    const entry = catalog.nvidia;
-    if (!entry) {
-      throw new Error('models.dev catalog missing nvidia entry');
-    }
-    const models = parseNvidiaProviderModels(await response.json(), entry);
-    if (models.length === 0) {
-      throw new Error('NVIDIA catalog intersection produced no supported models');
-    }
-    return models;
-  },
-};
 
 async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
   const response = await fetch('https://models.dev/api.json');
@@ -239,7 +198,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Neuralwatt',
     url: 'https://api.neuralwatt.com/v1/models',
   }),
-  nvidiaFetcher,
+  modelsDevFetcher('nvidia-byok', 'nvidia', parseNvidiaProviderModels),
   openAICompatibleFetcher({
     providerId: 'chutes-byok',
     label: 'Chutes',

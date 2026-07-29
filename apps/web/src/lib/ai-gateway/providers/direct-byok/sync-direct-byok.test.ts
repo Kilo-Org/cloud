@@ -134,7 +134,7 @@ describe('parseNvidiaProviderModels', () => {
     ...overrides,
   });
 
-  test('keeps only live, compatible tool-calling text models', () => {
+  test('keeps models.dev tool-calling text models', () => {
     const catalog = {
       chat: model('nvidia/chat'),
       vision: model('nvidia/vision', {
@@ -148,35 +148,17 @@ describe('parseNvidiaProviderModels', () => {
       noTextOutput: model('nvidia/no-text-output', {
         modalities: { input: ['text'], output: ['image'] },
       }),
-      metadataOnly: model('nvidia/metadata-only'),
-      blocked: model('google/gemma-2-2b-it'),
-    };
-    const live = {
-      data: Object.values(catalog)
-        .filter(({ id }) => id !== 'nvidia/metadata-only')
-        .map(({ id }) => ({ id }))
-        .concat({ id: 'nvidia/live-only' }),
+      unavailable: model('google/gemma-2-2b-it'),
     };
 
-    expect(parseNvidiaProviderModels(live, { models: catalog })).toEqual([
+    expect(parseNvidiaProviderModels({ models: catalog })).toEqual([
       expect.objectContaining({ id: 'nvidia/chat', variants: {} }),
       expect.objectContaining({
         id: 'nvidia/vision',
         input_modalities: ['text', 'image'],
         variants: {},
       }),
-    ]);
-  });
-
-  test('applies hosted context overrides', () => {
-    const ids = ['nvidia/nemotron-mini-4b-instruct', 'meta/llama-3.2-90b-vision-instruct'];
-    const models = Object.fromEntries(
-      ids.map(id => [id, model(id, { limit: { context: 128_000, output: 8192 } })])
-    );
-
-    expect(parseNvidiaProviderModels({ data: ids.map(id => ({ id })) }, { models })).toEqual([
-      expect.objectContaining({ id: ids[0], context_length: 4096 }),
-      expect.objectContaining({ id: ids[1], context_length: 32768 }),
+      expect.objectContaining({ id: 'google/gemma-2-2b-it', variants: {} }),
     ]);
   });
 
@@ -191,14 +173,12 @@ describe('parseNvidiaProviderModels', () => {
     };
     const ids = Object.keys(efforts);
     const models = Object.fromEntries(ids.map(id => [id, model(id)]));
-    const synced = parseNvidiaProviderModels({ data: ids.map(id => ({ id })) }, { models }).map(
-      item => ({
-        ...item,
-        name: item.name ?? item.id,
-        context_length: item.context_length ?? 200_000,
-        max_completion_tokens: item.max_completion_tokens ?? 32_000,
-      })
-    );
+    const synced = parseNvidiaProviderModels({ models }).map(item => ({
+      ...item,
+      name: item.name ?? item.id,
+      context_length: item.context_length ?? 200_000,
+      max_completion_tokens: item.max_completion_tokens ?? 32_000,
+    }));
     const parsed = DirectByokModelArraySchema.parse(JSON.parse(JSON.stringify(synced)));
 
     expect(

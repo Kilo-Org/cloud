@@ -69,6 +69,17 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # NOTE: the KiloCode provider was externalized from openclaw core into the standalone
 # @openclaw/kilocode-provider package (openclaw #93470, 2026.6.9); it is installed
 # alongside openclaw and its provider-models bundle is a single non-hashed file.
+# Patch: actionRequiresTarget treats an action id that is absent from OpenClaw's
+# MESSAGE_ACTION_TARGET_MODE map as needing a delivery target, because the raw
+# lookup yields undefined and `undefined !== "none"` is true. That makes the
+# runner throw `Action <id> requires a target.` for any plugin-declared action id
+# outside the core map. Default the lookup to "none" instead, matching what
+# OpenClaw itself already does for the same map in applyTargetToParams.
+# Locate the chunk by CONTENT, never by filename: OpenClaw ships more than one
+# `channel-target-*.js` (a `channel-target-prefix-*.js` appeared in 2026.6.9),
+# so a name glob plus `head -1` depends on directory read order and silently
+# patched the wrong file on 2026.7.1. Patch every file carrying the pattern and
+# assert positively afterwards, so a no-op can never pass as applied.
 RUN npm install -g pnpm openclaw@2026.7.1 @openclaw/kilocode-provider@2026.7.1 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && KP_DIST=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist \
@@ -81,11 +92,14 @@ RUN npm install -g pnpm openclaw@2026.7.1 @openclaw/kilocode-provider@2026.7.1 c
     && if [ "$AFTER" -ne 1 ]; then echo "ERROR: KiloCode sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
     && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$PM_FILE" 2>/dev/null; then echo "ERROR: old KiloCode 5e3 value still present after patch" >&2; exit 1; fi \
     && echo "OK: patched KiloCode DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
-    && CT_FILE=$(find "$OC_DIST" -name 'channel-target-*.js' | head -1) \
-    && if [ -z "$CT_FILE" ]; then echo "ERROR: channel-target-*.js not found in openclaw dist" >&2; exit 1; fi \
-    && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
-    && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
-    && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
+    && CT_FILES=$(grep -rl 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$OC_DIST" --include='*.js' || true) \
+    && if [ -z "$CT_FILES" ]; then echo "ERROR: actionRequiresTarget pattern not found in openclaw dist - openclaw may have changed" >&2; exit 1; fi \
+    && CT_BEFORE=$(echo "$CT_FILES" | wc -l | tr -d ' ') \
+    && echo "$CT_FILES" | xargs sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' \
+    && if grep -rq 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$OC_DIST" --include='*.js'; then echo "ERROR: actionRequiresTarget patch failed - old form still present" >&2; exit 1; fi \
+    && CT_AFTER=$(grep -rl 'MESSAGE_ACTION_TARGET_MODE\[action\] ?? "none"' "$OC_DIST" --include='*.js' | wc -l | tr -d ' ') \
+    && if [ "$CT_AFTER" -ne "$CT_BEFORE" ]; then echo "ERROR: actionRequiresTarget patch failed - patched $CT_AFTER of $CT_BEFORE files" >&2; exit 1; fi \
+    && echo "OK: patched actionRequiresTarget in $CT_BEFORE file(s): $(echo "$CT_FILES" | xargs -n1 basename | tr '\n' ' ')" \
     && openclaw --version \
     && npm cache clean --force
 

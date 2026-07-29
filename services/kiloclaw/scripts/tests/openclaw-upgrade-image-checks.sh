@@ -240,9 +240,18 @@ timeout_patch=$(docker run --rm "$IMAGE" sh -c \
   'F=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist/provider-models.js; grep -c "DISCOVERY_TIMEOUT_MS = 60e3" "$F"' 2>/dev/null || echo 0)
 check "model-discovery timeout patch applied (60e3)" "1" "$timeout_patch"
 
+# Scan the WHOLE dist by content, not one filename-globbed file. OpenClaw ships
+# several `channel-target-*.js` chunks and only one carries the pattern; picking
+# by name + `head -1` follows directory read order, which silently selected the
+# wrong file on 2026.7.1 while the Dockerfile's negative-only guard still passed.
+# Assert both directions: the patched form is present, and no unpatched form
+# survives anywhere in dist.
 action_patch=$(docker run --rm "$IMAGE" sh -c \
-  'OC=/usr/local/lib/node_modules/openclaw/dist; F=$(find $OC -name "channel-target-*.js" | head -1); grep -c "MESSAGE_ACTION_TARGET_MODE\[action\] ?? \"none\"" "$F"' 2>/dev/null || echo 0)
-check "actionRequiresTarget patch applied" "1" "$action_patch"
+  'OC=/usr/local/lib/node_modules/openclaw/dist
+   new=$(grep -rl "MESSAGE_ACTION_TARGET_MODE\[action\] ?? \"none\"" "$OC" --include="*.js" | wc -l | tr -d " ")
+   old=$(grep -rl "MESSAGE_ACTION_TARGET_MODE\[action\] !== \"none\"" "$OC" --include="*.js" | wc -l | tr -d " ")
+   if [ "$new" -ge 1 ] && [ "$old" -eq 0 ]; then echo ok; else echo "patched=$new unpatched=$old"; fi' 2>/dev/null || echo failed)
+check "actionRequiresTarget patch applied (whole dist, by content)" "ok" "$action_patch"
 
 # ── Externalized kilocode provider pin alignment ─────────────────────────────
 # The kilocode provider was externalized from openclaw core (openclaw #93470) and

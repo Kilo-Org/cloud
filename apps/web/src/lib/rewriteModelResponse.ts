@@ -743,9 +743,7 @@ export async function rewriteModelResponse(
   logging: RequestLoggingParams
 ): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
-  // Custom-priced models report upstream OpenRouter cost, which does not match
-  // the custom pricing, so it must be removed just like for free models.
-  const isFreeModelRequiringCostRemoval =
+  const requiresCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') &&
     (isKiloExclusiveFreeModel(model) || getCustomPricing(model) !== undefined);
 
@@ -754,7 +752,7 @@ export async function rewriteModelResponse(
   if (kind === 'chat_completions') {
     return rewriteModelResponse_ChatCompletions(
       response,
-      isFreeModelRequiringCostRemoval,
+      requiresCostRemoval,
       capture,
       vercelRequestId
     );
@@ -762,7 +760,7 @@ export async function rewriteModelResponse(
   if (kind === 'responses') {
     return rewriteModelResponse_Responses(
       response,
-      isFreeModelRequiringCostRemoval,
+      requiresCostRemoval,
       capture,
       vercelRequestId
     );
@@ -770,7 +768,7 @@ export async function rewriteModelResponse(
   if (kind === 'messages') {
     return rewriteModelResponse_Messages(
       response,
-      isFreeModelRequiringCostRemoval,
+      requiresCostRemoval,
       capture,
       vercelRequestId
     );

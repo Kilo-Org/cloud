@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Trash2, Clock, Play } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 
 type Bead = {
   bead_id: string;
@@ -219,6 +219,8 @@ export function BeadBoard({
     );
   }
 
+  const shouldReduce = useReducedMotion();
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
       {statusColumns.map((status, colIdx) => {
@@ -226,9 +228,9 @@ export function BeadBoard({
         return (
           <motion.div
             key={status}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: colIdx * 0.08, duration: 0.3 }}
+            initial={shouldReduce ? {} : { opacity: 0, y: 12 }}
+            animate={shouldReduce ? {} : { opacity: 1, y: 0 }}
+            transition={shouldReduce ? { duration: 0 } : { delay: colIdx * 0.08, duration: 0.3 }}
           >
             <div className="mb-3 flex items-center gap-2">
               <span
@@ -241,21 +243,21 @@ export function BeadBoard({
               </span>
               <motion.span
                 key={columnBeads.length}
-                initial={{ scale: 1.3, opacity: 0.5 }}
-                animate={{ scale: 1, opacity: 1 }}
+                initial={shouldReduce ? {} : { scale: 1.3, opacity: 0.5 }}
+                animate={shouldReduce ? {} : { scale: 1, opacity: 1 }}
                 className="text-xs text-white/45"
               >
                 {columnBeads.length}
               </motion.span>
             </div>
             <div className="space-y-2">
-              <AnimatePresence mode="popLayout" initial={false}>
+              <AnimatePresence mode={shouldReduce ? 'sync' : 'popLayout'} initial={false}>
                 {columnBeads.length === 0 && (
                   <motion.p
                     key="empty"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+                    initial={shouldReduce ? {} : { opacity: 0 }}
+                    animate={shouldReduce ? {} : { opacity: 1 }}
+                    exit={shouldReduce ? {} : { opacity: 0 }}
                     className="py-4 text-center text-xs text-white/35"
                   >
                     No beads
@@ -264,11 +266,11 @@ export function BeadBoard({
                 {columnBeads.map(bead => (
                   <motion.div
                     key={bead.bead_id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                    transition={{
+                    layout={!shouldReduce}
+                    initial={shouldReduce ? {} : { opacity: 0, scale: 0.95, y: 10 }}
+                    animate={shouldReduce ? {} : { opacity: 1, scale: 1, y: 0 }}
+                    exit={shouldReduce ? {} : { opacity: 0, scale: 0.95, y: -10 }}
+                    transition={shouldReduce ? { duration: 0 } : {
                       layout: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
                       opacity: { duration: 0.2 },
                       scale: { duration: 0.2 },

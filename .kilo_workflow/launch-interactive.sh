@@ -15,7 +15,7 @@
 #   - The window target carries a trailing colon so tmux cannot prefix-match a
 #     window name and fail with "create window failed: index N in use".
 #
-#   launch-interactive.sh <name> <worktree> [--log <file>] <command> [args...]
+#   launch-interactive.sh <name> <worktree> --log <file> <command> [args...]
 #
 #   name      tmux window/session name, e.g. <section>-planner
 #   worktree  working directory for the session
@@ -29,10 +29,32 @@ set -euo pipefail
 
 NAME=${1:?name} WT=${2:?worktree}
 shift 2
-LOGFILE=""
-if [ "${1:-}" = "--log" ]; then LOGFILE=${2:?log file}; shift 2; fi
+# --log is mandatory: Monitor Mode diagnoses wedges from transcript
+# stagnation, and a session without one cannot be told apart from work.
+[ "${1:-}" = "--log" ] || { echo "launch-interactive: --log <file> is required (monitors need the transcript)" >&2; exit 1; }
+LOGFILE=${2:?log file}
+shift 2
 [ $# -gt 0 ] || { echo "launch-interactive: no command given" >&2; exit 1; }
 [ -d "$WT" ] || { echo "launch-interactive: no such worktree: $WT" >&2; exit 1; }
+touch "$LOGFILE" 2>/dev/null || { echo "launch-interactive: cannot write log file $LOGFILE" >&2; exit 1; }
+
+# Machine-global launch spacing: concurrent kilo startups race the shared
+# SQLite credential/session stores and crash. Same gate as dispatch-role.sh.
+GATE="$HOME/.cache/kilo-launch-gate"
+mkdir -p "$GATE"
+while :; do
+  if mkdir "$GATE/lock" 2>/dev/null; then
+    NOW=$(date +%s)
+    LAST=$(cat "$GATE/last" 2>/dev/null || echo 0)
+    if [ $(( NOW - LAST )) -ge 3 ]; then
+      echo "$NOW" > "$GATE/last"
+      rmdir "$GATE/lock"
+      break
+    fi
+    rmdir "$GATE/lock"
+  fi
+  sleep 1
+done
 
 STRIP='$(env | grep -oE "^(KILO|OPENCODE)[A-Za-z0-9_]*" | sed "s/^/-u /" | tr "\n" " " || true)'
 CMD="env $STRIP"
@@ -50,7 +72,7 @@ else
   TARGET=$NAME
 fi
 
-[ -n "$LOGFILE" ] && tmux pipe-pane -t "$TARGET" -o "cat >> $(printf '%q' "$LOGFILE")"
+tmux pipe-pane -t "$TARGET" -o "cat >> $(printf '%q' "$LOGFILE")"
 
 # A command that dies instantly (bad flag, missing binary) closes its pane;
 # report that as a failure instead of handing back a dead target. list-panes,

@@ -35,7 +35,11 @@ set -uo pipefail
 DIR="$HOME/.cache/kilo-e2e-slots"
 TOTAL=3
 POLL=60
-mkdir -p "$DIR"
+# 45 minutes, per WORKFLOW.md: a blocked acquire past this is a foreign wedge
+# to report, not a queue to keep waiting in.
+ACQUIRE_DEADLINE=2700
+mkdir -p "$DIR" || { echo "cannot create slot state dir $DIR" >&2; exit 1; }
+[ -w "$DIR" ] || { echo "slot state dir $DIR is not writable" >&2; exit 1; }
 
 # The worktree that owns this copy of the script — recorded at acquire time so
 # release and reap know which stack belongs to the slot.
@@ -65,7 +69,7 @@ stack_is_covered() {
     # A slot mid-release no longer entitles its worktree to anything — without
     # this, a release would see its own still-present slot as coverage and
     # skip the teardown it exists to perform.
-    [ -f "$s/releasing" ] && continue
+    [ -e "$s/releasing" ] && continue
     wt=$(cat "$s/worktree" 2>/dev/null || echo)
     [ -n "$wt" ] && [ "$(stack_session "$wt")" = "$sess" ] && return 0
     owner=$(cat "$s/owner" 2>/dev/null || echo)
@@ -94,24 +98,40 @@ release_worktree_resources() {
   # only powers off devices its own claims booted.
   echo "releasing simulators claimed by $wt"
   (cd "$wt" && pnpm dev:mobile:simulator release-all) || rc=1
-  # Android claims are per-serial files; drop this worktree's so dead sections
-  # never wedge a serial.
-  for c in "${TMPDIR:-/tmp}/kilo-mobile-android-claims"/*.json; do
-    [ -f "$c" ] || continue
-    grep -qF "\"worktreeRoot\":\"$wt\"" "$c" 2>/dev/null || continue
-    serial=$(basename "$c" .json)
-    echo "releasing android claim $serial held by $wt"
-    (cd "$wt" && pnpm dev:mobile:android release "$serial") || rc=1
-  done
   # The runbook launches every emulator inside this worktree's dedicated tmux
   # session — the session name IS the boot provenance, so killing it powers
   # off exactly the emulators this worktree started and never a foreign one.
-  local android_sess
+  # Kill it BEFORE dropping the claims: a serial must never sit unclaimed
+  # while the emulator behind it is still dying.
+  local android_sess port
   android_sess="kilo-e2e-android-$(basename "$wt")"
   if tmux has-session -t "$android_sess" 2>/dev/null; then
     echo "killing emulator session $android_sess"
     tmux kill-session -t "$android_sess" || rc=1
   fi
+  # Android claims are per-serial files; drop this worktree's so dead sections
+  # never wedge a serial. Before each drop, verify nothing still answers on
+  # the serial's console port — a qemu that survived the session kill (or a
+  # foreign emulator this worktree merely claimed) is reported, not killed:
+  # there is no boot provenance beyond the session, and powering off a device
+  # we may not have booted is worse than reporting one.
+  for c in "${TMPDIR:-/tmp}/kilo-mobile-android-claims"/*.json; do
+    [ -f "$c" ] || continue
+    grep -qF "\"worktreeRoot\":\"$wt\"" "$c" 2>/dev/null || continue
+    serial=$(basename "$c" .json)
+    port=${serial#emulator-}
+    if [[ "$port" =~ ^[0-9]+$ ]]; then
+      for _ in 1 2 3 4 5; do
+        lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1 || break
+        sleep 2
+      done
+      if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+        echo "warning: an emulator still answers on $serial after teardown — it was not booted by this worktree's session; leaving it" >&2
+      fi
+    fi
+    echo "releasing android claim $serial held by $wt"
+    (cd "$wt" && pnpm dev:mobile:android release "$serial") || rc=1
+  done
   return "$rc"
 }
 
@@ -136,13 +156,21 @@ reap() {
     fi
     if ! printf '%s\n' "$alive" | grep -qxF -- "$owner"; then
       # The owner is gone, so the slot and everything it entitled — stack and
-      # claimed devices — are all reclaimable. Tear down BEFORE freeing the
-      # slot (the `releasing` marker takes it out of coverage), so a new
-      # acquirer can never run alongside the dead holder's still-live stack.
+      # claimed devices — are all reclaimable. `mkdir releasing` is the
+      # exclusive transition (an atomic marker two concurrent reapers cannot
+      # both win), it takes the slot out of coverage so the teardown runs,
+      # and the still-occupied slot keeps a new acquirer out until the dead
+      # holder's resources are actually gone. On teardown failure the slot is
+      # kept (marker removed) so the next reap retries instead of freeing
+      # capacity over a live stack.
       wt=$(cat "$s/worktree" 2>/dev/null || echo)
-      touch "$s/releasing"
-      release_worktree_resources "$wt" || true
-      rm -rf "$s"
+      mkdir "$s/releasing" 2>/dev/null || continue
+      if release_worktree_resources "$wt"; then
+        rm -rf "$s"
+      else
+        echo "reap: teardown failed for $s ($wt) — keeping the slot for retry" >&2
+        rmdir "$s/releasing" 2>/dev/null || true
+      fi
     fi
   done
 }
@@ -188,19 +216,28 @@ case "${1:?usage: acquire|release|status|stacks [tmux-session]}" in
         exit 1
       fi
     fi
-    # already holding one? idempotent.
+    # already holding one? idempotent — but only a COMPLETE record counts
+    # (owner is written last, so its presence proves the rest is there).
     for s in "$DIR"/slot-*; do
-      [ -d "$s" ] && [ "$(cat "$s/owner" 2>/dev/null)" = "$who" ] && { echo "already holding $(basename "$s")"; exit 0; }
+      [ -d "$s" ] || continue
+      [ "$(cat "$s/owner" 2>/dev/null)" = "$who" ] || continue
+      [ -e "$s/releasing" ] && continue
+      echo "already holding $(basename "$s")"
+      exit 0
     done
+    DEADLINE=$(( $(date +%s) + ACQUIRE_DEADLINE ))
     while :; do
       reap
       for i in $(seq 1 "$TOTAL"); do
         if mkdir "$DIR/slot-$i" 2>/dev/null; then
           # A partially written slot is worse than no slot: the reaper would
-          # hand it to someone else while this caller drives a device.
-          if printf '%s' "$who" > "$DIR/slot-$i/owner" &&
-             printf '%s' "$SELF_WORKTREE" > "$DIR/slot-$i/worktree" &&
-             date -u +%Y-%m-%dT%H:%M:%SZ > "$DIR/slot-$i/since"; then
+          # hand it to someone else while this caller drives a device. The
+          # owner file goes LAST — its presence is what marks the record
+          # complete, and an interrupted write leaves an ownerless orphan the
+          # reaper clears instead of a live session holding a broken slot.
+          if printf '%s' "$SELF_WORKTREE" > "$DIR/slot-$i/worktree" &&
+             date -u +%Y-%m-%dT%H:%M:%SZ > "$DIR/slot-$i/since" &&
+             printf '%s' "$who" > "$DIR/slot-$i/owner"; then
             echo "acquired slot-$i for ${SELF_WORKTREE:-unknown worktree}"
             exit 0
           fi
@@ -209,6 +246,12 @@ case "${1:?usage: acquire|release|status|stacks [tmux-session]}" in
           exit 1
         fi
       done
+      if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+        echo "acquire: no slot freed in ${ACQUIRE_DEADLINE}s — a foreign holder is likely wedged; current holders:" >&2
+        "$0" status >&2 || true
+        echo "report a blocker instead of waiting further (never kill another session to free a slot)" >&2
+        exit 1
+      fi
       echo "all $TOTAL device slots busy; retrying in ${POLL}s: $(ls -1 "$DIR" 2>/dev/null | tr '\n' ' ')" >&2
       sleep "$POLL"
     done
@@ -216,22 +259,34 @@ case "${1:?usage: acquire|release|status|stacks [tmux-session]}" in
   release)
     who=${2:-$(self_session)}
     [ -n "$who" ] || { echo "not inside tmux and no session name given" >&2; exit 1; }
+    # An explicit name is for cleaning up after a DEAD holder only. Releasing
+    # a live foreign session's slot would stop a running verifier's stack and
+    # devices out from under it.
+    if [ -n "${2:-}" ] && [ "$2" != "$(self_session)" ] && tmux has-session -t "$2" 2>/dev/null; then
+      echo "release: session '$2' is still alive — a live holder releases its own slot; refusing" >&2
+      exit 1
+    fi
     fail=0
     for s in "$DIR"/slot-*; do
       [ -d "$s" ] || continue
       [ "$(cat "$s/owner" 2>/dev/null)" = "$who" ] || continue
       wt=$(cat "$s/worktree" 2>/dev/null || echo)
-      # Tear down first, free the slot last: the `releasing` marker takes this
-      # slot out of coverage so the teardown runs, while the still-occupied
-      # slot directory keeps a new acquirer from starting a stack alongside
-      # the one being stopped. The stack and the claimed devices go with the
-      # slot; a later round acquires, starts, and claims fresh.
-      touch "$s/releasing"
-      release_worktree_resources "$wt" || fail=1
-      rm -rf "$s"
-      echo "released $(basename "$s")"
+      # Tear down first, free the slot last: `mkdir releasing` (atomic, so a
+      # concurrent reaper cannot double-teardown) takes this slot out of
+      # coverage so the teardown runs, while the still-occupied slot directory
+      # keeps a new acquirer from starting a stack alongside the one being
+      # stopped. On teardown failure the slot is kept so capacity is never
+      # freed over a live stack — fix the error and release again.
+      mkdir "$s/releasing" 2>/dev/null || { echo "$(basename "$s") is already being released elsewhere" >&2; continue; }
+      if release_worktree_resources "$wt"; then
+        rm -rf "$s"
+        echo "released $(basename "$s")"
+      else
+        rmdir "$s/releasing" 2>/dev/null || true
+        echo "release: teardown failed for $(basename "$s") ($wt) — slot kept; fix the error above and run release again" >&2
+        fail=1
+      fi
     done
-    [ "$fail" -eq 0 ] || echo "release: teardown reported errors above — verify with status and dev:status" >&2
     exit "$fail"
     ;;
   status)

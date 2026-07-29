@@ -27,18 +27,31 @@ case $ROLE in
   plan-reviewer | implementer | impl-reviewer | e2e-verifier) ;;
   *) echo "dispatch-role: unknown role '$ROLE' (plan-reviewer|implementer|impl-reviewer|e2e-verifier)" >&2; exit 1 ;;
 esac
-[[ "$SECTION" =~ ^[a-z0-9-]+$ ]] || { echo "dispatch-role: section must be a lowercase slug: '$SECTION'" >&2; exit 1; }
+[[ "$SECTION" =~ ^[a-z0-9-]+-[0-9a-f]{4}$ ]] || { echo "dispatch-role: section must be a lowercase slug ending in its 4-hex run id (see init-section.sh): '$SECTION'" >&2; exit 1; }
 [[ "$LABEL" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "dispatch-role: bad label '$LABEL'" >&2; exit 1; }
 [ -d "$WT" ] || { echo "dispatch-role: no such worktree: $WT" >&2; exit 1; }
+[ -f "$WT/.kilo/agent/$ROLE.md" ] || { echo "dispatch-role: $WT has no .kilo/agent/$ROLE.md — the worktree must be the CLOUD worktree (role definitions are only discovered there)" >&2; exit 1; }
 [ -d "$SCRATCH" ] || { echo "dispatch-role: no such scratch dir: $SCRATCH" >&2; exit 1; }
-# Only repeated `--file <existing path>` may follow — anything else (a --model
-# override, a typo) silently disagrees with the pinned role definition.
+# Only `--mode repro` (e2e-verifier repro gate) and repeated `--file
+# <existing path>` may follow — anything else (a --model override, a typo)
+# silently disagrees with the pinned role definition.
 FILES=()
+MODE=verify
 while [ $# -gt 0 ]; do
-  [ "$1" = "--file" ] || { echo "dispatch-role: only --file <path> is accepted after the message, got '$1'" >&2; exit 1; }
-  [ -f "${2:-}" ] || { echo "dispatch-role: --file path does not exist: '${2:-}'" >&2; exit 1; }
-  FILES+=("--file" "$2")
-  shift 2
+  case $1 in
+    --mode)
+      [ "${2:-}" = "repro" ] || { echo "dispatch-role: --mode takes only 'repro'" >&2; exit 1; }
+      [ "$ROLE" = "e2e-verifier" ] || { echo "dispatch-role: --mode repro is only for the e2e-verifier" >&2; exit 1; }
+      MODE=repro
+      shift 2
+      ;;
+    --file)
+      [ -f "${2:-}" ] || { echo "dispatch-role: --file path does not exist: '${2:-}'" >&2; exit 1; }
+      FILES+=("--file" "$2")
+      shift 2
+      ;;
+    *) echo "dispatch-role: only --mode repro and --file <path> are accepted after the message, got '$1'" >&2; exit 1 ;;
+  esac
 done
 
 NAME="$SECTION-$ROLE-$LABEL"
@@ -55,7 +68,10 @@ STRIP='$(env | grep -oE "^(KILO|OPENCODE)[A-Za-z0-9_]*" | sed "s/^/-u /" | tr "\
 # the terminal only, never into the log, so the EXITCODE contract is untouched.
 CMD="echo $(printf '%q' "$NAME: output goes to $LOG — this pane stays blank by design; watch with: tail -f $LOG") && cd $(printf '%q' "$WT") && env $STRIP kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME")"
 for arg in "${FILES[@]+"${FILES[@]}"}"; do CMD+=" $(printf '%q' "$arg")"; done
-CMD+=" > $(printf '%q' "$LOG") 2>&1; echo EXITCODE=\$? >> $(printf '%q' "$LOG")"
+# The wrapper-owned exit file is what proves the run ENDED: the in-log
+# EXITCODE marker is convenient for humans but shares the stream with agent
+# stdout, and an agent quoting "EXITCODE=0" mid-run must not read as done.
+CMD+=" > $(printf '%q' "$LOG") 2>&1; EC=\$?; echo \"EXITCODE=\$EC\" >> $(printf '%q' "$LOG"); echo \"\$EC\" > $(printf '%q' "$LOG.exit")"
 
 # Resolve the caller's session through this pane. An untargeted
 # `tmux display-message -p '#S'` answers with the SERVER's current session —
@@ -68,6 +84,25 @@ if [ -n "${TMUX_PANE:-}" ]; then
   CALLER_SESSION=$(tmux display-message -p -t "$TMUX_PANE" '#S' 2>/dev/null || true)
 fi
 
+# Machine-global launch spacing: concurrent kilo startups race the shared
+# SQLite credential/session stores and crash (void rounds). ~3s apart is
+# enough; the mkdir mutex makes the read-modify-write of the timestamp safe.
+GATE="$HOME/.cache/kilo-launch-gate"
+mkdir -p "$GATE"
+while :; do
+  if mkdir "$GATE/lock" 2>/dev/null; then
+    NOW=$(date +%s)
+    LAST=$(cat "$GATE/last" 2>/dev/null || echo 0)
+    if [ $(( NOW - LAST )) -ge 3 ]; then
+      echo "$NOW" > "$GATE/last"
+      rmdir "$GATE/lock"
+      break
+    fi
+    rmdir "$GATE/lock"
+  fi
+  sleep 1
+done
+
 if [ "$ROLE" = "e2e-verifier" ] || [ -z "$CALLER_SESSION" ]; then
   tmux new-session -d -s "$NAME" "$CMD"
   TARGET=$NAME
@@ -79,8 +114,8 @@ else
   # index N in use".
   TARGET=$(tmux new-window -d -P -F '#{session_name}:#{window_index}' -t "$CALLER_SESSION:" -n "$NAME" "$CMD")
 fi
-# Sidecar for await-role.sh: which sentinel contract applies and which tmux
-# target to pronounce dead. Same path plus .meta, so dispatchers only ever
-# hand around the log path.
-printf 'role=%s\ntmux=%s\n' "$ROLE" "$TARGET" > "$LOG.meta"
+# Sidecar for await-role.sh: which sentinel contract applies (role + repro
+# vs verify for the e2e-verifier) and which tmux target to pronounce dead.
+# Same path plus .meta, so dispatchers only ever hand around the log path.
+printf 'role=%s\nmode=%s\ntmux=%s\n' "$ROLE" "$MODE" "$TARGET" > "$LOG.meta"
 echo "$LOG"

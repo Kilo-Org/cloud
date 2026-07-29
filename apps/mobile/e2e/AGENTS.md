@@ -50,7 +50,7 @@ pnpm dev:status --json
 
 Rules:
 
-- Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts. If the automatic offset lands on an occupied port, use a per-command prefix — see `.kilo_workflow/learnings/worktree-port-offset-airplay-collision.md`.
+- Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts. When the automatic offset lands on occupied ports (AirPlay on 5000/7000, another worktree's stack), `dev:start` probes for a free offset itself and persists it in the manifest; later `dev:restart`/`dev:env` reuse the persisted value, so no manual prefix is needed. A per-command `KILO_PORT_OFFSET=<n>` prefix still overrides everything when you must pin one — never `export` it.
 - The `dev:env` step creates the JWT Secrets Store binding. Without it, session-ingest looks healthy but rejects every session request.
 - Secrets Store state is local to each Worker directory. `dev:start` refreshes every source-backed secret for its service graph before launching Workers; a secret-creation failure is fatal, not something to retry past.
 - `event-service` is required for presence and notification behavior.
@@ -84,12 +84,12 @@ pnpm dev:capture mobile
 PR-review E2E needs a local GitHub API instead of `api.github.com`. Three steps, all reversible:
 
 1. Set `GITHUB_API_BASE_URL` in the **worktree root** `.env.local` to the stub's base URL (for example `http://127.0.0.1:<port>`). Next.js reads it via `apps/web/src/lib/github-pr-review/client.ts` (the web `dev` script symlinks root `.env.local` into `apps/web/` when that file is missing). Remove the variable after the run.
-2. Seed a GitHub user token with the dev-only tRPC mutation `githubApps.devSeedUserGithubToken`. Any non-empty token string works. Use a FRESH random `githubUserId` (e.g. `9$(date +%s | tail -c 6)` — the stub never validates it): all worktrees share one postgres, `github_user_id` is unique, and the upsert's conflict target is `(kilo_user_id, github_app_type)`, so reusing a sibling's id errors with a raw drizzle duplicate-key insert instead of returning `false` (see `.kilo_workflow/learnings/mobile-pr-review-entry-github-seed.md`).
+2. Seed a GitHub user token with the dev-only tRPC mutation `githubApps.devSeedUserGithubToken` (the PR-review entry screen only shows the URL input once the user has a token row). Authenticate curl as the E2E user via next-auth fake-login with a cookie jar: `GET /api/auth/csrf`, then `POST /api/auth/callback/fake-login` with `csrfToken`, `email`, and `json=true`, then `POST /api/trpc/githubApps.devSeedUserGithubToken` with the jar. Any non-empty token string works. Use a FRESH random `githubUserId` (e.g. `9$(date +%s | tail -c 6)` — the stub never validates it): all worktrees share one postgres, `github_user_id` is unique, and the upsert's conflict target is `(kilo_user_id, github_app_type)`, so reusing a sibling's id errors with a raw drizzle duplicate-key insert instead of returning `false`. Relaunch the app afterwards so the connection query refetches.
 3. Start the stub in a `kilo-e2e-*` tmux session, for example:
    `tmux new-session -d -s "kilo-e2e-github-stub-$(basename "$PWD")" -c "$PWD/apps/mobile/e2e/github-api-stub" "node server.mjs <port>"`.
    Stop that session when finished. Request logs go to `GITHUB_STUB_LOG` or `./github-api-stub-requests.log` under the process cwd — keep them out of the tree (temp dir) and delete them after the run.
 
-Pinned surface only: REST pull/repo/check-runs/statuses plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`.
+Pinned surface only: REST pull/repo/check-runs/statuses/`pulls/{n}/files` (paginated via `page`/`per_page`) plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`.
 
 ## iOS Simulator
 
@@ -154,7 +154,7 @@ When editing the flows, preserve these device-tested constraints:
 - Pass `EMAIL` and `OTP` with `-e`; flow-level defaults override `-e` values in the installed Maestro version.
 - Target the email field by its placeholder `you@example.com`, and tap `Verify code` without trying to dismiss the number pad.
 - The email field is uncontrolled, so a login page left on screen by an earlier run still holds its address, and `inputText` inserts at the caret the tap just dropped mid-string. Erase the field first and assert the typed address before submitting; without that, two attempts interleave into one malformed address and the flow dies 15s later on a missing `Verify code`.
-- Keep every control a flow taps clear of the keyboard. Maestro taps an element's centre, and iOS hands a touch inside `UIRemoteKeyboardWindow` to the keyboard while Maestro still logs the tap `COMPLETED` — a silent no-op. Verify with `maestro --device <udid> hierarchy`: the control's centre must be above the keyboard window's top bound. See `.kilo_workflow/learnings/maestro-tap-swallowed-by-ios-keyboard.md`.
+- Keep every control a flow taps clear of the keyboard. Maestro taps an element's centre, and iOS hands a touch inside `UIRemoteKeyboardWindow` to the keyboard while Maestro still logs the tap `COMPLETED` — a silent no-op. Verify with `e2e/maestro.sh <udid> hierarchy`: the control's centre must be above the keyboard window's top bound. See `.kilo_workflow/learnings/maestro-tap-swallowed-by-ios-keyboard.md`.
 - The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`).
 
 Seed only when needed. `pnpm dev:seed` with no arguments lists every topic and its usage:
@@ -171,7 +171,7 @@ pnpm dev:seed app:api-token <email>              # mint a bearer token (used by 
 One-time machine setup: `brew install maestro`. For MCP, use stdio command `maestro mcp`, then restart the agent session so its tools appear.
 
 - Maestro is the primary automation driver on both iOS and Android. Fall back to `xcrun simctl` (iOS) or repository-wrapped ADB (Android) only when Maestro cannot inspect or operate a native state, or when low-level device control is required. Setup still uses `simctl`/ADB for boot, install, dev-client URL reconnection, screenshots, shutdown, and cleanup.
-- With more than one simulator booted (parallel worktrees), always target by UDID: `maestro --device <udid>` — without it Maestro picks an arbitrary booted simulator and taps silently land on another worktree's device. The Maestro MCP tools mis-target the same way; prefer the CLI plus `simctl` screenshots when several simulators are up.
+- With more than one simulator booted (parallel worktrees), always target by UDID and go through `e2e/maestro.sh <udid> ...` — it serializes per device (the driver is single-tenant) and without an explicit device Maestro picks an arbitrary booted simulator, so taps silently land on another worktree’s device. The Maestro MCP tools mis-target the same way; prefer the CLI plus `simctl` screenshots when several simulators are up.
 - Inspect the screen before selecting elements; re-inspect after UI changes.
 - Never guess a selector from a visible label or screenshot. Copy the exact `txt` or `a11y` value from `maestro_inspect_screen` (`a11y` maps to Maestro `text:`). Maestro text matching is full-string regex, not substring.
 - Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before relying on these examples; the count and labels can change.
@@ -224,7 +224,7 @@ Do not conclude Android is unavailable from `command -v adb` or the inherited `P
 pnpm dev:mobile:android doctor
 ```
 
-Use the wrappers for all Android tooling, including the Expo/Gradle build, so the resolved SDK/JDK environment is applied. Ordered glue: acquire e2e slot → launch emulator → `claim` at first adb visibility → bounded boot wait → `build` → `login.sh`. Claim the moment the serial is visible, before waiting for boot — adb serials are host-global, and a concurrent worktree's polling loop can claim your fresh emulator during the boot wait (see `mobile-android-emulator-claims.md`). Never unbounded `adb wait-for-device`. Never put manual `adb reverse` or dev-client `am start` on the primary path — `login.sh` preflight does both.
+Use the wrappers for all Android tooling, including the Expo/Gradle build, so the resolved SDK/JDK environment is applied. Ordered glue: acquire e2e slot → launch emulator → `claim` at first adb visibility → bounded boot wait → `build` → `login.sh`. Claim the moment the serial is visible, before waiting for boot — adb serials are host-global, and a concurrent worktree's polling loop can claim your fresh emulator during the boot wait (a lost race means: never drive that device, never kill it, boot another port). Never unbounded `adb wait-for-device`. Never put manual `adb reverse` or dev-client `am start` on the primary path — `login.sh` preflight does both.
 
 ### Launch and GPU policy
 
@@ -235,16 +235,21 @@ Two launch attempts total, then a test-environment blocker with the tail of `$EM
 ANDROID_SESSION="kilo-e2e-android-$(basename "$PWD")"
 EMULATOR_LOG="/tmp/${ANDROID_SESSION}.log"
 GPU_FLAG=host   # attempt 2: swiftshader_indirect only after process death; else host again
+# Explicit free even console port, so YOUR emulator's serial is known up front
+# (emulator-$PORT) and a parallel worktree's launch can never be confused with it.
+PORT=5554; while lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; do PORT=$((PORT + 2)); done
 tmux new-session -d -s "$ANDROID_SESSION" -c "$PWD" \
-  "pnpm dev:mobile:android emulator -avd <avd-name> -no-snapshot-save -no-boot-anim -gpu $GPU_FLAG 2>&1 | tee \"$EMULATOR_LOG\""
+  "pnpm dev:mobile:android emulator -avd <avd-name> -port $PORT -no-snapshot-save -no-boot-anim -gpu $GPU_FLAG 2>&1 | tee \"$EMULATOR_LOG\""
 ```
+
+Emulators always launch inside `$ANDROID_SESSION` — the session name is the boot provenance `e2e-slot.sh release` uses to power off exactly the emulators this worktree started. Record `$PORT` in the round handoff so the next round reuses the same serial. Never drive or kill a device claimed by another worktree, and never delete a foreign claim file — if your serial is taken, pick the next free port instead.
 
 ### Bounded boot wait
 
 From the moment of launch, poll about every 15 s until the envelope expires. Cold boot on an idle host ≈ 1–3 minutes; under parallel-workflow load allow up to 8 minutes before declaring the attempt failed (relaunch-rule bounds, not SLAs). Each poll, check in order:
 
 1. **Liveness** — `pgrep -f "qemu.*<avd-name>"` still prints a PID. If empty, the attempt failed with the process-death signal.
-2. **Visibility** — device appears with state `device` in `pnpm dev:mobile:android adb devices -l` (this is where the serial is discovered; a single local emulator is `emulator-5554`). Claim it immediately: `pnpm dev:mobile:android claim <serial>` — do not wait for readiness first.
+2. **Visibility** — `emulator-$PORT` appears with state `device` in `pnpm dev:mobile:android adb devices -l` (poll for YOUR serial, never "the first emulator"). Claim it immediately: `pnpm dev:mobile:android claim emulator-$PORT` — do not wait for readiness first; adb serials are host-global and a concurrent worktree's polling loop can otherwise claim your fresh emulator during the boot wait.
 3. **Readiness** — once visible, `pnpm dev:mobile:android adb -s <serial> shell getprop sys.boot_completed` prints `1`.
 
 Device visibility is not readiness. Never gate on `adb devices` output alone, and never wait on any one stage without the liveness check.

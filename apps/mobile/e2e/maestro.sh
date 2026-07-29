@@ -9,9 +9,8 @@
 #   e.g. maestro.sh <udid> test -e EMAIL=x flows/login-request-code.yaml
 #
 # Lock: atomic mkdir under ${TMPDIR:-/tmp}/kilo-maestro-locks/<device>, holder
-# PID recorded inside. exec preserves our PID, so the recorded PID is the live
-# maestro process; when it exits, the next waiter reclaims via the dead-PID
-# check. A held lock with a live holder is polled every 2s.
+# PID recorded inside, released by the EXIT trap when maestro ends. A held
+# lock with a live holder is polled every 2s; a dead holder's is reclaimed.
 set -euo pipefail
 
 DEVICE="${1:?usage: maestro.sh <device> <maestro-args...>}"
@@ -33,6 +32,10 @@ done
 trap 'rm -rf "$LOCK"' EXIT
 echo $$ >"$LOCK/pid"
 
-# exec replaces this shell (dropping the trap) but keeps the PID, so the lock
-# is held for exactly maestro's lifetime and reclaimed by the next waiter.
-exec maestro --device "$DEVICE" "$@"
+# Run maestro as a child (no exec): the EXIT trap then releases the lock the
+# moment maestro ends, instead of leaving a dead-PID lock for the next waiter
+# to reclaim — which PID reuse could make look live forever.
+set +e
+maestro --device "$DEVICE" "$@"
+rc=$?
+exit "$rc"

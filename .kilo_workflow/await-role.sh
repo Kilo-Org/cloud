@@ -3,16 +3,17 @@
 # .kilo_workflow/WORKFLOW.md. This replaces hand-rolled wait loops: exit codes
 # lie (kilo runs die mid-stream and still exit 0), grepping a whole log for a
 # sentinel false-passes when the agent quoted one, and a stalled run can sit
-# forever without ever writing its EXITCODE marker.
+# forever without ever writing its marker.
 #
 #   await-role.sh <log> [--timeout <sec>] [--stall <sec>]
 #
-# Reads the `<log>.meta` sidecar dispatch-role.sh writes (role + tmux target):
-# the sentinel must belong to THAT role's contract — an implementer ending
-# with `No findings.` is a crashed contract, not a pass — and a dead tmux
-# target with no EXITCODE marker is pronounced VOID immediately instead of
-# waiting out the stall window. Without a sidecar it falls back to accepting
-# any known sentinel and log-only liveness.
+# Completion is proven by the wrapper-owned `<log>.exit` file dispatch-role.sh
+# writes — never by text in the log, which the agent also writes. The
+# `<log>.meta` sidecar (role, mode, tmux target) picks the sentinel contract:
+# an implementer ending with `No findings.` — or a final verifier ending with
+# `REPRODUCED.` — is a crashed contract, not a pass. A missing or corrupt
+# sidecar is VOID: every legitimate dispatch goes through dispatch-role.sh.
+# A dead tmux target with no exit file is VOID immediately.
 #
 # Blocks up to --timeout (default 480s — safely under harness command
 # timeouts), then reports. Re-invoke while it prints RUNNING. Prints exactly
@@ -21,15 +22,15 @@
 #   DONE <sentinel>   exit 0  round finished with a real verdict; act on it
 #   VOID ...          exit 2  finished without a valid verdict — a crashed
 #                             run, never a pass; discard and dispatch fresh
-#   STALLED <sec>s    exit 3  no EXITCODE and the log has been quiet past the
+#   STALLED <sec>s    exit 3  no exit file and the log has been quiet past the
 #                             stall threshold (default 1200s) — kill the tmux
 #                             window/session, verify state, redispatch fresh
 #   RUNNING           exit 4  still working; invoke again
 #
-# The sentinel is the line above the EXITCODE marker — the only place a
-# verdict counts. `STOPPED EARLY.` reports as DONE: not void, not success;
-# re-dispatch with a continuation handoff. A quiet log is judged by mtime, so
-# any tool output the agent produces (builds included) counts as liveness.
+# The sentinel is the log's last line. `STOPPED EARLY.` reports as DONE: not
+# void, not success; re-dispatch with a continuation handoff. A quiet log is
+# judged by mtime, so any tool output the agent produces (builds included)
+# counts as liveness.
 set -euo pipefail
 
 LOG=${1:?usage: await-role.sh <log> [--timeout <sec>] [--stall <sec>]}
@@ -45,19 +46,25 @@ while [ $# -gt 0 ]; do
 done
 
 ROLE=""
+MODE=""
 TMUX_TARGET=""
 if [ -f "$LOG.meta" ]; then
   ROLE=$(sed -n 's/^role=//p' "$LOG.meta" | head -1)
+  MODE=$(sed -n 's/^mode=//p' "$LOG.meta" | head -1)
   TMUX_TARGET=$(sed -n 's/^tmux=//p' "$LOG.meta" | head -1)
 fi
 
 # FINDINGS requires a count of at least 1 — `FINDINGS: 0` contradicts itself
 # (zero findings is spelled `No findings.`) and signals a broken report.
-case $ROLE in
-  plan-reviewer | impl-reviewer) SENTINELS='^(No findings\.|FINDINGS: [1-9][0-9]*|STOPPED EARLY\.)$' ;;
-  implementer) SENTINELS='^(SLICE COMPLETE\.|STOPPED EARLY\.)$' ;;
-  e2e-verifier) SENTINELS='^(VERIFICATION (PASSED|FAILED|BLOCKED)\.|REPRODUCED\.|CANNOT REPRODUCE\.|STOPPED EARLY\.)$' ;;
-  *) SENTINELS='^(No findings\.|FINDINGS: [1-9][0-9]*|STOPPED EARLY\.|SLICE COMPLETE\.|VERIFICATION (PASSED|FAILED|BLOCKED)\.|REPRODUCED\.|CANNOT REPRODUCE\.)$' ;;
+case "$ROLE/$MODE" in
+  plan-reviewer/* | impl-reviewer/*) SENTINELS='^(No findings\.|FINDINGS: [1-9][0-9]*|STOPPED EARLY\.)$' ;;
+  implementer/*) SENTINELS='^(SLICE COMPLETE\.|STOPPED EARLY\.)$' ;;
+  e2e-verifier/repro) SENTINELS='^(REPRODUCED\.|CANNOT REPRODUCE\.|VERIFICATION BLOCKED\.|STOPPED EARLY\.)$' ;;
+  e2e-verifier/*) SENTINELS='^(VERIFICATION (PASSED|FAILED|BLOCKED)\.|STOPPED EARLY\.)$' ;;
+  *)
+    echo "VOID missing or corrupt $LOG.meta — dispatch through dispatch-role.sh; discard the round"
+    exit 2
+    ;;
 esac
 
 mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
@@ -69,32 +76,34 @@ target_dead() {
 START=$(date +%s)
 while :; do
   NOW=$(date +%s)
-  if [ -f "$LOG" ]; then
-    LAST=$(tail -1 "$LOG" 2>/dev/null || true)
-    if [[ "$LAST" =~ ^EXITCODE=([0-9]+) ]]; then
-      CODE=${BASH_REMATCH[1]}
-      # Strip trailing whitespace; roles must end their report with the bare
-      # sentinel as the last line before the marker.
-      SENTINEL=$(tail -2 "$LOG" | head -1 | sed 's/[[:space:]]*$//')
-      if [[ "$SENTINEL" =~ $SENTINELS ]]; then
-        echo "DONE $SENTINEL"
-        exit 0
-      fi
-      echo "VOID exit=$CODE — no valid ${ROLE:-role} sentinel; discard the round and dispatch a fresh session"
-      exit 2
+  if [ -f "$LOG.exit" ]; then
+    CODE=$(cat "$LOG.exit" 2>/dev/null || echo "?")
+    SENTINEL=$(tail -1 "$LOG" 2>/dev/null | sed 's/^EXITCODE=[0-9]*$//;s/[[:space:]]*$//')
+    # The human-facing EXITCODE marker is the true last line; the sentinel is
+    # the line above it. Tolerate either ordering in case the marker write
+    # raced the exit-file write.
+    if [ -z "$SENTINEL" ]; then
+      SENTINEL=$(tail -2 "$LOG" 2>/dev/null | head -1 | sed 's/[[:space:]]*$//')
     fi
+    if [[ "$SENTINEL" =~ $SENTINELS ]]; then
+      echo "DONE $SENTINEL"
+      exit 0
+    fi
+    echo "VOID exit=$CODE — no valid $ROLE${MODE:+/$MODE} sentinel; discard the round and dispatch a fresh session"
+    exit 2
+  fi
+  if [ -f "$LOG" ]; then
     if target_dead; then
-      # The pane is gone but the marker never landed; give the redirect a
-      # moment to flush, then re-check the tail once before pronouncing.
+      # The pane is gone but the exit file never landed; give the final
+      # writes a moment to flush, then re-check once before pronouncing.
       sleep 5
-      LAST=$(tail -1 "$LOG" 2>/dev/null || true)
-      [[ "$LAST" =~ ^EXITCODE= ]] && continue
-      echo "VOID tmux target $TMUX_TARGET is gone with no EXITCODE — the run was killed; discard and dispatch fresh"
+      [ -f "$LOG.exit" ] && continue
+      echo "VOID tmux target $TMUX_TARGET is gone with no exit file — the run was killed; discard and dispatch fresh"
       exit 2
     fi
     AGE=$(( NOW - $(mtime "$LOG") ))
     if [ "$AGE" -gt "$STALL" ]; then
-      echo "STALLED ${AGE}s quiet, no EXITCODE — kill the round's tmux window/session, verify state on disk, redispatch fresh"
+      echo "STALLED ${AGE}s quiet, no exit file — kill the round's tmux window/session, verify state on disk, redispatch fresh"
       exit 3
     fi
   elif target_dead || [ $(( NOW - START )) -gt 90 ]; then

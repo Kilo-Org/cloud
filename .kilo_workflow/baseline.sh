@@ -17,7 +17,19 @@ set -euo pipefail
 CMD=${1:?usage: baseline.sh snapshot|check <worktree> <baseline-dir>}
 WT=${2:?worktree} DIR=${3:?baseline dir}
 [ -d "$WT" ] || { echo "baseline: no such worktree: $WT" >&2; exit 1; }
-case "$DIR" in "$WT"/*) echo "baseline: the baseline dir must live outside the repository" >&2; exit 1 ;; esac
+# Canonicalize before comparing — a relative or symlinked path must not smuggle
+# the baseline into the repository (or make the repository the baseline).
+WT=$(cd "$WT" && pwd -P)
+CREATED=0
+[ -d "$DIR" ] || { mkdir -p "$DIR"; CREATED=1; }
+DIR=$(cd "$DIR" && pwd -P)
+case "$DIR" in
+  "$WT" | "$WT"/*)
+    [ "$CREATED" -eq 1 ] && rmdir "$DIR" 2>/dev/null
+    echo "baseline: the baseline dir must live outside the repository ($WT)" >&2
+    exit 1
+    ;;
+esac
 
 capture() {
   local out=$1
@@ -43,7 +55,15 @@ capture() {
 
 case $CMD in
   snapshot)
-    capture "$DIR"
+    # Refuse to re-snapshot: a verifier that re-runs the checklist after its
+    # temporary edits would otherwise bless the dirty state as the baseline.
+    [ ! -f "$DIR/head" ] || { echo "baseline: $DIR already holds a snapshot — check against it; never re-baseline mid-run" >&2; exit 1; }
+    # Capture to a sibling temp dir and publish atomically, so a killed
+    # snapshot can never pass for a complete one.
+    TMP=$(mktemp -d "$DIR.tmp.XXXXXX")
+    capture "$TMP"
+    rmdir "$DIR" 2>/dev/null || { echo "baseline: $DIR exists and is not empty — refusing to overwrite" >&2; rm -rf "$TMP"; exit 1; }
+    mv "$TMP" "$DIR"
     echo "baseline recorded in $DIR"
     ;;
   check)
@@ -60,7 +80,8 @@ case $CMD in
         head) echo "DIVERGED head: $(cat "$DIR/$f") -> $(cat "$NOW/$f")" ;;
         untracked.tsv)
           echo "DIVERGED untracked files (hash/mode/link or presence):"
-          diff "$DIR/$f" "$NOW/$f" | grep '^[<>]' | sed 's/^</  baseline only:/; s/^>/  now:/'
+          # diff exits 1 on difference — normal here, must not abort the report.
+          { diff "$DIR/$f" "$NOW/$f" || true; } | { grep '^[<>]' || true; } | sed 's/^</  baseline only:/; s/^>/  now:/'
           ;;
         *) echo "DIVERGED $f (run: diff $DIR/$f $NOW/$f)" ;;
       esac

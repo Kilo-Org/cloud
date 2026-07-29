@@ -35,16 +35,19 @@ PRS=$(
 )
 
 [ -n "$PRS" ] || exit 0
-RESULT=$(
-  for n in $PRS; do
-    # One vote per login per PR — several review submissions on one PR are
-    # still one relationship. Failures propagate; a half-counted ranking is
-    # worse than none.
-    gh pr view "$n" --repo "$REPO" --json reviews \
-      --jq '[.reviews[].author.login] | unique | .[]'
-  done \
-    | grep -viE '(^|[-_/])bot([-_[]|$)|\[bot\]$' \
-    | grep -vixF -- "$HANDLE" \
-    | sort | uniq -c | sort -rn | awk '{print $1, $2}' || true
-)
-[ -z "$RESULT" ] || echo "$RESULT"
+# One vote per login per PR — several review submissions on one PR are still
+# one relationship. A failed lookup aborts the run: a half-counted ranking is
+# worse than none, and only the filters below may legitimately come up empty.
+VOTES=""
+for n in $PRS; do
+  V=$(gh pr view "$n" --repo "$REPO" --json reviews \
+    --jq '[.reviews[].author.login] | unique | .[]') || { echo "pick-reviewers: failed to read reviews of PR #$n" >&2; exit 1; }
+  VOTES+="$V"$'\n'
+done
+# The filters (not the API) may legitimately leave nothing — that is the
+# promised empty success, not an error.
+printf '%s' "$VOTES" \
+  | { grep -viE '(^|[-_/])bot([-_[]|$)|\[bot\]$' || true; } \
+  | { grep -vixF -- "$HANDLE" || true; } \
+  | { grep . || true; } \
+  | sort | uniq -c | sort -rn | awk '{print $1, $2}'

@@ -57,26 +57,30 @@ read_body() {
   printf '%s' "$body"
 }
 
-# The REST reply endpoint wants the thread's FIRST top-level comment id;
-# resolve wants the GraphQL thread id. Look the comment id up from the thread
-# id so callers only ever juggle one identifier.
-first_comment_id() {
+# One lookup answers everything about a thread: its repository (verified
+# against the caller's, so a global node id cannot cross repositories), its PR
+# number (for the REST reply URL), its first top-level comment id (the only
+# valid REST reply target), and its existing comment bodies (so a retried
+# `close` never posts the same reply twice).
+thread_info() {
   gh api graphql -f query='query($id:ID!){node(id:$id){
-    ... on PullRequestReviewThread{comments(first:1){nodes{databaseId}}}}}' \
-    -f id="$1" --jq '.data.node.comments.nodes[0].databaseId'
-}
-
-# The thread's PR number, needed for the REST reply URL.
-thread_pr() {
-  gh api graphql -f query='query($id:ID!){node(id:$id){
-    ... on PullRequestReviewThread{pullRequest{number}}}}' \
-    -f id="$1" --jq '.data.node.pullRequest.number'
+    ... on PullRequestReviewThread{
+      pullRequest{number}
+      repository{nameWithOwner}
+      comments(first:100){nodes{databaseId body}}}}}' -f id="$1"
 }
 
 do_reply() {
-  local thread=$1 body=$2 pr comment
-  pr=$(thread_pr "$thread")
-  comment=$(first_comment_id "$thread")
+  local thread=$1 body=$2 info repo pr comment
+  info=$(thread_info "$thread")
+  repo=$(jq -r '.data.node.repository.nameWithOwner' <<<"$info")
+  [ "$repo" = "$REPO" ] || { echo "pr-threads: thread $thread belongs to $repo, not $REPO" >&2; exit 1; }
+  pr=$(jq -r '.data.node.pullRequest.number' <<<"$info")
+  comment=$(jq -r '.data.node.comments.nodes[0].databaseId' <<<"$info")
+  if jq -e --arg b "$body" '.data.node.comments.nodes[] | select(.body == $b)' <<<"$info" >/dev/null; then
+    echo "reply already posted; not repeating it"
+    return 0
+  fi
   gh api "repos/$REPO/pulls/$pr/comments/$comment/replies" -f body="$body" --jq '.html_url'
 }
 

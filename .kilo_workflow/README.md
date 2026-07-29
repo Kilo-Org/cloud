@@ -12,7 +12,7 @@ A multi-agent delivery workflow for this repository (and siblings like `~/Projec
 
 A run ends in one of two states:
 
-- **Complete** — an open PR, CI green, Kilobot-reviewed, assigned to you, awaiting your review. The workflow never approves or merges its own PR; a PR waiting on human review is the deliverable, not a stall.
+- **Complete** — an open PR, CI green, Kilobot-reviewed (or Kilobot's absence explicitly waived after two failed retriggers, noted on the PR), assigned to you, awaiting your review. The workflow never approves or merges its own PR; a PR waiting on human review is the deliverable, not a stall.
 - **BLOCKED** — a precise blocker report (in the PR or the section's final report) saying exactly what a human must do. It does not guess past blockers or fake completion.
 
 ## What happens inside
@@ -27,7 +27,7 @@ Pipeline: **starter → planner → orchestrator → implementer/reviewer loops 
 | Implementer / impl-reviewer | Cheap-model pairs: implement a slice, then a fresh reviewer re-derives the diff's correctness; loop until findings dry up |
 | E2E verifier | Boots the real local stack (simulator, browser, services — real LLM calls, no mocks) and verifies the plan's goals behave, not just compile |
 
-Each section works in its own worktree under `~/Projects/.worktrees/` — never a primary checkout — and cleans up everything it started when it ends.
+Each section works in its own worktree under `~/Projects/.worktrees/` — never a primary checkout — and cleans up everything it started when it ends; the worktree itself is the one local artifact that stays until its PR closes.
 
 ## The trade: wall time for correctness, at a good price
 
@@ -44,6 +44,7 @@ A section routinely takes hours of unattended machine time. The human cost is mi
 | Path | Purpose |
 |---|---|
 | [`WORKFLOW.md`](WORKFLOW.md) | The canonical spec — roles, loops, gates, dispatch commands |
+| [`init-section.sh`](init-section.sh) | Creates a section: run id, worktrees, cloud prepare, scratch directory — prints the manifest |
 | [`dispatch-role.sh`](dispatch-role.sh) | Launches a kilo role agent in tmux with a clean environment and logged exit code |
 | [`await-role.sh`](await-role.sh) | Waits on a dispatched agent's log and reports the round's outcome: DONE with its verdict, VOID, STALLED, or RUNNING |
 | [`launch-interactive.sh`](launch-interactive.sh) | Launches an interactive session (planner, orchestrator) in tmux with a clean environment and a live TTY |

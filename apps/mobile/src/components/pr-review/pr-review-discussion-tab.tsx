@@ -155,7 +155,18 @@ export function PrReviewDiscussionTab({
         const generation = settleGenerationRef.current;
         settleThreadIdRef.current = thread.threadId;
         void (async () => {
-          await listRef.current?.scrollToIndex({ index, viewPosition: 0, animated: true });
+          // scrollToIndex targets contentOffset = layout.y + firstItemOffset + viewOffset.
+          // Clip math uses absolute coords (layout.y + firstItemOffset); without a negative
+          // viewOffset the firstItemOffset is applied twice and the row parks above the
+          // list's visible top (under the screen chrome). viewOffset: -F yields
+          // contentOffset = layout.y so absolute offset equals rowTop.
+          const firstItemOffset = listRef.current?.getFirstItemOffset() ?? 0;
+          await listRef.current?.scrollToIndex({
+            index,
+            viewPosition: 0,
+            viewOffset: -firstItemOffset,
+            animated: true,
+          });
           if (settleGenerationRef.current === generation) {
             settleThreadIdRef.current = null;
             applyExpansion(expandThread(expansionRef.current, thread.threadId));

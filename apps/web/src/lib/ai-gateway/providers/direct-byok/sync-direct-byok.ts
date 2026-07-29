@@ -7,6 +7,7 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 import { ReasoningEffortSchema, type OpenCodeSettings } from '@kilocode/db/schema-types';
+import { REASONING_VARIANTS_BINARY } from '@/lib/ai-gateway/providers/model-settings';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -152,10 +153,7 @@ function modelsDevReasoningOptionsToVariants(
       : effortVariants;
   }
   if (hasToggle) {
-    return {
-      instant: { reasoning: { enabled: false, effort: 'none' } },
-      thinking: { reasoning: { enabled: true, effort: 'high' } },
-    };
+    return REASONING_VARIANTS_BINARY;
   }
   return {};
 }

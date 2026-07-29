@@ -74,6 +74,21 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
   });
 
+  test('returns 404 for forbidden free models without reading cached metadata', async () => {
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockClear();
+    const modelId = 'openai/gpt-oss-20b:free';
+
+    const response = await GET(request(modelId), {
+      params: Promise.resolve({ provider: 'openai', model: 'gpt-oss-20b:free' }),
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: { message: 'Not Found', code: 404 },
+    });
+    expect(mockedGetOpenRouterModelsMetadataFromDatabase).not.toHaveBeenCalled();
+  });
+
   test('applies custom pricing to every priced endpoint', async () => {
     const model = {
       id: QWEN37_MAX_MODEL_ID,

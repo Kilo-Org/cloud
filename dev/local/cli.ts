@@ -10,6 +10,7 @@ import {
   resolveGroups,
   topologicalSort,
   portOffset,
+  findFreePortOffset,
   resolveSessionNextAuthUrl,
   services,
 } from './services';
@@ -56,6 +57,29 @@ import {
 // ---------------------------------------------------------------------------
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+// Scan the resolved services' full computed port set for occupants. The
+// shared kiloclaw-docker-tcp bridge on 23750 is reused (not a conflict) when
+// the listener really is the Docker API.
+async function findPortConflicts(serviceNames: string[]): Promise<{
+  conflicts: string[];
+  reusedHostServices: Set<string>;
+}> {
+  const conflicts: string[] = [];
+  const reusedHostServices = new Set<string>();
+  for (const name of serviceNames) {
+    const service = getService(name);
+    if (service.type === 'infra' || service.port <= 0 || !(await probePort(service.port))) {
+      continue;
+    }
+    if (name === 'kiloclaw-docker-tcp' && (await probeDockerApi(service.port))) {
+      reusedHostServices.add(name);
+    } else {
+      conflicts.push(`${name}:${service.port}`);
+    }
+  }
+  return { conflicts, reusedHostServices };
+}
 
 function determineEnabledGroups(serviceNames: string[]): string[] {
   const nameSet = new Set(serviceNames);
@@ -112,6 +136,48 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     console.warn('  To sync from Vercel: vercel env pull .env.local');
   }
 
+  // --- Resolve targets ---
+  // Always start core (always-on) groups; additional targets are merged in
+  const coreServices = resolveGroups(getAlwaysOnGroupIds());
+  const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
+  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+
+  const sessionName = getSessionName();
+  const sessionAlreadyRunning = sessionExists(sessionName);
+
+  // --- Pick a free port offset before anything derives URLs from ports ---
+  // An explicit KILO_PORT_OFFSET is honored as-is. Otherwise, when the
+  // hash/persisted offset's ports are held by a foreign occupant (another
+  // worktree's stack, macOS AirPlay on 5000/7000), probe +100 candidate
+  // offsets and take the first whose full computed port set is free. Never
+  // silently share. The chosen offset is persisted in the manifest at the end
+  // of startup so later port-computing commands agree without an env prefix.
+  const offsetIsExplicit =
+    process.env.KILO_PORT_OFFSET !== undefined && process.env.KILO_PORT_OFFSET !== 'auto';
+  let reusedHostServices = new Set<string>();
+  if (!sessionAlreadyRunning) {
+    let scan = await findPortConflicts(serviceNames);
+    if (scan.conflicts.length > 0 && !offsetIsExplicit) {
+      console.warn(
+        `⚠ Ports at offset ${portOffset} are occupied (${scan.conflicts.join(', ')}) — probing for a free offset…`
+      );
+      const freeOffset = await findFreePortOffset(
+        async () => (await findPortConflicts(serviceNames)).conflicts.length > 0
+      );
+      if (freeOffset !== undefined) {
+        console.log(`${DIM}Auto-selected port offset ${freeOffset}${RESET}`);
+        scan = await findPortConflicts(serviceNames);
+      }
+    }
+    if (scan.conflicts.length > 0) {
+      throw new Error(
+        `Refusing to share occupied worktree service ports: ${scan.conflicts.join(', ')}. ` +
+          'Stop the owning worktree or set a distinct KILO_PORT_OFFSET.'
+      );
+    }
+    reusedHostServices = scan.reusedHostServices;
+  }
+
   // --- Export port offset for child processes (e.g. scripts/dev.sh) ---
   process.env.KILO_PORT_OFFSET = String(portOffset);
 
@@ -131,12 +197,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     console.log(`${DIM}Port offset: ${portOffset} (KILO_PORT_OFFSET)${RESET}`);
   }
 
-  // --- Resolve targets ---
-  // Always start core (always-on) groups; additional targets are merged in
-  const coreServices = resolveGroups(getAlwaysOnGroupIds());
-  const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
-  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
-
   const mobileEnv: Record<string, string> = {};
   if (serviceNames.includes('mobile')) {
     const host = process.env.MOBILE_DEV_HOST || detectLanIp();
@@ -152,8 +212,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Check for existing session ---
-  const sessionName = getSessionName();
-  if (sessionExists(sessionName)) {
+  if (sessionAlreadyRunning) {
     for (const name of serviceNames) {
       const service = getService(name);
       if (service.type !== 'worker' || !findServicePane(sessionName, name)) continue;
@@ -182,26 +241,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     );
     if (!noAttach) attachSession(sessionName);
     return;
-  }
-
-  const conflictingPorts: string[] = [];
-  const reusedHostServices = new Set<string>();
-  for (const name of serviceNames) {
-    const service = getService(name);
-    if (service.type !== 'infra' && service.port > 0 && (await probePort(service.port))) {
-      if (name === 'kiloclaw-docker-tcp') {
-        if (await probeDockerApi(service.port)) reusedHostServices.add(name);
-        else conflictingPorts.push(`${name}:${service.port}`);
-      } else {
-        conflictingPorts.push(`${name}:${service.port}`);
-      }
-    }
-  }
-  if (conflictingPorts.length > 0) {
-    throw new Error(
-      `Refusing to share occupied worktree service ports: ${conflictingPorts.join(', ')}. ` +
-        'Stop the owning worktree or set a distinct KILO_PORT_OFFSET.'
-    );
   }
 
   // --- Check for socat when kiloclaw-docker-tcp is requested ---

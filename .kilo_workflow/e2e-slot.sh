@@ -95,9 +95,7 @@ release_worktree_resources() {
   echo "releasing simulators claimed by $wt"
   (cd "$wt" && pnpm dev:mobile:simulator release-all) || rc=1
   # Android claims are per-serial files; drop this worktree's so dead sections
-  # never wedge a serial. The claim records no boot provenance, so the emulator
-  # process itself is left alone — powering off a device we may not have booted
-  # is worse than leaking one (known gap until Android claims record it).
+  # never wedge a serial.
   for c in "${TMPDIR:-/tmp}/kilo-mobile-android-claims"/*.json; do
     [ -f "$c" ] || continue
     grep -qF "\"worktreeRoot\":\"$wt\"" "$c" 2>/dev/null || continue
@@ -105,6 +103,15 @@ release_worktree_resources() {
     echo "releasing android claim $serial held by $wt"
     (cd "$wt" && pnpm dev:mobile:android release "$serial") || rc=1
   done
+  # The runbook launches every emulator inside this worktree's dedicated tmux
+  # session — the session name IS the boot provenance, so killing it powers
+  # off exactly the emulators this worktree started and never a foreign one.
+  local android_sess
+  android_sess="kilo-e2e-android-$(basename "$wt")"
+  if tmux has-session -t "$android_sess" 2>/dev/null; then
+    echo "killing emulator session $android_sess"
+    tmux kill-session -t "$android_sess" || rc=1
+  fi
   return "$rc"
 }
 

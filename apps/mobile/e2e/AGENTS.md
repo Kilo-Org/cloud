@@ -84,7 +84,7 @@ pnpm dev:capture mobile
 PR-review E2E needs a local GitHub API instead of `api.github.com`. Three steps, all reversible:
 
 1. Set `GITHUB_API_BASE_URL` in the **worktree root** `.env.local` to the stub's base URL (for example `http://127.0.0.1:<port>`). Next.js reads it via `apps/web/src/lib/github-pr-review/client.ts` (the web `dev` script symlinks root `.env.local` into `apps/web/` when that file is missing). Remove the variable after the run.
-2. Seed a GitHub user token with the dev-only tRPC mutation `githubApps.devSeedUserGithubToken`. Any non-empty token string works. Use the stable fake `githubUserId` `999001` so the upsert matches across worktrees; a `false` upsert result means a sibling already seeded it, not failure.
+2. Seed a GitHub user token with the dev-only tRPC mutation `githubApps.devSeedUserGithubToken`. Any non-empty token string works. Use a FRESH random `githubUserId` (e.g. `9$(date +%s | tail -c 6)` — the stub never validates it): all worktrees share one postgres, `github_user_id` is unique, and the upsert's conflict target is `(kilo_user_id, github_app_type)`, so reusing a sibling's id errors with a raw drizzle duplicate-key insert instead of returning `false` (see `.kilo_workflow/learnings/mobile-pr-review-entry-github-seed.md`).
 3. Start the stub in a `kilo-e2e-*` tmux session, for example:
    `tmux new-session -d -s "kilo-e2e-github-stub-$(basename "$PWD")" -c "$PWD/apps/mobile/e2e/github-api-stub" "node server.mjs <port>"`.
    Stop that session when finished. Request logs go to `GITHUB_STUB_LOG` or `./github-api-stub-requests.log` under the process cwd — keep them out of the tree (temp dir) and delete them after the run.
@@ -176,10 +176,10 @@ One-time machine setup: `brew install maestro`. For MCP, use stdio command `maes
 - Never guess a selector from a visible label or screenshot. Copy the exact `txt` or `a11y` value from `maestro_inspect_screen` (`a11y` maps to Maestro `text:`). Maestro text matching is full-string regex, not substring.
 - Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before relying on these examples; the count and labels can change.
 
-CLI fallback:
+CLI fallback — always through `e2e/maestro.sh`, which serializes per device (Maestro's per-device driver is single-tenant; two concurrent sessions against one UDID interleave taps and fail flows in ways that read as product defects):
 
 ```bash
-maestro --device <udid|emulator-5554> test -e KEY=VALUE <flow.yaml>
+apps/mobile/e2e/maestro.sh <udid|emulator-5554> test -e KEY=VALUE <flow.yaml>
 xcrun simctl io <udid> screenshot <path>      # iOS
 adb exec-out screencap -p > <path>            # Android
 ```
@@ -309,14 +309,12 @@ pnpm dev:mobile:android adb -s <serial> shell input keyevent KEYCODE_BACK
 Clean up only resources you started. The remote CLI session and its disposable install belong to the orchestrator; never kill `kilo-e2e-cli-*` sessions or remove CLI scratch directories you did not create.
 
 ```bash
-tmux kill-session -t "$ANDROID_SESSION"      # if created
 rm -f "$LOGIN_LOG"                           # if created
 rm -f "$EMULATOR_LOG"                        # if created
-pnpm dev:mobile:android release <serial>     # every Android device you claimed
 .kilo_workflow/e2e-slot.sh release           # always, as soon as the device phase ends
 ```
 
-The slot release is the teardown. It stops this worktree's dev stack and releases every simulator this worktree claimed — powering off the ones your claims booted, restoring their names, and leaving a device that was already running before your claim alone. So there is no `pnpm dev:stop`, no `xcrun simctl shutdown`, and no `pnpm dev:mobile:simulator release <udid>` on this list: releasing the slot does all three, and forgetting one is how simulators used to stay booted all day. Never call `xcrun simctl shutdown` on an E2E device yourself — the claim, not your memory of what you booted, is what knows whether the device is yours to power off.
+The slot release is the teardown. It stops this worktree's dev stack, releases every simulator this worktree claimed (powering off the ones the claims booted, restoring their names, leaving a device that was already running before the claim alone), drops this worktree's Android claims, and kills this worktree's `kilo-e2e-android-*` emulator session. So there is no `pnpm dev:stop`, no `xcrun simctl shutdown`, no per-device `release`, and no emulator-session kill on this list: releasing the slot does all of it, and forgetting one is how devices used to stay running all day. Never call `xcrun simctl shutdown` on an E2E device yourself — the claim, not your memory of what you booted, is what knows whether the device is yours to power off.
 
 Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, or use `pnpm dev:stop --force` while sibling worktrees are active.
 

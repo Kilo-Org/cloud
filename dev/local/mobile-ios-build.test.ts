@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { hashRootNativeInputs } from './mobile-native-build';
+
 import {
   buildCompatibilityKey,
   buildFingerprintOptions,
@@ -99,6 +101,20 @@ test('fingerprint options include iOS platform and only skip the Expo extra sect
   assert.equal(options.silent, true);
   // SourceSkips.ExpoConfigExtraSection === 4096
   assert.equal(options.sourceSkips & 4096, 4096);
+  assert.deepEqual(
+    options.extraSources.map(source => ({
+      type: source.type,
+      id: source.id,
+      contents: source.contents,
+    })),
+    [
+      {
+        type: 'contents',
+        id: 'repoRootNativeInputs',
+        contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+      },
+    ]
+  );
 });
 
 // ── Compatibility key ────────────────────────────────────────────────

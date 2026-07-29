@@ -45,6 +45,26 @@ latest_email() {
   return 0
 }
 
+# Two parallel logins with the same email invalidate each other's OTP: a
+# second code request voids the first code, so the first verify 401s. Hold a
+# per-worktree+email mutex from the outbox snapshot through code verification
+# (device prep above stays parallel). Same mkdir-lock pattern as maestro.sh;
+# a dead holder's lock is reclaimed, a live one is polled every 2s.
+LOCK="${TMPDIR:-/tmp}/kilo-otp-locks/${WORKTREE_SLUG}-${EMAIL}"
+mkdir -p "$(dirname "$LOCK")"
+while ! mkdir "$LOCK" 2>/dev/null; do
+  holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
+  if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+    mv "$LOCK" "$LOCK.stale.$$" 2>/dev/null && rm -rf "$LOCK.stale.$$"
+    continue
+  fi
+  sleep 2
+done
+trap 'rm -rf "$LOCK"' EXIT
+echo $$ >"$LOCK/pid"
+
+# Snapshot inside the lock: an email another login produced while we waited
+# must count as "old", or we would read its already-consumed code.
 before="$(latest_email)"
 
 request_code() {

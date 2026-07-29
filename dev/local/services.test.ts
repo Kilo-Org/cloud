@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
+  applyPortOffset,
+  candidatePortOffsets,
   computePortOffset,
+  findFreePortOffset,
   getAlwaysOnGroupIds,
   getService,
   portOffset,
+  readPersistedPortOffset,
   resolveGroups,
   resolveSessionNextAuthUrl,
   resolveTargets,
@@ -29,6 +35,84 @@ test('keeps the primary worktree on the default ports', () => {
 
 test('honors an explicit port offset', () => {
   assert.equal(computePortOffset({ explicit: '1200', isPrimary: false, slug: 'anything' }), 1200);
+});
+
+test('prefers the persisted manifest offset over the slug hash', () => {
+  assert.equal(
+    computePortOffset({
+      explicit: undefined,
+      persisted: 700,
+      isPrimary: false,
+      slug: 'mobile-context-info',
+    }),
+    700
+  );
+  // Stability beats reshuffling: a probed offset sticks for the primary too.
+  assert.equal(
+    computePortOffset({ explicit: undefined, persisted: 700, isPrimary: true, slug: 'cloud' }),
+    700
+  );
+});
+
+test('an explicit port offset beats the persisted manifest offset', () => {
+  assert.equal(
+    computePortOffset({ explicit: '1200', persisted: 700, isPrimary: false, slug: 'anything' }),
+    1200
+  );
+});
+
+test('reads the persisted offset back from the running-stack manifest', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-manifest-'));
+  try {
+    const manifestPath = path.join(dir, 'dev', 'logs', 'manifest.json');
+    fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({ session: 'kilo-dev', portOffset: 700, services: [] })
+    );
+    assert.equal(readPersistedPortOffset(dir), 700);
+
+    fs.writeFileSync(manifestPath, '{"portOffset":"garbage"}');
+    assert.equal(readPersistedPortOffset(dir), undefined);
+
+    assert.equal(readPersistedPortOffset(path.join(dir, 'missing')), undefined);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('candidate offsets step by 100 and wrap within the valid range', () => {
+  const candidates = candidatePortOffsets(4900);
+  assert.equal(candidates[0], 5000);
+  assert.equal(candidates[1], 100);
+  assert.equal(candidates.length, 49);
+  assert.ok(!candidates.includes(4900));
+  assert.ok(!candidates.includes(0));
+});
+
+test('applies the first free candidate offset when ports collide', async () => {
+  const original = portOffset;
+  const candidates = candidatePortOffsets(original);
+  const occupiedOffsets = new Set([original, candidates[0], candidates[1]]);
+  try {
+    const chosen = await findFreePortOffset(async () => occupiedOffsets.has(portOffset));
+    assert.equal(chosen, candidates[2]);
+    assert.equal(portOffset, candidates[2]);
+    const worker = getService('auto-routing');
+    assert.equal(worker.port, 8810 + candidates[2]);
+    assert.ok(worker.command.includes(String(worker.port)));
+  } finally {
+    applyPortOffset(original);
+  }
+});
+
+test('restores the original offset when every candidate is occupied', async () => {
+  const original = portOffset;
+  const originalPort = getService('auto-routing').port;
+  const chosen = await findFreePortOffset(async () => true);
+  assert.equal(chosen, undefined);
+  assert.equal(portOffset, original);
+  assert.equal(getService('auto-routing').port, originalPort);
 });
 
 test('points NEXTAUTH_URL at the offset port when the web app runs without a tunnel', () => {

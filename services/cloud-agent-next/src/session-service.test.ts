@@ -124,6 +124,32 @@ describe('SessionService.buildRuntimeEnv', () => {
     expect(runtimeEnv.SESSION_HOME).toBe('/home/agent_test');
     expect(runtimeEnv[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
   });
+
+  it('materializes code-review small_model from the smallModel option', () => {
+    const service = new SessionService();
+    const context = service.buildContext({
+      sandboxId: 'usr-test',
+      userId: 'user_test',
+      sessionId: 'agent_test',
+    });
+    const smallModel = 'anthropic/claude-haiku-4.5';
+
+    const runtimeEnv = service.buildRuntimeEnv({
+      context,
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+      kilocodeModel: 'anthropic/claude-sonnet-4.6',
+      smallModel,
+      createdOnPlatform: 'code-review',
+    });
+
+    const config = JSON.parse(runtimeEnv.KILO_CONFIG_CONTENT) as {
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(config.small_model).toBe(`kilo/${smallModel}`);
+    expect(config.agent?.title?.model).toBe(`kilo/${smallModel}`);
+  });
 });
 
 describe('code-review command guard policy', () => {
@@ -716,6 +742,53 @@ describe('SessionService.prepareWorkspace', () => {
       gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
+  });
+
+  it('forwards metadata.agent.smallModel into prepareWorkspace KILO_CONFIG', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const smallModel = 'anthropic/claude-haiku-4.5';
+    const base = createGitLabCodeReviewMetadata();
+    const metadata: CloudAgentSessionState = {
+      ...base,
+      agent: {
+        ...base.agent,
+        model: 'anthropic/claude-sonnet-4.6',
+        smallModel,
+      },
+      repository: {
+        ...base.repository!,
+        upstreamBranch: 'main',
+      },
+    };
+
+    const result = await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'anthropic/claude-sonnet-4.6',
+    });
+
+    const returnedConfig = JSON.parse(result.runtimeEnv.KILO_CONFIG_CONTENT) as {
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(returnedConfig.small_model).toBe(`kilo/${smallModel}`);
+    expect(returnedConfig.agent?.title?.model).toBe(`kilo/${smallModel}`);
+
+    expect(sandbox.createSessionMock).toHaveBeenCalled();
+    const createSessionArg = sandbox.createSessionMock.mock.calls[0]?.[0] as {
+      env?: { KILO_CONFIG_CONTENT?: string };
+    };
+    const sessionConfig = JSON.parse(createSessionArg.env?.KILO_CONFIG_CONTENT ?? '{}') as {
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(sessionConfig.small_model).toBe(`kilo/${smallModel}`);
+    expect(sessionConfig.agent?.title?.model).toBe(`kilo/${smallModel}`);
   });
 
   it('removes the managed Bitbucket token from origin after cold review branch setup', async () => {

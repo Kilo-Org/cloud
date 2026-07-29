@@ -216,7 +216,7 @@ The orchestrator drives the plan to completion. It is the expensive model steeri
 2. Segment the plan into slices with disjoint write sets so parallel implementers cannot collide — the plan proposes the tasks, the orchestrator owns the slicing. Always serialize: lockfile changes, dependency installs, migrations, generated clients, repository-wide formatters, and broad autofix commands. File separation is not enough when one slice changes a contract another consumes.
 3. Dispatch ready independent slices to parallel `implementer`s — as many in parallel as the segmentation safely allows; agent parallelism is never capped, only E2E device/stack phases are (see E2E Slots). Loop per slice, at most five rounds: implementer implements, then a fresh `impl-reviewer` reviews the slice diff — `git add -N -- <owned paths> && git diff HEAD -- <owned paths>` (the `add -N` makes new files visible to the diff; take the reviewer's pre-round snapshot **after** it, since it changes status output) written to a scratch file passed via `--file`, since parallel slices share the worktree; triage remarks (untrusted), route valid ones through a repair dispatch. Exit the loop when a fresh reviewer returns `No findings.`, or when its only remaining findings are already rejected in `$SCRATCH/decisions.md` and cite no evidence the rejection did not consider. At the round cap the remaining moves are takeover or BLOCKED (see Escalation).
 4. Create small logical commits at slice boundaries, staging only the slice's owned paths (`git add -- <owned paths>`, never `git add -A` while other slices are mid-flight). Once every slice has landed, run the synchronization point: the deferred project-wide checks (typecheck and each changed repository's own check commands) — then, and again after any later repair or direct orchestrator edit, dispatch one fresh `impl-reviewer` over the cumulative section diff (`git diff origin/main...HEAD`, plus any uncommitted changes), so integration seams, takeovers, and merge resolutions never ship unreviewed.
-5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it. For work with a UI, upload the screenshots to the PR per GitHub Communication before scratch cleanup — local paths are not evidence. Assign the PR to the requesting human, and request reviews per repository convention (cloud: `eshurakov`, `jeanduplessis`; kilocode: additionally `marius-kilocode`, `chrarnoldus`). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
+5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it. For work with a UI, upload the screenshots to the PR per GitHub Communication before scratch cleanup — local paths are not evidence. Assign the PR to the requesting human, and pick the reviewers yourself (see Picking Reviewers). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
 6. Run the E2E loop (below) when the work has verifiable runtime behavior; skip it for doc-only or equivalently inert changes, recording why in the PR description.
 7. Run the Kilobot loop (below).
 8. When both loops are clean, verify the completion gate, label the PR `human-ready` (`gh pr edit <n> --add-label human-ready`) as the last act before teardown, then shut the section down. The PR is the deliverable; everything else closes.
@@ -225,6 +225,26 @@ Two terminal states, distinguished by what remains on disk:
 
 - **COMPLETE** — the gate fully holds (a PR awaiting required human review is COMPLETE). Release every held resource (local backends, simulators, emulators, browsers, slots), delete the scratch directory, and close its own tmux window (`tmux kill-window`). Nothing survives but the PR — its description carries everything a human needs; material process notes (E2E skips with rationale, simpler-shape decisions) belong in it.
 - **BLOCKED** — something made the gate unsatisfiable. Release every resource all the same, write `$SCRATCH/final-report.md` — first line `BLOCKED`, then the blocker, PR link and state, acceptance-criteria outcomes, takeovers with justifications, rejected findings, learnings written — leave the scratch directory as evidence, and close the window.
+
+### Picking Reviewers
+
+There is no fixed reviewer list. Work out who fits this PR from what the repository already shows, using two sources:
+
+1. **The files.** For the two or three files the PR changes most, list recent commits — `git log -10 --format='%H' -- <path>` — and for each commit find its PR and that PR's reviewers:
+
+```bash
+gh api repos/<owner>/<repo>/commits/<sha>/pulls --jq '.[].number'
+gh pr view <number> --json reviews --jq '.reviews[].author.login'
+```
+
+2. **The human.** Do the same for the requesting human's last ten merged PRs, to see who usually reviews their work:
+
+```bash
+gh pr list --author <handle> --state merged --limit 10 --json number --jq '.[].number'
+gh pr view <number> --json reviews --jq '.reviews[].author.login'
+```
+
+Count how often each name appears across both lists. Drop bots and the requesting human. Request the top one or two: `gh pr edit <number> --add-reviewer <login>`. If both lists come out empty — new area, no history — request nobody and say so in one line in the PR description; Kilobot and the assignee still review it.
 
 ### E2E Loop
 

@@ -1088,7 +1088,29 @@ export class WrapperClient {
   async ensureSessionReady(
     request: WrapperSessionReadyRequest
   ): Promise<WrapperSessionReadySuccessResponse> {
-    return this.request<WrapperSessionReadySuccessResponse>('POST', '/session/ready', request);
+    const response = await this.request<WrapperSessionReadySuccessResponse>(
+      'POST',
+      '/session/ready',
+      request
+    );
+    // Single choke point for both callers (execution orchestrator and the sandbox
+    // ready path), so the metric is emitted exactly once per bootstrap. Only the
+    // wrapper's `telemetry` object is logged: `workspaceReady` carries `gitToken`.
+    // Older wrappers omit `telemetry` entirely, hence the guard.
+    if (response.telemetry) {
+      logger.info('Cloud agent workspace bootstrap', {
+        metric: 'cloud_agent_workspace_bootstrap',
+        count: 1,
+        sessionId: request.agentSessionId,
+        // Attaches the platform to a session-scoped event. The read-only command
+        // guard log carries `createdOnPlatform` but no session id, which makes
+        // code-review sessions impossible to isolate without trace-row guesswork.
+        platform: request.materialized.env.KILO_PLATFORM ?? '(none)',
+        workspaceWasWarm: response.telemetry.workspaceWasWarm,
+        ...(response.telemetry.clone ?? {}),
+      });
+    }
+    return response;
   }
 
   async updateRuntimeEnvironment(env: Record<string, string>): Promise<void> {

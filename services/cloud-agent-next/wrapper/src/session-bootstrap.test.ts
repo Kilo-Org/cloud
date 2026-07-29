@@ -389,6 +389,139 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(cloneArgs[1]).not.toContain('--filter=blob:none');
   });
 
+  it('reports blobless clone telemetry with size proxies parsed from git progress', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return {
+              stdout: '',
+              stderr: [
+                'remote: Enumerating objects: 1234, done.',
+                'remote: Total 1234 (delta 456), reused 1000 (delta 300), pack-reused 0',
+                'Receiving objects: 100% (1234/1234), 1.50 MiB | 12.34 MiB/s, done.',
+              ].join('\n'),
+              exitCode: 0,
+            };
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(result.clone?.mode).toBe('blobless');
+    expect(result.clone?.attempts).toBe(1);
+    expect(result.clone?.filterRejected).toBe(false);
+    expect(result.clone?.repoKind).toBe('github');
+    expect(result.clone?.repoPlatform).toBe('github');
+    expect(result.clone?.shallow).toBe(false);
+    expect(result.clone?.totalObjects).toBe(1234);
+    expect(result.clone?.receivedBytes).toBe(1.5 * 1024 * 1024);
+  });
+
+  it('reports blobless_fallback telemetry when the server rejects the filter', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            if (args.includes('--filter=blob:none')) {
+              return { stdout: '', stderr: 'fatal: filter blob:none not supported', exitCode: 128 };
+            }
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return { stdout: '', stderr: '', exitCode: 0 };
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(result.clone?.mode).toBe('blobless_fallback');
+    expect(result.clone?.attempts).toBe(2);
+    expect(result.clone?.filterRejected).toBe(true);
+  });
+
+  it('reports full clone telemetry for sessions that are not blobless eligible', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://bitbucket.org/acme/repo.git',
+      token: 'bb-token',
+      platform: 'bitbucket',
+    };
+    request.workspace.branchName = 'feature/login';
+
+    const result = await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(result.clone?.mode).toBe('full');
+    expect(result.clone?.attempts).toBe(1);
+    expect(result.clone?.filterRejected).toBe(false);
+    expect(result.clone?.repoKind).toBe('git');
+    expect(result.clone?.repoPlatform).toBe('bitbucket');
+    // git reported no progress counters, so the size proxies stay absent
+    // rather than defaulting to a misleading zero.
+    expect(result.clone?.totalObjects).toBeUndefined();
+    expect(result.clone?.receivedBytes).toBeUndefined();
+  });
+
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];

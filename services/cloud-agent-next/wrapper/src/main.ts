@@ -788,8 +788,9 @@ async function main() {
         workspaceBootstrapController.signal
       );
       activeWorkspaceBootstraps.add(workspaceBootstrap);
+      let bootstrapResult: Awaited<typeof workspaceBootstrap>;
       try {
-        await workspaceBootstrap;
+        bootstrapResult = await workspaceBootstrap;
       } finally {
         activeWorkspaceBootstraps.delete(workspaceBootstrap);
       }
@@ -850,6 +851,10 @@ async function main() {
           sessionHome: request.workspace.sessionHome,
           branchName: request.workspace.branchName,
           kiloSessionId: request.kiloSessionId,
+        },
+        telemetry: {
+          workspaceWasWarm: bootstrapResult.workspaceWasWarm,
+          ...(bootstrapResult.clone ? { clone: bootstrapResult.clone } : {}),
         },
       };
     } catch (error) {

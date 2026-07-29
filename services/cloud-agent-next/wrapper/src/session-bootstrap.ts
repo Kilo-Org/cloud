@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   type WrapperBootstrapAttachment,
+  type WrapperCloneTelemetry,
   type WrapperPromptRequest,
   type WrapperPromptPart,
   type WrapperSessionReadyRequest,
@@ -151,6 +152,8 @@ export type BootstrapProgress = {
 
 export type WrapperBootstrapResult = {
   workspaceWasWarm: boolean;
+  /** Absent when the workspace was warm and no clone ran. */
+  clone?: WrapperCloneTelemetry;
 };
 
 type GitRunner = (args: string[], opts?: ProcessOptions) => Promise<ExecResult>;
@@ -213,6 +216,43 @@ function gitOperationError(
 
 const GIT_PROGRESS_PATTERN =
   /\b(Receiving objects|Resolving deltas|Updating files|Checking out files|Compressing objects):\s+(\d+)%/g;
+
+// Size proxies straight out of git's own progress output, so measuring clone size
+// costs no extra subprocess:
+//   remote: Total 1234 (delta 456), reused 1000 (delta 300), pack-reused 0
+//   Receiving objects: 100% (1234/1234), 45.67 MiB | 12.34 MiB/s, done.
+const GIT_TOTAL_OBJECTS_PATTERN = /\bTotal\s+(\d+)\b/;
+const GIT_RECEIVED_SIZE_PATTERN =
+  /Receiving objects:\s+100%\s+\([^)]*\),\s+([\d.]+)\s+(bytes|KiB|MiB|GiB)/;
+const BYTE_UNIT_MULTIPLIERS: Record<string, number> = {
+  bytes: 1,
+  KiB: 1024,
+  MiB: 1024 * 1024,
+  GiB: 1024 * 1024 * 1024,
+};
+
+function parseCloneSizeProxies(output: string): {
+  totalObjects?: number;
+  receivedBytes?: number;
+} {
+  // git writes progress with carriage returns and may colorize it.
+  const text = stripAnsi(output).replace(/\r/g, '\n');
+  const proxies: { totalObjects?: number; receivedBytes?: number } = {};
+  const objects = GIT_TOTAL_OBJECTS_PATTERN.exec(text);
+  if (objects) {
+    const parsed = Number.parseInt(objects[1], 10);
+    if (Number.isFinite(parsed)) proxies.totalObjects = parsed;
+  }
+  const size = GIT_RECEIVED_SIZE_PATTERN.exec(text);
+  if (size) {
+    const amount = Number.parseFloat(size[1]);
+    const multiplier = BYTE_UNIT_MULTIPLIERS[size[2]];
+    if (Number.isFinite(amount) && multiplier !== undefined) {
+      proxies.receivedBytes = Math.round(amount * multiplier);
+    }
+  }
+  return proxies;
+}
 
 function gitProgressReporter(
   progress: BootstrapProgress | undefined,
@@ -360,7 +400,7 @@ async function cloneRepository(
   runGit: GitRunner,
   progress: BootstrapProgress | undefined,
   signal: AbortSignal
-): Promise<void> {
+): Promise<WrapperCloneTelemetry> {
   const repo = request.repo;
   if (!repo) {
     throw new Error('Session metadata is missing a repository source');
@@ -396,20 +436,38 @@ async function cloneRepository(
   // Most servers without partial-clone support ignore the filter and full-clone,
   // but some reject it outright. If the blobless attempt failed with a filter
   // error, retry once as a full clone so a review is never lost to the optimization.
+  const startedAt = Date.now();
+  let attempts = 1;
+  let filterRejected = false;
   let result = await runClone(useBlobless);
   if (
     useBlobless &&
     result.exitCode !== 0 &&
     /filter/i.test(`${result.stderr}\n${result.stdout}`)
   ) {
+    filterRejected = true;
     logToFile(
       `bootstrap blobless clone rejected; retrying full clone kiloSessionId=${request.kiloSessionId}`
     );
     result = await runClone(false);
+    attempts = 2;
   }
   if (result.exitCode !== 0) {
     throw gitOperationError(result, 'clone');
   }
+  const cloneTelemetry: WrapperCloneTelemetry = {
+    mode: !useBlobless ? 'full' : filterRejected ? 'blobless_fallback' : 'blobless',
+    attempts,
+    filterRejected,
+    durationMs: Date.now() - startedAt,
+    repoKind: repo.kind,
+    repoPlatform: platform ?? 'unknown',
+    shallow: repo.shallow === true,
+    ...parseCloneSizeProxies(`${result.stderr}\n${result.stdout}`),
+  };
+  logToFile(
+    `bootstrap clone complete kiloSessionId=${request.kiloSessionId} mode=${cloneTelemetry.mode} attempts=${attempts} durationMs=${cloneTelemetry.durationMs} totalObjects=${cloneTelemetry.totalObjects ?? '(unknown)'} receivedBytes=${cloneTelemetry.receivedBytes ?? '(unknown)'}`
+  );
 
   const authorName =
     repo.kind === 'github' ? (repo.gitAuthor?.name ?? 'Kilo Code Cloud') : 'Kilo Code Cloud';
@@ -426,6 +484,7 @@ async function cloneRepository(
   if (authorNameResult.exitCode !== 0 || authorEmailResult.exitCode !== 0) {
     throw new Error('Failed to configure git author identity');
   }
+  return cloneTelemetry;
 }
 
 async function branchExists(
@@ -1070,6 +1129,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
 
   let workspaceWasWarm = false;
   let workspaceNeedsBootstrap = true;
+  let cloneTelemetry: WrapperCloneTelemetry | undefined;
   const restoredFromBackup = request.workspace.restoredFromBackup === true;
 
   try {
@@ -1105,7 +1165,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap cold workspace cloning repository kiloSessionId=${request.kiloSessionId}`
       );
-      await cloneRepository(request, runGit, progress, signal);
+      cloneTelemetry = await cloneRepository(request, runGit, progress, signal);
       logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
     }
 
@@ -1155,7 +1215,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       `bootstrap workspace ready kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap}`
     );
     progress?.('kilo_server', 'Starting Kilo...');
-    return { workspaceWasWarm };
+    return { workspaceWasWarm, ...(cloneTelemetry ? { clone: cloneTelemetry } : {}) };
   } catch (error) {
     if (error instanceof RestoredWorkspaceReconciliationError) {
       if (workspaceNeedsBootstrap) {

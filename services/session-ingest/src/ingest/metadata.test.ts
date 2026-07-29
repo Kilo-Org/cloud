@@ -119,6 +119,8 @@ type ApplyMetadataDbOptions = {
   parentSessionId?: string | null;
   createsCycle?: boolean;
   scopeRootMissing?: boolean;
+  /** Title stored on the row before applyMetadataChanges runs. Defaults to the creation placeholder (NULL). */
+  initialTitle?: string | null;
 };
 
 /**
@@ -148,6 +150,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
 
   function currentSessionState() {
     return {
+      title: options.initialTitle ?? null,
       status: options.initialStatus ?? 'idle',
       parentSessionId: options.parentSessionId ?? null,
       cloudAgentSessionScopeId: options.cloudAgentSessionScopeId ?? null,
@@ -664,6 +667,65 @@ describe('applyMetadataChanges', () => {
     expect(db.execute).toHaveBeenCalledTimes(1);
     expect(db.updateSets).toEqual([]);
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  describe('agent-generated title vs. user rename race', () => {
+    it('applies the agent-generated title when the row still has the creation placeholder (NULL)', async () => {
+      const db = createApplyMetadataDb({ initialTitle: null });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['title', 'Agent title']]));
+
+      expect(db.updateSets).toEqual([expect.objectContaining({ title: 'Agent title' })]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    });
+
+    it('skips the agent-generated title write when the user already renamed the session', async () => {
+      const db = createApplyMetadataDb({ initialTitle: 'User chosen title' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const warnSpy = vi.mocked(console.warn);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['title', 'Agent title']]));
+
+      // Title write is dropped entirely; no update statement is issued for a title-only batch.
+      expect(db.applyUpdate).not.toHaveBeenCalled();
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Skipping agent-generated title write; title is no longer the placeholder',
+        expect.objectContaining({ kiloUserId: 'usr_1', sessionId: 'ses_1' })
+      );
+    });
+
+    it('still applies other metadata fields when the title write is skipped due to a prior user rename', async () => {
+      const db = createApplyMetadataDb({ initialTitle: 'User chosen title' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['title', 'Agent title'],
+          ['platform', 'cli'],
+          ['status', 'busy'],
+        ])
+      );
+
+      expect(db.updateSets).toEqual([
+        expect.objectContaining({
+          created_on_platform: 'cli',
+          status: 'busy',
+        }),
+      ]);
+      const written = db.updateSets[0] as Record<string, unknown>;
+      expect(written).not.toHaveProperty('title');
+    });
   });
 
   it('logs when a session scope root is missing during reparent', async () => {

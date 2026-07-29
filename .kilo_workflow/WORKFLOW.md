@@ -194,6 +194,8 @@ The `orchestrator` agent definition pins the model and permissions, so the launc
 
 After the handoff the planner stops all hands-on work. It has exactly one job — relaunch or unstick the orchestrator when infrastructure fails (a crashed kilo CLI, a dead tmux window, a hung service). Product, logic, design, and review problems are the orchestrator's, handled by its escalation ladder. Check about every 30 minutes; react immediately when the orchestrator's process exits.
 
+A monitor never kills a live dispatch on a judgment call, never edits the worktree, and never writes to another role's dispatch log — a forged `EXITCODE` line corrupts the dispatcher's void-round detection, the exact signal the contract keys on. Before concluding an orchestrator is misbehaving, read its evidence: its pane scrollback (`tmux capture-pane -t <window> -p -S -`), its scratch directory, and the git log. The orchestrator's handoff may route user questions to its own interactive session, so an answer the monitor never saw can exist there (see `learnings/monitor-must-read-orchestrator-scrollback-before-intervening.md`). The only kill-worthy states are the infrastructure failures named above.
+
 A dead orchestrator window is not automatically a crash — check the scratch directory:
 
 - Scratch **gone** → the section COMPLETED and shut itself down; confirm the PR exists in gate state in **every** repository the section touched (`gh pr view <section> --repo <owner>/<repo>` — never bare `gh pr view`, which only checks the cloud branch), tell the user, and close yourself. A missing PR means it was not a completion — treat it as a crash.
@@ -214,7 +216,7 @@ The orchestrator drives the plan to completion. It is the expensive model steeri
 2. Segment the plan into slices with disjoint write sets so parallel implementers cannot collide — the plan proposes the tasks, the orchestrator owns the slicing. Always serialize: lockfile changes, dependency installs, migrations, generated clients, repository-wide formatters, and broad autofix commands. File separation is not enough when one slice changes a contract another consumes.
 3. Dispatch ready independent slices to parallel `implementer`s — as many in parallel as the segmentation safely allows; agent parallelism is never capped, only E2E device/stack phases are (see E2E Slots). Loop per slice, at most five rounds: implementer implements, then a fresh `impl-reviewer` reviews the slice diff — `git add -N -- <owned paths> && git diff HEAD -- <owned paths>` (the `add -N` makes new files visible to the diff; take the reviewer's pre-round snapshot **after** it, since it changes status output) written to a scratch file passed via `--file`, since parallel slices share the worktree; triage remarks (untrusted), route valid ones through a repair dispatch. Exit the loop when a fresh reviewer returns `No findings.`, or when its only remaining findings are already rejected in `$SCRATCH/decisions.md` and cite no evidence the rejection did not consider. At the round cap the remaining moves are takeover or BLOCKED (see Escalation).
 4. Create small logical commits at slice boundaries, staging only the slice's owned paths (`git add -- <owned paths>`, never `git add -A` while other slices are mid-flight). Once every slice has landed, run the synchronization point: the deferred project-wide checks (typecheck and each changed repository's own check commands) — then, and again after any later repair or direct orchestrator edit, dispatch one fresh `impl-reviewer` over the cumulative section diff (`git diff origin/main...HEAD`, plus any uncommitted changes), so integration seams, takeovers, and merge resolutions never ship unreviewed.
-5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it — assign it to the requesting human, and pick the reviewers yourself (see Picking Reviewers). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
+5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it. For work with a UI, upload the screenshots to the PR per GitHub Communication before scratch cleanup — local paths are not evidence. Assign the PR to the requesting human, and pick the reviewers yourself (see Picking Reviewers). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
 6. Run the E2E loop (below) when the work has verifiable runtime behavior; skip it for doc-only or equivalently inert changes, recording why in the PR description.
 7. Run the Kilobot loop (below).
 8. When both loops are clean, verify the completion gate, label the PR `human-ready` (`gh pr edit <n> --add-label human-ready`) as the last act before teardown, then shut the section down. The PR is the deliverable; everything else closes.
@@ -271,6 +273,7 @@ The work is complete only when every item holds:
 - A fresh E2E verifier returned `VERIFICATION PASSED.` for the plan's goals — or E2E was skipped as inert, with the rationale in the PR description
 - Changes are organized into small, coherent commits; format, typecheck, lint, and tests pass in every changed repository, using the check commands the nearest `AGENTS.md` or `package.json` defines for each changed package
 - The PR exists with what/why/how sections and is assigned to the requesting human
+- If any accepted task has a UI, the PR description renders screenshots of the final behavior from the latest head, uploaded to that repository as GitHub `user-attachments`; visual changes include before/after evidence when a meaningful before state exists. A non-UI PR records `Visual Changes: N/A`
 - Kilobot has posted an approving summary comment on the latest head and no actionable posted comment is unresolved — or Kilobot's absence after two retriggers is noted in a `(bot) ` PR comment
 - All expected CI checks on the latest head are green, and GitHub reports the head mergeable with no conflicts
 - No generated fixture remains, tracked or untracked; every verifier temporary edit is restored
@@ -307,13 +310,15 @@ The machine is shared by parallel workflows, and unslotted device or stack work 
 .kilo_workflow/e2e-slot.sh stacks [--reap]          # stacks running with no slot
 ```
 
-**A slot and a dev stack are the same resource.** The slot is what entitles a worktree to run a stack, and a stack must never outlive it: `release` stops the releasing worktree's stack, and reclaiming a dead holder's slot stops its stack too. So a later round re-acquires and starts a fresh stack rather than inheriting one — that restart is the price of the cap. A stack up with no slot is a defect, not a shortcut; `stacks` lists them and `stacks --reap` stops the workflow-owned ones (a stack with no section run id in its name was started by hand and is only reported). Five live stacks on this host drove the load average past 300 and made every emulator boot and native build time out, which reads as flaky devices rather than as over-subscription.
+**A slot, a dev stack, and a claimed device are the same resource.** The slot is what entitles a worktree to run a stack and claim a simulator, and neither may outlive it: `release` stops the releasing worktree's stack *and* releases every simulator that worktree claimed, and reclaiming a dead holder's slot does the same for it. So a later round re-acquires, starts a fresh stack, and claims a device again rather than inheriting either — that restart is the price of the cap. A stack up with no slot is a defect, not a shortcut; `stacks` lists them and `stacks --reap` reaps the workflow-owned ones (a stack with no section run id in its name was started by hand and is only reported). Five live stacks on this host drove the load average past 300 and made every emulator boot and native build time out, which reads as flaky devices rather than as over-subscription.
+
+Teardown is the slot's job, never the agent's memory. Runbook cleanup lists used to end with a conditional `xcrun simctl shutdown <udid>` — "only if you booted it" — and agents that dutifully released their slot still skipped it, so simulators stayed booted for the rest of the day under every section that followed. The claim now records whether it booted the device, and release powers off only what it started; a device that was already running before the claim is still never shut down. Never hand-roll device teardown around the wrapper.
 
 - Slot state lives in `$HOME/.cache/kilo-e2e-slots`, machine-global by design: every copy of the script — any worktree, any repository — contends for the same slots, and the script has no overrides by design. When working in a repository without the script (a sibling like `~/Projects/kilocode`), invoke it by absolute path from a cloud worktree.
 - This holds on every run, not only when another workflow is visibly active, and a stack that is already up is not an exemption.
 - `acquire` blocking is correct behavior, never a wedge to route around and never a reason to start device work unslotted. If an acquire is still blocked after about 45 minutes, the dispatcher inspects `status` for a wedged foreign holder and reports a blocker instead of waiting forever.
 - The slot caps load, not data: postgres and redis containers are shared across worktrees. Keep test data keyed to this worktree's accounts (the runbooks' per-worktree defaults) and never wipe shared state.
-- Release immediately when the device/stack phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them — and since release takes the stack with it, do not release mid-round while you still need the services.
+- Release immediately when the device/stack phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them — and since release takes the stack and the claimed devices with it, do not release mid-round while you still need the services or the simulator.
 - Slots are owned by tmux session name, record the worktree that took them, and are reclaimed automatically when the session dies. A holder that is alive but wedged belongs to its own workflow's monitor — never kill another session to free a slot; if the queue is starved by a foreign wedge, report a blocker to the user instead.
 - The orchestrator is accountable: every device-phase handoff states the slot rule, and a role agent that reports device work with no acquire gets re-dispatched.
 
@@ -347,3 +352,26 @@ Environment blockers and their fixes — broken local stacks, credential traps, 
 ## GitHub Communication
 
 Every GitHub issue comment, PR comment, review comment, review body, and thread reply written by this workflow begins exactly with `(bot) `, including replies to Kilobot and rejections of findings. Only the PR title and PR description carry no prefix.
+
+GitHub's public API and `gh pr comment` cannot upload attachments. Use the repository's
+checksum-pinned wrapper around the security-reviewed
+[`gh-image`](https://github.com/drogers0/gh-image) v1.2.0 binary. It performs the same
+repository-scoped upload as GitHub's comment box and prints ready-to-paste Markdown:
+
+```bash
+.kilo_workflow/upload-pr-attachment.sh "$SCREENSHOT" --repo <owner/repo>
+# ![screenshot.png](https://github.com/user-attachments/assets/<id>)
+```
+
+Put that Markdown in the PR's `Visual Changes` section (or a `(bot) ` comment when adding
+later), then fetch the PR body/comments with `gh` and verify the
+`github.com/user-attachments/` URL is present. `gh-image` uses an existing GitHub browser
+session because a normal `gh` API token cannot authorize this undocumented upload endpoint.
+It may trigger a one-time OS keychain approval; never print, pass on the command line, commit,
+or place its `user_session` cookie in a handoff; never invoke `gh-image` directly. The wrapper
+verifies the reviewed release digest before every execution and blocks every supported explicit
+token path. Its audit and residual risks are recorded in
+`learnings/gh-image-unverified-release-binary.md`. A missing browser session is a completion
+blocker for UI work, not a reason to commit screenshots into the product repository or use an
+unrelated public image host. Any version change requires a fresh security review and new committed
+digests.

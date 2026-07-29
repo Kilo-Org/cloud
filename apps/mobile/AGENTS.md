@@ -66,7 +66,8 @@ git diff --check
 ### Text inputs
 
 - iOS: never control text with `value` plus state. Store text in a ref via `onChangeText`, use state only for derived UI, read the ref on submit.
-- Use `defaultValue` only for initial content. Set an explicit Tailwind line height.
+- Use `defaultValue` only for initial content.
+- Single-line inputs: use `leading-[normal]`. A `lineHeight` above the font's natural one (which `text-sm`/`text-base` set on their own) makes iOS draw the placeholder lower than the typed text and clip it. Multi-line inputs keep an explicit `leading-*`.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules

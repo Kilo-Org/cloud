@@ -353,15 +353,26 @@ describe('remoteAgentLabel', () => {
 });
 
 describe('remoteMeta', () => {
-  it('returns the uppercased relative time when updatedAt is present', () => {
+  it('returns the same relative-time string as formatMeta when updatedAt is present', () => {
     const updatedAt = '2024-01-01T00:00:00.000Z';
-    const expected = timeAgo(parseTimestamp(updatedAt)).toUpperCase();
-    expect(remoteMeta({ status: 'running', updatedAt })).toBe(expected);
+    expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
+    expect(remoteMeta({ updatedAt })).toBe(timeAgo(parseTimestamp(updatedAt)).toUpperCase());
   });
 
-  it('returns the uppercased status when updatedAt is absent', () => {
-    expect(remoteMeta({ status: 'running' })).toBe('RUNNING');
-    expect(remoteMeta({ status: 'needs_input' })).toBe('NEEDS_INPUT');
+  it('returns undefined when updatedAt is absent (never idle/busy/retry status words)', () => {
+    // Former fallback uppercased session.status into the timestamp slot
+    // (BUSY/IDLE/RETRY). Status is no longer a parameter; assert undefined
+    // for each status that used to leak, plus a row with no status field.
+    // Extra `status` fields stay on the object so a regression that re-reads
+    // `.status` would still see them — remoteMeta must ignore them.
+    const idleRow: { updatedAt?: string; status?: string } = { status: 'idle' };
+    const busyRow: { updatedAt?: string; status?: string } = { status: 'busy' };
+    const retryRow: { updatedAt?: string; status?: string } = { status: 'retry' };
+    const noStatusRow: { updatedAt?: string } = {};
+    expect(remoteMeta(idleRow)).toBeUndefined();
+    expect(remoteMeta(busyRow)).toBeUndefined();
+    expect(remoteMeta(retryRow)).toBeUndefined();
+    expect(remoteMeta(noStatusRow)).toBeUndefined();
   });
 });
 

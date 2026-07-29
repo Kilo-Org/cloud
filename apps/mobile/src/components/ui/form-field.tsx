@@ -65,7 +65,7 @@ function FormField({
           }
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground',
+          'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-[normal] text-foreground',
           'focus:border-ring',
           displayedError && 'border-destructive',
           disabled && 'opacity-50',

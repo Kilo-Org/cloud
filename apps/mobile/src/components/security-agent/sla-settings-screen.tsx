@@ -97,7 +97,7 @@ function SlaDayRow({
         accessibilityHint={
           isValidDayCount(days) ? undefined : 'Enter a whole number between 1 and 365'
         }
-        className="h-11 w-16 rounded-lg border border-input bg-background px-2 text-sm leading-5 text-foreground"
+        className="h-11 w-16 rounded-lg border border-input bg-background px-2 text-sm leading-[normal] text-foreground"
         textAlign="center"
         editable={!disabled}
         accessibilityState={{ disabled }}

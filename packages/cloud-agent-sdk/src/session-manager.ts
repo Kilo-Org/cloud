@@ -206,6 +206,14 @@ type SessionManagerConfig = {
   onComplete?: () => void;
   onBranchChanged?: (branch: string) => void;
   onSendFailed?: (messageText: string, displayMessage?: string, error?: unknown) => void;
+  /**
+   * Optional sink for image attachment bytes, called just before the chat
+   * processor strips a completed tool part's image data URLs for storage.
+   * Receives the raw data URL exactly once per processor pass; consumers use
+   * it to persist bytes outside the in-memory store (e.g. mobile's
+   * file-system cache). Web never passes it, so web behaviour is unchanged.
+   */
+  onImageAttachment?: (partId: string, mime: string, dataUrl: string) => void;
   onRemoteSessionOpened?: (data: { kiloSessionId: KiloSessionId }) => void;
   onRemoteSessionMessageSent?: (data: { kiloSessionId: KiloSessionId }) => void;
 };
@@ -666,7 +674,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const snapshot = await config.fetchSnapshot(childSessionId);
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
 
-        const chatProcessor = createChatProcessor(storage);
+        const chatProcessor = createChatProcessor(storage, {
+          onImageAttachment: config.onImageAttachment,
+        });
         for (const message of snapshot.messages) {
           chatProcessor.process({ type: 'message.updated', info: message.info });
           for (const part of message.parts) {
@@ -918,7 +928,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const storage = store.get(sessionStorageAtom);
     if (!storage) return false;
 
-    const chatProcessor = createChatProcessor(storage);
+    const chatProcessor = createChatProcessor(storage, {
+      onImageAttachment: config.onImageAttachment,
+    });
     for (const message of outcome.messages) {
       chatProcessor.process({ type: 'message.updated', info: message.info });
       for (const part of message.parts) {
@@ -1092,6 +1104,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       websocketBaseUrl: config.websocketBaseUrl,
       storage: jotaiStorage,
+      onImageAttachment: config.onImageAttachment,
       onSessionCreated: info => {
         if (info.parentID == null) {
           // Adopt the server-reported root session ID so message

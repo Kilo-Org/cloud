@@ -40,6 +40,12 @@ async function loadInit() {
   return module.initAppsFlyer;
 }
 
+async function loadModule() {
+  vi.resetModules();
+  const module = await import('./appsflyer');
+  return module;
+}
+
 describe('initAppsFlyer purchase connector', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -143,5 +149,70 @@ describe('initAppsFlyer purchase connector', () => {
     expect(captured).toBeInstanceOf(Error);
     expect((captured as Error).message).toContain('AppsFlyer purchase connector failed');
     expect((captured as Error).message).toContain('native bridge down');
+  });
+});
+
+// AppsFlyer's logEvent takes (name, values, onSuccess, onError); the error
+// callback is the fourth argument, read positionally to stay under max-params.
+function failLogEventTransport() {
+  mockedAppsFlyer.logEvent.mockImplementation((...args: unknown[]) => {
+    const onError = args[3] as (details: unknown) => void;
+    onError('Failed to connect to fxvuzl.inapps.appsflyersdk.com/[::]:443');
+  });
+}
+
+describe('AppsFlyer event reporting', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedPlatform.OS = 'ios';
+    mockedAppsFlyer.create.mockResolvedValue(undefined);
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        onSuccess('ok');
+      }
+    );
+  });
+
+  it('does not report a logEvent transport failure to Sentry', async () => {
+    const Sentry = await import('@sentry/react-native');
+    failLogEventTransport();
+
+    const { initAppsFlyer, trackEvent } = await loadModule();
+    initAppsFlyer();
+    trackEvent('access-required-shown');
+
+    expect(mockedAppsFlyer.logEvent).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('does not report a queued-event delivery failure when the queue drains', async () => {
+    const Sentry = await import('@sentry/react-native');
+    failLogEventTransport();
+
+    const { initAppsFlyer, trackEvent } = await loadModule();
+    trackEvent('access-required-shown');
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+
+    initAppsFlyer();
+
+    expect(mockedAppsFlyer.logEvent).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('still reports an SDK init failure to Sentry', async () => {
+    const Sentry = await import('@sentry/react-native');
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, _onSuccess: (result: string) => void, onError: (d: unknown) => void) => {
+        onError('Invalid dev key');
+      }
+    );
+
+    const { initAppsFlyer } = await loadModule();
+    initAppsFlyer();
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    const captured = vi.mocked(Sentry.captureException).mock.calls[0]?.[0];
+    expect((captured as Error).message).toContain('AppsFlyer init failed');
+    expect((captured as Error).message).toContain('Invalid dev key');
   });
 });

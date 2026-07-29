@@ -363,45 +363,24 @@ describe('getMetricsAccessibilityLabel', () => {
     expect(label).not.toContain('100%');
   });
 
-  it('prefixes platform when known and interactive', () => {
-    const label = getMetricsAccessibilityLabel({
-      info: info({ contextTokens: 84_000, contextWindow: 200_000, percentage: 42 }),
-      totalCostMicrodollars: 80_000,
-      platform: 'cli',
-      interactive: true,
-    });
-    expect(label.startsWith('CLI')).toBe(true);
-    expect(label.toLowerCase()).toContain('context details');
-  });
-
-  it('drops tap intent when not pressable and reads platform plus cost', () => {
+  it('drops tap intent when not pressable and reads cost', () => {
     expect(
       getMetricsAccessibilityLabel({
         info: undefined,
         totalCostMicrodollars: 80_000,
-        platform: 'cli',
         interactive: false,
       })
-    ).toBe('CLI, cost 8 cents');
+    ).toBe('cost 8 cents');
     expect(
       getMetricsAccessibilityLabel({
         info: undefined,
         totalCostMicrodollars: 120_000,
-        platform: 'cli',
         interactive: false,
       })
-    ).toBe('CLI, cost 12 cents');
+    ).toBe('cost 12 cents');
   });
 
-  it('reads only platform, or empty, when there is no info or cost', () => {
-    expect(
-      getMetricsAccessibilityLabel({
-        info: undefined,
-        totalCostMicrodollars: null,
-        platform: 'cli',
-        interactive: false,
-      })
-    ).toBe('CLI');
+  it('reads empty when there is no info or cost', () => {
     expect(
       getMetricsAccessibilityLabel({
         info: undefined,
@@ -409,6 +388,16 @@ describe('getMetricsAccessibilityLabel', () => {
         interactive: false,
       })
     ).toBe('');
+  });
+
+  it('does not speak a platform when info and cost are present', () => {
+    const label = getMetricsAccessibilityLabel({
+      info: info({ contextTokens: 84_000, contextWindow: 200_000, percentage: 42 }),
+      totalCostMicrodollars: 80_000,
+      interactive: true,
+    });
+    expect(label).not.toContain('CLI');
+    expect(label.toLowerCase()).toContain('context details');
   });
 });
 

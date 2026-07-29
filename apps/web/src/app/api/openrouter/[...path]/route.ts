@@ -47,7 +47,6 @@ import {
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
-  wrapInSafeNextResponse,
   forbiddenFreeModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
@@ -997,16 +996,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  const rewrittenResponse = await rewriteModelResponse(
+  return await rewriteModelResponse(
     response,
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,
     requestBodyParsed.kind,
     requestLogging
   );
-  if (rewrittenResponse) {
-    return rewrittenResponse;
-  }
-
-  return wrapInSafeNextResponse(response);
 }

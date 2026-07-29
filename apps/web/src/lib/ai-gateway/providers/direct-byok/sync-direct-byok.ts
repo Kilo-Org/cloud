@@ -36,18 +36,13 @@ const ModelsDevReasoningOptionSchema = z.discriminatedUnion('type', [
     type: z.literal('effort'),
     values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
   }),
-  z.object({
-    type: z.literal('budget_tokens'),
-    min: z.number().optional(),
-    max: z.number().optional(),
-  }),
 ]);
 
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
   reasoning: z.boolean().optional(),
-  reasoning_options: z.array(ModelsDevReasoningOptionSchema).optional(),
+  reasoning_options: z.array(ModelsDevReasoningOptionSchema).optional().catch(undefined),
   status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
   limit: z
     .object({
@@ -132,11 +127,11 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
 }
 
 function modelsDevReasoningOptionsToVariants(
-  options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>> | undefined
+  options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>>
 ): NonNullable<OpenCodeSettings['variants']> {
-  const hasToggle = options?.some(option => option.type === 'toggle') ?? false;
+  const hasToggle = options.some(option => option.type === 'toggle');
   const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};
-  for (const option of options ?? []) {
+  for (const option of options) {
     if (option.type !== 'effort') continue;
     for (const value of option.values) {
       const effort = ReasoningEffortSchema.safeParse(value);
@@ -177,7 +172,7 @@ export function parseModelsDevProviderModels(
       max_completion_tokens: model.limit?.output,
       input_modalities: model.modalities?.input,
       flags: model.reasoning ? ['reasoning'] : undefined,
-      variants: modelsDevReasoningOptionsToVariants(model.reasoning_options),
+      variants: modelsDevReasoningOptionsToVariants(model.reasoning_options ?? []),
     }));
 }
 

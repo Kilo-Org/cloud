@@ -68,7 +68,6 @@ describe('parseModelsDevProviderModels', () => {
           reasoning_options: [
             { type: 'toggle' },
             { type: 'effort', values: ['high', 'max', 'default', null] },
-            { type: 'budget_tokens', min: 0, max: 32_000 },
           ],
           limit: { context: 128_000, output: 32_000 },
           modalities: { input: ['text', 'image'], output: ['text'] },
@@ -146,6 +145,24 @@ describe('parseModelsDevProviderModels', () => {
         variants: {},
       },
     ]);
+  });
+
+  test('ignores reasoning option types that are not supported locally', () => {
+    const models = parseModelsDevProviderModels({
+      models: {
+        futureControl: {
+          id: 'future-control',
+          reasoning: true,
+          reasoning_options: [{ type: 'budget_tokens', min: 0, max: 32_000 }],
+        },
+      },
+    });
+
+    expect(models[0]).toMatchObject({
+      id: 'future-control',
+      flags: ['reasoning'],
+      variants: {},
+    });
   });
 
   test('excludes models missing from the provider model list', () => {

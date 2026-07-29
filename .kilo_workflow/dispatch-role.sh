@@ -34,7 +34,13 @@ STRIP='$(env | grep -oE "^(KILO|OPENCODE)[A-Za-z0-9_]*" | sed "s/^/-u /" | tr "\
 # Redirection below means an attached pane shows nothing at all. Say so in the
 # pane itself — a blank window reads as a dead agent otherwise. This prints to
 # the terminal only, never into the log, so the EXITCODE contract is untouched.
-CMD="echo $(printf '%q' "$NAME: output goes to $LOG — this pane stays blank by design; watch with: tail -f $LOG") && cd $(printf '%q' "$WT") && env $STRIP kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME")"
+# `--auto`: a headless `kilo run` auto-REJECTS every permission ask it cannot
+# pre-empt (e.g. protected ~/.config/kilo reads), and the reject kills the
+# round silently with EXITCODE=0 and no sentinel (see
+# learnings/system/headless-role-dispatch-dies-on-permission-ask.md in the main
+# checkout). Role definitions already grant what these agents need; --auto
+# stops the CLI answering "no" on the agent's behalf.
+CMD="echo $(printf '%q' "$NAME: output goes to $LOG — this pane stays blank by design; watch with: tail -f $LOG") && cd $(printf '%q' "$WT") && env $STRIP kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --auto --title $(printf '%q' "$NAME")"
 for arg in "$@"; do CMD+=" $(printf '%q' "$arg")"; done
 CMD+=" > $(printf '%q' "$LOG") 2>&1; echo EXITCODE=\$? >> $(printf '%q' "$LOG")"
 

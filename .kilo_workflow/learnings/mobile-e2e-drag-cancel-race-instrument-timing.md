@@ -18,3 +18,11 @@ Fix / instruments, fastest first:
    Android: if a second tap supersedes cleanly (exactly one expand, no collapse), the
    cancel mechanism works on the platform; combine with iOS 7b for the drag path before
    classifying an Android 7b expansion as a product failure.
+
+UPDATE 2026-07-29 (pr-review-d957 r2): instrument 1 CONFIRMED working — first honest
+attempt with `adb shell "input tap 423 479 && input swipe 540 1400 540 1100 250"` on an
+UNclamped control (control top 458 > edge 444) cancelled the expand; the thread stayed
+collapsed (verified by re-exposing the card and reading `Expand thread`, not just its
+bounds band, which is ambiguous while clamped). r1's three failures used clamped-sliver
+targets, which the learning already flags. To unclamp, ADB-nudge down in ~50px steps until
+the control's reported top clears the clamp edge.

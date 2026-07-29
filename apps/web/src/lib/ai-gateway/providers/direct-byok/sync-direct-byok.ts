@@ -114,13 +114,17 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
     }));
 }
 
-export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
+export function parseModelsDevProviderModels(
+  entry: unknown,
+  availableModelIds?: ReadonlySet<string>
+): RawModel[] {
   const provider = ModelsDevProviderSchema.parse(entry);
   return Object.values(provider.models)
     .filter(
       model =>
         model.status !== 'deprecated' &&
-        (!model.modalities?.output || model.modalities.output.includes('text'))
+        (!model.modalities?.output || model.modalities.output.includes('text')) &&
+        (!availableModelIds || availableModelIds.has(model.id))
     )
     .map(model => ({
       id: model.id,
@@ -134,7 +138,8 @@ export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
 
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
-  catalogKey: string
+  catalogKey: string,
+  availableModelsUrl?: string
 ): ProviderFetcher {
   return {
     providerId,
@@ -144,7 +149,21 @@ function modelsDevFetcher(
       if (!entry) {
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
       }
-      return parseModelsDevProviderModels(entry);
+      if (!availableModelsUrl) {
+        return parseModelsDevProviderModels(entry);
+      }
+      const response = await fetch(availableModelsUrl);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch ${providerId} available models: ${response.status} ${response.statusText}`
+        );
+      }
+      const availableModelIds = new Set(
+        OpenAICompatibleModelsResponseSchema.parse(await response.json()).data.map(
+          model => model.id
+        )
+      );
+      return parseModelsDevProviderModels(entry, availableModelIds);
     },
   };
 }
@@ -202,8 +221,8 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   }),
   modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
-  modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
-  modelsDevFetcher('opencode-go', 'opencode-go'),
+  modelsDevFetcher('ollama-cloud', 'ollama-cloud', 'https://ollama.com/v1/models'),
+  modelsDevFetcher('opencode-go', 'opencode-go', 'https://opencode.ai/zen/go/v1/models'),
   modelsDevFetcher('xiaomi-token-plan-ams', 'xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp', 'xiaomi-token-plan-sgp'),
 ];

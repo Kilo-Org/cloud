@@ -563,10 +563,7 @@ async function sanitizeBitbucketCodeReviewRemote(
   // must stay in place for a blobless clone's later lazy blob fetches. Only a raw
   // workspace token needs stripping. Either way this is a handled code-review
   // remote (return true), so callers do not refresh a token over it.
-  if (
-    typeof request.repo.token === 'string' &&
-    request.repo.token.startsWith(BITBUCKET_CAPABILITY_PREFIX)
-  ) {
+  if (hasBitbucketReviewCapability(request)) {
     return true;
   }
   const canonicalUrl = new URL(request.repo.url);

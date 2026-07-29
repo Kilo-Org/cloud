@@ -740,18 +740,10 @@ export async function rewriteModelResponse(
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
   logging: RequestLoggingParams
-): Promise<NextResponse | null> {
+): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const isFreeModelRequiringCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
-
-  // When request logging is enabled the response has to be processed anyway
-  // so the body can be captured for the request log in a single pass, so the
-  // rewrite is not skipped in that case.
-  if (!isFreeModelRequiringCostRemoval && !capture) {
-    console.debug('[rewriteModelResponse] skipping rewrite for %s', model);
-    return null;
-  }
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;
@@ -780,7 +772,7 @@ export async function rewriteModelResponse(
     );
   }
 
-  console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);
-  capture?.setReadError(new Error('response was not processed'));
-  return null;
+  const error = new Error(`implementation error: unrecognized API kind ${kind}`);
+  capture?.setReadError(error);
+  throw error;
 }

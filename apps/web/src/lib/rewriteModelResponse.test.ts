@@ -582,16 +582,29 @@ describe('rewriteModelResponse', () => {
     });
   });
 
-  test('does not rewrite paid-model traffic for other organizations', async () => {
+  test('rewrites paid-model traffic for other organizations without stripping cost', async () => {
     const result = await rewriteModelResponse(
-      jsonResponse({ model: 'openai/gpt-5' }),
+      jsonResponse({
+        model: 'openai/gpt-5',
+        usage: {
+          cost: 0.5,
+          cost_details: { upstream_inference_cost: 0.4 },
+          is_byok: false,
+        },
+      }),
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
       makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' })
     );
 
-    expect(result).toBeNull();
+    expect(await result.json()).toMatchObject({
+      usage: {
+        cost: 0.5,
+        cost_details: { upstream_inference_cost: 0.4 },
+        is_byok: false,
+      },
+    });
   });
 
   test('continues stripping cost for free models outside the Kilo organization', async () => {
@@ -613,7 +626,7 @@ describe('rewriteModelResponse', () => {
     });
   });
 
-  test('processes responses it would normally skip when request logging is enabled', async () => {
+  test('processes paid-model responses when request logging is enabled', async () => {
     mockedOptIn.mockResolvedValueOnce(true);
     const result = await rewriteModelResponse(
       jsonResponse({ model: 'openai/gpt-5' }),

@@ -557,9 +557,9 @@ describe('admin.cloudBillingSkus usage records', () => {
       intervalCount: 2,
       uniqueMeterInstances: 1,
       queriedCloudflareInstances: 1,
-      providerComparisonSeconds: 30,
-      differenceSeconds: 0,
-      differencePercent: 0,
+      providerComparisonSeconds: null,
+      differenceSeconds: null,
+      differencePercent: null,
     });
     expect(userResult.rows).toEqual([
       expect.objectContaining({
@@ -569,14 +569,14 @@ describe('admin.cloudBillingSkus usage records', () => {
         services: ['cloud-agent-next-sandbox'],
         skuIds: ['usage-reconciliation-sku', 'usage-search-sku'],
         providerCpuTimeSec: 3,
-        providerComparisonSeconds: 30,
+        providerComparisonSeconds: null,
         providerMemorySeconds: 30,
         providerDiskSeconds: 30,
         provisionedMemoryBytes: 12 * 1024 ** 3,
         provisionedDiskBytes: 20_000_000_000,
-        differenceSeconds: 0,
-        differencePercent: 0,
-        status: 'matched',
+        differenceSeconds: null,
+        differencePercent: null,
+        status: 'comparison_unavailable',
       }),
     ]);
     expect(userResult.provider.rawResponses).toHaveLength(1);
@@ -599,8 +599,10 @@ describe('admin.cloudBillingSkus usage records', () => {
       providerInstanceId: 'gastown-physical-id',
       providerApplicationIds: ['observed-gastown-app'],
       meterAcceptedSeconds: 30,
-      providerComparisonSeconds: 30,
-      status: 'matched',
+      providerComparisonSeconds: null,
+      providerMemorySeconds: 30,
+      providerDiskSeconds: 30,
+      status: 'comparison_unavailable',
     });
   });
 

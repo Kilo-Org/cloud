@@ -98,7 +98,7 @@ const MEBIBYTE_BYTES = 1024 ** 2;
 const MEGABYTE_BYTES = 1_000_000;
 const CAPACITY_CROSS_CHECK_RELATIVE_TOLERANCE = 1e-6;
 const COMPARISON_METHOD =
-  'Provider awake seconds use allocated memory byte-seconds divided by the provisioned memory for the recorded service class. Difference is provider minus meter.';
+  'Cloudflare allocated resource sums include overlapping container and micro-VM records, so they cannot be normalized to awake wall-clock seconds. Capacity-equivalent memory and disk seconds are diagnostic only.';
 const usageMetadataSchema = z
   .record(z.string().min(1).max(64), z.string().max(512))
   .refine(
@@ -204,7 +204,6 @@ function postgresErrorCode(error: unknown): string | undefined {
 }
 
 export type ReconciliationStatus =
-  | 'matched'
   | 'missing_from_cloudflare'
   | 'ambiguous_application'
   | 'provider_partial'
@@ -360,13 +359,13 @@ function normalizedReconciliationRows(
     let status: ReconciliationStatus;
     let statusDetail: string;
     let matchedProvider: ContainerUsageAnalyticsResult['rows'][number] | null = null;
-    let providerComparisonSeconds: number | null = null;
+    const providerComparisonSeconds: number | null = null;
     let providerMemorySeconds: number | null = null;
     let providerDiskSeconds: number | null = null;
     let provisionedMemoryBytes: number | null = null;
     let provisionedDiskBytes: number | null = null;
-    let differenceSeconds: number | null = null;
-    let differencePercent: number | null = null;
+    const differenceSeconds: number | null = null;
+    const differencePercent: number | null = null;
     if (meter.identityIssue) {
       status = 'comparison_unavailable';
       statusDetail = meter.identityIssue;
@@ -408,13 +407,9 @@ function normalizedReconciliationRows(
           statusDetail =
             'Provider memory and disk byte-seconds imply different active durations for this service capacity.';
         } else {
-          status = 'matched';
+          status = 'comparison_unavailable';
           statusDetail =
-            'Provider memory and disk byte-seconds agree for the provisioned capacity.';
-          providerComparisonSeconds = providerMemorySeconds;
-          differenceSeconds = providerComparisonSeconds - meter.acceptedSeconds;
-          differencePercent =
-            meter.acceptedSeconds === 0 ? null : (differenceSeconds / meter.acceptedSeconds) * 100;
+            'Cloudflare memory and disk allocation equivalents agree, but overlapping billing records prevent an awake-time comparison.';
         }
       }
     }
@@ -519,14 +514,7 @@ export async function reconcileUsageWithCloudflare(
   const rows = normalizedReconciliationRows(meterRows, provider);
   const countStatus = (status: ReconciliationStatus) =>
     rows.filter(row => row.status === status).length;
-  const matchedRows = rows.filter(row => row.status === 'matched');
-  const completeComparison = rows.length > 0 && matchedRows.length === rows.length;
   const totalMeterSeconds = rows.reduce((total, row) => total + row.meterAcceptedSeconds, 0);
-  const totalProviderSeconds = completeComparison
-    ? matchedRows.reduce((total, row) => total + (row.providerComparisonSeconds ?? 0), 0)
-    : null;
-  const totalDifferenceSeconds =
-    totalProviderSeconds === null ? null : totalProviderSeconds - totalMeterSeconds;
   return {
     subjectType: input.subjectType,
     subjectId: input.subjectId,
@@ -534,27 +522,22 @@ export async function reconcileUsageWithCloudflare(
     end: input.end,
     generatedAt: new Date().toISOString(),
     comparison: {
-      available: matchedRows.length > 0,
-      method: 'allocated_memory_byte_seconds' as const,
+      available: false as const,
+      method: 'unavailable' as const,
       description: COMPARISON_METHOD,
     },
     totals: {
       meterAcceptedSeconds: totalMeterSeconds,
-      providerComparisonSeconds: totalProviderSeconds,
-      differenceSeconds: totalDifferenceSeconds,
-      differencePercent:
-        totalDifferenceSeconds === null || totalMeterSeconds === 0
-          ? null
-          : (totalDifferenceSeconds / totalMeterSeconds) * 100,
-      providerCpuTimeSec: completeComparison
-        ? matchedRows.reduce((total, row) => total + (row.providerCpuTimeSec ?? 0), 0)
-        : null,
+      providerComparisonSeconds: null,
+      differenceSeconds: null,
+      differencePercent: null,
+      providerCpuTimeSec: null,
       intervalCount: new Set(meterSegments.map(row => row.intervalId)).size,
       uniqueMeterInstances: rows.length,
       queriedCloudflareInstances: providerInstanceIds.length,
     },
     counts: {
-      matched: countStatus('matched'),
+      matched: 0,
       missing: countStatus('missing_from_cloudflare'),
       ambiguous: countStatus('ambiguous_application'),
       partial: countStatus('provider_partial'),

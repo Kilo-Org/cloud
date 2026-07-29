@@ -85,8 +85,6 @@ function assertNever(value: never): never {
 
 function reconciliationStatusLabel(status: ReconciliationStatus): string {
   switch (status) {
-    case 'matched':
-      return 'Matched';
     case 'missing_from_cloudflare':
       return 'Missing from Cloudflare';
     case 'ambiguous_application':
@@ -101,8 +99,6 @@ function reconciliationStatusLabel(status: ReconciliationStatus): string {
 
 function reconciliationStatusVariant(status: ReconciliationStatus) {
   switch (status) {
-    case 'matched':
-      return 'new' as const;
     case 'missing_from_cloudflare':
       return 'destructive' as const;
     case 'ambiguous_application':
@@ -878,7 +874,7 @@ export default function UsageRecordsContent() {
                                 <TableHead>Application / service</TableHead>
                                 <TableHead>SKU(s)</TableHead>
                                 <TableHead>Meter accepted</TableHead>
-                                <TableHead>Provider seconds</TableHead>
+                                <TableHead>Provider allocation equivalents</TableHead>
                                 <TableHead>Difference (provider - meter)</TableHead>
                                 <TableHead>Provider CPU</TableHead>
                                 <TableHead>Status</TableHead>
@@ -924,8 +920,14 @@ export default function UsageRecordsContent() {
                                     {row.meterAcceptedSeconds.toLocaleString()}s
                                   </TableCell>
                                   <TableCell className="tabular-nums type-code">
-                                    {formatProviderNumber(row.providerComparisonSeconds)}
-                                    {row.providerComparisonSeconds === null ? '' : 's'}
+                                    <span className="block">
+                                      Memory {formatProviderNumber(row.providerMemorySeconds)}
+                                      {row.providerMemorySeconds === null ? '' : 's'}
+                                    </span>
+                                    <span className="block text-muted-foreground">
+                                      Disk {formatProviderNumber(row.providerDiskSeconds)}
+                                      {row.providerDiskSeconds === null ? '' : 's'}
+                                    </span>
                                   </TableCell>
                                   <TableCell className="tabular-nums type-code">
                                     {formatDifference(row.differenceSeconds, row.differencePercent)}
@@ -938,7 +940,7 @@ export default function UsageRecordsContent() {
                                     <Badge variant={reconciliationStatusVariant(row.status)}>
                                       {reconciliationStatusLabel(row.status)}
                                     </Badge>
-                                    {row.status !== 'matched' && (
+                                    {row.status !== 'comparison_unavailable' && (
                                       <p className="mt-2 min-w-64 text-muted-foreground type-label">
                                         {row.statusDetail}
                                       </p>

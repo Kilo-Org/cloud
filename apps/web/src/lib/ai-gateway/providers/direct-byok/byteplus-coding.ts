@@ -22,7 +22,7 @@ export default {
         name: 'Seed-Code',
         description:
           "ByteDance's latest code model has been deeply optimized for agentic programming tasks.",
-        flags: ['recommended', 'vision'],
+        flags: ['recommended', 'vision', 'reasoning'],
         context_length: 262144,
         max_completion_tokens: 32768,
         variants: REASONING_VARIANTS_BINARY,

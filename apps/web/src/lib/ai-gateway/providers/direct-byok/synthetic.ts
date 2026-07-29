@@ -19,7 +19,7 @@ export default {
       {
         id: 'hf:moonshotai/Kimi-K2.6',
         name: 'Kimi-K2.6',
-        flags: ['vision'],
+        flags: ['vision', 'reasoning'],
         context_length: 262144,
         max_completion_tokens: 65535,
       },

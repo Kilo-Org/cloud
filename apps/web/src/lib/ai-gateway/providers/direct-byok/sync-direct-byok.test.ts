@@ -30,6 +30,7 @@ describe('parseOpenAICompatibleProviderModels', () => {
         context_length: 262144,
         max_completion_tokens: 131072,
         input_modalities: ['text', 'image'],
+        flags: ['reasoning'],
       },
       {
         id: 'morph-minimax3-428b',
@@ -37,6 +38,7 @@ describe('parseOpenAICompatibleProviderModels', () => {
         context_length: 256000,
         max_completion_tokens: undefined,
         input_modalities: undefined,
+        flags: ['reasoning'],
       },
     ]);
   });
@@ -62,6 +64,7 @@ describe('parseModelsDevProviderModels', () => {
         stable: {
           id: 'stable',
           name: 'provider/stable',
+          reasoning: true,
           limit: { context: 128_000, output: 32_000 },
           modalities: { input: ['text', 'image'], output: ['text'] },
         },
@@ -72,6 +75,7 @@ describe('parseModelsDevProviderModels', () => {
         beta: {
           id: 'beta',
           status: 'beta',
+          reasoning: false,
         },
         unknownStatus: {
           id: 'unknown-status',
@@ -97,6 +101,7 @@ describe('parseModelsDevProviderModels', () => {
         context_length: 128_000,
         max_completion_tokens: 32_000,
         input_modalities: ['text', 'image'],
+        flags: ['reasoning'],
       },
       {
         id: 'alpha',
@@ -104,6 +109,7 @@ describe('parseModelsDevProviderModels', () => {
         context_length: undefined,
         max_completion_tokens: undefined,
         input_modalities: undefined,
+        flags: undefined,
       },
       {
         id: 'beta',
@@ -111,6 +117,7 @@ describe('parseModelsDevProviderModels', () => {
         context_length: undefined,
         max_completion_tokens: undefined,
         input_modalities: undefined,
+        flags: undefined,
       },
       {
         id: 'unknown-status',
@@ -118,6 +125,7 @@ describe('parseModelsDevProviderModels', () => {
         context_length: undefined,
         max_completion_tokens: undefined,
         input_modalities: undefined,
+        flags: undefined,
       },
     ]);
   });

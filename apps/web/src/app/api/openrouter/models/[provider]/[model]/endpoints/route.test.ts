@@ -16,7 +16,7 @@ function request(modelId: string) {
 }
 
 describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
-  test('returns the cached model without adding missing fields', async () => {
+  test('undoes discounts for every priced endpoint without adding missing fields', async () => {
     const model = {
       id: 'deepseek/deepseek-v4-pro',
       name: 'DeepSeek: DeepSeek V4 Pro',
@@ -24,8 +24,13 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
         {
           provider_name: 'DeepSeek',
           context_length: 1_048_576,
-          pricing: { prompt: '0.000000435', completion: '0.00000087' },
+          pricing: { prompt: '0.000000435', completion: '0.00000087', discount: 0.5 },
         },
+        {
+          provider_name: 'Baidu',
+          pricing: { prompt: '0.0000006253', completion: '0.0000012506', discount: 0.63 },
+        },
+        { provider_name: 'Unpriced' },
       ],
     };
     mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
@@ -35,7 +40,24 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ data: model });
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        id: model.id,
+        name: model.name,
+        endpoints: [
+          {
+            provider_name: 'DeepSeek',
+            context_length: 1_048_576,
+            pricing: { prompt: '0.000000870000', completion: '0.000001740000' },
+          },
+          {
+            provider_name: 'Baidu',
+            pricing: { prompt: '0.000001690000', completion: '0.000003380000' },
+          },
+          { provider_name: 'Unpriced' },
+        ],
+      },
+    });
   });
 
   test('returns 404 when the model is absent from the cache', async () => {

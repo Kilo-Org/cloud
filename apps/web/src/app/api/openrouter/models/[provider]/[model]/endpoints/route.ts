@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter';
 
 export async function GET(
   _request: NextRequest,
@@ -14,5 +15,17 @@ export async function GET(
     return NextResponse.json({ error: { message: 'Not Found', code: 404 } }, { status: 404 });
   }
 
-  return NextResponse.json({ data: storedModel });
+  return NextResponse.json({
+    data: {
+      ...storedModel,
+      endpoints: storedModel.endpoints.map(endpoint =>
+        endpoint.pricing
+          ? {
+              ...endpoint,
+              pricing: getModelDisplayPricing(storedModel.id, endpoint.pricing),
+            }
+          : endpoint
+      ),
+    },
+  });
 }

@@ -860,7 +860,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     });
 
     // Fail pending commands that targeted this specific socket
-    this.failPendingCommandsForSocket(disconnectedWs);
+    this.failPendingCommandsForSocket(disconnectedWs, !replaced);
 
     if (replaced) {
       console.log('Stale CLI socket closed (already replaced)', { connectionId });
@@ -1083,7 +1083,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       const att = ws.deserializeAttachment() as WSAttachment | null;
       if (att?.role === 'cli' && att.connectionId === connectionId) {
         console.log('Closing stale CLI socket for reconnect', { connectionId });
-        this.failPendingCommandsForSocket(ws);
+        this.failPendingCommandsForSocket(ws, false);
         // Preserve session ownership — the reconnecting CLI still owns these sessions
         ws.close(1000, 'replaced by reconnect');
         return true;
@@ -1132,16 +1132,25 @@ export class UserConnectionDO extends DurableObject<Env> {
     return undefined;
   }
 
-  private failPendingCommandsForSocket(targetWs: WebSocket): void {
+  private failPendingCommandsForSocket(targetWs: WebSocket, cliGone: boolean): void {
     for (const [id, entry] of this.pendingCommands) {
-      if (entry.targetCliWs === targetWs) {
-        this.sendToWeb(entry.ws, {
-          type: 'response',
-          id: entry.originalId,
-          error: entry.expectedOwnerConnectionId ? SESSION_OWNER_CHANGED_ERROR : 'CLI disconnected',
-        });
-        this.pendingCommands.delete(id);
-      }
+      if (entry.targetCliWs !== targetWs) continue;
+      // The owning CLI is really gone, so a forwarded `exit_cli` got what it
+      // asked for: this session is no longer owned by anyone.
+      const exited = cliGone && entry.command === 'exit_cli';
+      this.sendToWeb(
+        entry.ws,
+        exited
+          ? { type: 'response', id: entry.originalId, result: {} }
+          : {
+              type: 'response',
+              id: entry.originalId,
+              error: entry.expectedOwnerConnectionId
+                ? SESSION_OWNER_CHANGED_ERROR
+                : 'CLI disconnected',
+            }
+      );
+      this.pendingCommands.delete(id);
     }
   }
 
@@ -1154,11 +1163,15 @@ export class UserConnectionDO extends DurableObject<Env> {
         continue;
       }
       this.pendingCommands.delete(id);
-      this.sendToWeb(entry.ws, {
-        type: 'response',
-        id: entry.originalId,
-        error: SESSION_OWNER_CHANGED_ERROR,
-      });
+      // `exit_cli` asked for exactly this: the session is no longer owned.
+      // Ownership moving to another CLI is a genuine owner change and still fails.
+      const exited = entry.command === 'exit_cli' && nextOwnerConnectionId === undefined;
+      this.sendToWeb(
+        entry.ws,
+        exited
+          ? { type: 'response', id: entry.originalId, result: {} }
+          : { type: 'response', id: entry.originalId, error: SESSION_OWNER_CHANGED_ERROR }
+      );
     }
   }
 

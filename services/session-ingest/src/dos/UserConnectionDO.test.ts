@@ -3045,6 +3045,171 @@ describe('UserConnectionDO', () => {
 
       expect(parseSent(webWs)).toEqual({ type: 'response', id: 'cmd-1', result });
     });
+
+    it('resolves exit_cli successfully when heartbeat drops the session', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Exit's own effect: CLI heartbeat no longer lists the session.
+      sendHeartbeat(doInstance, cliWs, []);
+
+      expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        result: {},
+      });
+      expect(
+        allSent(webWs).some(
+          m =>
+            m.type === 'response' &&
+            m.id === 'cmd-1' &&
+            isRecord(m.error) &&
+            m.error.code === 'SESSION_OWNER_CHANGED'
+        )
+      ).toBe(false);
+
+      // CLI's late ACK must not produce a second cmd-1 response.
+      const responsesBeforeLateAck = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'cmd-1'
+      ).length;
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: {} });
+      expect(allSent(webWs).filter(m => m.type === 'response' && m.id === 'cmd-1')).toHaveLength(
+        responsesBeforeLateAck
+      );
+    });
+
+    it('resolves exit_cli successfully when the owning socket closes', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      webWs.send.mockClear();
+
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        result: {},
+      });
+    });
+
+    it.each(['list_models', 'send_message'] as const)(
+      'still fails %s with SESSION_OWNER_CHANGED when heartbeat drops the session',
+      command => {
+        const { doInstance, mockCtx } = setup();
+        const cliWs = addCliSocket(mockCtx, 'cli-1');
+        const webWs = addWebSocket(mockCtx, 'web-1');
+
+        sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+        cliWs.send.mockClear();
+        webWs.send.mockClear();
+        sendCommand(doInstance, webWs, {
+          id: 'cmd-1',
+          command,
+          sessionId: 's1',
+          connectionId: 'cli-1',
+        });
+        webWs.send.mockClear();
+
+        sendHeartbeat(doInstance, cliWs, []);
+
+        expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+          type: 'response',
+          id: 'cmd-1',
+          error: {
+            source: 'relay',
+            code: 'SESSION_OWNER_CHANGED',
+            message: 'Session owner changed',
+          },
+        });
+      }
+    );
+
+    it('still fails exit_cli with SESSION_OWNER_CHANGED on genuine takeover', () => {
+      const { doInstance, mockCtx } = setup();
+      const firstOwner = addCliSocket(mockCtx, 'cli-1');
+      const nextOwner = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, firstOwner, [makeSession('s1')]);
+      sendHeartbeat(doInstance, nextOwner, []);
+      firstOwner.send.mockClear();
+      webWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      webWs.send.mockClear();
+
+      sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+
+      expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+    });
+
+    it('still fails exit_cli with SESSION_OWNER_CHANGED when socket is replaced by reconnect', () => {
+      const { doInstance, mockCtx } = setup();
+      const firstCli = connectCliSocket(doInstance, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, firstCli, [makeSession('s1')]);
+      firstCli.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      webWs.send.mockClear();
+
+      connectCliSocket(doInstance, 'cli-1');
+
+      expect(firstCli.close).toHaveBeenCalledWith(1000, 'replaced by reconnect');
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
+import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
@@ -218,7 +219,7 @@ async function readResponseText(
   response: Response,
   headers: Headers,
   vercelRequestId: string | null | undefined,
-  capture?: RequestLogCapture | null
+  capture: RequestLogCapture | null
 ): Promise<{ text: string } | { error: unknown; errorResponse: NextResponse }> {
   try {
     return { text: await response.text() };
@@ -256,7 +257,7 @@ async function rewriteSseStream(
   serializeError: (error: ResponseReadError) => string,
   onFinally: () => void,
   vercelRequestId: string | null | undefined,
-  capture?: RequestLogCapture | null
+  capture: RequestLogCapture | null
 ) {
   const decoder = new TextDecoder();
   // Accumulate the raw upstream text for request logging while the stream is
@@ -323,9 +324,9 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
 
 export async function rewriteModelResponse_ChatCompletions(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null,
-  vercelRequestId?: string | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
@@ -478,9 +479,9 @@ function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
 
 export async function rewriteModelResponse_Messages(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null,
-  vercelRequestId?: string | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
@@ -614,9 +615,9 @@ type ResponsesApiEvent = {
 
 export async function rewriteModelResponse_Responses(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null,
-  vercelRequestId?: string | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
@@ -742,8 +743,11 @@ export async function rewriteModelResponse(
   logging: RequestLoggingParams
 ): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
+  // Custom-priced models report upstream OpenRouter cost, which does not match
+  // the custom pricing, so it must be removed just like for free models.
   const isFreeModelRequiringCostRemoval =
-    (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
+    (providerId === 'openrouter' || providerId === 'vercel') &&
+    (isKiloExclusiveFreeModel(model) || getCustomPricing(model) !== undefined);
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;

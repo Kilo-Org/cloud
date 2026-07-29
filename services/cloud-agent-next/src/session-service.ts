@@ -632,6 +632,7 @@ export type ResolvedWorkspaceTokens = {
   githubFallbackReason?: ManagedGitHubFallbackReason;
   gitToken?: string;
   gitlabCapabilityGitUrl?: string;
+  bitbucketCapabilityGitUrl?: string;
   gitlabTokenManaged?: boolean;
   bitbucketTokenManaged?: boolean;
   gitlabInstanceUrl?: string;
@@ -1743,6 +1744,7 @@ export class SessionService {
     const platform = repositoryPlatform(metadata);
     let gitToken = git?.type === 'git' ? git.token : undefined;
     let gitlabCapabilityGitUrl: string | undefined;
+    let bitbucketCapabilityGitUrl: string | undefined;
     let gitlabTokenManaged = git?.type === 'gitlab' ? git.gitlabTokenManaged : undefined;
     let bitbucketTokenManaged = git?.type === 'bitbucket' ? git.bitbucketTokenManaged : undefined;
     let gitlabInstanceUrl: string | undefined;
@@ -1834,6 +1836,11 @@ export class SessionService {
           throw ExecutionError.invalidRequest(message);
         }
         gitToken = result.value.capability;
+        // The canonical clone URL is resolved from the workspace/repo UUIDs at
+        // issue time; git.url may carry a stale/renamed slug. Redeem validates
+        // the outbound path against this canonical name, so clone with it too
+        // (mirrors gitlabCapabilityGitUrl) or contained clones 404/mismatch.
+        bitbucketCapabilityGitUrl = result.value.gitUrl;
         bitbucketTokenManaged = true;
       } else {
         const result = await resolveManagedBitbucketToken(env, {
@@ -1873,6 +1880,7 @@ export class SessionService {
       githubFallbackReason,
       gitToken,
       gitlabCapabilityGitUrl,
+      bitbucketCapabilityGitUrl,
       gitlabTokenManaged,
       bitbucketTokenManaged,
       gitlabInstanceUrl,
@@ -2024,7 +2032,10 @@ export class SessionService {
       sessionHome,
       githubRepo: github?.repo,
       githubToken: resolvedTokens.githubToken,
-      gitUrl: resolvedTokens.gitlabCapabilityGitUrl ?? git?.url,
+      gitUrl:
+        resolvedTokens.gitlabCapabilityGitUrl ??
+        resolvedTokens.bitbucketCapabilityGitUrl ??
+        git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
@@ -2054,7 +2065,10 @@ export class SessionService {
       createdOnPlatform: metadata.identity.createdOnPlatform,
       callbackTarget: metadata.callback?.target,
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
-      gitUrl: resolvedTokens.gitlabCapabilityGitUrl ?? git?.url,
+      gitUrl:
+        resolvedTokens.gitlabCapabilityGitUrl ??
+        resolvedTokens.bitbucketCapabilityGitUrl ??
+        git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
@@ -2209,7 +2223,7 @@ export class SessionService {
     if (git) {
       return {
         kind: 'git',
-        url: tokens.gitlabCapabilityGitUrl ?? git.url,
+        url: tokens.gitlabCapabilityGitUrl ?? tokens.bitbucketCapabilityGitUrl ?? git.url,
         ...(tokens.gitToken ? { token: tokens.gitToken } : {}),
         ...(repositoryPlatform(metadata) ? { platform: repositoryPlatform(metadata) } : {}),
         ...(repositoryShallow(metadata) !== undefined
@@ -2281,7 +2295,10 @@ export class SessionService {
       sessionHome,
       githubRepo: github?.repo,
       githubToken: resolvedTokens.githubToken,
-      gitUrl: resolvedTokens.gitlabCapabilityGitUrl ?? git?.url,
+      gitUrl:
+        resolvedTokens.gitlabCapabilityGitUrl ??
+        resolvedTokens.bitbucketCapabilityGitUrl ??
+        git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
@@ -2585,7 +2602,7 @@ export class SessionService {
       await cloneGitRepo(
         session,
         workspacePath,
-        tokens.gitlabCapabilityGitUrl ?? git.url,
+        tokens.gitlabCapabilityGitUrl ?? tokens.bitbucketCapabilityGitUrl ?? git.url,
         tokens.gitToken,
         undefined,
         {
@@ -2702,7 +2719,7 @@ export class SessionService {
         await updateGitRemoteToken(
           session,
           context.workspacePath,
-          tokens.gitlabCapabilityGitUrl ?? git.url,
+          tokens.gitlabCapabilityGitUrl ?? tokens.bitbucketCapabilityGitUrl ?? git.url,
           tokens.gitToken,
           repositoryPlatform(metadata)
         );

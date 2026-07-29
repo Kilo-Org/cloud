@@ -482,7 +482,7 @@ function isGitLabGitAuthPath(pathname: string): boolean {
   );
 }
 
-function decodeGitLabPathname(pathname: string): string | null {
+function decodePathnameIteratively(pathname: string): string | null {
   let decoded = pathname;
   for (let depth = 0; depth < 4; depth++) {
     let next: string;
@@ -518,7 +518,7 @@ function validateGitLabCapabilityUpstream(
   if (url.origin !== base.origin) {
     return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
   }
-  const decodedPathname = decodeGitLabPathname(url.pathname);
+  const decodedPathname = decodePathnameIteratively(url.pathname);
   if (
     decodedPathname === null ||
     decodedPathname.includes('\\') ||
@@ -562,6 +562,18 @@ function validateBitbucketCapabilityUpstream(
   }
   if (url.origin !== 'https://bitbucket.org') {
     return { failure: 'upstream_origin_not_allowed' };
+  }
+  // Defense in depth against nested percent-encoding: the raw check above only
+  // catches single-encoded traversal (%2e/%2f). Decode the pathname iteratively
+  // and re-check, so sequences like %252e%252e%252f — which survive the raw pass
+  // and only resolve into ../ once Bitbucket decodes them — are rejected here.
+  const decodedPathname = decodePathnameIteratively(url.pathname);
+  if (
+    decodedPathname === null ||
+    decodedPathname.includes('\\') ||
+    /(?:^|\/)\.{1,2}(?:\/|$)/.test(decodedPathname)
+  ) {
+    return { failure: 'invalid_upstream_url' };
   }
   // Bitbucket smart-HTTP paths live under /<workspace>/<repo>.git/... The full
   // name was validated (single slash, no traversal) when the capability decoded.

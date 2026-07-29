@@ -444,6 +444,25 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
       })
     ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
   });
+
+  it.each([
+    // Single-encoded traversal is caught by the raw check.
+    ['https://bitbucket.org/acme/widgets.git/%2e%2e/git-upload-pack'],
+    // Nested/double-encoded traversal survives the raw check and must be caught
+    // by the iterative-decode recheck (mirrors the GitLab %252e%252e%252f case).
+    ['https://bitbucket.org/acme/widgets.git/%252e%252e%252facme/other.git/git-upload-pack'],
+    ['https://bitbucket.org/acme/widgets.git/objects/..%252f..%252fother/git-upload-pack'],
+  ] as const)('rejects percent-encoded path traversal %s', async requestUrl => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl,
+      })
+    ).resolves.toEqual({ success: false, reason: 'invalid_upstream_url' });
+  });
 });
 
 describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {

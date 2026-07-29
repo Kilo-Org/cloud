@@ -31,6 +31,7 @@ import type {
   GitHubAuthorAssociation,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { parseFixCommand } from '@kilocode/app-shared/code-review';
+import { isLikelyKiloBotActor } from '@/lib/code-reviews/review-memory/github-feedback';
 
 /**
  * author_association values that imply write access.
@@ -60,6 +61,22 @@ export class ReviewCommentWebhookProcessor {
         '[ReviewCommentWebhookProcessor] Malformed repository.full_name, cannot proceed',
         { fullName: repository.full_name }
       );
+      return;
+    }
+
+    // 0. Ignore comments authored by Kilo itself.
+    //    Every inline review comment Kilo posts ends with the advertised
+    //    "Reply with `@kilocode-bot fix it` …" footer, which parseFixCommand
+    //    (below) admits as a fix request. Without this guard the bot processes
+    //    its own comment, fails the author write-access check (a GitHub App
+    //    bot is not a repo collaborator), and reacts with a thumbs-down (-1)
+    //    on its own review comment. The sibling review-memory consumer of this
+    //    same webhook guards identically (see github-feedback.ts).
+    if (isLikelyKiloBotActor(comment.user.login)) {
+      logExceptInTest('[ReviewCommentWebhookProcessor] Ignoring Kilo bot-authored comment', {
+        commentId: comment.id,
+        author: comment.user.login,
+      });
       return;
     }
 

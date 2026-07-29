@@ -37,13 +37,16 @@
 // inside the screen's tab shell and needs a fresh FlatList so the
 // list can virtualize when a PR has hundreds of threads. (Same
 // approach as the Files tab.)
+//
+// Happy-path list lives in discussion/pr-review-discussion-list.tsx
+// (max-lines extraction). Expansion settle bookkeeping stays here.
 
-import { FlashList } from '@shopify/flash-list';
+import { type FlashListRef } from '@shopify/flash-list';
 import { MessageSquarePlus } from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
-import { CommentRow } from '@/components/pr-review/discussion/comment-row';
-import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
+import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -54,7 +57,15 @@ import {
   type DiscussionListItem,
   isDiscussionEmpty,
   mergeDiscussionListItems,
+  type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import {
+  expandedForThread,
+  expandThread,
+  seedThreadExpansion,
+  shouldDeferExpand,
+  toggleThreadExpanded,
+} from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 
 type PrReviewDiscussionTabProps = {
@@ -69,10 +80,6 @@ type PrReviewDiscussionTabProps = {
 };
 
 const SKELETON_ROW_COUNT = 4;
-const DISCUSSION_LIST_CONTENT_STYLE = { paddingTop: 12 };
-const noopReactionToggle = () => {
-  // Conversation comments are read-only (A2.3): no reaction mutations.
-};
 
 export function PrReviewDiscussionTab({
   owner,
@@ -86,6 +93,79 @@ export function PrReviewDiscussionTab({
       repo,
       number,
     });
+
+  const [expansion, setExpansion] = useState<Record<string, boolean>>({});
+  const expansionRef = useRef(expansion);
+  const listRef = useRef<FlashListRef<DiscussionListItem>>(null);
+  const settleGenerationRef = useRef(0);
+  const settleThreadIdRef = useRef<string | null>(null);
+
+  // Single write path: the ref is the tap-time source of truth (render-closure
+  // state can lag a queued update on rapid taps).
+  const applyExpansion = (next: Record<string, boolean>) => {
+    expansionRef.current = next;
+    setExpansion(next);
+  };
+
+  // First-sight seeding: a resolve/unresolve must NOT change expansion (see
+  // thread-expansion.ts). No-op on the loading branch (threads is []).
+  useEffect(() => {
+    const seeded = seedThreadExpansion(expansionRef.current, threads);
+    if (seeded !== expansionRef.current) {
+      applyExpansion(seeded);
+    }
+  }, [threads]);
+
+  // A data change mid-settle (load-more re-sort, optimistic mutation) cancels the
+  // settle: the captured scroll index can point at a different row after a re-sort.
+  // The user taps again; a wrong-row settle is worse.
+  useEffect(() => {
+    settleGenerationRef.current += 1;
+    settleThreadIdRef.current = null;
+  }, [threads]);
+
+  // Unmount cancels any in-flight settle.
+  useEffect(
+    () => () => {
+      settleGenerationRef.current += 1;
+      settleThreadIdRef.current = null;
+    },
+    []
+  );
+
+  const invalidateSettle = () => {
+    settleGenerationRef.current += 1;
+    settleThreadIdRef.current = null;
+  };
+
+  const handleToggleExpand = (thread: ReviewThread, index: number) => {
+    // Same-thread retap during an in-flight settle: cancel that settle, then run
+    // THIS tap's path below (cancel + supersede — never two concurrent settles,
+    // and exactly one expand results, which E2E flow 7a asserts).
+    if (settleThreadIdRef.current === thread.threadId) {
+      invalidateSettle();
+    }
+    const expanded = expandedForThread(expansionRef.current, thread.threadId, thread.isResolved);
+    if (!expanded) {
+      const layout = listRef.current?.getLayout(index);
+      const rowTop = layout ? layout.y + (listRef.current?.getFirstItemOffset() ?? 0) : null;
+      const offset = listRef.current?.getAbsoluteLastScrollOffset() ?? 0;
+      if (shouldDeferExpand(rowTop, offset)) {
+        settleGenerationRef.current += 1;
+        const generation = settleGenerationRef.current;
+        settleThreadIdRef.current = thread.threadId;
+        void (async () => {
+          await listRef.current?.scrollToIndex({ index, viewPosition: 0, animated: true });
+          if (settleGenerationRef.current === generation) {
+            settleThreadIdRef.current = null;
+            applyExpansion(expandThread(expansionRef.current, thread.threadId));
+          }
+        })();
+        return;
+      }
+    }
+    applyExpansion(toggleThreadExpanded(expansionRef.current, thread.threadId, thread.isResolved));
+  };
 
   // ── First-page error / terminal states ─────────────────────────────
   if (firstPageErrorState) {
@@ -171,104 +251,24 @@ export function PrReviewDiscussionTab({
   const listItems = mergeDiscussionListItems(threads, conversation);
 
   return (
-    <FlashList
-      data={listItems}
-      keyExtractor={keyForItem}
-      getItemType={item => item.kind}
-      renderItem={({ item }) => {
-        if (item.kind === 'comment') {
-          return (
-            <View className="px-4 pb-3">
-              <View className="gap-2.5 rounded-xl border border-border bg-card p-3.5">
-                <CommentRow
-                  comment={item.comment}
-                  reactionsDisabled
-                  onToggleReaction={noopReactionToggle}
-                />
-              </View>
-            </View>
-          );
-        }
-        return (
-          <View className="px-4 pb-3">
-            <DiscussionThread owner={owner} repo={repo} number={number} thread={item.thread} />
-          </View>
-        );
+    <PrReviewDiscussionList
+      owner={owner}
+      repo={repo}
+      number={number}
+      listItems={listItems}
+      listRef={listRef}
+      expansion={expansion}
+      onToggleExpand={handleToggleExpand}
+      onScrollBeginDrag={invalidateSettle}
+      hasNextPage={query.hasNextPage}
+      isFetchingNextPage={query.isFetchingNextPage}
+      laterPageError={laterPageError}
+      onLoadMore={() => {
+        void query.fetchNextPage();
       }}
-      contentContainerStyle={DISCUSSION_LIST_CONTENT_STYLE}
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-      ListFooterComponent={
-        <ListFooter
-          hasNextPage={query.hasNextPage}
-          isFetchingNextPage={query.isFetchingNextPage}
-          laterPageError={laterPageError}
-          onLoadMore={() => {
-            void query.fetchNextPage();
-          }}
-          onRetryLoadMore={() => {
-            void query.refetch();
-          }}
-        />
-      }
+      onRetryLoadMore={() => {
+        void query.refetch();
+      }}
     />
-  );
-}
-
-function keyForItem(item: DiscussionListItem): string {
-  return item.kind === 'thread'
-    ? `thread:${item.thread.threadId}`
-    : `comment:${item.comment.nodeId}`;
-}
-
-// ── Footer (Load more / error row) ───────────────────────────────────
-
-type ListFooterProps = {
-  readonly hasNextPage: boolean;
-  readonly isFetchingNextPage: boolean;
-  readonly laterPageError: boolean;
-  readonly onLoadMore: () => void;
-  readonly onRetryLoadMore: () => void;
-};
-
-function ListFooter({
-  hasNextPage,
-  isFetchingNextPage,
-  laterPageError,
-  onLoadMore,
-  onRetryLoadMore,
-}: Readonly<ListFooterProps>) {
-  if (laterPageError) {
-    return (
-      <View className="items-center gap-2 px-4 pb-8 pt-2">
-        <Text variant="muted" className="text-center text-xs">
-          Could not load more comments.
-        </Text>
-        <Button
-          size="sm"
-          variant="outline"
-          onPress={onRetryLoadMore}
-          accessibilityLabel="Retry loading more comments"
-        >
-          <Text>Retry</Text>
-        </Button>
-      </View>
-    );
-  }
-  if (!hasNextPage) {
-    return <View className="h-6" />;
-  }
-  return (
-    <View className="items-center px-4 pb-8 pt-2">
-      <Button
-        size="sm"
-        variant="outline"
-        loading={isFetchingNextPage}
-        onPress={onLoadMore}
-        accessibilityLabel="Load more comments"
-      >
-        <Text>Load more</Text>
-      </Button>
-    </View>
   );
 }

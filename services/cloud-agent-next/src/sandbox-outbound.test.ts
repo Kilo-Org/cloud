@@ -1299,3 +1299,68 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
     expect(forward).toHaveBeenCalledOnce();
   });
 });
+
+describe('handleManagedScmOutbound Bitbucket', () => {
+  const BITBUCKET_CAPABILITY = 'kbb1.opaque';
+  const REDEEMED_BITBUCKET_AUTHORIZATION = `Basic ${Buffer.from('x-token-auth:upstream-token').toString('base64')}`;
+
+  function bitbucketEnv(
+    redeemBitbucketSessionCapability: ReturnType<typeof vi.fn>
+  ): Cloudflare.Env {
+    return {
+      GIT_TOKEN_SERVICE: {
+        redeemGitHubSessionCapability: vi.fn(),
+        redeemGitLabSessionCapability: vi.fn(),
+        redeemKiloSessionCapability: vi.fn(),
+        redeemBitbucketSessionCapability,
+      },
+      INTERNAL_API_SECRET_PROD: { get: vi.fn(async () => 'trusted-internal-secret') },
+      SESSION_INGEST: { fetch: vi.fn() },
+    } as unknown as Cloudflare.Env;
+  }
+
+  function bitbucketGitRequest(username = 'x-token-auth'): Request {
+    return new Request('https://bitbucket.org/acme/widgets.git/git-upload-pack', {
+      method: 'POST',
+      headers: { Authorization: basicCredential(BITBUCKET_CAPABILITY, 'Basic', username) },
+    });
+  }
+
+  it('redeems a Bitbucket capability and forwards with injected auth', async () => {
+    const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
+    vi.stubGlobal('fetch', forward);
+    const redeem = vi.fn(async () => ({
+      success: true,
+      headers: { authorization: REDEEMED_BITBUCKET_AUTHORIZATION },
+    }));
+
+    const response = await handleOutbound(bitbucketGitRequest(), bitbucketEnv(redeem));
+
+    expect(response.status).toBe(200);
+    expect(redeem).toHaveBeenCalledWith({
+      capability: BITBUCKET_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      requestMethod: 'POST',
+      requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+    });
+    const forwardedRequest = forward.mock.calls[0][0] as Request;
+    expect(forwardedRequest.headers.get('Authorization')).toBe(REDEEMED_BITBUCKET_AUTHORIZATION);
+  });
+
+  it('fails closed when Bitbucket redemption is rejected', async () => {
+    const redeem = vi.fn(async () => ({ success: false, reason: 'container_mismatch' }));
+    const response = await handleOutbound(bitbucketGitRequest(), bitbucketEnv(redeem));
+    expect(response.status).toBe(502);
+  });
+
+  it('does not redeem a Bitbucket capability sent under the wrong Basic username', async () => {
+    const redeem = vi.fn();
+    // A bitbucket capability is only valid git auth under x-token-auth.
+    const response = await handleOutbound(
+      bitbucketGitRequest('x-access-token'),
+      bitbucketEnv(redeem)
+    );
+    expect(redeem).not.toHaveBeenCalled();
+    expect(response.status).toBe(502);
+  });
+});

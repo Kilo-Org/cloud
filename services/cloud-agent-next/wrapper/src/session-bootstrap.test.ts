@@ -266,6 +266,52 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     // blob could never be lazily fetched — it keeps a normal full clone.
     const cloneCall = gitCalls.find(args => args[0] === 'clone');
     expect(cloneCall).not.toContain('--filter=blob:none');
+    // The raw-token origin is stripped to a credential-free URL.
+    expect(gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(true);
+  });
+
+  it('uses a blobless clone and keeps the capability origin for a contained Bitbucket review session', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://bitbucket.org/acme/repo.git',
+      token: 'kbb1.opaque-capability',
+      platform: 'bitbucket',
+    };
+    request.workspace.branchName = 'feature/login';
+
+    const gitCalls: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          gitCalls.push(args);
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    // A capability origin stays authenticated through the outbound interceptor,
+    // so the clone is blobless and the origin is NOT stripped.
+    expect(gitCalls.find(args => args[0] === 'clone')).toContain('--filter=blob:none');
+    expect(gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(false);
   });
 
   it('uses a blobless partial clone for GitLab review sessions', async () => {

@@ -44,7 +44,7 @@
 import { type FlashListRef } from '@shopify/flash-list';
 import { MessageSquarePlus } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
@@ -173,17 +173,18 @@ export function PrReviewDiscussionTab({
           });
           if (settleGenerationRef.current === generation) {
             settleThreadIdRef.current = null;
-            // Suppress maintainVisibleContentPosition for exactly the expand
-            // commit. Measured across E2E rounds r1-r4: every top-clipped
-            // flight equals the expansion height — the post-expand native
-            // mVCP adjustment, not a settle-target error. The settle only
-            // has to make the row fully visible; with mVCP disabled at this
-            // one commit the +expansion-height adjustment cannot fire,
-            // whatever the anchor-boundary geometry (Android parks nearer
-            // the visible edge than iOS). Re-enabled on a timeout; the
-            // load-more insertion protection (why mVCP stays on for this
-            // list) is unaffected outside this ~150ms window.
-            setSuppressContentPosition(true);
+            // Android only: suppress maintainVisibleContentPosition for exactly
+            // the expand commit. Measured across E2E rounds r1-r5: every
+            // top-clipped flight equals the expansion height — the post-expand
+            // native mVCP adjustment, not a settle-target error. Android's
+            // shallower park loses the anchor without this (r4); with it the
+            // adjustment cannot fire (r5: all Android flows pass). iOS must
+            // NOT cycle the prop: removing and re-adding native mVCP blanks
+            // the whole list (r5, deterministic -997949 offset), and iOS's
+            // deeper park is anchor-safe without suppression (r4: 3/3 pass).
+            if (Platform.OS === 'android') {
+              setSuppressContentPosition(true);
+            }
             applyExpansion(expandThread(expansionRef.current, thread.threadId));
             setTimeout(() => {
               setSuppressContentPosition(false);

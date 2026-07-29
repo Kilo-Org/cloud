@@ -385,14 +385,14 @@ async function cloneRepository(
   const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
   const platform = repo.kind === 'git' ? repo.platform : 'github';
   const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
-  // GitHub/GitLab code review reads changed files from the working tree and gets
-  // the PR diff from the provider API or a local `git diff <prev>..HEAD`. It needs
-  // the full commit graph but not every historical file blob, so a blobless
-  // partial clone keeps the clone bounded by the current working tree (git fetches
-  // blobs lazily on demand) instead of full history, which on large repositories
-  // otherwise exceeds the clone timeout. Full history is retained, so incremental
-  // diffs and merge-base still work. See isBloblessReviewCloneEligible for why
-  // only GitHub/GitLab qualify.
+  // Code review reads changed files from the working tree and gets the PR diff
+  // from the provider API or a local `git diff <prev>..HEAD`. It needs the full
+  // commit graph but not every historical file blob, so a blobless partial clone
+  // fetches blobs lazily on demand instead of downloading every historical blob,
+  // which on large repositories otherwise exceeds the clone timeout. Full history
+  // is retained, so incremental diffs and merge-base still work. See
+  // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
+  // capability-backed Bitbucket, whose origin stays authenticated for lazy fetch).
   const useBlobless = isBloblessReviewCloneEligible(request);
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {

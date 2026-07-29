@@ -42,7 +42,7 @@ export function HomeScreen() {
   const isFocused = useIsFocused();
   const [refreshing, setRefreshing] = useState(false);
 
-  const { organizationId } = useOrganization();
+  const { organizationId, isLoaded: orgLoaded } = useOrganization();
 
   const invalidateHomeQueries = useCallback(() => {
     void queryClient.invalidateQueries({
@@ -97,9 +97,10 @@ export function HomeScreen() {
     refetch: refetchSessions,
   } = useAgentSessions({
     organizationId,
+    enabled: orgLoaded,
   });
 
-  const isLoading = instancesPending || sessionsLoading;
+  const isLoading = instancesPending || sessionsLoading || !orgLoaded;
 
   // Match what the Home Agent-sessions section actually renders (cloud-agent
   // stored + any active), so a CLI-only account shows the first-use promo

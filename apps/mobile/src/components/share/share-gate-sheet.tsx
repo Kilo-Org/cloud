@@ -60,7 +60,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const trpc = useTRPC();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   // Org-scoped stored page only (cloud-agent + cli). Active list is an
-  // id/capability lookup — never a row source (no organizationId filter).
+  // id/capability lookup — never a row source.
   const sessions = useAgentSessions({
     createdOnPlatform: expandPlatformFilter(['cloud-agent', 'cli']),
     organizationId,

@@ -65,12 +65,19 @@ describe('parseModelsDevProviderModels', () => {
           id: 'stable',
           name: 'provider/stable',
           reasoning: true,
+          reasoning_options: [
+            { type: 'toggle' },
+            { type: 'effort', values: ['high', 'max', 'default', null] },
+            { type: 'budget_tokens', min: 0, max: 32_000 },
+          ],
           limit: { context: 128_000, output: 32_000 },
           modalities: { input: ['text', 'image'], output: ['text'] },
         },
         alpha: {
           id: 'alpha',
           status: 'alpha',
+          reasoning: true,
+          reasoning_options: [{ type: 'toggle' }],
         },
         beta: {
           id: 'beta',
@@ -102,6 +109,11 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: 32_000,
         input_modalities: ['text', 'image'],
         flags: ['reasoning'],
+        variants: {
+          none: { reasoning: { enabled: false, effort: 'none' } },
+          high: { reasoning: { enabled: true, effort: 'high' } },
+          max: { reasoning: { enabled: true, effort: 'max' } },
+        },
       },
       {
         id: 'alpha',
@@ -109,7 +121,11 @@ describe('parseModelsDevProviderModels', () => {
         context_length: undefined,
         max_completion_tokens: undefined,
         input_modalities: undefined,
-        flags: undefined,
+        flags: ['reasoning'],
+        variants: {
+          instant: { reasoning: { enabled: false, effort: 'none' } },
+          thinking: { reasoning: { enabled: true, effort: 'high' } },
+        },
       },
       {
         id: 'beta',
@@ -118,6 +134,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
+        variants: undefined,
       },
       {
         id: 'unknown-status',
@@ -126,6 +143,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
+        variants: undefined,
       },
     ]);
   });

@@ -6,6 +6,7 @@ import {
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
+import { ReasoningEffortSchema, type OpenCodeSettings } from '@kilocode/db/schema-types';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -28,10 +29,24 @@ const OpenAICompatibleModelsResponseSchema = z.object({
   ),
 });
 
+const ModelsDevReasoningOptionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('toggle') }),
+  z.object({
+    type: z.literal('effort'),
+    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
+  }),
+  z.object({
+    type: z.literal('budget_tokens'),
+    min: z.number().optional(),
+    max: z.number().optional(),
+  }),
+]);
+
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
   reasoning: z.boolean().optional(),
+  reasoning_options: z.array(ModelsDevReasoningOptionSchema).optional(),
   status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
   limit: z
     .object({
@@ -62,6 +77,7 @@ type RawModel = {
   max_completion_tokens?: number;
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
   flags?: ReadonlyArray<DirectByokModelFlag>;
+  variants?: OpenCodeSettings['variants'];
 };
 
 type SyncContext = {
@@ -114,6 +130,38 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
     }));
 }
 
+function modelsDevReasoningOptionsToVariants(
+  options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>> | undefined
+): OpenCodeSettings['variants'] {
+  if (!options) return undefined;
+
+  const hasToggle = options.some(option => option.type === 'toggle');
+  const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};
+  for (const option of options) {
+    if (option.type !== 'effort') continue;
+    for (const value of option.values) {
+      const effort = ReasoningEffortSchema.safeParse(value);
+      if (!effort.success) continue;
+      effortVariants[effort.data] = {
+        reasoning: { enabled: effort.data !== 'none', effort: effort.data },
+      };
+    }
+  }
+
+  if (Object.keys(effortVariants).length > 0) {
+    return hasToggle && !effortVariants.none
+      ? { none: { reasoning: { enabled: false, effort: 'none' } }, ...effortVariants }
+      : effortVariants;
+  }
+  if (hasToggle) {
+    return {
+      instant: { reasoning: { enabled: false, effort: 'none' } },
+      thinking: { reasoning: { enabled: true, effort: 'high' } },
+    };
+  }
+  return undefined;
+}
+
 export function parseModelsDevProviderModels(
   entry: unknown,
   availableModelIds?: ReadonlySet<string>
@@ -133,6 +181,7 @@ export function parseModelsDevProviderModels(
       max_completion_tokens: model.limit?.output,
       input_modalities: model.modalities?.input,
       flags: model.reasoning ? ['reasoning'] : undefined,
+      variants: modelsDevReasoningOptionsToVariants(model.reasoning_options),
     }));
 }
 
@@ -246,6 +295,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       flags: flags.size > 0 ? [...flags] : undefined,
       context_length,
       max_completion_tokens,
+      variants: raw.variants,
     });
   }
 

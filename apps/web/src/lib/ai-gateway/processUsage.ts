@@ -1253,11 +1253,19 @@ export async function processTokenData(
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
     if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
+      // The provider's generation lookup and the response's own usage payload should
+      // yield the same cost. A mismatch means inconsistent token or pricing data from
+      // the provider; the generation lookup values win (see assignment below).
       console.warn(
-        `DEV ODDITY / WARNING: Usage stats do not match generation data:`,
-        genStats.model,
-        [genStats.cost_mUsd, usageStats.cost_mUsd],
-        [genStats.cacheDiscount_mUsd, usageStats.cacheDiscount_mUsd]
+        'Cost from provider generation lookup differs from cost computed from response usage data:',
+        {
+          model: genStats.model,
+          cost_mUsd: { generation: genStats.cost_mUsd, response: usageStats.cost_mUsd },
+          cacheDiscount_mUsd: {
+            generation: genStats.cacheDiscount_mUsd,
+            response: usageStats.cacheDiscount_mUsd,
+          },
+        }
       );
     }
     usageStats = genStats;

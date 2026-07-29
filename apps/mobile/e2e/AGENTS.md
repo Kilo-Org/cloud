@@ -7,10 +7,10 @@ Interactive verification against a local backend. Run commands from the reposito
 This machine is shared by parallel workflows. Before starting a stack, booting a simulator or emulator, or running a native build — on every run, whether or not you can see another workflow active — acquire a slot:
 
 ```bash
-.kilo_workflow/e2e-slot.sh acquire <your-tmux-session>   # blocks until a slot frees
-.kilo_workflow/e2e-slot.sh status                        # current holders
-.kilo_workflow/e2e-slot.sh release <your-tmux-session>   # the moment the device phase ends
-.kilo_workflow/e2e-slot.sh stacks                        # any stack running with no slot
+.kilo_workflow/e2e-slot.sh acquire   # run from your own tmux session — it resolves the name itself; blocks until a slot frees
+.kilo_workflow/e2e-slot.sh status    # current holders
+.kilo_workflow/e2e-slot.sh release   # the moment the device phase ends
+.kilo_workflow/e2e-slot.sh stacks    # any stack running with no slot
 ```
 
 A slot, this worktree's dev stack, and the simulators it claims are one resource: the slot is what entitles you to all three, and `release` takes all three back — it stops the stack and releases every simulator this worktree claimed, powering off the ones your claims booted. Release when your device phase is genuinely over, not partway through a round you still need services or a device for.
@@ -312,7 +312,7 @@ tmux kill-session -t "$ANDROID_SESSION"      # if created
 rm -f "$LOGIN_LOG"                           # if created
 rm -f "$EMULATOR_LOG"                        # if created
 pnpm dev:mobile:android release <serial>     # every Android device you claimed
-.kilo_workflow/e2e-slot.sh release <tmux-session>   # always, as soon as the device phase ends
+.kilo_workflow/e2e-slot.sh release           # always, as soon as the device phase ends
 ```
 
 The slot release is the teardown. It stops this worktree's dev stack and releases every simulator this worktree claimed — powering off the ones your claims booted, restoring their names, and leaving a device that was already running before your claim alone. So there is no `pnpm dev:stop`, no `xcrun simctl shutdown`, and no `pnpm dev:mobile:simulator release <udid>` on this list: releasing the slot does all three, and forgetting one is how simulators used to stay booted all day. Never call `xcrun simctl shutdown` on an E2E device yourself — the claim, not your memory of what you booted, is what knows whether the device is yours to power off.

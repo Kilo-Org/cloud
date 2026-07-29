@@ -10,9 +10,8 @@
 #   label    round tag, e.g. r1 or api-r2 (slice-r<round>)
 #   message  short literal instruction — file content goes via --file, never $(cat)
 #
-# Prints the log path. Wait per WORKFLOW.md: the run is done when the tmux
-# window/session is gone or `tail -1 <log>` matches ^EXITCODE=[0-9]; then check
-# the role's sentinel line — a log without it is a void round.
+# Prints the log path. Wait on it with await-role.sh, never a hand-rolled
+# loop — it reports DONE with the role's sentinel, VOID, STALLED, or RUNNING.
 #
 # The e2e-verifier gets its own tmux session (device slots are owned and
 # auto-reaped by session name); every other role runs as a window in the

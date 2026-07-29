@@ -45,8 +45,16 @@ A section routinely takes hours of unattended machine time. The human cost is mi
 |---|---|
 | [`WORKFLOW.md`](WORKFLOW.md) | The canonical spec — roles, loops, gates, dispatch commands |
 | [`dispatch-role.sh`](dispatch-role.sh) | Launches a kilo role agent in tmux with a clean environment and logged exit code |
+| [`await-role.sh`](await-role.sh) | Waits on a dispatched agent's log and reports the round's outcome: DONE with its verdict, VOID, STALLED, or RUNNING |
+| [`launch-interactive.sh`](launch-interactive.sh) | Launches an interactive session (planner, orchestrator) in tmux with a clean environment and a live TTY |
 | [`steer.sh`](steer.sh) | Delivers a message to a running interactive session (starter, planner, orchestrator) and confirms it was submitted |
 | [`e2e-slot.sh`](e2e-slot.sh) | Machine-global semaphore (default 3) capping concurrent device/stack E2E phases; agents are never capped |
+| [`slice-diff.sh`](slice-diff.sh) | Emits one slice's diff for review plus a snapshot fingerprint that catches tree/commit violations after a round |
+| [`pr-threads.sh`](pr-threads.sh) | Lists, replies to, and resolves PR review threads (GraphQL plumbing for the Kilobot loop) |
+| [`pick-reviewers.sh`](pick-reviewers.sh) | Ranks reviewer candidates for a PR from file history and the requester's past reviewers |
+| [`upload-pr-attachment.sh`](upload-pr-attachment.sh) | Uploads a screenshot to GitHub `user-attachments` via the checksum-pinned, security-reviewed `gh-image` binary |
 | [`learnings/`](learnings/) | Environment blockers and fixes, one file each, committed via PRs so every future run inherits them; `learnings/system/` is gitignored machine-local state |
+
+A standing rule from the spec: **anything that can be automated away, should be automated away.** Agents' tokens go to the work, not to battling the workflow or the environment — when a run stumbles on something a script or a document could have prevented, the run fixes the script or the document in the same PR, and learnings that graduate into automation get deleted.
 
 Role definitions live in the repository root `.kilo/agent/` (the kilo CLI only discovers agents there). The workflow self-heals: when a run stumbles on something this documentation could have prevented, it fixes the documentation in the same PR.

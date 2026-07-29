@@ -21,7 +21,8 @@ These apply to every role. Later sections do not repeat them.
 - Always aim for the simplest solution that achieves the user's goals — feature-wise as much as code-wise. Reuse existing helpers, components, and contracts. Do not add abstraction or scope without evidence it is required.
 - Commit in small, logically scoped commits. The orchestrator owns every commit, push, branch change, and PR; other roles make only uncommitted worktree edits, and only where their definitions allow.
 - Monitoring is event-driven: when a dispatched process exits, its dispatcher reacts immediately, never after a fixed sleep. Periodic checks exist only to detect a wedge.
-- Before any environment-dependent phase, read the learnings (see Learnings): the worktree's `.kilo_workflow/learnings/`, plus the main checkout's `~/Projects/cloud/.kilo_workflow/learnings/system/` — the canonical machine-local set, which mid-run writes go to and worktree copies lag.
+- Tokens go to the work, never to fighting the workflow or the environment. Every mechanical step that can be scripted is scripted — `dispatch-role.sh`, `await-role.sh`, `steer.sh`, `launch-interactive.sh`, `e2e-slot.sh`, `slice-diff.sh`, `pr-threads.sh`, `pick-reviewers.sh`, `upload-pr-attachment.sh` — use the script, never hand-assemble its steps. **Anything that can be automated away, should be automated away:** when a run stumbles on something a script or an instruction could have prevented, fix the script or the document in the same run (see Learnings).
+- Learnings are the residue automation cannot reach. Before any environment-dependent phase, list both learnings directories — the worktree's `.kilo_workflow/learnings/` and the main checkout's `~/Projects/cloud/.kilo_workflow/learnings/system/` (the canonical machine-local set, which mid-run writes go to and worktree copies lag) — and read the entries whose names match your surface; filenames are symptom-keyed. When a tool or environment failure blocks you mid-run, grep both directories for the error text before debugging from scratch: a prior run has usually already paid for the answer.
 
 ### Models
 
@@ -53,20 +54,29 @@ LOG=$(.kilo_workflow/dispatch-role.sh plan-reviewer <section> r1 <cloud-worktree
 
 The cwd/worktree is always the **cloud** worktree, even when the slice edits a sibling repository — the role definitions in root `.kilo/agent/` are only discovered there, and they pin the model, so worker dispatches never pass `--model`/`--variant`. The message is a short literal; file content — handoffs, plans, diffs — always travels via `--file <path>` (repeatable), never inlined with `"$(cat file)"`: dispatches routed through a tmux command string get re-parsed by another shell, and backticks inside the file then execute (see `learnings/kilo-run-shell-substitution-executes-backticks.md`).
 
-What the script encodes (details in `learnings/`):
+What the script encodes (details in its header comments):
 
 - tmux wrapping — harness command timeouts kill bare long runs. The `e2e-verifier` gets its **own tmux session** (E2E slots are owned and auto-reclaimed by session name; a window-named owner leaks or shares slots); other roles run as windows in the dispatcher's session, resolved through `$TMUX_PANE`. A dispatcher that is not itself inside tmux has no such session, so its roles get their own sessions too — never a guessed one. Names are `<section>-<role>-<label>`, logs `$SCRATCH/<role>-<label>.log`.
 - Full `KILO_*`/`OPENCODE*` env strip — a dispatcher running inside kilo poisons nested runs otherwise (see `learnings/nested-kilo-run-env-poisoning.md`).
 - Output redirected, never piped (`| tee` makes `$?` report the pipe's exit, not kilo's), with `EXITCODE=$?` appended as the log's last line.
 
-Wait event-driven: the run is done when the tmux window/session is gone or `tail -1 "$LOG"` matches `^EXITCODE=[0-9]`. The role's sentinel is then the line **above** the marker — check it with `tail -2 "$LOG" | head -1`, never by grepping the whole log (agents quote sentinel strings when reading this document, and a mid-log match false-passes).
-- **Void rounds:** every role definition requires a fixed sentinel as the log's **last report line** (reviewers: `No findings.`, `FINDINGS: <n>`, or `STOPPED EARLY.`; implementer: `SLICE COMPLETE.`/`STOPPED EARLY.`; verifier: `VERIFICATION PASSED.`/`VERIFICATION FAILED.`/`VERIFICATION BLOCKED.`/`REPRODUCED.`/`CANNOT REPRODUCE.`/`STOPPED EARLY.`). A round without its sentinel is void, never a pass, regardless of exit code — kilo runs can die mid-stream and still exit 0. Discard it and dispatch a fresh session. `STOPPED EARLY.` is not void but not success either: re-dispatch with a continuation handoff; it counts toward the loop's round cap.
-- After a reviewer round, the reviewed slice's owned paths must match the dispatcher's pre-round snapshot (other slices' implementers may legitimately be editing theirs); after an implementer round no new commits may exist. A violation voids the round.
-- Void rounds count toward the loop's round cap, and three consecutive void rounds are an infrastructure blocker (auth wedge, provider outage), never something to redispatch through.
+Wait with [`await-role.sh`](await-role.sh) — never a hand-rolled loop (exit codes lie, whole-log sentinel greps false-pass on quoted sentinels, and a stalled run never writes its marker):
+
+```bash
+.kilo_workflow/await-role.sh "$LOG"   # blocks up to 8 minutes, prints exactly one line
+```
+
+Act on that line:
+
+- `DONE <sentinel>` — the round's verdict, taken from the only place a verdict counts (the line above the `EXITCODE` marker). Sentinels: reviewers `No findings.` / `FINDINGS: <n>`; implementer `SLICE COMPLETE.`; verifier `VERIFICATION PASSED.`/`VERIFICATION FAILED.`/`VERIFICATION BLOCKED.` (repro mode: `REPRODUCED.`/`CANNOT REPRODUCE.`); any role `STOPPED EARLY.` — not a failure but not success: re-dispatch with a continuation handoff, and it counts toward the loop's round cap.
+- `RUNNING` — invoke it again. Each re-invocation is also the moment to unstick **infrastructure failures only**: a wedged or crashed kilo CLI, a dead tmux window, a hung service the agent cannot restart itself. Product, logic, or review problems are never stuck states — route those through the escalation ladder.
+- `VOID` — the run ended with no verdict (kilo runs can die mid-stream and still exit 0). Never a pass: discard the round and dispatch a fresh session.
+- `STALLED` — the stall that never exits. Kill the round's tmux window/session, verify state from artifacts on disk (never the dead run's claims), and redispatch fresh with a continuation handoff.
+
+Two checks stay with the dispatcher, since only it knows the slice — both are one `slice-diff.sh` re-run (compare its `SNAPSHOT` line against the pre-round one): after a reviewer round the whole line must be identical — the reviewer never modifies the tree (other slices' implementers may legitimately be editing *their* paths); after an implementer round the head sha must be unchanged — the implementer never commits. A violation voids the round. Void rounds count toward the loop's round cap, and three consecutive void rounds are an infrastructure blocker (auth wedge, provider outage), never something to redispatch through.
 
 Role boundaries — reviewers never modify the tree, the implementer never commits, no role dispatches agents — are enforced by instruction, not permission. This is deliberate: permission deny lists caused void review rounds (a reviewer whose blocked command made it exit with no verdict, which read as a pass) and takeover churn. The single exception is `task: deny` in the definitions — blocking agent dispatch costs nothing and cannot void a round. The workflow otherwise trades enforcement for reliable rounds and accepts that a misbehaving agent can do what it was told not to; do not "fix" this by re-adding deny lists.
 
-While a role agent runs, its dispatcher checks on it about every 7 minutes and unsticks infrastructure failures only: a wedged or crashed kilo CLI, a dead tmux window, a hung service the agent cannot restart itself. Product, logic, or review problems are not stuck states — route those through the escalation ladder.
 
 ### Steering a Live Interactive Session
 
@@ -84,7 +94,7 @@ It prints `running` when the session took the message immediately and `queued` w
 - A refusal to paste into a pane that is not running the kilo CLI — a mistargeted steer executes in a shell.
 - Delivery confirmed from the pane, never assumed.
 
-**`N queued` in the footer is delivery working, not a wedge.** Queued messages land one at a time at turn boundaries, in order, and a session that chains tool calls for tens of minutes holds the whole queue that entire time. Never kill, relaunch, or escalate on a queue count; a wedge needs its own evidence (frozen build timer, stream or api error, dead process — see Planner Monitor Mode). `Escape` does not flush the queue.
+**`N queued` in the footer is delivery working, not a wedge.** Queued messages land one at a time at turn boundaries, in order, and a session that chains tool calls for tens of minutes holds the whole queue that entire time. Never kill, relaunch, or escalate on a queue count; a wedge needs its own evidence (frozen build timer, stream or api error, dead process — see Monitor Mode). `Escape` does not flush the queue.
 
 Because delivery is ordered and turn-paced, a correction cannot overtake what it corrects: send ONE consolidated, self-contained message per change, never a drip of add-then-retract. When a change must take effect before the current turn ends, kill the session and relaunch it fresh with an updated handoff — faster than waiting on the queue, and it cannot half-apply. Everything a session needs at launch belongs in its launch message and handoff; steering a live one is the exception, not the channel.
 
@@ -110,7 +120,7 @@ Every dispatch to a role agent includes:
 - The mode; for hands-off, a direct instruction to never ask the user questions
 - Sanitized env values inline. Role agents must never read `.env`, `.env.*`, `.dev.vars`, or equivalent files; the handoff table is authoritative. Never place secrets or raw environment-file contents in a handoff.
 - The exact checks or flows expected for that stage
-- For any device or stack phase: the slot rule (see E2E Slots) with the tmux session name that owns the slot
+- For any device or stack phase: the slot rule (see E2E Slots)
 - Prior findings being addressed, including rejected findings that must not reopen without new evidence
 - Priority order, minimum complete outcome, optional work to drop, and a clean stopping rule before budget exhaustion (estimate roughly one step per planned tool call; when in doubt, split the task); on early stop, the required continuation state (completed work, remaining work, failures, files touched, checks run or deferred, safest next action)
 - The GitHub comment rule (see GitHub Communication)
@@ -126,26 +136,23 @@ The session the user invokes the workflow from is the starter, running on the ha
 2. Explore the relevant parts of the codebase.
 3. Interrogate the requirements — in `hands on` mode by grilling the user one question at a time, in `hands off` mode by grilling itself and answering from repository evidence, recording material assumptions. Always drive toward the simplest solution that achieves the user's goals, and challenge the request itself: "should we even do this?", "why not do this instead?", "we could achieve the same thing simpler, like this".
 4. Divide the finalized work into related, **disjoint** sections — no two sections may touch the same files or contracts.
-5. For each section: create the dedicated worktree and scratch directory (Ground Rules), write the section brief to `$SCRATCH/brief.md` — the work, the mode, acceptance criteria and constraints gathered so far, the requesting human's GitHub handle for PR assignment, the worktree path, and the scratch path — and launch a planner in a new tmux window on the planner harness and model. `<session>` is the starter's own tmux session, resolved through its own pane — `tmux display-message -p -t "$TMUX_PANE" '#S'`; never the untargeted `tmux display-message -p '#S'`, which answers with the tmux **server's** current session (the most recently active one) and silently files the window under an unrelated section. A starter that is not itself inside tmux has no such session and `$TMUX_PANE` is unset: launch the planner with `tmux new-session -d -s <section>-planner` instead of guessing a target. The `$SCRATCH` value must be expanded by the launching shell (double-quote the tmux command string; the tmux server does not know the variable):
+5. For each section: create the dedicated worktree and scratch directory (Ground Rules), write the section brief to `$SCRATCH/brief.md` — the work, the mode, acceptance criteria and constraints gathered so far, the requesting human's GitHub handle for PR assignment, the worktree path, and the scratch path — and launch a planner on the planner harness and model with [`launch-interactive.sh`](launch-interactive.sh). The script encodes the launch traps (env strip, TTY, tmux targeting — details in its header), lands the window in your own session when you are inside tmux and a fresh session otherwise, prints the tmux target for `steer.sh` and `capture-pane`, and fails loudly if the command dies at launch:
 
 ```bash
 # kilo planner (the planner agent definition pins permissions; the model is the user's pick):
-tmux new-window -t <session> -n <section>-planner -c <worktree> \
-  "env \$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /' || true) \
-   kilo run 'Plan the work in the attached brief.' --agent planner \
-   --interactive --model <planner-model> --variant high --title '<section> planner' --file $SCRATCH/brief.md"
+.kilo_workflow/launch-interactive.sh <section>-planner <worktree> \
+  kilo run 'Plan the work in the attached brief.' --agent planner \
+  --interactive --model <planner-model> --variant high --title '<section> planner' --file "$SCRATCH/brief.md"
 # claude planner:
-tmux new-window -t <session> -n <section>-planner -c <worktree> \
-  "claude 'You are the planner in .kilo_workflow/WORKFLOW.md. Plan the work in the brief at $SCRATCH/brief.md.'"
+.kilo_workflow/launch-interactive.sh <section>-planner <worktree> \
+  claude "You are the planner in .kilo_workflow/WORKFLOW.md. Plan the work in the brief at $SCRATCH/brief.md."
 ```
-
-The escaped `\$(env ...)` strip runs inside the new window, clearing `KILO_*`/`OPENCODE*` the tmux server may carry (see `learnings/nested-kilo-run-env-poisoning.md`).
 
 One planner per section; each section flows through its own planner, orchestrator, and PR. A single-section run launches a single planner. If the starter's own session already fits the planner role (right model, user agrees), it may become the single planner itself instead of launching one.
 
 ### Starter Monitor Mode
 
-After launching planners the starter monitors them the same way the planner monitors the orchestrator: check about every 30 minutes, unstick or relaunch on infrastructure death only (a fresh session with a continuation brief covering what the dead planner observably finished — never `--continue`), and never intervene in planning judgment. The starter's duty ends when every section has reached a terminal state (see Planner Monitor Mode).
+After launching planners the starter enters Monitor Mode (see Monitor Mode, which is written for the planner watching its orchestrator — the starter applies the same rules with planners as its dispatches and the brief as the handoff). The starter's duty ends when every section has reached a terminal state.
 
 ### Interaction Modes
 
@@ -179,20 +186,16 @@ A `CANNOT REPRODUCE.` sentinel is a blocker, not a license to fix an unconfirmed
 ### Launching the Orchestrator
 
 ```bash
-tmux new-window -t <session> -n <section>-orchestrator -c <worktree> \
-  "env \$(env | grep -oE '^(KILO|OPENCODE)[A-Za-z0-9_]*' | sed 's/^/-u /' || true) \
-   kilo run 'Execute the approved plan in the attached handoff. Own implementation through the completion gate.' \
-   --agent orchestrator --interactive \
-   --title '<section> orchestrator' --file $SCRATCH/handoff.md"
+.kilo_workflow/launch-interactive.sh <section>-orchestrator <worktree> \
+  kilo run 'Execute the approved plan in the attached handoff. Own implementation through the completion gate.' \
+  --agent orchestrator --interactive --title '<section> orchestrator' --file "$SCRATCH/handoff.md"
 ```
 
-The `orchestrator` agent definition pins the model and permissions, so the launch passes neither.
+The `orchestrator` agent definition pins the model and permissions, so the launch passes neither. Do not add `--continue` or `--session`; the orchestrator must be a fresh session. The script preserves the TTY that `--interactive` requires (pass `--log <file>` before the command for a transcript), verifies the session survived launch, and prints the tmux target — report that target, the worktree path, and the handoff path.
 
-`--interactive` requires a TTY: launch it as the tmux window command with no pipe, and attach logging with `tmux pipe-pane` if needed. Do not add `--continue` or `--session`; the orchestrator must be a fresh session. Verify the window started, then report the window name, worktree path, and handoff path.
+### Monitor Mode
 
-### Planner Monitor Mode
-
-After the handoff the planner stops all hands-on work. It has exactly one job — relaunch or unstick the orchestrator when infrastructure fails (a crashed kilo CLI, a dead tmux window, a hung service). Product, logic, design, and review problems are the orchestrator's, handled by its escalation ladder. Check about every 30 minutes; react immediately when the orchestrator's process exits.
+After the handoff the planner stops all hands-on work. It has exactly one job — relaunch or unstick the orchestrator when infrastructure fails (a crashed kilo CLI, a dead tmux window, a hung service). Product, logic, design, and review problems are the orchestrator's, handled by its escalation ladder. Check about every 30 minutes; react immediately when the orchestrator's process exits. (The starter monitors its planners under these same rules.)
 
 A monitor never kills a live dispatch on a judgment call, never edits the worktree, and never writes to another role's dispatch log — a forged `EXITCODE` line corrupts the dispatcher's void-round detection, the exact signal the contract keys on. Before concluding an orchestrator is misbehaving, read its evidence: its pane scrollback (`tmux capture-pane -t <window> -p -S -`), its scratch directory, and the git log. The orchestrator's handoff may route user questions to its own interactive session, so an answer the monitor never saw can exist there — a monitor once killed a healthy implementer and forged its `EXITCODE` line because it never read the scrollback where the user had already answered. The only kill-worthy states are the infrastructure failures named above.
 
@@ -214,7 +217,13 @@ The orchestrator drives the plan to completion. It is the expensive model steeri
 
 1. Ingest the handoff, verify each worktree matches its recorded branch and state (`git -C <worktree> rev-parse --abbrev-ref HEAD` and `git -C <worktree> status --porcelain` against the handoff), and read the learnings.
 2. Segment the plan into slices with disjoint write sets so parallel implementers cannot collide — the plan proposes the tasks, the orchestrator owns the slicing. Always serialize: lockfile changes, dependency installs, migrations, generated clients, repository-wide formatters, and broad autofix commands. File separation is not enough when one slice changes a contract another consumes.
-3. Dispatch ready independent slices to parallel `implementer`s — as many in parallel as the segmentation safely allows; agent parallelism is never capped, only E2E device/stack phases are (see E2E Slots). Loop per slice, at most five rounds: implementer implements, then a fresh `impl-reviewer` reviews the slice diff — `git add -N -- <owned paths> && git diff HEAD -- <owned paths>` (the `add -N` makes new files visible to the diff; take the reviewer's pre-round snapshot **after** it, since it changes status output) written to a scratch file passed via `--file`, since parallel slices share the worktree; triage remarks (untrusted), route valid ones through a repair dispatch. Exit the loop when a fresh reviewer returns `No findings.`, or when its only remaining findings are already rejected in `$SCRATCH/decisions.md` and cite no evidence the rejection did not consider. At the round cap the remaining moves are takeover or BLOCKED (see Escalation).
+3. Dispatch ready independent slices to parallel `implementer`s — as many in parallel as the segmentation safely allows; agent parallelism is never capped, only E2E device/stack phases are (see E2E Slots). Loop per slice, at most five rounds: implementer implements, then a fresh `impl-reviewer` reviews the slice diff, produced with [`slice-diff.sh`](slice-diff.sh) (parallel slices share the worktree, so the reviewer gets a diff file via `--file`, never the whole tree):
+
+```bash
+.kilo_workflow/slice-diff.sh <worktree> "$SCRATCH/slice-api.diff" -- <owned paths>   # prints SNAPSHOT=<head>:<hash>
+```
+
+   Keep the `SNAPSHOT` line and re-run the same command after the round — after a reviewer round the whole line must be identical, after an implementer round the head part must be (see the dispatcher checks under Dispatching). Triage remarks (untrusted), route valid ones through a repair dispatch. Exit the loop when a fresh reviewer returns `No findings.`, or when its only remaining findings are already rejected in `$SCRATCH/decisions.md` and cite no evidence the rejection did not consider. At the round cap the remaining moves are takeover or BLOCKED (see Escalation).
 4. Create small logical commits at slice boundaries, staging only the slice's owned paths (`git add -- <owned paths>`, never `git add -A` while other slices are mid-flight). Once every slice has landed, run the synchronization point: the deferred project-wide checks (typecheck and each changed repository's own check commands) — then, and again after any later repair or direct orchestrator edit, dispatch one fresh `impl-reviewer` over the cumulative section diff (`git diff origin/main...HEAD`, plus any uncommitted changes), so integration seams, takeovers, and merge resolutions never ship unreviewed.
 5. Create the PR — use the repository's PR template when one exists, with the human-readable **what / why / how** narrative inside its summary section, and verification evidence (verifier screenshots and flow results, pulled from reports before scratch cleanup) where the template asks for it. For work with a UI, upload the screenshots to the PR per GitHub Communication before scratch cleanup — local paths are not evidence. Assign the PR to the requesting human, and pick the reviewers yourself (see Picking Reviewers). When the section spans multiple repositories, use the same branch name in each, open one PR per repository, cross-link them, and hold every one to the completion gate. CI and Kilobot start running concurrently with E2E.
 6. Run the E2E loop (below) when the work has verifiable runtime behavior; skip it for doc-only or equivalently inert changes, recording why in the PR description.
@@ -228,23 +237,13 @@ Two terminal states, distinguished by what remains on disk:
 
 ### Picking Reviewers
 
-There is no fixed reviewer list. Work out who fits this PR from what the repository already shows, using two sources:
-
-1. **The files.** For the two or three files the PR changes most, list recent commits — `git log -10 --format='%H' -- <path>` — and for each commit find its PR and that PR's reviewers:
+There is no fixed reviewer list. [`pick-reviewers.sh`](pick-reviewers.sh) ranks candidates from what the repository already shows — who reviewed recent PRs touching the same files, and who reviews the requesting human's work:
 
 ```bash
-gh api repos/<owner>/<repo>/commits/<sha>/pulls --jq '.[].number'
-gh pr view <number> --json reviews --jq '.reviews[].author.login'
+.kilo_workflow/pick-reviewers.sh <owner/repo> <requesting-handle> <file> [file...]   # run in the changed repo, on its 2–3 most-changed files
 ```
 
-2. **The human.** Do the same for the requesting human's last ten merged PRs, to see who usually reviews their work:
-
-```bash
-gh pr list --author <handle> --state merged --limit 10 --json number --jq '.[].number'
-gh pr view <number> --json reviews --jq '.reviews[].author.login'
-```
-
-Count how often each name appears across both lists. Drop bots and the requesting human. Request the top one or two: `gh pr edit <number> --add-reviewer <login>`. If both lists come out empty — new area, no history — request nobody and say so in one line in the PR description; Kilobot and the assignee still review it.
+Request the top one or two names it prints: `gh pr edit <number> --add-reviewer <login>`. If it prints nothing — new area, no history — request nobody and say so in one line in the PR description; Kilobot and the assignee still review it.
 
 ### E2E Loop
 
@@ -255,8 +254,8 @@ Count how often each name appears across both lists. Drop bots and the requestin
 
 ### Kilobot Loop
 
-1. Wait for Kilobot to review the latest head (`gh pr view <n> --json statusCheckRollup,mergeable,mergeStateStatus`; thread state is GraphQL-only — exact queries and the reply/resolve mutations are in `learnings/github-pr-review-threads-api.md`). Kilobot can crash: after about 20 minutes without a review, retrigger it (`git commit --allow-empty -m "chore: retrigger review" && git push`, or a `(bot) @kilocode-bot please review` PR comment), then resume waiting. After two failed retriggers, stop waiting: post `(bot) Kilobot posted no approving summary on this head after two retriggers` on the PR and treat the gate's Kilobot item as waived — the pending human review covers it. A green `Kilo Code Review` check only says the review finished; it carries no verdict. The clean state is a Kilobot summary comment on the current head that approves it (`gh pr view <n> --json comments` — read the verdict the comment states, do not match an exact string; bot wording drifts) plus zero **unresolved** review threads. A green check with no approving summary is not a clean head: keep waiting, then retrigger.
-2. For each comment: verify it (untrusted), then route valid findings through the implementer → impl-reviewer loop; commit, push, reply in the thread, and resolve it. Invalid finding: reply with technical evidence and do not change correct code. A fix without its in-thread reply and thread resolution is not done. Follow the repository-root `AGENTS.md` "Kilobot Review Remarks" contract.
+1. Wait for Kilobot to review the latest head (`gh pr view <n> --json statusCheckRollup,mergeable,mergeStateStatus`; thread state is GraphQL-only — list, reply to, and resolve threads with [`pr-threads.sh`](pr-threads.sh), never hand-written GraphQL). Kilobot can crash: after about 20 minutes without a review, retrigger it (`git commit --allow-empty -m "chore: retrigger review" && git push`, or a `(bot) @kilocode-bot please review` PR comment), then resume waiting. After two failed retriggers, stop waiting: post `(bot) Kilobot posted no approving summary on this head after two retriggers` on the PR and treat the gate's Kilobot item as waived — the pending human review covers it. A green `Kilo Code Review` check only says the review finished; it carries no verdict. The clean state is a Kilobot summary comment on the current head that approves it (`gh pr view <n> --json comments` — read the verdict the comment states, do not match an exact string; bot wording drifts) plus zero **unresolved** review threads. A green check with no approving summary is not a clean head: keep waiting, then retrigger.
+2. For each comment: verify it (untrusted), then route valid findings through the implementer → impl-reviewer loop; commit, push, reply in the thread, and resolve it (`pr-threads.sh reply` / `pr-threads.sh resolve`). Invalid finding: reply with technical evidence and do not change correct code. A fix without its in-thread reply and thread resolution is not done. Follow the repository-root `AGENTS.md` "Kilobot Review Remarks" contract.
 3. Comments already posted by other reviewers — bots or humans — get the same triage flow, but never wait for anyone except Kilobot to review or re-review.
 4. CI failures are findings too: route the fix through the implementer loop; rerun a flaky check once (`gh run rerun <id> --failed`); a check still failing after two fix rounds makes the section BLOCKED.
 5. Rerun E2E for any repair that affects verified behavior (touched bits only). Three full E2E↔Kilobot alternations without converging is BLOCKED.
@@ -304,15 +303,17 @@ Any step where an agent or LLM must actually respond — cloud-agent sessions, c
 The machine is shared by parallel workflows, and unslotted device or stack work overloads it. Only E2E runs are capped — agents themselves are never capped. Every phase that drives a simulator, emulator, local backend stack, browser fleet, or native build — the repro gate and every E2E round — runs inside a slot from [`e2e-slot.sh`](e2e-slot.sh) (default 3, machine-global):
 
 ```bash
-.kilo_workflow/e2e-slot.sh acquire <tmux-session>   # blocks until a slot frees
-.kilo_workflow/e2e-slot.sh status                   # holders, their worktrees, stack coverage
-.kilo_workflow/e2e-slot.sh release <tmux-session>   # the moment the device phase ends
-.kilo_workflow/e2e-slot.sh stacks [--reap]          # stacks running with no slot
+.kilo_workflow/e2e-slot.sh acquire          # from your own tmux session; blocks until a slot frees
+.kilo_workflow/e2e-slot.sh status           # holders, their worktrees, stack coverage
+.kilo_workflow/e2e-slot.sh release          # the moment the device phase ends
+.kilo_workflow/e2e-slot.sh stacks [--reap]  # stacks running with no slot
 ```
+
+`acquire` and `release` resolve the caller's own tmux session themselves (and refuse to run outside one — a slot owner must be a live session so a dead holder can be reclaimed). Pass a session name only when releasing on behalf of a holder that is already dead.
 
 **A slot, a dev stack, and a claimed device are the same resource.** The slot is what entitles a worktree to run a stack and claim a simulator, and neither may outlive it: `release` stops the releasing worktree's stack *and* releases every simulator that worktree claimed, and reclaiming a dead holder's slot does the same for it. So a later round re-acquires, starts a fresh stack, and claims a device again rather than inheriting either — that restart is the price of the cap. A stack up with no slot is a defect, not a shortcut; `stacks` lists them and `stacks --reap` reaps the workflow-owned ones (a stack with no section run id in its name was started by hand and is only reported). Five live stacks on this host drove the load average past 300 and made every emulator boot and native build time out, which reads as flaky devices rather than as over-subscription.
 
-Teardown is the slot's job, never the agent's memory. Runbook cleanup lists used to end with a conditional `xcrun simctl shutdown <udid>` — "only if you booted it" — and agents that dutifully released their slot still skipped it, so simulators stayed booted for the rest of the day under every section that followed. The claim now records whether it booted the device, and release powers off only what it started; a device that was already running before the claim is still never shut down. Never hand-roll device teardown around the wrapper.
+Teardown is the slot's job, never the agent's memory: the claim records whether it booted the device, and release powers off only what its own claim booted — a device already running before the claim is never shut down. Never hand-roll device teardown around the wrapper.
 
 - Slot state lives in `$HOME/.cache/kilo-e2e-slots`, machine-global by design: every copy of the script — any worktree, any repository — contends for the same slots, and the script has no overrides by design. When working in a repository without the script (a sibling like `~/Projects/kilocode`), invoke it by absolute path from a cloud worktree.
 - This holds on every run, not only when another workflow is visibly active, and a stack that is already up is not an exemption.
@@ -345,6 +346,7 @@ Environment blockers and their fixes — broken local stacks, credential traps, 
 - `.kilo_workflow/` is exempt from section disjointness — any section may write learnings or fix this document; overlaps resolve as ordinary merge conflicts.
 - Role agents whose rules forbid dirtying the tree (the E2E verifier's byte-identical baseline restore) write their learnings to `$SCRATCH/learnings/` instead and list them in their report; the orchestrator moves them into `.kilo_workflow/learnings/` and commits them.
 - Read before writing: when an existing entry covers the blocker, update it instead of appending a duplicate. When a run proves an entry wrong or stale, fix the entry in the same run.
+- **Graduation:** a learning is a workaround waiting for a fix. When the blocker can be prevented by a script change (a flag, a guard, a wrapper) or by a line where agents already look (this document, a runbook, a role definition), make that change instead of — or in the same PR as — writing the learning, and delete any learning the change supersedes. Keep as learnings only what genuinely cannot be automated or folded away: environment trivia, one-off incident evidence, niche device quirks.
 - Every role records blockers it resolves, immediately after resolving them.
 - Never keep a workflow learning only in a harness's private memory; it belongs in these folders so runs on other harnesses can use it.
 - The same rule applies to this document: when a run stumbles on something `WORKFLOW.md` could have prevented — a missing command, an ambiguous rule, a wrong assumption — the orchestrator fixes the document in the same run and ships the fix with the PR. Role-definition fixes from a kilo session go through shell (`cat > .kilo/agent/<name>.md <<'EOF'`) because kilo's edit tool blocks `.kilo/` paths (see `learnings/kilo-edit-tool-blocks-kilo-config-paths.md`). Mistakes that recur are workflow bugs, not agent bugs.

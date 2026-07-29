@@ -10,14 +10,21 @@
 # section that follows. Planning, implementation, review, and CI waits need
 # neither, and are unlimited.
 #
-#   e2e-slot.sh acquire <tmux-session>   # blocks until a slot is free, then holds it
-#   e2e-slot.sh release <tmux-session>   # frees the slot AND hands back the worktree's stack and simulators
+#   e2e-slot.sh acquire [tmux-session]   # blocks until a slot is free, then holds it
+#   e2e-slot.sh release [tmux-session]   # frees the slot AND hands back the worktree's stack and simulators
 #   e2e-slot.sh status                   # who holds what, for how long, with stack coverage
 #   e2e-slot.sh stacks [--reap]          # stacks with no slot; --reap stops them
 #
 # A slot is owned by a tmux session name and records the worktree that took it.
 # If that tmux session no longer exists the slot is stale and is reclaimed
 # automatically — no heartbeats to maintain.
+#
+# acquire/release resolve the CALLER'S OWN tmux session when no name is given —
+# through $TMUX_PANE, never the untargeted `display-message -p '#S'`, which
+# answers with the server's most recently active session and hands your slot an
+# owner that can die while you still drive a device. Passing a name is for
+# operators cleaning up a dead holder, not for owning a slot under a session
+# that is not yours.
 #
 # State is machine-global on purpose: every worktree's copy of this script must
 # contend for the same slots, so the state dir never lives next to the script.
@@ -123,9 +130,21 @@ uncovered_stacks() {
   done
 }
 
-case "${1:?usage: acquire|release|status <tmux-session>}" in
+# The caller's own tmux session, resolved through its pane. Empty when not in
+# tmux — a process that cannot own a slot, because reclamation keys on the
+# owning session's liveness.
+self_session() {
+  [ -n "${TMUX_PANE:-}" ] || return 0
+  tmux display-message -p -t "$TMUX_PANE" '#S' 2>/dev/null || true
+}
+
+case "${1:?usage: acquire|release|status|stacks [tmux-session]}" in
   acquire)
-    who=${2:?tmux session name required}
+    who=${2:-$(self_session)}
+    [ -n "$who" ] || {
+      echo "not inside a tmux session — a slot owner must be a live tmux session so a dead holder can be reclaimed; run from your own session (your dispatcher should have launched you in one)" >&2
+      exit 1
+    }
     # Reject an owner that is not a live session — a window name, or a session
     # name misread from the untargeted `display-message -p '#S'`. Such a slot is
     # reapable the moment it is written, so it gets handed to a second workflow
@@ -157,7 +176,8 @@ case "${1:?usage: acquire|release|status <tmux-session>}" in
     done
     ;;
   release)
-    who=${2:?tmux session name required}
+    who=${2:-$(self_session)}
+    [ -n "$who" ] || { echo "not inside tmux and no session name given" >&2; exit 1; }
     for s in "$DIR"/slot-*; do
       [ -d "$s" ] || continue
       [ "$(cat "$s/owner" 2>/dev/null)" = "$who" ] || continue
@@ -217,5 +237,5 @@ case "${1:?usage: acquire|release|status <tmux-session>}" in
       release_worktree_resources "$wt"
     done
     ;;
-  *) echo "usage: $0 acquire|release|status|stacks <tmux-session>" >&2; exit 1 ;;
+  *) echo "usage: $0 acquire|release|status|stacks [tmux-session]" >&2; exit 1 ;;
 esac

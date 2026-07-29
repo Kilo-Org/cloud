@@ -54,10 +54,10 @@ capture() {
     if [ -L "$WT/$p" ]; then
       printf 'link\t%s\t%s\n' "$(readlink "$WT/$p")" "$p"
     elif command -v sha256sum >/dev/null; then
-      printf 'file\t%s\t%s\t%s\n' "$(stat -f %p "$WT/$p" 2>/dev/null || stat -c %a "$WT/$p")" \
+      printf 'file\t%s\t%s\t%s\n' "$(stat -c %a "$WT/$p" 2>/dev/null || stat -f %p "$WT/$p")" \
         "$(sha256sum "$WT/$p" | cut -d' ' -f1)" "$p"
     else
-      printf 'file\t%s\t%s\t%s\n' "$(stat -f %p "$WT/$p" 2>/dev/null || stat -c %a "$WT/$p")" \
+      printf 'file\t%s\t%s\t%s\n' "$(stat -c %a "$WT/$p" 2>/dev/null || stat -f %p "$WT/$p")" \
         "$(shasum -a 256 "$WT/$p" | cut -d' ' -f1)" "$p"
     fi
   done | sort > "$out/untracked.tsv"
@@ -75,7 +75,7 @@ capture() {
         hash=$(shasum -a 256 "$WT/$p" | cut -d' ' -f1)
       fi
       printf 'file\t%s\t%s\t%s\n' \
-        "$(stat -f %p "$WT/$p" 2>/dev/null || stat -c %a "$WT/$p")" "$hash" "$p"
+        "$(stat -c %a "$WT/$p" 2>/dev/null || stat -f %p "$WT/$p")" "$hash" "$p"
     elif [ -e "$WT/$p" ]; then
       echo "baseline: --include supports files, symlinks, or absent paths, not $p" >&2
       return 1

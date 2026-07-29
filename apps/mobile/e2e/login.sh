@@ -54,7 +54,11 @@ latest_email() {
 # second code request voids the first code, so the first verify 401s. Hold a
 # email mutex from the outbox snapshot through code verification. OTP
 # invalidation is keyed by normalized email, not worktree.
-EMAIL_KEY=$(printf '%s' "$EMAIL" | tr '[:upper:]' '[:lower:]' | shasum -a 256 | cut -d' ' -f1)
+if command -v sha256sum >/dev/null; then
+  EMAIL_KEY=$(printf '%s' "$EMAIL" | tr '[:upper:]' '[:lower:]' | sha256sum | cut -d' ' -f1)
+else
+  EMAIL_KEY=$(printf '%s' "$EMAIL" | tr '[:upper:]' '[:lower:]' | shasum -a 256 | cut -d' ' -f1)
+fi
 LOCK="${TMPDIR:-/tmp}/kilo-otp-locks/$EMAIL_KEY"
 if [ "${KILO_OTP_LOCKED:-}" != "1" ]; then
   exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \

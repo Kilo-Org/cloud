@@ -2,6 +2,11 @@
 # Stop one resource before the caller frees its E2E slot.
 set -euo pipefail
 
+# Run from this script's own repository, never the caller's CWD — invoked by
+# absolute path from a sibling worktree, pnpm would otherwise stop the wrong
+# stack while the slot record names this one.
+cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+
 resource=${1:?usage: $0 stack | ios | android | command <cmd> [args...]}
 shift
 case "$resource" in

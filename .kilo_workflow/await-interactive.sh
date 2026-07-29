@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 
 START=$(date +%s)
 while :; do

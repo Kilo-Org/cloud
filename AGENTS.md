@@ -63,7 +63,7 @@ package manifests before running repository JavaScript or package scripts. Load
 | Service, Durable Object, or Worker code | `services/AGENTS.md`, nearest owning service's `AGENTS.md`, and relevant Durable Objects or Workers skills |
 | Domain language and ownership | `CONTEXT.md`, when its scope applies |
 | Business requirements | Relevant `.specs/*.md`, indexed by `specs` skill |
-| UI and product design | Relevant app `AGENTS.md`; for `apps/web`, the `kilo-design-cloud` skill synced from `Kilo-Org/kilo-design` |
+| UI and product design | `DESIGN.md`, relevant app `AGENTS.md`; for `apps/web`, the `kilo-design-cloud` skill synced from `Kilo-Org/kilo-design` |
 | Contribution and PR workflow | `CONTRIBUTING.md` and relevant Git or PR skill |
 
 ## Security Baseline

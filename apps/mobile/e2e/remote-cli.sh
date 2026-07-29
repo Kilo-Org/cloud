@@ -220,7 +220,7 @@ cmd_status() {
     tmux capture-pane -p -t "$SESSION" -S -40 | sed -e 's/[[:space:]]*$//' | grep -v '^$' | tail -20
   else
     echo "No remote CLI session '$SESSION' is running."
-    [ -f "$ENV_FILE" ] && echo "(env is prepared; run 'remote-cli.sh exec <args>' or 'start')"
+    [ -f "$ENV_FILE" ] && echo "(env is prepared; run 'remote-cli.sh exec <args>' or 'start')" || true
   fi
 }
 
@@ -244,7 +244,7 @@ case "${1:-start}" in
   start) shift || true; cmd_start "$@" ;;
   prepare) shift || true; cmd_prepare "$@" ;;
   exec) shift || true; cmd_exec "$@" ;;
-  status) shift || true; cmd_status ;;
+  status) shift || true; [ "$#" -eq 0 ] || { echo "status takes no arguments" >&2; exit 2; }; cmd_status ;;
   stop) shift || true; cmd_stop "$@" ;;
   -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//' | sed '1d' ;;
   *) echo "unknown command: ${1} (expected start|prepare|exec|status|stop)" >&2; exit 2 ;;

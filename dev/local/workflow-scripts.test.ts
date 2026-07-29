@@ -326,7 +326,7 @@ test('E2E lifecycle scripts take, start, stop, and free one slot', () => {
       'exit 1\n'
   );
   fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\nprintf '%s\\n' '${repoRoot}'\n`);
-  fs.writeFileSync(path.join(bin, 'pnpm'), '#!/bin/sh\nprintf "%s\\n" "$*" >> "$COMMAND_LOG"\n');
+  fs.writeFileSync(path.join(bin, 'pnpm'), '#!/bin/sh\nprintf "%s: %s\\n" "$PWD" "$*" >> "$COMMAND_LOG"\n');
   for (const command of ['tmux', 'git', 'pnpm']) fs.chmodSync(path.join(bin, command), 0o755);
   const env = {
     ...process.env,
@@ -337,26 +337,37 @@ test('E2E lifecycle scripts take, start, stop, and free one slot', () => {
     TMUX_PANE: '%1',
   };
   try {
-    const run = (script: string, args: string[] = []) =>
+    const run = (script: string, args: string[] = [], cwd: string = repoRoot) =>
       spawnSync(path.join(repoRoot, '.kilo_workflow', script), args, {
-        cwd: repoRoot,
+        cwd,
         encoding: 'utf8',
         env,
       });
+    // Starting a resource before taking a slot refuses with the remedy.
+    const early = run('e2e-start-resource.sh', ['stack', 'mobile']);
+    assert.equal(early.status, 1);
+    assert.match(early.stderr, /take a slot first/);
     assert.equal(run('e2e-take-slot.sh').status, 0);
-    assert.equal(run('e2e-start-resource.sh', ['stack', 'mobile', 'web']).status, 0);
-    assert.equal(run('e2e-stop-resource.sh', ['stack']).status, 0);
+    // Invoked from a foreign CWD, repo wrappers still run in the script's repo.
+    assert.equal(run('e2e-start-resource.sh', ['stack', 'mobile', 'web'], os.tmpdir()).status, 0);
+    assert.equal(run('e2e-stop-resource.sh', ['stack'], os.tmpdir()).status, 0);
     assert.match(run('e2e-slot-status.sh').stdout, /slot-1: test-owner/);
     // The old API was `e2e-slot.sh acquire <session>` — a forwarded session
     // name must fail loudly, never acquire under the wrong owner.
     const badTake = run('e2e-take-slot.sh', ['my-session']);
     assert.equal(badTake.status, 1);
     assert.match(badTake.stderr, /takes no session name/);
+    const badStatus = run('e2e-slot-status.sh', ['bogus']);
+    assert.equal(badStatus.status, 1);
+    assert.match(badStatus.stderr, /takes no arguments/);
+    const badFree = run('e2e-free-slot.sh', ['bogus']);
+    assert.equal(badFree.status, 1);
+    assert.match(badFree.stderr, /takes no arguments/);
     assert.equal(run('e2e-free-slot.sh').status, 0);
     assert.match(run('e2e-slot-status.sh').stdout, /0\/3 held/);
     assert.equal(
       fs.readFileSync(commandLog, 'utf8'),
-      'dev:start --no-attach --reuse-running mobile web\ndev:stop\n'
+      `${repoRoot}: dev:start --no-attach --reuse-running mobile web\n${repoRoot}: dev:stop\n`
     );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

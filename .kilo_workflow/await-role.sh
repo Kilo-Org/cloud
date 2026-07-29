@@ -67,7 +67,7 @@ case "$ROLE/$MODE" in
     ;;
 esac
 
-mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 target_dead() {
   [ -n "$TMUX_TARGET" ] || return 1
   ! tmux list-panes -t "$TMUX_TARGET" >/dev/null 2>&1

@@ -9,6 +9,10 @@ HERE=$(dirname "$0")
 
 resource=${1:?usage: $0 stack [targets...] | ios [udid] | android <avd> [--gpu ...] | command <cmd> [args...]}
 shift
+# Run repo wrappers from this script's own repository, never the caller's
+# CWD — invoked by absolute path from a sibling worktree, pnpm would
+# otherwise start the wrong stack while the slot record names this one.
+cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 case "$resource" in
   stack) exec pnpm dev:start --no-attach --reuse-running "$@" ;;
   ios) exec pnpm dev:mobile:simulator claim "$@" ;;

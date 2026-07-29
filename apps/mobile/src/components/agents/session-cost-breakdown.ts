@@ -9,7 +9,7 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 
-export type SessionCostBreakdownTotals = {
+type SessionCostBreakdownTotals = {
   input: number;
   output: number;
   reasoning: number;

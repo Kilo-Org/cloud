@@ -48,6 +48,7 @@ import {
 import { dedupeFilesByPath } from '@/lib/pr-review/diff/dedupe-file-pages';
 import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { stickyFileHeaderIndices } from '@/lib/pr-review/diff/sticky-file-headers';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
 import {
   useFetchToCompletion,
@@ -179,6 +180,8 @@ export function PrReviewFileList({
     ]
   );
 
+  const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
+
   const { handleContentSizeChange } = usePrDiffListScroll({
     owner,
     repo,
@@ -271,6 +274,11 @@ export function PrReviewFileList({
             renderItem={renderItem}
             keyExtractor={item => item.key}
             getItemType={item => itemTypeFor(item)}
+            stickyHeaderIndices={stickyHeaderIndices}
+            // Height changes above the viewport (expand / collapse-on-mark)
+            // misfire mVCP and jump the list; gap-context insert after
+            // scroll-away is rare and acceptable without anchor hold.
+            maintainVisibleContentPosition={{ disabled: true }}
             // Re-measure rows when the bounded font scale changes.
             extraData={diffFontMetrics.scale}
             onContentSizeChange={handleContentSizeChange}

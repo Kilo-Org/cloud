@@ -353,6 +353,25 @@ type GetBitbucketTokenResult =
   | { success: true; token: string }
   | { success: false; reason: BitbucketTokenFailureReason };
 
+type IssueBitbucketSessionCapabilityResult =
+  | { success: true; capability: string; gitUrl: string }
+  | { success: false; reason: BitbucketTokenFailureReason | 'capability_configuration_error' };
+
+type RedeemBitbucketSessionCapabilityResult =
+  | { success: true; headers: { authorization: string } }
+  | {
+      success: false;
+      reason:
+        | 'invalid_capability'
+        | 'expired_capability'
+        | 'capability_configuration_error'
+        | 'container_mismatch'
+        | 'invalid_upstream_url'
+        | 'upstream_origin_not_allowed'
+        | 'repository_mismatch'
+        | 'source_unavailable';
+    };
+
 export type KiloSessionCapabilityTargets = {
   backendBaseUrl: string;
   providerBaseUrl: string;
@@ -377,7 +396,15 @@ type IssueKiloSessionCapabilityResult =
     };
 
 type RedeemKiloSessionCapabilityResult =
-  | { success: true; authorization: string; routeClass: KiloCapabilityRouteClass }
+  | {
+      success: true;
+      authorization: string;
+      routeClass: KiloCapabilityRouteClass;
+      sessionIngestScope?: {
+        cloudAgentSessionId: string;
+        rootKiloSessionId: string;
+      };
+    }
   | {
       success: false;
       reason:
@@ -435,6 +462,21 @@ export type GitTokenService = {
     requestMethod: string;
     requestUrl: string;
   }): Promise<RedeemGitLabSessionCapabilityResult>;
+  issueBitbucketSessionCapability?(params: {
+    userId: string;
+    orgId: string;
+    outboundContainerId: string;
+    expectedIntegrationId?: string;
+    workspaceUuid: string;
+    repositoryUuid: string;
+    repositoryUrl: string;
+  }): Promise<IssueBitbucketSessionCapabilityResult>;
+  redeemBitbucketSessionCapability?(params: {
+    capability: string;
+    outboundContainerId: string;
+    requestMethod: string;
+    requestUrl: string;
+  }): Promise<RedeemBitbucketSessionCapabilityResult>;
   issueKiloSessionCapability(params: {
     userId: string;
     cloudAgentSessionId: string;
@@ -449,6 +491,7 @@ export type GitTokenService = {
     requestMethod: string;
     requestUrl: string;
     bootstrapKiloSessionId?: string;
+    sessionIngestProxyVersion?: 1;
   }): Promise<RedeemKiloSessionCapabilityResult>;
 };
 
@@ -529,6 +572,8 @@ export type Env = {
   GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;
   /** Comma-separated org IDs whose GitLab token uses credential containment, or `*` for all orgs */
   GITLAB_TOKEN_CONTAINMENT_ORG_IDS?: string;
+  /** Comma-separated org IDs whose Bitbucket token uses credential containment, or `*` for all orgs */
+  BITBUCKET_TOKEN_CONTAINMENT_ORG_IDS?: string;
   /** Comma-separated org IDs whose Kilo token uses credential containment, or `*` for all orgs */
   KILOCODE_TOKEN_CONTAINMENT_ORG_IDS?: string;
   /** Comma-separated org IDs that receive workspace repo snapshots, or '*' for all */

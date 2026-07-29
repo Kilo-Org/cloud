@@ -11,8 +11,6 @@ import {
   MarkdownRenderer,
 } from './markdown-renderer';
 
-export type { MarkdownLinkLongPressHandler, MarkdownLinkPressHandler };
-
 export type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;

@@ -50,11 +50,6 @@ export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH = {
   ...REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
 } as const;
 
-export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
-  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
-} as const;
-
 export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
   none: { reasoning: { enabled: false, effort: 'none' } },
   high: { reasoning: { enabled: true, effort: 'high' } },

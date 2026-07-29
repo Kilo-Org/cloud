@@ -1,4 +1,5 @@
 import type { KiloSessionCapabilityTargets } from './kilo-session-capability.js';
+import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 
 export type KiloCapabilityRouteClass =
   | 'provider_model'
@@ -7,12 +8,17 @@ export type KiloCapabilityRouteClass =
   | 'session_ingest';
 
 export type KiloCapabilityRouteClassification =
-  | { success: true; routeClass: KiloCapabilityRouteClass }
+  | {
+      success: true;
+      routeClass: KiloCapabilityRouteClass;
+      sessionIngestScopedProxy?: true;
+    }
   | { success: false; reason: 'invalid_upstream_url' | 'upstream_not_allowed' };
 
 export type KiloCapabilityRequestIdentity = {
   requestMethod?: string;
   bootstrapKiloSessionId?: string;
+  sessionIngestProxyVersion?: 1;
 };
 
 type ParsedTarget = {
@@ -116,6 +122,13 @@ function isSessionBootstrapRoute(pathname: string, basePath: string): boolean {
   return pathname === appendPath(basePath, '/api/session');
 }
 
+function getSessionIngestPathSessionId(pathname: string, basePath: string): string | null {
+  const sessionsPrefix = appendPath(basePath, '/api/session/');
+  if (!pathname.startsWith(sessionsPrefix)) return null;
+  const match = /^([^/]+)\/ingest$/.exec(pathname.slice(sessionsPrefix.length));
+  return match?.[1] ?? null;
+}
+
 function isSessionIngestShapedRoute(pathname: string, basePath: string): boolean {
   if (pathname === appendPath(basePath, '/api/session')) return true;
   const sessionsPrefix = appendPath(basePath, '/api/session/');
@@ -180,7 +193,35 @@ export function classifyKiloCapabilityRequest(
     ) {
       return { success: true, routeClass: 'session_ingest' };
     }
+    if (
+      requestIdentity.requestMethod?.toUpperCase() === 'POST' &&
+      requestIdentity.sessionIngestProxyVersion === 1 &&
+      requestIdentity.bootstrapKiloSessionId !== kiloSessionId &&
+      containedKiloSessionIdSchema.safeParse(requestIdentity.bootstrapKiloSessionId).success
+    ) {
+      return {
+        success: true,
+        routeClass: 'session_ingest',
+        sessionIngestScopedProxy: true,
+      };
+    }
     return { success: false, reason: 'upstream_not_allowed' };
+  }
+  if (isWithinTarget(url, sessionIngest)) {
+    const targetSessionId = getSessionIngestPathSessionId(url.pathname, sessionIngest.basePath);
+    if (
+      requestIdentity.requestMethod?.toUpperCase() === 'POST' &&
+      requestIdentity.sessionIngestProxyVersion === 1 &&
+      targetSessionId !== null &&
+      targetSessionId !== kiloSessionId &&
+      containedKiloSessionIdSchema.safeParse(targetSessionId).success
+    ) {
+      return {
+        success: true,
+        routeClass: 'session_ingest',
+        sessionIngestScopedProxy: true,
+      };
+    }
   }
   // Backend is the catch-all for its origin, so it must exclude provider- and
   // session-ingest-shaped paths. Otherwise a shared backend/session-ingest origin

@@ -1,5 +1,4 @@
-import { useScrollToTop } from '@react-navigation/native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { Bot, Plus } from 'lucide-react-native';
 import {
   type ReactElement,

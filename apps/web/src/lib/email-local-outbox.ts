@@ -77,6 +77,8 @@ export async function writeEmailToLocalOutbox(
   const filePath = path.join(directory, `${timestamp}-${randomUUID()}.html`);
   const html = addDevelopmentBanner(params.html, developmentBanner(params));
   await writeFile(filePath, html, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
-  openEmail(filePath);
+  if (process.env.LOCAL_EMAIL_OPEN_BROWSER !== 'false') {
+    openEmail(filePath);
+  }
   return filePath;
 }

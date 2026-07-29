@@ -54,6 +54,8 @@ export function attachKittyEnterHandler(term: Terminal, wsRef?: React.RefObject<
 type XtermPtyOptions = {
   townId: string;
   agentId: string | null;
+  /** Whether PTY creation and reconnects are allowed. */
+  enabled?: boolean;
   /** Number of retry attempts for PTY creation (default: 1, no retries). */
   retries?: number;
   /** Delay in ms between retries (default: 3000). */
@@ -99,6 +101,7 @@ const RECONNECT_MAX_DELAY_MS = 8_000;
 export function useXtermPty({
   townId,
   agentId,
+  enabled = true,
   retries = 1,
   retryDelay = 3_000,
   onStatusChange,
@@ -140,7 +143,7 @@ export function useXtermPty({
   const connectedAgentRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!agentId || agentId === connectedAgentRef.current) return;
+    if (!enabled || !agentId || agentId === connectedAgentRef.current) return;
     const capturedAgentId = agentId;
     connectedAgentRef.current = capturedAgentId;
 
@@ -416,7 +419,7 @@ export function useXtermPty({
       ptyRef.current = null;
       connectedAgentRef.current = null;
     };
-  }, [agentId, townId]);
+  }, [agentId, enabled, townId]);
 
   return { terminalRef, connected, connectionStatus, status, fitAddonRef };
 }

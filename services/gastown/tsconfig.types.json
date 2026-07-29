@@ -4,6 +4,7 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "declarationDir": "./dist-types",
+    "rootDir": "./src",
     "noEmit": false,
     "skipLibCheck": true
   },

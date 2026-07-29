@@ -38,6 +38,8 @@ const usageSearchSchema = z
         kind: z.literal('subject'),
         subjectType: z.enum(['user', 'org']),
         subjectId: z.string().trim().min(1).max(256),
+        start: z.iso.datetime(),
+        end: z.iso.datetime(),
       }),
     ]),
     status: z.enum(['open', 'closed']).optional(),
@@ -58,7 +60,11 @@ const usageSearchSchema = z
       .optional(),
     limit: z.number().int().min(1).max(100).default(25),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (input.search.kind !== 'subject') return;
+    validateUsageWindow(input.search.start, input.search.end, context);
+  });
 
 const segmentSearchSchema = z
   .object({
@@ -68,6 +74,18 @@ const segmentSearchSchema = z
   })
   .strict();
 
+const usageSummarySchema = z
+  .object({
+    subjectType: z.enum(['user', 'org']),
+    subjectId: z.string().trim().min(1).max(256),
+    start: z.iso.datetime(),
+    end: z.iso.datetime(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    validateUsageWindow(input.start, input.end, context);
+  });
+
 const BILLING_HEALTH_WINDOW_MS = 24 * 60 * 60 * 1_000;
 const STALE_OPEN_INTERVAL_MS = 15 * 60 * 1_000;
 const usageMetadataSchema = z
@@ -76,6 +94,22 @@ const usageMetadataSchema = z
     metadata => Object.keys(metadata).length <= 16,
     'Metadata may contain at most 16 entries'
   );
+
+function validateUsageWindow(startValue: string, endValue: string, context: z.RefinementCtx): void {
+  const start = new Date(startValue).getTime();
+  const end = new Date(endValue).getTime();
+  if (end <= start) {
+    context.addIssue({ code: 'custom', path: ['end'], message: 'End must be after start' });
+    return;
+  }
+  if (end - start > 31 * 24 * 60 * 60 * 1_000) {
+    context.addIssue({
+      code: 'custom',
+      path: ['end'],
+      message: 'Usage windows may not exceed 31 days',
+    });
+  }
+}
 
 export type SerializedUsageInterval = Pick<
   ContainerUsageInterval,
@@ -212,7 +246,13 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     } else {
       predicates.push(
         eq(container_usage_interval.subject_type, input.search.subjectType),
-        eq(container_usage_interval.subject_id, input.search.subjectId)
+        eq(container_usage_interval.subject_id, input.search.subjectId),
+        sql`exists (
+          select 1 from ${container_usage_segment}
+          where ${container_usage_segment.interval_id} = ${container_usage_interval.id}
+            and ${container_usage_segment.received_at} >= ${input.search.start}
+            and ${container_usage_segment.received_at} < ${input.search.end}
+        )`
       );
     }
     if (input.status) predicates.push(eq(container_usage_interval.status, input.status));
@@ -275,6 +315,69 @@ export const cloudBillingSkusRouter = createTRPCRouter({
       metadata: parseUsageMetadata(interval.metadata),
       items: page.map(serializeUsageSegment),
       nextCursor: hasMore ? (page.at(-1)?.seq ?? null) : null,
+    };
+  }),
+
+  getUsageSummary: adminProcedure.input(usageSummarySchema).query(async ({ input }) => {
+    const rows = await db
+      .select({
+        skuId: container_usage_interval.cloud_billing_sku_id,
+        skuName: cloud_billing_sku.name,
+        rateCentsPerSecond: cloud_billing_sku.rate_cents_per_unit,
+        acceptedSeconds:
+          sql<number>`coalesce(sum(${container_usage_segment.usage_seconds}), 0)`.mapWith(Number),
+        intervals: sql<number>`count(distinct ${container_usage_interval.id})`.mapWith(Number),
+        estimatedCents:
+          sql<string>`coalesce(sum(${container_usage_segment.usage_seconds}::numeric * ${cloud_billing_sku.rate_cents_per_unit}), 0)::text`.mapWith(
+            String
+          ),
+        totalAcceptedSeconds:
+          sql<number>`sum(sum(${container_usage_segment.usage_seconds})) over ()`.mapWith(Number),
+        totalEstimatedCents:
+          sql<string>`sum(sum(${container_usage_segment.usage_seconds}::numeric * ${cloud_billing_sku.rate_cents_per_unit})) over ()::text`.mapWith(
+            String
+          ),
+      })
+      .from(container_usage_segment)
+      .innerJoin(
+        container_usage_interval,
+        eq(container_usage_segment.interval_id, container_usage_interval.id)
+      )
+      .innerJoin(
+        cloud_billing_sku,
+        eq(container_usage_interval.cloud_billing_sku_id, cloud_billing_sku.id)
+      )
+      .where(
+        and(
+          eq(container_usage_interval.subject_type, input.subjectType),
+          eq(container_usage_interval.subject_id, input.subjectId),
+          sql`${container_usage_segment.received_at} >= ${input.start}`,
+          lt(container_usage_segment.received_at, input.end)
+        )
+      )
+      .groupBy(
+        container_usage_interval.cloud_billing_sku_id,
+        cloud_billing_sku.name,
+        cloud_billing_sku.rate_cents_per_unit
+      )
+      .orderBy(container_usage_interval.cloud_billing_sku_id);
+    const items = rows.map(row => ({
+      skuId: row.skuId,
+      skuName: row.skuName,
+      rateCentsPerSecond: normalizeCloudBillingSkuRate(row.rateCentsPerSecond),
+      acceptedSeconds: row.acceptedSeconds,
+      estimatedCents: normalizeCloudBillingSkuRate(row.estimatedCents),
+      intervals: row.intervals,
+    }));
+    const totals = rows[0];
+    return {
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      start: input.start,
+      end: input.end,
+      items,
+      acceptedSeconds: totals?.totalAcceptedSeconds ?? 0,
+      estimatedCents: normalizeCloudBillingSkuRate(totals?.totalEstimatedCents ?? '0'),
     };
   }),
 

@@ -12,6 +12,14 @@ export const getGatewayModelsQueryKey = ({
   readonly token: string;
 }): readonly string[] => ['side-panel', 'gateway-models', token, organizationId ?? 'personal'];
 
+export const getModelPreferencesQueryKey = ({
+  organizationId,
+  token,
+}: {
+  readonly organizationId: string | undefined;
+  readonly token: string;
+}): readonly string[] => ['side-panel', 'model-preferences', token, organizationId ?? 'personal'];
+
 export const getOrganizationsQueryKey = (token: string): readonly string[] => [
   'side-panel',
   'organizations',

@@ -27,6 +27,7 @@ import {
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { isOpenRouterGpt56PromoModel } from '@/lib/ai-gateway/providers/openai';
 
 type VercelRoutingPercentages = {
   paid: number;
@@ -94,6 +95,13 @@ export async function shouldRouteToVercel(
   request: GatewayRequest,
   randomSeed: string
 ) {
+  if (isOpenRouterGpt56PromoModel(requestedModel)) {
+    console.debug(
+      `[shouldRouteToVercel] routing ${requestedModel} to OpenRouter for the GPT-5.6 promotion`
+    );
+    return false;
+  }
+
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const percentages = await getVercelRoutingPercentages();
   const routingPercentage = (await isFreeModel(requestedModel))

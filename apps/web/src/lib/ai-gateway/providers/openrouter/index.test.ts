@@ -4,7 +4,6 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   shouldSuppressOpenRouterModel,
-  undoPricingDiscount,
 } from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
@@ -19,6 +18,7 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import { OPENROUTER_GPT56_PROMO_MODEL_IDS } from '@/lib/ai-gateway/providers/openai';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -150,44 +150,24 @@ describe('formatName', () => {
     });
     expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model ($$$$)');
   });
-});
 
-describe('undoPricingDiscount', () => {
-  it('reverses the discount and drops the field without exponential output', () => {
-    const result = undoPricingDiscount({
-      prompt: '0.00000006',
-      completion: '0.0000006',
-      input_cache_read: '0.000000015',
-      discount: 0.7,
+  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('prefers the 50% off marker for %s', modelId => {
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({
+      id: modelId,
+      created: recentlyCreated,
+      expiration_date: '2026-07-01',
+      pricing: { prompt: '0.00001', completion: '0', discount: 0.5 },
     });
-    expect(result).toEqual({
-      prompt: '0.000000200000',
-      completion: '0.000002000000',
-      input_cache_read: '0.000000050000',
-    });
-    expect('discount' in result).toBe(false);
-    for (const value of Object.values(result)) {
-      expect(value).not.toMatch(/e/i);
-    }
+    expect(formatName(model, 0)).toBe('Test Model (50% off)');
   });
 
-  it('leaves pricing untouched when there is no discount', () => {
-    const pricing = { prompt: '0.000001', completion: '0.000005' };
-    expect(undoPricingDiscount(pricing)).toBe(pricing);
-  });
-
-  it('leaves pricing untouched when the discount is zero', () => {
-    const pricing = { prompt: '0.000001', completion: '0.000005', discount: 0 };
-    expect(undoPricingDiscount(pricing)).toBe(pricing);
-  });
-
-  it('drops the field when the discount cannot be reversed', () => {
-    const result = undoPricingDiscount({
-      prompt: '0.000001',
-      completion: '0.000005',
-      discount: 1,
+  it('takes the promo percentage from endpoint metadata', () => {
+    const model = buildModel({
+      id: OPENROUTER_GPT56_PROMO_MODEL_IDS[0],
+      pricing: { prompt: '0.00001', completion: '0', discount: 0.375 },
     });
-    expect(result).toEqual({ prompt: '0.000001', completion: '0.000005' });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (37.5% off)');
   });
 });
 
@@ -235,6 +215,23 @@ describe('auto models', () => {
     const models = await getEnhancedOpenRouterModels();
 
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
+  });
+
+  it('excludes OpenRouter batch variants from the public model list', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [buildModel(), buildModel({ id: 'vendor/model:batch' })],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
+    expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
   });
 });
 

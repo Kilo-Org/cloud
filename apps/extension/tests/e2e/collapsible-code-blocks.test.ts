@@ -1,7 +1,7 @@
 /* eslint-disable import/no-nodejs-modules */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -55,6 +55,7 @@ test('long assistant code blocks are collapsible', async () => {
           ],
         },
       ],
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

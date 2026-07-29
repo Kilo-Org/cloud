@@ -45,6 +45,26 @@ function copyUsageContext(context: UsageContext): UsageContext {
   };
 }
 
+type MeterOperation = 'start' | 'heartbeat' | 'stop';
+
+function logRpcOutcome(
+  operation: MeterOperation,
+  service: string,
+  outcome: 'accepted' | 'rejected' | 'failed',
+  details: { dedup?: boolean; rejectionCode?: string; errorName?: string } = {}
+): void {
+  console.log(
+    JSON.stringify({
+      message: 'Container usage meter RPC completed',
+      event: 'container_usage_rpc',
+      operation,
+      service,
+      outcome,
+      ...details,
+    })
+  );
+}
+
 export class ContainerUsageMeter
   extends WorkerEntrypoint<Cloudflare.Env>
   implements ContainerUsageRpcMethods
@@ -57,17 +77,27 @@ export class ContainerUsageMeter
     );
     const context = copyUsageContext(parsed);
     const id = intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs);
-    const result = await applyStart(
-      this.env,
-      parsed,
-      id,
-      await usageContextFingerprint(context),
-      Date.now()
-    );
+    let result: Awaited<ReturnType<typeof applyStart>>;
+    try {
+      result = await applyStart(
+        this.env,
+        parsed,
+        id,
+        await usageContextFingerprint(context),
+        Date.now()
+      );
+    } catch (error) {
+      logRpcOutcome('start', parsed.service, 'failed', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      throw error;
+    }
     switch (result.kind) {
       case 'rejected':
+        logRpcOutcome('start', parsed.service, 'rejected', { rejectionCode: result.code });
         return { success: false, error: { code: result.code, message: result.message } };
       case 'applied':
+        logRpcOutcome('start', parsed.service, 'accepted', { dedup: result.dedup });
         return {
           success: true,
           ack: { intervalId: id, durable: 'pg', dedup: result.dedup },
@@ -83,13 +113,22 @@ export class ContainerUsageMeter
       heartbeatIdempotencyKey(parsed.service, parsed.instanceId, parsed.startEpochMs, parsed.seq)
     );
     const id = intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs);
-    const result = await applyHeartbeat(
-      this.env,
-      parsed,
-      id,
-      await usageContextFingerprint(parsed.context),
-      Date.now()
-    );
+    let result: Awaited<ReturnType<typeof applyHeartbeat>>;
+    try {
+      result = await applyHeartbeat(
+        this.env,
+        parsed,
+        id,
+        await usageContextFingerprint(parsed.context),
+        Date.now()
+      );
+    } catch (error) {
+      logRpcOutcome('heartbeat', parsed.service, 'failed', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      throw error;
+    }
+    logRpcOutcome('heartbeat', parsed.service, 'accepted', { dedup: result.dedup });
     return {
       intervalId: id,
       durable: 'pg',
@@ -106,13 +145,22 @@ export class ContainerUsageMeter
       stopIdempotencyKey(parsed.service, parsed.instanceId, parsed.startEpochMs)
     );
     const id = intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs);
-    const result = await applyStop(
-      this.env,
-      parsed,
-      id,
-      await usageContextFingerprint(parsed.context),
-      Date.now()
-    );
+    let result: Awaited<ReturnType<typeof applyStop>>;
+    try {
+      result = await applyStop(
+        this.env,
+        parsed,
+        id,
+        await usageContextFingerprint(parsed.context),
+        Date.now()
+      );
+    } catch (error) {
+      logRpcOutcome('stop', parsed.service, 'failed', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      throw error;
+    }
+    logRpcOutcome('stop', parsed.service, 'accepted', { dedup: result.dedup });
     return { intervalId: id, durable: 'pg', dedup: result.dedup };
   }
 }

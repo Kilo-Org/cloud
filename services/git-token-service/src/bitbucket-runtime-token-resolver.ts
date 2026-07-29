@@ -330,11 +330,16 @@ export async function listBitbucketRepositories(
   }
 }
 
-export async function resolveBitbucketToken(
+type BitbucketTokenFailure = Extract<GetBitbucketTokenResult, { success: false }>;
+
+async function resolveBitbucketAuthorizedRepository(
   env: CloudflareEnv,
   params: GetBitbucketTokenParams,
   dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
-): Promise<GetBitbucketTokenResult> {
+): Promise<
+  | { success: true; authorization: RuntimeAuthorization; repository: BitbucketRepository }
+  | BitbucketTokenFailure
+> {
   if (!params.orgId) return { success: false, reason: 'invalid_request' };
   const workspaceUuid = normalizeBitbucketUuid(params.workspaceUuid);
   const repositoryUuid = normalizeBitbucketUuid(params.repositoryUuid);
@@ -383,5 +388,49 @@ export async function resolveBitbucketToken(
   ) {
     return { success: false, reason: 'repository_mismatch' };
   }
-  return { success: true, token: authorization.token };
+  return { success: true, authorization, repository };
+}
+
+export async function resolveBitbucketToken(
+  env: CloudflareEnv,
+  params: GetBitbucketTokenParams,
+  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
+): Promise<GetBitbucketTokenResult> {
+  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides);
+  if (!resolved.success) return resolved;
+  return { success: true, token: resolved.authorization.token };
+}
+
+export type BitbucketCapabilitySubject = {
+  integrationId: string;
+  workspaceUuid: string;
+  workspaceSlug: string;
+  repositoryUuid: string;
+  repositoryFullName: string;
+  token: string;
+};
+
+// Resolve the same authorized repository as resolveBitbucketToken, but return
+// the identity needed to mint an outbound session capability (and the token, so
+// the caller can bind a rotation digest). Used at capability issue time and, on
+// the redeem path, to re-resolve the current token for comparison.
+export async function resolveBitbucketCapabilitySubject(
+  env: CloudflareEnv,
+  params: GetBitbucketTokenParams,
+  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
+): Promise<{ success: true; subject: BitbucketCapabilitySubject } | BitbucketTokenFailure> {
+  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides);
+  if (!resolved.success) return resolved;
+  const { authorization, repository } = resolved;
+  return {
+    success: true,
+    subject: {
+      integrationId: authorization.integrationId,
+      workspaceUuid: authorization.workspace.uuid,
+      workspaceSlug: authorization.workspace.slug,
+      repositoryUuid: repository.id,
+      repositoryFullName: repository.fullName,
+      token: authorization.token,
+    },
+  };
 }

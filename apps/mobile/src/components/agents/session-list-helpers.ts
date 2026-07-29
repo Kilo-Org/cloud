@@ -150,12 +150,13 @@ export function remoteAgentLabel(createdOnPlatform: string | undefined): string 
 }
 
 /**
- * Pinned-tray meta line for an active session. Mirrors `formatMeta` when an
- * `updatedAt` timestamp is available, otherwise falls back to the uppercased
- * status string (matches the legacy RemoteSessionRow behavior).
+ * Pinned-tray meta line for an active session. Returns the relative timestamp
+ * when `updatedAt` is present; otherwise `undefined` so `SessionRow` renders
+ * the live dot alone. Never the CLI status — status words in the timestamp
+ * slot were a defect (BUSY/IDLE/RETRY).
  */
-export function remoteMeta(session: { status: string; updatedAt?: string }): string {
-  return session.updatedAt ? formatMeta(session.updatedAt) : session.status.toUpperCase();
+export function remoteMeta(session: { updatedAt?: string }): string | undefined {
+  return session.updatedAt ? formatMeta(session.updatedAt) : undefined;
 }
 
 /**
@@ -205,10 +206,12 @@ const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;
 /**
  * Select which active sessions appear in the pinned "Active now" tray.
  *
- * Free-text search is not a parameter: the pinned set ignores search by
- * construction. Filters mirror the server-side platform/project narrowing
- * used by the stored-session list so the tray never shows a session that
- * the user has explicitly filtered out.
+ * `searchQuery` narrows the tray with the same semantics as the
+ * server-side history search: a case-insensitive substring match on the
+ * session's `title` OR `id` (`position()`/`includes` — LIKE wildcards
+ * match literally). Empty or whitespace-only queries perform no narrowing.
+ * The text query applies in conjunction with the platform/project filters,
+ * which mirror the server-side narrowing used by the stored-session list.
  *
  * No dedup against stored pages is performed here — exclusivity is enforced
  * on the history side by Task 3, so this helper stays pure and symmetric.
@@ -217,15 +220,25 @@ export function selectPinnedActiveSessions(params: {
   activeSessions: ActiveSession[];
   projectFilter: string[];
   platformFilter: string[];
+  searchQuery: string;
 }): ActiveSession[] {
-  const { activeSessions, projectFilter, platformFilter } = params;
+  const { activeSessions, projectFilter, platformFilter, searchQuery } = params;
   const projectActive = projectFilter.length > 0;
   const platformActive = platformFilter.length > 0;
+  const needle = searchQuery.trim().toLowerCase();
 
   const concretePlatforms = platformFilter.filter(p => p !== 'other');
   const includeOther = platformFilter.includes('other');
   const expanded = expandPlatformFilter(concretePlatforms);
   return activeSessions.filter(session => {
+    if (needle.length > 0) {
+      const hayTitle = session.title.toLowerCase();
+      const hayId = session.id.toLowerCase();
+      if (!hayTitle.includes(needle) && !hayId.includes(needle)) {
+        return false;
+      }
+    }
+
     if (projectActive && (!session.gitUrl || !projectFilter.includes(session.gitUrl))) {
       return false;
     }

@@ -243,9 +243,9 @@ export function PrReviewEntryScreen() {
                       setHelperMessage(null);
                     }
                   }}
-                  // explicit line-height so the placeholder + typed text render
-                  // at the same vertical position on every iOS version.
-                  className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-1 text-base text-foreground leading-[22px]"
+                  // leading-[normal] so no lineHeight reaches the style: an explicit lineHeight
+                  // makes iOS draw the placeholder lower than the typed text (see AGENTS.md).
+                  className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-1 text-base text-foreground leading-[normal]"
                   accessibilityLabel="GitHub pull request URL"
                   returnKeyType="go"
                   onSubmitEditing={() => {

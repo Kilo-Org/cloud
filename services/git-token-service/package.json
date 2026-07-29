@@ -14,6 +14,7 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@octokit/auth-app": "catalog:",
     "@octokit/rest": "22.0.1",

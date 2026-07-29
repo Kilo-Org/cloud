@@ -39,6 +39,4 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return resolve(context, moduleName, platform);
 };
 
-module.exports = withNativewind(config, {
-  inlineVariables: false,
-});
+module.exports = withNativewind(config, { inlineVariables: false });

@@ -52,6 +52,7 @@ export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'
 );
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
+export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
 export const REQUEST_LOGGING_OPT_INS_REDIS_KEY = redisKey('ai-gateway:request-logging-opt-ins');
 

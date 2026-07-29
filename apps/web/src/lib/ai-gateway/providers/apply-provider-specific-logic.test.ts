@@ -1,11 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
-import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   applyGatewayModelsFallback,
   applyPreferredProvider,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import { OPENROUTER_GPT56_PROMO_MODEL_IDS } from '@/lib/ai-gateway/providers/openai';
 
 function makeRequest(model: string, models?: string[]): GatewayRequest {
   return {
@@ -19,38 +20,54 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
 }
 
 describe('applyGatewayModelsFallback', () => {
-  it.each<ProviderId>(['openrouter', 'vercel'])(
-    'sets Opus as the Fable fallback for the %s provider',
-    async providerId => {
-      const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
+  it.each([
+    ['openrouter', 'anthropic/claude-fable-5'],
+    ['vercel', 'anthropic/claude-fable-5'],
+    ['openrouter', 'anthropic/claude-opus-5'],
+    ['vercel', 'anthropic/claude-opus-5'],
+  ] satisfies [ProviderId, string][])(
+    'sets Opus 4.8 as the fallback for %s requests to %s',
+    async (providerId, requestedModel) => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
 
-      await applyGatewayModelsFallback(providerId, 'anthropic/claude-fable-5', request);
+      await applyGatewayModelsFallback(providerId, requestedModel, request);
 
-      expect(request.body.models).toEqual([
-        'anthropic/claude-fable-5',
-        CLAUDE_OPUS_CURRENT_MODEL_ID,
-      ]);
+      expect(request.body.models).toEqual([requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID]);
     }
   );
 
-  it('removes caller-provided fallbacks for Fable on other providers', async () => {
-    const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
+  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5'])(
+    'removes caller-provided fallbacks for %s on other providers',
+    async requestedModel => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
 
-    await applyGatewayModelsFallback('martian', 'anthropic/claude-fable-5', request);
+      await applyGatewayModelsFallback('martian', requestedModel, request);
 
-    expect(request.body.models).toBeUndefined();
-  });
+      expect(request.body.models).toBeUndefined();
+    }
+  );
 
-  it('removes caller-provided fallbacks for other models', async () => {
-    const request = makeRequest('openai/gpt-4o', ['caller/fallback']);
+  it.each(['anthropic/claude-opus-4.8', 'anthropic/claude-opus-6', 'openai/gpt-4o'])(
+    'removes caller-provided fallbacks for other model %s',
+    async requestedModel => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
 
-    await applyGatewayModelsFallback('openrouter', 'openai/gpt-4o', request);
+      await applyGatewayModelsFallback('openrouter', requestedModel, request);
 
-    expect(request.body.models).toBeUndefined();
-  });
+      expect(request.body.models).toBeUndefined();
+    }
+  );
 });
 
 describe('applyPreferredProvider', () => {
+  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('prefers OpenAI for promo model %s', model => {
+    const request = makeRequest(model);
+
+    applyPreferredProvider(model, request.body);
+
+    expect(request.body.provider).toEqual({ order: ['openai'] });
+  });
+
   it('does not set a provider order for Fable', () => {
     const request = makeRequest('anthropic/claude-fable-5');
 

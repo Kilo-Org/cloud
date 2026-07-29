@@ -1,7 +1,7 @@
 /* eslint-disable import/no-nodejs-modules, max-lines */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import type { Page } from '@playwright/test';
 import {
   launchExtensionContext,
@@ -10,14 +10,6 @@ import {
   startFixtureServer,
   waitForStoredConversationText,
 } from './extension-context-fixture';
-
-const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'search_memories',
-  'get_memory',
-];
 
 /*
  * Read the persisted conversation store as a JSON string. Storage is the source of truth and is

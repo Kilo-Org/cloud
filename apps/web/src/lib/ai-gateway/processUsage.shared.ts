@@ -1,9 +1,11 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { toMicrodollars } from '../utils';
+import { errorExceptInTest } from '@/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
 import type {
   NotYetCostedUsageStats,
+  VercelProviderAttempt,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 
@@ -62,6 +64,22 @@ export function computeVercelCostMicrodollars(
 }
 
 /**
+ * Finds the provider attempt that served the request in the Vercel AI Gateway
+ * routing metadata: the successful provider attempt within the successful model
+ * attempt, falling back to the last attempt of each when none reports success.
+ */
+function findVercelServingProviderAttempt(
+  vercelGateway: NonNullable<VercelProviderMetaData['gateway']> | undefined | null
+): VercelProviderAttempt | undefined {
+  const modelAttempts = vercelGateway?.routing?.modelAttempts;
+  if (!modelAttempts) return undefined;
+  const servingModel = modelAttempts.find(m => m.success) ?? modelAttempts.at(-1);
+  const providerAttempts = servingModel?.providerAttempts;
+  if (!providerAttempts) return undefined;
+  return providerAttempts.find(p => p.success) ?? providerAttempts.at(-1);
+}
+
+/**
  * Extracts whether the Vercel AI Gateway served the request with BYOK credentials.
  *
  * The gateway reports per-attempt `credentialType` ("byok" | "system") in
@@ -72,16 +90,25 @@ export function computeVercelCostMicrodollars(
 export function extractVercelIsByok(
   vercelGateway: NonNullable<VercelProviderMetaData['gateway']> | undefined | null
 ): boolean | null {
-  const modelAttempts = vercelGateway?.routing?.modelAttempts;
-  if (!modelAttempts) return null;
-  const successfulModel = modelAttempts.find(m => m.success) ?? modelAttempts.at(-1);
-  const providerAttempts = successfulModel?.providerAttempts;
-  if (!providerAttempts) return null;
-  const successfulProvider = providerAttempts.find(p => p.success) ?? providerAttempts.at(-1);
-  const credentialType = successfulProvider?.credentialType;
+  const credentialType = findVercelServingProviderAttempt(vercelGateway)?.credentialType;
   if (credentialType === 'byok') return true;
   if (credentialType === 'system') return false;
   return null;
+}
+
+/**
+ * Extracts the upstream provider's own request/response id from the Vercel AI
+ * Gateway routing metadata, so it can be stored as
+ * `microdollar_usage_metadata.upstream_id` without a `/generation` lookup.
+ *
+ * Mirrors the attempt selection of `extractVercelIsByok`. Returns `null` when
+ * the gateway did not report an id.
+ */
+export function extractVercelUpstreamId(
+  vercelProviderMetadata: VercelProviderMetaData | undefined | null
+): string | null {
+  const attempt = findVercelServingProviderAttempt(vercelProviderMetadata?.gateway);
+  return attempt?.providerRequestId ?? attempt?.providerResponseId ?? null;
 }
 
 export function isResponseInterruptedError(error: unknown): boolean {
@@ -91,8 +118,8 @@ export function isResponseInterruptedError(error: unknown): boolean {
 
 /**
  * Drains a ReadableStream of binary chunks, calling `onTextChunk` for each
- * decoded piece of text. Handles client aborts and upstream timeouts gracefully
- * and always releases the reader lock and ends `streamProcessingSpan`.
+ * decoded piece of text. Handles stream processing failures gracefully and
+ * always releases the reader lock and ends `streamProcessingSpan`.
  *
  * Returns `true` if the stream was aborted before completion.
  */
@@ -111,11 +138,8 @@ export async function drainSseStream(
       onTextChunk(decoder.decode(value, { stream: true }));
     }
   } catch (error) {
-    if (isResponseInterruptedError(error)) {
-      wasAborted = true;
-    } else {
-      throw error;
-    }
+    errorExceptInTest('[processUsage] treating stream processing error as aborted', error);
+    wasAborted = true;
   } finally {
     reader.releaseLock();
     streamProcessingSpan.end();

@@ -857,6 +857,36 @@ describe('cli-sessions-v2-router', () => {
       expect(result.title).toBe('renamed by current member');
     });
 
+    it('rename always overwrites the title, whether it is still the creation placeholder or an existing (e.g. agent-generated) title', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // Session starts with title NULL (the creation placeholder) — rename must succeed.
+      const [beforeAnyTitle] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(beforeAnyTitle?.title).toBeNull();
+
+      const firstRename = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'agent-generated title',
+      });
+      expect(firstRename.title).toBe('agent-generated title');
+
+      // A subsequent user rename must overwrite an already non-null (agent-generated) title too.
+      const secondRename = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'user renamed title',
+      });
+      expect(secondRename.title).toBe('user renamed title');
+
+      const [persisted] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(persisted?.title).toBe('user renamed title');
+    });
+
     it('rename rejects an organization session after its creator loses membership', async () => {
       const originalTitle = 'organization session title';
       await db

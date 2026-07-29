@@ -18,6 +18,9 @@ import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platfor
 const mockGetAgentConfigForOwner = jest.fn();
 const mockFindExistingReviewCommentFixTicket = jest.fn();
 const mockParseFixCommand = jest.fn();
+const mockAddReactionToPRReviewComment = jest.fn().mockResolvedValue(undefined);
+const mockGetCollaboratorPermissionLevel = jest.fn();
+const mockIsLikelyKiloBotActor = jest.fn();
 
 jest.mock('@/lib/agent-config/db/agent-configs', () => ({
   getAgentConfigForOwner: (...args: unknown[]) => mockGetAgentConfigForOwner(...args),
@@ -39,8 +42,9 @@ jest.mock('@/lib/bot-users/bot-user-service', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
-  addReactionToPRReviewComment: jest.fn().mockResolvedValue(undefined),
-  getCollaboratorPermissionLevel: jest.fn(),
+  addReactionToPRReviewComment: (...args: unknown[]) => mockAddReactionToPRReviewComment(...args),
+  getCollaboratorPermissionLevel: (...args: unknown[]) =>
+    mockGetCollaboratorPermissionLevel(...args),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -49,6 +53,10 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@kilocode/app-shared/code-review', () => ({
   parseFixCommand: (text: string) => mockParseFixCommand(text),
+}));
+
+jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
+  isLikelyKiloBotActor: (...args: unknown[]) => mockIsLikelyKiloBotActor(...args),
 }));
 
 import { ReviewCommentWebhookProcessor } from './review-comment-webhook-processor';
@@ -102,6 +110,8 @@ describe('ReviewCommentWebhookProcessor admission', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: comments are authored by humans, so admission proceeds.
+    mockIsLikelyKiloBotActor.mockReturnValue(false);
     processor = new ReviewCommentWebhookProcessor();
   });
 
@@ -150,6 +160,30 @@ describe('ReviewCommentWebhookProcessor admission', () => {
     await processor.process(buildPayload(body), integration);
 
     expect(mockParseFixCommand).toHaveBeenCalledWith(body);
+    expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+  });
+
+  it('ignores a comment authored by Kilo itself before parsing (no self thumbs-down)', async () => {
+    // Regression: Kilo's own inline comments carry the advertised
+    // "Reply with `@kilocode-bot fix it` …" footer, which parseFixCommand
+    // would admit. The bot must never process its own comment — doing so
+    // previously produced a thumbs-down (-1) reaction on its own review
+    // comment because the author write-access check fails for the bot.
+    const body =
+      'Some finding.\n\n---\nReply with `@kilocode-bot fix it` to have Kilo Code address this issue.';
+    const payload = buildPayload(body);
+    payload.comment.user.login = 'kilo-code-bot[bot]';
+    // author_association from a GitHub App bot is NONE, but the guard must
+    // short-circuit before we ever reach the permission check or the parser.
+    payload.comment.author_association = 'NONE';
+    mockIsLikelyKiloBotActor.mockReturnValue(true);
+
+    await processor.process(payload, integration);
+
+    expect(mockIsLikelyKiloBotActor).toHaveBeenCalledWith('kilo-code-bot[bot]');
+    expect(mockParseFixCommand).not.toHaveBeenCalled();
+    expect(mockGetCollaboratorPermissionLevel).not.toHaveBeenCalled();
+    expect(mockAddReactionToPRReviewComment).not.toHaveBeenCalled();
     expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
   });
 });

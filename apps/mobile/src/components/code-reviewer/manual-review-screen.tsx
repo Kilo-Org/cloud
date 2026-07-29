@@ -229,7 +229,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           </Text>
           <TextInput
             key={platform}
-            className="h-12 rounded-md border border-input bg-background px-3 text-sm leading-5 text-foreground"
+            className="h-12 rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
             placeholder={URL_PLACEHOLDER[platform]}
             placeholderTextColor={colors.mutedForeground}
             autoCapitalize="none"

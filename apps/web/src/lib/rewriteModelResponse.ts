@@ -1,5 +1,6 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
+import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
@@ -218,7 +219,7 @@ async function readResponseText(
   response: Response,
   headers: Headers,
   vercelRequestId: string | null | undefined,
-  capture?: RequestLogCapture | null
+  capture: RequestLogCapture | null
 ): Promise<{ text: string } | { error: unknown; errorResponse: NextResponse }> {
   try {
     return { text: await response.text() };
@@ -256,7 +257,7 @@ async function rewriteSseStream(
   serializeError: (error: ResponseReadError) => string,
   onFinally: () => void,
   vercelRequestId: string | null | undefined,
-  capture?: RequestLogCapture | null
+  capture: RequestLogCapture | null
 ) {
   const decoder = new TextDecoder();
   // Accumulate the raw upstream text for request logging while the stream is
@@ -323,9 +324,9 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
 
 export async function rewriteModelResponse_ChatCompletions(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null,
-  vercelRequestId?: string | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
@@ -478,9 +479,9 @@ function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
 
 export async function rewriteModelResponse_Messages(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null,
-  vercelRequestId?: string | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
@@ -614,9 +615,9 @@ type ResponsesApiEvent = {
 
 export async function rewriteModelResponse_Responses(
   response: Response,
-  removeCost = true,
-  capture?: RequestLogCapture | null,
-  vercelRequestId?: string | null
+  removeCost: boolean,
+  capture: RequestLogCapture | null,
+  vercelRequestId: string | null
 ) {
   const headers = getOutputHeaders(response);
 
@@ -740,47 +741,30 @@ export async function rewriteModelResponse(
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
   logging: RequestLoggingParams
-): Promise<NextResponse | null> {
+): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
-  const isFreeModelRequiringCostRemoval =
-    (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
-
-  // When request logging is enabled the response has to be processed anyway
-  // so the body can be captured for the request log in a single pass, so the
-  // rewrite is not skipped in that case.
-  if (!isFreeModelRequiringCostRemoval && !capture) {
-    console.debug('[rewriteModelResponse] skipping rewrite for %s', model);
-    return null;
-  }
+  const requiresCostRemoval =
+    (providerId === 'openrouter' || providerId === 'vercel') &&
+    (isKiloExclusiveFreeModel(model) || getCustomPricing(model) !== undefined);
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;
   if (kind === 'chat_completions') {
     return rewriteModelResponse_ChatCompletions(
       response,
-      isFreeModelRequiringCostRemoval,
+      requiresCostRemoval,
       capture,
       vercelRequestId
     );
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(
-      response,
-      isFreeModelRequiringCostRemoval,
-      capture,
-      vercelRequestId
-    );
+    return rewriteModelResponse_Responses(response, requiresCostRemoval, capture, vercelRequestId);
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(
-      response,
-      isFreeModelRequiringCostRemoval,
-      capture,
-      vercelRequestId
-    );
+    return rewriteModelResponse_Messages(response, requiresCostRemoval, capture, vercelRequestId);
   }
 
-  console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);
-  capture?.setReadError(new Error('response was not processed'));
-  return null;
+  const error = new Error(`implementation error: unrecognized API kind ${kind}`);
+  capture?.setReadError(error);
+  throw error;
 }

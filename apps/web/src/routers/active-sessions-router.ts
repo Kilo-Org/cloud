@@ -7,6 +7,7 @@ import { generateInternalServiceToken } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 export const activeSessionSchema = z.object({
   id: z.string(),
@@ -50,8 +51,38 @@ const connectedInstancesResponseSchema = z.object({
   instances: z.array(connectedInstanceSchema),
 });
 
-export type ActiveSession = z.infer<typeof activeSessionSchema>;
+/**
+ * A live session as this router returns it: the worker's wire row plus the
+ * fields enriched from `cli_sessions_v2`.
+ */
+export type ActiveSession = z.infer<typeof activeSessionSchema> & {
+  /**
+   * Owning organization from `cli_sessions_v2`; `null` = personal, which
+   * also covers a live session with no `cli_sessions_v2` row (an
+   * unattributable session — the server attributes it to personal).
+   *
+   * This router sets the field on EVERY row it returns, so an absent value
+   * on a client-cached row means exactly one thing: that row entered the
+   * cache from a WS payload and has never been server-attributed. The
+   * client filter relies on that (see the mobile
+   * `filterActiveSessionsByOrganization`). The field stays optional in the
+   * type only because those WS-inserted cached rows share it.
+   */
+  organizationId?: string | null;
+};
 export type ConnectedInstance = z.infer<typeof connectedInstanceSchema>;
+
+const listInputSchema = z
+  .object({
+    /**
+     * Personal/organization context. `undefined` = no context filter (the
+     * liveness-resolution callers), `null` = personal only, a uuid = that
+     * organization. Mirrors `addOrganizationCondition` in
+     * `cli-sessions-v2-router.ts`.
+     */
+    organizationId: z.uuid().nullable().optional(),
+  })
+  .optional();
 
 /**
  * Overlay stored attention (question/permission) onto a live heartbeat
@@ -78,7 +109,12 @@ export const activeSessionsRouter = createTRPCRouter({
     return { token };
   }),
 
-  list: baseProcedure.query(async ({ ctx }) => {
+  list: baseProcedure.input(listInputSchema).query(async ({ ctx, input }) => {
+    const organizationId = input?.organizationId;
+    if (typeof organizationId === 'string') {
+      await ensureOrganizationAccess(ctx, organizationId);
+    }
+
     if (!SESSION_INGEST_WORKER_URL) {
       return { sessions: [] as ActiveSession[] };
     }
@@ -125,6 +161,8 @@ export const activeSessionsRouter = createTRPCRouter({
       created_at: string;
       updated_at: string;
       status: string | null;
+      title: string | null;
+      organization_id: string | null;
     }> = [];
     try {
       rows = await db
@@ -134,6 +172,8 @@ export const activeSessionsRouter = createTRPCRouter({
           created_at: cli_sessions_v2.created_at,
           updated_at: cli_sessions_v2.updated_at,
           status: cli_sessions_v2.status,
+          title: cli_sessions_v2.title,
+          organization_id: cli_sessions_v2.organization_id,
         })
         .from(cli_sessions_v2)
         .where(
@@ -144,30 +184,55 @@ export const activeSessionsRouter = createTRPCRouter({
         );
     } catch (error) {
       console.warn('[active-sessions] enrichment db query failed:', error);
-      return parsed;
+      // Attribution is unknowable without the join. An unfiltered caller (web,
+      // `resolveSession`) keeps the existing best-effort unenriched passthrough —
+      // a DB blip must not collapse its list. A filtered caller cannot be
+      // answered at all: calling every row personal would lie (breaking AC 1)
+      // and returning an empty list would silently blank the tray with no
+      // explanation. So fail the query and let the client's already-shipped
+      // retryable state handle it (D11).
+      if (organizationId === undefined) {
+        return parsed;
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to resolve the organization context for active sessions',
+        cause: error,
+      });
     }
 
     const byId = new Map(rows.map(r => [r.session_id, r]));
-    const sessions: ActiveSession[] = parsed.sessions.map(session => {
+    const sessions: ActiveSession[] = [];
+    for (const session of parsed.sessions) {
       const row = byId.get(session.id);
-      if (!row) {
-        return session;
+      // No `cli_sessions_v2` row → unattributable → personal. An SQL-side filter
+      // could not tell this case apart from "belongs to another organization".
+      const rowOrganizationId = row?.organization_id ?? null;
+      if (organizationId !== undefined && rowOrganizationId !== organizationId) {
+        continue;
       }
-      // Explicit snake_case → camelCase mapping: the mobile client only
-      // reads createdOnPlatform/createdAt/updatedAt, so we do not spread
-      // the DB row (which carries snake_case keys it never uses).
-      // Status: prefer DB attention (question/permission) over the live
-      // heartbeat so a released CLI that only reports idle/busy still
-      // surfaces NEEDS INPUT after tRPC seed / enrichment / reconnect.
-      return {
+      if (!row) {
+        // Always emit the field, `null` included: an absent `organizationId` on
+        // a client-cached row must mean "never server-attributed" and nothing
+        // else, or the client filter cannot tell a heartbeat-inserted row apart
+        // from a server-attributed personal one (D4/D6).
+        sessions.push({ ...session, organizationId: null });
+        continue;
+      }
+      sessions.push({
         ...session,
         status: resolveActiveSessionStatus(session.status, row.status),
+        // The tray title must be what a rename wrote, not what the CLI still
+        // reports: nothing propagates a cloud rename back to the CLI, so the
+        // heartbeat title stays stale forever. A NULL title (never-ingested
+        // placeholder row) falls back to the live one.
+        title: row.title ?? session.title,
+        organizationId: row.organization_id,
         createdOnPlatform: row.created_on_platform ?? undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
-      };
-    });
-
+      });
+    }
     return { sessions };
   }),
 

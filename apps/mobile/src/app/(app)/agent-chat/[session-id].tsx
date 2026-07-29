@@ -86,7 +86,6 @@ export default function SessionDetailScreen() {
           headerRight={
             <SessionContextMetrics
               info={undefined}
-              platform={null}
               totalCostMicrodollars={null}
               hasMessages={false}
             />

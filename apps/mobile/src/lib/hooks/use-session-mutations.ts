@@ -1,6 +1,7 @@
 import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
+import { applyActiveSessionTitle, type CachedActiveSessionsData } from '@/lib/active-sessions-live';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { chainSave } from '@/lib/hooks/save-chain';
 import {
@@ -20,12 +21,15 @@ export function useSessionMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const listKey = trpc.cliSessionsV2.list.infiniteQueryKey();
+  const activeListFilter = trpc.activeSessions.list.pathFilter();
 
   const invalidateSessions = async () => {
     await invalidateAgentSessionQueries(queryClient, trpc);
   };
 
-  const snapshotAndUpdate = async (update: (data: SessionsListData) => SessionsListData) => {
+  const snapshotAndUpdate = async (
+    update: (data: SessionsListData) => SessionsListData
+  ): Promise<{ previous: SessionsListSnapshot }> => {
     await queryClient.cancelQueries({ queryKey: listKey });
     const previous = queryClient.getQueriesData<SessionsListData>({ queryKey: listKey });
     queryClient.setQueriesData<SessionsListData>({ queryKey: listKey }, old =>
@@ -34,7 +38,21 @@ export function useSessionMutations() {
     return { previous };
   };
 
-  const rollback = (previous?: SessionsListSnapshot) => {
+  /**
+   * Optimistically retitle the row in every cached "Active now" tray. The tray
+   * cache is keyed per personal/org context, so patch them all by path filter —
+   * the mutation hook has no context of its own, and a rename is rare.
+   */
+  const snapshotAndUpdateActive = async (sessionId: string, title: string) => {
+    await queryClient.cancelQueries(activeListFilter);
+    const previousActive = queryClient.getQueriesData<CachedActiveSessionsData>(activeListFilter);
+    queryClient.setQueriesData<CachedActiveSessionsData>(activeListFilter, old =>
+      old ? { sessions: applyActiveSessionTitle(old.sessions, sessionId, title) } : old
+    );
+    return previousActive;
+  };
+
+  const rollback = (previous?: [QueryKey, unknown][]) => {
     for (const [key, data] of previous ?? []) {
       queryClient.setQueryData(key, data);
     }
@@ -55,13 +73,16 @@ export function useSessionMutations() {
 
   const renameSessionMutation = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions({
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-      onMutate: ({ session_id, title }) =>
-        snapshotAndUpdate(data =>
+      onMutate: async ({ session_id, title }) => {
+        const { previous } = await snapshotAndUpdate(data =>
           mapStoredSessions(data, session_id, session => ({ ...session, title }))
-        ),
+        );
+        const previousActive = await snapshotAndUpdateActive(session_id, title);
+        return { previous, previousActive };
+      },
       onError: (error, _input, context) => {
         rollback(context?.previous);
+        rollback(context?.previousActive);
         onError(error);
       },
       onSettled: invalidateSessions,

@@ -68,10 +68,14 @@ export async function applyMetadataChanges(
   /** True only when an organization_id write was actually applied (authorized claim or explicit null clear). */
   let organizationIdWriteApplied = false;
 
+  /** True only when an agent-generated title write was actually applied (placeholder was still unset). */
+  let titleWriteApplied = false;
+
   const notification = await db.transaction(async tx => {
     const selectCurrentRow = () =>
       tx
         .select({
+          title: cli_sessions_v2.title,
           status: cli_sessions_v2.status,
           parentSessionId: cli_sessions_v2.parent_session_id,
           cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
@@ -125,6 +129,23 @@ export async function applyMetadataChanges(
             const previousStatus = SessionStatusSchema.nullable().parse(currentRow.status);
             return { changed: status !== previousStatus, previousStatus };
           })();
+
+    // Agent-generated titles arrive asynchronously and can race a user rename. A session's
+    // title starts out NULL (the placeholder set at row creation); only promote it from that
+    // placeholder here. Once the title is non-null — whether from a user rename or an earlier
+    // agent-generated write — leave it alone so a later user rename can never be clobbered by
+    // an in-flight ingest.
+    if (mergedChanges.has('title')) {
+      if (currentRow.title === null) {
+        titleWriteApplied = true;
+      } else {
+        console.warn('Skipping agent-generated title write; title is no longer the placeholder', {
+          kiloUserId,
+          sessionId,
+        });
+        delete updates.title;
+      }
+    }
 
     // Membership check only for non-null org claims; run on the same tx as the UPDATE.
     // Residual: SessionIngestDO.writeIngestMetaIfChanged records the claimed orgId in DO
@@ -281,9 +302,9 @@ export async function applyMetadataChanges(
       }
     }
 
-    // Refused org/parent claims must not emit phantom session.updated events.
+    // Refused org/parent/title claims must not emit phantom session.updated events.
     const changedNonStatus =
-      mergedChanges.has('title') ||
+      titleWriteApplied ||
       mergedChanges.has('platform') ||
       organizationIdWriteApplied ||
       mergedChanges.has('gitUrl') ||

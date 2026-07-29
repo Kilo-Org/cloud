@@ -26,6 +26,10 @@ type ExecWithOutputFn = (command: string, args: readonly string[]) => CommandRes
 // Production wires this to `xcrun simctl rename <device> <name>`.
 // Injectable for deterministic tests.
 export type RenameFn = (deviceId: string, name: string) => void;
+// Shutdown hook used to power the device off on release.
+// Production wires this to `xcrun simctl shutdown <device>`.
+// Injectable for deterministic tests.
+export type ShutdownFn = (deviceId: string) => void;
 // A claim is a small JSON lock file owned by a worktree. It is stale —
 // and silently reclaimable — when its worktree no longer exists on
 // disk. Concurrency is handled by atomic `wx` creation plus a short
@@ -42,6 +46,12 @@ type ClaimRecord = {
   // before renaming).
   originalDeviceName?: string;
   currentDeviceName?: string;
+  // Whether this claim is what booted the device. Release powers the
+  // device off only when this is true, so a simulator that was already
+  // running before the claim is never shut down under someone else.
+  // Absent on claims written before this field existed — treated as
+  // false, which leaks a device at worst and never steals one.
+  bootedByClaim?: boolean;
 };
 type ClaimArgs = {
   devices: SimulatorDevice[];
@@ -53,7 +63,10 @@ type ClaimArgs = {
   // `xcrun simctl rename` in production via `main`. Tests inject a
   // recording stub.
   rename?: RenameFn;
-  prepare?: (device: SimulatorDevice) => void;
+  // Returns true when it actually booted the device, false when the
+  // device was already running and was adopted as-is. That answer is
+  // only knowable here, so it is recorded in the claim for release.
+  prepare?: (device: SimulatorDevice) => boolean | void;
   fileOperations?: {
     readFileSync?: (filePath: string, encoding: 'utf8') => string;
   };
@@ -78,12 +91,21 @@ function buildSimulatorLabel(worktreeRoot: string): string {
   return `${prefix}${sanitized}`;
 }
 
-// Parse the CLI arguments: `claim [<udid>]` or `release <udid>`. Pure
-// helper exported for tests.
+// Parse the CLI arguments: `claim [<udid>]`, `release <udid>`, or
+// `release-all`. Pure helper exported for tests.
 function parseClaimArgs(
   argv: readonly string[]
-): { command: 'claim'; udid: string | undefined } | { command: 'release'; udid: string } {
+):
+  | { command: 'claim'; udid: string | undefined }
+  | { command: 'release'; udid: string }
+  | { command: 'release-all' } {
   const [command, ...rest] = argv;
+  if (command === 'release-all') {
+    if (rest.length !== 0) {
+      throw new Error('Usage: release-all');
+    }
+    return { command: 'release-all' };
+  }
   if (command === 'release') {
     if (rest.length !== 1) {
       throw new Error('Usage: release <udid>');
@@ -91,7 +113,7 @@ function parseClaimArgs(
     return { command: 'release', udid: rest[0] };
   }
   if (command !== 'claim' || rest.length > 1) {
-    throw new Error('Usage: claim [<udid>] | release <udid>');
+    throw new Error('Usage: claim [<udid>] | release <udid> | release-all');
   }
   return { command: 'claim', udid: rest[0] };
 }
@@ -144,6 +166,7 @@ function readClaim(
       typeof obj.originalDeviceName === 'string' ? obj.originalDeviceName : undefined,
     currentDeviceName:
       typeof obj.currentDeviceName === 'string' ? obj.currentDeviceName : undefined,
+    bootedByClaim: obj.bootedByClaim === true,
   };
 }
 
@@ -197,12 +220,16 @@ function isBootstatusTerminalFailure(result: CommandResult): boolean {
 // "Booted" device we started. Never shut down a simulator that was already
 // booted by someone else, and never shut down a simulator whose `boot` failed
 // (it never started).
+//
+// Returns true when this call booted the device and false when it adopted an
+// already-running one, so the claim can record who is responsible for shutting
+// it down again.
 function bootSimulator(
   device: SimulatorDevice,
   exec: ExecFn = execFileSync,
   runWithOutput: ExecWithOutputFn = execWithOutput
-): void {
-  if (device.state === 'Booted') return;
+): boolean {
+  if (device.state === 'Booted') return false;
   let booted = false;
   try {
     exec('xcrun', ['simctl', 'boot', device.id], { stdio: 'ignore' });
@@ -229,6 +256,7 @@ function bootSimulator(
     }
     throw wrapped;
   }
+  return true;
 }
 
 function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwned: boolean } {
@@ -302,8 +330,9 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
       // unless the device may still be running (a failed boot whose
       // follow-up shutdown also failed), in which case the claim stays
       // so a peer cannot adopt a booted device.
+      let bootedByClaim = false;
       try {
-        args.prepare?.(device);
+        bootedByClaim = args.prepare?.(device) === true;
         if (!args.rename) {
           throw new Error(`Simulator ${device.id} claim requires a rename hook`);
         }
@@ -328,6 +357,7 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
             claimedAt: new Date().toISOString(),
             originalDeviceName: device.name,
             currentDeviceName: targetLabel,
+            bootedByClaim,
           }),
           { flag: 'w' }
         );
@@ -359,6 +389,10 @@ function releaseSimulator(args: {
   // before deleting an owned claim. Claims without `originalDeviceName`
   // (no label was applied) skip the restore.
   rename?: RenameFn;
+  // Optional shutdown hook. Invoked only for a claim that recorded
+  // `bootedByClaim`, so releasing a device that was already running
+  // before the claim leaves it running.
+  shutdown?: ShutdownFn;
 }): void {
   withClaimMutationLock(args.lockRoot, args.deviceId, () => {
     const filePath = lockPath(args.lockRoot, args.deviceId);
@@ -401,8 +435,59 @@ function releaseSimulator(args: {
     ) {
       args.rename(args.deviceId, record.originalDeviceName);
     }
+    // Power the device off before dropping the claim, but only when this
+    // claim is what booted it. A shutdown failure preserves the claim and
+    // surfaces the error rather than leaving a running device unclaimed.
+    if (args.shutdown !== undefined && record.bootedByClaim === true) {
+      args.shutdown(args.deviceId);
+    }
     fs.rmSync(filePath, { force: true });
   });
+}
+
+// Release every simulator this worktree still holds, powering off the ones
+// its claims booted. Callers that only know the worktree — teardown paths like
+// `.kilo_workflow/e2e-slot.sh release`, which frees a slot without ever seeing
+// a UDID — need this so a forgotten `release <udid>` cannot leak a device.
+// Returns the released device ids. Foreign claims are ignored, never touched.
+function releaseWorktreeSimulators(args: {
+  lockRoot: string;
+  worktreeRoot: string;
+  rename?: RenameFn;
+  shutdown?: ShutdownFn;
+}): string[] {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(args.lockRoot);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [];
+    throw error;
+  }
+  const released: string[] = [];
+  const failures: Error[] = [];
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    const deviceId = entry.slice(0, -'.json'.length);
+    // `readClaim` discards corrupt records and claims whose worktree is gone,
+    // so an unreadable claim simply is not ours to release.
+    if (readClaim(args.lockRoot, deviceId)?.worktreeRoot !== args.worktreeRoot) continue;
+    // Every claim gets its attempt before anything is reported. One device
+    // that will not power off must not strand the rest of the worktree's
+    // devices, which is the leak this whole path exists to prevent.
+    try {
+      releaseSimulator({ ...args, deviceId });
+      released.push(deviceId);
+    } catch (error) {
+      failures.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `Released ${released.length === 0 ? 'no simulator' : released.join(' ')}; ${failures.length} failed: ${failures.map(failure => failure.message).join('; ')}`
+    );
+  }
+  return released;
 }
 
 function listIosDevices(exec: ExecFn = execFileSync): SimulatorDevice[] {
@@ -452,6 +537,18 @@ function defaultRename(deviceId: string, name: string): void {
   execFileSync('xcrun', ['simctl', 'rename', deviceId, name], { stdio: 'ignore' });
 }
 
+// Production shutdown: `xcrun simctl shutdown <device>`. A device that is
+// already off exits non-zero with "Unable to shutdown device in current state:
+// Shutdown" — the desired end state, so that one case is not an error.
+function defaultShutdown(deviceId: string): void {
+  const result = spawnSync('xcrun', ['simctl', 'shutdown', deviceId], { encoding: 'utf8' });
+  if (result.error) throw result.error;
+  if (result.status === 0) return;
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  if (/current state: Shutdown/.test(output)) return;
+  throw new Error(output.trim() || `xcrun simctl shutdown ${deviceId} failed`);
+}
+
 function main(): void {
   const parsed = parseClaimArgs(process.argv.slice(2));
   const worktreeRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
@@ -472,12 +569,27 @@ function main(): void {
     );
     return;
   }
+  if (parsed.command === 'release-all') {
+    const released = releaseWorktreeSimulators({
+      lockRoot,
+      worktreeRoot,
+      rename: defaultRename,
+      shutdown: defaultShutdown,
+    });
+    console.log(
+      released.length === 0
+        ? `No simulator claimed by ${worktreeRoot}`
+        : `Released ${released.join(' ')}`
+    );
+    return;
+  }
   // parsed.command === 'release'
   releaseSimulator({
     deviceId: parsed.udid,
     lockRoot,
     worktreeRoot,
     rename: defaultRename,
+    shutdown: defaultShutdown,
   });
   console.log(`Released ${parsed.udid}`);
 }
@@ -500,4 +612,5 @@ export {
   listIosDevices,
   parseClaimArgs,
   releaseSimulator,
+  releaseWorktreeSimulators,
 };

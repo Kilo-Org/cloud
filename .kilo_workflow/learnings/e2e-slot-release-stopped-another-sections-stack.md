@@ -35,3 +35,15 @@ a `slot-acq` window under a proxy `<section>-e2e-seed` session and parked a
 `sleep` to hold it. That both violates the E2E-loop rule and creates a
 self-deadlock: the verifier polls for a free slot that its own section's
 sleeper holds, and neither side can progress.
+
+Victim-side recovery (worked twice in hermes-mem-c716 r1, the section named in
+the symptom): the kill is silent for the victim — `pnpm dev:status` just prints
+"No dev session running" mid-round and the dev client loses Metro. While the
+slot is still held, restart the stack in place: `pnpm dev:start --no-attach
+mobile cloud-agent-next kiloclaw event-service` (the same ports return), restart
+the CLI relay (`remote-cli.sh exec remote` → `Remote connection enabled.`),
+re-prove `session list --pure`, re-anchor the dev client with the deep link, and
+re-run only the iteration that was in flight — device-local measurements (e.g.
+meminfo) from completed iterations stay valid. The companion `stack=none` shown
+by `e2e-slot.sh status` even for live stacks was the #4836 name-mangling bug
+(the same mangled session name made `has-session` always fail), already fixed.

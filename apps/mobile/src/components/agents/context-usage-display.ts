@@ -1,4 +1,3 @@
-import { platformLabel } from '@/lib/platform-label';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { formatSessionTotalCost } from './session-list-helpers';
@@ -194,28 +193,17 @@ export function getContextSheetContent(
 export function getMetricsAccessibilityLabel({
   info,
   totalCostMicrodollars,
-  platform,
   interactive,
 }: {
   info: SessionContextInfo | undefined;
   totalCostMicrodollars: number | null;
-  /** Spoken only when the caller has a mapped platform glyph. */
-  platform?: string | null;
   interactive: boolean;
 }): string {
-  const platformPart = platform != null && platform !== '' ? platformLabel(platform) : null;
   const spoken = formatSpokenCost(totalCostMicrodollars);
   const tapPart = interactive ? ' Tap to view context details.' : '';
 
   if (!info) {
-    const parts: string[] = [];
-    if (platformPart) {
-      parts.push(platformPart);
-    }
-    if (spoken) {
-      parts.push(`cost ${spoken}`);
-    }
-    return parts.join(', ');
+    return spoken ? `cost ${spoken}` : '';
   }
 
   const costPart = spoken ? `, cost ${spoken}` : '';
@@ -223,7 +211,7 @@ export function getMetricsAccessibilityLabel({
     info.contextWindow === undefined
       ? `Context ${formatExactTokens(info.contextTokens)} tokens, window unavailable${costPart}.`
       : `Context ${formatExactTokens(info.contextTokens)} of ${formatExactTokens(info.contextWindow)} tokens, ${info.percentage ?? 0}% used${costPart}.`;
-  return platformPart ? `${platformPart}. ${body}${tapPart}` : `${body}${tapPart}`;
+  return `${body}${tapPart}`;
 }
 
 type SheetMountState =

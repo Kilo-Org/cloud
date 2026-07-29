@@ -1,7 +1,6 @@
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -11,11 +10,9 @@ import {
   getHeaderPillContent,
   getMetricsAccessibilityLabel,
 } from './context-usage-display';
-import { SessionPlatformIcon } from './session-platform-icon';
 
 type SessionContextMetricsProps = {
   info: SessionContextInfo | undefined;
-  platform: string | null | undefined;
   totalCostMicrodollars: number | null;
   hasMessages: boolean;
   onPress?: () => void;
@@ -23,7 +20,6 @@ type SessionContextMetricsProps = {
 
 const RING_SIZE = 28;
 const RING_STROKE = 3;
-const GLYPH_SIZE = 14;
 
 const TONE_TEXT_CLASS: Record<ContextTone, string> = {
   destructive: 'text-destructive',
@@ -38,12 +34,10 @@ function toneTextClass(tone: ContextTone): string {
 
 export function SessionContextMetrics({
   info,
-  platform,
   totalCostMicrodollars,
   hasMessages,
   onPress,
 }: Readonly<SessionContextMetricsProps>) {
-  const colors = useThemeColors();
   const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages });
   // Single source for element kind and a11y affordance wording so a future
   // caller with interactive content but no onPress cannot advertise a tap.
@@ -51,7 +45,6 @@ export function SessionContextMetrics({
   const accessibilityLabel = getMetricsAccessibilityLabel({
     info,
     totalCostMicrodollars,
-    platform,
     interactive: pressable,
   });
 
@@ -72,7 +65,6 @@ export function SessionContextMetrics({
             tone={content.tone}
           />
         </View>
-        <SessionPlatformIcon platform={platform} size={GLYPH_SIZE} color={colors.mutedForeground} />
       </View>
       {content.primary != null ? (
         <View className="flex-row items-baseline gap-1">

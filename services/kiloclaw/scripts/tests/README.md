@@ -12,8 +12,20 @@ Validate an OpenClaw version bump before merging the bump PR.
 
 ```bash
 export KILOCODE_API_KEY=<dedicated free-model key>   # for the live smoke; from app.kilo.ai/profile
+export KILOCODE_ORGANIZATION_ID=<org id>             # REQUIRED if the key is a personal key in an org
 bash services/kiloclaw/scripts/tests/openclaw-upgrade-validate.sh
 ```
+
+> **Credits.** A personal Kilo token spends **personal** credits. If your account
+> is in an organization and you want the org's credits, `KILOCODE_ORGANIZATION_ID`
+> must be set — the token alone does not carry org scope. Note that exporting
+> `KILOCODE_API_KEY` (the line above) means the smoke can no longer read the org id
+> out of your Kilo CLI config the way it does for a CLI-sourced token, so set it
+> explicitly. Get it wrong and the live turn fails deep in the gateway as
+> `402 add credits`, a websocket `1008` close, or "provider rejected the request
+> schema" — none of which name the real cause, and all of which look like a broken
+> image. The smoke now preflights this and refuses to run rather than let you
+> debug the wrong thing.
 
 It runs a preflight (Docker, bump branch, clean tree, grype, credential) then:
 

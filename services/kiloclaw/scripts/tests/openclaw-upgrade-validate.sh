@@ -152,6 +152,10 @@ elif [ "$IS_BUMP" -eq 1 ]; then
   echo "Phase 2 (the live smoke) is half the coverage and needs a Kilo API key."
   echo "For the full validation, set a dedicated free-model key and re-run:"
   echo "    export KILOCODE_API_KEY=<key>   # from https://app.kilo.ai/profile (bottom)"
+  echo "    export KILOCODE_ORGANIZATION_ID=<org id>   # REQUIRED to spend ORG credits;"
+  echo "                                               # a personal token alone spends only"
+  echo "                                               # personal credits and the live turn"
+  echo "                                               # then fails with a misleading error"
   echo "    bash $0"
   ask_continue_keyless_or_stop
 

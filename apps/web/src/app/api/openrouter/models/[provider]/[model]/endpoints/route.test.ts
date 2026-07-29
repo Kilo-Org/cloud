@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { GET } from './route';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -71,5 +72,53 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     await expect(response.json()).resolves.toEqual({
       error: { message: 'Not Found', code: 404 },
     });
+  });
+
+  test('applies custom pricing to every priced endpoint', async () => {
+    const model = {
+      id: QWEN37_MAX_MODEL_ID,
+      name: 'Qwen: Qwen3.7 Max',
+      endpoints: [
+        {
+          provider_name: 'Alibaba',
+          pricing: { prompt: '0.000001', completion: '0.000002' },
+        },
+        {
+          provider_name: 'Another provider',
+          pricing: { prompt: '0.000003', completion: '0.000004' },
+        },
+        { provider_name: 'Unpriced' },
+      ],
+    };
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
+    const [provider, modelName] = model.id.split('/');
+
+    const response = await GET(request(model.id), {
+      params: Promise.resolve({ provider, model: modelName }),
+    });
+
+    expect(response.status).toBe(200);
+    const data = (await response.json()).data;
+    expect(data.endpoints).toEqual([
+      {
+        provider_name: 'Alibaba',
+        pricing: {
+          prompt: '0.000001250000',
+          completion: '0.000003750000',
+          input_cache_read: '0.000000125000',
+          input_cache_write: '0.000001562500',
+        },
+      },
+      {
+        provider_name: 'Another provider',
+        pricing: {
+          prompt: '0.000001250000',
+          completion: '0.000003750000',
+          input_cache_read: '0.000000125000',
+          input_cache_write: '0.000001562500',
+        },
+      },
+      { provider_name: 'Unpriced' },
+    ]);
   });
 });

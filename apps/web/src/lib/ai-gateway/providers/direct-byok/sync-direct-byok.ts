@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { type DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
+import {
+  type DirectByokModel,
+  type DirectByokModelFlag,
+} from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
@@ -28,6 +31,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
+  reasoning: z.boolean().optional(),
   status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
   limit: z
     .object({
@@ -57,6 +61,7 @@ type RawModel = {
   context_length?: number;
   max_completion_tokens?: number;
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
+  flags?: ReadonlyArray<DirectByokModelFlag>;
 };
 
 type SyncContext = {
@@ -105,6 +110,7 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
       context_length: model.context_length ?? model.max_model_len,
       max_completion_tokens: model.max_output_length,
       input_modalities: model.input_modalities,
+      flags: ['reasoning'],
     }));
 }
 
@@ -122,6 +128,7 @@ export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
       context_length: model.limit?.context,
       max_completion_tokens: model.limit?.output,
       input_modalities: model.modalities?.input,
+      flags: model.reasoning ? ['reasoning'] : undefined,
     }));
 }
 
@@ -208,6 +215,8 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
   for (const raw of fetched) {
     const name = raw.name ?? shortenDisplayName(raw.id);
     const context_length = raw.context_length ?? DEFAULT_CONTENT_LENGTH;
+    const flags = new Set(raw.flags);
+    if (raw.input_modalities?.includes('image')) flags.add('vision');
     const max_completion_tokens = Math.min(
       raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       context_length
@@ -215,7 +224,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
     models.push({
       id: raw.id,
       name,
-      flags: raw.input_modalities?.includes('image') ? ['vision'] : undefined,
+      flags: flags.size > 0 ? [...flags] : undefined,
       context_length,
       max_completion_tokens,
     });

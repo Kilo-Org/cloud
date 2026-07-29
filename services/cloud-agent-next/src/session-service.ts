@@ -15,6 +15,7 @@ import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
+  issueCloudAgentBitbucketSessionCapability,
   issueCloudAgentGitLabSessionCapability,
   issueCloudAgentKiloSessionCapability,
   resolveCloudAgentGitHubAuthForRepo,
@@ -1796,26 +1797,56 @@ export class SessionService {
         throw ExecutionError.invalidRequest('Bitbucket repositories require an organization');
       }
 
-      const result = await resolveManagedBitbucketToken(env, {
-        userId: metadata.identity.userId,
-        orgId: metadata.identity.orgId,
-        ...(git.bitbucketIntegrationId
-          ? { expectedIntegrationId: git.bitbucketIntegrationId }
-          : {}),
-        workspaceUuid: git.workspaceUuid,
-        repositoryUuid: git.repositoryUuid,
-        repositoryUrl: git.url,
-      });
-      if (!result.success) {
-        const reconnect = result.reason === 'reconnect_required' ? ' Reconnect Bitbucket.' : '';
-        const message = `Bitbucket repository authorization failed (${result.reason}).${reconnect}`;
-        if (isTemporaryManagedBitbucketTokenFailure(result.reason)) {
-          throw ExecutionError.workspaceSetupFailed(message);
+      if (credentialContainment.bitbucket) {
+        // Contained sessions get an opaque capability instead of the raw
+        // workspace token; the outbound interceptor redeems it per request, so
+        // bitbucket.org is `git.url` (the canonical clone URL) with the
+        // capability supplied as the git password by the wrapper.
+        if (!env.GIT_TOKEN_SERVICE) {
+          throw ExecutionError.invalidRequest('Git token service is not configured');
         }
-        throw ExecutionError.invalidRequest(message);
+        const result = await issueCloudAgentBitbucketSessionCapability(env, {
+          userId: metadata.identity.userId,
+          orgId: metadata.identity.orgId,
+          outboundContainerId: getOutboundContainerId(env, sandboxId, {
+            managedScmContainment: containmentSandboxRequired,
+          }),
+          ...(git.bitbucketIntegrationId
+            ? { expectedIntegrationId: git.bitbucketIntegrationId }
+            : {}),
+          workspaceUuid: git.workspaceUuid,
+          repositoryUuid: git.repositoryUuid,
+          repositoryUrl: git.url,
+        });
+        if (!result.success) {
+          throw ExecutionError.workspaceSetupFailed(
+            `Bitbucket session capability issuance failed (${result.reason})`
+          );
+        }
+        gitToken = result.value.capability;
+        bitbucketTokenManaged = true;
+      } else {
+        const result = await resolveManagedBitbucketToken(env, {
+          userId: metadata.identity.userId,
+          orgId: metadata.identity.orgId,
+          ...(git.bitbucketIntegrationId
+            ? { expectedIntegrationId: git.bitbucketIntegrationId }
+            : {}),
+          workspaceUuid: git.workspaceUuid,
+          repositoryUuid: git.repositoryUuid,
+          repositoryUrl: git.url,
+        });
+        if (!result.success) {
+          const reconnect = result.reason === 'reconnect_required' ? ' Reconnect Bitbucket.' : '';
+          const message = `Bitbucket repository authorization failed (${result.reason}).${reconnect}`;
+          if (isTemporaryManagedBitbucketTokenFailure(result.reason)) {
+            throw ExecutionError.workspaceSetupFailed(message);
+          }
+          throw ExecutionError.invalidRequest(message);
+        }
+        gitToken = result.token;
+        bitbucketTokenManaged = true;
       }
-      gitToken = result.token;
-      bitbucketTokenManaged = true;
     }
 
     if (git?.type === 'bitbucket' && !gitToken) {

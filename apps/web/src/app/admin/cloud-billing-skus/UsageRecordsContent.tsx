@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ChevronDown, ChevronRight, Cloud, Copy, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
   SelectContent,
@@ -69,6 +70,48 @@ type UsageSummaryRequest = {
 
 function formatTimestamp(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—';
+}
+
+function formatProviderNumber(value: number | null): string {
+  return value === null
+    ? 'Unavailable'
+    : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function reconciliationStatusLabel(status: string): string {
+  switch (status) {
+    case 'matched':
+      return 'Matched';
+    case 'missing_from_cloudflare':
+      return 'Missing from Cloudflare';
+    case 'ambiguous_application':
+      return 'Ambiguous application';
+    case 'provider_partial':
+      return 'Provider partial';
+    default:
+      return 'Comparison unavailable';
+  }
+}
+
+function reconciliationStatusVariant(status: string) {
+  if (status === 'matched') return 'new' as const;
+  if (status === 'missing_from_cloudflare') return 'destructive' as const;
+  if (status === 'ambiguous_application') return 'beta' as const;
+  if (status === 'provider_partial') return 'secondary-outline' as const;
+  return 'secondary' as const;
+}
+
+function formatDifference(seconds: number | null, percent: number | null): string {
+  if (seconds === null) return 'Unavailable';
+  const secondsPrefix = seconds > 0 ? '+' : '';
+  if (percent === null) return `${secondsPrefix}${formatProviderNumber(seconds)}s`;
+  const percentPrefix = percent > 0 ? '+' : '';
+  return `${secondsPrefix}${formatProviderNumber(seconds)}s (${percentPrefix}${formatProviderNumber(percent)}%)`;
+}
+
+function formatProvisionedCapacity(memoryBytes: number | null, diskBytes: number | null) {
+  if (memoryBytes === null || diskBytes === null) return null;
+  return `${formatProviderNumber(memoryBytes / 1024 ** 3)} GiB memory · ${formatProviderNumber(diskBytes / 1_000_000_000)} GB disk`;
 }
 
 function toDateTimeLocalValue(value: Date): string {
@@ -226,6 +269,8 @@ export default function UsageRecordsContent() {
   const [summaryEnd, setSummaryEnd] = useState(() => toDateTimeLocalValue(new Date()));
   const [summaryRequest, setSummaryRequest] = useState<UsageSummaryRequest | null>(null);
   const [summaryInputError, setSummaryInputError] = useState<string | null>(null);
+  const [rawResponseOpen, setRawResponseOpen] = useState(false);
+  const [rawCopyStatus, setRawCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const input = {
     search:
@@ -258,6 +303,9 @@ export default function UsageRecordsContent() {
     ),
     enabled: summaryRequest !== null,
   });
+  const reconciliation = useMutation(
+    trpc.admin.cloudBillingSkus.reconcileUsageWithCloudflare.mutationOptions()
+  );
   const rows = results.data?.items ?? [];
 
   const resetResultNavigation = () => {
@@ -353,6 +401,9 @@ export default function UsageRecordsContent() {
                 submittedSummaryStart === nextSummaryStart &&
                 submittedSummaryEnd === nextSummaryEnd;
               setSummaryInputError(null);
+              reconciliation.reset();
+              setRawResponseOpen(false);
+              setRawCopyStatus('idle');
               setSummaryRequest(
                 next.kind === 'user' || next.kind === 'org'
                   ? {
@@ -419,6 +470,9 @@ export default function UsageRecordsContent() {
                       setCloseReason('all');
                       setSkuId('all');
                       setSummaryInputError(null);
+                      reconciliation.reset();
+                      setRawResponseOpen(false);
+                      setRawCopyStatus('idle');
                       setSummaryRequest(null);
                       setSubmitted({ kind: 'recent' });
                       replaceCloseReasonParam(undefined);
@@ -645,6 +699,281 @@ export default function UsageRecordsContent() {
                         </TableRow>
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {summary.isSuccess && summaryRequest && (
+              <div className="space-y-4 border-t border-border pt-4">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                  <div className="max-w-2xl space-y-1">
+                    <h3 className="font-medium type-body">Cloudflare reconciliation</h3>
+                    <p className="text-muted-foreground type-label">
+                      Query Cloudflare only for physical instance IDs recorded for this applied
+                      subject and window. This is shadow validation and does not change usage or
+                      billing.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full sm:w-auto sm:shrink-0"
+                    disabled={reconciliation.isPending}
+                    onClick={() => reconciliation.mutate(summaryRequest)}
+                  >
+                    <Cloud className="size-4" />
+                    {reconciliation.isPending
+                      ? 'Reconciling with Cloudflare...'
+                      : 'Reconcile with Cloudflare'}
+                  </Button>
+                </div>
+
+                {reconciliation.isError && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Cloudflare reconciliation could not be completed</AlertTitle>
+                    <AlertDescription className="space-y-3">
+                      <p>{reconciliation.error.message}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={reconciliation.isPending}
+                        onClick={() => reconciliation.mutate(summaryRequest)}
+                      >
+                        Retry reconciliation
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {reconciliation.isSuccess && (
+                  <div className="space-y-4" aria-live="polite">
+                    {reconciliation.data.rows.length === 0 ? (
+                      <p className="text-muted-foreground type-body">
+                        No accepted meter usage was recorded for this subject in the applied window.
+                        Cloudflare was not queried.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-muted-foreground type-label">
+                          {reconciliation.data.comparison.description} Provider CPU is shown only as
+                          a diagnostic.
+                        </p>
+
+                        <dl className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="bg-surface-inset p-3">
+                            <dt className="text-muted-foreground type-label">
+                              Meter accepted seconds
+                            </dt>
+                            <dd className="mt-1 tabular-nums type-code">
+                              {reconciliation.data.totals.meterAcceptedSeconds.toLocaleString()}s
+                            </dd>
+                          </div>
+                          <div className="bg-surface-inset p-3">
+                            <dt className="text-muted-foreground type-label">
+                              Provider comparison seconds
+                            </dt>
+                            <dd className="mt-1 tabular-nums type-code">
+                              {formatProviderNumber(
+                                reconciliation.data.totals.providerComparisonSeconds
+                              )}
+                              {reconciliation.data.totals.providerComparisonSeconds === null
+                                ? ''
+                                : 's'}
+                            </dd>
+                          </div>
+                          <div className="bg-surface-inset p-3">
+                            <dt className="text-muted-foreground type-label">
+                              Difference (provider - meter)
+                            </dt>
+                            <dd className="mt-1 tabular-nums type-code">
+                              {formatDifference(
+                                reconciliation.data.totals.differenceSeconds,
+                                reconciliation.data.totals.differencePercent
+                              )}
+                            </dd>
+                          </div>
+                          <div className="bg-surface-inset p-3">
+                            <dt className="text-muted-foreground type-label">Instances queried</dt>
+                            <dd className="mt-1 tabular-nums type-code">
+                              {reconciliation.data.totals.queriedCloudflareInstances.toLocaleString()}
+                            </dd>
+                          </div>
+                        </dl>
+
+                        <p className="text-muted-foreground type-label">
+                          {reconciliation.data.counts.matched} matched ·{' '}
+                          {reconciliation.data.counts.missing} missing ·{' '}
+                          {reconciliation.data.counts.ambiguous} ambiguous ·{' '}
+                          {reconciliation.data.counts.partial} partial ·{' '}
+                          {reconciliation.data.counts.comparisonUnavailable} comparison unavailable
+                        </p>
+
+                        {reconciliation.data.provider.issues.length > 0 && (
+                          <Alert variant="warning">
+                            <AlertTitle>Cloudflare returned partial data</AlertTitle>
+                            <AlertDescription>
+                              {reconciliation.data.provider.issues.map(issue => (
+                                <p key={issue}>{issue}</p>
+                              ))}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                          <Table>
+                            <caption className="sr-only">
+                              Cloudflare reconciliation for {reconciliation.data.subjectType}{' '}
+                              {reconciliation.data.subjectId} from{' '}
+                              {formatTimestamp(reconciliation.data.start)} to{' '}
+                              {formatTimestamp(reconciliation.data.end)}
+                            </caption>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Instance</TableHead>
+                                <TableHead>Application / service</TableHead>
+                                <TableHead>SKU(s)</TableHead>
+                                <TableHead>Meter accepted</TableHead>
+                                <TableHead>Provider seconds</TableHead>
+                                <TableHead>Difference (provider - meter)</TableHead>
+                                <TableHead>Provider CPU</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {reconciliation.data.rows.map(row => (
+                                <TableRow key={`${row.instanceId}:${row.services.join(',')}`}>
+                                  <TableCell>
+                                    <code className="block max-w-56 break-all type-code">
+                                      {row.instanceId}
+                                    </code>
+                                    <p className="text-muted-foreground type-label">
+                                      {row.intervalCount} interval
+                                      {row.intervalCount === 1 ? '' : 's'}
+                                    </p>
+                                  </TableCell>
+                                  <TableCell>
+                                    <p className="type-code">
+                                      {row.providerApplicationIds.join(', ') || 'No provider match'}
+                                    </p>
+                                    <p className="text-muted-foreground type-label">
+                                      {row.services.join(', ')}
+                                    </p>
+                                    {row.provisionedMemoryBytes !== null &&
+                                      row.provisionedDiskBytes !== null && (
+                                        <p className="text-muted-foreground type-label">
+                                          {formatProvisionedCapacity(
+                                            row.provisionedMemoryBytes,
+                                            row.provisionedDiskBytes
+                                          )}
+                                        </p>
+                                      )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <code className="block max-w-56 break-all type-code">
+                                      {row.skuIds.join(', ')}
+                                    </code>
+                                  </TableCell>
+                                  <TableCell className="tabular-nums type-code">
+                                    {row.meterAcceptedSeconds.toLocaleString()}s
+                                  </TableCell>
+                                  <TableCell className="tabular-nums type-code">
+                                    {formatProviderNumber(row.providerComparisonSeconds)}
+                                    {row.providerComparisonSeconds === null ? '' : 's'}
+                                  </TableCell>
+                                  <TableCell className="tabular-nums type-code">
+                                    {formatDifference(row.differenceSeconds, row.differencePercent)}
+                                  </TableCell>
+                                  <TableCell className="tabular-nums type-code">
+                                    {formatProviderNumber(row.providerCpuTimeSec)}
+                                    {row.providerCpuTimeSec === null ? '' : 's'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={reconciliationStatusVariant(row.status)}>
+                                      {reconciliationStatusLabel(row.status)}
+                                    </Badge>
+                                    {row.status !== 'matched' && (
+                                      <p className="mt-2 min-w-64 text-muted-foreground type-label">
+                                        {row.statusDetail}
+                                      </p>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        {reconciliation.data.provider.rawResponses.length > 0 && (
+                          <Collapsible open={rawResponseOpen} onOpenChange={setRawResponseOpen}>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                              <CollapsibleTrigger asChild>
+                                <Button type="button" variant="outline" size="sm">
+                                  <ChevronRight
+                                    className={`size-4 transition-transform ${rawResponseOpen ? 'rotate-90' : ''}`}
+                                  />
+                                  {rawResponseOpen
+                                    ? 'Hide raw Cloudflare response'
+                                    : 'View raw Cloudflare response'}
+                                </Button>
+                              </CollapsibleTrigger>
+                              {rawResponseOpen && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (!navigator.clipboard) {
+                                      setRawCopyStatus('failed');
+                                      return;
+                                    }
+                                    const rawJson = JSON.stringify(
+                                      reconciliation.data.provider.rawResponses,
+                                      null,
+                                      2
+                                    );
+                                    void navigator.clipboard.writeText(rawJson).then(
+                                      () => setRawCopyStatus('copied'),
+                                      () => setRawCopyStatus('failed')
+                                    );
+                                  }}
+                                >
+                                  <Copy className="size-4" /> Copy raw JSON
+                                </Button>
+                              )}
+                              {rawCopyStatus !== 'idle' && (
+                                <span
+                                  className="text-muted-foreground type-label"
+                                  role="status"
+                                  aria-live="polite"
+                                >
+                                  {rawCopyStatus === 'copied' ? 'Raw JSON copied.' : 'Copy failed.'}
+                                </span>
+                              )}
+                            </div>
+                            <CollapsibleContent className="mt-3 space-y-3">
+                              {reconciliation.data.provider.rawResponses.map((raw, index) => (
+                                <section
+                                  key={`${raw.dataset}:${raw.windowIndex}:${raw.batchIndex}:${index}`}
+                                  className="space-y-2"
+                                >
+                                  <h4 className="text-muted-foreground type-label">
+                                    {raw.dataset} · window {raw.windowIndex + 1} · batch{' '}
+                                    {raw.batchIndex + 1}
+                                    {raw.window
+                                      ? ` · ${formatTimestamp(raw.window.start)} to ${formatTimestamp(raw.window.end)}`
+                                      : ''}
+                                  </h4>
+                                  <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface-inset p-4 whitespace-pre type-code">
+                                    {JSON.stringify(raw.body, null, 2)}
+                                  </pre>
+                                </section>
+                              ))}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>

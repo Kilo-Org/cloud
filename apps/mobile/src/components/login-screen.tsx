@@ -11,7 +11,7 @@ import {
   ScrollView,
   View,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -185,7 +185,11 @@ export function LoginScreen() {
             <Text className="text-center text-lg">Welcome to Kilo Code</Text>
           </View>
 
-          <Animated.View className="w-full max-w-sm gap-3" layout={LinearTransition}>
+          {/* Nested parent layout + child entering animations parked a remounted
+              branch at ~zero opacity once on iOS (r0 logout→login remount repro);
+              un-nesting is a mechanism-class mitigation for an intermittent
+              defect, not a proven fix. */}
+          <Animated.View className="w-full max-w-sm gap-3">
             {status === 'idle' && (
               <Animated.View
                 className="w-full gap-3"

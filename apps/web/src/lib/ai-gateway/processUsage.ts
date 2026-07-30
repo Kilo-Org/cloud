@@ -19,7 +19,10 @@ import { hasPaymentMethod } from '@/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
 import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
-import { scheduleOrganizationLowBalanceAlert } from '@/lib/organizations/organization-usage';
+import {
+  mutateOrganizationUsage,
+  scheduleOrganizationLowBalanceAlert,
+} from '@/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
@@ -483,16 +486,20 @@ async function insertUsageTransaction(
       coreUsageFields,
       metadataFields
     );
-    if (coreUsageFields.organization_id && coreUsageFields.cost > 0) {
-      const consumption = await recordOrganizationConsumption(tx, {
-        organizationId: coreUsageFields.organization_id,
-        kiloUserId: coreUsageFields.kilo_user_id,
-        amountMicrodollars: coreUsageFields.cost,
-        occurredAt: coreUsageFields.created_at,
-        source: 'ai-gateway',
-        sourceId: coreUsageFields.id,
-      });
-      inserted.organizationUsage = consumption.organizationUsage;
+    if (coreUsageFields.organization_id) {
+      if (coreUsageFields.cost > 0) {
+        const consumption = await recordOrganizationConsumption(tx, {
+          organizationId: coreUsageFields.organization_id,
+          kiloUserId: coreUsageFields.kilo_user_id,
+          amountMicrodollars: coreUsageFields.cost,
+          occurredAt: coreUsageFields.created_at,
+          source: 'ai-gateway',
+          sourceId: coreUsageFields.id,
+        });
+        inserted.organizationUsage = consumption.organizationUsage;
+      } else if (coreUsageFields.cost < 0) {
+        inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
+      }
     }
     if (coreUsageFields.cost !== 0) {
       await enqueueDailyUsageRollupRepair(tx, {

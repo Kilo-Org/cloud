@@ -288,9 +288,6 @@ export function CurrentAllocationTable({
                         content={`This amount includes prorated Credits for passes added partway through the billing cycle. Prorated Credits are based on the days remaining in the current period. A full monthly period includes ${formatOrgPassMoney(fullMonthlyCreditsPerPassUsd)} in base Credits per pass.`}
                       />
                     ) : null}
-                    {allocation.supplementCreditsUsd
-                      ? ` + ${formatOrgPassMoney(allocation.supplementCreditsUsd)} additional Credits`
-                      : ''}
                   </p>
                 </div>
               </div>

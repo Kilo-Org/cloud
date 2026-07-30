@@ -770,6 +770,8 @@ export async function activatePaidAgreement(input: {
       : null;
     const appliesPendingCapacity =
       pendingCapacityEffectiveAt !== null && input.paidFrom >= pendingCapacityEffectiveAt;
+    // Seat increases update the same provider quantity that held any scheduled decrease,
+    // so the confirmed higher quantity supersedes that pending decrease.
     const replacesPendingCapacity = input.paidSeatCount > existing.purchased_pass_capacity;
     await tx
       .update(kilo_pass_org_agreements)

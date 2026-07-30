@@ -34,7 +34,6 @@ export type OrgKiloPassAllocation = {
   passCount: number;
   hasProratedCredits?: boolean;
   baseCreditsUsd?: number;
-  supplementCreditsUsd?: number;
   qualifyingSpendUsd?: number;
   unlockTargetUsd?: number;
   bonusCreditsUsd?: number;

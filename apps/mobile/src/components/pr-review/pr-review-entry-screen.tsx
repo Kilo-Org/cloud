@@ -28,6 +28,7 @@ import {
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import { decidePrLinkPaste } from '@/lib/pr-review/pr-link-paste';
 import { getRecentPrs, type RecentPr, upsertRecentPr } from '@/lib/pr-review/recent-prs';
+import { cn } from '@/lib/utils';
 
 const URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
 
@@ -127,16 +128,13 @@ export function PrReviewEntryScreen() {
   });
   const showClearButton = selectPrLinkClearButtonVisible({ hasInput });
   const isInvalid = helperMessage === 'invalid';
-
-  let helperContent: ReactNode = null;
+  // Stable always-mounted slot (D6): same Text line box every state — only
+  // string + color token change. NBSP keeps the line box at every font scale.
+  let helperSlotCopy = '\u00A0';
   if (slotState === 'invalid') {
-    helperContent = <Text className="text-sm text-destructive">{PR_LINK_HELPER_INVALID_COPY}</Text>;
+    helperSlotCopy = PR_LINK_HELPER_INVALID_COPY;
   } else if (slotState === 'clipboard-empty') {
-    helperContent = (
-      <Text variant="muted" className="text-sm">
-        {PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY}
-      </Text>
-    );
+    helperSlotCopy = PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY;
   }
 
   let recentsBody: ReactNode = null;
@@ -288,7 +286,15 @@ export function PrReviewEntryScreen() {
                 <ClipboardIcon size={18} color={colors.mutedForeground} />
               </Pressable>
             </View>
-            {helperContent}
+            <Text
+              numberOfLines={1}
+              className={cn(
+                'text-sm',
+                slotState === 'invalid' ? 'text-destructive' : 'text-muted-foreground'
+              )}
+            >
+              {helperSlotCopy}
+            </Text>
             <Button
               disabled={!hasInput || isInvalid}
               onPress={() => {

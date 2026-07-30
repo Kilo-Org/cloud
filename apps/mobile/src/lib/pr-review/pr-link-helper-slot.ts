@@ -15,8 +15,9 @@ type PrLinkHelperSlotInput = {
  *
  * Priority: active message (invalid / clipboard-empty) wins over none.
  * No active message selects none — the input placeholder already shows the
- * example URL. The UI mounts helper text only when this is not `none`
- * (conditional mount; layout may shift when a message appears or clears).
+ * example URL. The UI keeps one always-mounted Text in a reserved slot and
+ * only swaps the string (active copy or a non-breaking-space placeholder)
+ * and color token, so appear/clear never shifts the input row or Open button.
  */
 export function selectPrLinkHelperSlotState(input: PrLinkHelperSlotInput): PrLinkHelperSlotState {
   if (input.message === 'invalid') {

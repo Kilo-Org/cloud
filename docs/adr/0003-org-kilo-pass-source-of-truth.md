@@ -34,7 +34,7 @@ Existing manually administered customers are backfilled into org agreement recor
 
 Migration records contractual half-open paid-through interval, external contract identity, processing mode, and `manually_issued_through`. It does not synthesize historical issuances or credits. Automation requires explicit next allocation plan and renewal transition.
 
-New manual or enterprise agreements use the same automated allocation, monthly issuance, and pooled bonus engine as self-serve agreements by default. Manual processing requires explicit legacy or exceptional contract designation; purchase channel does not determine processing mode.
+The product does not support creating new manual, enterprise, or custom agreements yet. Manual processing exists only to preserve imported legacy agreements; purchase channel does not determine processing mode.
 
 An agreement moves to a newer term version at its commercial renewal boundary: next monthly renewal for monthly agreements, next annual renewal for annual agreements, or explicit contractual renewal for manual agreements. Existing terms remain effective through the paid period.
 
@@ -122,7 +122,7 @@ One agreement/window processing attempt is an all-or-nothing database transactio
 
 Canonical qualifying debit ledger remains queryable by allocation container, timestamp, and stable transaction ID. Blocked run records original window immediately; repair reconstructs pooled spend from immutable debit records.
 
-Platform admins alone may create custom/manual agreements, set paid-through intervals, designate manual processing, schedule commercial transitions, issue audited compensation, or manually retry processing. Every mutation records actor, reason, before/after values, and timestamp.
+The product does not expose creation of new custom or manual agreements. Platform admins may maintain imported legacy agreements by setting paid-through intervals, designating manual processing, scheduling commercial transitions, issuing audited compensation, or manually retrying processing. Every mutation records actor, reason, before/after values, and timestamp.
 
 Issuance operations persist `pending`, `running`, `succeeded`, `blocked`, or `failed`, use leased idempotent retries, expose manual replay and metrics, and show persistent subscription-page status. Blocked window sends one deduplicated email to current parent owners and billing managers.
 

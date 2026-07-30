@@ -1,9 +1,23 @@
-import { describe, expect, test } from '@jest/globals';
+import { beforeEach, describe, expect, test } from '@jest/globals';
 import {
   hasMatchingRequestLoggingOptIn,
+  isDynamicallyOptedIntoRequestLogging,
   RequestLoggingOptInsSchema,
   type RequestLoggingOptIn,
 } from './request-logging-opt-ins';
+import { redisClient } from '@/lib/redis';
+import { errorExceptInTest } from '@/lib/utils.server';
+
+jest.mock('@/lib/redis', () => ({
+  redisClient: { get: jest.fn() },
+}));
+
+jest.mock('@/lib/utils.server', () => ({
+  errorExceptInTest: jest.fn(),
+}));
+
+const mockedRedisGet = jest.mocked(redisClient.get);
+const mockedError = jest.mocked(errorExceptInTest);
 
 const optIns: RequestLoggingOptIn[] = [
   {
@@ -25,6 +39,11 @@ const optIns: RequestLoggingOptIn[] = [
 ];
 
 describe('request logging opt-ins', () => {
+  beforeEach(() => {
+    mockedRedisGet.mockReset();
+    mockedError.mockReset();
+  });
+
   test('matches account and organization IDs by type', () => {
     expect(
       hasMatchingRequestLoggingOptIn(optIns, {
@@ -57,5 +76,17 @@ describe('request logging opt-ins', () => {
         },
       ])
     ).toThrow();
+  });
+
+  test('logs refresh failures while safely disabling dynamic request logging', async () => {
+    mockedRedisGet.mockRejectedValueOnce(new TypeError('Redis unavailable'));
+
+    await expect(
+      isDynamicallyOptedIntoRequestLogging({ accountId: 'account-1', organizationId: null })
+    ).resolves.toBe(false);
+    expect(mockedError).toHaveBeenCalledWith(
+      '[requestLogging] failed to refresh dynamic logging opt-ins',
+      { errorName: 'TypeError' }
+    );
   });
 });

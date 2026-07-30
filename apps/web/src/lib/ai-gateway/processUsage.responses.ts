@@ -44,6 +44,9 @@ type ResponsesApiStreamEvent = {
   delta?: string;
   response?: ResponsesApiResponse;
   error?: { message: string; code: string };
+  code?: string | null;
+  message?: string;
+  param?: string | null;
 };
 
 export function processResponsesApiUsage(
@@ -154,9 +157,10 @@ export async function parseResponsesMicrodollarUsageFromStream(
         return;
       }
 
-      if ('error' in json && json.error) {
+      const streamError = json.type === 'error' ? json : json.error;
+      if (streamError) {
         reportedError = true;
-        captureException(new Error(`Responses API error: ${json.error.message}`), {
+        captureException(new Error(`Responses API error: ${streamError.message ?? 'unknown'}`), {
           tags: { source: 'responses_sse_processing' },
           extra: { json, event },
         });

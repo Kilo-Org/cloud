@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { redisClient } from '@/lib/redis';
 import { REQUEST_LOGGING_OPT_INS_REDIS_KEY } from '@/lib/redis-keys';
+import { errorExceptInTest } from '@/lib/utils.server';
 
 export const RequestLoggingOptInSchema = z.object({
   id: z.string().uuid(),
@@ -74,8 +75,19 @@ export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> 
   return RequestLoggingOptInsSchema.parse(JSON.parse(raw));
 }
 
+async function getRequestLoggingOptInsWithDiagnostics(): Promise<RequestLoggingOptIn[]> {
+  try {
+    return await getRequestLoggingOptIns();
+  } catch (error) {
+    errorExceptInTest('[requestLogging] failed to refresh dynamic logging opt-ins', {
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
+    throw error;
+  }
+}
+
 const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
-  getRequestLoggingOptIns,
+  getRequestLoggingOptInsWithDiagnostics,
   REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS,
   []
 );

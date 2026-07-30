@@ -297,6 +297,33 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.status_code).toBe(502);
   });
 
+  test('does not treat Chat Completions SSE chunk with error: null as an error', async () => {
+    const sse = [
+      'data: {"id":"gen-null-err","object":"chat.completion.chunk","created":1,"model":"test-model","choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":null}],"error":null}',
+      'data: {"id":"gen-null-err","object":"chat.completion.chunk","created":1,"model":"test-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"cost":0.001,"is_byok":false,"prompt_tokens_details":{"cached_tokens":0},"cost_details":{"upstream_inference_cost":null},"completion_tokens_details":{"reasoning_tokens":0}}}',
+      'data: [DONE]',
+      '',
+    ].join('\n\n');
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(sse));
+        controller.close();
+      },
+    });
+
+    await expect(
+      parseMicrodollarUsageFromStream(stream, 'fake-user-id', undefined, 'openrouter', 200)
+    ).resolves.toMatchObject({
+      hasError: false,
+      messageId: 'gen-null-err',
+      model: 'test-model',
+      responseContent: 'hi',
+      cost_mUsd: 1000,
+      status_code: 200,
+    });
+  });
+
   test('records the Vercel upstream provider request id as upstream_id', async () => {
     const chunk = `data: {"id":"gen_01KYMFY57BAFKZGK45197SCRGD","object":"chat.completion.chunk","created":1785246720,"model":"moonshotai/kimi-k3-fast","choices":[{"index":0,"delta":{"provider_metadata":{"fireworks":{},"gateway":{"routing":{"originalModelId":"moonshotai/kimi-k3-fast","resolvedProvider":"fireworks","fallbacksAvailable":[],"canonicalSlug":"moonshotai/kimi-k3-fast","finalProvider":"fireworks","speed":"fast","modelAttemptCount":1,"modelAttempts":[{"canonicalSlug":"moonshotai/kimi-k3-fast","success":true,"providerAttemptCount":1,"providerAttempts":[{"provider":"fireworks","credentialType":"system","success":true,"startTime":1785246717210,"endTime":1785246721497,"providerRequestId":"chatcmpl-ccebc94c526d4f8797cfe00023478a9a","statusCode":200,"providerResponseId":"chatcmpl-ccebc94c526d4f8797cfe00023478a9a"}]}],"totalProviderAttemptCount":1},"cost":"0.0474822","marketCost":"0.0474822","generationId":"gen_01KYMFY57BAFKZGK45197SCRGD"}}},"logprobs":null,"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":91904,"completion_tokens":134,"total_tokens":92038,"cost":0.0474822,"is_byok":false,"prompt_tokens_details":{"cached_tokens":91136},"cost_details":{"upstream_inference_cost":null},"completion_tokens_details":{"reasoning_tokens":0}},"generationId":"gen_01KYMFY57BAFKZGK45197SCRGD"}\n\ndata: [DONE]\n\n`;
 

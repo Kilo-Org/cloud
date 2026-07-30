@@ -134,7 +134,12 @@ export async function drainSseStream(
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        const trailingText = decoder.decode();
+        if (trailingText) onTextChunk(trailingText);
+        onTextChunk('\n\n');
+        break;
+      }
       onTextChunk(decoder.decode(value, { stream: true }));
     }
   } catch (error) {

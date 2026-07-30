@@ -1065,7 +1065,7 @@ export async function parseMicrodollarUsageFromStream(
         return;
       }
 
-      if ('error' in json) {
+      if ('error' in json && json.error != null) {
         const error = json.error as OpenRouterError;
         reportedError = true;
         if (typeof error.code === 'number') {

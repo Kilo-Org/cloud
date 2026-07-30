@@ -195,6 +195,33 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.responseContent).toBe('Hello world');
     expect(result.hasError).toBe(true);
   });
+
+  test('marks hasError for standard OpenAI Responses type:error SSE events', async () => {
+    const errorEvent = `data: ${JSON.stringify({
+      type: 'error',
+      code: 'server_error',
+      message: 'The server had an error while processing your request.',
+      param: null,
+      sequence_number: 3,
+    })}\n\n`;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(errorEvent));
+        controller.close();
+      },
+    });
+
+    const result = await parseResponsesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.hasError).toBe(true);
+  });
 });
 
 describe('parseMicrodollarUsageFromString approval tests', () => {

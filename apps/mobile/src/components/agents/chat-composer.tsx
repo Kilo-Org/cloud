@@ -7,14 +7,16 @@ import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   Keyboard,
-  type LayoutChangeEvent,
   type TextInput,
+  type TextInputContentSizeChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -29,9 +31,13 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import {
+  resolveComposerHeightOnTextChange,
+  resolveComposerInputHeight,
+  shouldEnableComposerInputScroll,
+} from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
-import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -44,6 +50,7 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
@@ -54,11 +61,11 @@ import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-subm
 const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
 const TEXT_INPUT_VERTICAL_PADDING = 24;
-const TEXT_INPUT_HORIZONTAL_PADDING = 32;
 const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_FONT_SIZE = 16;
+const COMPOSER_FOCUS_RESTORE_DELAY_MS = 100;
 
 type ChatComposerProps = {
   onSend: (
@@ -122,9 +129,13 @@ export function ChatComposer({
   const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
+  const inputFocusedRef = useRef(false);
+  const restoreFocusOnActiveRef = useRef(false);
+  const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastContentHeightRef = useRef<number | null>(null);
   const [hasText, setHasText] = useState(false);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
-  const [inputWidth, setInputWidth] = useState(0);
+  const [inputHeight, setInputHeight] = useState(TEXT_INPUT_MIN_HEIGHT);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -153,15 +164,6 @@ export function ChatComposer({
   };
   const upload = useAgentAttachmentUpload({ organizationId });
 
-  const measure = useTextHeight({
-    minHeight: TEXT_INPUT_MIN_HEIGHT,
-    maxHeight: TEXT_INPUT_MAX_HEIGHT,
-    verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
-    textContentWidth: inputWidth - TEXT_INPUT_HORIZONTAL_PADDING,
-    fontSize: TEXT_INPUT_FONT_SIZE,
-    lineHeight: TEXT_INPUT_LINE_HEIGHT,
-  });
-
   // Compute base composer disabled before the voice hook so voice can react to it.
   // `isStreaming` is intentionally NOT a composer gate (see
   // `chat-composer-input-state.ts`); the user must remain able to type and
@@ -169,11 +171,41 @@ export function ChatComposer({
   const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
 
+  function applyHeightFromTextChange(previousDraftLength: number, nextDraftLength: number) {
+    const nextHeight = resolveComposerHeightOnTextChange({
+      previousDraftLength,
+      nextDraftLength,
+      lastContentHeight: lastContentHeightRef.current,
+      minHeight: TEXT_INPUT_MIN_HEIGHT,
+      maxHeight: TEXT_INPUT_MAX_HEIGHT,
+    });
+    if (nextHeight !== null) {
+      setInputHeight(nextHeight);
+    }
+    if (nextDraftLength === 0) {
+      lastContentHeightRef.current = null;
+    }
+  }
+
   function handleChangeText(value: string) {
+    const previousDraftLength = textRef.current.length;
     textRef.current = value;
-    measure.setText(value);
+    applyHeightFromTextChange(previousDraftLength, value.length);
     setHasText(value.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(value));
+  }
+
+  function handleContentSizeChange(event: TextInputContentSizeChangeEvent) {
+    const contentHeight = event.nativeEvent.contentSize.height;
+    lastContentHeightRef.current = contentHeight;
+    setInputHeight(
+      resolveComposerInputHeight({
+        draftLength: textRef.current.length,
+        contentHeight,
+        minHeight: TEXT_INPUT_MIN_HEIGHT,
+        maxHeight: TEXT_INPUT_MAX_HEIGHT,
+      })
+    );
   }
 
   const { addCandidates, removeAttachment, retryAttachment } = upload;
@@ -219,11 +251,63 @@ export function ChatComposer({
   // The strip must show share-prefilled files before the session resolves.
   const showAttachments = attachmentsEnabled || upload.attachments.length > 0;
 
+  useEffect(() => {
+    const clearRestoreFocusTimeout = () => {
+      if (restoreFocusTimeoutRef.current !== null) {
+        clearTimeout(restoreFocusTimeoutRef.current);
+        restoreFocusTimeoutRef.current = null;
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      const transition = resolveMessageInputAppStateTransition({
+        nextAppState,
+        restoreFocusOnActive: restoreFocusOnActiveRef.current,
+        wasFocused: inputFocusedRef.current,
+      });
+      restoreFocusOnActiveRef.current = transition.restoreFocusOnActive;
+
+      if (transition.shouldBlur) {
+        clearRestoreFocusTimeout();
+        inputRef.current?.blur();
+      }
+
+      if (transition.shouldFocus && !disabled && !isSending) {
+        clearRestoreFocusTimeout();
+        restoreFocusTimeoutRef.current = setTimeout(() => {
+          restoreFocusTimeoutRef.current = null;
+          inputRef.current?.focus();
+        }, COMPOSER_FOCUS_RESTORE_DELAY_MS);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      clearRestoreFocusTimeout();
+    };
+  }, [disabled, isSending]);
+
+  const inputScrollable = shouldEnableComposerInputScroll(inputHeight, TEXT_INPUT_MAX_HEIGHT);
+  const dismissKeyboardPan = useMemo(
+    () =>
+      // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
+      Gesture.Pan()
+        .runOnJS(true)
+        .activeOffsetY(24)
+        .failOffsetX([-16, 16])
+        .enabled(!inputScrollable)
+        .onStart(() => {
+          Keyboard.dismiss();
+        }),
+    [inputScrollable]
+  );
+
   function clearDraft() {
     textRef.current = '';
     setHasText(false);
     setSlashCommandInput(null);
-    measure.reset();
+    lastContentHeightRef.current = null;
+    setInputHeight(TEXT_INPUT_MIN_HEIGHT);
     inputRef.current?.clear();
   }
 
@@ -304,15 +388,16 @@ export function ChatComposer({
     if (sendLockRef.current.isLocked()) {
       return;
     }
+    const previousDraftLength = textRef.current.length;
     const value = `/${command.name} `;
     textRef.current = value;
-    measure.setText(value);
     setHasText(true);
     setSlashCommandInput(null);
     inputRef.current?.setNativeProps({
       text: value,
       selection: { start: value.length, end: value.length },
     });
+    applyHeightFromTextChange(previousDraftLength, value.length);
     inputRef.current?.focus();
   }
 
@@ -335,11 +420,6 @@ export function ChatComposer({
     void onStop?.();
   }
 
-  function handleInputLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
-    setInputWidth(current => (current === nextWidth ? current : nextWidth));
-  }
-
   const handleAddAttachment = useCallback(async () => {
     // Fire-and-forget: the upload hook owns its own progress + error toasts,
     // and the composer's send flow consults `upload.isUploading` /
@@ -350,7 +430,7 @@ export function ChatComposer({
   const textInputStyle: TextStyle = {
     color: colors.foreground,
     fontSize: TEXT_INPUT_FONT_SIZE,
-    height: measure.height,
+    height: inputHeight,
     includeFontPadding: false,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
     paddingHorizontal: 16,
@@ -361,8 +441,6 @@ export function ChatComposer({
 
   return (
     <BlurBar>
-      {measure.measureElement}
-
       {control.showToolbar ? (
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(100)}>
           <ChatToolbar
@@ -398,42 +476,48 @@ export function ChatComposer({
         <VoiceInputStatus status={voiceInput.status} />
       </View>
 
-      <ChatComposerInputRow
-        attachmentsEnabled={attachmentsEnabled}
-        canSend={control.canSend}
-        disabled={disabled}
-        inputAccessibilityDisabled={control.inputAccessibilityDisabled}
-        inputEditable={control.inputEditable}
-        inputRef={inputRef}
-        isSending={isSending}
-        isStreaming={isStreaming}
-        maxInputHeight={TEXT_INPUT_MAX_HEIGHT}
-        measureHeight={measure.height}
-        onAddAttachment={() => {
-          void handleAddAttachment();
-        }}
-        onChangeText={handleChangeText}
-        onInputBlur={() => {
-          setIsFocused(false);
-        }}
-        onInputFocus={() => {
-          setIsFocused(true);
-        }}
-        onInputLayout={handleInputLayout}
-        onStop={handleStop}
-        onSubmit={() => {
-          void submit();
-        }}
-        onToggleVoice={() => {
-          void voiceInput.toggle();
-        }}
-        paperclipDisabled={control.paperclipDisabled}
-        placeholder={placeholder}
-        textInputStyle={textInputStyle}
-        voiceDisabled={control.voiceDisabled}
-        voiceInputAvailable={voiceInput.available}
-        voiceInputStatus={voiceInput.status}
-      />
+      <GestureDetector gesture={dismissKeyboardPan}>
+        <View collapsable={false} className="w-full">
+          <ChatComposerInputRow
+            attachmentsEnabled={attachmentsEnabled}
+            canSend={control.canSend}
+            disabled={disabled}
+            inputAccessibilityDisabled={control.inputAccessibilityDisabled}
+            inputEditable={control.inputEditable}
+            inputHeight={inputHeight}
+            inputRef={inputRef}
+            isSending={isSending}
+            isStreaming={isStreaming}
+            maxInputHeight={TEXT_INPUT_MAX_HEIGHT}
+            onAddAttachment={() => {
+              void handleAddAttachment();
+            }}
+            onChangeText={handleChangeText}
+            onContentSizeChange={handleContentSizeChange}
+            onInputBlur={() => {
+              inputFocusedRef.current = false;
+              setIsFocused(false);
+            }}
+            onInputFocus={() => {
+              inputFocusedRef.current = true;
+              setIsFocused(true);
+            }}
+            onStop={handleStop}
+            onSubmit={() => {
+              void submit();
+            }}
+            onToggleVoice={() => {
+              void voiceInput.toggle();
+            }}
+            paperclipDisabled={control.paperclipDisabled}
+            placeholder={placeholder}
+            textInputStyle={textInputStyle}
+            voiceDisabled={control.voiceDisabled}
+            voiceInputAvailable={voiceInput.available}
+            voiceInputStatus={voiceInput.status}
+          />
+        </View>
+      </GestureDetector>
     </BlurBar>
   );
 }

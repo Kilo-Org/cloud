@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
-import { resolveMessageInputAppStateTransition } from './message-input-app-state';
+import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import {
   editableAttachmentToPreviewRow,
   resolveMessageInputSendDisabled,

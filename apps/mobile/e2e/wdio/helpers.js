@@ -46,14 +46,17 @@ function make(driver, platform) {
       );
     } else {
       // UiSelector matches whole strings already; the (?:..) wrap keeps
-      // alternation precedence identical to the iOS side.
-      const re = javaEscape(anchored);
+      // alternation precedence identical to the iOS side. Backslash escapes
+      // (\?, \., ...) are consumed by the selector parser and silently match
+      // nothing — translate every escaped char into a character class.
+      const classed = anchored.replace(/\\(.)/g, '[$1]');
+      const re = javaEscape(classed);
       const byText = await driver.findElements(
-        'android uiautomator',
+        '-android uiautomator',
         `new UiSelector().textMatches("${re}")`
       );
       const byDesc = await driver.findElements(
-        'android uiautomator',
+        '-android uiautomator',
         `new UiSelector().descriptionMatches("${re}")`
       );
       const seen = new Set();

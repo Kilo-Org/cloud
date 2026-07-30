@@ -9,8 +9,11 @@ const S = require('./states');
 module.exports = async function settleApp(ctx) {
   const { h, when } = ctx;
 
-  // Something known must render before we settle.
-  await h.waitVisible(S.ANY_STATE, { timeout: 15000 });
+  // Something known must render before we settle. A preflight reconnect
+  // refetches the JS bundle on Android (a minute or more under load); the
+  // long budget returns as soon as anything renders, so healthy runs and
+  // iOS never pay it.
+  await h.waitVisible(S.ANY_STATE, { timeout: ctx.platform === 'android' ? 300000 : 15000 });
 
   // A deep-link reconnect may raise the external-app confirmation; one
   // bounded optional look, then move on (the only optional wait here).

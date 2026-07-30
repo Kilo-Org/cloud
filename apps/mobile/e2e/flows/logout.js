@@ -11,6 +11,13 @@ module.exports = async function logout(ctx) {
   // An open code-verification screen backs out to the email form.
   await when(ctx, 'Verify code', () => h.tapOn('Back'));
 
+  // A leftover sign-out confirmation from an interrupted run: confirm it.
+  if (await h.visible(/Sign out\?/)) {
+    await h.tapOn('Sign out', { index: 0, ci: true });
+    await h.waitVisible('you@example.com', { timeout: 15000 });
+    return;
+  }
+
   // Signed out already? Land on the login page. Anything else that is not
   // Home gets settled first (prompts, developer menu, consent gate).
   await whenNot(ctx, S.LOGIN, async () => {
@@ -29,7 +36,9 @@ module.exports = async function logout(ctx) {
     await h.tapOn('Profile, tab, 4 of 4');
     await h.scrollUntilVisible('Sign Out', { direction: 'DOWN' });
     await h.tapOn('Sign Out');
-    await h.assertVisible('Sign out?');
+    // The confirmation alert animates in. The title carries a literal '?',
+    // which is a regex quantifier — match it escaped.
+    await h.waitVisible(/Sign out\?/, { timeout: 5000 });
     // The alert's confirm ("Sign out") and the screen button ("Sign Out")
     // collide under a case-insensitive match; index 0 is topmost by position,
     // which is the alert button.

@@ -18,6 +18,16 @@ shift
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 export APPIUM_HOME="${KILO_APPIUM_HOME:-$HOME/.cache/kilo-appium}"
+# The uiautomator2 driver locates the SDK through these; mirror the repo's
+# resolution (dev/local/mobile-android.ts) so the agent's PATH never matters.
+if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+  for candidate in /opt/homebrew/share/android-commandlinetools "$HOME/Library/Android/sdk"; do
+    if [ -d "$candidate" ]; then
+      export ANDROID_HOME="$candidate" ANDROID_SDK_ROOT="$candidate"
+      break
+    fi
+  done
+fi
 APPIUM_BIN="$REPO_ROOT/node_modules/.bin/appium"
 LOCK="${TMPDIR:-/tmp}/kilo-appium-locks/$DEVICE"
 

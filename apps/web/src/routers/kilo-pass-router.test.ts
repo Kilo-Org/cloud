@@ -153,6 +153,7 @@ type KiloPassCaller = {
       currentPeriodHostingCostUsd: number;
       currentPeriodBonusCreditsUsd: number | null;
       isBonusUnlocked: boolean;
+      isBonusAvailableToUnlock: boolean;
       refillAt: string | null;
     } | null;
     isEligibleForFirstMonthPromo: boolean;
@@ -428,6 +429,11 @@ async function insertBaseCreditsIssuance(params: {
   stripeInvoiceId?: string;
   createdAt?: string;
   usageBaselineMicrodollars?: number | null;
+  kiloPassThreshold?: number | null;
+  bonusKind?:
+    | KiloPassIssuanceItemKind.Bonus
+    | KiloPassIssuanceItemKind.PromoFirstMonth50Pct
+    | KiloPassIssuanceItemKind.ReferralBonus;
 }): Promise<void> {
   const issuedMonth = new Date().toISOString().slice(0, 7);
   const issueMonth = params.issueMonth ?? `${issuedMonth}-01`;
@@ -480,6 +486,41 @@ async function insertBaseCreditsIssuance(params: {
   if (!issuanceItem) {
     throw new Error('Failed to insert kilo_pass_issuance_items row for test');
   }
+
+  if (params.bonusKind) {
+    const [bonusCreditTxn] = await db
+      .insert(credit_transactions)
+      .values({
+        id: crypto.randomUUID(),
+        kilo_user_id: params.kiloUserId,
+        amount_microdollars: 500_000,
+        is_free: true,
+        description: `kilo-pass-bonus-test-${Date.now()}`,
+        created_at: params.createdAt,
+      })
+      .returning({ id: credit_transactions.id });
+
+    if (!bonusCreditTxn) {
+      throw new Error('Failed to insert bonus credit transaction for test');
+    }
+
+    await db.insert(kilo_pass_issuance_items).values({
+      kilo_pass_issuance_id: issuance.id,
+      kind: params.bonusKind,
+      credit_transaction_id: bonusCreditTxn.id,
+      amount_usd: 5,
+      bonus_percent_applied: 0.5,
+      created_at: params.createdAt,
+    });
+  }
+
+  await db
+    .update(kilocode_users)
+    .set({
+      kilo_pass_threshold:
+        params.kiloPassThreshold === undefined ? 19_000_000 : params.kiloPassThreshold,
+    })
+    .where(eq(kilocode_users.id, params.kiloUserId));
 }
 
 async function insertKiloPassReferralReward(params: {
@@ -758,6 +799,7 @@ describe('kiloPassRouter', () => {
 
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-get-state-yearly@example.com',
+        kilo_pass_threshold: 49_000_000,
       });
       const nextYearlyIssueAt = new Date('2030-01-01T00:00:00.000Z').toISOString();
       await insertSubscription({
@@ -891,7 +933,98 @@ describe('kiloPassRouter', () => {
       expect(result.subscription?.currentPeriodBaseCreditsUsd).toBe(baseAmountUsd);
       expect(result.subscription?.currentPeriodUsageUsd).toBe(0);
       expect(result.subscription?.isBonusUnlocked).toBe(false);
+      expect(result.subscription?.isBonusAvailableToUnlock).toBe(true);
       expect(result.subscription?.refillAt).toBe(expectedNextBillingAt);
+    });
+
+    it('does not project a reachable current bonus when the threshold is null', async () => {
+      const stripeMock = getStripeMock();
+      const currentPeriodEndSeconds = 1_700_123_456;
+      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_monthly_no_threshold',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_end: currentPeriodEndSeconds,
+              current_period_start: currentPeriodStartSeconds,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-no-threshold@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_monthly_no_threshold',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        kiloPassThreshold: null,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          status: 'active',
+          currentPeriodBonusCreditsUsd: null,
+          isBonusUnlocked: false,
+          isBonusAvailableToUnlock: false,
+        })
+      );
+    });
+
+    it('keeps unlocked state when a bonus-like item exists and the threshold is null', async () => {
+      const stripeMock = getStripeMock();
+      const currentPeriodEndSeconds = 1_700_123_456;
+      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_monthly_bonus_issued',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_end: currentPeriodEndSeconds,
+              current_period_start: currentPeriodStartSeconds,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-bonus-issued@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_monthly_bonus_issued',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        kiloPassThreshold: null,
+        bonusKind: KiloPassIssuanceItemKind.Bonus,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription?.currentPeriodBonusCreditsUsd).toBeGreaterThan(0);
+      expect(result.subscription?.isBonusUnlocked).toBe(true);
+      expect(result.subscription?.isBonusAvailableToUnlock).toBe(false);
     });
 
     it('keeps first-month current bonus visible for first-time subscribers with a new card', async () => {
@@ -1139,7 +1272,7 @@ describe('kiloPassRouter', () => {
 
       await db
         .update(kilocode_users)
-        .set({ microdollars_used: 19_250_000 })
+        .set({ microdollars_used: 19_250_000, kilo_pass_threshold: 19_000_000 })
         .where(eq(kilocode_users.id, user.id));
 
       const caller = await createCallerForUser(user.id);
@@ -1454,6 +1587,11 @@ describe('kiloPassRouter', () => {
           raw_payload_json: {},
         },
       ]);
+
+      await db
+        .update(kilocode_users)
+        .set({ kilo_pass_threshold: 19_000_000 })
+        .where(eq(kilocode_users.id, user.id));
 
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();

@@ -25,12 +25,14 @@ type CommentRowProps = {
   readonly comment: ReviewComment;
   readonly onToggleReaction: (content: ReviewReactionContent) => void;
   readonly reactionsDisabled?: boolean;
+  readonly readOnly?: boolean;
 };
 
 export function CommentRow({
   comment,
   onToggleReaction,
   reactionsDisabled,
+  readOnly,
 }: Readonly<CommentRowProps>) {
   const authorName = selectCommentAuthorName(comment.author);
   const timestamp = parseTimestamp(comment.createdAt);
@@ -61,6 +63,7 @@ export function CommentRow({
         reactions={comment.reactions}
         onToggle={onToggleReaction}
         disabled={reactionsDisabled}
+        readOnly={readOnly}
       />
     </View>
   );

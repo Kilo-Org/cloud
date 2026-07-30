@@ -18,6 +18,7 @@ export default defineProject({
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
       'src/lib/agent-attachments/**/*.test.ts',
+      'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',

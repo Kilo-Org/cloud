@@ -28,6 +28,7 @@ function buildSubscription(
     currentPeriodUsageUsd: 0,
     currentPeriodBonusCreditsUsd: 0,
     isBonusUnlocked: false,
+    isBonusAvailableToUnlock: false,
     ...overrides,
   };
 }
@@ -314,13 +315,37 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
   describe('computeUsageProgressModel()', () => {
     test('returns null when baseUsd is not positive', () => {
       expect(
-        computeUsageProgressModel({ baseUsd: 0, bonusUsd: 10, usageUsd: 5, isBonusUnlocked: false })
+        computeUsageProgressModel({
+          baseUsd: 0,
+          bonusUsd: 10,
+          usageUsd: 5,
+          isBonusUnlocked: false,
+          isBonusAvailableToUnlock: true,
+        })
       ).toBeNull();
     });
 
     test('returns null when bonusUsd is not positive', () => {
       expect(
-        computeUsageProgressModel({ baseUsd: 10, bonusUsd: 0, usageUsd: 5, isBonusUnlocked: false })
+        computeUsageProgressModel({
+          baseUsd: 10,
+          bonusUsd: 0,
+          usageUsd: 5,
+          isBonusUnlocked: false,
+          isBonusAvailableToUnlock: true,
+        })
+      ).toBeNull();
+    });
+
+    test('returns null when no bonus is unlocked or available to unlock', () => {
+      expect(
+        computeUsageProgressModel({
+          baseUsd: 20,
+          bonusUsd: 10,
+          usageUsd: 5,
+          isBonusUnlocked: false,
+          isBonusAvailableToUnlock: false,
+        })
       ).toBeNull();
     });
 
@@ -330,6 +355,7 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
         bonusUsd: 10,
         usageUsd: 5,
         isBonusUnlocked: false,
+        isBonusAvailableToUnlock: true,
       });
 
       expect(model).not.toBeNull();
@@ -345,6 +371,7 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
         bonusUsd: 10,
         usageUsd: 31,
         isBonusUnlocked: true,
+        isBonusAvailableToUnlock: false,
       });
 
       expect(model).not.toBeNull();
@@ -358,6 +385,7 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
         bonusUsd: 10,
         usageUsd: 25,
         isBonusUnlocked: true,
+        isBonusAvailableToUnlock: false,
       });
 
       expect(model).not.toBeNull();

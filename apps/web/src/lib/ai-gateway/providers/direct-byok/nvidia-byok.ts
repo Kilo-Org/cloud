@@ -37,6 +37,7 @@ export default {
     delete request.body.providerOptions;
     delete request.body.transforms;
     delete request.body.reasoning;
+    delete request.body.include_reasoning;
     delete request.body.safety_identifier;
     delete request.body.prompt_cache_key;
   },

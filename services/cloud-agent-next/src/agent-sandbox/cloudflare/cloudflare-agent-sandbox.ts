@@ -81,6 +81,16 @@ import {
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
 
+/**
+ * Outcome of a wrapper stop inspection, as reported by the `wrapper_stop_inspection` log.
+ *
+ * Extends `WrapperObservation` with `absent-no-container`: absence established from
+ * container state rather than by inspecting, so the log can distinguish a confirmed-empty
+ * container from one we booted in order to look. Not a `WrapperObservation` status,
+ * because nothing was observed.
+ */
+type StopInspection = WrapperObservation | { status: 'absent-no-container' };
+
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
@@ -752,11 +762,6 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     reason: WrapperStopReason;
   }): Promise<StopWrappersResult> {
     const sandbox = await this.getSandbox();
-    const stopInspectionLogger = logger.withTags({
-      logTag: 'wrapper_stop_inspection',
-      sessionId: this.metadata.identity.sessionId,
-      sandboxId: await this.resolveSandboxId(),
-    });
 
     // Inspecting is a container fetch, so it boots a sleeping container. A wrapper is a
     // process, and a process cannot outlive its container (activity expiry SIGTERMs the
@@ -766,24 +771,20 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     // runtime or pending work remains, and it is the path that was waking cold containers
     // for nothing. Every other stop reason keeps inspecting, which preserves the leaked
     // wrapper recovery those paths were built for.
-    if (request.reason === 'idle-timeout') {
-      const containerRunning = await isSandboxContainerRunning(sandbox);
-      if (containerRunning === false) {
-        stopInspectionLogger
-          .withFields({
-            reason: request.reason,
-            attemptId: request.attemptId,
-            target: request.target.kind,
-            observation: 'absent-no-container',
-            observedWrapperCount: 0,
-          })
-          .info('Wrapper stop inspection completed');
-        return { status: 'absent' };
-      }
-    }
+    const skipsInspection =
+      request.reason === 'idle-timeout' && (await isSandboxContainerRunning(sandbox)) === false;
+    const initial: StopInspection = skipsInspection
+      ? { status: 'absent-no-container' }
+      : await this.observeTarget(request.target);
 
-    const initial = await this.observeTarget(request.target);
-    stopInspectionLogger
+    // Single emission for every outcome. `wrapper_stop_inspection` is how container wake
+    // behaviour is measured, so the field set is defined once here rather than per branch.
+    logger
+      .withTags({
+        logTag: 'wrapper_stop_inspection',
+        sessionId: this.metadata.identity.sessionId,
+        sandboxId: await this.resolveSandboxId(),
+      })
       .withFields({
         reason: request.reason,
         attemptId: request.attemptId,
@@ -792,6 +793,8 @@ export class CloudflareAgentSandbox implements AgentSandbox {
         observedWrapperCount: initial.status === 'present' ? initial.observed.length : 0,
       })
       .info('Wrapper stop inspection completed');
+
+    if (initial.status === 'absent-no-container') return { status: 'absent' };
     if (initial.status !== 'present') return initial;
 
     try {

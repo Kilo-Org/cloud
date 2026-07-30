@@ -183,6 +183,10 @@ pnpm dev:seed app:add-credits <user-id> <usd>    # grant credits
 pnpm dev:seed app:api-token <email>              # mint a bearer token (used by remote-cli.sh)
 ```
 
+## Foreign Data on Your Device
+
+A hierarchy or screenshot that shows another worktree's data (rows, sessions, searches that cannot belong to the signed-in `e2e-mobile-*` account) is never a product defect on its own. Prove it against the backend first: row ownership in Postgres, this worktree's nextjs/ingest logs, and whether a pull-to-refresh reproduces it. Re-confirm the signed-in account (Profile tab) and Metro provenance before continuing. Backend evidence contradicting the capture means cross-device environment noise: re-run the affected check cleanly and report both.
+
 ## Appium + WebdriverIO
 
 Setup is automatic: the repository install provides Appium and the webdriverio client, and the wrapper below installs the XCUITest / UiAutomator2 drivers into a machine-global `APPIUM_HOME` (`~/.cache/kilo-appium`, override with `KILO_APPIUM_HOME`) on first use. Never use MCP automation tools or a hand-rolled driver connection: they bypass the per-device lock; use the repository wrapper.

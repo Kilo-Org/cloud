@@ -8,7 +8,7 @@ import {
   getModelUserByokProviders,
 } from '@/lib/ai-gateway/byok';
 import { custom_llm2, type User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { readDb } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
@@ -67,8 +67,8 @@ async function checkDirectBYOK(
     return null;
   }
   const userByok = organizationId
-    ? await getBYOKforOrganization(db, organizationId, [directByok.id])
-    : await getBYOKforUser(db, user.id, [directByok.id]);
+    ? await getBYOKforOrganization(readDb, organizationId, [directByok.id])
+    : await getBYOKforUser(readDb, user.id, [directByok.id]);
   if (!userByok || userByok.length === 0) {
     return null;
   }
@@ -93,7 +93,7 @@ async function checkCustomLlm(
   requestedModel: string,
   organizationId: string
 ): Promise<GetProviderProviderResult | null> {
-  const [row] = await db
+  const [row] = await readDb
     .select()
     .from(custom_llm2)
     .where(eq(custom_llm2.public_id, requestedModel));
@@ -139,8 +139,8 @@ async function checkVercelBYOK(
   const modelProviders = await getModelUserByokProviders(requestedModel);
   if (modelProviders.length === 0) return null;
   return organizationId
-    ? getBYOKforOrganization(db, organizationId, modelProviders)
-    : getBYOKforUser(db, user.id, modelProviders);
+    ? getBYOKforOrganization(readDb, organizationId, modelProviders)
+    : getBYOKforUser(readDb, user.id, modelProviders);
 }
 
 export type GetProviderInput = {

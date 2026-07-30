@@ -224,4 +224,86 @@ describe('createRemoteSessionOnConnection', () => {
     expect(rejection).not.toBeInstanceOf(CommandDeliveredError);
     expect(rejection).not.toBeInstanceOf(UserWebCommandError);
   });
+
+  it('spreads defined inheritance fields into wire data', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({
+      protocolVersion: 1,
+      sessionID: VALID_SESSION_ID,
+    });
+
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      agent: 'architect',
+      model: { providerID: 'kilo', modelID: 'kilo-auto', variant: 'efficient' },
+      orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: {
+        protocolVersion: 1,
+        agent: 'architect',
+        model: { providerID: 'kilo', modelID: 'kilo-auto', variant: 'efficient' },
+        orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      },
+      expectedConnectionId: 'cli-owner-1',
+    });
+  });
+
+  it('retries once with bare protocolVersion on exact invalid create_session command error', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+
+    const result = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      agent: 'code',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(2);
+    expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(1, {
+      command: 'create_session',
+      data: { protocolVersion: 1, agent: 'code' },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(2, {
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    expect(parseCreateSessionResponse(result)).toEqual({
+      ok: true,
+      kiloSessionId: VALID_SESSION_ID,
+    });
+  });
+
+  it('does not retry other CommandDeliveredError messages', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockRejectedValue(
+      new CommandDeliveredError('Session owner not found')
+    );
+
+    await expect(
+      createRemoteSessionOnConnection(connection, 'cli-owner-1', { agent: 'code' })
+    ).rejects.toBeInstanceOf(CommandDeliveredError);
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces the shared bad-sessionId string after one bare retry', async () => {
+    // Same delivered string covers malformed sessionId (harmless retry).
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockRejectedValue(
+      new CommandDeliveredError('invalid create_session command')
+    );
+
+    await expect(
+      createRemoteSessionOnConnection(connection, 'cli-owner-1', { agent: 'code' })
+    ).rejects.toBeInstanceOf(CommandDeliveredError);
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(2);
+    expect(connection.sendCommandToConnection).toHaveBeenLastCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+  });
 });

@@ -2,6 +2,7 @@ import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import type { Images } from '@kilocode/app-shared/images-schema';
 import { errorShapeSchema } from './schemas';
 import type {
+  CreateRemoteSessionInput,
   RemoteAttachmentPart,
   SendCommandPayload,
   SendPromptPayload,
@@ -123,6 +124,54 @@ const EMPTY_REMOTE_COMMAND_STATE = {
   refresh: 'idle',
   commands: [],
 } satisfies RemoteCommandState;
+
+/** UUID v1–v5 shape used to gate orgId inheritance on create_session. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const TRANSCRIPT_CLEARED_INDICATOR =
+  'View cleared — earlier messages are still on this session';
+
+/**
+ * Flatten a `ModelSelection` into the Decision 5 create_session model object.
+ * `variant` is nested only when present (no second top-level field).
+ */
+function flattenModelSelectionForCreate(selection: ModelSelection): {
+  providerID: string;
+  modelID: string;
+  variant?: string;
+} {
+  return {
+    providerID: selection.model.providerID,
+    modelID: selection.model.modelID,
+    ...(selection.variant ? { variant: selection.variant } : {}),
+  };
+}
+
+/**
+ * Compute optional inheritance fields for `/new` create_session from the
+ * active session's manager state (Decision 6).
+ */
+function computeCreateRemoteSessionInheritance(args: {
+  modelSelection: ModelSelection | null | undefined;
+  sessionMode: string | null | undefined;
+  lastPromptMode: string | null;
+  organizationId: string | null | undefined;
+}): CreateRemoteSessionInput {
+  const input: CreateRemoteSessionInput = {};
+  if (args.modelSelection) {
+    input.model = flattenModelSelectionForCreate(args.modelSelection);
+  }
+  const mode =
+    args.sessionMode && args.sessionMode !== '' ? args.sessionMode : args.lastPromptMode;
+  if (mode) {
+    input.agent = mode;
+  }
+  if (args.organizationId && UUID_RE.test(args.organizationId)) {
+    input.orgId = args.organizationId;
+  }
+  return input;
+}
 
 type AssociatedPrData = {
   url: string;
@@ -275,6 +324,12 @@ type SessionManagerAtoms = {
   olderMessagesError: W<OlderMessagesError | null>;
   /** Total items omitted across every page loaded so far (initial + older). */
   olderMessagesOmittedItemCount: W<number>;
+  /**
+   * Timestamp when the user cleared the local transcript view (`/clear`), or
+   * null when not cleared. Blocks older-page loads for this visit; cleared on
+   * switch/destroy so history reappears on re-entry.
+   */
+  transcriptCleared: W<number | null>;
 };
 
 type SessionManager = {
@@ -307,9 +362,15 @@ type SessionManager = {
   setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
   retryRemoteModels(): void;
   retryRemoteCommands(): void;
-  createRemoteSession(): Promise<KiloSessionId>;
+  createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId>;
   exitRemoteSession(): Promise<void>;
   interrupt(): Promise<void>;
+  /**
+   * Clear the active session's local transcript view only. Server-side history
+   * is untouched and reappears on re-entry (`switchSession`). No-op without an
+   * active session.
+   */
+  clearTranscript(): void;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
   respondToPermission(requestId: string, response: 'once' | 'always' | 'reject'): Promise<void>;
@@ -479,6 +540,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const isLoadingOlderMessagesAtom = atom<boolean>(false);
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
+  const transcriptClearedAtom = atom<number | null>(null);
 
   // Derived atoms
   const messagesListAtom = atom<StoredMessage[]>(get => {
@@ -566,6 +628,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Once a non-retryable terminal failure lands, we permanently disable
   // further older-page loads for the active session.
   let olderMessagesTerminal: boolean = false;
+  /**
+   * Last non-empty `mode` from a remote prompt send. Used as agent inheritance
+   * fallback when `sessionConfigAtom.mode` is absent/`''`. Reset on switch/destroy.
+   */
+  let lastPromptMode: string | null = null;
 
   function setIndicator(ind: SessionStatusIndicator | null): void {
     if (indicatorTimer !== null) {
@@ -624,9 +691,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isLoadingOlderMessagesAtom, false);
     store.set(olderMessagesErrorAtom, null);
     store.set(olderMessagesOmittedItemCountAtom, 0);
+    store.set(transcriptClearedAtom, null);
     olderMessagesCursor = null;
     loadOlderGeneration += 1;
     olderMessagesInFlight = null;
+    lastPromptMode = null;
     olderMessagesTerminal = false;
     currentCapabilities = undefined;
   }
@@ -952,6 +1021,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // Terminal failures block any further backend hits until the next
     // switchSession (which resets `olderMessagesTerminal`).
     if (olderMessagesTerminal) return;
+    // `/clear` keeps the local view empty for this visit — do not page history back in.
+    if (store.get(transcriptClearedAtom) !== null) return;
     // No cursor means nothing left to load.
     if (olderMessagesCursor === null) return;
     // Dedupe: if a load is already in flight, every caller awaits the
@@ -1201,6 +1272,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (expectedGeneration !== switchGeneration) return;
         remoteHistoryReplaying = false;
         store.set(isLoadingAtom, false);
+        // `/clear` view must survive reconnect snapshot replay: re-clear once
+        // per completed replay while the marker is set (Decision 3 / round 5).
+        if (store.get(transcriptClearedAtom) !== null) {
+          session.storage.clear();
+        }
       },
 
       onBranchChanged: branch => {
@@ -1322,6 +1398,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // were current when the user pressed send, not the post-switch ones.
     const kiloSessionId = activeSessionId;
     const sessionType = activeSessionType;
+
+    // Client-side `/clear` for remote sessions: clear the local transcript view
+    // only; never hit the transport (Decision 3/4).
+    if (
+      sessionType === 'remote' &&
+      input.payload.type === 'command' &&
+      input.payload.command === 'clear' &&
+      input.payload.arguments === ''
+    ) {
+      clearTranscript();
+      return true;
+    }
+
     const messageId = generateMessageId();
     const messageText =
       input.payload.type === 'command'
@@ -1333,6 +1422,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (input.payload.type === 'command') {
       transportPayload = input.payload;
     } else if (sessionType === 'remote') {
+      // Capture mode for `/new` agent inheritance (Decision 6).
+      if (input.payload.mode) {
+        lastPromptMode = input.payload.mode;
+      }
       transportPayload = {
         type: 'prompt',
         prompt: input.payload.prompt,
@@ -1407,6 +1500,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  function restoreCapabilityAtoms(session: CloudAgentSession): void {
+    const cs = store.get(cloudStatusAtom);
+    const cloudReady = cs === null || cs.type === 'ready';
+    store.set(canSendAtom, session.canSend && cloudReady);
+    store.set(canInterruptAtom, session.canInterrupt);
+  }
+
   async function interrupt(): Promise<void> {
     if (!currentSession) return;
     // Snapshot before await — switchSession()/destroy() can swap currentSession while in flight.
@@ -1422,17 +1522,44 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         await session.interrupt();
       }
       if (currentSession === session) {
+        // Restore immediately after ACK — do not wait for external state events
+        // (heartbeat status is deduped and may never re-enable). Sends while
+        // the CLI is still busy are queued CLI-side.
+        restoreCapabilityAtoms(session);
         setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
       }
     } catch {
       if (currentSession === session) {
-        store.set(canInterruptAtom, session.canInterrupt);
-        const cs = store.get(cloudStatusAtom);
-        const cloudReady = cs === null || cs.type === 'ready';
-        store.set(canSendAtom, session.canSend && cloudReady);
-        store.set(errorAtom, 'Failed to stop execution');
+        restoreCapabilityAtoms(session);
+        // Never poison errorAtom — that disables the composer. Use the
+        // transient indicator instead (Item 14 / Decision 2).
+        setIndicator({
+          type: 'error',
+          message: 'Failed to stop execution',
+          timestamp: Date.now(),
+        });
       }
     }
+  }
+
+  function clearTranscript(): void {
+    if (!currentSession) return;
+    currentSession.storage.clear();
+    olderMessagesCursor = null;
+    store.set(hasOlderMessagesAtom, false);
+    // Same idle reset as clearAllAtoms: an in-flight older-page fetch will
+    // hit the generation guard and return without clearing these atoms.
+    store.set(isLoadingOlderMessagesAtom, false);
+    store.set(olderMessagesErrorAtom, null);
+    olderMessagesInFlight = null;
+    loadOlderGeneration += 1;
+    store.set(transcriptClearedAtom, Date.now());
+    store.set(chatUIAtom, { shouldAutoScroll: true });
+    setIndicator({
+      type: 'info',
+      message: TRANSCRIPT_CLEARED_INDICATOR,
+      timestamp: Date.now(),
+    });
   }
 
   async function answerQuestion(requestId: string, answers: string[][]): Promise<void> {
@@ -1489,11 +1616,33 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.retryRemoteCommands();
   }
 
-  async function createRemoteSession(): Promise<KiloSessionId> {
+  async function createRemoteSession(
+    input?: CreateRemoteSessionInput
+  ): Promise<KiloSessionId> {
     if (!currentSession || activeSessionType !== 'remote') {
       throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
     }
-    return currentSession.createRemoteSession();
+    // Inheritance from the active session (Decision 6). Explicit caller fields
+    // win when provided (e.g. tests); otherwise store-derived values apply.
+    const selection =
+      store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
+    const inherited = computeCreateRemoteSessionInheritance({
+      modelSelection: selection,
+      sessionMode: store.get(sessionConfigAtom)?.mode,
+      lastPromptMode,
+      organizationId: store.get(fetchedSessionDataAtom)?.organizationId,
+    });
+    const agent = input?.agent ?? inherited.agent;
+    const model = input?.model ?? inherited.model;
+    const orgId = input?.orgId ?? inherited.orgId;
+    const merged: CreateRemoteSessionInput = {
+      ...(agent !== undefined ? { agent } : {}),
+      ...(model !== undefined ? { model } : {}),
+      ...(orgId !== undefined ? { orgId } : {}),
+    };
+    const hasFields =
+      merged.agent !== undefined || merged.model !== undefined || merged.orgId !== undefined;
+    return currentSession.createRemoteSession(hasFields ? merged : undefined);
   }
 
   async function exitRemoteSession(): Promise<void> {
@@ -1532,6 +1681,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     createRemoteSession,
     exitRemoteSession,
     interrupt,
+    clearTranscript,
     answerQuestion,
     rejectQuestion,
     respondToPermission,
@@ -1589,6 +1739,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       isLoadingOlderMessages: isLoadingOlderMessagesAtom,
       olderMessagesError: olderMessagesErrorAtom,
       olderMessagesOmittedItemCount: olderMessagesOmittedItemCountAtom,
+      transcriptCleared: transcriptClearedAtom,
     },
   };
 }
@@ -1611,3 +1762,5 @@ export type {
   AssociatedPrData,
   PrepareInput,
 };
+
+export type { CreateRemoteSessionInput } from './transport';

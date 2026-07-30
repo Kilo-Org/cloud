@@ -396,6 +396,11 @@ describe('createSessionManager', () => {
     mockSession.destroy.mockClear();
     mockSession.send.mockClear();
     mockSession.interrupt.mockClear();
+    mockSession.interrupt.mockResolvedValue({});
+    mockSession.createRemoteSession.mockClear();
+    mockSession.createRemoteSession.mockResolvedValue(
+      kiloId('ses_12345678901234567890123456')
+    );
     mockSession.exitRemoteSession.mockClear();
     mockSession.exitRemoteSession.mockResolvedValue();
     mockSession.respondToPermission.mockClear();
@@ -417,6 +422,7 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onPermissionResolved = undefined;
     mockSessionCallbacks.onSessionCreated = undefined;
     mockSessionCallbacks.onSessionUpdated = undefined;
+    mockSessionCallbacks.onReplayComplete = undefined;
     mockSessionCallbacks.onResolved = undefined;
     mockSessionCallbacks.onRemoteModelStateChange = undefined;
     mockSessionCallbacks.onTransportCapabilityChange = undefined;
@@ -2609,7 +2615,7 @@ describe('createSessionManager', () => {
       );
     });
 
-    it('sets error on failure', async () => {
+    it('shows error indicator on failure without poisoning errorAtom', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -2617,8 +2623,13 @@ describe('createSessionManager', () => {
       mockSession.interrupt.mockRejectedValueOnce(new Error('interrupt failed'));
       await mgr.interrupt();
 
-      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
-        'Failed to stop execution'
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      const indicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(indicator).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Failed to stop execution' })
       );
     });
 
@@ -2636,6 +2647,23 @@ describe('createSessionManager', () => {
       // After a failed interrupt, atoms should be restored from session state
       expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
       expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+    });
+
+    it('restores canSend and canInterrupt on interrupt success without external events', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Success path must re-enable immediately after ACK (no heartbeat needed).
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
     });
 
     it('is a no-op without active session', async () => {
@@ -3226,6 +3254,442 @@ describe('createSessionManager', () => {
       await expect(mgr.createRemoteSession()).rejects.toThrow(
         REMOTE_SESSION_CREATION_NOT_SUPPORTED
       );
+    });
+
+    it('forwards inheritance: model from override.selection, agent from sessionConfig.mode, orgId from fetched data', async () => {
+      const orgId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          organizationId: orgId,
+          mode: 'architect',
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(
+        kiloId('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa')
+      );
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'architect',
+        model: {
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          variant: 'high',
+        },
+        orgId,
+      });
+    });
+
+    it('prefers override.selection over observedModel and omits variant when absent', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(
+        kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb')
+      );
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      config.store.set(mgr.atoms.observedModel, {
+        model: { providerID: 'openai', modelID: 'gpt-4' },
+      });
+      mgr.setRemoteModelOverride({
+        source: 'legacy-gateway',
+        selection: {
+          model: { providerID: 'kilo', modelID: 'kilo-auto' },
+        },
+      });
+
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'code',
+        model: { providerID: 'kilo', modelID: 'kilo-auto' },
+      });
+    });
+
+    it('falls back to observedModel when override is null', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(
+        kiloId('ses_cccccccccccccccccccccccccc')
+      );
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      config.store.set(mgr.atoms.observedModel, {
+        model: { providerID: 'openai', modelID: 'gpt-4o' },
+        variant: 'fast',
+      });
+
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'code',
+        model: { providerID: 'openai', modelID: 'gpt-4o', variant: 'fast' },
+      });
+    });
+
+    it('treats empty sessionConfig.mode as absent and uses lastPromptMode', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: null,
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(
+        kiloId('ses_dddddddddddddddddddddddddd')
+      );
+      mockSession.send.mockResolvedValue({});
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      // mode hydrates as '' when fetch returns null
+      expect(atomValue<{ mode: string } | null>(config.store, mgr.atoms.sessionConfig)?.mode).toBe(
+        ''
+      );
+
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'hi', mode: 'debug' },
+      });
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'debug',
+      });
+    });
+
+    it('prefers non-empty sessionConfig.mode over lastPromptMode', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: 'architect',
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(
+        kiloId('ses_eeeeeeeeeeeeeeeeeeeeeeeeee')
+      );
+      mockSession.send.mockResolvedValue({});
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'hi', mode: 'debug' },
+      });
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'architect',
+      });
+    });
+
+    it('omits orgId when organizationId is not a uuid', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          organizationId: 'not-a-uuid',
+          mode: null,
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(
+        kiloId('ses_ffffffffffffffffffffffffff')
+      );
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith(undefined);
+    });
+
+    it('forwards explicit input fields over inheritance', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: 'architect',
+          organizationId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(
+        kiloId('ses_11111111111111111111111111')
+      );
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      await mgr.createRemoteSession({
+        agent: 'custom',
+        model: { providerID: 'kilo', modelID: 'kilo-auto' },
+      });
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'custom',
+        model: { providerID: 'kilo', modelID: 'kilo-auto' },
+        orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // clearTranscript / /clear interception
+  // -------------------------------------------------------------------------
+
+  describe('clearTranscript', () => {
+    it('clears storage, blocks older loads, shows info indicator, leaves question/pending intact', async () => {
+      const fetchSnapshotPage = jest.fn().mockResolvedValue({
+        kind: 'success',
+        info: { id: 'ses-1' },
+        messages: [
+          {
+            info: stubUserMessage({ id: 'msg-clear-1', sessionID: 'ses-1' }),
+            parts: [
+              stubTextPart({
+                id: 'part-1',
+                sessionID: 'ses-1',
+                messageID: 'msg-clear-1',
+                text: 'hello',
+              }),
+            ],
+          },
+        ],
+        nextCursor: 'cursor-older',
+        omittedItemCount: 0,
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      // Flush the mock transport's async onInitialPageLoaded.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Seed a question + pending message so we can assert they survive.
+      config.store.set(mgr.atoms.question, {
+        requestId: 'q-1',
+        questions: [{ question: 'Continue?', header: 'q', options: [], multiple: false }],
+      });
+      config.store.set(
+        mgr.atoms.pendingMessages,
+        new Map([['msg-p', { status: 'queued' as const }]])
+      );
+      config.store.set(mgr.atoms.permission, {
+        requestId: 'perm-1',
+        permission: 'edit',
+        patterns: ['*'],
+        metadata: {},
+        always: [],
+      });
+
+      expect(
+        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).length
+      ).toBeGreaterThan(0);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+      mgr.clearTranscript();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).not.toBeNull();
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'info',
+          message: 'View cleared — earlier messages are still on this session',
+        })
+      );
+      // Non-goals: question / permission / pending survive.
+      expect(atomValue(config.store, mgr.atoms.question)).toEqual(
+        expect.objectContaining({ requestId: 'q-1' })
+      );
+      expect(atomValue(config.store, mgr.atoms.permission)).toEqual(
+        expect.objectContaining({ requestId: 'perm-1' })
+      );
+      expect(
+        atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+          config.store,
+          mgr.atoms.pendingMessages
+        ).size
+      ).toBe(1);
+      // Composer / streaming untouched.
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue(config.store, mgr.atoms.isStreaming)).toBe(false);
+
+      // Older-page loads blocked while marker set.
+      fetchSnapshotPage.mockClear();
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).not.toHaveBeenCalled();
+    });
+
+    it('re-clears storage when onReplayComplete fires while marker is set', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.clearTranscript();
+
+      // Simulate reconnect replay writing history back into storage.
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg-replay', sessionID: 'ses-1' }));
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).length).toBe(1);
+
+      mockSessionCallbacks.onReplayComplete?.();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).not.toBeNull();
+    });
+
+    it('clears the marker on switchSession so history can reload', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.clearTranscript();
+      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).not.toBeNull();
+
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).toBeNull();
+    });
+
+    it('intercepts /clear command for remote sessions without hitting the transport', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.send.mockClear();
+
+      const ok = await mgr.send({
+        payload: { type: 'command', command: 'clear', arguments: '' },
+      });
+
+      expect(ok).toBe(true);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).not.toBeNull();
+    });
+
+    it('does not intercept /clear for cloud-agent sessions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      // default resolution is cloud-agent
+      mockSession.send.mockResolvedValue({});
+
+      await mgr.send({
+        payload: { type: 'command', command: 'clear', arguments: '' },
+      });
+
+      expect(mockSession.send).toHaveBeenCalled();
+      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).toBeNull();
+    });
+
+    it('does not intercept /clear with non-empty arguments', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.send.mockResolvedValue({});
+
+      await mgr.send({
+        payload: { type: 'command', command: 'clear', arguments: 'extra' },
+      });
+
+      expect(mockSession.send).toHaveBeenCalled();
+      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).toBeNull();
+    });
+
+    it('resets isLoadingOlderMessages when /clear races an in-flight older-page fetch', async () => {
+      let resolvePage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+      const slowPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+        resolvePage = resolve;
+      });
+
+      const fetchSnapshotPage = jest.fn() as jest.MockedFunction<
+        NonNullable<SessionManagerConfig['fetchSnapshotPage']>
+      >;
+      fetchSnapshotPage
+        .mockResolvedValueOnce({
+          kind: 'success',
+          info: { id: 'ses-1' },
+          messages: [],
+          nextCursor: 'cursor-older',
+          omittedItemCount: 0,
+        })
+        .mockReturnValueOnce(slowPage);
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      // Flush the mock transport's async onInitialPageLoaded.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+      const loading = mgr.loadOlderMessages();
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(true);
+
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+
+      // Late resolution must not re-stick the loading flag (generation guard).
+      resolvePage({
+        kind: 'success',
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+      await loading;
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+    });
+
+    it('clears a prior olderMessagesError so the banner does not outlive /clear', async () => {
+      const fetchSnapshotPage = jest.fn() as jest.MockedFunction<
+        NonNullable<SessionManagerConfig['fetchSnapshotPage']>
+      >;
+      fetchSnapshotPage
+        .mockResolvedValueOnce({
+          kind: 'success',
+          info: { id: 'ses-1' },
+          messages: [],
+          nextCursor: 'cursor-older',
+          omittedItemCount: 0,
+        })
+        .mockResolvedValueOnce({ kind: 'retryable_failure' as const });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await mgr.loadOlderMessages();
+      expect(atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)).toEqual({
+        kind: 'retryable',
+      });
+
+      mgr.clearTranscript();
+
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
     });
   });
 

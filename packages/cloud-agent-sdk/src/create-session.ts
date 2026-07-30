@@ -13,11 +13,16 @@
  * session-scoped transport.
  */
 import { createSessionResponseV1Schema, type CreateSessionResponseV1 } from './schemas';
+import type { CreateRemoteSessionInput } from './transport';
 import type { KiloSessionId } from './types';
-import type { UserWebConnection } from './user-web-connection';
+import { CommandDeliveredError, type UserWebConnection } from './user-web-connection';
 
 export { createSessionResponseV1Schema } from './schemas';
 export type { CreateSessionResponseV1 } from './schemas';
+export type { CreateRemoteSessionInput } from './transport';
+
+/** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
+const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
 
 export type CreateSessionParseResult =
   | { ok: true; kiloSessionId: KiloSessionId }
@@ -63,11 +68,32 @@ export type CreateRemoteSessionRawResult = unknown;
  */
 export async function createRemoteSessionOnConnection(
   connection: Pick<UserWebConnection, 'sendCommandToConnection'>,
-  connectionId: string
+  connectionId: string,
+  input?: CreateRemoteSessionInput
 ): Promise<CreateRemoteSessionRawResult> {
-  return connection.sendCommandToConnection({
-    command: 'create_session',
-    data: { protocolVersion: 1 },
-    expectedConnectionId: connectionId,
-  });
+  const data = {
+    protocolVersion: 1 as const,
+    ...(input?.agent !== undefined ? { agent: input.agent } : {}),
+    ...(input?.model !== undefined ? { model: input.model } : {}),
+    ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
+  };
+  try {
+    return await connection.sendCommandToConnection({
+      command: 'create_session',
+      data,
+      expectedConnectionId: connectionId,
+    });
+  } catch (error) {
+    if (
+      error instanceof CommandDeliveredError &&
+      error.message === INVALID_CREATE_SESSION_COMMAND
+    ) {
+      return connection.sendCommandToConnection({
+        command: 'create_session',
+        data: { protocolVersion: 1 },
+        expectedConnectionId: connectionId,
+      });
+    }
+    throw error;
+  }
 }

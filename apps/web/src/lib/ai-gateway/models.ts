@@ -40,6 +40,7 @@ export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 export const autoFreeModels = [
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
   'inclusionai/ling-3.0-flash:free',
+  'poolside/laguna-s-2.1:free',
 ].filter(m => m !== null);
 
 export const preferredModels = [

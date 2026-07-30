@@ -4,13 +4,9 @@ Interactive verification against a local backend. Run commands from the reposito
 
 ## E2E Bundle: Required First Step
 
-This machine is shared by parallel workflows. One slot permits one round's
-complete bundle: one dev stack, up to one iOS simulator, up to one Android
-emulator, plus its remote CLIs and other resources. It is not one slot per
-resource or platform verifier.
-
-The planner owns a repro bundle; the orchestrator owns later verification
-bundles. Before dispatching verifiers, that owner runs:
+E2E device/stack work runs only inside a slot bundle. Bundle contents,
+ownership, blocked-take, and release rules: `.kilo_workflow/WORKFLOW.md` "E2E
+Slots". Before dispatching verifiers, the owner runs:
 
 ```bash
 .kilo_workflow/e2e-take-slot.sh      # run from your own tmux session; blocks until a slot frees
@@ -19,13 +15,9 @@ bundles. Before dispatching verifiers, that owner runs:
 
 The owner starts every bundle resource through `e2e-start-resource.sh`, passes
 the ready services and device identifiers in each verifier handoff, then stops
-every resource through `e2e-stop-resource.sh` before freeing the slot. Parallel
-iOS and Android verifiers share this bundle and never take another slot.
-
-- Default 3 slots, machine-global, owned by tmux session name; a dead session's slot is reclaimed automatically, so a crash cannot wedge the queue.
-- A blocked take is correct behavior, not a hang and not a wedge. Wait for it.
-- Taking is idempotent per session; every E2E round needs one bundle slot.
-- Release as soon as the device phase ends. Planning, implementation, review, checks, and CI waits are uncapped — never hold a slot through them.
+every resource through `e2e-stop-resource.sh` before freeing the slot. Taking
+is idempotent per session. Parallel iOS and Android verifiers share this bundle
+and never take another slot.
 
 ## Fresh Worktree Quickstart
 
@@ -52,16 +44,14 @@ If this worktree has no stack, the bundle owner starts the complete mobile flow
 after taking its slot:
 
 ```bash
-pnpm dev:env -y cloudflare-session-ingest
 .kilo_workflow/e2e-start-resource.sh stack mobile cloud-agent-next kiloclaw event-service
-pnpm drizzle migrate
-pnpm dev:status --json
 ```
+
+The script also refreshes the session-ingest Secrets Store binding, applies migrations, and fails fast when a requested service or the kiloclaw docker bridge never comes up.
 
 Rules:
 
 - Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts. When the automatic offset lands on occupied ports (AirPlay on 5000/7000, another worktree's stack), `dev:start` probes for a free offset itself and persists it before services launch; later `dev:restart`/`dev:env` reuse the persisted value, so no manual prefix is needed. A per-command `KILO_PORT_OFFSET=<n>` prefix still overrides everything when you must pin one — never `export` it.
-- The `dev:env` step creates the JWT Secrets Store binding. Without it, session-ingest looks healthy but rejects every session request.
 - Secrets Store state is local to each Worker directory. `dev:start` refreshes every source-backed secret for its service graph before launching Workers; a secret-creation failure is fatal, not something to retry past.
 - `event-service` is required for presence and notification behavior.
 - Never run bare `wrangler secrets-store` commands. Use `pnpm dev:env -y <group>` from the repository root so values come from the canonical local source.
@@ -118,7 +108,7 @@ and boots it:
 .kilo_workflow/e2e-stop-resource.sh ios          # this worktree's claims
 ```
 
-The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted. One exception: a claim killed mid-boot returns instantly as already-owned WITHOUT booting on the next claim, and `pnpm dev:mobile:ios build` then fails `code=405 "Unable to lookup in current state: Shutdown"` — recover with `xcrun simctl boot <udid> && xcrun simctl bootstatus <udid> -b`, and give claims a >=10-minute timeout under parallel-workflow load.
+The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted. A claim killed mid-boot boots the Shutdown device again on reclaim automatically; give claims a >=10-minute timeout under parallel-workflow load (booting is slow).
 
 Install a validated cached native build. A compatible fingerprint skips rebuilding; a cache miss serializes through the host-wide native compiler semaphore. Never install an arbitrary DerivedData app or run a separate Expo native build:
 

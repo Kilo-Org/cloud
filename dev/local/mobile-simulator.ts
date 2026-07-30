@@ -319,6 +319,28 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
       });
 
       if (reclaimed) {
+        if (device.state === 'Booted') {
+          return { device: { ...device, name: targetLabel }, alreadyOwned: true };
+        }
+        // A previous claim died mid-boot: the record exists but the device
+        // is down. Boot through the same prepare hook as a fresh claim and
+        // record bootedByClaim so release powers off what this reclaim
+        // started (prepare holds no mutation lock, matching the fresh path).
+        const bootedByClaim = args.prepare?.(device) === true;
+        withClaimMutationLock(lockRoot, device.id, () => {
+          const current = readClaim(
+            lockRoot,
+            device.id,
+            args.fileOperations?.readFileSync ?? fs.readFileSync
+          );
+          if (current) {
+            fs.writeFileSync(
+              lockPath(lockRoot, device.id),
+              JSON.stringify({ ...current, bootedByClaim }),
+              { flag: 'w' }
+            );
+          }
+        });
         return { device: { ...device, name: targetLabel }, alreadyOwned: true };
       }
 

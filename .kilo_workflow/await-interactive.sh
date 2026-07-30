@@ -5,7 +5,7 @@
 # leaves a final report in it — and a dead window is only a crash when
 # neither of those happened.
 #
-#   await-interactive.sh <tmux-target> <scratch-dir> [--log <file>] [--timeout <sec>] [--quiet <sec>]
+#   await-interactive.sh <tmux-target> <scratch-dir> [--log <file>]
 #
 # Blocks up to --timeout (default 1500s, the ~25-minute monitor cadence),
 # then reports. Prints exactly one line:
@@ -14,7 +14,7 @@
 #   BLOCKED <report>    exit 5  final-report.md present — relay it, leave scratch
 #   DEAD                exit 2  target gone, scratch present, no report — a
 #                               crash; relaunch fresh with a continuation handoff
-#   QUIET <sec>s        exit 3  --log given and stagnant past --quiet (default
+#   QUIET <sec>s        exit 3  --log given and stagnant past the quiet budget (default
 #                               1200s) with the target alive. NOT a verdict:
 #                               read the pane first — a hands-on question or
 #                               queued steers look exactly like this
@@ -23,12 +23,12 @@ set -euo pipefail
 
 TARGET=${1:?tmux target} SCRATCH=${2:?scratch dir}
 shift 2
+# 25 minutes per invocation; 20 quiet transcript seconds reports QUIET.
+# Tune by editing these two numbers — never by adding call-site options.
 LOGFILE="" TIMEOUT=1500 QUIET=1200
 while [ $# -gt 0 ]; do
   case $1 in
     --log) LOGFILE=${2:?}; shift 2 ;;
-    --timeout) TIMEOUT=${2:?}; shift 2 ;;
-    --quiet) QUIET=${2:?}; shift 2 ;;
     *) echo "await-interactive: unknown option $1" >&2; exit 1 ;;
   esac
 done

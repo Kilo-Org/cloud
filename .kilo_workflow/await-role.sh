@@ -5,7 +5,7 @@
 # sentinel false-passes when the agent quoted one, and a stalled run can sit
 # forever without ever writing its marker.
 #
-#   await-role.sh <log> [--timeout <sec>] [--stall <sec>]
+#   await-role.sh <log>
 #
 # Completion is proven by the wrapper-owned `<log>.exit` file dispatch-role.sh
 # writes — never by text in the log, which the agent also writes. The
@@ -33,17 +33,11 @@
 # counts as liveness.
 set -euo pipefail
 
-LOG=${1:?usage: await-role.sh <log> [--timeout <sec>] [--stall <sec>]}
-shift
+LOG=${1:?usage: await-role.sh <log>}
+# 8 minutes to produce a verdict; 20 minutes of log silence reads as STALLED.
+# Tune by editing these two numbers — never by adding call-site options.
 TIMEOUT=480
 STALL=1200
-while [ $# -gt 0 ]; do
-  case $1 in
-    --timeout) TIMEOUT=${2:?}; shift 2 ;;
-    --stall) STALL=${2:?}; shift 2 ;;
-    *) echo "await-role: unknown option $1" >&2; exit 1 ;;
-  esac
-done
 
 ROLE=""
 MODE=""

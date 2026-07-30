@@ -68,4 +68,4 @@ A section can still take hours of unattended machine time when builds or live E2
 
 A standing rule from the spec: **anything that can be automated away, should be automated away.** Agents' tokens go to the work, not to battling the workflow or the environment — when a run stumbles on something a script or a document could have prevented, the run fixes the script or the document in the same PR, and learnings that graduate into automation get deleted.
 
-Role definitions live in the repository root `.kilo/agent/` (the kilo CLI only discovers agents there). The workflow self-heals: when a run stumbles on something this documentation could have prevented, it fixes the documentation in the same PR.
+Role definitions live in the repository root `.kilo/agent/` (the kilo CLI only discovers agents there). 

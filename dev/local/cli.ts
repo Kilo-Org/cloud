@@ -960,6 +960,32 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 }
 
+
+// Metro's jest-haste-map cache ($TMPDIR/metro-file-map-*) persists per project
+// root across dependency relayouts and then serves stale module instances
+// (deterministic white screen + metroRequire stack overflow). Clearing this
+// worktree's file-map on every mobile restart makes the recovery automatic.
+function clearStaleMetroFileMaps(repoRoot: string): void {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(os.tmpdir());
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.startsWith('metro-file-map-')) continue;
+    const full = path.join(os.tmpdir(), entry);
+    try {
+      if (!fs.statSync(full).isFile()) continue;
+      if (!fs.readFileSync(full).includes(repoRoot)) continue;
+      fs.rmSync(full, { force: true });
+      console.log(`Cleared stale Metro file-map ${entry}`);
+    } catch {
+      // Another worktree's file or a race with Metro — leave it.
+    }
+  }
+}
+
 async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
   if (!services.has(serviceName)) {
     console.error(`Unknown service: ${serviceName}`);
@@ -990,6 +1016,7 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
     if (!host) throw new Error('Could not detect LAN IP. Set MOBILE_DEV_HOST explicitly.');
     restartEnv = prepareMobileEnvironment(repoRoot, host).sessionEnv;
     setSessionEnvironment(sessionName, restartEnv);
+    clearStaleMetroFileMaps(repoRoot);
   }
 
   console.log(`Restarting ${serviceName} (waiting for the old process to shut down)...`);

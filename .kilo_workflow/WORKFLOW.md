@@ -21,7 +21,7 @@ These apply to every role. Later sections do not repeat them.
 - Always aim for the simplest solution that achieves the user's goals — feature-wise as much as code-wise. Reuse existing helpers, components, and contracts. Do not add abstraction or scope without evidence it is required.
 - Commit in small, logically scoped commits. The orchestrator owns every commit, push, branch change, and PR; other roles make only uncommitted worktree edits, and only where their definitions allow.
 - Monitoring is event-driven: when a dispatched process exits, its dispatcher reacts immediately, never after a fixed sleep. Periodic checks exist only to detect a wedge.
-- Tokens go to the work, never to fighting the workflow or the environment. Every mechanical step that can be scripted is scripted — `init-section.sh`, `dispatch-role.sh`, `await-role.sh`, `launch-interactive.sh`, `launch-gate.sh`, `await-interactive.sh`, `steer.sh`, the five `e2e-*` lifecycle scripts, `slice-diff.sh`, `baseline.sh`, `pr-threads.sh`, `pr-gate.sh`, `pick-reviewers.sh`, `upload-pr-attachment.sh` — use the script, never hand-assemble its steps. **Anything that can be automated away, should be automated away:** when a run stumbles on something a script or an instruction could have prevented, fix the script or the document in the same run (see Learnings).
+- Tokens go to the work, never to fighting the workflow or the environment. Every mechanical step that can be scripted is scripted — `init-section.sh`, `dispatch-role.sh`, `await-role.sh`, `launch-interactive.sh`, `launch-gate.sh`, `await-interactive.sh`, `steer.sh`, the five `e2e-*` lifecycle scripts, `slice-diff.sh`, `baseline.sh`, `pr-threads.sh`, `pr-gate.sh`, `pick-reviewers.sh`, `upload-pr-attachment.sh` — use the script, never hand-assemble its steps. **Anything that can be automated away, should be** (see Learnings).
 - Learnings are the residue automation cannot reach. Before any environment-dependent phase, list both learnings directories — the worktree's `.kilo_workflow/learnings/` and the main checkout's `~/Projects/cloud/.kilo_workflow/learnings/system/` (the canonical machine-local set, which mid-run writes go to and worktree copies lag) — and read the entries whose names match your surface; filenames are symptom-keyed. When a tool or environment failure blocks you mid-run, grep both directories for the error text before debugging from scratch: a prior run has usually already paid for the answer.
 
 ### Models
@@ -56,9 +56,9 @@ The cwd/worktree is always the **cloud** worktree, even when the slice edits a s
 
 What the script encodes (details in its header comments):
 
-- tmux wrapping — harness command timeouts kill bare long runs. Roles run as windows in the dispatcher's session, resolved through `$TMUX_PANE`; a dispatcher outside tmux gives the role its own session. The script appends a unique dispatch id: names are `<section>-<role>-<label>-<id>`, logs `$SCRATCH/<role>-<label>-<id>.log`; parallel and repeated labels cannot share artifacts.
+The script prints the log path for `await-role.sh`; it guarantees tmux wrapping (a dispatcher outside tmux gives the role its own session), unique per-dispatch names and logs, and the redirection + `EXITCODE` marker the await script judges.
+
 - Full `KILO_*`/`OPENCODE*` env strip — a child kilo inheriting `KILO_*`/`OPENCODE*` (from a parent kilo or the tmux server environment) misattaches sessions and auth. If the tmux server itself is poisoned, clear it with `tmux set-environment -g -u <var>`.
-- Output redirected, never piped (`| tee` makes `$?` report the pipe's exit, not kilo's), with `EXITCODE=$?` appended as the log's last line.
 - `--auto` on every dispatch — a plain `kilo run` auto-rejects any permission ask (some paths ask regardless of what the agent definition grants) and still exits 0 with no verdict, which reads as a pass. Never strip the flag; any non-interactive `kilo run` outside `dispatch-role.sh` must pass it explicitly.
 
 Wait with [`await-role.sh`](await-role.sh) — never a hand-rolled loop (exit codes lie, whole-log sentinel greps false-pass on quoted sentinels, and a stalled run never writes its marker):
@@ -94,12 +94,7 @@ Worker roles are steered by re-dispatching them (see Escalation). The interactiv
 printf '%s' "$AMENDMENT" | .kilo_workflow/steer.sh <section>-orchestrator -   # long or multi-line text via stdin
 ```
 
-It prints `running` when the session took the message immediately and `queued` when the message is waiting behind the active turn; either way it is delivered. A non-zero exit means it is **not** delivered — inspect the target rather than sending a second copy. What the script encodes (details in its header comments):
-
-- Enter as its own keystroke after the text. A trailing `Enter` in the same `send-keys` call submits short messages but is swallowed by long ones, which then sit unsent in the composer — the "wedged" session that is really an undelivered message.
-- Bracketed paste, so a multi-line message stays one prompt. An unbracketed paste submits at every newline, and the first fragment gets acted on before the rest arrives.
-- A refusal to paste into a pane that is not running the kilo CLI — a mistargeted steer executes in a shell.
-- Delivery confirmed from the pane, never assumed.
+It prints `running` when the session took the message immediately and `queued` when the message is waiting behind the active turn; either way it is delivered. A non-zero exit means it is **not** delivered — inspect the target rather than sending a second copy. Delivery mechanics (Enter as its own keystroke, bracketed paste, non-kilo-pane refusal, pane-confirmed delivery) are enforced by the script — see its header.
 
 **`N queued` in the footer is delivery working, not a wedge.** Queued messages land one at a time at turn boundaries, in order, and a session that chains tool calls for tens of minutes holds the whole queue that entire time. Never kill, relaunch, or escalate on a queue count; a wedge needs its own evidence (frozen build timer, stream or api error, dead process — see Monitor Mode). `Escape` does not flush the queue.
 

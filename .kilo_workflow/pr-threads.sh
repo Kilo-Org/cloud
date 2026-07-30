@@ -7,15 +7,13 @@
 #   pr-threads.sh list <owner/repo> <pr>                 # every thread: id, state, path, comments, first-comment id/author/body
 #   pr-threads.sh unresolved <owner/repo> <pr>           # just the unresolved ones (empty output = clean)
 #   pr-threads.sh close <owner/repo> <thread-id> <body>  # reply in-thread AND resolve it, asserting both
-#   pr-threads.sh reply <owner/repo> <thread-id> <body>  # reply only (e.g. while more work is coming)
-#   pr-threads.sh resolve <owner/repo> <thread-id>       # resolve only
 #
 # <body> may be `-` to read stdin. Replies get the mandatory "(bot) " prefix
 # added when missing. A fix without its in-thread reply and resolution is not
 # done — `close` is the normal move.
 set -euo pipefail
 
-CMD=${1:?usage: pr-threads.sh list|unresolved|close|reply|resolve ...}
+CMD=${1:?usage: pr-threads.sh list|unresolved|close ...}
 REPO=${2:?owner/repo}
 [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "repository must be owner/repo" >&2; exit 1; }
 OWNER=${REPO%%/*}
@@ -121,13 +119,6 @@ case $CMD in
     BODY=$(read_body "${4:?body or -}")
     do_reply "${3:?thread id}" "$BODY"
     do_resolve "$3"
-    ;;
-  reply)
-    BODY=$(read_body "${4:?body or -}")
-    do_reply "${3:?thread id}" "$BODY"
-    ;;
-  resolve)
-    do_resolve "${3:?thread id}"
     ;;
   *) echo "usage: pr-threads.sh list|unresolved|close|reply|resolve ..." >&2; exit 1 ;;
 esac

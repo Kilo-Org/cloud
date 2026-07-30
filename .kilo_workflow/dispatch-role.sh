@@ -31,6 +31,16 @@ esac
 [ -d "$WT" ] || { echo "dispatch-role: no such worktree: $WT" >&2; exit 1; }
 [ -f "$WT/.kilo/agent/$ROLE.md" ] || { echo "dispatch-role: $WT has no .kilo/agent/$ROLE.md — the worktree must be the CLOUD worktree (role definitions are only discovered there)" >&2; exit 1; }
 [ -d "$SCRATCH" ] || { echo "dispatch-role: no such scratch dir: $SCRATCH" >&2; exit 1; }
+if [ "$ROLE" = "e2e-verifier" ]; then
+  # The verifier restores a byte-identical baseline; concurrent uncommitted
+  # edits (learnings included) would read as false product failures.
+  DIRTY=$(git -C "$WT" status --porcelain)
+  [ -z "$DIRTY" ] || {
+    echo "dispatch-role: $WT must be fully committed before e2e-verifier dispatch:" >&2
+    echo "$DIRTY" >&2
+    exit 1
+  }
+fi
 # Only `--mode repro` (e2e-verifier repro gate) and repeated `--file
 # <existing path>` may follow — anything else (a --model override, a typo)
 # silently disagrees with the pinned role definition.

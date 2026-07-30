@@ -6,11 +6,10 @@
 # the comment actually approve, are the screenshots real — stay with the
 # agent; this script pins the facts to one head SHA.
 #
-#   pr-gate.sh <owner/repo> <pr> [--assignee <handle>] [--label <name>] [--bot <login>] [--wait <sec>]
+#   pr-gate.sh <owner/repo> <pr> [--assignee <handle>] [--label <name>] [--wait <sec>]
 #
 #   --assignee   gate-fail unless this handle is among the assignees
 #   --label      gate-fail unless this label is present (monitors: human-ready)
-#   --bot        the reviewing bot's exact login (default kilo-code-bot);
 #                substring 'bot' matching would let any bot vouch for the head
 #   --wait       poll every 120s up to this budget for the bot summary (or
 #                waiver) to appear before reporting; retriggering stays the
@@ -34,7 +33,6 @@ while [ $# -gt 0 ]; do
   case $1 in
     --assignee) ASSIGNEE=${2:?}; shift 2 ;;
     --label) LABEL=${2:?}; shift 2 ;;
-    --bot) BOT=${2:?}; shift 2 ;;
     --wait) WAIT=${2:?}; shift 2 ;;
     *) echo "pr-gate: unknown option $1" >&2; exit 1 ;;
   esac

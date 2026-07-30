@@ -102,6 +102,18 @@ test('role dispatches allocate distinct artifacts and verifier scratch', () => {
       'exit 0\n'
   );
   fs.chmodSync(tmux, 0o755);
+  // The verifier refuses a dirty worktree, so dispatch targets a minimal
+  // clean repo, never the live one (which may legitimately be dirty).
+  const wt = path.join(root, 'wt');
+  fs.mkdirSync(path.join(wt, '.kilo/agent'), { recursive: true });
+  for (const role of ['implementer', 'plan-reviewer', 'impl-reviewer', 'e2e-verifier']) {
+    fs.writeFileSync(path.join(wt, `.kilo/agent/${role}.md`), '# role\n');
+  }
+  execFileSync('git', ['init', '-q'], { cwd: wt });
+  execFileSync('git', ['add', '.'], { cwd: wt });
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'init'], {
+    cwd: wt,
+  });
   const script = path.join(repoRoot, '.kilo_workflow/dispatch-role.sh');
   const env = {
     ...process.env,
@@ -113,7 +125,7 @@ test('role dispatches allocate distinct artifacts and verifier scratch', () => {
   const dispatch = (role = 'implementer', extraArgs: string[] = []) =>
     execFileSync(
       script,
-      [role, 'test-abcd', 'r1', repoRoot, scratch, 'Exercise the role.', ...extraArgs],
+      [role, 'test-abcd', 'r1', wt, scratch, 'Exercise the role.', ...extraArgs],
       {
         cwd: root,
         encoding: 'utf8',
@@ -129,6 +141,11 @@ test('role dispatches allocate distinct artifacts and verifier scratch', () => {
     assert.ok(fs.existsSync(`${second}.meta`));
     assert.match(fs.readFileSync(`${first}.meta`, 'utf8'), /^tmux=@42$/m);
     fs.writeFileSync(path.join(home, '.cache/kilo-launch-gate/last'), '0\n');
+    // Uncommitted state in the target worktree blocks only the verifier.
+    fs.writeFileSync(path.join(wt, 'dirty.txt'), 'uncommitted\n');
+    assert.throws(() => dispatch('e2e-verifier'), /must be fully committed/);
+    dispatch('implementer');
+    fs.rmSync(path.join(wt, 'dirty.txt'));
     const verifier = dispatch('e2e-verifier');
     const verifierScratch = fs
       .readFileSync(`${verifier}.meta`, 'utf8')
@@ -328,7 +345,10 @@ test('E2E lifecycle scripts take, start, stop, and free one slot', () => {
   fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\nprintf '%s\\n' '${repoRoot}'\n`);
   fs.writeFileSync(
     path.join(bin, 'pnpm'),
-    '#!/bin/sh\nprintf "%s: %s\\n" "$PWD" "$*" >> "$COMMAND_LOG"\n'
+    '#!/bin/sh\nprintf "%s: %s\\n" "$PWD" "$*" >> "$COMMAND_LOG"\n' +
+      'if [ "$2" = "dev:status" ]; then\n' +
+      '  printf \'%s\\n\' \'{"services":[{"name":"mobile","status":"up"},{"name":"nextjs","status":"up"},{"name":"cloudflare-session-ingest","status":"up"},{"name":"web","status":"up"}]}\'\n' +
+      'fi\n'
   );
   for (const command of ['tmux', 'git', 'pnpm']) fs.chmodSync(path.join(bin, command), 0o755);
   const env = {
@@ -370,7 +390,11 @@ test('E2E lifecycle scripts take, start, stop, and free one slot', () => {
     assert.match(run('e2e-slot-status.sh').stdout, /0\/3 held/);
     assert.equal(
       fs.readFileSync(commandLog, 'utf8'),
-      `${repoRoot}: dev:start --no-attach --reuse-running mobile web\n${repoRoot}: dev:stop\n`
+      `${repoRoot}: dev:env -y cloudflare-session-ingest\n` +
+        `${repoRoot}: dev:start --no-attach --reuse-running mobile web\n` +
+        `${repoRoot}: drizzle migrate\n` +
+        `${repoRoot}: -s dev:status --json\n` +
+        `${repoRoot}: dev:stop\n`
     );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

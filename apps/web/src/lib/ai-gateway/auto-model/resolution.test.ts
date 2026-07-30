@@ -39,23 +39,21 @@ const sampleDecision: AutoRoutingDecision = {
 };
 
 describe('selectAutoFreeCandidate', () => {
-  it('follows the configured routing percentages', () => {
-    const selectionCounts = new Map(autoFreeModelRoutes.map(route => [route.model, 0]));
-    const sampleSize = 10_000;
-
-    for (let seed = 0; seed < sampleSize; seed++) {
-      const selected = selectAutoFreeCandidate(
-        autoFreeModelRoutes.map(route => route.model),
-        String(seed)
-      );
-      if (selected) selectionCounts.set(selected, (selectionCounts.get(selected) ?? 0) + 1);
-    }
-
+  it('maps the configured percentage boundaries to each model', () => {
+    const candidates = autoFreeModelRoutes.map(route => route.model);
+    const totalPercentage = autoFreeModelRoutes.reduce(
+      (total, route) => total + route.percentage,
+      0
+    );
+    let cumulativePercentage = 0;
     for (const route of autoFreeModelRoutes) {
-      expect((selectionCounts.get(route.model) ?? 0) / sampleSize).toBeCloseTo(
-        route.percentage / 100,
-        1
-      );
+      const firstBucket = Math.ceil((cumulativePercentage * 10_000) / totalPercentage);
+      const lastBucket =
+        Math.ceil(((cumulativePercentage + route.percentage) * 10_000) / totalPercentage) - 1;
+
+      expect(selectAutoFreeCandidate(candidates, 'seed', () => firstBucket)).toBe(route.model);
+      expect(selectAutoFreeCandidate(candidates, 'seed', () => lastBucket)).toBe(route.model);
+      cumulativePercentage += route.percentage;
     }
   });
 

@@ -106,7 +106,8 @@ function gatewaySupportsApiKind(
 
 export function selectAutoFreeCandidate(
   candidates: ReadonlyArray<string>,
-  randomSeed: string
+  randomSeed: string,
+  randomNumber: typeof getRandomNumber = getRandomNumber
 ): string | null {
   const availableCandidates = new Set(candidates);
   const routes = autoFreeModelRoutes.filter(route => availableCandidates.has(route.model));
@@ -114,7 +115,7 @@ export function selectAutoFreeCandidate(
   if (totalPercentage <= 0) return null;
 
   const percentageBucket =
-    (getRandomNumber('free_routing_' + randomSeed, 10_000) / 10_000) * totalPercentage;
+    (randomNumber('free_routing_' + randomSeed, 10_000) / 10_000) * totalPercentage;
   let cumulativePercentage = 0;
   for (const route of routes) {
     cumulativePercentage += route.percentage;

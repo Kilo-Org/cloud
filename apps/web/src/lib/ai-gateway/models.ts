@@ -38,14 +38,18 @@ import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModelRoutes = [
-  ...(stepfun_37_flash_free_model.status === 'public'
-    ? [{ model: stepfun_37_flash_free_model.public_id, percentage: 34 }]
-    : []),
+  { model: stepfun_37_flash_free_model.public_id, percentage: 34 },
   { model: 'inclusionai/ling-3.0-flash:free', percentage: 33 },
   { model: 'poolside/laguna-s-2.1:free', percentage: 33 },
 ] satisfies ReadonlyArray<{ model: string; percentage: number }>;
 
-export const autoFreeModels = autoFreeModelRoutes.map(route => route.model);
+export const autoFreeModels = autoFreeModelRoutes
+  .filter(
+    route =>
+      route.model !== stepfun_37_flash_free_model.public_id ||
+      stepfun_37_flash_free_model.status === 'public'
+  )
+  .map(route => route.model);
 
 export const preferredModels = [
   KILO_AUTO_FRONTIER_MODEL.id,

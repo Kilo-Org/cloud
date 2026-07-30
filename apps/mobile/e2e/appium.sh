@@ -109,8 +109,12 @@ ensure_server() {
 }
 
 stop_server() {
-  if [ -f "$STATE_DIR/appium.pid" ] && kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null; then
-    kill "$(cat "$STATE_DIR/appium.pid")" || true
+  if [ -f "$STATE_DIR/appium.pid" ]; then
+    PID=$(cat "$STATE_DIR/appium.pid")
+    # Pids get recycled; only signal a process that is actually our appium.
+    if kill -0 "$PID" 2>/dev/null && ps -o command= -p "$PID" 2>/dev/null | grep -q appium; then
+      kill "$PID" || true
+    fi
   fi
   rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
 }

@@ -96,7 +96,7 @@ case $CMD in
     # Capture to a sibling temp dir and publish atomically, so a killed
     # snapshot can never pass for a complete one.
     TMP=$(mktemp -d "$DIR.tmp.XXXXXX")
-    capture "$TMP" || { rm -rf "$TMP"; exit 1; }
+    { capture "$TMP" && [ -s "$TMP/head" ]; } || { rm -rf "$TMP"; echo 'baseline: capture failed' >&2; exit 1; }
     rmdir "$DIR" 2>/dev/null || { echo "baseline: $DIR exists and is not empty — refusing to overwrite" >&2; rm -rf "$TMP"; exit 1; }
     mv "$TMP" "$DIR"
     echo "baseline recorded in $DIR"
@@ -106,7 +106,7 @@ case $CMD in
     NOW=$(mktemp -d "${TMPDIR:-/tmp}/kilo-baseline-check.XXXXXX")
     # Kept on mismatch so the printed diff commands stay runnable.
     trap '[ "${fail:-1}" -eq 0 ] && rm -rf "$NOW"' EXIT
-    capture "$NOW" || { rm -rf "$NOW"; exit 1; }
+    { capture "$NOW" && [ -s "$NOW/head" ]; } || { rm -rf "$NOW"; echo 'baseline: capture failed' >&2; exit 1; }
     fail=0
     for f in head status.z worktree.diff index.diff untracked.tsv included.tsv; do
       cmp -s "$DIR/$f" "$NOW/$f" && continue

@@ -18,11 +18,22 @@ done > "$covered"
 
 unaccounted=0
 while IFS= read -r session; do
-  slug=${session#kilo-dev-}
+  # Slug extraction and candidate scheme must match how each session kind was
+  # named: kilo-dev-*/emulator records use per-char underscores, cli sessions
+  # the collapsing dash slug, stub sessions the raw basename.
+  case "$session" in
+    kilo-dev-*) slug=${session#kilo-dev-}; scheme=underscore ;;
+    kilo-e2e-cli-*) slug=${session#kilo-e2e-cli-}; scheme=dash ;;
+    kilo-e2e-github-stub-*) slug=${session#kilo-e2e-github-stub-}; scheme=raw ;;
+  esac
   found=0
   while IFS= read -r worktree; do
     [ -n "$worktree" ] || continue
-    candidate=$(basename "$worktree" | tr -c 'A-Za-z0-9_\n-' '_')
+    case "$scheme" in
+      underscore) candidate=$(basename "$worktree" | tr -c 'A-Za-z0-9_\n-' '_') ;;
+      dash) candidate=$(basename "$worktree" | tr -cs 'a-zA-Z0-9' '-' | sed 's/^-*//;s/-*$//') ;;
+      raw) candidate=$(basename "$worktree") ;;
+    esac
     [ "$candidate" = "$slug" ] && found=1
   done < "$covered"
   if [ "$found" -eq 0 ]; then

@@ -27,7 +27,7 @@ export type DirectByokProvider = {
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
   supported_chat_apis: ReadonlyArray<GatewayChatApiKind>;
   default_ai_sdk_provider: CustomLlmProvider;
-  transformRequest(context: TransformRequestContext, model: DirectByokModel): void;
+  transformRequest(context: TransformRequestContext): void;
 };
 
 export const COMPATIBLE_USER_AGENT = 'Kilo-Code/5.12';

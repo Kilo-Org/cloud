@@ -83,7 +83,6 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
 
     // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
     reasoning?: OpenRouterReasoningConfig;
-    include_reasoning?: boolean;
 
     // https://platform.minimax.io/docs/api-reference/text-openai-api#4-important-note
     reasoning_split?: boolean;

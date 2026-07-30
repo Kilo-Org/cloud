@@ -11,6 +11,7 @@ import {
   getBYOKforOrganization,
 } from '@/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
+import { readDb } from '@/lib/drizzle';
 
 jest.mock('@/lib/ai-gateway/byok');
 
@@ -63,6 +64,7 @@ describe('getEmbeddingProvider', () => {
     expect(result.provider.id).toBe('vercel');
     expect(result.provider).toBe(PROVIDERS.VERCEL_AI_GATEWAY);
     expect(result.userByok).toBe(mockByokResult);
+    expect(mockedGetBYOKforUser).toHaveBeenCalledWith(readDb, user.id, ['openai']);
   });
 
   it('should check organization BYOK when organizationId is provided', async () => {
@@ -76,9 +78,7 @@ describe('getEmbeddingProvider', () => {
 
     expect(result.provider.id).toBe('vercel');
     expect(result.userByok).toBe(mockByokResult);
-    expect(mockedGetBYOKforOrganization).toHaveBeenCalledWith(expect.anything(), 'org-123', [
-      'mistral',
-    ]);
+    expect(mockedGetBYOKforOrganization).toHaveBeenCalledWith(readDb, 'org-123', ['mistral']);
   });
 
   it('should skip BYOK check for anonymous users', async () => {

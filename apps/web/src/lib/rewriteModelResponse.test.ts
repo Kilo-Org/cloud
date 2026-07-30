@@ -914,7 +914,25 @@ describe('request log capture', () => {
     const reader = result.body?.getReader();
     await reader?.cancel();
 
-    expect(capture.setReadError).toHaveBeenCalled();
+    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined);
     expect(capture.setBody).not.toHaveBeenCalled();
   });
+
+  test.each(rewriters)(
+    '%s: records the chunks received before the response stream is cancelled',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+      const receivedChunks = 'data: {"id":"gen-1","choices":[]}\n\n';
+      const { response: upstream } = hangingSseResponse(receivedChunks);
+
+      const result = await rewrite(upstream, true, capture, null);
+      const reader = result.body?.getReader();
+      await reader?.read();
+      await reader?.cancel();
+
+      expect(capture.setReadError).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks);
+      expect(capture.setBody).not.toHaveBeenCalled();
+    }
+  );
 });

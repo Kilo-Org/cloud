@@ -263,6 +263,10 @@ async function readResponseText(
   }
 }
 
+function partialCapturedBody(capturedChunks: string[] | null): string | undefined {
+  return capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined;
+}
+
 async function rewriteSseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   parser: ReturnType<typeof createParser>,
@@ -272,17 +276,12 @@ async function rewriteSseStream(
   serializeError: (error: ResponseReadError) => string,
   onFinally: () => void,
   vercelRequestId: string | null | undefined,
-  capture: RequestLogCapture | null
+  capture: RequestLogCapture | null,
+  capturedChunks: string[] | null
 ) {
   const decoder = new TextDecoder();
-  // Accumulate the raw upstream text for request logging while the stream is
-  // being processed anyway, so it doesn't have to be processed a second time.
-  const capturedChunks: string[] | null = capture ? [] : null;
   const settleReadError = (error: unknown) =>
-    capture?.setReadError(
-      error,
-      capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined
-    );
+    capture?.setReadError(error, partialCapturedBody(capturedChunks));
   const settleBody = () => {
     if (capturedChunks) {
       capturedChunks.push(decoder.decode());
@@ -398,6 +397,11 @@ export async function rewriteModelResponse_ChatCompletions(
     });
   }
 
+  // Accumulate the raw upstream text for request logging while the stream is
+  // being processed anyway, so it doesn't have to be processed a second time.
+  // Shared with the stream's cancel() callback so a client disconnect still
+  // logs the partially received response body.
+  const capturedChunks: string[] | null = capture ? [] : null;
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -480,11 +484,15 @@ export async function rewriteModelResponse_ChatCompletions(
           '\n\n',
         progress.stop,
         vercelRequestId,
-        capture
+        capture,
+        capturedChunks
       );
     },
     cancel() {
-      capture?.setReadError(new Error('response stream was cancelled'));
+      capture?.setReadError(
+        new Error('response stream was cancelled'),
+        partialCapturedBody(capturedChunks)
+      );
     },
   });
 
@@ -559,6 +567,11 @@ export async function rewriteModelResponse_Messages(
     });
   }
 
+  // Accumulate the raw upstream text for request logging while the stream is
+  // being processed anyway, so it doesn't have to be processed a second time.
+  // Shared with the stream's cancel() callback so a client disconnect still
+  // logs the partially received response body.
+  const capturedChunks: string[] | null = capture ? [] : null;
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -648,11 +661,15 @@ export async function rewriteModelResponse_Messages(
           '\n\n',
         progress.stop,
         vercelRequestId,
-        capture
+        capture,
+        capturedChunks
       );
     },
     cancel() {
-      capture?.setReadError(new Error('response stream was cancelled'));
+      capture?.setReadError(
+        new Error('response stream was cancelled'),
+        partialCapturedBody(capturedChunks)
+      );
     },
   });
 
@@ -708,6 +725,11 @@ export async function rewriteModelResponse_Responses(
     });
   }
 
+  // Accumulate the raw upstream text for request logging while the stream is
+  // being processed anyway, so it doesn't have to be processed a second time.
+  // Shared with the stream's cancel() callback so a client disconnect still
+  // logs the partially received response body.
+  const capturedChunks: string[] | null = capture ? [] : null;
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -792,11 +814,15 @@ export async function rewriteModelResponse_Responses(
           '\n\n',
         progress.stop,
         vercelRequestId,
-        capture
+        capture,
+        capturedChunks
       );
     },
     cancel() {
-      capture?.setReadError(new Error('response stream was cancelled'));
+      capture?.setReadError(
+        new Error('response stream was cancelled'),
+        partialCapturedBody(capturedChunks)
+      );
     },
   });
 

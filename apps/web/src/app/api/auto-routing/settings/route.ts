@@ -176,11 +176,12 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   }
 
   // Reuse the shared worker contract (includes retryEntries refinements).
-  // Owner identity is resolved from auth/query, not the client body.
+  // Owner identity is resolved from auth/query, not the client body: spread
+  // the body first so auth-resolved ownerType/ownerId always win in parsed.data.
   const parsed = UpdateAutoRoutingSettingsRequestSchema.safeParse({
+    ...(rawBody !== null && typeof rawBody === 'object' ? rawBody : {}),
     ownerType: owner.ownerType,
     ownerId: owner.ownerId,
-    ...(rawBody !== null && typeof rawBody === 'object' ? rawBody : {}),
   });
   if (!parsed.success) {
     // Map common pool/retry shape failures to specific messages when possible.

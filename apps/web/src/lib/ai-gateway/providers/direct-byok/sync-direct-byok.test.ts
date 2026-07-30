@@ -221,7 +221,7 @@ describe('parseModelsDevProviderModels', () => {
         },
       },
       'alibaba-token-plan',
-      { availableModelIds: new Set(['available', 'provider-only']) }
+      new Set(['available', 'provider-only'])
     );
 
     expect(models.map(model => model.id)).toEqual(['available']);
@@ -256,15 +256,13 @@ describe('parseModelsDevProviderModels', () => {
         },
       },
       'nvidia-byok',
-      {
-        availableModelIds: new Set([
-          'nvidia/chat',
-          'nvidia/vision',
-          'nvidia/unknown',
-          'nvidia/no-tools',
-          'nvidia/no-text-input',
-        ]),
-      }
+      new Set([
+        'nvidia/chat',
+        'nvidia/vision',
+        'nvidia/unknown',
+        'nvidia/no-tools',
+        'nvidia/no-text-input',
+      ])
     );
 
     expect(models).toEqual([

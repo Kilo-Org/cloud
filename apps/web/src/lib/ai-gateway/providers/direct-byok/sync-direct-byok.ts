@@ -85,14 +85,6 @@ type RawModel = {
   variants?: OpenCodeSettings['variants'];
 };
 
-type ModelsDevProviderOptions = {
-  availableModelIds?: ReadonlySet<string>;
-};
-
-type ModelsDevFetcherOptions = {
-  availableModelsUrl?: string;
-};
-
 type SyncContext = {
   getModelsDevCatalog(): Promise<ModelsDevCatalog>;
 };
@@ -187,7 +179,7 @@ function addAnthropicVariantVerbosity(
 export function parseModelsDevProviderModels(
   entry: unknown,
   providerId: DirectUserByokInferenceProviderId,
-  options: ModelsDevProviderOptions = {}
+  availableModelIds?: ReadonlySet<string>
 ): RawModel[] {
   const provider = ModelsDevProviderSchema.parse(entry);
   return Object.values(provider.models)
@@ -195,7 +187,7 @@ export function parseModelsDevProviderModels(
       model =>
         model.status !== 'deprecated' &&
         (!model.modalities?.output || model.modalities.output.includes('text')) &&
-        (!options.availableModelIds || options.availableModelIds.has(model.id)) &&
+        (!availableModelIds || availableModelIds.has(model.id)) &&
         model.tool_call !== false &&
         (!model.modalities?.input || model.modalities.input.includes('text'))
     )
@@ -220,7 +212,7 @@ export function parseModelsDevProviderModels(
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
   catalogKey: string,
-  options: ModelsDevFetcherOptions = {}
+  availableModelsUrl?: string
 ): ProviderFetcher {
   return {
     providerId,
@@ -230,23 +222,21 @@ function modelsDevFetcher(
       if (!entry) {
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
       }
-      let availableModelIds: ReadonlySet<string> | undefined;
-      if (options.availableModelsUrl) {
-        const response = await fetch(options.availableModelsUrl);
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch ${providerId} available models: ${response.status} ${response.statusText}`
-          );
-        }
-        availableModelIds = new Set(
-          OpenAICompatibleModelsResponseSchema.parse(await response.json()).data.map(
-            model => model.id
-          )
+      if (!availableModelsUrl) {
+        return parseModelsDevProviderModels(entry, providerId);
+      }
+      const response = await fetch(availableModelsUrl);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch ${providerId} available models: ${response.status} ${response.statusText}`
         );
       }
-      return parseModelsDevProviderModels(entry, providerId, {
-        availableModelIds,
-      });
+      const availableModelIds = new Set(
+        OpenAICompatibleModelsResponseSchema.parse(await response.json()).data.map(
+          model => model.id
+        )
+      );
+      return parseModelsDevProviderModels(entry, providerId, availableModelIds);
     },
   };
 }
@@ -267,9 +257,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Neuralwatt',
     url: 'https://api.neuralwatt.com/v1/models',
   }),
-  modelsDevFetcher('nvidia-byok', 'nvidia', {
-    availableModelsUrl: 'https://integrate.api.nvidia.com/v1/models',
-  }),
+  modelsDevFetcher('nvidia-byok', 'nvidia', 'https://integrate.api.nvidia.com/v1/models'),
   openAICompatibleFetcher({
     providerId: 'chutes-byok',
     label: 'Chutes',
@@ -307,12 +295,8 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   }),
   modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
-  modelsDevFetcher('ollama-cloud', 'ollama-cloud', {
-    availableModelsUrl: 'https://ollama.com/v1/models',
-  }),
-  modelsDevFetcher('opencode-go', 'opencode-go', {
-    availableModelsUrl: 'https://opencode.ai/zen/go/v1/models',
-  }),
+  modelsDevFetcher('ollama-cloud', 'ollama-cloud', 'https://ollama.com/v1/models'),
+  modelsDevFetcher('opencode-go', 'opencode-go', 'https://opencode.ai/zen/go/v1/models'),
   modelsDevFetcher('xiaomi-token-plan-ams', 'xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp', 'xiaomi-token-plan-sgp'),
 ];

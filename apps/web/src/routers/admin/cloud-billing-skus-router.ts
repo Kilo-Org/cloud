@@ -19,7 +19,7 @@ import {
   type ContainerUsageSegment,
 } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, gt, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 
 export type SerializedCloudBillingSku = Omit<CloudBillingSku, 'created_at'> & {
@@ -79,6 +79,8 @@ const segmentSearchSchema = z
   })
   .strict();
 
+const MAX_RECONCILIATION_RUNS = 15;
+
 const usageSummarySchema = z
   .object({
     subjectType: z.enum(['user', 'org']),
@@ -91,14 +93,27 @@ const usageSummarySchema = z
     validateUsageWindow(input.start, input.end, context);
   });
 
+const usageReconciliationSchema = z
+  .object({
+    subjectType: z.enum(['user', 'org']),
+    subjectId: z.string().trim().min(1).max(256),
+    start: z.iso.datetime(),
+    end: z.iso.datetime(),
+    intervalIds: z.array(z.string().trim().min(1).max(512)).min(1).max(MAX_RECONCILIATION_RUNS),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    validateUsageWindow(input.start, input.end, context);
+  });
+
 const BILLING_HEALTH_WINDOW_MS = 24 * 60 * 60 * 1_000;
 const STALE_OPEN_INTERVAL_MS = 15 * 60 * 1_000;
-const MAX_RECONCILIATION_INSTANCES = 100;
+const PROVIDER_BOUNDARY_PADDING_MS = 5_000;
 const MEBIBYTE_BYTES = 1024 ** 2;
 const MEGABYTE_BYTES = 1_000_000;
 const CAPACITY_CROSS_CHECK_RELATIVE_TOLERANCE = 1e-6;
 const COMPARISON_METHOD =
-  'Cloudflare allocated resource sums include overlapping container and micro-VM records, so they cannot be normalized to awake wall-clock seconds. Capacity-equivalent memory and disk seconds are diagnostic only.';
+  'Cloudflare memory and disk byte-seconds are queried with five seconds of boundary tolerance, normalized by configured instance capacity, and compared with accepted meter seconds for each exact meter run. CPU time is included as a secondary usage diagnostic.';
 const usageMetadataSchema = z
   .record(z.string().min(1).max(64), z.string().max(512))
   .refine(
@@ -204,6 +219,7 @@ function postgresErrorCode(error: unknown): string | undefined {
 }
 
 export type ReconciliationStatus =
+  | 'compared'
   | 'missing_from_cloudflare'
   | 'ambiguous_application'
   | 'provider_partial'
@@ -217,6 +233,8 @@ type MeterReconciliationRow = {
   skuIds: Set<string>;
   intervalIds: Set<string>;
   acceptedSeconds: number;
+  startedAt: string;
+  endedAt: string;
   identityIssue: string | null;
 };
 
@@ -298,12 +316,12 @@ function addMeterReconciliationRow(
     skuId: string;
     metadata: unknown;
     acceptedSeconds: number;
+    startedAt: string;
+    endedAt: string;
   }
 ): void {
   const providerIdentity = providerIdentityForMeterRow(meter);
-  const key = providerIdentity.instanceId
-    ? `provider\0${providerIdentity.instanceId}`
-    : `meter\0${meter.service}\0${meter.instanceId}`;
+  const key = meter.intervalId;
   let row = rows.get(key);
   if (!row) {
     row = {
@@ -314,6 +332,8 @@ function addMeterReconciliationRow(
       skuIds: new Set(),
       intervalIds: new Set(),
       acceptedSeconds: 0,
+      startedAt: meter.startedAt,
+      endedAt: meter.endedAt,
       identityIssue: providerIdentity.issue,
     };
     rows.set(key, row);
@@ -343,17 +363,22 @@ function normalizedReconciliationRows(
   meterRows: MeterReconciliationRow[],
   provider: ContainerUsageAnalyticsResult | null
 ) {
-  const providerByInstance = new Map<string, ContainerUsageAnalyticsResult['rows']>();
-  const partialUsageInstanceIds = new Set(provider?.usagePartialInstanceIds ?? []);
+  const providerByRun = new Map<string, ContainerUsageAnalyticsResult['rows']>();
+  const partialUsageRunKeys = new Set(provider?.usagePartialRunKeys ?? []);
+  const unavailableRuns = new Map(
+    provider?.usageUnavailableRuns.map(run => [run.runKey, run.reason] as const) ?? []
+  );
   for (const row of provider?.rows ?? []) {
-    const existing = providerByInstance.get(row.instanceId);
+    const existing = providerByRun.get(row.runKey);
     if (existing) existing.push(row);
-    else providerByInstance.set(row.instanceId, [row]);
+    else providerByRun.set(row.runKey, [row]);
   }
 
   return meterRows.map(meter => {
     const candidates = meter.providerInstanceId
-      ? (providerByInstance.get(meter.providerInstanceId) ?? [])
+      ? (providerByRun.get(meter.key) ?? []).filter(
+          candidate => candidate.instanceId === meter.providerInstanceId
+        )
       : [];
     const providerApplicationIds = candidates.map(candidate => candidate.applicationId).sort();
     let status: ReconciliationStatus;
@@ -361,14 +386,20 @@ function normalizedReconciliationRows(
     let matchedProvider: ContainerUsageAnalyticsResult['rows'][number] | null = null;
     let providerMemorySeconds: number | null = null;
     let providerDiskSeconds: number | null = null;
+    let providerMemoryDifferenceSeconds: number | null = null;
+    let providerMemoryDifferencePercent: number | null = null;
+    let providerDiskDifferenceSeconds: number | null = null;
+    let providerDiskDifferencePercent: number | null = null;
     let provisionedMemoryBytes: number | null = null;
     let provisionedDiskBytes: number | null = null;
     if (meter.identityIssue) {
       status = 'comparison_unavailable';
       statusDetail = meter.identityIssue;
+    } else if (unavailableRuns.get(meter.key) === 'outside_retention') {
+      status = 'comparison_unavailable';
+      statusDetail = 'This run is outside Cloudflare Analytics retention.';
     } else if (candidates.length === 0) {
-      const usagePartial =
-        meter.providerInstanceId !== null && partialUsageInstanceIds.has(meter.providerInstanceId);
+      const usagePartial = partialUsageRunKeys.has(meter.key);
       status = usagePartial ? 'provider_partial' : 'missing_from_cloudflare';
       statusDetail = usagePartial
         ? 'Cloudflare returned partial data, so this instance cannot be classified as missing.'
@@ -376,10 +407,7 @@ function normalizedReconciliationRows(
     } else if (candidates.length !== 1) {
       status = 'ambiguous_application';
       statusDetail = 'Multiple Cloudflare applications returned this physical instance ID.';
-    } else if (
-      meter.providerInstanceId !== null &&
-      partialUsageInstanceIds.has(meter.providerInstanceId)
-    ) {
+    } else if (partialUsageRunKeys.has(meter.key)) {
       status = 'provider_partial';
       statusDetail = 'Cloudflare returned only part of the required provider data.';
     } else {
@@ -394,19 +422,26 @@ function normalizedReconciliationRows(
         providerMemorySeconds =
           matchedProvider.usage.allocatedMemory / provisionedCapacity.memoryBytes;
         providerDiskSeconds = matchedProvider.usage.allocatedDisk / provisionedCapacity.diskBytes;
+        providerMemoryDifferenceSeconds = providerMemorySeconds - meter.acceptedSeconds;
+        providerDiskDifferenceSeconds = providerDiskSeconds - meter.acceptedSeconds;
+        if (meter.acceptedSeconds > 0) {
+          providerMemoryDifferencePercent =
+            (providerMemoryDifferenceSeconds / meter.acceptedSeconds) * 100;
+          providerDiskDifferencePercent =
+            (providerDiskDifferenceSeconds / meter.acceptedSeconds) * 100;
+        }
         const capacityCrossCheckDifference = Math.abs(providerMemorySeconds - providerDiskSeconds);
         const capacityCrossCheckScale = Math.max(1, providerMemorySeconds, providerDiskSeconds);
         if (
           capacityCrossCheckDifference / capacityCrossCheckScale >
           CAPACITY_CROSS_CHECK_RELATIVE_TOLERANCE
         ) {
-          status = 'comparison_unavailable';
+          status = 'compared';
           statusDetail =
-            'Provider memory and disk byte-seconds imply different active durations for this service capacity.';
+            'Provider memory and disk allocation equivalents differ; review both variances.';
         } else {
-          status = 'comparison_unavailable';
-          statusDetail =
-            'Cloudflare memory and disk allocation equivalents agree, but overlapping billing records prevent an awake-time comparison.';
+          status = 'compared';
+          statusDetail = 'Provider memory and disk allocation equivalents agree.';
         }
       }
     }
@@ -418,10 +453,17 @@ function normalizedReconciliationRows(
       services: [...meter.services].sort(),
       providerApplicationIds,
       skuIds: [...meter.skuIds].sort(),
+      intervalIds: [...meter.intervalIds].sort(),
       intervalCount: meter.intervalIds.size,
       meterAcceptedSeconds: meter.acceptedSeconds,
+      meterStartedAt: meter.startedAt,
+      meterEndedAt: meter.endedAt,
       providerMemorySeconds,
       providerDiskSeconds,
+      providerMemoryDifferenceSeconds,
+      providerMemoryDifferencePercent,
+      providerDiskDifferenceSeconds,
+      providerDiskDifferencePercent,
       provisionedMemoryBytes,
       provisionedDiskBytes,
       providerCpuTimeSec: matchedProvider?.usage.cpuTimeSec ?? null,
@@ -434,11 +476,11 @@ function normalizedReconciliationRows(
   });
 }
 
-type UsageSummaryInput = z.infer<typeof usageSummarySchema>;
+type UsageReconciliationInput = z.infer<typeof usageReconciliationSchema>;
 type QueryContainerUsageAnalytics = typeof queryContainerUsageAnalytics;
 
 export async function reconcileUsageWithCloudflare(
-  input: UsageSummaryInput,
+  input: UsageReconciliationInput,
   queryProvider: QueryContainerUsageAnalytics = queryContainerUsageAnalytics
 ) {
   const meterSegments = await db
@@ -448,20 +490,24 @@ export async function reconcileUsageWithCloudflare(
       instanceId: container_usage_interval.instance_id,
       skuId: container_usage_interval.cloud_billing_sku_id,
       metadata: container_usage_interval.metadata,
+      startedAt: container_usage_interval.started_at,
+      lastSeenAt: container_usage_interval.last_seen_at,
+      stoppedAt: container_usage_interval.stopped_at,
       acceptedSeconds:
         sql<number>`coalesce(sum(${container_usage_segment.usage_seconds}), 0)`.mapWith(Number),
     })
-    .from(container_usage_segment)
-    .innerJoin(
-      container_usage_interval,
-      eq(container_usage_segment.interval_id, container_usage_interval.id)
+    .from(container_usage_interval)
+    .leftJoin(
+      container_usage_segment,
+      eq(container_usage_interval.id, container_usage_segment.interval_id)
     )
     .where(
       and(
         eq(container_usage_interval.subject_type, input.subjectType),
         eq(container_usage_interval.subject_id, input.subjectId),
-        sql`${container_usage_segment.received_at} >= ${input.start}`,
-        lt(container_usage_segment.received_at, input.end)
+        inArray(container_usage_interval.id, input.intervalIds),
+        lt(container_usage_interval.started_at, input.end),
+        gt(container_usage_interval.last_seen_at, input.start)
       )
     )
     .groupBy(
@@ -469,30 +515,45 @@ export async function reconcileUsageWithCloudflare(
       container_usage_interval.service,
       container_usage_interval.instance_id,
       container_usage_interval.cloud_billing_sku_id,
-      container_usage_interval.metadata
-    );
+      container_usage_interval.metadata,
+      container_usage_interval.started_at,
+      container_usage_interval.last_seen_at,
+      container_usage_interval.stopped_at
+    )
+    .orderBy(asc(container_usage_interval.started_at), asc(container_usage_interval.id));
 
   const grouped = new Map<string, MeterReconciliationRow>();
-  for (const meterSegment of meterSegments) addMeterReconciliationRow(grouped, meterSegment);
+  for (const meterSegment of meterSegments) {
+    addMeterReconciliationRow(grouped, {
+      ...meterSegment,
+      startedAt: new Date(meterSegment.startedAt).toISOString(),
+      endedAt: new Date(meterSegment.stoppedAt ?? meterSegment.lastSeenAt).toISOString(),
+    });
+  }
   const meterRows = [...grouped.values()];
-  const providerInstanceIds = [
-    ...new Set(meterRows.flatMap(row => (row.providerInstanceId ? [row.providerInstanceId] : []))),
-  ];
-  if (providerInstanceIds.length > MAX_RECONCILIATION_INSTANCES) {
+  const providerRuns = meterRows.flatMap(row =>
+    row.providerInstanceId
+      ? [
+          {
+            key: row.key,
+            instanceId: row.providerInstanceId,
+            start: new Date(Date.parse(row.startedAt) - PROVIDER_BOUNDARY_PADDING_MS).toISOString(),
+            end: new Date(Date.parse(row.endedAt) + PROVIDER_BOUNDARY_PADDING_MS).toISOString(),
+          },
+        ]
+      : []
+  );
+  if (providerRuns.length > MAX_RECONCILIATION_RUNS) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message: `This window contains ${providerInstanceIds.length} unique Cloudflare instances (maximum ${MAX_RECONCILIATION_INSTANCES}). Narrow the window and retry.`,
+      message: `The selected records contain ${providerRuns.length} Cloudflare runs (maximum ${MAX_RECONCILIATION_RUNS}).`,
     });
   }
 
   let provider: ContainerUsageAnalyticsResult | null = null;
-  if (providerInstanceIds.length > 0) {
+  if (providerRuns.length > 0) {
     try {
-      provider = await queryProvider({
-        instanceIds: providerInstanceIds,
-        start: input.start,
-        end: input.end,
-      });
+      provider = await queryProvider({ runs: providerRuns });
     } catch (error) {
       if (error instanceof ContainerUsageAnalyticsError) {
         throw new TRPCError({
@@ -516,17 +577,18 @@ export async function reconcileUsageWithCloudflare(
     end: input.end,
     generatedAt: new Date().toISOString(),
     comparison: {
-      available: false as const,
-      method: 'unavailable' as const,
+      available: true as const,
+      method: 'capacity_equivalent' as const,
       description: COMPARISON_METHOD,
     },
     totals: {
       meterAcceptedSeconds: totalMeterSeconds,
       intervalCount: new Set(meterSegments.map(row => row.intervalId)).size,
-      uniqueMeterInstances: rows.length,
-      queriedCloudflareInstances: providerInstanceIds.length,
+      meterRuns: rows.length,
+      queriedCloudflareRuns: providerRuns.length,
     },
     counts: {
+      compared: countStatus('compared'),
       missing: countStatus('missing_from_cloudflare'),
       ambiguous: countStatus('ambiguous_application'),
       partial: countStatus('provider_partial'),
@@ -732,7 +794,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
   }),
 
   reconcileUsageWithCloudflare: adminProcedure
-    .input(usageSummarySchema)
+    .input(usageReconciliationSchema)
     .mutation(async ({ input }) => reconcileUsageWithCloudflare(input)),
 
   usageHealth: adminProcedure.query(async () => {

@@ -21,9 +21,14 @@ const USAGE_FIELDS = [
   'sum_txBytes',
 ];
 const input = {
-  instanceIds: ['instance-1'],
-  start: '2026-07-01T00:00:00.000Z',
-  end: '2026-07-01T01:00:00.000Z',
+  runs: [
+    {
+      key: 'run-1',
+      instanceId: 'instance-1',
+      start: '2026-07-01T00:00:00.000Z',
+      end: '2026-07-01T01:00:00.000Z',
+    },
+  ],
 };
 const options: ContainerUsageAnalyticsOptions = {
   accountId: ACCOUNT_ID,
@@ -67,19 +72,28 @@ function settingsBody(
   };
 }
 
+type UsageGroup = {
+  dimensions: { applicationId: string; instanceId: string };
+  sum: { cpuTimeSec: number; allocatedMemory: number; allocatedDisk: number; txBytes: number };
+};
+
 function usageBody(
-  groups: Array<{
-    dimensions: { applicationId: string; instanceId: string };
-    sum: { cpuTimeSec: number; allocatedMemory: number; allocatedDisk: number; txBytes: number };
-  }> = [],
+  groups: UsageGroup[] = [],
   errors: Array<{ message: string }> | null = null,
   extra: Record<string, unknown> = {}
 ) {
   return {
-    data: { viewer: { accounts: [{ containersUsageAdaptiveGroups: groups }] } },
+    data: { viewer: { accounts: [{ u0: groups }] } },
     errors,
     ...extra,
   };
+}
+
+function usageBatchBody(
+  aliases: Record<string, UsageGroup[]>,
+  errors: Array<{ message: string; path?: Array<string | number> }> | null = null
+) {
+  return { data: { viewer: { accounts: [aliases] } }, errors };
 }
 
 function response(body: unknown, init: ResponseInit = {}) {
@@ -120,16 +134,18 @@ describe('queryContainerUsageAnalytics', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(requests[0]?.body.variables).toEqual({ accountTag: ACCOUNT_ID });
     expect(requests[1]?.headers.get('authorization')).toBe(`Bearer ${API_TOKEN}`);
-    expect(requests[1]?.body.query).toContain('datetime_lt: $datetimeEnd');
-    expect(requests[1]?.body.query).toContain('instanceId_in: $instanceIds');
+    expect(requests[1]?.body.query).toContain('u0: containersUsageAdaptiveGroups');
+    expect(requests[1]?.body.query).toContain('datetime_lt: $datetimeEnd0');
+    expect(requests[1]?.body.query).toContain('instanceId_in: $instanceIds0');
     expect(requests[1]?.body.variables).toEqual({
       accountTag: ACCOUNT_ID,
-      datetimeStart: input.start,
-      datetimeEnd: input.end,
-      instanceIds: ['instance-1'],
+      datetimeStart0: input.runs[0]?.start,
+      datetimeEnd0: input.runs[0]?.end,
+      instanceIds0: ['instance-1'],
     });
     expect(result.rows).toEqual([
       {
+        runKey: 'run-1',
         applicationId: 'observed-app',
         instanceId: 'instance-1',
         usage: providerRow.sum,
@@ -141,6 +157,93 @@ describe('queryContainerUsageAnalytics', () => {
     ]);
     expect(JSON.stringify(result)).not.toContain(API_TOKEN);
     expect(JSON.stringify(result)).not.toContain('authorization');
+  });
+
+  it('keeps reused instance IDs isolated by alias and marks only the errored run partial', async () => {
+    const runs = [
+      input.runs[0]!,
+      {
+        key: 'run-2',
+        instanceId: 'instance-1',
+        start: '2026-07-01T02:00:00.000Z',
+        end: '2026-07-01T03:00:00.000Z',
+      },
+    ];
+    const { fetch } = requestCapture((_request, index) =>
+      response(
+        index === 0
+          ? settingsBody()
+          : usageBatchBody(
+              {
+                u0: [
+                  {
+                    dimensions: { applicationId: 'app', instanceId: 'instance-1' },
+                    sum: { cpuTimeSec: 1, allocatedMemory: 10, allocatedDisk: 20, txBytes: 30 },
+                  },
+                ],
+                u1: [
+                  {
+                    dimensions: { applicationId: 'app', instanceId: 'instance-1' },
+                    sum: { cpuTimeSec: 2, allocatedMemory: 100, allocatedDisk: 200, txBytes: 300 },
+                  },
+                ],
+              },
+              [{ message: 'run 2 partial', path: ['ContainerUsage', 'u1'] }]
+            )
+      )
+    );
+
+    const result = await queryContainerUsageAnalytics({ runs }, { ...options, fetch });
+
+    expect(result.rows).toEqual([
+      expect.objectContaining({
+        runKey: 'run-1',
+        usage: expect.objectContaining({ allocatedMemory: 10 }),
+      }),
+      expect.objectContaining({
+        runKey: 'run-2',
+        usage: expect.objectContaining({ allocatedMemory: 100 }),
+      }),
+    ]);
+    expect(result.usagePartialRunKeys).toEqual(['run-2']);
+    expect(result.issues).toEqual([
+      expect.stringContaining('run run-2 window 0 returned partial data: run 2 partial'),
+    ]);
+    expect(result.issues.join(' ')).not.toContain('run run-1');
+  });
+
+  it('fails an unscoped batched GraphQL error without retry fan-out', async () => {
+    const runs = [
+      input.runs[0]!,
+      {
+        key: 'run-2',
+        instanceId: 'instance-2',
+        start: '2026-07-01T02:00:00.000Z',
+        end: '2026-07-01T03:00:00.000Z',
+      },
+    ];
+    const providerRows: UsageGroup[] = runs.map((run, index) => ({
+      dimensions: { applicationId: 'app', instanceId: run.instanceId },
+      sum: {
+        cpuTimeSec: index + 1,
+        allocatedMemory: (index + 1) * 10,
+        allocatedDisk: (index + 1) * 20,
+        txBytes: (index + 1) * 30,
+      },
+    }));
+    const { fetch } = requestCapture((_request, index) => {
+      if (index === 0) return response(settingsBody());
+      return response(
+        usageBatchBody({ u0: [providerRows[0]!], u1: [providerRows[1]!] }, [
+          { message: 'batch partial' },
+        ])
+      );
+    });
+
+    await expect(
+      queryContainerUsageAnalytics({ runs }, { ...options, fetch })
+    ).rejects.toMatchObject({ code: 'graphql_error' });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it.each([
@@ -178,7 +281,7 @@ describe('queryContainerUsageAnalytics', () => {
     );
     const result = await queryContainerUsageAnalytics(input, { ...options, fetch: partial.fetch });
     expect(result.partial).toBe(true);
-    expect(result.usagePartialInstanceIds).toEqual(['instance-1']);
+    expect(result.usagePartialRunKeys).toEqual(['run-1']);
     expect(result.rows).toHaveLength(1);
   });
 
@@ -207,25 +310,38 @@ describe('queryContainerUsageAnalytics', () => {
     }
   });
 
-  it('chunks by live duration and batches exact IDs below the page limit', async () => {
-    const ids = Array.from({ length: 51 }, (_, index) => `instance-${index}`);
+  it('batches up to 15 independently filtered run windows per usage request', async () => {
+    const runs = Array.from({ length: 16 }, (_, index) => ({
+      key: index === 0 ? 'interval:with:colons' : `run-${index}`,
+      instanceId: `instance-${index}`,
+      start: '2026-07-01T00:00:00.000Z',
+      end: '2026-07-01T01:00:00.000Z',
+    }));
     const { fetch, requests } = requestCapture((_request, index) =>
-      response(index === 0 ? settingsBody({ maxDuration: 3_600, maxPageSize: 100 }) : usageBody())
+      response(
+        index === 0
+          ? settingsBody({ maxDuration: 3_600, maxPageSize: 100 })
+          : usageBatchBody(
+              Object.fromEntries(
+                Array.from({ length: index === 1 ? 15 : 1 }, (_, aliasIndex) => [
+                  `u${aliasIndex}`,
+                  [],
+                ])
+              )
+            )
+      )
     );
 
-    await queryContainerUsageAnalytics(
-      { instanceIds: ids, start: input.start, end: '2026-07-01T02:00:00.000Z' },
-      { ...options, fetch }
-    );
+    const result = await queryContainerUsageAnalytics({ runs }, { ...options, fetch });
 
-    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(fetch).toHaveBeenCalledTimes(3);
     const queries = requests.slice(1);
-    expect(new Set(queries.map(item => item.body.variables.instanceIds.length))).toEqual(
-      new Set([1, 50])
-    );
-    expect(new Set(queries.map(item => item.body.variables.datetimeStart))).toEqual(
-      new Set(['2026-07-01T00:00:00.000Z', '2026-07-01T01:00:00.000Z'])
-    );
+    expect(queries[0]?.body.variables.instanceIds14).toEqual(['instance-14']);
+    expect(queries[1]?.body.variables.instanceIds0).toEqual(['instance-15']);
+    expect(queries[0]?.body.query).not.toContain('interval:with:colons');
+    expect(result.rawResponses).toHaveLength(3);
+    expect(result.rawResponses[1]?.queries).toHaveLength(15);
+    expect(result.rawResponses[1]?.queries[0]?.runKey).toBe('interval:with:colons');
   });
 
   it('marks a full page partial and rejects request plans above the cap', async () => {
@@ -249,7 +365,7 @@ describe('queryContainerUsageAnalytics', () => {
       ...options,
       fetch: fullPage.fetch,
     });
-    expect(partial.usagePartialInstanceIds).toEqual(['instance-1']);
+    expect(partial.usagePartialRunKeys).toEqual(['run-1']);
 
     const requestCap = requestCapture((_request, index) =>
       response(index === 0 ? settingsBody({ maxPageSize: 2, maxDuration: 3_600 }) : usageBody())
@@ -257,9 +373,12 @@ describe('queryContainerUsageAnalytics', () => {
     await expect(
       queryContainerUsageAnalytics(
         {
-          instanceIds: Array.from({ length: 50 }, (_, index) => `instance-${index}`),
-          start: input.start,
-          end: '2026-07-02T00:00:00.000Z',
+          runs: Array.from({ length: 5 }, (_, index) => ({
+            key: `run-${index}`,
+            instanceId: `instance-${index}`,
+            start: '2026-07-01T00:00:00.000Z',
+            end: '2026-07-02T00:00:00.000Z',
+          })),
         },
         { ...options, fetch: requestCap.fetch }
       )
@@ -296,7 +415,7 @@ describe('queryContainerUsageAnalytics', () => {
                 viewer: {
                   accounts: [
                     {
-                      containersUsageAdaptiveGroups: [
+                      u0: [
                         {
                           dimensions: { applicationId: 'app', instanceId: 'instance-1' },
                           sum: { cpuTimeSec: 1, allocatedMemory: 2, txBytes: 3 },
@@ -315,7 +434,7 @@ describe('queryContainerUsageAnalytics', () => {
     });
   });
 
-  it('marks retention clipping partial and rejects fully expired windows', async () => {
+  it('marks retention clipping partial and skips fully expired runs without blocking valid runs', async () => {
     const retained = requestCapture((_request, index) =>
       response(index === 0 ? settingsBody({ notOlderThan: 84_600 }) : usageBody())
     );
@@ -324,11 +443,33 @@ describe('queryContainerUsageAnalytics', () => {
       fetch: retained.fetch,
     });
     expect(partial.partial).toBe(true);
-    expect(partial.usagePartialInstanceIds).toEqual(['instance-1']);
+    expect(partial.usagePartialRunKeys).toEqual(['run-1']);
 
-    const expired = requestCapture(() => response(settingsBody({ notOlderThan: 3_600 })));
-    await expect(
-      queryContainerUsageAnalytics(input, { ...options, fetch: expired.fetch })
-    ).rejects.toMatchObject({ code: 'outside_retention' });
+    const validProviderRow = {
+      dimensions: { applicationId: 'app', instanceId: 'instance-2' },
+      sum: { cpuTimeSec: 1, allocatedMemory: 2, allocatedDisk: 3, txBytes: 4 },
+    };
+    const expired = requestCapture((_request, index) =>
+      response(index === 0 ? settingsBody({ notOlderThan: 3_600 }) : usageBody([validProviderRow]))
+    );
+    const result = await queryContainerUsageAnalytics(
+      {
+        runs: [
+          input.runs[0]!,
+          {
+            key: 'valid-run',
+            instanceId: 'instance-2',
+            start: '2026-07-01T23:30:00.000Z',
+            end: '2026-07-01T23:45:00.000Z',
+          },
+        ],
+      },
+      { ...options, fetch: expired.fetch }
+    );
+    expect(expired.fetch).toHaveBeenCalledTimes(2);
+    expect(result.usageUnavailableRuns).toEqual([{ runKey: 'run-1', reason: 'outside_retention' }]);
+    expect(result.rows).toEqual([
+      expect.objectContaining({ runKey: 'valid-run', instanceId: 'instance-2' }),
+    ]);
   });
 });

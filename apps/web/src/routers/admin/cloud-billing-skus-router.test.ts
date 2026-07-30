@@ -557,9 +557,6 @@ describe('admin.cloudBillingSkus usage records', () => {
       intervalCount: 2,
       uniqueMeterInstances: 1,
       queriedCloudflareInstances: 1,
-      providerComparisonSeconds: null,
-      differenceSeconds: null,
-      differencePercent: null,
     });
     expect(userResult.rows).toEqual([
       expect.objectContaining({
@@ -569,13 +566,10 @@ describe('admin.cloudBillingSkus usage records', () => {
         services: ['cloud-agent-next-sandbox'],
         skuIds: ['usage-reconciliation-sku', 'usage-search-sku'],
         providerCpuTimeSec: 3,
-        providerComparisonSeconds: null,
         providerMemorySeconds: 30,
         providerDiskSeconds: 30,
         provisionedMemoryBytes: 12 * 1024 ** 3,
         provisionedDiskBytes: 20_000_000_000,
-        differenceSeconds: null,
-        differencePercent: null,
         status: 'comparison_unavailable',
       }),
     ]);
@@ -599,7 +593,6 @@ describe('admin.cloudBillingSkus usage records', () => {
       providerInstanceId: 'gastown-physical-id',
       providerApplicationIds: ['observed-gastown-app'],
       meterAcceptedSeconds: 30,
-      providerComparisonSeconds: null,
       providerMemorySeconds: 30,
       providerDiskSeconds: 30,
       status: 'comparison_unavailable',
@@ -691,7 +684,6 @@ describe('admin.cloudBillingSkus usage records', () => {
     });
     expect(mockQueryContainerUsageAnalytics.mock.calls[0]?.[0].instanceIds).toHaveLength(3);
     expect(result.counts).toEqual({
-      matched: 0,
       missing: 1,
       ambiguous: 1,
       partial: 1,
@@ -787,11 +779,8 @@ describe('admin.cloudBillingSkus usage records', () => {
     expect(result.rows[0]).toMatchObject({
       providerMemorySeconds: 10,
       providerDiskSeconds: 11,
-      providerComparisonSeconds: null,
-      differenceSeconds: null,
       status: 'comparison_unavailable',
     });
-    expect(result.totals.providerComparisonSeconds).toBeNull();
   });
 
   it('rejects reconciliation above the unique physical instance cap', async () => {

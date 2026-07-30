@@ -127,14 +127,6 @@ function sameSummaryRequest(
   );
 }
 
-function formatDifference(seconds: number | null, percent: number | null): string {
-  if (seconds === null) return 'Unavailable';
-  const secondsPrefix = seconds > 0 ? '+' : '';
-  if (percent === null) return `${secondsPrefix}${formatProviderNumber(seconds)}s`;
-  const percentPrefix = percent > 0 ? '+' : '';
-  return `${secondsPrefix}${formatProviderNumber(seconds)}s (${percentPrefix}${formatProviderNumber(percent)}%)`;
-}
-
 function formatProvisionedCapacity(memoryBytes: number | null, diskBytes: number | null) {
   if (memoryBytes === null || diskBytes === null) return null;
   return `${formatProviderNumber(memoryBytes / 1024 ** 3)} GiB memory · ${formatProviderNumber(diskBytes / 1_000_000_000)} GB disk`;
@@ -800,37 +792,13 @@ export default function UsageRecordsContent() {
                           a diagnostic.
                         </p>
 
-                        <dl className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
+                        <dl className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2">
                           <div className="bg-surface-inset p-3">
                             <dt className="text-muted-foreground type-label">
                               Meter accepted seconds
                             </dt>
                             <dd className="mt-1 tabular-nums type-code">
                               {reconciliation.data.totals.meterAcceptedSeconds.toLocaleString()}s
-                            </dd>
-                          </div>
-                          <div className="bg-surface-inset p-3">
-                            <dt className="text-muted-foreground type-label">
-                              Provider comparison seconds
-                            </dt>
-                            <dd className="mt-1 tabular-nums type-code">
-                              {formatProviderNumber(
-                                reconciliation.data.totals.providerComparisonSeconds
-                              )}
-                              {reconciliation.data.totals.providerComparisonSeconds === null
-                                ? ''
-                                : 's'}
-                            </dd>
-                          </div>
-                          <div className="bg-surface-inset p-3">
-                            <dt className="text-muted-foreground type-label">
-                              Difference (provider - meter)
-                            </dt>
-                            <dd className="mt-1 tabular-nums type-code">
-                              {formatDifference(
-                                reconciliation.data.totals.differenceSeconds,
-                                reconciliation.data.totals.differencePercent
-                              )}
                             </dd>
                           </div>
                           <div className="bg-surface-inset p-3">
@@ -842,7 +810,6 @@ export default function UsageRecordsContent() {
                         </dl>
 
                         <p className="text-muted-foreground type-label">
-                          {reconciliation.data.counts.matched} matched ·{' '}
                           {reconciliation.data.counts.missing} missing ·{' '}
                           {reconciliation.data.counts.ambiguous} ambiguous ·{' '}
                           {reconciliation.data.counts.partial} partial ·{' '}
@@ -875,7 +842,6 @@ export default function UsageRecordsContent() {
                                 <TableHead>SKU(s)</TableHead>
                                 <TableHead>Meter accepted</TableHead>
                                 <TableHead>Provider allocation equivalents</TableHead>
-                                <TableHead>Difference (provider - meter)</TableHead>
                                 <TableHead>Provider CPU</TableHead>
                                 <TableHead>Status</TableHead>
                               </TableRow>
@@ -930,9 +896,6 @@ export default function UsageRecordsContent() {
                                     </span>
                                   </TableCell>
                                   <TableCell className="tabular-nums type-code">
-                                    {formatDifference(row.differenceSeconds, row.differencePercent)}
-                                  </TableCell>
-                                  <TableCell className="tabular-nums type-code">
                                     {formatProviderNumber(row.providerCpuTimeSec)}
                                     {row.providerCpuTimeSec === null ? '' : 's'}
                                   </TableCell>
@@ -940,11 +903,9 @@ export default function UsageRecordsContent() {
                                     <Badge variant={reconciliationStatusVariant(row.status)}>
                                       {reconciliationStatusLabel(row.status)}
                                     </Badge>
-                                    {row.status !== 'comparison_unavailable' && (
-                                      <p className="mt-2 min-w-64 text-muted-foreground type-label">
-                                        {row.statusDetail}
-                                      </p>
-                                    )}
+                                    <p className="mt-2 min-w-64 text-muted-foreground type-label">
+                                      {row.statusDetail}
+                                    </p>
                                   </TableCell>
                                 </TableRow>
                               ))}

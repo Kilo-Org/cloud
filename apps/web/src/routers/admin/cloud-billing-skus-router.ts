@@ -359,13 +359,10 @@ function normalizedReconciliationRows(
     let status: ReconciliationStatus;
     let statusDetail: string;
     let matchedProvider: ContainerUsageAnalyticsResult['rows'][number] | null = null;
-    const providerComparisonSeconds: number | null = null;
     let providerMemorySeconds: number | null = null;
     let providerDiskSeconds: number | null = null;
     let provisionedMemoryBytes: number | null = null;
     let provisionedDiskBytes: number | null = null;
-    const differenceSeconds: number | null = null;
-    const differencePercent: number | null = null;
     if (meter.identityIssue) {
       status = 'comparison_unavailable';
       statusDetail = meter.identityIssue;
@@ -423,13 +420,10 @@ function normalizedReconciliationRows(
       skuIds: [...meter.skuIds].sort(),
       intervalCount: meter.intervalIds.size,
       meterAcceptedSeconds: meter.acceptedSeconds,
-      providerComparisonSeconds,
       providerMemorySeconds,
       providerDiskSeconds,
       provisionedMemoryBytes,
       provisionedDiskBytes,
-      differenceSeconds,
-      differencePercent,
       providerCpuTimeSec: matchedProvider?.usage.cpuTimeSec ?? null,
       providerAllocatedMemoryByteSeconds: matchedProvider?.usage.allocatedMemory ?? null,
       providerAllocatedDiskByteSeconds: matchedProvider?.usage.allocatedDisk ?? null,
@@ -528,16 +522,11 @@ export async function reconcileUsageWithCloudflare(
     },
     totals: {
       meterAcceptedSeconds: totalMeterSeconds,
-      providerComparisonSeconds: null,
-      differenceSeconds: null,
-      differencePercent: null,
-      providerCpuTimeSec: null,
       intervalCount: new Set(meterSegments.map(row => row.intervalId)).size,
       uniqueMeterInstances: rows.length,
       queriedCloudflareInstances: providerInstanceIds.length,
     },
     counts: {
-      matched: 0,
       missing: countStatus('missing_from_cloudflare'),
       ambiguous: countStatus('ambiguous_application'),
       partial: countStatus('provider_partial'),

@@ -59,6 +59,7 @@ What the script encodes (details in its header comments):
 - tmux wrapping — harness command timeouts kill bare long runs. Roles run as windows in the dispatcher's session, resolved through `$TMUX_PANE`; a dispatcher outside tmux gives the role its own session. The script appends a unique dispatch id: names are `<section>-<role>-<label>-<id>`, logs `$SCRATCH/<role>-<label>-<id>.log`; parallel and repeated labels cannot share artifacts.
 - Full `KILO_*`/`OPENCODE*` env strip — a child kilo inheriting `KILO_*`/`OPENCODE*` (from a parent kilo or the tmux server environment) misattaches sessions and auth. If the tmux server itself is poisoned, clear it with `tmux set-environment -g -u <var>`.
 - Output redirected, never piped (`| tee` makes `$?` report the pipe's exit, not kilo's), with `EXITCODE=$?` appended as the log's last line.
+- `--auto` on every dispatch — a plain `kilo run` auto-rejects any permission ask (some paths ask regardless of what the agent definition grants) and still exits 0 with no verdict, which reads as a pass. Never strip the flag; any non-interactive `kilo run` outside `dispatch-role.sh` must pass it explicitly.
 
 Wait with [`await-role.sh`](await-role.sh) — never a hand-rolled loop (exit codes lie, whole-log sentinel greps false-pass on quoted sentinels, and a stalled run never writes its marker):
 
@@ -131,7 +132,7 @@ Every dispatch to a role agent includes:
 - Priority order, minimum complete outcome, optional work to drop, and a clean stopping rule before budget exhaustion (estimate roughly one step per planned tool call; when in doubt, split the task); on early stop, the required continuation state (completed work, remaining work, failures, files touched, checks run or deferred, safest next action)
 - For long tool-heavy phases: output discipline — cap every shell command's output (`| tail -c 1500` / `| tail -5`), write dumps and captures to files and print only greps or counts, bound the final report. Oversized session payloads kill kilo runs silently mid-task.
 - The GitHub comment rule (see GitHub Communication)
-- Fixture rule: never commit generated E2E fixtures; create them in a temporary directory and clean up before returning
+- Fixture rule: never commit generated E2E fixtures; create them in a temporary directory and clean up before returning. Save every sanctioned temporary worktree edit (stub fixtures, test patches) as a patch file under `$SCRATCH` and name it in the report — Edit-tool entries in a dispatch log are not recoverable state (terminal echo corrupts the logged diff, so it does not `git apply`)
 
 Write handoffs to temporary files outside every repository, and never ask a role agent to infer context from a conversation it cannot see.
 
@@ -286,7 +287,7 @@ Check the mechanical half with [`pr-gate.sh`](pr-gate.sh) — it pins every fact
 - All accepted plan tasks are implemented, with automated coverage for every applicable feature state
 - A fresh impl reviewer has cleared the cumulative section diff (step 4), including any repair or orchestrator edit since
 - A fresh E2E verifier returned `VERIFICATION PASSED.` for the plan's goals — or E2E was skipped as inert, with the rationale in the PR description
-- Changes are organized into small, coherent commits; format, typecheck, lint, and tests pass in every changed repository, using the check commands the nearest `AGENTS.md` or `package.json` defines for each changed package
+- Changes are organized into small, coherent commits; format, typecheck, lint, and tests pass in every changed repository, using the check commands the nearest `AGENTS.md` or `package.json` defines for each changed package. oxfmt covers `*.yml`/`*.yaml`: after writing or editing workflow YAML, run `pnpm format` and diff its rewrite before committing — never let a formatter rewrite load-bearing whitespace unreviewed
 - The PR exists with what/why/how sections and is assigned to the requesting human
 - If any accepted task has a UI, the PR description renders screenshots of the final behavior from the latest head, uploaded to that repository as GitHub `user-attachments`; visual changes include before/after evidence when a meaningful before state exists. A non-UI PR records `Visual Changes: N/A`
 - Kilobot has posted an approving summary comment on the latest head and no actionable posted comment is unresolved — or Kilobot's absence after two retriggers is noted with the exact waiver sentence from the Kilobot loop

@@ -99,6 +99,12 @@ PR-review E2E needs a local GitHub API instead of `api.github.com`. Three steps,
    `tmux new-session -d -s "kilo-e2e-github-stub-$(basename "$PWD")" -c "$PWD/apps/mobile/e2e/github-api-stub" "node server.mjs <port>"`.
    Stop that session when finished. Request logs go to `GITHUB_STUB_LOG` or `./github-api-stub-requests.log` under the process cwd — keep them out of the tree (temp dir) and delete them after the run.
 
+If the app stalls on "GitHub connection expired" with nextjs logging repeated
+`githubPrReview.getPullRequest 412` and the stub log shows only the first fetch,
+git-token-service is missing its per-worktree Secrets Store binding:
+`pnpm dev:env -y cloudflare-git-token-service && pnpm dev:restart cloudflare-git-token-service`.
+Note nextjs reads `GIT_TOKEN_SERVICE_API_URL` from `apps/web/.env.development.local`, not root `.env.local`.
+
 Pinned surface only: REST pull/repo/check-runs/statuses/`pulls/{n}/files` (paginated via `page`/`per_page`) plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`.
 
 ## iOS Simulator
@@ -112,7 +118,7 @@ and boots it:
 .kilo_workflow/e2e-stop-resource.sh ios          # this worktree's claims
 ```
 
-The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted.
+The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted. One exception: a claim killed mid-boot returns instantly as already-owned WITHOUT booting on the next claim, and `pnpm dev:mobile:ios build` then fails `code=405 "Unable to lookup in current state: Shutdown"` — recover with `xcrun simctl boot <udid> && xcrun simctl bootstatus <udid> -b`, and give claims a >=10-minute timeout under parallel-workflow load.
 
 Install a validated cached native build. A compatible fingerprint skips rebuilding; a cache miss serializes through the host-wide native compiler semaphore. Never install an arbitrary DerivedData app or run a separate Expo native build:
 
@@ -126,6 +132,8 @@ Connect the app to the Metro URL shown by this worktree's `mobile` pane:
 xcrun simctl openurl <udid> \
   "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
 ```
+
+Never append an app route to the dev-client `url` param — the dev client treats the whole param as the Metro packager root and the manifest fetch 404s. Connect with the BARE Metro URL, wait for `iOS Bundled`, then drive routes via `xcrun simctl openurl <udid> "kiloapp://<route>"` (app scheme `kiloapp`, no SpringBoard confirmation) — only after cold-boot finishes; a link fired during boot is dropped.
 
 - Prefer `simctl openurl` for scheme reconnection; it skips Safari's external-app confirmation. Since universal links (`associatedDomains`) were configured, iOS may instead show a SpringBoard confirmation with the exact message `Open in "Kilo"?` (curly or straight quotes) — the shared launch flows match both wordings and tap `Open`. When a flow intentionally goes through Safari or a WebView, look for the exact message `Open this page in "Kilo"?` and tap the exact `Open` accessibility action — one bounded optional prompt inside the existing five-second optional-prompt budget, never a new fixed wait.
 - Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen does not prove the bundle came from this worktree.
@@ -221,6 +229,8 @@ apps/mobile/e2e/remote-cli.sh exec run "say hello"     # non-interactive run
 ```
 
 The real-time relay (`remote`) blocks until SIGTERM — a one-shot `exec remote` exits and the relay dies with it. Run it persistently in its own `kilo-e2e-*` tmux window (or send `/remote` to the running TUI session) and keep it alive for the whole flow.
+
+`-m` takes CLI provider/model ids, not in-app ids: use `kilo/kilo-auto/efficient`, never `kilo-auto/efficient` (that fails `ProviderModelNotFoundError` and leaves an empty `New session - <ts>` row — harmless, but do not confuse it with the content session). Run `remote-cli.sh exec models` and copy the exact id. A fresh E2E account has $0 credit — seed with `pnpm dev:seed app:add-credits <user-id> 10` first.
 
 Role agents reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
 

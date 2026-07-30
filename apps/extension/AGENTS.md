@@ -29,6 +29,10 @@ pnpm --filter kilo-extension zip:firefox
 pnpm --filter kilo-extension validate:firefox
 ```
 
+Analytics E2E specs need the key at BUILD time: targeted manual runs must rebuild with `VITE_POSTHOG_API_KEY=e2e-test-key pnpm --filter kilo-extension build` first (the `e2e:chrome` script does this itself; without the key analytics is compiled out and every event wait fails).
+
+Under heavy machine load `e2e:firefox` can die mid-run with `UnsupportedOperationError: newSession` (geckodriver cannot spawn the next per-scenario Firefox). Retry the command; never patch product code or the harness for this.
+
 Before committing extension changes, run `pnpm format`. Prefer `pnpm --filter kilo-extension verify` over full-repo typecheck unless the change crosses package boundaries.
 
 ## Browser Targets

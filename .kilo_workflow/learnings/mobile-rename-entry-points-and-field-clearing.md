@@ -9,11 +9,13 @@ session-detail header (pressable title, a11y label `Rename session: <title>`, op
 A live session is hoisted out of history into the tray, so while it is live its only row is the
 non-renameable tray row. To rename a live session on device: tray row tap → detail → tap title.
 
-Fix (flow notes, verified on iOS 26.5 simulator):
-- History row: `longPressOn: '<title>(.)*'` → tap `Rename` → native Alert.prompt: `eraseText: 40`
-  then `inputText: '<new>'`, VERIFY the field value via hierarchy before tapping the alert's
-  `Rename` button (this machine's inputText appends/doubles on non-empty fields; erase-first worked
-  on both the native prompt and the RN RenameModal field `Session name`).
-- Detail header: tap `Rename session:(.)*` → field a11y `Session name` → same erase+input+verify →
-  tap `Save`. Tap target `Rename` regex is full-string: `Rename session: <title>` will not match a
-  bare `Rename` pattern — the sheet option and the alert button both match `Rename` exactly.
+Fix (flow notes, JS flows in `apps/mobile/e2e/flows/`):
+- History row: long-press (W3C actions longPress) the row matching /<title>(.)*/ → tap
+  `Rename` → native prompt: `await h.eraseText(40)` then `await h.inputText('<new>')`,
+  VERIFY the field value via `appium.sh <device> hierarchy` before tapping the alert's
+  `Rename` button (inputText appends/doubles on non-empty fields; erase-first worked on both
+  the native prompt and the RN RenameModal field `Session name`).
+- Detail header: tap /Rename session:(.)*/ → field a11y `Session name` → same
+  erase+input+verify → tap `Save`. The header target regex is full-string: a bare `Rename`
+  pattern will not match it — the sheet option and the alert button both match `Rename`
+  exactly.

@@ -518,21 +518,11 @@ export async function queryContainerUsageAnalytics(
     const unscopedErrors = errorDetails.filter(
       error => !error.path?.some(part => typeof part === 'string' && /^u\d+$/.test(part))
     );
-    if ((unscopedErrors.length > 0 || (!account && errors.length > 0)) && batch.length > 1) {
-      for (const plan of batch) {
-        try {
-          await queryBatch([plan]);
-        } catch (error) {
-          if (!(error instanceof ContainerUsageAnalyticsError) || error.code !== 'graphql_error') {
-            throw error;
-          }
-          partialIds.add(plan.run.key);
-          issues.push(
-            `${DATASET} run ${plan.run.key} window ${plan.windowIndex} returned no usable data: ${error.message}`
-          );
-        }
-      }
-      return;
+    if (unscopedErrors.length > 0 && batch.length > 1) {
+      throw new ContainerUsageAnalyticsError(
+        'graphql_error',
+        `Cloudflare Analytics returned an unscoped batch error: ${graphqlErrors(unscopedErrors).join('; ')}`
+      );
     }
     if (!account) {
       throw new ContainerUsageAnalyticsError(

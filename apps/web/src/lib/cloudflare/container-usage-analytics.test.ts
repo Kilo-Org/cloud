@@ -212,7 +212,7 @@ describe('queryContainerUsageAnalytics', () => {
     expect(result.issues.join(' ')).not.toContain('run run-1');
   });
 
-  it('retries an unscoped batched GraphQL error as isolated run requests', async () => {
+  it('fails an unscoped batched GraphQL error without retry fan-out', async () => {
     const runs = [
       input.runs[0]!,
       {
@@ -231,28 +231,19 @@ describe('queryContainerUsageAnalytics', () => {
         txBytes: (index + 1) * 30,
       },
     }));
-    const { fetch, requests } = requestCapture((_request, index) => {
+    const { fetch } = requestCapture((_request, index) => {
       if (index === 0) return response(settingsBody());
-      if (index === 1) {
-        return response(
-          usageBatchBody({ u0: [providerRows[0]!], u1: [providerRows[1]!] }, [
-            { message: 'batch partial' },
-          ])
-        );
-      }
-      return response(usageBody([providerRows[index - 2]!]));
+      return response(
+        usageBatchBody({ u0: [providerRows[0]!], u1: [providerRows[1]!] }, [
+          { message: 'batch partial' },
+        ])
+      );
     });
 
-    const result = await queryContainerUsageAnalytics({ runs }, { ...options, fetch });
-
-    expect(fetch).toHaveBeenCalledTimes(4);
-    expect(requests[2]?.body.variables.instanceIds0).toEqual(['instance-1']);
-    expect(requests[3]?.body.variables.instanceIds0).toEqual(['instance-2']);
-    expect(result.partial).toBe(false);
-    expect(result.rows).toEqual([
-      expect.objectContaining({ runKey: 'run-1', instanceId: 'instance-1' }),
-      expect.objectContaining({ runKey: 'run-2', instanceId: 'instance-2' }),
-    ]);
+    await expect(
+      queryContainerUsageAnalytics({ runs }, { ...options, fetch })
+    ).rejects.toMatchObject({ code: 'graphql_error' });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it.each([

@@ -969,7 +969,7 @@ importers:
         version: 10.6.2
       headroom-ai:
         specifier: ^0.22.4
-        version: 0.22.4(@ai-sdk/provider@4.0.3)(@anthropic-ai/sdk@0.104.1(zod@4.4.3))(ai@7.0.29(zod@4.4.3))(openai@6.29.0(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3))
+        version: 0.22.4(@ai-sdk/provider@4.0.3)(@anthropic-ai/sdk@0.104.1(zod@4.4.3))(ai@7.0.29(zod@4.4.3))(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3))
       jotai:
         specifier: 2.18.1
         version: 2.18.1(@babel/core@7.29.0)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6)
@@ -1007,8 +1007,8 @@ importers:
         specifier: 4.24.14
         version: 4.24.14(next@16.2.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       openai:
-        specifier: 6.29.0
-        version: 6.29.0(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
+        specifier: 6.49.0
+        version: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       p-limit:
         specifier: 'catalog:'
         version: 7.3.0
@@ -4601,11 +4601,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.is'
+    deprecated: 'Merged into tsx: https://tsx.hirok.io'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.is'
+    deprecated: 'Merged into tsx: https://tsx.hirok.io'
 
   '@esbuild/aix-ppc64@0.27.4':
     resolution: {integrity: sha512-cQPwL2mp2nSmHHJlCyoXgHGhbEPMrEEU5xhkcy3Hs/O7nGZqEpZ2sUtLaL9MORLtDfRvVl2/3PAuEkYZH0Ty8Q==}
@@ -15836,8 +15836,8 @@ packages:
     resolution: {integrity: sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ==}
     engines: {node: '>=12'}
 
-  openai@6.29.0:
-    resolution: {integrity: sha512-YxoArl2BItucdO89/sN6edksV0x47WUTgkgVfCgX7EuEMhbirENsgYe5oO4LTjBL9PtdKtk2WqND1gSLcTd2yw==}
+  openai@6.39.1:
+    resolution: {integrity: sha512-z3dO9fEWOXBzlXynVb/xZ/tujzUjFWQWn3C0n0mw6Vo0zJTbEkaN4b2cLWjhJ6haJQx8LlREoafHRl+Gu/Hl+A==}
     hasBin: true
     peerDependencies:
       ws: 8.21.0
@@ -15848,13 +15848,21 @@ packages:
       zod:
         optional: true
 
-  openai@6.39.1:
-    resolution: {integrity: sha512-z3dO9fEWOXBzlXynVb/xZ/tujzUjFWQWn3C0n0mw6Vo0zJTbEkaN4b2cLWjhJ6haJQx8LlREoafHRl+Gu/Hl+A==}
-    hasBin: true
+  openai@6.49.0:
+    resolution: {integrity: sha512-aYCc0C6L864eR6WSYIwQGyXriw/nIyZx0ObvhzOEVuk0zoBDpynjSbrionWI7q65B5H8jJX0DXR9snEzM6bfPg==}
     peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
       ws: 8.21.0
       zod: ^3.25 || ^4.0
     peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
       ws:
         optional: true
       zod:
@@ -31595,12 +31603,12 @@ snapshots:
 
   he@1.2.0: {}
 
-  headroom-ai@0.22.4(@ai-sdk/provider@4.0.3)(@anthropic-ai/sdk@0.104.1(zod@4.4.3))(ai@7.0.29(zod@4.4.3))(openai@6.29.0(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)):
+  headroom-ai@0.22.4(@ai-sdk/provider@4.0.3)(@anthropic-ai/sdk@0.104.1(zod@4.4.3))(ai@7.0.29(zod@4.4.3))(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)):
     optionalDependencies:
       '@ai-sdk/provider': 4.0.3
       '@anthropic-ai/sdk': 0.104.1(zod@4.4.3)
       ai: 7.0.29(zod@4.4.3)
-      openai: 6.29.0(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
+      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
 
   hermes-compiler@250829098.0.14: {}
 
@@ -34631,13 +34639,14 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@6.29.0(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3):
+  openai@6.39.1(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3):
     optionalDependencies:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.4.3
 
-  openai@6.39.1(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3):
+  openai@6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3):
     optionalDependencies:
+      '@aws-sdk/credential-provider-node': 3.972.21
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.4.3
 

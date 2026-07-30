@@ -19,6 +19,7 @@ import { SessionMessageList } from './session-message-list';
 import { WorkingIndicator } from './working-indicator';
 
 type ChildSessionSheetProps = {
+  visible: boolean;
   sessionId: string;
   title: string;
   getChildMessages: (sessionId: string) => StoredMessage[];
@@ -34,6 +35,7 @@ type ChildSessionSheetProps = {
 function noopLoadOlder(): void {}
 
 export function ChildSessionSheet({
+  visible,
   sessionId,
   title,
   getChildMessages,
@@ -111,7 +113,12 @@ export function ChildSessionSheet({
   }
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
       <View className="flex-1 bg-background">
         <SheetHeader title={title} onDone={onClose} />
         {content}

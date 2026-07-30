@@ -8,6 +8,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useKeepAwake } from 'expo-keep-awake';
 import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,6 +64,11 @@ import { useSessionDetailRename } from '@/components/agents/use-session-detail-r
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
+import {
+  type ChildSessionSheetMountState,
+  closeChildSessionSheet,
+  openChildSessionSheet,
+} from '@/components/agents/child-session-sheet-state';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
@@ -117,10 +123,10 @@ export function SessionDetailContent({
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
-  const [childSession, setChildSession] = useState<{
-    sessionId: KiloSessionId;
-    title: string;
-  }>();
+  const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
+    sheet: null,
+    visible: false,
+  });
 
   const messages = useAtomValue(manager.atoms.messagesList);
   const isLoading = useAtomValue(manager.atoms.isLoading);
@@ -339,11 +345,17 @@ export function SessionDetailContent({
 
   const handleOpenChildSession = useCallback(
     (childSessionId: KiloSessionId, childTitle: string) => {
-      setChildSession({ sessionId: childSessionId, title: childTitle });
+      setChildSessionSheet(current =>
+        openChildSessionSheet(current, { sessionId: childSessionId, title: childTitle })
+      );
       void manager.hydrateChildSession(childSessionId);
     },
     [manager]
   );
+
+  const handleCloseChildSession = useCallback(() => {
+    setChildSessionSheet(closeChildSessionSheet);
+  }, []);
 
   const transcript = useMemo(
     () => mergeSessionTranscript(messages, preparationAttempts),
@@ -671,6 +683,8 @@ export function SessionDetailContent({
     [manager, router]
   );
 
+  const keepScreenAwake = isStreaming || pendingMessages.size > 0;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -683,6 +697,7 @@ export function SessionDetailContent({
             }
           : {})}
       />
+      {keepScreenAwake ? <ActiveSessionKeepAwake /> : null}
 
       {!isConnected && <ConnectivityBanner />}
 
@@ -729,21 +744,24 @@ export function SessionDetailContent({
         }}
       />
 
-      {childSession ? (
+      {childSessionSheet.sheet ? (
         <ChildSessionSheet
-          sessionId={childSession.sessionId}
-          title={childSession.title}
+          visible={childSessionSheet.visible}
+          sessionId={childSessionSheet.sheet.sessionId}
+          title={childSessionSheet.sheet.title}
           getChildMessages={getChildMessages}
-          hydrationState={getChildSessionHydrationState(childSession.sessionId)}
-          isStreaming={getChildSessionStreaming(messages, childSession.sessionId)}
+          hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+          isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
           renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={handleOpenChildSession}
           onRetry={() => {
-            void manager.hydrateChildSession(childSession.sessionId);
+            const openSheet = childSessionSheet.sheet;
+            if (!openSheet) {
+              return;
+            }
+            void manager.hydrateChildSession(openSheet.sessionId);
           }}
-          onClose={() => {
-            setChildSession(undefined);
-          }}
+          onClose={handleCloseChildSession}
         />
       ) : null}
 
@@ -921,6 +939,11 @@ export function SessionDetailContent({
       />
     );
   }
+}
+
+function ActiveSessionKeepAwake() {
+  useKeepAwake();
+  return null;
 }
 
 // Mirrors MessageBubble's bubble geometry (px-4 py-1/py-2 wrapper,

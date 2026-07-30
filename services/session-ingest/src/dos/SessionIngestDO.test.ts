@@ -698,6 +698,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       string,
       { ingested_at: number | null; item_data_r2_key: string | null }
     >();
+    let costScanCount = 0;
 
     type SelectKind = 'meta_get' | 'item_guard' | 'message_cost' | 'other';
     let selectKind: SelectKind = 'other';
@@ -726,7 +727,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
         return undefined;
       }),
       all: vi.fn(() => {
-        if (selectKind === 'message_cost') return messageRows;
+        if (selectKind === 'message_cost') {
+          costScanCount += 1;
+          return messageRows;
+        }
         return [];
       }),
     };
@@ -842,6 +846,9 @@ describe('SessionIngestDO live activity + cost persist', () => {
       get pgCallCount() {
         return pgCallCount;
       },
+      get costScanCount() {
+        return costScanCount;
+      },
       pgSet,
       pgWhere,
       getWorkerDb: dbClientMocks.getWorkerDb,
@@ -857,6 +864,17 @@ describe('SessionIngestDO live activity + cost persist', () => {
         time: { created: 1000 },
         tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
         cost,
+      },
+    };
+  }
+
+  function userItem(id: string) {
+    return {
+      type: 'message' as const,
+      data: {
+        id,
+        role: 'user',
+        time: { created: 1000 },
       },
     };
   }
@@ -1032,5 +1050,289 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(set).toHaveProperty('last_activity_at');
     expect(set).not.toHaveProperty('total_cost_microdollars');
     expect(sqlFragmentText(set.last_activity_at)).toContain(new Date(2000).toISOString());
+  });
+
+  it('skips full message cost scan when 30s cost window is closed (KB-3)', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: {
+        lastCostPersistedAtMs: String(Date.now()), // within 30s
+        lastCostPersistedMicrodollars: '100000',
+        // activity throttle closed so we isolate cost-scan behavior
+        lastActivityPersistedAtMs: String(Date.now()),
+        lastActivityPersistedValueMs: '9999999999999',
+      },
+      seedMessageRows: [
+        {
+          item_data: JSON.stringify({
+            role: 'assistant',
+            time: { created: 1000 },
+            tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+            cost: 0.5,
+          }),
+        },
+      ],
+    });
+
+    await harness.durableObject.ingest(
+      [assistantItem('m_throttled', 0.99)],
+      'usr_live',
+      'ses_live',
+      1,
+      Date.now()
+    );
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(0);
+    expect(harness.pgCallCount).toBe(0);
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('100000');
+  });
+
+  it('idle transition still scans and persists cost inside closed 30s window (D17)', async () => {
+    const priorCost = JSON.stringify({
+      role: 'assistant',
+      time: { created: 1000 },
+      tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+      cost: 0.25,
+    });
+    const harness = makeLiveHarness({
+      seedMeta: {
+        status: 'busy',
+        lastCostPersistedMicrodollars: '100000',
+        lastCostPersistedAtMs: String(Date.now()),
+      },
+      seedMessageRows: [{ item_data: priorCost }],
+    });
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      Date.now()
+    );
+    await harness.settle();
+
+    // cost scan runs at least once (attention path may also select message rows)
+    expect(harness.costScanCount).toBeGreaterThanOrEqual(1);
+    expect(harness.pgCallCount).toBe(1);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('250000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
+  });
+
+  it('user-only message batch does not open cost persist (KB-4)', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: {
+        // leave activity path free so we can see activity-only write
+      },
+    });
+
+    await harness.durableObject.ingest(
+      [userItem('u1')],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(0);
+    expect(harness.pgCallCount).toBe(1);
+    const set = harness.lastPgSet!;
+    expect(set).toHaveProperty('last_activity_at');
+    expect(set).not.toHaveProperty('total_cost_microdollars');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBeUndefined();
+  });
+
+  it('assistant message still opens cost path (KB-4 regression)', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('a1', 0.05)],
+      'usr_live',
+      'ses_live',
+      1,
+      4_000
+    );
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.pgCallCount).toBe(1);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('50000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('50000');
+  });
+
+  it('decreased recomputed cost does not move lastCostPersistedMicrodollars backward (KB-7)', async () => {
+    // Prior persist was 200000; R2 offload left '{}' so recompute yields 0 → gate closed.
+    const harness = makeLiveHarness({
+      seedMeta: {
+        lastCostPersistedMicrodollars: '200000',
+        lastCostPersistedAtMs: String(Date.now() - 60_000), // window open
+        lastActivityPersistedAtMs: String(Date.now()),
+        lastActivityPersistedValueMs: '9999999999999',
+      },
+      seedMessageRows: [{ item_data: '{}' }],
+    });
+
+    await harness.durableObject.ingest(
+      [assistantItem('m_r2', 0.01)], // upserted as inline in harness, but seed rows dominate scan
+      'usr_live',
+      'ses_live',
+      1,
+      Date.now()
+    );
+    await harness.settle();
+
+    // Scan ran (window open) but cost gate rejects decrease; no PG cost write / meta regression.
+    expect(harness.costScanCount).toBe(1);
+    // activity throttled → no persist at all, or only if activity fired
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('200000');
+    if (harness.pgCallCount > 0) {
+      expect(harness.lastPgSet).not.toHaveProperty('total_cost_microdollars');
+    }
+  });
+
+  it('post-await throttle meta max-merges so older completion cannot regress newer (KB-6)', async () => {
+    // Two concurrent waitUntil tasks: newer cost meta is written first; older completion must not clobber.
+    type Gate = { resolve: () => void; promise: Promise<void> };
+    const makeGate = (): Gate => {
+      let resolve!: () => void;
+      const promise = new Promise<void>(r => {
+        resolve = r;
+      });
+      return { resolve, promise };
+    };
+
+    const gateA = makeGate(); // older, lower cost — completes second
+    const gateB = makeGate(); // newer, higher cost — completes first
+    let pgInvoke = 0;
+
+    const meta = new Map<string, string | null>();
+    const messageRows: Array<{ item_data: string }> = [];
+    const itemRows = new Map<
+      string,
+      { ingested_at: number | null; item_data_r2_key: string | null }
+    >();
+    let selectKind: 'meta_get' | 'item_guard' | 'message_cost' | 'other' = 'other';
+    let eqKey: string | undefined;
+
+    const selectQuery = {
+      from: vi.fn(() => selectQuery),
+      where: vi.fn((condition: unknown) => {
+        const params = collectBoundParams(condition);
+        eqKey = params.find((p): p is string => typeof p === 'string');
+        return selectQuery;
+      }),
+      orderBy: vi.fn(() => selectQuery),
+      limit: vi.fn(() => selectQuery),
+      get: vi.fn(() => {
+        if (selectKind === 'item_guard' && eqKey !== undefined) return itemRows.get(eqKey);
+        if (eqKey !== undefined && meta.has(eqKey)) return { value: meta.get(eqKey) };
+        if (eqKey !== undefined) return meta.has(eqKey) ? { value: meta.get(eqKey) } : undefined;
+        return undefined;
+      }),
+      all: vi.fn(() => (selectKind === 'message_cost' ? messageRows : [])),
+    };
+
+    const db = {
+      select: vi.fn((columns?: unknown) => {
+        const cols = columns as Record<string, unknown> | undefined;
+        if (cols && 'item_data' in cols && !('item_type' in cols) && !('value' in cols)) {
+          selectKind = 'ingested_at' in cols ? 'item_guard' : 'message_cost';
+        } else if (cols && 'value' in cols) {
+          selectKind = 'meta_get';
+        } else if (cols && 'ingested_at' in cols) {
+          selectKind = 'item_guard';
+        } else {
+          selectKind = 'other';
+        }
+        return selectQuery;
+      }),
+      insert: vi.fn(() => ({
+        values: vi.fn(
+          (values: {
+            key?: string;
+            value?: string | null;
+            item_id?: string;
+            item_type?: string;
+            item_data?: string;
+            item_data_r2_key?: string | null;
+            ingested_at?: number | null;
+          }) => ({
+            onConflictDoUpdate: vi.fn(() => ({
+              run: vi.fn(() => {
+                if (values.key !== undefined) {
+                  meta.set(values.key, values.value ?? null);
+                } else if (values.item_id !== undefined) {
+                  itemRows.set(values.item_id, {
+                    ingested_at: values.ingested_at ?? null,
+                    item_data_r2_key: values.item_data_r2_key ?? null,
+                  });
+                  if (values.item_type === 'message' && values.item_data) {
+                    messageRows.push({ item_data: values.item_data });
+                  }
+                }
+              }),
+            })),
+            onConflictDoNothing: vi.fn(() => ({
+              returning: vi.fn(() => ({ get: vi.fn(() => ({ state: 'pending' })) })),
+            })),
+          })
+        ),
+      })),
+      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+    };
+    drizzleMocks.db = db;
+
+    const waitUntilPromises: Promise<unknown>[] = [];
+    const waitUntil = vi.fn((promise: Promise<unknown>) => {
+      waitUntilPromises.push(promise);
+    });
+    const state = {
+      storage: { setAlarm: vi.fn() },
+      waitUntil,
+      blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
+    } as unknown as DurableObjectState;
+
+    const pgWhere = vi.fn(() => {
+      pgInvoke += 1;
+      const gate = pgInvoke === 1 ? gateA : gateB;
+      return {
+        then(
+          onFulfilled?: ((value: unknown) => unknown) | null,
+          onRejected?: ((reason: unknown) => unknown) | null
+        ) {
+          return gate.promise.then(() => undefined).then(onFulfilled, onRejected);
+        },
+      };
+    });
+    dbClientMocks.getWorkerDb.mockReset();
+    dbClientMocks.getWorkerDb.mockReturnValue({
+      update: vi.fn(() => ({ set: vi.fn(() => ({ where: pgWhere })) })),
+    });
+
+    const env = {
+      SESSION_INGEST_R2: { delete: vi.fn() },
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      NOTIFICATIONS: { sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })) },
+    } as never;
+    const durableObject = new SessionIngestDO(state, env);
+
+    // Ingest A: cost 100000 — its PG write is held on gateA
+    await durableObject.ingest([assistantItem('ma', 0.1)], 'usr_live', 'ses_live', 1, 10_000);
+    // Ingest B: cost 250000 — held on gateB
+    await durableObject.ingest([assistantItem('mb', 0.25)], 'usr_live', 'ses_live', 1, 20_000);
+
+    expect(waitUntilPromises.length).toBe(2);
+
+    // B completes first (sum 0.1+0.25 → 350000), then A (0.1 → 100000).
+    // Without max-merge, A would regress meta to 100000.
+    gateB.resolve();
+    await waitUntilPromises[1];
+    expect(meta.get('lastCostPersistedMicrodollars')).toBe('350000');
+
+    gateA.resolve();
+    await waitUntilPromises[0];
+    expect(meta.get('lastCostPersistedMicrodollars')).toBe('350000');
+    // activity value also max-merged
+    expect(Number(meta.get('lastActivityPersistedValueMs'))).toBe(20_000);
   });
 });

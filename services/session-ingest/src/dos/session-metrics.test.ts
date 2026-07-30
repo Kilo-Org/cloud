@@ -502,6 +502,42 @@ describe('decideLivePersist', () => {
     ).toEqual({ persistActivity: false, persistCost: false });
   });
 
+  it('skips cost when recomputed value decreased (monotonic, matches SQL CASE)', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          wroteAssistantMessageItem: true,
+          currentCostMicrodollars: 50_000,
+          lastCostPersistedMicrodollars: 100_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('skips decreased cost even on idleTransition', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          idleTransition: true,
+          currentCostMicrodollars: 80_000,
+          lastCostPersistedMicrodollars: 100_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('persists cost 0 when never persisted before (null last → -1)', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          wroteAssistantMessageItem: true,
+          currentCostMicrodollars: 0,
+          lastCostPersistedMicrodollars: null,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: true });
+  });
+
   it('forces cost on idleTransition without assistant message or throttle window', () => {
     expect(
       decideLivePersist(

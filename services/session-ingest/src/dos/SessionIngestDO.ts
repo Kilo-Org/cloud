@@ -343,7 +343,9 @@ export class SessionIngestDO extends DurableObject<Env> {
       if (item.type === 'message' || item.type === 'part') {
         wroteActivityItem = true;
       }
-      if (item.type === 'message') {
+      // Cost gate is assistant-only (computeRunningAssistantCostUsd sums role:assistant).
+      // data is looseObject — role is optional at the type level; cheap property check, no parse.
+      if (item.type === 'message' && (item.data as { role?: unknown }).role === 'assistant') {
         wroteAssistantMessageItem = true;
       }
 
@@ -456,8 +458,17 @@ export class SessionIngestDO extends DurableObject<Env> {
     const idleTransition =
       statusChangeForLive !== undefined && isCompletedStatus(statusChangeForLive.value);
 
+    // Only scan all inline messages when the cost-persist window is open (KB-3).
+    // Window needs no cost value: idle forces (D17), else assistant upsert + 30s throttle.
+    const nowMs = Date.now();
+    const lastCostPersistedAtMs = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
+    const costWindowOpen =
+      idleTransition ||
+      (wroteAssistantMessageItem &&
+        (lastCostPersistedAtMs === null || nowMs - lastCostPersistedAtMs >= 30_000));
+
     let currentCostMicrodollars: number | null = null;
-    if (wroteAssistantMessageItem || idleTransition) {
+    if (costWindowOpen) {
       const messageRows = this.db
         .select({ item_data: ingestItems.item_data })
         .from(ingestItems)
@@ -467,7 +478,6 @@ export class SessionIngestDO extends DurableObject<Env> {
       currentCostMicrodollars = Math.max(0, Math.round(usd * 1_000_000));
     }
 
-    const nowMs = Date.now();
     const lastActivityValueMs = ingestedAt ?? nowMs;
     const decision = decideLivePersist({
       nowMs,
@@ -478,7 +488,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       lastActivityPersistedAtMs: readIngestMetaNumber(this.db, 'lastActivityPersistedAtMs'),
       lastActivityPersistedValueMs: readIngestMetaNumber(this.db, 'lastActivityPersistedValueMs'),
       currentCostMicrodollars,
-      lastCostPersistedAtMs: readIngestMetaNumber(this.db, 'lastCostPersistedAtMs'),
+      lastCostPersistedAtMs,
       lastCostPersistedMicrodollars: readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars'),
     });
 
@@ -497,14 +507,33 @@ export class SessionIngestDO extends DurableObject<Env> {
         (async () => {
           try {
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
+            // Max-merge post-await so out-of-order concurrent ingests cannot regress throttle meta.
             if (activityValueMs !== undefined) {
-              writeIngestMetaNumber(this.db, 'lastActivityPersistedAtMs', nowMs);
-              writeIngestMetaNumber(this.db, 'lastActivityPersistedValueMs', activityValueMs);
-              writeIngestMetaNumber(this.db, 'lastActivityValueMs', activityValueMs);
+              const prevAt = readIngestMetaNumber(this.db, 'lastActivityPersistedAtMs');
+              if (prevAt === null || nowMs > prevAt) {
+                writeIngestMetaNumber(this.db, 'lastActivityPersistedAtMs', nowMs);
+              }
+              const prevPersistedValue = readIngestMetaNumber(
+                this.db,
+                'lastActivityPersistedValueMs'
+              );
+              if (prevPersistedValue === null || activityValueMs > prevPersistedValue) {
+                writeIngestMetaNumber(this.db, 'lastActivityPersistedValueMs', activityValueMs);
+              }
+              const prevActivityValue = readIngestMetaNumber(this.db, 'lastActivityValueMs');
+              if (prevActivityValue === null || activityValueMs > prevActivityValue) {
+                writeIngestMetaNumber(this.db, 'lastActivityValueMs', activityValueMs);
+              }
             }
             if (costToPersist !== undefined) {
-              writeIngestMetaNumber(this.db, 'lastCostPersistedAtMs', nowMs);
-              writeIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars', costToPersist);
+              const prevCostAt = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
+              if (prevCostAt === null || nowMs > prevCostAt) {
+                writeIngestMetaNumber(this.db, 'lastCostPersistedAtMs', nowMs);
+              }
+              const prevCost = readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars');
+              if (prevCost === null || costToPersist > prevCost) {
+                writeIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars', costToPersist);
+              }
             }
           } catch (error) {
             console.error('SessionIngestDO failed to persist live session columns', {

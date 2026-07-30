@@ -378,10 +378,12 @@ export function decideLivePersist(args: DecideLivePersistArgs): {
     args.nowMs - args.lastActivityPersistedAtMs >= ACTIVITY_PERSIST_THROTTLE_MS;
   const persistActivity = args.wroteActivityItem && activityNewer && activityThrottleOk;
 
+  // Monotonic: only open the gate when cost strictly increased (matches SQL CASE).
+  // null last → treat as -1 so any cost ≥ 0 (including 0) can persist once.
   let persistCost = false;
   if (
     args.currentCostMicrodollars !== null &&
-    args.currentCostMicrodollars !== args.lastCostPersistedMicrodollars
+    args.currentCostMicrodollars > (args.lastCostPersistedMicrodollars ?? -1)
   ) {
     if (args.idleTransition) {
       persistCost = true;

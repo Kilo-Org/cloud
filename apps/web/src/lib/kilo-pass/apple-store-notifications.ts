@@ -38,10 +38,7 @@ import {
   completeStoreKiloPassPurchase,
   type CompleteStoreKiloPassPurchaseResult,
 } from './store-subscription-completion';
-import {
-  runAfterResponse,
-  trackKiloPassPurchaseCompleted,
-} from '@/lib/kilo-pass/posthog-tracking';
+import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { dayjs } from './dayjs';
 

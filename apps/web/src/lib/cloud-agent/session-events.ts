@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { generateInternalServiceToken } from '@/lib/tokens';
@@ -20,6 +19,7 @@ type NotifyCliSessionRenamedInput = {
  * on the web. The worker relays `session.renamed` to the owning CLI connection.
  *
  * Callers must treat failure as non-fatal — the DB rename is the source of truth.
+ * Callers own Sentry reporting; this helper only throws.
  */
 export async function notifyCliSessionRenamed({
   sessionId,
@@ -45,14 +45,9 @@ export async function notifyCliSessionRenamed({
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
-    const error = new Error(
+    throw new Error(
       `Session ingest rename-notify failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
     );
-    captureException(error, {
-      tags: { source: 'session-events', endpoint: 'rename-notify' },
-      extra: { sessionId, status: response.status },
-    });
-    throw error;
   }
 
   const body = RenameNotifyResponseSchema.parse(await response.json());

@@ -536,7 +536,7 @@ function isDefaultSessionTitle(title: string | null | undefined): boolean {
 }
 
 const reportSessionTitleSchema = z.object({
-  title: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(200),
   generated: z.boolean(),
 });
 
@@ -619,9 +619,11 @@ api.post('/session/:sessionId/title', async c => {
       )
     : ownership;
 
+  // Preserve updated_at so title-only writes do not reorder activity lists
+  // (same as the web rename path).
   const [updatedRow] = await db
     .update(cli_sessions_v2)
-    .set({ title, updated_at: new Date().toISOString() })
+    .set({ title, updated_at: existing.updated_at })
     .where(writeWhere)
     .returning();
 

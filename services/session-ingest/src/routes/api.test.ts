@@ -2009,10 +2009,13 @@ describe('api routes', () => {
     it('generated applies over NULL title and emits session.updated', async () => {
       const { db, fns } = makeDbFakes();
       vi.mocked(getWorkerDb).mockReturnValue(db);
-      fns.selectResult.mockResolvedValueOnce([fullRow({ title: null })]);
+      const existingUpdatedAt = '2026-07-30T12:00:00.000Z';
+      fns.selectResult.mockResolvedValueOnce([
+        fullRow({ title: null, updated_at: existingUpdatedAt }),
+      ]);
       const updated = fullRow({
         title: 'Auto Title',
-        updated_at: '2026-07-30T12:05:00.000Z',
+        updated_at: existingUpdatedAt,
       });
       fns.updateResult.mockResolvedValueOnce([updated]);
 
@@ -2028,7 +2031,10 @@ describe('api routes', () => {
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ title: 'Auto Title', applied: true });
-      expect(fns.updateSet).toHaveBeenCalled();
+      expect(fns.updateSet).toHaveBeenCalledWith({
+        title: 'Auto Title',
+        updated_at: existingUpdatedAt,
+      });
       expect(notifyUserSessionEvent).toHaveBeenCalledWith(
         expect.anything(),
         'usr_test',
@@ -2036,9 +2042,11 @@ describe('api routes', () => {
           type: 'session.updated',
           data: expect.objectContaining({
             source: 'v2',
+            changedAt: existingUpdatedAt,
             session: expect.objectContaining({
               sessionId,
               title: 'Auto Title',
+              updatedAt: existingUpdatedAt,
             }),
           }),
         })
@@ -2048,9 +2056,12 @@ describe('api routes', () => {
     it('generated applies over a default-pattern title', async () => {
       const { db, fns } = makeDbFakes();
       vi.mocked(getWorkerDb).mockReturnValue(db);
-      fns.selectResult.mockResolvedValueOnce([fullRow({ title: defaultTitle })]);
+      const existingUpdatedAt = '2026-07-30T12:00:00.000Z';
+      fns.selectResult.mockResolvedValueOnce([
+        fullRow({ title: defaultTitle, updated_at: existingUpdatedAt }),
+      ]);
       fns.updateResult.mockResolvedValueOnce([
-        fullRow({ title: 'Generated', updated_at: '2026-07-30T12:06:00.000Z' }),
+        fullRow({ title: 'Generated', updated_at: existingUpdatedAt }),
       ]);
 
       const app = makeApiApp();
@@ -2065,6 +2076,10 @@ describe('api routes', () => {
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ title: 'Generated', applied: true });
+      expect(fns.updateSet).toHaveBeenCalledWith({
+        title: 'Generated',
+        updated_at: existingUpdatedAt,
+      });
     });
 
     it('generated refused over a rename returns applied:false with no event or update', async () => {
@@ -2146,9 +2161,12 @@ describe('api routes', () => {
     it('non-generated last-write-wins including over a rename', async () => {
       const { db, fns } = makeDbFakes();
       vi.mocked(getWorkerDb).mockReturnValue(db);
-      fns.selectResult.mockResolvedValueOnce([fullRow({ title: 'Previous Rename' })]);
+      const existingUpdatedAt = '2026-07-30T12:00:00.000Z';
+      fns.selectResult.mockResolvedValueOnce([
+        fullRow({ title: 'Previous Rename', updated_at: existingUpdatedAt }),
+      ]);
       fns.updateResult.mockResolvedValueOnce([
-        fullRow({ title: 'CLI Rename', updated_at: '2026-07-30T12:07:00.000Z' }),
+        fullRow({ title: 'CLI Rename', updated_at: existingUpdatedAt }),
       ]);
 
       const app = makeApiApp();
@@ -2163,11 +2181,75 @@ describe('api routes', () => {
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ title: 'CLI Rename', applied: true });
+      expect(fns.updateSet).toHaveBeenCalledWith({
+        title: 'CLI Rename',
+        updated_at: existingUpdatedAt,
+      });
       expect(notifyUserSessionEvent).toHaveBeenCalledWith(
         expect.anything(),
         'usr_test',
-        expect.objectContaining({ type: 'session.updated' })
+        expect.objectContaining({
+          type: 'session.updated',
+          data: expect.objectContaining({ changedAt: existingUpdatedAt }),
+        })
       );
+    });
+
+    it('preserves existing updated_at on title writes', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      const existingUpdatedAt = '2026-07-01T08:00:00.000Z';
+      fns.selectResult.mockResolvedValueOnce([
+        fullRow({ title: 'Before', updated_at: existingUpdatedAt }),
+      ]);
+      fns.updateResult.mockResolvedValueOnce([
+        fullRow({ title: 'After', updated_at: existingUpdatedAt }),
+      ]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'After', generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(fns.updateSet).toHaveBeenCalledWith({
+        title: 'After',
+        updated_at: existingUpdatedAt,
+      });
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        'usr_test',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            changedAt: existingUpdatedAt,
+            session: expect.objectContaining({ updatedAt: existingUpdatedAt }),
+          }),
+        })
+      );
+    });
+
+    it('returns 400 when title exceeds 200 characters', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(201), generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(400);
+      expect(fns.select).not.toHaveBeenCalled();
+      expect(fns.update).not.toHaveBeenCalled();
     });
 
     it('returns 404 for unknown session and 400 for invalid body', async () => {

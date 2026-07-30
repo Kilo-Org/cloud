@@ -1,10 +1,5 @@
-import { captureException } from '@sentry/nextjs';
 import { generateInternalServiceToken } from '@/lib/tokens';
 import { notifyCliSessionRenamed } from './session-events';
-
-jest.mock('@sentry/nextjs', () => ({
-  captureException: jest.fn(),
-}));
 
 jest.mock('@/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
@@ -17,13 +12,11 @@ jest.mock('@/lib/tokens', () => ({
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-const mockCaptureException = jest.mocked(captureException);
 const mockGenerateInternalServiceToken = jest.mocked(generateInternalServiceToken);
 
 describe('notifyCliSessionRenamed', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockCaptureException.mockReset();
     mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
@@ -90,7 +83,7 @@ describe('notifyCliSessionRenamed', () => {
     );
   });
 
-  it('throws and calls captureException on non-OK response', async () => {
+  it('throws on non-OK response without capturing (caller owns Sentry)', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 500,
@@ -106,14 +99,6 @@ describe('notifyCliSessionRenamed', () => {
       })
     ).rejects.toThrow(
       'Session ingest rename-notify failed: 500 Internal Server Error - something broke'
-    );
-
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        tags: { source: 'session-events', endpoint: 'rename-notify' },
-        extra: { sessionId: 'ses_abc123', status: 500 },
-      })
     );
   });
 });

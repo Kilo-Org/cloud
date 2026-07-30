@@ -4293,20 +4293,69 @@ describe('UserConnectionDO', () => {
 
       claimSessionReadyPush.mockRejectedValueOnce(new Error('DO down'));
       await doInstance.alarm();
-      const after1 = ctx.storage.store.get('readyPush:ses_retry') as { attempts: number };
+      const after1 = ctx.storage.store.get('readyPush:ses_retry') as {
+        attempts: number;
+        fireAt: number;
+      };
       expect(after1.attempts).toBe(1);
-      expect(internal.readyPushFireAt.has('ses_retry')).toBe(true);
+      // Retry must back off so attempts span real time (not fireAt already ≤ now).
+      expect(after1.fireAt).toBe(now + 5_000);
+      expect(internal.readyPushFireAt.get('ses_retry')).toBe(now + 5_000);
 
+      // Advance past backoff so attempt 2 is due.
+      vi.spyOn(Date, 'now').mockReturnValue(now + 5_000);
       claimSessionReadyPush.mockRejectedValueOnce(new Error('DO down'));
       await doInstance.alarm();
-      expect((ctx.storage.store.get('readyPush:ses_retry') as { attempts: number }).attempts).toBe(
-        2
-      );
+      const after2 = ctx.storage.store.get('readyPush:ses_retry') as {
+        attempts: number;
+        fireAt: number;
+      };
+      expect(after2.attempts).toBe(2);
+      expect(after2.fireAt).toBe(now + 10_000);
 
+      vi.spyOn(Date, 'now').mockReturnValue(now + 10_000);
       claimSessionReadyPush.mockRejectedValueOnce(new Error('DO down'));
       await doInstance.alarm();
       expect(ctx.storage.store.has('readyPush:ses_retry')).toBe(false);
       expect(internal.readyPushFireAt.has('ses_retry')).toBe(false);
+    });
+
+    it('claim rejection re-arms at now+backoff, not now', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_backoff')]);
+      await flushAsync();
+
+      const internal = doInstance as unknown as { readyPushFireAt: Map<string, number> };
+      internal.readyPushFireAt.set('ses_backoff', now - 1);
+      await ctx.storage.put('readyPush:ses_backoff', {
+        kiloUserId: 'usr_1',
+        title: 'Test',
+        fireAt: now - 1,
+        attempts: 0,
+      });
+
+      claimSessionReadyPush.mockRejectedValueOnce(new Error('transport blip'));
+      await doInstance.alarm();
+
+      const entry = ctx.storage.store.get('readyPush:ses_backoff') as {
+        attempts: number;
+        fireAt: number;
+      };
+      expect(entry.attempts).toBe(1);
+      expect(entry.fireAt).toBe(now + 5_000);
+      expect(internal.readyPushFireAt.get('ses_backoff')).toBe(now + 5_000);
+
+      // Same instant must not exhaust further attempts.
+      claimSessionReadyPush.mockClear();
+      claimSessionReadyPush.mockRejectedValue(new Error('still down'));
+      await doInstance.alarm();
+      expect(claimSessionReadyPush).not.toHaveBeenCalled();
+      expect(
+        (ctx.storage.store.get('readyPush:ses_backoff') as { attempts: number }).attempts
+      ).toBe(1);
     });
 
     it('does not refire after a successful claim', async () => {
@@ -4469,6 +4518,54 @@ describe('UserConnectionDO', () => {
       );
       expect(reEmits).toHaveLength(1);
       expect(reEmits[0].data).toEqual({ sessionId: 'ses_wu', title: 'Catch Up Title' });
+    });
+
+    it('prunes rename entries older than TTL and does not re-emit them', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const now = 1_700_000_000_000;
+      const RENAME_ENTRY_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_stale', 'idle', 'Old')]);
+
+      await ctx.storage.put('rename:ses_stale', {
+        title: 'Never Applied',
+        at: now - RENAME_ENTRY_TTL_MS - 1,
+      });
+
+      cliWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_stale', 'idle', 'Old')]);
+      await flushAsync();
+
+      const reEmits = allSent(cliWs).filter(
+        m => m.type === 'system' && m.event === 'session.renamed'
+      );
+      expect(reEmits).toHaveLength(0);
+      expect(ctx.storage.store.has('rename:ses_stale')).toBe(false);
+    });
+
+    it('still re-emits a fresh rename entry within TTL', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_fresh', 'idle', 'Old')]);
+
+      await ctx.storage.put('rename:ses_fresh', {
+        title: 'Within TTL',
+        at: now - 60_000,
+      });
+
+      cliWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_fresh', 'idle', 'Old')]);
+      await flushAsync();
+
+      const reEmits = allSent(cliWs).filter(
+        m => m.type === 'system' && m.event === 'session.renamed'
+      );
+      expect(reEmits).toHaveLength(1);
+      expect(reEmits[0].data).toEqual({ sessionId: 'ses_fresh', title: 'Within TTL' });
+      expect(ctx.storage.store.has('rename:ses_fresh')).toBe(true);
     });
   });
 });

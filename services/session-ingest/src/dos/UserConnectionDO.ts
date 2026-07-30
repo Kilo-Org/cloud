@@ -175,7 +175,11 @@ type RenameEntry = {
 const READY_PUSH_KEY_PREFIX = 'readyPush:';
 const RENAME_KEY_PREFIX = 'rename:';
 const SESSION_READY_PUSH_DELAY_MS = 5_000;
+/** Backoff between ready-push claim retries so the 3-attempt bound spans real time. */
+const READY_PUSH_RETRY_BACKOFF_MS = 5_000;
 const READY_PUSH_MAX_ATTEMPTS = 3;
+/** Drop offline rename catch-up entries that never matched a heartbeat title. */
+const RENAME_ENTRY_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 
 export class UserConnectionDO extends DurableObject<Env> {
   private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
@@ -642,11 +646,13 @@ export class UserConnectionDO extends DurableObject<Env> {
             error: error instanceof Error ? error.message : String(error),
           });
         } else {
-          await this.ctx.storage.put(key, { ...entry, attempts });
-          this.readyPushFireAt.set(sessionId, entry.fireAt);
+          const fireAt = now + READY_PUSH_RETRY_BACKOFF_MS;
+          await this.ctx.storage.put(key, { ...entry, attempts, fireAt });
+          this.readyPushFireAt.set(sessionId, fireAt);
           console.error('Session-ready push claim failed; will retry', {
             sessionId,
             attempts,
+            fireAt,
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -664,6 +670,7 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   private async catchUpPendingRenames(ws: WebSocket, sessions: HeartbeatSession[]): Promise<void> {
+    const now = Date.now();
     for (const session of sessions) {
       const key = `${RENAME_KEY_PREFIX}${session.id}`;
       let entry: RenameEntry | undefined;
@@ -677,6 +684,19 @@ export class UserConnectionDO extends DurableObject<Env> {
         continue;
       }
       if (!entry) continue;
+
+      // Prune entries past TTL so finished/ignored renames do not re-emit forever.
+      if (typeof entry.at === 'number' && now - entry.at > RENAME_ENTRY_TTL_MS) {
+        try {
+          await this.ctx.storage.delete(key);
+        } catch (error: unknown) {
+          console.error('Failed to delete expired rename entry', {
+            sessionId: session.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        continue;
+      }
 
       if (session.title === entry.title) {
         try {

@@ -44,11 +44,11 @@ export default {
     providerId: 'nvidia-byok',
     recommendedModels: [
       {
-        id: 'nvidia/nemotron-3-nano-30b-a3b',
-        name: 'Nemotron 3 Nano 30B A3B',
+        id: 'nvidia/nemotron-3-super-120b-a12b',
+        name: 'Nemotron 3 Super 120B A12B',
         flags: ['reasoning'],
-        context_length: 131072,
-        max_completion_tokens: 131072,
+        context_length: 262144,
+        max_completion_tokens: 262144,
       },
     ],
   }),

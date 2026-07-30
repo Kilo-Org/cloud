@@ -87,14 +87,10 @@ type RawModel = {
 
 type ModelsDevProviderOptions = {
   availableModelIds?: ReadonlySet<string>;
-  requireToolCall?: boolean;
-  requireTextInput?: boolean;
-  contextLengthOverrides?: Readonly<Record<string, number>>;
 };
 
-type ModelsDevFetcherOptions = Omit<ModelsDevProviderOptions, 'availableModelIds'> & {
+type ModelsDevFetcherOptions = {
   availableModelsUrl?: string;
-  rejectEmpty?: boolean;
 };
 
 type SyncContext = {
@@ -200,8 +196,8 @@ export function parseModelsDevProviderModels(
         model.status !== 'deprecated' &&
         (!model.modalities?.output || model.modalities.output.includes('text')) &&
         (!options.availableModelIds || options.availableModelIds.has(model.id)) &&
-        (!options.requireToolCall || model.tool_call === true) &&
-        (!options.requireTextInput || model.modalities?.input?.includes('text') === true)
+        model.tool_call !== false &&
+        (!model.modalities?.input || model.modalities.input.includes('text'))
     )
     .map(model => {
       const modelId = `${providerId}/${model.id}`.toLowerCase();
@@ -212,7 +208,7 @@ export function parseModelsDevProviderModels(
       return {
         id: model.id,
         name: shortenDisplayName(model.name),
-        context_length: options.contextLengthOverrides?.[model.id] ?? model.limit?.context,
+        context_length: model.limit?.context,
         max_completion_tokens: model.limit?.output,
         input_modalities: model.modalities?.input,
         flags: model.reasoning ? ['reasoning'] : undefined,
@@ -234,10 +230,9 @@ function modelsDevFetcher(
       if (!entry) {
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
       }
-      const { availableModelsUrl, rejectEmpty, ...parseOptions } = options;
       let availableModelIds: ReadonlySet<string> | undefined;
-      if (availableModelsUrl) {
-        const response = await fetch(availableModelsUrl);
+      if (options.availableModelsUrl) {
+        const response = await fetch(options.availableModelsUrl);
         if (!response.ok) {
           throw new Error(
             `Failed to fetch ${providerId} available models: ${response.status} ${response.statusText}`
@@ -249,14 +244,9 @@ function modelsDevFetcher(
           )
         );
       }
-      const models = parseModelsDevProviderModels(entry, providerId, {
-        ...parseOptions,
+      return parseModelsDevProviderModels(entry, providerId, {
         availableModelIds,
       });
-      if (rejectEmpty && models.length === 0) {
-        throw new Error(`${providerId} catalog intersection produced no supported models`);
-      }
-      return models;
     },
   };
 }
@@ -279,13 +269,6 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   }),
   modelsDevFetcher('nvidia-byok', 'nvidia', {
     availableModelsUrl: 'https://integrate.api.nvidia.com/v1/models',
-    requireToolCall: true,
-    requireTextInput: true,
-    contextLengthOverrides: {
-      'nvidia/nemotron-mini-4b-instruct': 4096,
-      'meta/llama-3.2-90b-vision-instruct': 32768,
-    },
-    rejectEmpty: true,
   }),
   openAICompatibleFetcher({
     providerId: 'chutes-byok',

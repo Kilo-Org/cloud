@@ -4,7 +4,6 @@ import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { ReasoningDetailUnion } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type { AwsCredentials } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type Anthropic from '@anthropic-ai/sdk';
-import type { ReasoningEffort } from '@kilocode/db/schema-types';
 
 // Base types for OpenRouter API that don't depend on other lib files
 // This breaks circular dependencies with mistral.ts, minimax.ts, etc.
@@ -77,14 +76,10 @@ export type GatewayMessagesRequest = SharedGatewayRequestProperties &
 /**
  * Approximately OpenRouter API request type. Actually based on OpenAI's, but the differences aren't huge.
  */
-export type OpenRouterChatCompletionRequest = Omit<
-  OpenAI.Chat.ChatCompletionCreateParams,
-  'reasoning_effort'
-> &
+export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreateParams &
   SharedGatewayRequestProperties & {
     max_tokens?: number;
     transforms?: string[];
-    reasoning_effort?: ReasoningEffort | null;
 
     // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
     reasoning?: OpenRouterReasoningConfig;

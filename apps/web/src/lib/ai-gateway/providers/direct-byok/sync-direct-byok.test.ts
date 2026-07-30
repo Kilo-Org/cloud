@@ -227,7 +227,8 @@ describe('parseModelsDevProviderModels', () => {
     expect(models.map(model => model.id)).toEqual(['available']);
     expect(models[0].context_length).toBe(128_000);
   });
-  test('supports provider capability requirements and context overrides', () => {
+
+  test('excludes explicit capability mismatches while accepting missing metadata', () => {
     const model = (id: string, overrides: Record<string, unknown> = {}) => ({
       id,
       name: id,
@@ -246,6 +247,7 @@ describe('parseModelsDevProviderModels', () => {
           vision: model('nvidia/vision', {
             modalities: { input: ['text', 'image'], output: ['text'] },
           }),
+          unknownCapabilities: { id: 'nvidia/unknown' },
           unavailable: model('nvidia/unavailable'),
           noTools: model('nvidia/no-tools', { tool_call: false }),
           noTextInput: model('nvidia/no-text-input', {
@@ -258,19 +260,17 @@ describe('parseModelsDevProviderModels', () => {
         availableModelIds: new Set([
           'nvidia/chat',
           'nvidia/vision',
+          'nvidia/unknown',
           'nvidia/no-tools',
           'nvidia/no-text-input',
         ]),
-        requireToolCall: true,
-        requireTextInput: true,
-        contextLengthOverrides: { 'nvidia/chat': 4096 },
       }
     );
 
     expect(models).toEqual([
       expect.objectContaining({
         id: 'nvidia/chat',
-        context_length: 4096,
+        context_length: 128000,
         flags: ['reasoning'],
         variants: {
           none: { reasoning: { enabled: false, effort: 'none' } },
@@ -282,6 +282,7 @@ describe('parseModelsDevProviderModels', () => {
         id: 'nvidia/vision',
         input_modalities: ['text', 'image'],
       }),
+      expect.objectContaining({ id: 'nvidia/unknown' }),
     ]);
   });
 });

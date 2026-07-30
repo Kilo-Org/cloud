@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { type Dispatch, type SetStateAction, useCallback, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -9,6 +9,7 @@ import { toast } from 'sonner-native';
 import { NewSessionCloudForm } from '@/components/agents/new-session-cloud-form';
 import { RemoteSpawnComposer } from '@/components/agents/remote-spawn-composer';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
+import { RemoteSpawnInheritanceProvider } from '@/components/agents/use-remote-spawn-dispatch';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ScreenHeader } from '@/components/screen-header';
@@ -31,7 +32,48 @@ import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
+/**
+ * Outer shell owns picker state and the inheritance Provider so
+ * `useNewSessionShareRemote` → `useRemoteSpawnDispatch` (in the inner
+ * body) reads mode/model/variant as a true descendant. Provider wrapping
+ * only the returned JSX left the hook outside the tree with `{}`.
+ */
 export default function NewSessionScreen() {
+  const [mode, setMode] = useState<AgentMode>('code');
+  const [model, setModel] = useState('');
+  const [variant, setVariant] = useState('');
+
+  return (
+    <RemoteSpawnInheritanceProvider mode={mode} model={model} variant={variant}>
+      <NewSessionScreenBody
+        mode={mode}
+        setMode={setMode}
+        model={model}
+        setModel={setModel}
+        variant={variant}
+        setVariant={setVariant}
+      />
+    </RemoteSpawnInheritanceProvider>
+  );
+}
+
+type NewSessionScreenBodyProps = {
+  mode: AgentMode;
+  setMode: Dispatch<SetStateAction<AgentMode>>;
+  model: string;
+  setModel: Dispatch<SetStateAction<string>>;
+  variant: string;
+  setVariant: Dispatch<SetStateAction<string>>;
+};
+
+function NewSessionScreenBody({
+  mode,
+  setMode,
+  model,
+  setModel,
+  variant,
+  setVariant,
+}: NewSessionScreenBodyProps) {
   const { showActionSheetWithOptions } = useActionSheet();
   const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
     organizationId?: string;
@@ -41,9 +83,6 @@ export default function NewSessionScreen() {
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
 
   // ── Selectors state ──────────────────────────────────────────────
-  const [mode, setMode] = useState<AgentMode>('code');
-  const [model, setModel] = useState('');
-  const [variant, setVariant] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
   // `null` = default Cloud Agent target (the existing path). Any
   // non-null value is a live `kilo remote` instance the user picked.
@@ -57,11 +96,7 @@ export default function NewSessionScreen() {
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
 
-  // Org-scoped new-agent flows are Cloud-Agent only by design: a remote
-  // spawn creates a personal CLI session that the org route would not be
-  // able to attribute to the flow's organization (mobile's data model
-  // only loads CLI sessions on personal routes). Hide the entire
-  // "Run on" section when the flow is org-scoped.
+  // Org contexts support CLI instances (org attribution travels with create).
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
   // ── Models ───────────────────────────────────────────────────────
@@ -152,7 +187,8 @@ export default function NewSessionScreen() {
     variant,
   });
 
-  // Share latch + remote spawn + share-aware Run-on (F1/F2).
+  // Share latch + remote spawn + share-aware Run-on (F1/F2). Runs under
+  // RemoteSpawnInheritanceProvider so mode/model/variant reach the wire.
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
     shareId,
     organizationId,
@@ -170,7 +206,7 @@ export default function NewSessionScreen() {
       saveModel(organizationId, { model: modelId, variant: newVariant });
       persistServerLastSelected({ model: modelId, ...(newVariant ? { variant: newVariant } : {}) });
     },
-    [organizationId, saveModel, persistServerLastSelected]
+    [organizationId, saveModel, persistServerLastSelected, setModel, setVariant]
   );
 
   const handleOpenGitHubIntegration = useCallback(async () => {

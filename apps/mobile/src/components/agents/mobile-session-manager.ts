@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- fetchSession NOT_FOUND retry helpers stay with the manager (M1). */
 import * as SecureStore from 'expo-secure-store';
 import { toast } from 'sonner-native';
 import {
@@ -18,10 +19,108 @@ import {
 } from '@/components/agents/mobile-session-diagnostics';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
+import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { cacheToolCardImage } from '@/components/agents/tool-card-image-cache';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
+type SessionWithRuntimeState =
+  inferRouterOutputs<MobileRouter>['cliSessionsV2']['getWithRuntimeState'];
+
+/** Flat 1s cadence — same budget as the session-detail route's spawned retry. */
+const FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS = 1000;
+
+/**
+ * tRPC error code from a thrown client error. Walks the same shapes the
+ * session-detail route and blocking-card classifier use.
+ */
+export function readFetchSessionErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+  const record = error as Record<string, unknown>;
+  const data = record.data;
+  if (data && typeof data === 'object') {
+    const code = (data as Record<string, unknown>).code;
+    if (typeof code === 'string') {
+      return code;
+    }
+  }
+  const shape = record.shape;
+  if (shape && typeof shape === 'object') {
+    const shapeData = (shape as Record<string, unknown>).data;
+    if (shapeData && typeof shapeData === 'object') {
+      const code = (shapeData as Record<string, unknown>).code;
+      if (typeof code === 'string') {
+        return code;
+      }
+    }
+  }
+  const top = record.code;
+  if (typeof top === 'string') {
+    return top;
+  }
+  return undefined;
+}
+
+/* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
+async function defaultFetchSessionQuery(
+  sessionId: KiloSessionId
+): Promise<SessionWithRuntimeState> {
+  return trpcClient.cliSessionsV2.getWithRuntimeState.query({
+    session_id: sessionId,
+  });
+}
+/* eslint-enable @typescript-eslint/promise-function-async, require-await */
+
+async function defaultFetchSessionSleep(ms: number): Promise<void> {
+  await new Promise<void>(resolve => {
+    setTimeout(() => {
+      resolve();
+    }, ms);
+  });
+}
+
+/**
+ * Query `cliSessionsV2.getWithRuntimeState` with a NOT_FOUND retry so a
+ * just-spawned or just-`/new`ed session can open on org routes (where the
+ * route-level `cliSessionsV2.get` query is disabled). Personal routes get
+ * the same budget harmlessly. Non-NOT_FOUND errors fail immediately.
+ *
+ * `query` and `sleep` are injectable for unit tests.
+ */
+export async function fetchSessionWithNotFoundRetry(
+  kiloSessionId: KiloSessionId,
+  options?: {
+    query?: (sessionId: KiloSessionId) => Promise<SessionWithRuntimeState>;
+    sleep?: (ms: number) => Promise<void>;
+    maxAttempts?: number;
+    delayMs?: number;
+  }
+): Promise<SessionWithRuntimeState> {
+  const query = options?.query ?? defaultFetchSessionQuery;
+  const sleep = options?.sleep ?? defaultFetchSessionSleep;
+  const maxAttempts = options?.maxAttempts ?? SPAWNED_NOT_FOUND_MAX_ATTEMPTS;
+  const delayMs = options?.delayMs ?? FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS;
+
+  let attempt = 0;
+  for (;;) {
+    try {
+      // Sequential backoff — each attempt waits for the previous failure.
+      // eslint-disable-next-line no-await-in-loop -- NOT_FOUND retry cadence
+      return await query(kiloSessionId);
+    } catch (error) {
+      if (readFetchSessionErrorCode(error) !== 'NOT_FOUND' || attempt >= maxAttempts) {
+        throw error;
+      }
+      attempt += 1;
+      // eslint-disable-next-line no-await-in-loop -- flat 1s delay between retries
+      await sleep(delayMs);
+    }
+  }
+}
 
 type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
@@ -251,9 +350,7 @@ export function createMobileAgentSessionManager({
       );
     },
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
-      const sessionResult = await trpcClient.cliSessionsV2.getWithRuntimeState.query({
-        session_id: kiloSessionId,
-      });
+      const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId);
       const rs = sessionResult.runtimeState;
       return {
         kiloSessionId,

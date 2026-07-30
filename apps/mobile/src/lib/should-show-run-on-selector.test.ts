@@ -11,15 +11,11 @@ describe('shouldShowRunOnSelector', () => {
     expect(shouldShowRunOnSelector(null)).toBe(true);
   });
 
-  it('hides the selector on an org-scoped flow (organizationId present)', () => {
-    expect(shouldShowRunOnSelector('org-123')).toBe(false);
+  it('shows the selector on an org-scoped flow (organizationId present)', () => {
+    expect(shouldShowRunOnSelector('org-123')).toBe(true);
   });
 
-  it('treats an empty-string organizationId as still-scoped (defensive)', () => {
-    // `useLocalSearchParams` returns strings, not null, so an empty string
-    // is a real possibility. We treat it as scoped (hidden) — the route
-    // never pushes an empty value intentionally, but if one arrives we
-    // must not silently fall through to the personal path.
-    expect(shouldShowRunOnSelector('')).toBe(false);
+  it('shows the selector for an empty-string organizationId', () => {
+    expect(shouldShowRunOnSelector('')).toBe(true);
   });
 });

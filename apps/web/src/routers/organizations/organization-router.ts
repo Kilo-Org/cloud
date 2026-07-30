@@ -70,6 +70,7 @@ import { organizationKiloclawRouter } from '@/routers/organizations/organization
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
 import { organizationFundsRouter } from '@/routers/organizations/organization-funds-router';
 import { organizationCostInsightsRouter } from '@/routers/organizations/organization-cost-insights-router';
+import { organizationKiloPassRouter } from '@/routers/organizations/organization-kilo-pass-router';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -132,6 +133,7 @@ export const organizationsRouter = createTRPCRouter({
   bitbucket: organizationBitbucketRouter,
   funds: organizationFundsRouter,
   costInsights: organizationCostInsightsRouter,
+  kiloPass: organizationKiloPassRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;

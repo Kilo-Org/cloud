@@ -7,11 +7,17 @@ import {
   organization_memberships,
   kilo_pass_subscriptions,
   platform_integrations,
+  kilo_pass_org_agreements,
+  kilo_pass_org_allocation_plans,
+  kilo_pass_org_allocation_plan_rows,
+  kilo_pass_org_issuance_snapshots,
+  kilo_pass_org_term_versions,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassOrgBonusMode } from '@kilocode/db/schema-types';
 import { fetchExpiringTransactionsForOrganization } from '@/lib/creditExpiration';
 import type { User, Organization } from '@kilocode/db/schema';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -1401,6 +1407,218 @@ describe('organization admin router', () => {
         await db.delete(organizations).where(eq(organizations.id, organization.id));
       }
     });
+
+    describe('Kilo Pass allocation guard', () => {
+      const organizationIds: string[] = [];
+      const agreementIds: string[] = [];
+      const termVersionIds: string[] = [];
+
+      afterEach(async () => {
+        if (agreementIds.length > 0) {
+          await db
+            .delete(kilo_pass_org_issuance_snapshots)
+            .where(inArray(kilo_pass_org_issuance_snapshots.agreement_id, agreementIds));
+          await db
+            .delete(kilo_pass_org_agreements)
+            .where(inArray(kilo_pass_org_agreements.id, agreementIds));
+        }
+        if (termVersionIds.length > 0) {
+          await db
+            .delete(kilo_pass_org_term_versions)
+            .where(inArray(kilo_pass_org_term_versions.id, termVersionIds));
+        }
+        if (organizationIds.length > 0) {
+          await db
+            .update(organizations)
+            .set({ parent_organization_id: null })
+            .where(inArray(organizations.id, organizationIds));
+          await db.delete(organizations).where(inArray(organizations.id, organizationIds));
+        }
+        agreementIds.length = 0;
+        termVersionIds.length = 0;
+        organizationIds.length = 0;
+      });
+
+      async function createAllocatedChild(params: {
+        initialCapacity: number;
+        futureCapacity?: number;
+        issuedCreditsOnly?: boolean;
+      }) {
+        const prefix = `Kilo Pass hierarchy ${crypto.randomUUID()}`;
+        const parent = await createOrganization(`${prefix} parent`, adminUser.id);
+        const child = await createOrganization(`${prefix} child`, adminUser.id);
+        const replacementParent = await createOrganization(`${prefix} replacement`, adminUser.id);
+        organizationIds.push(parent.id, child.id, replacementParent.id);
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parent.id })
+          .where(eq(organizations.id, child.id));
+
+        const [termVersion] = await db
+          .insert(kilo_pass_org_term_versions)
+          .values({
+            version_key: crypto.randomUUID(),
+            tier: KiloPassTier.Tier19,
+            cadence: KiloPassCadence.Monthly,
+            billing_price_microdollars_per_pass: 1,
+            base_credit_microdollars_per_pass: 1,
+            bonus_credit_microdollars_per_pass: 0,
+            unlock_spend_microdollars_per_pass: 0,
+            bonus_mode: KiloPassOrgBonusMode.AfterBase,
+          })
+          .returning({ id: kilo_pass_org_term_versions.id });
+        termVersionIds.push(termVersion.id);
+
+        const [agreement] = await db
+          .insert(kilo_pass_org_agreements)
+          .values({
+            parent_organization_id: parent.id,
+            term_version_id: termVersion.id,
+            state: 'active',
+            processing_condition: 'ready',
+            purchase_channel: 'manual',
+            cadence: KiloPassCadence.Monthly,
+            purchased_pass_capacity: 10,
+            issuance_anchor_at: new Date().toISOString(),
+          })
+          .returning({ id: kilo_pass_org_agreements.id });
+        agreementIds.push(agreement.id);
+
+        const capacities = [params.initialCapacity];
+        if (params.futureCapacity !== undefined) capacities.push(params.futureCapacity);
+        for (const [index, capacity] of capacities.entries()) {
+          const [plan] = await db
+            .insert(kilo_pass_org_allocation_plans)
+            .values({
+              agreement_id: agreement.id,
+              effective_window_start: new Date(
+                Date.now() + index * 31 * 24 * 60 * 60 * 1000
+              ).toISOString(),
+              version: index + 1,
+              created_by_kilo_user_id: adminUser.id,
+            })
+            .returning({ id: kilo_pass_org_allocation_plans.id });
+          await db.insert(kilo_pass_org_allocation_plan_rows).values({
+            allocation_plan_id: plan.id,
+            allocation_container_organization_id: child.id,
+            pass_capacity: capacity,
+          });
+        }
+
+        if (params.issuedCreditsOnly) {
+          await db.insert(kilo_pass_org_issuance_snapshots).values({
+            agreement_id: agreement.id,
+            term_version_id: termVersion.id,
+            allocation_container_organization_id: child.id,
+            window_start: new Date().toISOString(),
+            window_end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            qualifying_spend_starts_at: new Date().toISOString(),
+            kind: 'regular',
+            tranche_key: 'issued-credit-only',
+            allocated_pass_capacity: 1,
+            base_credit_microdollars: 1,
+            bonus_credit_microdollars: 0,
+            unlock_spend_microdollars: 0,
+            bonus_mode: KiloPassOrgBonusMode.AfterBase,
+          });
+        }
+
+        return { parent, child, replacementParent };
+      }
+
+      it('blocks detaching a child with a nonzero initial allocation', async () => {
+        const { child } = await createAllocatedChild({ initialCapacity: 1 });
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: child.id,
+            parentOrganizationId: null,
+          })
+        ).rejects.toThrow(
+          'Cannot change organization hierarchy while it has Kilo Pass allocations'
+        );
+      });
+
+      it('allows detaching a child with zero allocation despite issued credits', async () => {
+        const { child } = await createAllocatedChild({
+          initialCapacity: 0,
+          issuedCreditsOnly: true,
+        });
+        const caller = await createCallerForUser(adminUser.id);
+
+        await caller.organizations.admin.setParent({
+          organizationId: child.id,
+          parentOrganizationId: null,
+        });
+
+        const [updated] = await db
+          .select({ parentOrganizationId: organizations.parent_organization_id })
+          .from(organizations)
+          .where(eq(organizations.id, child.id));
+        expect(updated.parentOrganizationId).toBeNull();
+      });
+
+      it('blocks reparenting a child with a nonzero future allocation', async () => {
+        const { child, replacementParent } = await createAllocatedChild({
+          initialCapacity: 0,
+          futureCapacity: 1,
+        });
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: child.id,
+            parentOrganizationId: replacementParent.id,
+          })
+        ).rejects.toThrow(
+          'Cannot change organization hierarchy while it has Kilo Pass allocations'
+        );
+      });
+
+      it('allows reparenting a child with only zero allocations', async () => {
+        const { child, replacementParent } = await createAllocatedChild({
+          initialCapacity: 0,
+          futureCapacity: 0,
+        });
+        const caller = await createCallerForUser(adminUser.id);
+
+        await caller.organizations.admin.setParent({
+          organizationId: child.id,
+          parentOrganizationId: replacementParent.id,
+        });
+
+        const [updated] = await db
+          .select({ parentOrganizationId: organizations.parent_organization_id })
+          .from(organizations)
+          .where(eq(organizations.id, child.id));
+        expect(updated.parentOrganizationId).toBe(replacementParent.id);
+      });
+
+      it('blocks archiving a child with a nonzero allocation', async () => {
+        const { child } = await createAllocatedChild({ initialCapacity: 1 });
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.delete({ organizationId: child.id })
+        ).rejects.toThrow(
+          'Cannot change organization hierarchy while it has Kilo Pass allocations'
+        );
+      });
+
+      it('allows archiving a child with only zero allocations', async () => {
+        const { child } = await createAllocatedChild({ initialCapacity: 0 });
+        const caller = await createCallerForUser(adminUser.id);
+
+        await caller.organizations.admin.delete({ organizationId: child.id });
+
+        const [updated] = await db
+          .select({ deletedAt: organizations.deleted_at })
+          .from(organizations)
+          .where(eq(organizations.id, child.id));
+        expect(updated.deletedAt).not.toBeNull();
+      });
+    });
   });
 
   describe('list — trial active filter', () => {
@@ -1464,52 +1682,68 @@ describe('organization admin router', () => {
     });
   });
 
-  describe('list — Kilo Pass tier sorting', () => {
-    it('sorts by the joined active Kilo Pass tier selected for display', async () => {
+  describe('list — organization Kilo Pass tier sorting', () => {
+    it('sorts by the organization-owned agreement tier selected for display', async () => {
       const searchPrefix = `Admin Kilo Pass Sort ${crypto.randomUUID()}`;
-      const tier19User = await insertTestUser({
-        google_user_email: `${crypto.randomUUID()}@tier19.example.com`,
-      });
-      const tier49User = await insertTestUser({
-        google_user_email: `${crypto.randomUUID()}@tier49.example.com`,
-      });
-      const tier19Org = await createOrganization(`${searchPrefix} tier 19`, tier19User.id);
-      const tier49Org = await createOrganization(`${searchPrefix} tier 49`, tier49User.id);
-      const stripeSubscriptionIds = [
-        `sub_admin_org_tier19_${crypto.randomUUID()}`,
-        `sub_admin_org_tier49_${crypto.randomUUID()}`,
-      ];
+      const tier19Org = await createOrganization(`${searchPrefix} tier 19`, adminUser.id);
+      const tier49Org = await createOrganization(`${searchPrefix} tier 49`, adminUser.id);
+      const termVersionIds: string[] = [];
+      const agreementIds: string[] = [];
 
       try {
         const now = new Date().toISOString();
-        await db.insert(kilo_pass_subscriptions).values([
-          {
-            kilo_user_id: tier19User.id,
-            provider_subscription_id: stripeSubscriptionIds[0],
-            stripe_subscription_id: stripeSubscriptionIds[0],
-            tier: KiloPassTier.Tier19,
-            cadence: KiloPassCadence.Monthly,
-            status: 'active',
-            cancel_at_period_end: false,
-            current_streak_months: 1,
-            started_at: now,
-            ended_at: null,
-            next_yearly_issue_at: null,
-          },
-          {
-            kilo_user_id: tier49User.id,
-            provider_subscription_id: stripeSubscriptionIds[1],
-            stripe_subscription_id: stripeSubscriptionIds[1],
-            tier: KiloPassTier.Tier49,
-            cadence: KiloPassCadence.Monthly,
-            status: 'active',
-            cancel_at_period_end: false,
-            current_streak_months: 1,
-            started_at: now,
-            ended_at: null,
-            next_yearly_issue_at: null,
-          },
-        ]);
+        const terms = await db
+          .insert(kilo_pass_org_term_versions)
+          .values([
+            {
+              version_key: crypto.randomUUID(),
+              tier: KiloPassTier.Tier19,
+              cadence: KiloPassCadence.Monthly,
+              billing_price_microdollars_per_pass: 19_000_000,
+              base_credit_microdollars_per_pass: 19_000_000,
+              bonus_credit_microdollars_per_pass: 4_000_000,
+              unlock_spend_microdollars_per_pass: 19_000_000,
+              bonus_mode: KiloPassOrgBonusMode.AfterBase,
+            },
+            {
+              version_key: crypto.randomUUID(),
+              tier: KiloPassTier.Tier49,
+              cadence: KiloPassCadence.Monthly,
+              billing_price_microdollars_per_pass: 49_000_000,
+              base_credit_microdollars_per_pass: 49_000_000,
+              bonus_credit_microdollars_per_pass: 12_000_000,
+              unlock_spend_microdollars_per_pass: 49_000_000,
+              bonus_mode: KiloPassOrgBonusMode.AfterBase,
+            },
+          ])
+          .returning({ id: kilo_pass_org_term_versions.id });
+        termVersionIds.push(...terms.map(term => term.id));
+        const agreements = await db
+          .insert(kilo_pass_org_agreements)
+          .values([
+            {
+              parent_organization_id: tier19Org.id,
+              term_version_id: terms[0]!.id,
+              state: 'active',
+              processing_condition: 'ready',
+              purchase_channel: 'self_serve',
+              cadence: KiloPassCadence.Monthly,
+              purchased_pass_capacity: 2,
+              issuance_anchor_at: now,
+            },
+            {
+              parent_organization_id: tier49Org.id,
+              term_version_id: terms[1]!.id,
+              state: 'cancel_at_period_end',
+              processing_condition: 'ready',
+              purchase_channel: 'self_serve',
+              cadence: KiloPassCadence.Monthly,
+              purchased_pass_capacity: 2,
+              issuance_anchor_at: now,
+            },
+          ])
+          .returning({ id: kilo_pass_org_agreements.id });
+        agreementIds.push(...agreements.map(agreement => agreement.id));
 
         const caller = await createCallerForUser(adminUser.id);
         const result = await caller.organizations.admin.list({
@@ -1525,17 +1759,99 @@ describe('organization admin router', () => {
         expect(result.organizations).toHaveLength(1);
         expect(result.organizations[0]?.id).toBe(tier19Org.id);
         expect(result.organizations[0]?.kilo_pass_tier).toBe(KiloPassTier.Tier19);
+        expect(result.organizations[0]?.kilo_pass_state).toBe('active');
         expect(result.pagination.total).toBe(2);
       } finally {
         await db
-          .delete(kilo_pass_subscriptions)
-          .where(inArray(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionIds));
+          .delete(kilo_pass_org_agreements)
+          .where(inArray(kilo_pass_org_agreements.id, agreementIds));
+        await db
+          .delete(kilo_pass_org_term_versions)
+          .where(inArray(kilo_pass_org_term_versions.id, termVersionIds));
         await db
           .delete(organization_memberships)
           .where(inArray(organization_memberships.organization_id, [tier19Org.id, tier49Org.id]));
         await db
           .delete(organizations)
           .where(inArray(organizations.id, [tier19Org.id, tier49Org.id]));
+      }
+    });
+  });
+
+  describe('getKiloPassSummary', () => {
+    it('returns the parent agreement as read-only information for a child organization', async () => {
+      const parent = await createOrganization(
+        `Admin pass parent ${crypto.randomUUID()}`,
+        adminUser.id
+      );
+      const child = await createOrganization(
+        `Admin pass child ${crypto.randomUUID()}`,
+        adminUser.id
+      );
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const [term] = await db
+        .insert(kilo_pass_org_term_versions)
+        .values({
+          version_key: crypto.randomUUID(),
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Yearly,
+          billing_price_microdollars_per_pass: 49_000_000,
+          base_credit_microdollars_per_pass: 49_000_000,
+          bonus_credit_microdollars_per_pass: 12_000_000,
+          unlock_spend_microdollars_per_pass: 49_000_000,
+          bonus_mode: KiloPassOrgBonusMode.AfterBase,
+        })
+        .returning({ id: kilo_pass_org_term_versions.id });
+      const [agreement] = await db
+        .insert(kilo_pass_org_agreements)
+        .values({
+          parent_organization_id: parent.id,
+          term_version_id: term.id,
+          state: 'active',
+          processing_condition: 'ready',
+          purchase_channel: 'self_serve',
+          cadence: KiloPassCadence.Yearly,
+          purchased_pass_capacity: 4,
+          issuance_anchor_at: new Date().toISOString(),
+          provider_subscription_id: 'sub_admin_summary',
+          provider_seat_add_on_item_id: 'si_admin_summary',
+        })
+        .returning({ id: kilo_pass_org_agreements.id });
+
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.getKiloPassSummary({ organizationId: child.id })
+        ).resolves.toMatchObject({
+          managedByOrganization: { id: parent.id, name: parent.name },
+          agreement: {
+            state: 'active',
+            processingCondition: 'ready',
+            tier: KiloPassTier.Tier49,
+            cadence: KiloPassCadence.Yearly,
+            purchasedPassCapacity: 4,
+            providerSubscriptionId: 'sub_admin_summary',
+            providerSeatAddOnItemId: 'si_admin_summary',
+          },
+        });
+      } finally {
+        await db
+          .delete(kilo_pass_org_agreements)
+          .where(eq(kilo_pass_org_agreements.id, agreement.id));
+        await db
+          .delete(kilo_pass_org_term_versions)
+          .where(eq(kilo_pass_org_term_versions.id, term.id));
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, child.id));
+        await db
+          .delete(organization_memberships)
+          .where(inArray(organization_memberships.organization_id, [parent.id, child.id]));
+        await db.delete(organizations).where(inArray(organizations.id, [parent.id, child.id]));
       }
     });
   });

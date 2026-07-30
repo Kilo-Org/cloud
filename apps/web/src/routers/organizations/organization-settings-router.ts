@@ -314,10 +314,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
   listAvailableModels: organizationMemberProcedure
     .input(OrganizationIdInputSchema)
     .output(z.custom<OpenRouterModelsResponse>())
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const { organizationId } = input;
 
-      const result = await getAvailableModelsForOrganization(organizationId, ctx.clientIp ?? null);
+      const result = await getAvailableModelsForOrganization(organizationId);
       if (!result) {
         throw new TRPCError({
           code: 'NOT_FOUND',

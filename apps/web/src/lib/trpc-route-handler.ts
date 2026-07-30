@@ -23,7 +23,7 @@ export async function handleTRPCRequest<TResult>(
 ): Promise<NextResponse<ErrorResponse | TResult>> {
   try {
     // Create tRPC context and caller
-    const ctx = await createTRPCContext({ req: request });
+    const ctx = await createTRPCContext();
     const caller = createCaller(ctx);
 
     // Execute the handler and return the result

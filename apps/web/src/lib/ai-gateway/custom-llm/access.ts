@@ -9,7 +9,11 @@ function isIpAllowed(clientIp: string, ipAllowList: string[]): boolean {
 
   const blockList = new BlockList();
   for (const allowedIp of ipAllowList) {
-    blockList.addAddress(allowedIp, isIP(allowedIp) === 4 ? 'ipv4' : 'ipv6');
+    const allowedIpVersion = isIP(allowedIp);
+    if (allowedIpVersion === 0) {
+      continue;
+    }
+    blockList.addAddress(allowedIp, allowedIpVersion === 4 ? 'ipv4' : 'ipv6');
   }
 
   return blockList.check(clientIp, clientIpVersion === 4 ? 'ipv4' : 'ipv6');

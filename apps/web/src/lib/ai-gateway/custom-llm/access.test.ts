@@ -55,4 +55,15 @@ describe('canAccessCustomLlm', () => {
       false
     );
   });
+
+  it('denies malformed stored allow-list entries instead of throwing', () => {
+    const restrictedDefinition = {
+      ...definition,
+      ip_allow_list: ['not-an-ip'],
+    } satisfies CustomLlmDefinition;
+
+    expect(canAccessCustomLlm(restrictedDefinition, 'allowed-organization', '203.0.113.10')).toBe(
+      false
+    );
+  });
 });

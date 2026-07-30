@@ -27,7 +27,10 @@ import {
   KiloPassPaymentProvider,
   KiloPassTier,
 } from './enums';
-import type { AppleStoreDecodedNotification } from './apple-store-notifications';
+import type {
+  AppleStoreDecodedNotification,
+  processAppStoreKiloPassNotification as ProcessAppStoreKiloPassNotificationFn,
+} from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import { toMicrodollars } from '@/lib/utils';
 
@@ -49,7 +52,7 @@ function getPosthogTrackingMock(): PosthogTrackingMock {
   return jest.requireMock('@/lib/kilo-pass/posthog-tracking') as PosthogTrackingMock;
 }
 
-let processAppStoreKiloPassNotification: typeof import('./apple-store-notifications').processAppStoreKiloPassNotification;
+let processAppStoreKiloPassNotification: ProcessAppStoreKiloPassNotificationFn;
 
 const APP_STORE_NOTIFICATION_TEST_NOW_MS = Date.parse('2026-05-15T00:00:00.000Z');
 

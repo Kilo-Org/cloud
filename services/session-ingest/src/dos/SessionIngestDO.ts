@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull } from 'drizzle-orm';
+import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -27,7 +27,9 @@ import {
   type AttentionSignal,
 } from './session-ingest-attention';
 import {
+  computeRunningAssistantCostUsd,
   computeSessionMetrics,
+  decideLivePersist,
   INACTIVITY_TIMEOUT_MS,
   POST_CLOSE_DRAIN_MS,
   type TerminationReason,
@@ -40,6 +42,13 @@ import {
 } from './kilo-sdk-materialization';
 import { resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
 
+type LiveThrottleMetaKey =
+  | 'lastActivityValueMs'
+  | 'lastActivityPersistedAtMs'
+  | 'lastActivityPersistedValueMs'
+  | 'lastCostPersistedAtMs'
+  | 'lastCostPersistedMicrodollars';
+
 type IngestMetaKey =
   | ExtractableMetaKey
   | 'kiloUserId'
@@ -48,7 +57,8 @@ type IngestMetaKey =
   | 'closeReason'
   | 'metricsEmitted'
   | 'deleted'
-  | 'sessionReadyNotified';
+  | 'sessionReadyNotified'
+  | LiveThrottleMetaKey;
 
 type ExtractableMetaKey =
   | 'title'
@@ -87,6 +97,78 @@ function hasIngestMeta(db: DrizzleSqliteDODatabase, key: IngestMetaKey): boolean
     db.select({ value: ingestMeta.value }).from(ingestMeta).where(eq(ingestMeta.key, key)).get() !==
     undefined
   );
+}
+
+function readIngestMetaNumber(
+  db: DrizzleSqliteDODatabase,
+  key: LiveThrottleMetaKey
+): number | null {
+  const row = db
+    .select({ value: ingestMeta.value })
+    .from(ingestMeta)
+    .where(eq(ingestMeta.key, key))
+    .get();
+  if (row?.value === null || row?.value === undefined) return null;
+  const n = Number(row.value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function writeIngestMetaNumber(
+  db: DrizzleSqliteDODatabase,
+  key: LiveThrottleMetaKey,
+  value: number
+): void {
+  const serialized = String(value);
+  db.insert(ingestMeta)
+    .values({ key, value: serialized })
+    .onConflictDoUpdate({ target: ingestMeta.key, set: { value: serialized } })
+    .run();
+}
+
+/**
+ * Monotonic live-column write for cost and/or last_activity_at.
+ * Per-column CASE guards so concurrent waitUntil tasks commute.
+ * Used by live ingest persists and the close-path emitSessionMetrics write.
+ */
+export async function persistLiveSessionColumns(
+  connectionString: string,
+  kiloUserId: string,
+  sessionId: string,
+  columns: { costMicrodollars?: number; lastActivityAtIso?: string }
+): Promise<void> {
+  const set: {
+    total_cost_microdollars?: ReturnType<typeof sql>;
+    last_activity_at?: ReturnType<typeof sql>;
+  } = {};
+
+  if (columns.costMicrodollars !== undefined) {
+    const cost = columns.costMicrodollars;
+    set.total_cost_microdollars = sql`CASE
+      WHEN ${cli_sessions_v2.total_cost_microdollars} IS NULL
+        OR ${cli_sessions_v2.total_cost_microdollars} < ${cost}
+      THEN ${cost}
+      ELSE ${cli_sessions_v2.total_cost_microdollars}
+    END`;
+  }
+
+  if (columns.lastActivityAtIso !== undefined) {
+    const activity = columns.lastActivityAtIso;
+    set.last_activity_at = sql`CASE
+      WHEN ${cli_sessions_v2.last_activity_at} IS NULL
+        OR ${cli_sessions_v2.last_activity_at} < ${activity}
+      THEN ${activity}
+      ELSE ${cli_sessions_v2.last_activity_at}
+    END`;
+  }
+
+  if (Object.keys(set).length === 0) return;
+
+  await getWorkerDb(connectionString)
+    .update(cli_sessions_v2)
+    .set(set)
+    .where(
+      and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+    );
 }
 
 const INGEST_META_EXTRACTORS: Array<{
@@ -195,6 +277,9 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const lifecycleEvents: IngestLifecycleEvent[] = [];
     const orphanedR2Keys: string[] = [];
+    // Executed upserts only (not stale-skipped). Activity = message|part; cost gate = message.
+    let wroteActivityItem = false;
+    let wroteAssistantMessageItem = false;
     // §4.10: in-batch {notificationId -> message} so the post-loop signal builder can
     // re-emit on replay without re-reading item_data from SQLite.
     const pendingAgentNotifications = new Map<string, string>();
@@ -254,6 +339,13 @@ export class SessionIngestDO extends DurableObject<Env> {
           },
         })
         .run();
+
+      if (item.type === 'message' || item.type === 'part') {
+        wroteActivityItem = true;
+      }
+      if (item.type === 'message') {
+        wroteAssistantMessageItem = true;
+      }
 
       // §4.10: agent_notification items carry no state transition, so the DO durably tracks
       // per-identity dispatch state alongside the item. Insert-if-absent keeps replays from
@@ -358,9 +450,77 @@ export class SessionIngestDO extends DurableObject<Env> {
       );
     }
 
+    // Live activity + cost Postgres persist (items 7 + 17). Not via applyMetadataChanges
+    // (avoids per-tick WS fanout). Throttle meta advances only after a successful write.
+    const statusChangeForLive = changes.find(change => change.name === 'status');
+    const idleTransition =
+      statusChangeForLive !== undefined && isCompletedStatus(statusChangeForLive.value);
+
+    let currentCostMicrodollars: number | null = null;
+    if (wroteAssistantMessageItem || idleTransition) {
+      const messageRows = this.db
+        .select({ item_data: ingestItems.item_data })
+        .from(ingestItems)
+        .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
+        .all();
+      const usd = computeRunningAssistantCostUsd(messageRows);
+      currentCostMicrodollars = Math.max(0, Math.round(usd * 1_000_000));
+    }
+
+    const nowMs = Date.now();
+    const lastActivityValueMs = ingestedAt ?? nowMs;
+    const decision = decideLivePersist({
+      nowMs,
+      wroteActivityItem,
+      wroteAssistantMessageItem,
+      idleTransition,
+      lastActivityValueMs,
+      lastActivityPersistedAtMs: readIngestMetaNumber(this.db, 'lastActivityPersistedAtMs'),
+      lastActivityPersistedValueMs: readIngestMetaNumber(this.db, 'lastActivityPersistedValueMs'),
+      currentCostMicrodollars,
+      lastCostPersistedAtMs: readIngestMetaNumber(this.db, 'lastCostPersistedAtMs'),
+      lastCostPersistedMicrodollars: readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars'),
+    });
+
+    if (decision.persistActivity || decision.persistCost) {
+      const columns: { costMicrodollars?: number; lastActivityAtIso?: string } = {};
+      if (decision.persistCost && currentCostMicrodollars !== null) {
+        columns.costMicrodollars = currentCostMicrodollars;
+      }
+      if (decision.persistActivity) {
+        columns.lastActivityAtIso = new Date(lastActivityValueMs).toISOString();
+      }
+      const costToPersist = columns.costMicrodollars;
+      const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
+      const connectionString = this.env.HYPERDRIVE.connectionString;
+      this.ctx.waitUntil(
+        (async () => {
+          try {
+            await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
+            if (activityValueMs !== undefined) {
+              writeIngestMetaNumber(this.db, 'lastActivityPersistedAtMs', nowMs);
+              writeIngestMetaNumber(this.db, 'lastActivityPersistedValueMs', activityValueMs);
+              writeIngestMetaNumber(this.db, 'lastActivityValueMs', activityValueMs);
+            }
+            if (costToPersist !== undefined) {
+              writeIngestMetaNumber(this.db, 'lastCostPersistedAtMs', nowMs);
+              writeIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars', costToPersist);
+            }
+          } catch (error) {
+            console.error('SessionIngestDO failed to persist live session columns', {
+              kiloUserId,
+              sessionId,
+              error: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+            });
+          }
+        })()
+      );
+    }
+
     const attentionSignals: AttentionSignal[] = [];
 
-    const statusChange = changes.find(change => change.name === 'status');
+    const statusChange = statusChangeForLive;
     if (statusChange && isCompletedStatus(statusChange.value) && hadPriorStatus) {
       // An idle transition means the assistant finished its turn. Pair it with the most recent
       // completed assistant message so the signal carries that turn's excerpt; if none exists yet
@@ -707,18 +867,16 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Best-effort persist the per-session total cost to Postgres so the session
     // list can surface it. Runs before the O11Y RPC so an analytics failure cannot
     // skip it. Failures are logged and swallowed — must never break metrics emission.
+    // Same helper + CASE guard as live cost persist (D20).
     try {
       if (Number.isFinite(metrics.totalCost)) {
         const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));
-        await getWorkerDb(this.env.HYPERDRIVE.connectionString)
-          .update(cli_sessions_v2)
-          .set({ total_cost_microdollars: totalCostMicrodollars })
-          .where(
-            and(
-              eq(cli_sessions_v2.session_id, sessionId),
-              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-            )
-          );
+        await persistLiveSessionColumns(
+          this.env.HYPERDRIVE.connectionString,
+          kiloUserId,
+          sessionId,
+          { costMicrodollars: totalCostMicrodollars }
+        );
       }
     } catch (error) {
       console.error('SessionIngestDO failed to persist session total cost', {

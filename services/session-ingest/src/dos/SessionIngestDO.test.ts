@@ -509,7 +509,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     };
     drizzleMocks.db = db;
 
-    let persistedMicrodollars: number | undefined;
+    let persistedSet: Record<string, unknown> | undefined;
     let pgWhereCondition: unknown;
     let pgWhereBoundParams: string[] = [];
     /**
@@ -524,13 +524,13 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
           onFulfilled?: ((value: unknown) => unknown) | null,
           onRejected?: ((reason: unknown) => unknown) | null
         ) {
-          operations.push('persist:total_cost_microdollars');
+          operations.push('persist:live_session_columns');
           return Promise.resolve(undefined).then(onFulfilled, onRejected);
         },
       };
     });
-    const pgSet = vi.fn((set: { total_cost_microdollars?: number }) => {
-      persistedMicrodollars = set.total_cost_microdollars;
+    const pgSet = vi.fn((set: Record<string, unknown>) => {
+      persistedSet = set;
       return { where: pgWhere };
     });
     const pgUpdate = vi.fn(() => ({ set: pgSet }));
@@ -563,8 +563,8 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
       pgSet,
       pgWhere,
       getWorkerDb: dbClientMocks.getWorkerDb,
-      get persistedMicrodollars() {
-        return persistedMicrodollars;
+      get persistedSet() {
+        return persistedSet;
       },
       get pgWhereCondition() {
         return pgWhereCondition;
@@ -577,7 +577,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     };
   }
 
-  it('persists total_cost_microdollars before O11Y when O11Y rejects', async () => {
+  it('persists total_cost_microdollars via persistLiveSessionColumns before O11Y when O11Y rejects', async () => {
     const o11yError = new Error('o11y unavailable');
     const harness = makeAlarmHarness({
       totalCostDollars: 0.15,
@@ -589,8 +589,15 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     await expect(harness.durableObject.alarm()).rejects.toThrow('o11y unavailable');
 
     expect(harness.getWorkerDb).toHaveBeenCalledWith('postgres://test');
-    expect(harness.pgSet).toHaveBeenCalledWith({ total_cost_microdollars: 150_000 });
-    expect(harness.persistedMicrodollars).toBe(150_000);
+    expect(harness.pgSet).toHaveBeenCalledTimes(1);
+    const setArg = harness.persistedSet!;
+    // Close path: cost only (no last_activity_at).
+    expect(setArg).toHaveProperty('total_cost_microdollars');
+    expect(setArg).not.toHaveProperty('last_activity_at');
+    // CASE guard binds the cost value; SQL shape asserted via stringified chunks.
+    const costSql = sqlFragmentText(setArg.total_cost_microdollars);
+    expect(costSql).toMatch(/CASE/i);
+    expect(costSql).toContain('150000');
     expect(harness.pgWhere).toHaveBeenCalledTimes(1);
     // where() must bind both session_id and kilo_user_id (and(...) nests eq chunks).
     expect(harness.pgWhereBoundParams).toEqual(expect.arrayContaining(['ses_cost', 'usr_cost']));
@@ -606,7 +613,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     );
 
     // Ordering: persist must precede the unguarded O11Y RPC.
-    const persistIdx = harness.operations.indexOf('persist:total_cost_microdollars');
+    const persistIdx = harness.operations.indexOf('persist:live_session_columns');
     const o11yIdx = harness.operations.indexOf('o11y:ingestSessionMetrics');
     expect(persistIdx).toBeGreaterThanOrEqual(0);
     expect(o11yIdx).toBeGreaterThanOrEqual(0);
@@ -616,5 +623,414 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     expect(harness.operations).not.toContain('meta:metricsEmitted:true');
     expect(harness.operations).not.toContain('deleteAlarm');
     expect(harness.meta.get('metricsEmitted')).toBeUndefined();
+  });
+});
+
+/** Walk nested drizzle queryChunks and collect bound Param values (string | number). */
+function collectBoundParams(
+  condition: unknown,
+  out: Array<string | number> = []
+): Array<string | number> {
+  const chunks = (condition as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? [];
+  for (const chunk of chunks) {
+    if (chunk == null || typeof chunk !== 'object') continue;
+    const value = (chunk as { value?: unknown }).value;
+    if (typeof value === 'string' || typeof value === 'number') {
+      out.push(value);
+      continue;
+    }
+    if ('queryChunks' in (chunk as object)) {
+      collectBoundParams(chunk, out);
+    }
+  }
+  return out;
+}
+
+/** Flatten drizzle SQL fragment chunks to a debug string (literals + bound params). */
+function sqlFragmentText(fragment: unknown): string {
+  const parts: string[] = [];
+  const walk = (node: unknown, depth = 0) => {
+    if (node == null || depth > 12) return;
+    if (typeof node === 'string') {
+      parts.push(node);
+      return;
+    }
+    if (typeof node === 'number') {
+      parts.push(String(node));
+      return;
+    }
+    if (typeof node !== 'object') return;
+    const value = (node as { value?: unknown }).value;
+    // StringChunk: value is string[]; Param: value is scalar; nested SQL: queryChunks
+    if (typeof value === 'string' || typeof value === 'number') {
+      parts.push(String(value));
+    } else if (Array.isArray(value) && value.every(v => typeof v === 'string')) {
+      parts.push(...(value as string[]));
+    }
+    const chunks = (node as { queryChunks?: unknown[] }).queryChunks;
+    if (Array.isArray(chunks)) {
+      for (const c of chunks) walk(c, depth + 1);
+    }
+  };
+  walk(fragment);
+  return parts.join(' ');
+}
+
+function sqlContainsCase(sqlFragment: unknown): boolean {
+  return /CASE/i.test(sqlFragmentText(sqlFragment));
+}
+
+describe('SessionIngestDO live activity + cost persist', () => {
+  type LiveHarnessOptions = {
+    /** Pre-seeded ingest_meta rows (throttle state, prior status, etc.). */
+    seedMeta?: Record<string, string | null>;
+    /** Pre-seeded message item rows returned by cost SELECT .all(). */
+    seedMessageRows?: Array<{ item_data: string }>;
+    /** If set, Postgres update rejects with this error. */
+    persistError?: Error;
+  };
+
+  function makeLiveHarness(options: LiveHarnessOptions = {}) {
+    const meta = new Map<string, string | null>(Object.entries(options.seedMeta ?? {}));
+    const messageRows = options.seedMessageRows ?? [];
+    // item rows keyed by item_id for stale-guard lookups during ingest loop
+    const itemRows = new Map<
+      string,
+      { ingested_at: number | null; item_data_r2_key: string | null }
+    >();
+
+    type SelectKind = 'meta_get' | 'item_guard' | 'message_cost' | 'other';
+    let selectKind: SelectKind = 'other';
+    let eqKey: string | undefined;
+
+    const selectQuery = {
+      from: vi.fn(() => selectQuery),
+      where: vi.fn((condition: unknown) => {
+        const params = collectBoundParams(condition);
+        eqKey = params.find((p): p is string => typeof p === 'string');
+        return selectQuery;
+      }),
+      orderBy: vi.fn(() => selectQuery),
+      limit: vi.fn(() => selectQuery),
+      get: vi.fn(() => {
+        if (selectKind === 'item_guard' && eqKey !== undefined) {
+          return itemRows.get(eqKey);
+        }
+        if (eqKey !== undefined && meta.has(eqKey)) {
+          return { value: meta.get(eqKey) };
+        }
+        // hasIngestMeta: presence check — undefined means missing
+        if (eqKey !== undefined) {
+          return meta.has(eqKey) ? { value: meta.get(eqKey) } : undefined;
+        }
+        return undefined;
+      }),
+      all: vi.fn(() => {
+        if (selectKind === 'message_cost') return messageRows;
+        return [];
+      }),
+    };
+
+    const db = {
+      select: vi.fn((columns?: unknown) => {
+        const cols = columns as Record<string, unknown> | undefined;
+        if (cols && 'item_data' in cols && !('item_type' in cols) && !('value' in cols)) {
+          // Cost compute: select({ item_data }) ... all()
+          // OR item guard: select({ ingested_at, item_data_r2_key }) — has ingested_at
+          if ('ingested_at' in cols) {
+            selectKind = 'item_guard';
+          } else {
+            selectKind = 'message_cost';
+          }
+        } else if (cols && 'value' in cols) {
+          selectKind = 'meta_get';
+        } else if (cols && 'ingested_at' in cols) {
+          selectKind = 'item_guard';
+        } else {
+          selectKind = 'other';
+        }
+        return selectQuery;
+      }),
+      insert: vi.fn(() => ({
+        values: vi.fn(
+          (values: {
+            key?: string;
+            value?: string | null;
+            item_id?: string;
+            item_type?: string;
+            item_data?: string;
+            item_data_r2_key?: string | null;
+            ingested_at?: number | null;
+          }) => ({
+            onConflictDoUpdate: vi.fn(() => ({
+              run: vi.fn(() => {
+                if (values.key !== undefined) {
+                  meta.set(values.key, values.value ?? null);
+                } else if (values.item_id !== undefined) {
+                  itemRows.set(values.item_id, {
+                    ingested_at: values.ingested_at ?? null,
+                    item_data_r2_key: values.item_data_r2_key ?? null,
+                  });
+                  if (values.item_type === 'message' && values.item_data) {
+                    messageRows.push({ item_data: values.item_data });
+                  }
+                }
+              }),
+            })),
+            onConflictDoNothing: vi.fn(() => ({
+              returning: vi.fn(() => ({
+                get: vi.fn(() => ({ state: 'pending' })),
+              })),
+            })),
+          })
+        ),
+      })),
+      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+    };
+    drizzleMocks.db = db;
+
+    const waitUntilPromises: Promise<unknown>[] = [];
+    const waitUntil = vi.fn((promise: Promise<unknown>) => {
+      waitUntilPromises.push(promise);
+    });
+    const state = {
+      storage: { setAlarm: vi.fn() },
+      waitUntil,
+      blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
+    } as unknown as DurableObjectState;
+
+    let lastPgSet: Record<string, unknown> | undefined;
+    let pgCallCount = 0;
+    const pgWhere = vi.fn((_condition: unknown) => {
+      return {
+        then(
+          onFulfilled?: ((value: unknown) => unknown) | null,
+          onRejected?: ((reason: unknown) => unknown) | null
+        ) {
+          pgCallCount += 1;
+          if (options.persistError) {
+            return Promise.reject(options.persistError).then(onFulfilled, onRejected);
+          }
+          return Promise.resolve(undefined).then(onFulfilled, onRejected);
+        },
+      };
+    });
+    const pgSet = vi.fn((set: Record<string, unknown>) => {
+      lastPgSet = set;
+      return { where: pgWhere };
+    });
+    const pgUpdate = vi.fn(() => ({ set: pgSet }));
+    dbClientMocks.getWorkerDb.mockReset();
+    dbClientMocks.getWorkerDb.mockReturnValue({ update: pgUpdate });
+
+    const env = {
+      SESSION_INGEST_R2: { delete: vi.fn() },
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      NOTIFICATIONS: { sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })) },
+    } as never;
+
+    return {
+      durableObject: new SessionIngestDO(state, env),
+      meta,
+      itemRows,
+      messageRows,
+      waitUntil,
+      settle: () => Promise.all(waitUntilPromises),
+      get lastPgSet() {
+        return lastPgSet;
+      },
+      get pgCallCount() {
+        return pgCallCount;
+      },
+      pgSet,
+      pgWhere,
+      getWorkerDb: dbClientMocks.getWorkerDb,
+    };
+  }
+
+  function assistantItem(id: string, cost: number) {
+    return {
+      type: 'message' as const,
+      data: {
+        id,
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost,
+      },
+    };
+  }
+
+  it('persists activity + cost on first assistant message batch', async () => {
+    const harness = makeLiveHarness();
+    const ingestedAt = 1_700_000_000_000;
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.15)],
+      'usr_live',
+      'ses_live',
+      1,
+      ingestedAt
+    );
+    await harness.settle();
+
+    expect(harness.pgCallCount).toBe(1);
+    expect(harness.lastPgSet).toBeDefined();
+    const set = harness.lastPgSet!;
+    expect(set).toHaveProperty('total_cost_microdollars');
+    expect(set).toHaveProperty('last_activity_at');
+    expect(sqlContainsCase(set.total_cost_microdollars)).toBe(true);
+    expect(sqlContainsCase(set.last_activity_at)).toBe(true);
+    expect(sqlFragmentText(set.total_cost_microdollars)).toContain('150000');
+    const activityIso = new Date(ingestedAt).toISOString();
+    expect(sqlFragmentText(set.last_activity_at)).toContain(activityIso);
+    // Meta advanced only after successful write
+    expect(harness.meta.get('lastActivityPersistedValueMs')).toBe(String(ingestedAt));
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('150000');
+  });
+
+  it('does not persist activity for session_open / session_close / metadata-only batches', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [
+        { type: 'session_open', data: {} },
+        { type: 'session_close', data: { reason: 'completed' } },
+        { type: 'session', data: { title: 'T' } },
+        { type: 'kilo_meta', data: { platform: 'cli' } },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      1000
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('does not persist when message is stale-skipped by ingested_at guard', async () => {
+    const harness = makeLiveHarness();
+    harness.itemRows.set('message/m1', {
+      ingested_at: 5000,
+      item_data_r2_key: null,
+    });
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.15)],
+      'usr_live',
+      'ses_live',
+      1,
+      1000 // older than existing 5000 → stale skip
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('idle-only batch after prior assistant messages persists cost (D17)', async () => {
+    const priorCost = JSON.stringify({
+      role: 'assistant',
+      time: { created: 1000 },
+      tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+      cost: 0.25,
+    });
+    const harness = makeLiveHarness({
+      seedMeta: {
+        status: 'busy',
+        lastCostPersistedMicrodollars: '100000',
+        lastCostPersistedAtMs: String(Date.now()), // within 30s — idle forces anyway
+      },
+      seedMessageRows: [{ item_data: priorCost }],
+    });
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      Date.now()
+    );
+    await harness.settle();
+
+    expect(harness.pgCallCount).toBe(1);
+    const set = harness.lastPgSet!;
+    expect(set).toHaveProperty('total_cost_microdollars');
+    expect(set).not.toHaveProperty('last_activity_at'); // no message/part upsert
+    expect(sqlFragmentText(set.total_cost_microdollars)).toContain('250000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
+  });
+
+  it('terminalized-without-idle batch does not live-persist cost', async () => {
+    // session_close is lifecycle only — no idle status change, no message upsert
+    const harness = makeLiveHarness({
+      seedMessageRows: [
+        {
+          item_data: JSON.stringify({
+            role: 'assistant',
+            time: { created: 1000 },
+            tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+            cost: 0.5,
+          }),
+        },
+      ],
+    });
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_close', data: { reason: 'completed' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      Date.now()
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('swallows persist failure and leaves meta un-advanced for retry', async () => {
+    const harness = makeLiveHarness({
+      persistError: new Error('postgres down'),
+    });
+    const ingestedAt = 1_700_000_000_100;
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.1)],
+      'usr_live',
+      'ses_live',
+      1,
+      ingestedAt
+    );
+    await harness.settle();
+
+    expect(harness.pgCallCount).toBe(1);
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBeUndefined();
+    expect(harness.meta.get('lastActivityPersistedValueMs')).toBeUndefined();
+  });
+
+  it('one persist call per batch carries exactly the fired columns', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'p1',
+            messageID: 'm1',
+            type: 'text',
+            text: 'hi',
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+
+    // part → activity only, no cost compute
+    expect(harness.pgCallCount).toBe(1);
+    expect(harness.waitUntil).toHaveBeenCalledTimes(1);
+    const set = harness.lastPgSet!;
+    expect(set).toHaveProperty('last_activity_at');
+    expect(set).not.toHaveProperty('total_cost_microdollars');
+    expect(sqlFragmentText(set.last_activity_at)).toContain(new Date(2000).toISOString());
   });
 });

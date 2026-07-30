@@ -398,9 +398,7 @@ describe('createSessionManager', () => {
     mockSession.interrupt.mockClear();
     mockSession.interrupt.mockResolvedValue({});
     mockSession.createRemoteSession.mockClear();
-    mockSession.createRemoteSession.mockResolvedValue(
-      kiloId('ses_12345678901234567890123456')
-    );
+    mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_12345678901234567890123456'));
     mockSession.exitRemoteSession.mockClear();
     mockSession.exitRemoteSession.mockResolvedValue();
     mockSession.respondToPermission.mockClear();
@@ -3266,9 +3264,7 @@ describe('createSessionManager', () => {
         }),
       });
       const mgr = createSessionManager(config);
-      mockSession.createRemoteSession.mockResolvedValue(
-        kiloId('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa')
-      );
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'));
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
@@ -3296,9 +3292,7 @@ describe('createSessionManager', () => {
     it('prefers override.selection over observedModel and omits variant when absent', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
-      mockSession.createRemoteSession.mockResolvedValue(
-        kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb')
-      );
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb'));
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
@@ -3323,9 +3317,7 @@ describe('createSessionManager', () => {
     it('falls back to observedModel when override is null', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
-      mockSession.createRemoteSession.mockResolvedValue(
-        kiloId('ses_cccccccccccccccccccccccccc')
-      );
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_cccccccccccccccccccccccccc'));
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
@@ -3350,9 +3342,7 @@ describe('createSessionManager', () => {
         }),
       });
       const mgr = createSessionManager(config);
-      mockSession.createRemoteSession.mockResolvedValue(
-        kiloId('ses_dddddddddddddddddddddddddd')
-      );
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_dddddddddddddddddddddddddd'));
       mockSession.send.mockResolvedValue({});
 
       await mgr.switchSession(kiloId('ses-1'));
@@ -3380,9 +3370,7 @@ describe('createSessionManager', () => {
         }),
       });
       const mgr = createSessionManager(config);
-      mockSession.createRemoteSession.mockResolvedValue(
-        kiloId('ses_eeeeeeeeeeeeeeeeeeeeeeeeee')
-      );
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_eeeeeeeeeeeeeeeeeeeeeeeeee'));
       mockSession.send.mockResolvedValue({});
 
       await mgr.switchSession(kiloId('ses-1'));
@@ -3406,9 +3394,7 @@ describe('createSessionManager', () => {
         }),
       });
       const mgr = createSessionManager(config);
-      mockSession.createRemoteSession.mockResolvedValue(
-        kiloId('ses_ffffffffffffffffffffffffff')
-      );
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_ffffffffffffffffffffffffff'));
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
@@ -3426,9 +3412,7 @@ describe('createSessionManager', () => {
         }),
       });
       const mgr = createSessionManager(config);
-      mockSession.createRemoteSession.mockResolvedValue(
-        kiloId('ses_11111111111111111111111111')
-      );
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_11111111111111111111111111'));
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
@@ -3680,7 +3664,9 @@ describe('createSessionManager', () => {
       await Promise.resolve();
 
       await mgr.loadOlderMessages();
-      expect(atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)).toEqual({
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toEqual({
         kind: 'retryable',
       });
 

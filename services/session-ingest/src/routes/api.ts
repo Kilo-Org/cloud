@@ -551,10 +551,7 @@ api.post('/session/:sessionId/rename-notify', async c => {
     .object({ title: z.string().trim().min(1) })
     .safeParse(await c.req.json().catch(() => null));
   if (!bodyParse.success) {
-    return c.json(
-      { success: false, error: 'Invalid body', issues: bodyParse.error.issues },
-      400
-    );
+    return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
   }
 
   const kiloUserId = c.get('user_id');
@@ -580,10 +577,7 @@ api.post('/session/:sessionId/title', async c => {
 
   const bodyParse = reportSessionTitleSchema.safeParse(await c.req.json().catch(() => null));
   if (!bodyParse.success) {
-    return c.json(
-      { success: false, error: 'Invalid body', issues: bodyParse.error.issues },
-      400
-    );
+    return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
   }
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);

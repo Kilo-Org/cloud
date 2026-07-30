@@ -126,11 +126,9 @@ const EMPTY_REMOTE_COMMAND_STATE = {
 } satisfies RemoteCommandState;
 
 /** UUID v1–v5 shape used to gate orgId inheritance on create_session. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const TRANSCRIPT_CLEARED_INDICATOR =
-  'View cleared — earlier messages are still on this session';
+const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are still on this session';
 
 /**
  * Flatten a `ModelSelection` into the Decision 5 create_session model object.
@@ -162,8 +160,7 @@ function computeCreateRemoteSessionInheritance(args: {
   if (args.modelSelection) {
     input.model = flattenModelSelectionForCreate(args.modelSelection);
   }
-  const mode =
-    args.sessionMode && args.sessionMode !== '' ? args.sessionMode : args.lastPromptMode;
+  const mode = args.sessionMode && args.sessionMode !== '' ? args.sessionMode : args.lastPromptMode;
   if (mode) {
     input.agent = mode;
   }
@@ -1616,16 +1613,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.retryRemoteCommands();
   }
 
-  async function createRemoteSession(
-    input?: CreateRemoteSessionInput
-  ): Promise<KiloSessionId> {
+  async function createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId> {
     if (!currentSession || activeSessionType !== 'remote') {
       throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
     }
     // Inheritance from the active session (Decision 6). Explicit caller fields
     // win when provided (e.g. tests); otherwise store-derived values apply.
-    const selection =
-      store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
+    const selection = store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
     const inherited = computeCreateRemoteSessionInheritance({
       modelSelection: selection,
       sessionMode: store.get(sessionConfigAtom)?.mode,

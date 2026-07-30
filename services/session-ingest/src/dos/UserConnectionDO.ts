@@ -625,9 +625,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // else undefined so notifications falls back to the live DB title.
       const heartbeatTitle = this.findHeartbeatTitle(sessionId);
       const freshest =
-        heartbeatTitle !== undefined && heartbeatTitle !== entry.title
-          ? heartbeatTitle
-          : undefined;
+        heartbeatTitle !== undefined && heartbeatTitle !== entry.title ? heartbeatTitle : undefined;
 
       try {
         await this.claimSessionReadyPush(entry.kiloUserId, sessionId, freshest);
@@ -665,10 +663,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     return undefined;
   }
 
-  private async catchUpPendingRenames(
-    ws: WebSocket,
-    sessions: HeartbeatSession[]
-  ): Promise<void> {
+  private async catchUpPendingRenames(ws: WebSocket, sessions: HeartbeatSession[]): Promise<void> {
     for (const session of sessions) {
       const key = `${RENAME_KEY_PREFIX}${session.id}`;
       let entry: RenameEntry | undefined;
@@ -1213,10 +1208,7 @@ export class UserConnectionDO extends DurableObject<Env> {
    * Persist a web→CLI rename under KV (offline catch-up) and deliver
    * `session.renamed` to the owning CLI socket when one is connected.
    */
-  async notifySessionRenamed(
-    sessionId: string,
-    title: string
-  ): Promise<{ delivered: boolean }> {
+  async notifySessionRenamed(sessionId: string, title: string): Promise<{ delivered: boolean }> {
     this.ensureState();
     await this.ctx.storage.put(`${RENAME_KEY_PREFIX}${sessionId}`, {
       title,

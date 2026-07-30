@@ -4457,9 +4457,11 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('ses_wu', 'idle', 'Stale')]);
       expect(waitUntil).toHaveBeenCalled();
       const registered = waitUntil.mock.calls.map(c => c[0]);
-      expect(registered.some(p => p instanceof Promise || typeof (p as PromiseLike<unknown>)?.then === 'function')).toBe(
-        true
-      );
+      expect(
+        registered.some(
+          p => p instanceof Promise || typeof (p as PromiseLike<unknown>)?.then === 'function'
+        )
+      ).toBe(true);
 
       await flushAsync();
       const reEmits = allSent(cliWs).filter(

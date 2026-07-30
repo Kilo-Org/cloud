@@ -433,17 +433,18 @@ This run covered only the checks that need NO Kilo API key. Before merge,
 run the credentialed live smoke locally too (it loads a real key into the
 freshly released OpenClaw, which is why nothing here runs in CI):
 
-  export KILOCODE_API_KEY=<dedicated free-model key>   # not your personal key
+  export KILOCODE_API_KEY=<key on an account with credits>   # not your personal key
   export KILOCODE_ORGANIZATION_ID=<org id>             # required to spend ORG credits
   bash services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
 
 That covers what CI cannot without a credential:
   - persisted-root upgrade boot (baseline -> candidate on the same /root)
+  - the candidate on a FRESH root too (the shape a new signup gets)
   - gateway readiness + proxied Control UI
   - kilo-chat plugin load, diagnostics, and webhook route
   - app config-write routes (/_kilo/config/patch, agent-defaults, agents CRUD)
   - exec-approvals seeding
-  - a real Auto Free agent turn through the live Kilo Gateway
+  - a real agent turn on a paid route through the live Kilo Gateway
 ----------------------------------------------------------------------
 EOF
 

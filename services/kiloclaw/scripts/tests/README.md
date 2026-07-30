@@ -11,7 +11,7 @@ Validate an OpenClaw version bump before merging the bump PR.
 **Run this one:**
 
 ```bash
-export KILOCODE_API_KEY=<dedicated free-model key>   # for the live smoke; from app.kilo.ai/profile
+export KILOCODE_API_KEY=<key on an account with credits>   # for the live smoke; from app.kilo.ai/profile
 export KILOCODE_ORGANIZATION_ID=<org id>             # REQUIRED if the key is a personal key in an org
 bash services/kiloclaw/scripts/tests/openclaw-upgrade-validate.sh
 ```

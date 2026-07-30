@@ -10,6 +10,7 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_RAW_RESPONSE_BYTES = 1024 * 1024;
 const MAX_RETAINED_RAW_BYTES = 4 * 1024 * 1024;
 const MAX_PROVIDER_QUERY_PLANS = 100;
+// Cloudflare applies maxNumberOfFields per aliased dataset selection, not across aliases.
 const MAX_RUN_WINDOWS_PER_REQUEST = 15;
 
 export type ContainerUsageAnalyticsInput = {
@@ -473,9 +474,8 @@ export async function queryContainerUsageAnalytics(
 
   const rows = new Map<string, ContainerUsageAnalyticsRow>();
   const queryBatches = batches(queryPlans, MAX_RUN_WINDOWS_PER_REQUEST);
-  for (let batchIndex = 0; batchIndex < queryBatches.length; batchIndex += 1) {
-    const batch = queryBatches[batchIndex];
-    if (!batch) continue;
+  let responseIndex = 1;
+  const queryBatch = async (batch: QueryPlan[]): Promise<void> => {
     const variables: Record<string, unknown> = { accountTag: accountId };
     for (let index = 0; index < batch.length; index += 1) {
       const plan = batch[index];
@@ -492,9 +492,11 @@ export async function queryContainerUsageAnalytics(
       variables,
       retainedBytes,
     });
+    const batchIndex = responseIndex;
+    responseIndex += 1;
     rawResponses.push({
       dataset: DATASET,
-      batchIndex: batchIndex + 1,
+      batchIndex,
       queries: batch.map((plan, index) => ({
         alias: `u${index}`,
         runKey: plan.run.key,
@@ -510,8 +512,28 @@ export async function queryContainerUsageAnalytics(
         'Cloudflare Analytics usage response had an unexpected shape.'
       );
     }
-    const errors = graphqlErrors(response.data.errors);
+    const errorDetails = response.data.errors ?? [];
+    const errors = graphqlErrors(errorDetails);
     const account = response.data.data?.viewer?.accounts?.[0];
+    const unscopedErrors = errorDetails.filter(
+      error => !error.path?.some(part => typeof part === 'string' && /^u\d+$/.test(part))
+    );
+    if ((unscopedErrors.length > 0 || (!account && errors.length > 0)) && batch.length > 1) {
+      for (const plan of batch) {
+        try {
+          await queryBatch([plan]);
+        } catch (error) {
+          if (!(error instanceof ContainerUsageAnalyticsError) || error.code !== 'graphql_error') {
+            throw error;
+          }
+          partialIds.add(plan.run.key);
+          issues.push(
+            `${DATASET} run ${plan.run.key} window ${plan.windowIndex} returned no usable data: ${error.message}`
+          );
+        }
+      }
+      return;
+    }
     if (!account) {
       throw new ContainerUsageAnalyticsError(
         'graphql_error',
@@ -520,21 +542,19 @@ export async function queryContainerUsageAnalytics(
           : 'Cloudflare Analytics usage query returned no account data.'
       );
     }
-    const errorAliases = new Set(
-      (response.data.errors ?? []).flatMap(error => {
-        const alias = error.path?.find(part => typeof part === 'string' && /^u\d+$/.test(part));
-        return typeof alias === 'string' ? [alias] : [];
-      })
-    );
-    const hasUnscopedError = (response.data.errors ?? []).some(
-      error => !error.path?.some(part => typeof part === 'string' && /^u\d+$/.test(part))
-    );
     for (let index = 0; index < batch.length; index += 1) {
       const plan = batch[index];
       if (!plan) continue;
       const alias = `u${index}`;
       const groups = account[alias];
-      const aliasPartial = hasUnscopedError || errorAliases.has(alias);
+      const aliasErrors = errorDetails.filter(error => {
+        const errorAlias = error.path?.find(
+          part => typeof part === 'string' && /^u\d+$/.test(part)
+        );
+        return errorAlias === alias || errorAlias === undefined;
+      });
+      const aliasErrorMessages = graphqlErrors(aliasErrors);
+      const aliasPartial = aliasErrors.length > 0;
       if (groups === null || groups === undefined) {
         if (!aliasPartial) {
           throw new ContainerUsageAnalyticsError(
@@ -544,7 +564,7 @@ export async function queryContainerUsageAnalytics(
         }
         partialIds.add(plan.run.key);
         issues.push(
-          `${DATASET} run ${plan.run.key} window ${plan.windowIndex} returned no usable data: ${errors.join('; ')}`
+          `${DATASET} run ${plan.run.key} window ${plan.windowIndex} returned no usable data: ${aliasErrorMessages.join('; ')}`
         );
         continue;
       }
@@ -552,7 +572,7 @@ export async function queryContainerUsageAnalytics(
         partialIds.add(plan.run.key);
         issues.push(
           aliasPartial
-            ? `${DATASET} run ${plan.run.key} window ${plan.windowIndex} returned partial data: ${errors.join('; ')}`
+            ? `${DATASET} run ${plan.run.key} window ${plan.windowIndex} returned partial data: ${aliasErrorMessages.join('; ')}`
             : `${DATASET} run ${plan.run.key} window ${plan.windowIndex} reached the page limit.`
         );
       }
@@ -574,7 +594,8 @@ export async function queryContainerUsageAnalytics(
         }
       }
     }
-  }
+  };
+  for (const batch of queryBatches) await queryBatch(batch);
 
   return {
     rows: [...rows.values()].sort(

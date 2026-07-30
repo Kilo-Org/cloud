@@ -1022,7 +1022,7 @@ export default function UsageRecordsContent() {
                                   <h4 className="text-muted-foreground type-label">
                                     {raw.dataset}
                                     {raw.queries.length > 0
-                                      ? ` · batch ${raw.batchIndex} · ${raw.queries.length} run${raw.queries.length === 1 ? '' : 's'}`
+                                      ? ` · batch ${raw.batchIndex} · ${raw.queries.length} window${raw.queries.length === 1 ? '' : 's'}`
                                       : ''}
                                   </h4>
                                   <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface-inset p-4 whitespace-pre type-code">

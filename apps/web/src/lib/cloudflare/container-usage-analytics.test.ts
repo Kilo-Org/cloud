@@ -206,6 +206,53 @@ describe('queryContainerUsageAnalytics', () => {
       }),
     ]);
     expect(result.usagePartialRunKeys).toEqual(['run-2']);
+    expect(result.issues).toEqual([
+      expect.stringContaining('run run-2 window 0 returned partial data: run 2 partial'),
+    ]);
+    expect(result.issues.join(' ')).not.toContain('run run-1');
+  });
+
+  it('retries an unscoped batched GraphQL error as isolated run requests', async () => {
+    const runs = [
+      input.runs[0]!,
+      {
+        key: 'run-2',
+        instanceId: 'instance-2',
+        start: '2026-07-01T02:00:00.000Z',
+        end: '2026-07-01T03:00:00.000Z',
+      },
+    ];
+    const providerRows: UsageGroup[] = runs.map((run, index) => ({
+      dimensions: { applicationId: 'app', instanceId: run.instanceId },
+      sum: {
+        cpuTimeSec: index + 1,
+        allocatedMemory: (index + 1) * 10,
+        allocatedDisk: (index + 1) * 20,
+        txBytes: (index + 1) * 30,
+      },
+    }));
+    const { fetch, requests } = requestCapture((_request, index) => {
+      if (index === 0) return response(settingsBody());
+      if (index === 1) {
+        return response(
+          usageBatchBody({ u0: [providerRows[0]!], u1: [providerRows[1]!] }, [
+            { message: 'batch partial' },
+          ])
+        );
+      }
+      return response(usageBody([providerRows[index - 2]!]));
+    });
+
+    const result = await queryContainerUsageAnalytics({ runs }, { ...options, fetch });
+
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(requests[2]?.body.variables.instanceIds0).toEqual(['instance-1']);
+    expect(requests[3]?.body.variables.instanceIds0).toEqual(['instance-2']);
+    expect(result.partial).toBe(false);
+    expect(result.rows).toEqual([
+      expect.objectContaining({ runKey: 'run-1', instanceId: 'instance-1' }),
+      expect.objectContaining({ runKey: 'run-2', instanceId: 'instance-2' }),
+    ]);
   });
 
   it.each([

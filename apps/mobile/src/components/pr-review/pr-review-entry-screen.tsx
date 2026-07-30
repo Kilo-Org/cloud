@@ -10,12 +10,12 @@ import {
 } from 'lucide-react-native';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { parseGitHubPrUrl } from '@/lib/github-pr-url';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
@@ -76,7 +76,7 @@ export function PrReviewEntryScreen() {
     const raw = inputValueRef.current;
     const parsed = parseGitHubPrUrl(raw.trim());
     if (!parsed) {
-      toast.error(PR_LINK_TOAST_INVALID_COPY);
+      announcingToast.error(PR_LINK_TOAST_INVALID_COPY);
       return;
     }
     // Title is backfilled on first successful load (S5).
@@ -94,13 +94,13 @@ export function PrReviewEntryScreen() {
     const clipboard = await Clipboard.getStringAsync();
     const decision = decidePrLinkPaste(clipboard);
     if (decision.kind === 'empty') {
-      toast.error(PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY);
+      announcingToast.error(PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY);
       return;
     }
     // Replace entire field (never append-at-cursor): native field + ref + hasInput.
     applyFieldText(decision.text);
     if (decision.kind === 'non-url-text') {
-      toast.error(PR_LINK_TOAST_INVALID_COPY);
+      announcingToast.error(PR_LINK_TOAST_INVALID_COPY);
       return;
     }
     await handleSubmit();

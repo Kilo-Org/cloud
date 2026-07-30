@@ -39,6 +39,22 @@ function sseResponse(body: string, status = 200): Response {
   });
 }
 
+function hangingSseResponse(body: string): { response: Response; cancel: jest.Mock } {
+  const encoder = new TextEncoder();
+  const cancel = jest.fn();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(body));
+    },
+    cancel,
+  });
+
+  return {
+    response: new Response(stream, { headers: { 'content-type': 'text/event-stream' } }),
+    cancel,
+  };
+}
+
 function failingResponse(contentType: string, errorName: string, initialBody?: string): Response {
   const encoder = new TextEncoder();
   let pullCount = 0;
@@ -526,7 +542,7 @@ describe('rewriteModelResponse_Responses', () => {
     expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
   });
 
-  test('strips the nested response usage in stream events and emits [DONE]', async () => {
+  test('strips nested response usage and closes after the completed event', async () => {
     const upstream = sseResponse(
       'event: response.completed\n' +
         'data: {"type":"response.completed","response":{"model":"upstream-model","usage":{"cost":0.5,"is_byok":true,"prompt_tokens":3,"completion_tokens":1,"total_tokens":4,"prompt_tokens_details":{"cached_tokens":1}}}}\n\n' +
@@ -552,8 +568,27 @@ describe('rewriteModelResponse_Responses', () => {
     expect(event.response.usage.is_byok).toBeUndefined();
     expect(event.response.usage.prompt_tokens_details.cached_tokens).toBe(1);
     expect(sse).toContain('event: response.completed');
-    expect(dataPayloads(sse)).toContain('[DONE]');
+    expect(dataPayloads(sse)).not.toContain('[DONE]');
   });
+
+  test.each(['response.completed', 'response.incomplete', 'response.failed'])(
+    'forwards %s, cancels upstream, and closes without waiting for EOF',
+    async type => {
+      const capture = makeCapture();
+      const body =
+        `event: ${type}\ndata: ${JSON.stringify({ type })}\n\n` +
+        'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"ignored"}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewriteModelResponse_Responses(upstream, true, capture, null);
+      const sse = await readOutputStream(result);
+
+      expect(dataObjects(sse)).toEqual([{ type }]);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+    }
+  );
 });
 
 function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingParams {

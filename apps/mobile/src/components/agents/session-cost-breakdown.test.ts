@@ -1,6 +1,7 @@
+/* eslint-disable max-lines -- cohesive unit suite for cost breakdown + older-activity residual */
 import { describe, expect, it } from 'vitest';
 
-import { getSessionCostBreakdown } from './session-cost-breakdown';
+import { getOlderActivityCostUsd, getSessionCostBreakdown } from './session-cost-breakdown';
 import {
   type AssistantMessage,
   type Part,
@@ -313,5 +314,51 @@ describe('getSessionCostBreakdown', () => {
     expect(openai?.steps).toBe(1);
     expect(result.attributedCostUsd).toBeCloseTo(0.06, 6);
     expect(result.subagentCostUsd).toBeCloseTo(0, 6);
+  });
+});
+
+describe('getOlderActivityCostUsd', () => {
+  it('returns 0 when total is null or non-finite', () => {
+    expect(getOlderActivityCostUsd(null, 0.01)).toBe(0);
+    expect(getOlderActivityCostUsd(Number.NaN, 0.01)).toBe(0);
+    expect(getOlderActivityCostUsd(Number.POSITIVE_INFINITY, 0.01)).toBe(0);
+  });
+
+  it('returns 0 when residual is zero or within epsilon', () => {
+    expect(getOlderActivityCostUsd(50_000, 0.05)).toBe(0);
+    // +0.5µ$ and +0.9µ$ are both below COST_RECONCILIATION_EPSILON_USD (1e-6)
+    expect(getOlderActivityCostUsd(50_000 + 0.5, 0.05)).toBe(0);
+    expect(getOlderActivityCostUsd(50_000 + 0.9, 0.05)).toBe(0);
+  });
+
+  it('returns exact residual when persisted exceeds live beyond epsilon', () => {
+    // 0.07 USD persisted, 0.05 live → 0.02 residual
+    expect(getOlderActivityCostUsd(70_000, 0.05)).toBeCloseTo(0.02, 9);
+  });
+
+  it('returns 0 when persisted is less than or equal to live', () => {
+    expect(getOlderActivityCostUsd(30_000, 0.05)).toBe(0);
+    expect(getOlderActivityCostUsd(50_000, 0.05)).toBe(0);
+  });
+
+  it('reconciles attributed + subagent + older activity to page total within epsilon', () => {
+    // Live breakdown: attributed 0.03 + subagent 0.02 = 0.05 live
+    // Page total: 0.08 USD (80_000 µ$) → older activity 0.03
+    const messages: StoredMessage[] = [
+      storedMessage(assistantInfo({ id: 'm1', cost: 0.05 }), [
+        stepFinish({ id: 'sf-1', cost: 0.03, tokens: oneOneTokens }),
+      ]),
+    ];
+    const liveCostUsd = 0.05;
+    const totalCostMicrodollars = 80_000;
+    const breakdown = getSessionCostBreakdown(messages, liveCostUsd);
+    const olderActivityCostUsd = getOlderActivityCostUsd(totalCostMicrodollars, liveCostUsd);
+
+    expect(breakdown.attributedCostUsd).toBeCloseTo(0.03, 6);
+    expect(breakdown.subagentCostUsd).toBeCloseTo(0.02, 6);
+    expect(olderActivityCostUsd).toBeCloseTo(0.03, 6);
+    expect(
+      breakdown.attributedCostUsd + breakdown.subagentCostUsd + olderActivityCostUsd
+    ).toBeCloseTo(totalCostMicrodollars / 1e6, 9);
   });
 });

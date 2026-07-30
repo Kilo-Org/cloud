@@ -22,6 +22,7 @@ import {
 } from './context-usage-display';
 import {
   getModelsSectionCount,
+  getOlderActivityCostUsd,
   getSessionCostBreakdown,
   getVisibleSessionCostModels,
   type SessionCostBreakdown,
@@ -79,7 +80,12 @@ export function SessionContextSheet({
     () => getVisibleSessionCostModels(breakdown.models),
     [breakdown.models]
   );
-  const modelsSectionCount = getModelsSectionCount(breakdown.models, breakdown.subagentCostUsd);
+  const olderActivityCostUsd = getOlderActivityCostUsd(totalCostMicrodollars, breakdownCostUsd);
+  const modelsSectionCount = getModelsSectionCount(
+    breakdown.models,
+    breakdown.subagentCostUsd,
+    olderActivityCostUsd
+  );
 
   return (
     <Modal
@@ -197,6 +203,9 @@ export function SessionContextSheet({
                 {breakdown.subagentCostUsd > 0 ? (
                   <SubagentRow costUsd={breakdown.subagentCostUsd} />
                 ) : null}
+                {olderActivityCostUsd > 0 ? (
+                  <OlderActivityRow costUsd={olderActivityCostUsd} />
+                ) : null}
               </View>
               <Text className="mt-1 text-xs text-muted-foreground">
                 Token totals cover this session only and exclude subagent/child-session tokens.
@@ -290,6 +299,22 @@ function SubagentRow({ costUsd }: Readonly<{ costUsd: number }>) {
       <View className="gap-0.5">
         <Text className="text-sm font-medium text-foreground">Subagents</Text>
         <Text className="text-xs text-muted-foreground">Residual cost from child sessions</Text>
+      </View>
+      <Text className="text-sm font-medium text-foreground tabular-nums">
+        {formatCost(costUsd)}
+      </Text>
+    </View>
+  );
+}
+
+function OlderActivityRow({ costUsd }: Readonly<{ costUsd: number }>) {
+  return (
+    <View className="flex-row items-center justify-between rounded-md border border-border px-3 py-3">
+      <View className="gap-0.5">
+        <Text className="text-sm font-medium text-foreground">Older activity</Text>
+        <Text className="text-xs text-muted-foreground">
+          Cost from activity before the loaded history
+        </Text>
       </View>
       <Text className="text-sm font-medium text-foreground tabular-nums">
         {formatCost(costUsd)}

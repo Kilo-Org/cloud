@@ -434,6 +434,7 @@ run the credentialed live smoke locally too (it loads a real key into the
 freshly released OpenClaw, which is why nothing here runs in CI):
 
   export KILOCODE_API_KEY=<dedicated free-model key>   # not your personal key
+  export KILOCODE_ORGANIZATION_ID=<org id>             # required to spend ORG credits
   bash services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
 
 That covers what CI cannot without a credential:

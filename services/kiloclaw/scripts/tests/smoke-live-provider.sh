@@ -72,8 +72,63 @@ if [ -z "${KILOCODE_API_KEY:-}" ]; then
   exit 1
 fi
 
-if [ -z "${KILOCODE_ORGANIZATION_ID:-}" ] && [ "$CREDENTIAL_SOURCE" = "local Kilo CLI config" ]; then
-  KILOCODE_ORGANIZATION_ID="$(read_active_provider_value kilocodeOrganizationId)"
+# Fall back to the Kilo CLI config's org id whatever the token's source. This
+# used to be gated on CREDENTIAL_SOURCE = "local Kilo CLI config", which meant the
+# DOCUMENTED path (export KILOCODE_API_KEY, as the README and the validator both
+# instruct) silently skipped org discovery and ran with no org scope at all.
+ORG_SOURCE=""
+if [ -n "${KILOCODE_ORGANIZATION_ID:-}" ]; then
+  ORG_SOURCE="environment"
+else
+  KILOCODE_ORGANIZATION_ID="$(read_active_provider_value kilocodeOrganizationId 2>/dev/null || true)"
+  [ -n "${KILOCODE_ORGANIZATION_ID:-}" ] && ORG_SOURCE="local Kilo CLI config"
+fi
+
+# Credential preflight. A personal token spends PERSONAL credits; org credits are
+# only reachable when the org id travels with the request. Get this wrong and the
+# live turn fails deep inside the gateway as a 402, a websocket 1008 policy close,
+# or "provider rejected the request schema" — none of which name the real cause,
+# and all of which read as a product regression. Fail here instead, by name.
+KILOCODE_API_BASE="${KILOCODE_API_BASE:-https://api.kilocode.ai}"
+profile_json=$(curl -sL --max-time 20 -H "Authorization: Bearer $KILOCODE_API_KEY" \
+  "$KILOCODE_API_BASE/api/profile" 2>/dev/null || true)
+
+if [ -z "$profile_json" ] || ! python3 -c 'import json,sys; json.load(sys.stdin)' <<< "$profile_json" >/dev/null 2>&1; then
+  echo "WARN: could not reach $KILOCODE_API_BASE/api/profile to validate the credential." >&2
+  echo "      Continuing, but a credential problem will surface later as a confusing" >&2
+  echo "      gateway error rather than as a credential error." >&2
+elif ! python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("user") else 1)' <<< "$profile_json" >/dev/null 2>&1; then
+  echo "✗ The Kilo token was rejected by $KILOCODE_API_BASE/api/profile (not a valid/active key)." >&2
+  echo "  Get a key from https://app.kilo.ai/profile (bottom) and export KILOCODE_API_KEY." >&2
+  exit 1
+else
+  org_list=$(python3 -c '
+import json
+import sys
+
+orgs = json.load(sys.stdin).get("organizations") or []
+for o in orgs:
+    print(f'"'"'  - {o.get("name", "?")}  {o.get("id", "?")}'"'"')
+' <<< "$profile_json" 2>/dev/null || true)
+
+  if [ -z "${KILOCODE_ORGANIZATION_ID:-}" ] && [ -n "$org_list" ]; then
+    echo "✗ KILOCODE_ORGANIZATION_ID is not set, but this token belongs to organization(s):" >&2
+    echo "$org_list" >&2
+    echo >&2
+    echo "  A personal token only spends PERSONAL credits. To spend ORG credits the org" >&2
+    echo "  id must be set, otherwise the live agent turn fails with '402 Add credits to" >&2
+    echo "  continue', which reads as a broken image rather than a credential problem." >&2
+    echo >&2
+    echo "  Fix (pick the org you want billed):" >&2
+    echo "    export KILOCODE_ORGANIZATION_ID=<id from above>" >&2
+    echo >&2
+    echo "  If this token really does have personal credits and you want to use them," >&2
+    echo "  re-run with ALLOW_NO_ORG_SCOPE=true to acknowledge and skip this check." >&2
+    if [ "${ALLOW_NO_ORG_SCOPE:-false}" != "true" ]; then
+      exit 1
+    fi
+    echo "  ALLOW_NO_ORG_SCOPE=true set — continuing without org scope." >&2
+  fi
 fi
 
 export KILOCODE_API_KEY
@@ -177,6 +232,29 @@ wait_for_ready() {
   return 1
 }
 
+# The controller's /_kilo/health reports `ready` as soon as the controller is up,
+# which is NOT the same as the gateway being able to serve a call: the gateway is
+# still loading ~32 provider plugins and running model discovery. A call landing
+# in that window dies with a websocket 1006 abnormal closure, which looks like a
+# product failure but is only a race. Gate on the gateway actually answering a
+# lightweight method (`status`) before asserting anything that needs it, and call
+# this again after any gateway RESTART, not just after first boot.
+wait_for_gateway_serving() {
+  local label="$1"
+
+  echo "waiting for $label gateway to serve calls ..."
+  for i in $(seq 1 120); do
+    if docker exec "$CID" openclaw gateway call status --json --timeout 5000 >/dev/null 2>&1; then
+      echo "  gateway serving after ${i}s"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "FAIL: $label gateway did not start serving calls"
+  return 1
+}
+
 assert_configured_model() {
   local model
   model=$(docker exec -i "$CID" python3 - <<'PY'
@@ -250,6 +328,18 @@ assert_control_ui_proxy() {
   check "proxied Control UI HTML" "ready" "$result"
 }
 
+# Print the turn's error identity. Only add the "suppressed" caveat when there is
+# genuinely nothing more to show: for a transport close we already printed the
+# gateway's own close reason, which explains the failure outright.
+report_turn_error() {
+  local ident="$1"
+  if [[ "$ident" == *" :: "* ]]; then
+    echo "  error: $ident"
+  else
+    echo "  error: $ident (provider message suppressed — it can contain live credentials)"
+  fi
+}
+
 assert_live_agent_turn() {
   local nonce
   local session_id
@@ -277,13 +367,66 @@ PY
 
   # openclaw writes the --json payload to stdout and logs to stderr; drop stderr
   # (it can contain provider/credential detail) so the parsed value is pure JSON.
-  if ! output=$(docker exec "$CID" openclaw gateway call agent \
-    --params "$params" \
-    --expect-final \
-    --timeout 240000 \
-    --json 2>/dev/null); then
+  #
+  # Retry ONLY the warm-up race: a 1006 abnormal closure, i.e. the gateway
+  # vanishing mid-call with no close frame while it is still coming up. Every
+  # other outcome is a real result and must fail on the first attempt. That
+  # includes other transport closes — notably 1008 (policy violation), which is a
+  # DELIBERATE server-side close and reproduces identically on every attempt.
+  # Retrying anything broader would mask exactly the incompatibilities this smoke
+  # exists to catch.
+  local attempt
+  local kind=""
+  for attempt in 1 2 3; do
+    if output=$(docker exec "$CID" openclaw gateway call agent \
+      --params "$params" \
+      --expect-final \
+      --timeout 240000 \
+      --json 2>/dev/null); then
+      break
+    fi
+
+    # Surface the structured error identity, plus the websocket close `reason`
+    # for transport errors. That reason is generated by OpenClaw's own gateway
+    # (the loopback ws://127.0.0.1:3001 inside the container), not by the model
+    # provider, so it carries no credentials and is safe to print — and it is the
+    # single most useful line here. Suppressing it hid strings like "pairing
+    # required: device is asking for more scopes than currently approved", which
+    # names the cause outright. Provider error bodies stay suppressed.
+    kind=$(python3 -c '
+import json
+import sys
+
+try:
+    err = json.load(sys.stdin).get("error", {})
+except Exception:
+    print("unparseable")
+    sys.exit()
+
+ident = " ".join(str(err.get(k, "")) for k in ("type", "kind", "code") if err.get(k))
+reason = err.get("reason")
+if reason and str(err.get("type", "")) == "gateway_transport_error":
+    ident = f"{ident} :: {reason}"
+print(ident)
+' <<< "$output" 2>/dev/null || echo "unparseable")
+
+    if [[ "$kind" != *"gateway_transport_error"*"1006"* ]]; then
+      check "live Auto Free agent turn" "nonce returned" "command failed"
+      report_turn_error "$kind"
+      return
+    fi
+
+    echo "  attempt $attempt hit the gateway warm-up race [$kind]; retrying"
+    if [ "$attempt" -lt 3 ]; then
+      wait_for_gateway_serving "post-transport-error" || true
+      sleep 5
+    fi
+    output=""
+  done
+
+  if [ -z "$output" ]; then
     check "live Auto Free agent turn" "nonce returned" "command failed"
-    echo "  Gateway output suppressed because provider errors can contain live credentials."
+    report_turn_error "$kind after 3 attempts"
     return
   fi
 
@@ -454,6 +597,7 @@ run_phase() {
   echo "=== $label: $image ==="
   start_container "$image"
   wait_for_ready "$label"
+  wait_for_gateway_serving "$label"
   assert_openclaw_version "$expected_version"
   assert_openclaw_config_valid
   assert_gateway_status
@@ -479,6 +623,10 @@ run_phase() {
     # crash-looping. Leaves the config valid, so the live turn below still runs
     # against a working gateway — which doubles as proof the repair is sound.
     assert_hook_config_self_heal "$CID" "$PORT" "$TOKEN"
+    # That assertion restarts the gateway, and its own wait only gets the
+    # CONTROLLER back to ready. Re-gate on the gateway actually serving before
+    # the live turn below, or the turn races the gateway's plugin load.
+    wait_for_gateway_serving "$label post-self-heal"
   fi
   assert_exec_approvals_seeded "$CID"
   assert_github_gh_auth
@@ -491,9 +639,9 @@ run_phase() {
 echo "Credential source: $CREDENTIAL_SOURCE"
 echo "Model under test: $KILOCODE_SMOKE_MODEL"
 if [ -n "${KILOCODE_ORGANIZATION_ID:-}" ]; then
-  echo "Organization scope: configured"
+  echo "Organization scope: configured (from ${ORG_SOURCE:-unknown}) — org credits will be used"
 else
-  echo "Organization scope: not configured"
+  echo "Organization scope: NOT configured — this run spends PERSONAL credits only"
 fi
 
 if [ "$MODE" = "upgrade" ]; then

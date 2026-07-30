@@ -24,7 +24,7 @@ for claims_dir in "${TMPDIR:-/tmp}/kilo-mobile-simulator-claims" "${TMPDIR:-/tmp
   [ -d "$claims_dir" ] || continue
   for json in "$claims_dir"/*.json; do
     [ -f "$json" ] || continue
-    grep -q "\"worktreeRoot\": *\"$ROOT\"" "$json" 2>/dev/null || continue
+    node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(r.worktreeRoot===process.argv[2]?0:1)' "$json" "$ROOT" 2>/dev/null || continue
     leftovers+=("device claim: $json")
   done
 done

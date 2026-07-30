@@ -66,12 +66,16 @@ port_free() {
 }
 
 ensure_server() {
-  # Adopt only our own recorded server: an unrecorded Appium answering on the
-  # base port belongs to another device whose hash collided with this block,
-  # and attaching here would interleave taps across devices.
-  if [ -f "$STATE_DIR/server.port" ]; then
+  # Adopt only our own recorded server — and only while its recorded pid is
+  # alive. A live pid with no /status is hung: kill it and start over. A dead
+  # pid with a status answer is a hash-colliding sibling on this port:
+  # adopting it would interleave taps across devices.
+  if [ -f "$STATE_DIR/server.port" ] && [ -f "$STATE_DIR/appium.pid" ]; then
     APPIUM_PORT=$(cat "$STATE_DIR/server.port")
-    if server_status; then return 0; fi
+    if kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null; then
+      if server_status; then return 0; fi
+      stop_server
+    fi
   fi
   ensure_drivers
   local base_port=$APPIUM_PORT attempt
@@ -122,7 +126,10 @@ case "$cmd" in
     case "${2:-}" in
       start) ensure_drivers && ensure_server ;;
       stop) stop_server ;;
-      status) server_status && echo "up ($DEVICE, port $APPIUM_PORT)" || { echo "down"; exit 1; } ;;
+      status)
+        [ -f "$STATE_DIR/server.port" ] && APPIUM_PORT=$(cat "$STATE_DIR/server.port")
+        server_status && echo "up ($DEVICE, port $APPIUM_PORT)" || { echo "down"; exit 1; }
+        ;;
       *) echo "usage: appium.sh <device> server start|stop|status" >&2; exit 1 ;;
     esac
     ;;
@@ -132,13 +139,14 @@ case "$cmd" in
     FLOWS=()
     while [ $# -gt 0 ]; do
       case "$1" in
-        -e) ENV_ARGS+=("$2"); shift 2 ;;
+        -e) [ $# -ge 2 ] || { echo "appium.sh: -e needs a KEY=VALUE" >&2; exit 1; }
+            ENV_ARGS+=("$2"); shift 2 ;;
         *) FLOWS+=("$1"); shift ;;
       esac
     done
     [ "${#FLOWS[@]}" -gt 0 ] || { echo "usage: appium.sh <device> test [-e K=V]... <flow.js> [more-flows.js]" >&2; exit 1; }
     ensure_server
-    env DEVICE="$DEVICE" APPIUM_PORT="$APPIUM_PORT" "${ENV_ARGS[@]}" \
+    env DEVICE="$DEVICE" APPIUM_PORT="$APPIUM_PORT" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} \
       node "$SCRIPT_DIR/wdio/run-flow.js" "${FLOWS[@]}"
     ;;
   hierarchy)

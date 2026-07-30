@@ -217,7 +217,7 @@ cmd_exec() {
 cmd_status() {
   if tmux has-session -t "$SESSION" 2>/dev/null; then
     echo "Remote CLI session '$SESSION' is running."
-    tmux capture-pane -p -t "$SESSION" -S -40 | sed -e 's/[[:space:]]*$//' | grep -v '^$' | tail -20
+    tmux capture-pane -p -t "$SESSION" -S -40 | sed -e 's/[[:space:]]*$//' | grep -v '^$' | tail -20 || true
   else
     echo "No remote CLI session '$SESSION' is running."
     [ -f "$ENV_FILE" ] && echo "(env is prepared; run 'remote-cli.sh exec <args>' or 'start')" || true

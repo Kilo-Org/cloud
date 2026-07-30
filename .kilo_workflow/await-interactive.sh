@@ -7,7 +7,7 @@
 #
 #   await-interactive.sh <tmux-target> <scratch-dir> [--log <file>]
 #
-# Blocks up to --timeout (default 1500s, the ~25-minute monitor cadence),
+# Blocks up to TIMEOUT seconds (default 1500s, the ~25-minute monitor cadence),
 # then reports. Prints exactly one line:
 #
 #   COMPLETED           exit 0  scratch gone — verify the PR is in gate state

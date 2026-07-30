@@ -418,7 +418,9 @@ async function startAndroidEmulator(
         throw error;
       }
     },
-    60_000
+    // Two slow holders (pid-file wait + 30s port bind + teardown each) must
+    // not starve a third slot's healthy launch.
+    120_000
   );
 }
 

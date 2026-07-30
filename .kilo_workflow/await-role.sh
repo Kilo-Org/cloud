@@ -15,7 +15,7 @@
 # sidecar is VOID: every legitimate dispatch goes through dispatch-role.sh.
 # A dead tmux target with no exit file is VOID immediately.
 #
-# Blocks up to --timeout (default 480s — safely under harness command
+# Blocks up to TIMEOUT seconds (480 — safely under harness command
 # timeouts), then reports. Re-invoke while it prints RUNNING. Prints exactly
 # one line:
 #
@@ -72,12 +72,12 @@ while :; do
   NOW=$(date +%s)
   if [ -f "$LOG.exit" ]; then
     CODE=$(cat "$LOG.exit" 2>/dev/null || echo "?")
-    SENTINEL=$(tail -1 "$LOG" 2>/dev/null | sed 's/^EXITCODE=[0-9]*$//;s/[[:space:]]*$//')
+    SENTINEL=$({ tail -1 "$LOG" 2>/dev/null || true; } | sed 's/^EXITCODE=[0-9]*$//;s/[[:space:]]*$//')
     # The human-facing EXITCODE marker is the true last line; the sentinel is
     # the line above it. Tolerate either ordering in case the marker write
     # raced the exit-file write.
     if [ -z "$SENTINEL" ]; then
-      SENTINEL=$(tail -2 "$LOG" 2>/dev/null | head -1 | sed 's/[[:space:]]*$//')
+      SENTINEL=$({ tail -2 "$LOG" 2>/dev/null || true; } | head -1 | sed 's/[[:space:]]*$//')
     fi
     if [[ "$SENTINEL" =~ $SENTINELS ]]; then
       echo "DONE $SENTINEL"

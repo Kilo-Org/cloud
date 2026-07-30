@@ -53,6 +53,9 @@ capture() {
   git -C "$WT" ls-files --others --exclude-standard -z | while IFS= read -r -d '' p; do
     if [ -L "$WT/$p" ]; then
       printf 'link\t%s\t%s\n' "$(readlink "$WT/$p")" "$p"
+    elif [ ! -f "$WT/$p" ]; then
+      # FIFOs and sockets block readers; record existence only.
+      printf 'other\t%s\n' "$p"
     elif command -v sha256sum >/dev/null; then
       printf 'file\t%s\t%s\t%s\n' "$(stat -c %a "$WT/$p" 2>/dev/null || stat -f %p "$WT/$p")" \
         "$(sha256sum "$WT/$p" | cut -d' ' -f1)" "$p"
@@ -93,7 +96,7 @@ case $CMD in
     # Capture to a sibling temp dir and publish atomically, so a killed
     # snapshot can never pass for a complete one.
     TMP=$(mktemp -d "$DIR.tmp.XXXXXX")
-    capture "$TMP"
+    capture "$TMP" || { rm -rf "$TMP"; exit 1; }
     rmdir "$DIR" 2>/dev/null || { echo "baseline: $DIR exists and is not empty — refusing to overwrite" >&2; rm -rf "$TMP"; exit 1; }
     mv "$TMP" "$DIR"
     echo "baseline recorded in $DIR"
@@ -103,7 +106,7 @@ case $CMD in
     NOW=$(mktemp -d "${TMPDIR:-/tmp}/kilo-baseline-check.XXXXXX")
     # Kept on mismatch so the printed diff commands stay runnable.
     trap '[ "${fail:-1}" -eq 0 ] && rm -rf "$NOW"' EXIT
-    capture "$NOW"
+    capture "$NOW" || { rm -rf "$NOW"; exit 1; }
     fail=0
     for f in head status.z worktree.diff index.diff untracked.tsv included.tsv; do
       cmp -s "$DIR/$f" "$NOW/$f" && continue

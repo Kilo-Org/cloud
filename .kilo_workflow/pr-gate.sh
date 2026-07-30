@@ -11,7 +11,7 @@
 #   --assignee   gate-fail unless this handle is among the assignees
 #   --label      gate-fail unless this label is present (monitors: human-ready)
 #                substring 'bot' matching would let any bot vouch for the head
-#   --wait       poll every 120s up to this budget for the bot summary (or
+#   --wait       poll every 30s up to this budget for the bot summary (or
 #                waiver) to appear before reporting; retriggering stays the
 #                orchestrator's move — this only waits
 #
@@ -48,7 +48,7 @@ while :; do
   # createdAt filter never sees later approvals. The REST `since` parameter
   # filters by updated_at — exactly "bot activity postdating the head".
   # REST logins carry the [bot] suffix gh pr view normalizes away.
-  COMMENTS=$(gh api "repos/$REPO/issues/$PR/comments?since=$HEAD_TIME&per_page=100")
+  COMMENTS=$(gh api "repos/$REPO/issues/$PR/comments?since=$HEAD_TIME&per_page=100&sort=updated&direction=desc")
   BOTCOMMENTS=$(jq -r --arg bot "$BOT" --arg waiver "$WAIVER" \
     '[.[] | select((.user.login == $bot or .user.login == ($bot + "[bot]") or .body == $waiver))
       | "\(.user.login) @ \(.updated_at): \(.body | gsub("\\s+"; " ") | .[0:200])"] | .[]' <<<"$COMMENTS")

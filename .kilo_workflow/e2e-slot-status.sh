@@ -29,7 +29,7 @@ while IFS= read -r session; do
     echo "UNACCOUNTED stack: $session"
     unaccounted=1
   fi
-done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^kilo-dev-' || true)
+done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^(kilo-dev-|kilo-e2e-cli-|kilo-e2e-github-stub-)' || true)
 
 for root in "${TMPDIR:-/tmp}/kilo-mobile-simulator-claims" \
             "${TMPDIR:-/tmp}/kilo-mobile-android-claims" \

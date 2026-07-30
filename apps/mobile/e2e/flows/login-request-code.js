@@ -28,7 +28,9 @@ module.exports = async function requestCode(ctx) {
   await h.inputText(email);
   // Fail here, immediately and legibly, instead of 15s later on a missing
   // "Verify code": a mismatch means typing landed in a field that was not empty.
-  await h.assertVisible(email);
+  // The address is text, not a pattern — escape before it reaches the regex
+  // selector (plus-sign and dot aliases never full-match otherwise).
+  await h.assertVisible(email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   await h.tapOn('Send sign-in code');
   // Sending is a network round-trip.
   await h.waitVisible('Verify code', { timeout: 15000 });

@@ -55,8 +55,9 @@ else
   ACTUAL=$(checksum "$KILO_IMAGE_TMP/$ASSET")
   [ "$ACTUAL" = "$EXPECTED" ] || { echo "gh-image checksum mismatch" >&2; exit 1; }
   mkdir -p "$(dirname "$BINARY")"
-  install -m 0755 "$KILO_IMAGE_TMP/$ASSET" "$BINARY"
+  install -m 0755 "$KILO_IMAGE_TMP/$ASSET" "$BINARY.tmp.$$"
+  mv -f "$BINARY.tmp.$$" "$BINARY"
 fi
 
-[ "$ACTUAL" = "$EXPECTED" ] || { echo "cached gh-image checksum mismatch" >&2; exit 1; }
+[ "$ACTUAL" = "$EXPECTED" ] || { echo "cached gh-image checksum mismatch" >&2; rm -f "$BINARY"; exit 1; }
 exec "$BINARY" "$SCREENSHOT" --repo "$REPO"

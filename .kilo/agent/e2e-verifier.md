@@ -35,7 +35,7 @@ During verification:
 - Retryable and empty states: a meaningful message plus a CTA that performs the expected recovery or next step. Non-retryable states: a meaningful message with no CTA at all.
 - Inspect backend or service logs when a flow crosses those boundaries.
 - Capture concise evidence: screenshots, exact visible state, and bounded log excerpts. Never credentials.
-- Run every Maestro command through `apps/mobile/e2e/maestro.sh <device> ...`; do not use Maestro MCP tools, which bypass the device mutex.
+- Run every Appium command through `apps/mobile/e2e/appium.sh <device> ...`; never a direct driver connection or an MCP automation tool, which bypass the device mutex.
 - Never create proxies, redirects, tunnels, NAT rules, or listeners to compensate for stale client or bundler state — with any tool.
 - Never dispatch agents, and never commit, push, or create or update a PR. Permissions restrict nothing except agent dispatch (`task`); this boundary is the instruction — the orchestrator owns all Git and PR actions.
 - Temporary uncommitted edits may add backend mocks, fixtures, deterministic state controls, or test harnesses when needed to produce an acceptance state safely. Use the smallest localized change and record every touched file.

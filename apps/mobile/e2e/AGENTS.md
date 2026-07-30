@@ -134,7 +134,7 @@ xcrun simctl openurl <udid> \
 
 ## Sign In and Out
 
-Backend and Metro must be running. These idempotent wrappers verify simulator ownership, required services, the generated API port, and Metro project provenance, then reconnect the dev client to this worktree's exact Metro URL before Maestro runs. Never bypass their preflight or call the login YAML flows directly:
+Backend and Metro must be running. These idempotent wrappers verify simulator ownership, required services, the generated API port, and Metro project provenance, then reconnect the dev client to this worktree's exact Metro URL before Appium runs. Never bypass their preflight or call the flow files directly:
 
 ```bash
 apps/mobile/e2e/login.sh <udid> [email]   # default: e2e-mobile-<worktree>-<ios|android>@example.com
@@ -143,7 +143,7 @@ apps/mobile/e2e/logout.sh <udid>
 
 The default email is `e2e-mobile-<worktree-basename>-<ios|android>@example.com`, derived from the worktree and device serial. Parallel platform shards therefore use separate backend users. Pass an explicit email only when a test needs a specific account.
 
-Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. If the request half fails it cold-relaunches through `flows/open-app.yaml` and retries once — that clears both a half-started dev client and an email field left dirty by an earlier run — and if the retry fails too it says which half broke: no outbox email means the app never reached `POST /api/auth/native/otp`, a new outbox email means the request worked and only the code screen was never reached. `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app; `flows/open-app.yaml` is the standalone cold-launch flow.
+Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. If the request half fails it cold-relaunches through `flows/open-app.js` and retries once — that clears both a half-started dev client and an email field left dirty by an earlier run — and if the retry fails too it says which half broke: no outbox email means the app never reached `POST /api/auth/native/otp`, a new outbox email means the request worked and only the code screen was never reached. `flows/settle-app.js` handles late tracking and Expo developer-menu prompts without restarting the app; `flows/open-app.js` is the standalone cold-launch flow.
 
 Native prompts are states in the flow, not errors to tap through blindly:
 
@@ -152,7 +152,7 @@ Native prompts are states in the flow, not errors to tap through blindly:
 - Feature-triggered prompts (speech recognition, microphone): handle only when the flow reaches that feature. Inspect the hierarchy, copy the exact button accessibility text (`Allow` or `Don’t Allow`), and choose the state the test requires.
 - Never use a generic `tapOn: 'Allow'` before identifying which prompt is visible.
 
-Maestro can emit a large interactive transcript. Keep successful output out of context; show only a bounded failure tail:
+Appium can emit a large server and driver transcript. Keep successful output out of context; show only a bounded failure tail:
 
 ```bash
 LOGIN_LOG=$(mktemp /tmp/kilo-login.XXXXXX)
@@ -162,12 +162,11 @@ apps/mobile/e2e/login.sh <udid> >"$LOGIN_LOG" 2>&1 || \
 
 When editing the flows, preserve these device-tested constraints:
 
-- Tap the Kilo home-screen icon; Maestro `launchApp` can bounce the Expo dev client to SpringBoard.
-- Pass `EMAIL` and `OTP` with `-e`; flow-level defaults override `-e` values in the installed Maestro version.
+- Pass `EMAIL` and `OTP` with `-e`; the flows require them and fail fast when absent.
 - Target the email field by its placeholder `you@example.com`, and tap `Verify code` without trying to dismiss the number pad.
-- The email field is uncontrolled, so a login page left on screen by an earlier run still holds its address, and `inputText` inserts at the caret the tap just dropped mid-string. Erase the field first and assert the typed address before submitting; without that, two attempts interleave into one malformed address and the flow dies 15s later on a missing `Verify code`.
-- Keep every control a flow taps clear of the keyboard. Maestro taps an element's centre, and iOS hands a touch inside `UIRemoteKeyboardWindow` to the keyboard while Maestro still logs the tap `COMPLETED` — a silent no-op. Verify with `e2e/maestro.sh <udid> hierarchy`: the control's centre must be above the keyboard window's top bound. See `.kilo_workflow/learnings/maestro-tap-swallowed-by-ios-keyboard.md`.
-- The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`).
+- The email field is uncontrolled, so a login page left on screen by an earlier run still holds its address, and typing inserts at the caret the tap just dropped mid-string. Erase the field first and assert the typed address before submitting; without that, two attempts interleave into one malformed address and the flow dies 15s later on a missing `Verify code`.
+- Keep every control a flow taps clear of the keyboard. Taps land on the element's centre, and iOS hands a touch inside `UIRemoteKeyboardWindow` to the keyboard while the driver still reports the tap delivered — a silent no-op. Verify with `e2e/appium.sh <udid> hierarchy`: the control's centre must be above the keyboard window's top bound. The same mechanism creates a dead zone under fixed header chrome; never read a swallowed tap as a product regression.
+- The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`, topmost by position).
 
 Seed only when needed. `pnpm dev:seed` with no arguments lists every topic and its usage:
 
@@ -178,23 +177,27 @@ pnpm dev:seed app:add-credits <user-id> <usd>    # grant credits
 pnpm dev:seed app:api-token <email>              # mint a bearer token (used by remote-cli.sh)
 ```
 
-## Maestro
+## Appium + WebdriverIO
 
-One-time machine setup: `brew install maestro`. Workflow verification never uses Maestro Model Context Protocol (MCP) tools because they bypass the device lock; use the repository wrapper below.
+Setup is automatic: the repository install provides Appium and the webdriverio client, and the wrapper below installs the XCUITest / UiAutomator2 drivers into a machine-global `APPIUM_HOME` (`~/.cache/kilo-appium`, override with `KILO_APPIUM_HOME`) on first use. Never use MCP automation tools or a hand-rolled driver connection: they bypass the per-device lock; use the repository wrapper.
 
-- Maestro is the primary automation driver on both iOS and Android. Fall back to `xcrun simctl` (iOS) or repository-wrapped ADB (Android) only when Maestro cannot inspect or operate a native state, or when low-level device control is required. Setup still uses `simctl`/ADB for boot, install, dev-client URL reconnection, and screenshots; the repository wrappers own shutdown and cleanup.
-- With more than one simulator booted (parallel worktrees), always target by UDID and go through `e2e/maestro.sh <udid> ...` — it serializes per device (the driver is single-tenant) and without an explicit device Maestro picks an arbitrary booted simulator, so taps silently land on another worktree’s device. The Maestro MCP tools mis-target the same way; prefer the CLI plus `simctl` screenshots when several simulators are up.
+- Appium is the primary automation driver on both iOS and Android. Fall back to `xcrun simctl` (iOS) or repository-wrapped ADB (Android) only when Appium cannot inspect or operate a native state, or when low-level device control is required. Setup still uses `simctl`/ADB for boot, install, dev-client URL reconnection, and screenshots; the repository wrappers own shutdown and cleanup.
+- With more than one device booted (parallel worktrees), always go through `e2e/appium.sh <udid> ...` — it serializes per device (one Appium server per device on a deterministic port, one session at a time), so taps can never silently land on another worktree's device.
 - Inspect the screen before selecting elements; re-inspect after UI changes.
-- Never guess a selector from a visible label or screenshot. Copy the exact text or accessibility value from `e2e/maestro.sh <udid> hierarchy`. Maestro text matching is full-string regex, not substring.
-- Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before relying on these examples; the count and labels can change.
+- Never guess a selector from a visible label or screenshot. Copy the exact text or accessibility value from `e2e/appium.sh <udid> hierarchy` (writes the XML page source; redirect to a file and grep it). Matching is full-string regex against the element label (iOS) or text / content-desc (Android), not substring.
+- Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn('Agents')` is wrong. Inspect again before relying on these examples; the count and labels can change.
+- Flows are plain node modules in `e2e/flows/*.js` using the helpers in `e2e/wdio/helpers.js` (`tapOn`, `assertVisible`, `waitVisible`, `inputText`, `eraseText`, `scrollUntilVisible`, `stopApp`/`launchApp`, `when`/`whenNot`). A failed helper throws and the process exit code is the verdict — no report files to inspect.
 
-CLI fallback — always through `e2e/maestro.sh`, which serializes per device (Maestro's per-device driver is single-tenant; two concurrent sessions against one UDID interleave taps and fail flows in ways that read as product defects):
+CLI usage — always through `e2e/appium.sh`, which serializes per device (two concurrent sessions against one UDID interleave taps and fail flows in ways that read as product defects):
 
 ```bash
-apps/mobile/e2e/maestro.sh <udid|emulator-5554> test -e KEY=VALUE <flow.yaml>
+apps/mobile/e2e/appium.sh <udid|emulator-5554> test -e KEY=VALUE <flow.js>
+apps/mobile/e2e/appium.sh <udid> hierarchy > /tmp/hierarchy.xml
 xcrun simctl io <udid> screenshot <path>      # iOS
 pnpm dev:mobile:android adb -s <serial> exec-out screencap -p > <path>  # Android
 ```
+
+The Appium server per device starts on demand and keeps running for the bundle's lifetime; stop it during bundle cleanup with `apps/mobile/e2e/appium.sh <udid> server stop`.
 
 Attach a screenshot of a changed flow to the PR when it helps review. For transitions, prefer a short screenshot loop over `simctl io recordVideo`, which can produce one-frame recordings.
 
@@ -306,7 +309,7 @@ pnpm dev:mobile:android adb -s <serial> shell am start -a android.intent.action.
 
 Drives a real App Link through Android intent resolution.
 
-### ADB fallback (Maestro stays primary)
+### ADB fallback (Appium stays primary)
 
 Derive tap coordinates from the current `uiautomator` bounds, never from screenshots or remembered positions. Re-dump after every navigation or prompt.
 

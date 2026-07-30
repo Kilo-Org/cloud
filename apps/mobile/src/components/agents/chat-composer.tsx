@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Composer owns its uncontrolled input, slash suggestions, and submission flow end-to-end.
  * The wiring between the TextInput and SlashCommandSuggestions is covered by
- * Maestro E2E; this app has no @testing-library/react-native dependency, so it
+ * Appium E2E; this app has no @testing-library/react-native dependency, so it
  * is not expressed as a unit test.
  */
 import * as Haptics from 'expo-haptics';

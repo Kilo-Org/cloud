@@ -1,9 +1,10 @@
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { Plug } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
 import { getGenericToolTitle } from '../tool-card-utils';
 
@@ -30,22 +31,24 @@ export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const hasExpandedContent = Boolean(inputStr) || Boolean(output) || Boolean(error);
 
   return (
-    <ToolCardShell icon={Plug} title={part.tool} subtitle={subtitle} status={part.state.status}>
+    <ToolCardShell
+      icon={Plug}
+      title={part.tool}
+      subtitle={subtitle}
+      status={part.state.status}
+      part={part}
+    >
       {hasExpandedContent ? (
         <View className="gap-2">
           {inputStr ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <Text selectable className="font-mono text-xs leading-4 text-muted-foreground">
-                {inputStr.slice(0, 1000)}
-              </Text>
-            </ScrollView>
+            <MonoScrollBlock
+              content={inputStr}
+              maxLength={1000}
+              textClassName="text-muted-foreground"
+            />
           ) : null}
           {output ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <Text selectable className="font-mono text-xs leading-4 text-foreground">
-                {output.slice(0, 2000)}
-              </Text>
-            </ScrollView>
+            <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
           ) : null}
           {error ? (
             <Text selectable className="text-xs text-destructive">

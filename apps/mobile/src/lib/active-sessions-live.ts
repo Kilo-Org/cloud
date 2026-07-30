@@ -2,12 +2,16 @@
  * Pure helpers for the app-level active-sessions live-sync owner.
  *
  * WS payloads lack enrichment fields (`createdOnPlatform`/`createdAt`/
- * `updatedAt`); the merge helpers preserve those fields for ids already in
- * the cache while letting every other field (including `connectionId`)
- * come from the latest WS payload, so session ownership can transfer
- * between CLI connections. The functions here never touch React, the
- * network, or a QueryClient — they are pure and exhaustively unit-tested
- * alongside this file.
+ * `updatedAt`) and `organizationId`; the merge helpers preserve those
+ * fields for ids already in the cache while letting every other field
+ * (including `connectionId`) come from the latest WS payload, so session
+ * ownership can transfer between CLI connections. Once a row has been
+ * through a tRPC fetch the cached DB title is sticky too — heartbeats
+ * never carry a cloud rename. `capabilities` is the hybrid exception: the
+ * WS value wins when present (upgrade or downgrade), and the cached value
+ * is preserved only when the WS row omits the field. The functions here
+ * never touch React, the network, or a QueryClient — they are pure and
+ * exhaustively unit-tested alongside this file.
  *
  * Status resolution for live rows: CLI heartbeats/snapshots often report
  * only idle/busy while `cli_sessions_v2` holds question/permission. A
@@ -24,7 +28,7 @@ import {
   sessionsListDataSchema,
   type SessionStatusUpdatedPayload,
   sessionStatusUpdatedPayloadSchema,
-} from 'cloud-agent-sdk/schemas';
+} from '@kilocode/cloud-agent-sdk/schemas';
 
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
@@ -37,6 +41,7 @@ type IncomingWsSession = {
   gitBranch?: string;
   parentSessionId?: string;
   connectionId?: string;
+  capabilities?: { attachments?: boolean };
 };
 
 /** Cached active session (tRPC output); enrichment fields preserved across WS. */
@@ -46,8 +51,8 @@ export type CachedActiveSessionsData = {
   sessions: CachedActiveSession[];
 };
 
+/** The three fields that mark a row as having been through a tRPC fetch. */
 const ENRICHMENT_FIELDS = ['createdOnPlatform', 'createdAt', 'updatedAt'] as const;
-type EnrichmentField = (typeof ENRICHMENT_FIELDS)[number];
 
 /** Structured question/permission — the Active Now "NEEDS INPUT" badge. */
 export function isAttentionStatus(status: string | null | undefined): boolean {
@@ -136,14 +141,24 @@ export function parseSessionStatusUpdatedPayload(
 
 // ── Enrichment-preserving merge helpers ──────────────────────────────
 
-function readEnrichment(
-  current: CachedActiveSession | undefined
-): Record<EnrichmentField, string | undefined> {
+type PreservedFields = {
+  createdOnPlatform: string | undefined;
+  createdAt: string | undefined;
+  updatedAt: string | undefined;
+  /** Sticky like the three above: WS payloads never carry an org id. */
+  organizationId: string | null | undefined;
+};
+
+function readEnrichment(current: CachedActiveSession | undefined): PreservedFields {
   return {
     createdOnPlatform:
       typeof current?.createdOnPlatform === 'string' ? current.createdOnPlatform : undefined,
     createdAt: typeof current?.createdAt === 'string' ? current.createdAt : undefined,
     updatedAt: typeof current?.updatedAt === 'string' ? current.updatedAt : undefined,
+    // Pass through as-is: `null` means "the server said personal". Do not
+    // collapse with a `typeof === 'string'` guard — that would hide every
+    // personal row from the personal tray (see filter helper).
+    organizationId: current?.organizationId,
   };
 }
 
@@ -160,10 +175,19 @@ function withEnrichmentAndConnectionId(
     // Sticky attention: a non-attention WS status must not clear a held
     // question/permission. "stored" for WS paths is the cached row status.
     status: effectiveStatus(row.status, current?.status),
-    title: row.title,
+    // The tray title is DB-authoritative (the router enriches it from
+    // cli_sessions_v2), so once a row has been through a tRPC fetch a heartbeat's
+    // CLI title must not overwrite it — nothing propagates a cloud rename back to
+    // the CLI, which is what made a renamed session flash its old name. An
+    // unenriched row (never joined) still takes the wire title so a just-spawned
+    // session shows something immediately.
+    title: current && isEnriched(current) ? current.title : row.title,
     gitUrl: row.gitUrl,
     gitBranch: row.gitBranch,
     connectionId,
+    // Wire capabilities win when present (upgrade and downgrade); cache
+    // only when the WS row omits the field (legacy payloads).
+    capabilities: row.capabilities ?? current?.capabilities,
     ...enrichment,
   };
 }
@@ -171,9 +195,10 @@ function withEnrichmentAndConnectionId(
 /**
  * Replace the entire cache with the snapshot. Rows whose id is in both
  * the snapshot and the cache keep the three enrichment fields and any
- * held attention status from the cache; every other field (including
- * `connectionId`) comes from the snapshot. Rows absent from the snapshot
- * are dropped.
+ * held attention status from the cache; `capabilities` comes from the
+ * snapshot when present and from the cache when omitted; every other
+ * field (including `connectionId`) comes from the snapshot. Rows absent
+ * from the snapshot are dropped.
  */
 export function mergeSnapshotForActiveSessions(
   current: readonly CachedActiveSession[],
@@ -250,6 +275,42 @@ export function applySessionStatusUpdated(
   );
 }
 
+/**
+ * Optimistic tray rename. Unknown session ids are ignored — the live cache only
+ * holds active rows.
+ */
+export function applyActiveSessionTitle(
+  current: readonly CachedActiveSession[],
+  sessionId: string,
+  title: string
+): CachedActiveSession[] {
+  return current.map(row =>
+    row.id === sessionId && row.title !== title ? { ...row, title } : row
+  );
+}
+
+/**
+ * Keep only the rows belonging to the selected personal/org context:
+ * `undefined` = no filter, `null` = personal, a uuid = that organization.
+ *
+ * The router attributes every row it returns (`null` for a session with no
+ * `cli_sessions_v2` row), so an absent `organizationId` here means the row was
+ * inserted by the WS push path, which cannot carry one. Such a row is hidden in
+ * ANY filtered context — strict equality against a `string | null` context drops
+ * it — and reappears once the next tRPC fetch attributes it. Treating unknown as
+ * personal instead would re-admit an out-of-context session on every heartbeat,
+ * for the whole life of that session (D6).
+ */
+export function filterActiveSessionsByOrganization<T extends { organizationId?: string | null }>(
+  sessions: readonly T[],
+  organizationId: string | null | undefined
+): T[] {
+  if (organizationId === undefined) {
+    return [...sessions];
+  }
+  return sessions.filter(session => session.organizationId === organizationId);
+}
+
 export function removeActiveSessionsForConnection(
   current: readonly CachedActiveSession[],
   connectionId: string
@@ -262,13 +323,11 @@ export function removeActiveSessionsForConnection(
  * field is set. Empty `createdOnPlatform` (e.g. `'unknown'`) is still a
  * real value from the tRPC router and counts as enriched; the trpc
  * pipeline is the source of truth for "the DB row has been joined in".
+ * `organizationId` is sticky too but does NOT count — WS-inserted rows
+ * never carry it, and the enrichment-retry cadence must not shift.
  */
 export function isEnriched(row: CachedActiveSession): boolean {
-  return (
-    typeof row.createdOnPlatform === 'string' ||
-    typeof row.createdAt === 'string' ||
-    typeof row.updatedAt === 'string'
-  );
+  return ENRICHMENT_FIELDS.some(field => typeof row[field] === 'string');
 }
 
 export function hasUnenrichedLiveId(rows: readonly CachedActiveSession[]): boolean {

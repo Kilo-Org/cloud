@@ -255,11 +255,11 @@ export function ProfileScreen() {
               return (
                 <Animated.View
                   key={`${p.provider}-${p.email}`}
-                  className="flex-row items-center gap-3 rounded-lg bg-secondary p-3"
+                  className="flex-row items-start gap-3 rounded-lg bg-secondary p-3"
                   entering={FadeIn.duration(200)}
                 >
                   <Icon size={18} color={colors.secondaryForeground} />
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Text className="text-sm font-medium capitalize">{p.provider}</Text>
                     <Text variant="muted" className="text-xs">
                       {p.email}
@@ -312,40 +312,36 @@ export function ProfileScreen() {
           </View>
         ) : null}
 
-        {/* Actions */}
+        {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
-          <View className="flex-row gap-3">
-            <ActionTile
-              icon={MessageSquare}
-              label="Feedback"
-              color={colors.mutedForeground}
-              onPress={() => {
-                showFeedbackPrompt(userId);
-              }}
-            />
-            <ActionTile
-              icon={Lock}
-              label="Privacy choices"
-              color={colors.mutedForeground}
-              onPress={showPrivacyChoices}
-            />
-          </View>
-          <View className="flex-row gap-3">
-            <ActionTile
-              icon={LogOut}
-              label="Sign Out"
-              color={colors.mutedForeground}
-              onPress={confirmSignOut}
-            />
-            <ActionTile
-              icon={Trash2}
-              label="Delete Account"
-              color={colors.destructive}
-              destructive
-              disabled={deleteAccount.isPending}
-              onPress={confirmDeleteAccount}
-            />
-          </View>
+          <ActionTile
+            icon={MessageSquare}
+            label="Feedback"
+            color={colors.mutedForeground}
+            onPress={() => {
+              showFeedbackPrompt(userId);
+            }}
+          />
+          <ActionTile
+            icon={Lock}
+            label="Privacy choices"
+            color={colors.mutedForeground}
+            onPress={showPrivacyChoices}
+          />
+          <ActionTile
+            icon={LogOut}
+            label="Sign Out"
+            color={colors.mutedForeground}
+            onPress={confirmSignOut}
+          />
+          <ActionTile
+            icon={Trash2}
+            label="Delete Account"
+            color={colors.destructive}
+            destructive
+            disabled={deleteAccount.isPending}
+            onPress={confirmDeleteAccount}
+          />
 
           <Text className="text-center text-xs text-muted-foreground">
             v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})

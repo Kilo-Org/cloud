@@ -9,8 +9,8 @@
 
 import { type AgentAttachmentExtension, type AgentAttachmentMime } from './constants';
 
-export type AgentAttachmentKind = 'image' | 'document';
-export type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'error';
+type AgentAttachmentKind = 'image' | 'document';
+type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'error';
 
 export type AgentAttachment = {
   id: string;
@@ -52,7 +52,7 @@ export type AgentAttachmentWire = {
  * NOTE: there is NO `mime` field on the descriptor. Every consumer
  * derives MIME from the validated `remoteName` extension.
  */
-export type AgentAttachmentSubmissionFile = {
+type AgentAttachmentSubmissionFile = {
   remoteName: string;
   originalName: string;
   size: number;

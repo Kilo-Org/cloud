@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   ChevronDown,
+  Sparkles,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -56,6 +57,8 @@ import {
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
+import { ReviewMdConversionDialog } from './ReviewMdConversionDialog';
+import { buildSelectableRepositories } from '@/lib/code-reviews/core/selectable-repositories';
 import {
   RepositoryModelOverrides,
   type RepositoryModelOverrideValue,
@@ -77,21 +80,13 @@ import {
 
 type Platform = 'github' | 'gitlab';
 
-export type GitLabStatusData = {
-  connected: boolean;
-  integration?: {
-    isValid: boolean;
-    webhookSecret?: string;
-    instanceUrl?: string;
-  };
-};
-
 export type ReviewConfigFormProps = {
   organizationId?: string;
   platform?: Platform;
-  gitlabStatusData?: GitLabStatusData;
   /** Same gate as the manual council UI: local dev, or an entitled org behind the rollout flag. */
   councilUiEnabled?: boolean;
+  /** Local dev, or behind the `code-review-md-conversion` flag: gates the conversion button/dialog. */
+  conversionUiEnabled?: boolean;
 };
 
 // Labels/descriptions stay web-local; the ids/values themselves are derived
@@ -137,8 +132,8 @@ export const REVIEW_STYLES = REVIEW_STYLE_VALUES.map(value => ({
 export function ReviewConfigForm({
   organizationId,
   platform = 'github',
-  gitlabStatusData,
   councilUiEnabled = false,
+  conversionUiEnabled = false,
 }: ReviewConfigFormProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -252,6 +247,7 @@ export function ReviewConfigForm({
   // surfaced to configs that already have something stored in it, and stays
   // visible for the rest of the session even if the user clears it.
   const [showCustomInstructions, setShowCustomInstructions] = useState(false);
+  const [conversionDialogOpen, setConversionDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
@@ -275,6 +271,8 @@ export function ReviewConfigForm({
   // Optional council label gate, edited as a comma-separated string; parsed to a list on save.
   const [councilRequiredLabelsInput, setCouncilRequiredLabelsInput] = useState<string>('');
   const [useReviewMd, setUseReviewMd] = useState(true);
+  // Feature-level guardrail; defaults to skipping bot PRs (matches the server default).
+  const [skipBotPullRequests, setSkipBotPullRequests] = useState(true);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
   // Webhook sync result from last save
@@ -302,20 +300,28 @@ export function ReviewConfigForm({
     [selectedModel]
   );
 
-  const selectableRepositories = useMemo(() => {
-    const cachedRepositories = (repositoriesData?.repositories ?? []).map(repo => ({
-      id: repo.id,
-      name: repo.name,
-      full_name: repo.fullName,
-      private: repo.private,
-    }));
-    const cachedRepositoryIds = new Set(cachedRepositories.map(repo => repo.id));
-    const legacyRepositories = (configData?.manuallyAddedRepositories ?? []).filter(
-      repo => !cachedRepositoryIds.has(repo.id)
-    );
+  const selectableRepositories = useMemo(
+    () =>
+      buildSelectableRepositories(
+        repositoriesData?.repositories ?? [],
+        configData?.manuallyAddedRepositories ?? []
+      ),
+    [configData?.manuallyAddedRepositories, repositoriesData?.repositories]
+  );
 
-    return [...cachedRepositories, ...legacyRepositories];
-  }, [configData?.manuallyAddedRepositories, repositoriesData?.repositories]);
+  // Repos the conversion dialog may offer. Fetched integration repos ONLY (no manually-added
+  // entries, which are unverified client input) so this list stays in sync with the server route's
+  // allowlist — a repo the dialog offers is always one the route will authorize.
+  const conversionRepositories = useMemo(
+    () => buildSelectableRepositories(repositoriesData?.repositories ?? [], []),
+    [repositoriesData?.repositories]
+  );
+
+  // The conversion runs on the SAVED config server-side, so the button gates on the persisted value
+  // and blocks (with an explanation) while there are unsaved edits or nothing is saved yet.
+  const savedCustomInstructions = configData?.customInstructions ?? '';
+  const hasSavedCustomInstructions = savedCustomInstructions.trim().length > 0;
+  const hasUnsavedCustomInstructionEdits = customInstructions !== savedCustomInstructions;
 
   // Reset thinking effort when the model changes and the current selection is invalid
   useEffect(() => {
@@ -324,13 +330,45 @@ export function ReviewConfigForm({
     }
   }, [availableVariants, thinkingEffort]);
 
-  // Mutation for regenerating webhook secret
-  const regenerateSecretMutation = useMutation(
+  // Mutation for regenerating webhook secret. The org path is billing-gated
+  // (owner/billing_manager only); the personal path is self-gated. The
+  // secret is returned ONCE on success and never re-fetched from status —
+  // status no longer carries it.
+  const orgRegenerateSecretMutation = useMutation(
+    trpc.organizations.reviewAgent.rotateGitLabWebhookSecret.mutationOptions({
+      onSuccess: data => {
+        setRegeneratedSecret(data.webhookSecret);
+        const updated = data.webhookSync.updated;
+        const errors = data.webhookSync.errors.length;
+        toast.success(
+          errors > 0
+            ? `Webhook secret rotated. ${updated} webhooks updated, ${errors} error(s) — check audit log.`
+            : `Webhook secret rotated. ${updated} webhook(s) re-synced.`
+        );
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.reviewAgent.getGitLabStatus.queryKey({
+            organizationId: organizationId ?? '',
+          }),
+        });
+      },
+      onError: error => {
+        toast.error('Failed to rotate webhook secret', {
+          description: error.message,
+        });
+      },
+    })
+  );
+  const personalRegenerateSecretMutation = useMutation(
     trpc.gitlab.regenerateWebhookSecret.mutationOptions({
       onSuccess: data => {
         setRegeneratedSecret(data.webhookSecret);
-        toast.success('Webhook secret regenerated successfully');
-        // Invalidate the GitLab status query to refresh the data
+        const updated = data.webhookSync.updated;
+        const errors = data.webhookSync.errors.length;
+        toast.success(
+          errors > 0
+            ? `Webhook secret regenerated. ${updated} webhooks updated, ${errors} error(s) — check audit log.`
+            : `Webhook secret regenerated. ${updated} webhook(s) re-synced.`
+        );
         void queryClient.invalidateQueries({
           queryKey: trpc.personalReviewAgent.getGitLabStatus.queryKey(),
         });
@@ -345,8 +383,16 @@ export function ReviewConfigForm({
 
   const handleRegenerateSecret = () => {
     setRegeneratedSecret(null); // Clear any previously shown secret
-    regenerateSecretMutation.mutate({});
+    if (organizationId) {
+      orgRegenerateSecretMutation.mutate({ organizationId });
+    } else {
+      personalRegenerateSecretMutation.mutate();
+    }
   };
+
+  const regenerateSecretMutation = organizationId
+    ? orgRegenerateSecretMutation
+    : personalRegenerateSecretMutation;
 
   const handleCopyWebhookUrl = async () => {
     await navigator.clipboard.writeText(webhookUrl);
@@ -355,16 +401,10 @@ export function ReviewConfigForm({
     setTimeout(() => setCopiedWebhookUrl(false), 2000);
   };
 
-  const handleCopyWebhookSecret = async () => {
-    const secret = gitlabStatusData?.integration?.webhookSecret;
-    if (secret) {
-      await navigator.clipboard.writeText(secret);
-      setCopiedWebhookSecret(true);
-      toast.success('Webhook secret copied to clipboard');
-      setTimeout(() => setCopiedWebhookSecret(false), 2000);
-    }
-  };
-
+  // The status endpoint no longer returns the webhook secret, so the old
+  // `handleCopyWebhookSecret` (which copied the status-provided secret) and
+  // its markup are removed. The only path to view/copy the secret is the
+  // rotate mutation, which returns it once into `regeneratedSecret` below.
   const handleCopyRegeneratedSecret = async () => {
     if (regeneratedSecret) {
       await navigator.clipboard.writeText(regeneratedSecret);
@@ -422,6 +462,7 @@ export function ReviewConfigForm({
         )
       );
       setUseReviewMd(!(configData.disableReviewMd ?? false));
+      setSkipBotPullRequests(configData.skipBotPullRequests ?? true);
     }
   }, [configData, isGitLab]);
 
@@ -683,6 +724,7 @@ export function ReviewConfigForm({
         council: councilPayload,
         councilEnabledRepositoryIds: councilEnabledRepositoryIdsPayload,
         disableReviewMd: !useReviewMd,
+        skipBotPullRequests,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -700,6 +742,7 @@ export function ReviewConfigForm({
         manuallyAddedRepositories,
         repositoryModelOverrides: repositoryModelOverridesPayload,
         disableReviewMd: !useReviewMd,
+        skipBotPullRequests,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -885,6 +928,30 @@ export function ReviewConfigForm({
               />
             </div>
 
+            {/* GitHub only: bot detection relies on the GitHub-authoritative user.type, which
+                GitLab/Bitbucket webhooks do not provide, so the toggle is hidden there. */}
+            {!isGitLab && (
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="skip-bot-prs" className="text-base font-semibold">
+                    Skip pull requests from bots
+                  </Label>
+                  <p className="text-muted-foreground text-sm">
+                    Do not run automated reviews on {prLabel} opened by bot accounts (for example
+                    Dependabot or Renovate). Turn this off to review bot {prLabel} too.
+                  </p>
+                </div>
+                <Switch
+                  id="skip-bot-prs"
+                  checked={skipBotPullRequests}
+                  onCheckedChange={setSkipBotPullRequests}
+                  disabled={
+                    orgSaveMutation.isPending || personalSaveMutation.isPending || !isEnabled
+                  }
+                />
+              </div>
+            )}
+
             {/* Focus Areas (global) */}
             <div className="space-y-3">
               <Label>Focus Areas</Label>
@@ -935,6 +1002,29 @@ export function ReviewConfigForm({
                     Learn about REVIEW.md
                   </Link>
                 </p>
+                {conversionUiEnabled && (
+                  <div className="space-y-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConversionDialogOpen(true)}
+                      disabled={!hasSavedCustomInstructions || hasUnsavedCustomInstructionEdits}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Help me automate the conversion
+                    </Button>
+                    {hasUnsavedCustomInstructionEdits ? (
+                      <p className="text-muted-foreground text-sm">
+                        Save your changes first. The conversion uses your saved Custom Instructions.
+                      </p>
+                    ) : !hasSavedCustomInstructions ? (
+                      <p className="text-muted-foreground text-sm">
+                        Add and save Custom Instructions above to convert them.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1317,30 +1407,6 @@ export function ReviewConfigForm({
                                 </p>
                               </div>
                             </>
-                          ) : gitlabStatusData?.integration?.webhookSecret ? (
-                            <>
-                              <div className="flex items-center gap-2">
-                                <code className="bg-muted flex-1 rounded px-3 py-2 font-mono text-sm">
-                                  ••••••••••••••••
-                                </code>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handleCopyWebhookSecret}
-                                  className="shrink-0"
-                                >
-                                  {copiedWebhookSecret ? (
-                                    <Check className="h-4 w-4 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                              <p className="text-muted-foreground text-xs">
-                                Use this secret token in your GitLab webhook configuration for
-                                security.
-                              </p>
-                            </>
                           ) : (
                             <p className="text-muted-foreground text-sm">
                               No webhook secret configured. Click regenerate to create one.
@@ -1396,6 +1462,16 @@ export function ReviewConfigForm({
                   : 'Save Configuration'}
               </Button>
             </div>
+
+            {conversionUiEnabled && (
+              <ReviewMdConversionDialog
+                open={conversionDialogOpen}
+                onOpenChange={setConversionDialogOpen}
+                organizationId={organizationId}
+                platform={platform}
+                repositories={conversionRepositories}
+              />
+            )}
           </div>
         </div>
       </CardContent>

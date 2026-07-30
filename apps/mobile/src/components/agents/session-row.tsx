@@ -16,9 +16,10 @@ import {
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatMeta,
-  formatSessionListCost,
+  formatSessionTotalCost,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
+import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import {
   formatSpokenCost,
   formatSpokenTimeAgo,
@@ -65,6 +66,16 @@ type StoredSessionRowProps = {
    * Tap is preserved either way. Defaults to `true`.
    */
   interactive?: boolean;
+  /**
+   * Forwarded to the base `SessionRow` live dot. Defaults to `false` so
+   * Home and the Agents list stay behavior-identical.
+   */
+  live?: boolean;
+  /**
+   * Forwarded to the base `SessionRow` meta-while-live opt-in. Defaults to
+   * `false` so existing call sites are unchanged.
+   */
+  metaWhileLive?: boolean;
 };
 
 export function StoredSessionRow({
@@ -75,6 +86,8 @@ export function StoredSessionRow({
   onRename,
   variant = 'list',
   interactive = true,
+  live = false,
+  metaWhileLive = false,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const title = session.title && session.title.length > 0 ? session.title : 'Untitled session';
@@ -159,7 +172,7 @@ export function StoredSessionRow({
   // When a cost is present, both forms fold it in first (matches the row's
   // "$0.12 · time" order). Needs-input sessions have no persisted cost.
   const visibleMeta = composeStoredSessionVisibleMeta(
-    formatSessionListCost(session.total_cost_microdollars),
+    formatSessionTotalCost(session.total_cost_microdollars),
     formatMeta(timestamp)
   );
   const spokenMeta = needsInput
@@ -168,6 +181,26 @@ export function StoredSessionRow({
         formatSpokenCost(session.total_cost_microdollars),
         formatSpokenTimeAgo(timestamp)
       );
+
+  // Platform icon only on the Agents list variant. Home cards stay
+  // byte-identical (platformIcon defaults to undefined).
+  const { iconKind: platformIconKind, spokenPlatform: a11yPlatform } =
+    selectRowPlatformPresentation({
+      platform: session.created_on_platform,
+      variant,
+      needsInput,
+      gitUrl: session.git_url,
+    });
+  const platformIcon =
+    platformIconKind != null ? (
+      <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
+        <SessionPlatformIcon
+          platform={session.created_on_platform}
+          size={12}
+          color={colors.mutedSoft}
+        />
+      </View>
+    ) : undefined;
 
   return (
     <>
@@ -179,6 +212,7 @@ export function StoredSessionRow({
           needsInput,
           badge: agentLabel,
           meta: spokenMeta,
+          platform: a11yPlatform,
         })}
         className="active:opacity-70"
       >
@@ -187,7 +221,10 @@ export function StoredSessionRow({
           title={title}
           subtitle={session.git_branch}
           meta={visibleMeta}
+          live={live}
+          metaWhileLive={metaWhileLive}
           needsInput={needsInput}
+          platformIcon={platformIcon}
           stripMode={variant === 'card' ? 'edge' : 'inline'}
           last={variant === 'card' ? true : undefined}
           className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}

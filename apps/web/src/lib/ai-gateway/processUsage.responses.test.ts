@@ -34,7 +34,7 @@ describe('processResponsesApiUsage', () => {
       input_tokens: 50,
       output_tokens: 100,
       total_tokens: 150,
-      input_tokens_details: { cached_tokens: 10 },
+      input_tokens_details: { cached_tokens: 10, cache_write_tokens: 0 },
       output_tokens_details: { reasoning_tokens: 0 },
       cost: 0.001,
       is_byok: false,
@@ -56,7 +56,7 @@ describe('processResponsesApiUsage', () => {
       input_tokens: 50,
       output_tokens: 100,
       total_tokens: 150,
-      input_tokens_details: { cached_tokens: 0 },
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
       output_tokens_details: { reasoning_tokens: 0 },
       cost: 0.001,
       is_byok: true,
@@ -74,7 +74,7 @@ describe('processResponsesApiUsage', () => {
       input_tokens: 2425,
       output_tokens: 5,
       total_tokens: 2430,
-      input_tokens_details: { cached_tokens: 0 },
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
       output_tokens_details: { reasoning_tokens: 0 },
     };
     const providerMetadata = {
@@ -103,7 +103,7 @@ describe('processResponsesApiUsage', () => {
       input_tokens: 10,
       output_tokens: 5,
       total_tokens: 15,
-      input_tokens_details: { cached_tokens: 0 },
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
       output_tokens_details: { reasoning_tokens: 0 },
     };
     const providerMetadata = {

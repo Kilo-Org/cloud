@@ -6,7 +6,7 @@ import {
   seedExtensionAuth,
   startFixtureServer,
 } from './extension-context-fixture';
-import { mockKiloApi } from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi } from './kilo-api-fixture';
 
 test('conversation automatically continues through another eval request', async () => {
   const fixture = await startFixtureServer();
@@ -38,6 +38,7 @@ test('conversation automatically continues through another eval request', async 
       thirdCompletionEvents: [
         { choices: [{ delta: { content: 'Second round finished and final answer ready.' } }] },
       ],
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

@@ -8,8 +8,10 @@ import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  getTabBarOverlayHeight,
+  getEffectiveTabBarHeight,
+  getTabBarIconSize,
   shouldHideTabBar,
+  shouldShowTabLabel,
   TAB_LABEL_WRAP_FONT_SCALE,
 } from '@/lib/tab-bar-layout';
 
@@ -52,7 +54,13 @@ export default function TabsLayout() {
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const hideTabs = shouldHideTabBar(pathname);
-  const tabBarHeight = getTabBarOverlayHeight(bottom, Platform.OS, fontScale);
+  const showTabLabel = shouldShowTabLabel(fontScale);
+  const tabBarHeight = getEffectiveTabBarHeight({
+    bottomInset: bottom,
+    platform: Platform.OS,
+    fontScale,
+  });
+  const tabIconSize = getTabBarIconSize(fontScale);
 
   return (
     <Tabs
@@ -73,6 +81,7 @@ export default function TabsLayout() {
           height: tabBarHeight,
           position: 'absolute',
         },
+        tabBarShowLabel: showTabLabel,
       }}
     >
       <Tabs.Screen
@@ -82,7 +91,7 @@ export default function TabsLayout() {
           tabBarAccessibilityLabel: 'Home, tab, 1 of 4',
           tabBarLabel: ({ focused }) => <TabLabel label="Home" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
-            <House size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
+            <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
         listeners={{
@@ -103,7 +112,7 @@ export default function TabsLayout() {
             />
           ),
           tabBarIcon: ({ color, focused }) => (
-            <MessageSquare size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
+            <MessageSquare size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
         listeners={{
@@ -121,7 +130,7 @@ export default function TabsLayout() {
           tabBarAccessibilityLabel: 'Agents, tab, 3 of 4',
           tabBarLabel: ({ focused }) => <TabLabel label="Agents" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
-            <Bot size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
+            <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
         listeners={{
@@ -137,7 +146,7 @@ export default function TabsLayout() {
           tabBarAccessibilityLabel: 'Profile, tab, 4 of 4',
           tabBarLabel: ({ focused }) => <TabLabel label="Profile" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
-            <UserRound size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
+            <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
         listeners={{

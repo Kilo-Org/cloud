@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { hashRootNativeInputs } from './mobile-native-build';
+
 import {
   buildCompatibilityKey,
   buildFingerprintOptions,
@@ -99,6 +101,20 @@ test('fingerprint options include iOS platform and only skip the Expo extra sect
   assert.equal(options.silent, true);
   // SourceSkips.ExpoConfigExtraSection === 4096
   assert.equal(options.sourceSkips & 4096, 4096);
+  assert.deepEqual(
+    options.extraSources.map(source => ({
+      type: source.type,
+      id: source.id,
+      contents: source.contents,
+    })),
+    [
+      {
+        type: 'contents',
+        id: 'repoRootNativeInputs',
+        contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+      },
+    ]
+  );
 });
 
 // ── Compatibility key ────────────────────────────────────────────────
@@ -1741,87 +1757,40 @@ test('mobileRoot is resolved from import.meta.dirname, not process.cwd', () => {
   assert.doesNotMatch(actual, /apps\/mobile\/apps\/mobile/);
 });
 
-test('validateSimulatorClaim requires status ready and rejects preparing, invalid, legacy, and foreign', () => {
+test('validateSimulatorClaim enforces worktree ownership and rejects corrupt records', () => {
   const claimRoot = makeTempDir('claim-ready');
   const worktree = makeTempDir('wt');
   const other = makeTempDir('wt-other');
   const udid = 'UDID-ready';
   try {
-    // Ready claim owned by this worktree
+    // Claim owned by this worktree
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
       JSON.stringify({
         deviceId: udid,
         worktreeRoot: worktree,
-        claimId: 'c',
-        status: 'ready',
         claimedAt: new Date().toISOString(),
       })
     );
     assert.doesNotThrow(() => validateSimulatorClaim(udid, worktree, claimRoot));
 
-    // Same worktree but preparing
+    // Corrupt record (no worktreeRoot)
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
-      JSON.stringify({
-        deviceId: udid,
-        worktreeRoot: worktree,
-        claimId: 'c',
-        status: 'preparing',
-        claimedAt: new Date().toISOString(),
-      })
+      JSON.stringify({ deviceId: udid, claimedAt: new Date().toISOString() })
     );
-    assert.throws(
-      () => validateSimulatorClaim(udid, worktree, claimRoot),
-      /not ready|preparing|status/i
-    );
+    assert.throws(() => validateSimulatorClaim(udid, worktree, claimRoot), /corrupt/i);
 
-    // Invalid status
-    fs.writeFileSync(
-      path.join(claimRoot, `${udid}.json`),
-      JSON.stringify({
-        deviceId: udid,
-        worktreeRoot: worktree,
-        claimId: 'c',
-        status: 'invalid',
-        claimedAt: new Date().toISOString(),
-      })
-    );
-    assert.throws(
-      () => validateSimulatorClaim(udid, worktree, claimRoot),
-      /not ready|invalid|status/i
-    );
+    // Unparseable record
+    fs.writeFileSync(path.join(claimRoot, `${udid}.json`), 'not json');
+    assert.throws(() => validateSimulatorClaim(udid, worktree, claimRoot), /corrupt/i);
 
-    // Corrupt current record (missing claimId)
-    fs.writeFileSync(
-      path.join(claimRoot, `${udid}.json`),
-      JSON.stringify({
-        deviceId: udid,
-        worktreeRoot: worktree,
-        status: 'ready',
-        claimedAt: new Date().toISOString(),
-      })
-    );
-    assert.throws(() => validateSimulatorClaim(udid, worktree, claimRoot), /corrupt|claimId/i);
-
-    // Legacy claim (no status) is rejected for build cache
-    fs.writeFileSync(
-      path.join(claimRoot, `${udid}.json`),
-      JSON.stringify({ deviceId: udid, worktreeRoot: worktree })
-    );
-    assert.throws(
-      () => validateSimulatorClaim(udid, worktree, claimRoot),
-      /not ready|legacy|status/i
-    );
-
-    // Foreign ready claim
+    // Foreign claim
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
       JSON.stringify({
         deviceId: udid,
         worktreeRoot: other,
-        claimId: 'c',
-        status: 'ready',
         claimedAt: new Date().toISOString(),
       })
     );
@@ -1835,7 +1804,9 @@ test('validateSimulatorClaim requires status ready and rejects preparing, invali
 
 test('defaultIsLockActive requires both pidAlive and processIdentity match', () => {
   const aliveRecord: LockRecord = { key: 'k', pid: 1, identity: 'a', startedAt: '' };
-  const deadRecord: LockRecord = { key: 'k', pid: 2, identity: 'b', startedAt: '' };
+  // PID 9999999 exceeds the max PID on macOS (99998) and Linux (2^22), so the
+  // default probe reports it dead on both — a low "dead" pid is alive on Linux.
+  const deadRecord: LockRecord = { key: 'k', pid: 9999999, identity: 'b', startedAt: '' };
 
   // Both probes agree: active
   let active = defaultIsLockActive({

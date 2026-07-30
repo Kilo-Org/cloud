@@ -1,4 +1,4 @@
-import { type ChildSessionHydrationState } from 'cloud-agent-sdk';
+import { type ChildSessionHydrationState } from '@kilocode/cloud-agent-sdk';
 
 type ChildSessionSheetState = 'loading' | 'empty' | 'error' | 'content';
 

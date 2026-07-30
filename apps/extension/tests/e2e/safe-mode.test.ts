@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mockKiloApi } from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -356,6 +356,7 @@ test('dangerous mode conversation can use safe read tools', async () => {
           ],
         },
       ],
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

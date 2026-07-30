@@ -6,7 +6,7 @@ import {
   type StepFinishPart,
   type StoredMessage,
   type UserMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 import { resolveMessageDisplayModel } from './message-model-label';
 

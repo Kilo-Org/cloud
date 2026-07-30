@@ -1,4 +1,4 @@
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 export const CREATE_REMOTE_SESSION_FALLBACK_MESSAGE = 'Failed to create remote session';
 

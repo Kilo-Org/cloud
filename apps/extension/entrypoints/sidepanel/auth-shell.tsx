@@ -123,7 +123,7 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
           aria-label="Share usage analytics"
           className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected ${
             state.checked
-              ? 'border-border-strong bg-surface-selected'
+              ? 'border-brand-primary bg-brand-primary'
               : 'border-border bg-surface-overlay'
           }`}
           disabled={!interactive}
@@ -134,7 +134,7 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
           <span
             aria-hidden="true"
             className={`absolute top-0.5 size-3.5 rounded-full transition ${
-              state.checked ? 'left-4 bg-foreground' : 'left-0.5 bg-foreground-muted'
+              state.checked ? 'left-4 bg-brand-primary-foreground' : 'left-0.5 bg-foreground-muted'
             }`}
           />
         </button>

@@ -13,7 +13,7 @@ import {
   runAndroidBuild,
 } from './mobile-android-build';
 import { withNativeBuildSemaphore } from './mobile-native-build';
-import { withProcessLock } from './process-lock';
+import { withProcessLock, withProcessLockAsync } from './process-lock';
 
 type AndroidEnvironment = {
   adb: string;
@@ -37,11 +37,28 @@ type DeviceClaim = {
   claimedAt: string;
   claimId: string;
   status: 'ready';
+  // Linux boot id of the emulator instance the claim was taken against. ADB
+  // serials are recycled ports, not device identities: the next emulator to
+  // boot takes emulator-5554 again, so the serial alone cannot tell a live
+  // claim from one left behind by a long-dead instance.
+  bootId: string;
 };
 type ClaimOptions = {
   fileOperations?: {
     readFileSync?: (filePath: string, encoding: 'utf8') => string;
   };
+};
+
+type EmulatorRecord = {
+  avd: string;
+  gpu: string;
+  log: string;
+  pid: number;
+  pidFile: string;
+  port: number;
+  serial: string;
+  session: string;
+  worktreeRoot: string;
 };
 
 function firstExisting(
@@ -137,6 +154,276 @@ function run(command: string, args: string[], env: AndroidEnvironment, cwd?: str
   });
 }
 
+function tmuxSessionExists(session: string): boolean {
+  return spawnSync('tmux', ['has-session', '-t', session]).status === 0;
+}
+
+function androidEmulatorSlug(worktreeRoot: string): string {
+  return path.basename(worktreeRoot).replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+function androidEmulatorSession(worktreeRoot: string): string {
+  return `kilo-e2e-android-${androidEmulatorSlug(worktreeRoot)}`;
+}
+
+function emulatorRecordPath(worktreeRoot: string): string {
+  return path.join(
+    os.tmpdir(),
+    'kilo-mobile-android-emulators',
+    `${androidEmulatorSlug(worktreeRoot)}.json`
+  );
+}
+
+function portIsListening(port: number): boolean {
+  return (
+    spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN'], { stdio: 'ignore' }).status === 0
+  );
+}
+
+function listeningProcessIds(port: number): number[] {
+  const result = spawnSync('lsof', ['-nP', '-t', `-iTCP:${port}`, '-sTCP:LISTEN'], {
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) return [];
+  return result.stdout
+    .trim()
+    .split(/\s+/)
+    .map(Number)
+    .filter(pid => Number.isInteger(pid) && pid > 0);
+}
+
+function processOwnsListeningPort(
+  port: number,
+  pid: number,
+  listeners: (port: number) => number[] = listeningProcessIds
+): boolean {
+  return listeners(port).includes(pid);
+}
+
+function findAvailableEmulatorPort(isListening = portIsListening): number | undefined {
+  for (let port = 5554; port <= 5680; port += 2) {
+    if (!isListening(port)) return port;
+  }
+  return undefined;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function processIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function signalProcessIfPresent(
+  pid: number,
+  signal: NodeJS.Signals,
+  sendSignal: typeof process.kill = process.kill
+): void {
+  try {
+    sendSignal(pid, signal);
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error;
+  }
+}
+
+function commandMatchesRecordedEmulator(
+  command: string,
+  emulator: string,
+  avd: string,
+  port: number
+): boolean {
+  const qemuRoot = `${path.dirname(emulator)}${path.sep}qemu${path.sep}`;
+  const exactArgument = (flag: string, value: string): boolean => {
+    const escape = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:^|\\s)${escape(flag)}\\s+${escape(value)}(?=\\s|$)`).test(command);
+  };
+  return (
+    (command.includes(emulator) || command.includes(qemuRoot)) &&
+    exactArgument('-avd', avd) &&
+    exactArgument('-port', String(port))
+  );
+}
+
+function recordedEmulatorStillOwnsPid(record: EmulatorRecord, env: AndroidEnvironment): boolean {
+  if (!processIsAlive(record.pid)) return false;
+  const command =
+    spawnSync('ps', ['-p', String(record.pid), '-o', 'command='], {
+      encoding: 'utf8',
+    }).stdout?.trim() ?? '';
+  return commandMatchesRecordedEmulator(command, env.emulator, record.avd, record.port);
+}
+
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+function isValidEmulatorRecord(record: unknown, worktreeRoot: string): record is EmulatorRecord {
+  if (typeof record !== 'object' || record === null) return false;
+  const value = record as Partial<EmulatorRecord>;
+  const expectedSession = androidEmulatorSession(worktreeRoot);
+  return (
+    value.worktreeRoot === worktreeRoot &&
+    value.session === expectedSession &&
+    value.pidFile === path.join(os.tmpdir(), `${expectedSession}.pid`) &&
+    value.serial === `emulator-${value.port}` &&
+    Number.isInteger(value.pid) &&
+    Number.isInteger(value.port) &&
+    (value.port ?? 0) >= 5554 &&
+    (value.port ?? 0) <= 5680 &&
+    (value.port ?? 0) % 2 === 0
+  );
+}
+
+async function stopAndroidEmulator(env: AndroidEnvironment, worktreeRoot: string): Promise<void> {
+  const recordPath = emulatorRecordPath(worktreeRoot);
+  const expectedSession = androidEmulatorSession(worktreeRoot);
+  let raw: string;
+  try {
+    raw = fs.readFileSync(recordPath, 'utf8');
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+    if (tmuxSessionExists(expectedSession))
+      spawnSync('tmux', ['kill-session', '-t', expectedSession], { stdio: 'ignore' });
+    return;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`Invalid emulator record at ${recordPath}; refusing teardown`);
+  }
+  if (!isValidEmulatorRecord(parsed, worktreeRoot))
+    throw new Error(`Invalid emulator record at ${recordPath}; refusing teardown`);
+  const record = parsed;
+
+  if (tmuxSessionExists(record.session))
+    spawnSync('tmux', ['kill-session', '-t', record.session], { stdio: 'ignore' });
+  for (let i = 0; i < 50 && processIsAlive(record.pid); i++) await delay(100);
+  if (recordedEmulatorStillOwnsPid(record, env)) {
+    signalProcessIfPresent(record.pid, 'SIGTERM');
+    for (let i = 0; i < 50 && processIsAlive(record.pid); i++) await delay(100);
+  }
+  if (recordedEmulatorStillOwnsPid(record, env)) {
+    signalProcessIfPresent(record.pid, 'SIGKILL');
+    for (let i = 0; i < 20 && processIsAlive(record.pid); i++) await delay(100);
+  }
+  if (recordedEmulatorStillOwnsPid(record, env))
+    throw new Error(`Emulator PID ${record.pid} did not stop; keeping ${recordPath}`);
+  fs.rmSync(record.pidFile, { force: true });
+  fs.rmSync(recordPath, { force: true });
+}
+
+async function startAndroidEmulator(
+  env: AndroidEnvironment,
+  worktreeRoot: string,
+  avd: string,
+  gpu: string
+): Promise<EmulatorRecord> {
+  const session = androidEmulatorSession(worktreeRoot);
+
+  return withProcessLockAsync(
+    path.join(os.tmpdir(), 'kilo-mobile-android-emulators', 'launch.lock'),
+    'Android emulator launch',
+    async () => {
+      const recordPath = emulatorRecordPath(worktreeRoot);
+      if (tmuxSessionExists(session) || fs.existsSync(recordPath))
+        throw new Error(
+          `${session} already exists; run pnpm dev:mobile:android emulator-stop before launching another`
+        );
+      const port = findAvailableEmulatorPort();
+      if (port === undefined) throw new Error('No free Android emulator console port (5554-5680)');
+      const serial = `emulator-${port}`;
+      const log = path.join(os.tmpdir(), `${session}.log`);
+      const pidFile = path.join(os.tmpdir(), `${session}.pid`);
+      fs.mkdirSync(path.dirname(recordPath), { recursive: true });
+      fs.rmSync(log, { force: true });
+      fs.rmSync(pidFile, { force: true });
+      const emulatorArgs = [
+        '-avd',
+        avd,
+        '-port',
+        String(port),
+        '-no-snapshot-save',
+        '-no-boot-anim',
+        '-gpu',
+        gpu,
+      ];
+      const command = `echo $$ > ${shellQuote(pidFile)}; exec ${[env.emulator, ...emulatorArgs]
+        .map(shellQuote)
+        .join(' ')} >> ${shellQuote(log)} 2>&1`;
+
+      let pid = 0;
+      let sessionStarted = false;
+      try {
+        execFileSync('tmux', ['new-session', '-d', '-s', session, '-c', worktreeRoot, command]);
+        sessionStarted = true;
+        for (let i = 0; i < 50 && !fs.existsSync(pidFile); i++) await delay(100);
+        pid = Number(fs.readFileSync(pidFile, 'utf8').trim());
+        if (!Number.isInteger(pid) || pid <= 0)
+          throw new Error(`${session} did not record its PID`);
+        for (let i = 0; i < 300 && !portIsListening(port); i++) {
+          if (!processIsAlive(pid)) throw new Error(`${session} exited during launch; see ${log}`);
+          await delay(100);
+        }
+        if (!portIsListening(port))
+          throw new Error(`${session} did not bind console port ${port} within 30s; see ${log}`);
+        if (!processIsAlive(pid) || !processOwnsListeningPort(port, pid))
+          throw new Error(
+            `${session} does not own console port ${port}; refusing to record a foreign emulator`
+          );
+        const record = {
+          avd,
+          gpu,
+          log,
+          pid,
+          pidFile,
+          port,
+          serial,
+          session,
+          worktreeRoot,
+        } satisfies EmulatorRecord;
+        const tempRecord = `${recordPath}.${process.pid}.tmp`;
+        fs.writeFileSync(tempRecord, JSON.stringify(record, null, 2));
+        fs.renameSync(tempRecord, recordPath);
+        return record;
+      } catch (error) {
+        if (sessionStarted && tmuxSessionExists(session))
+          spawnSync('tmux', ['kill-session', '-t', session], { stdio: 'ignore' });
+        if (pid > 0) {
+          const partialRecord = {
+            avd,
+            gpu,
+            log,
+            pid,
+            pidFile,
+            port,
+            serial,
+            session,
+            worktreeRoot,
+          };
+          if (recordedEmulatorStillOwnsPid(partialRecord, env)) {
+            signalProcessIfPresent(pid, 'SIGTERM');
+            for (let i = 0; i < 50 && processIsAlive(pid); i++) await delay(100);
+          }
+          if (recordedEmulatorStillOwnsPid(partialRecord, env))
+            signalProcessIfPresent(pid, 'SIGKILL');
+        }
+        fs.rmSync(pidFile, { force: true });
+        fs.rmSync(`${recordPath}.${process.pid}.tmp`, { force: true });
+        fs.rmSync(recordPath, { force: true });
+        throw error;
+      }
+    },
+    // Two slow holders (pid-file wait + 30s port bind + teardown each) must
+    // not starve a third slot's healthy launch.
+    120_000
+  );
+}
+
 function getAndroidSerials(env: AndroidEnvironment): string[] {
   const output = execFileSync(env.adb, ['devices'], {
     encoding: 'utf8',
@@ -148,6 +435,67 @@ function getAndroidSerials(env: AndroidEnvironment): string[] {
     .map(line => line.trim().split(/\s+/))
     .filter(([, state]) => state === 'device')
     .map(([serial]) => serial);
+}
+
+function parseEmulatorStartArgs(args: string[]): { avd: string; gpu: string; wait: boolean } {
+  const avd = args[0];
+  const gpuIndex = args.indexOf('--gpu');
+  const gpu = gpuIndex === -1 ? 'host' : args[gpuIndex + 1];
+  const wait = args.includes('--wait');
+  const expectedArgs = (gpuIndex === -1 ? 1 : 3) + (wait ? 1 : 0);
+  if (
+    !avd ||
+    avd.startsWith('-') ||
+    !gpu ||
+    !['host', 'swiftshader_indirect'].includes(gpu) ||
+    args.length !== expectedArgs
+  ) {
+    throw new Error(
+      'Usage: pnpm dev:mobile:android emulator-start <avd-name> [--gpu host|swiftshader_indirect] [--wait]'
+    );
+  }
+  return { avd, gpu, wait };
+}
+
+// Poll until the emulator is fully booted: process alive, serial visible as
+// `device`, and sys.boot_completed=1. Console-port bind alone does not mean
+// the guest is ready for installs or taps.
+async function waitForAndroidBoot(env: AndroidEnvironment, record: EmulatorRecord): Promise<void> {
+  const deadline = Date.now() + 8 * 60_000;
+  for (;;) {
+    if (!processIsAlive(record.pid))
+      throw new Error(`${record.session} died while booting; see ${record.log}`);
+    try {
+      const ready =
+        getAndroidSerials(env).includes(record.serial) &&
+        execFileSync(env.adb, ['-s', record.serial, 'shell', 'getprop', 'sys.boot_completed'], {
+          encoding: 'utf8',
+          env: { ...process.env, PATH: env.path },
+        }).trim() === '1';
+      if (ready) return;
+    } catch (error) {
+      // adb errors mid-boot are transient; a dead emulator is not.
+      if (error instanceof Error && !processIsAlive(record.pid))
+        throw new Error(`${record.session} died while booting; see ${record.log}`);
+    }
+    if (Date.now() > deadline)
+      throw new Error(
+        `${record.serial} did not reach sys.boot_completed=1 within 8 minutes; see ${record.log}`
+      );
+    await delay(15_000);
+  }
+}
+
+// Identity of the running emulator instance, stable for its whole life and
+// regenerated by the guest kernel on every boot.
+function readBootId(env: AndroidEnvironment, serial: string): string {
+  const bootId = execFileSync(
+    env.adb,
+    ['-s', serial, 'shell', 'cat', '/proc/sys/kernel/random/boot_id'],
+    { encoding: 'utf8', env: androidProcessEnv(env) }
+  ).trim();
+  if (!bootId) throw new Error(`Unable to read the boot id of ${serial}`);
+  return bootId;
 }
 
 function claimPath(serial: string): string {
@@ -166,6 +514,7 @@ function withClaimMutationLock<T>(filePath: string, mutate: () => T): T {
 function claimAndroidDevice(
   serial: string,
   worktreeRoot: string,
+  bootId: string,
   options?: ClaimOptions
 ): DeviceClaim {
   const filePath = claimPath(serial);
@@ -175,13 +524,22 @@ function claimAndroidDevice(
       const readFileSync = options?.fileOperations?.readFileSync ?? fs.readFileSync;
       const claim = JSON.parse(readFileSync(filePath, 'utf8')) as Partial<DeviceClaim>;
       if (claim.worktreeRoot === worktreeRoot) {
-        if (claim.status === 'ready' && typeof claim.claimId === 'string')
+        if (
+          claim.status === 'ready' &&
+          typeof claim.claimId === 'string' &&
+          claim.bootId === bootId
+        )
           return claim as DeviceClaim;
-        const upgraded = buildReadyClaim(serial, worktreeRoot);
+        const upgraded = buildReadyClaim(serial, worktreeRoot, bootId);
         fs.writeFileSync(filePath, JSON.stringify(upgraded));
         return upgraded;
       }
-      if (fs.existsSync(claim.worktreeRoot))
+      // A foreign claim only holds this serial while it names the emulator
+      // instance currently answering on it. Claims from earlier instances, and
+      // claims written before boot ids were recorded, are stale — their
+      // worktree usually still exists on disk, so worktree liveness alone
+      // would wedge the serial forever.
+      if (claim.bootId === bootId && directoryExists(claim.worktreeRoot))
         throw new Error(`${serial} is claimed by ${claim.worktreeRoot}`);
       fs.rmSync(filePath, { force: true });
     } catch (error) {
@@ -193,19 +551,24 @@ function claimAndroidDevice(
         throw error;
       }
     }
-    const claim = buildReadyClaim(serial, worktreeRoot);
+    const claim = buildReadyClaim(serial, worktreeRoot, bootId);
     fs.writeFileSync(filePath, JSON.stringify(claim), { flag: 'wx' });
     return claim;
   });
 }
 
-function buildReadyClaim(serial: string, worktreeRoot: string): DeviceClaim {
+function directoryExists(candidate: unknown): boolean {
+  return typeof candidate === 'string' && fs.existsSync(candidate);
+}
+
+function buildReadyClaim(serial: string, worktreeRoot: string, bootId: string): DeviceClaim {
   return {
     serial,
     worktreeRoot,
     claimedAt: new Date().toISOString(),
     claimId: `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     status: 'ready',
+    bootId,
   };
 }
 
@@ -217,6 +580,34 @@ function releaseAndroidDevice(serial: string, worktreeRoot: string): void {
       throw new Error(`${serial} is claimed by ${claim.worktreeRoot}`);
     fs.rmSync(filePath);
   });
+}
+
+function releaseWorktreeAndroidDevices(worktreeRoot: string): string[] {
+  const claimRoot = path.join(os.tmpdir(), 'kilo-mobile-android-claims');
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(claimRoot);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [];
+    throw error;
+  }
+  const released: string[] = [];
+  const failures: Error[] = [];
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    const serial = entry.slice(0, -'.json'.length);
+    try {
+      const claim = JSON.parse(fs.readFileSync(path.join(claimRoot, entry), 'utf8')) as DeviceClaim;
+      if (claim.worktreeRoot !== worktreeRoot) continue;
+      releaseAndroidDevice(serial, worktreeRoot);
+      released.push(serial);
+    } catch (error) {
+      failures.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  if (failures.length > 0)
+    throw new AggregateError(failures, failures.map(failure => failure.message).join('; '));
+  return released;
 }
 
 async function main(): Promise<void> {
@@ -287,12 +678,25 @@ async function main(): Promise<void> {
     console.log(`Installed ${serial}`);
     return;
   }
+  if (command === 'emulator-start') {
+    const { avd, gpu, wait } = parseEmulatorStartArgs(args);
+    const record = await startAndroidEmulator(env, worktreeRoot, avd, gpu);
+    if (wait) await waitForAndroidBoot(env, record);
+    console.log(JSON.stringify(record, null, 2));
+    return;
+  }
+  if (command === 'emulator-stop') {
+    if (args.length !== 0) throw new Error('Usage: pnpm dev:mobile:android emulator-stop');
+    await stopAndroidEmulator(env, worktreeRoot);
+    console.log(`Stopped wrapper-owned emulator for ${path.basename(worktreeRoot)}`);
+    return;
+  }
   if (command === 'claim') {
-    const requested = args[0];
-    const serial = requested ?? getAndroidSerials(env)[0];
-    if (!serial || !getAndroidSerials(env).includes(serial))
+    const serials = getAndroidSerials(env);
+    const serial = args[0] ?? serials[0];
+    if (!serial || !serials.includes(serial))
       throw new Error('No connected Android device is available');
-    console.log(JSON.stringify(claimAndroidDevice(serial, worktreeRoot)));
+    console.log(JSON.stringify(claimAndroidDevice(serial, worktreeRoot, readBootId(env, serial))));
     return;
   }
   if (command === 'release') {
@@ -302,6 +706,16 @@ async function main(): Promise<void> {
     console.log(`Released ${serial}`);
     return;
   }
+  if (command === 'release-all') {
+    if (args.length !== 0) throw new Error('Usage: pnpm dev:mobile:android release-all');
+    const released = releaseWorktreeAndroidDevices(worktreeRoot);
+    console.log(
+      released.length === 0
+        ? `No Android device claimed by ${worktreeRoot}`
+        : `Released ${released.join(' ')}`
+    );
+    return;
+  }
   if (command === 'adb') return run(env.adb, args, env);
   if (command === 'emulator') return run(env.emulator, args, env);
   if (command === 'sdkmanager') {
@@ -309,7 +723,7 @@ async function main(): Promise<void> {
     return run(env.sdkmanager, args, env);
   }
   throw new Error(
-    'Usage: pnpm dev:mobile:android [doctor|fingerprint|build|prune|claim|release|adb|emulator|sdkmanager] [args...]'
+    'Usage: pnpm dev:mobile:android [doctor|fingerprint|build|prune|claim|release|release-all|emulator-start|emulator-stop|adb|emulator|sdkmanager] [args...]'
   );
 }
 
@@ -418,9 +832,17 @@ function androidProcessEnv(env: AndroidEnvironment): NodeJS.ProcessEnv {
 }
 
 export {
+  androidEmulatorSession,
   claimAndroidDevice,
+  commandMatchesRecordedEmulator,
+  findAvailableEmulatorPort,
+  isValidEmulatorRecord,
+  parseEmulatorStartArgs,
+  processOwnsListeningPort,
   readGradleWrapperVersion,
   releaseAndroidDevice,
+  releaseWorktreeAndroidDevices,
   resolveAndroidEnvironment,
+  signalProcessIfPresent,
 };
 export type { AndroidEnvironment };

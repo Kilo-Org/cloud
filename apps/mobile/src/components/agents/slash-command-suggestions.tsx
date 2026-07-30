@@ -1,4 +1,4 @@
-import { type SlashCommandInfo } from 'cloud-agent-sdk';
+import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';

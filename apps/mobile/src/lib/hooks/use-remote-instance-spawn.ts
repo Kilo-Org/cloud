@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 

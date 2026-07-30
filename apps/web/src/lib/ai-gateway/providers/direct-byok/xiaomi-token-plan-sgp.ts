@@ -13,6 +13,7 @@ export default {
       {
         id: 'mimo-v2.5-pro',
         name: 'MiMo-V2.5-Pro',
+        flags: ['reasoning'],
         context_length: 1048576,
         max_completion_tokens: 131072,
       },

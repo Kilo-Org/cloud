@@ -5,7 +5,6 @@ import {
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
-import type { StoredModel } from '@kilocode/db';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,
@@ -28,9 +27,16 @@ import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/t
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
+import { isOpenRouterGpt56PromoModel } from '@/lib/ai-gateway/providers/openai';
+import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+export {
+  getModelDisplayPricing,
+  undoPricingDiscount,
+} from '@/lib/ai-gateway/providers/openrouter/display-pricing';
+export type { EndpointPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
 
 export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
   const input_modalities = ['text'];
@@ -80,6 +86,11 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
+  const discount = model.pricing.discount;
+  if (isOpenRouterGpt56PromoModel(model.id) && discount !== undefined && discount > 0) {
+    const percentage = Number((discount * 100).toFixed(2));
+    return `${name} (${percentage}% off)`;
+  }
   const promptPrice = Number.parseFloat(model.pricing.prompt);
   const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
   if (isExpensive) return name + ' ($$$$)';
@@ -99,23 +110,6 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
     }
   }
   return name;
-}
-
-type EndpointPricing = NonNullable<StoredModel['endpoints'][number]['pricing']>;
-
-export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
-  const { discount, ...prices } = pricing;
-  if (discount === undefined || discount <= 0) return pricing;
-  const factor = 1 - discount;
-  if (factor <= 0) return prices;
-  const result = { ...prices };
-  for (const key of Object.keys(prices) as (keyof typeof prices)[]) {
-    const value = prices[key];
-    if (value !== undefined) {
-      result[key] = (Number.parseFloat(value) / factor).toFixed(12);
-    }
-  }
-  return result;
 }
 
 export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
@@ -138,6 +132,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
           !isForbiddenFreeModel(model.id) &&
+          !model.id.endsWith(':batch') &&
           !unavailableModels.some(unavailableId => model.id.includes(unavailableId))
       )
       .map(model => {
@@ -151,7 +146,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
                 normalizeInferenceProviderId(e.tag) ===
                 normalizeInferenceProviderId(preferredProvider)
             )?.pricing);
-        const pricing = rawPricing ? undoPricingDiscount(rawPricing) : rawPricing;
+        const pricing = getModelDisplayPricing(model.id, rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
         return {
           ...model,

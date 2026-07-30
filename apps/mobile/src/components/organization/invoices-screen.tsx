@@ -1,8 +1,9 @@
 import { formatCents } from '@kilocode/app-shared/utils';
-import { FileText } from 'lucide-react-native';
-import { type ReactNode } from 'react';
-import { FlatList, View } from 'react-native';
+import { Download, FileText } from 'lucide-react-native';
+import { type ReactNode, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -16,6 +17,12 @@ import {
   useOrgBoundary,
   useOrgInvoices,
 } from '@/lib/hooks/use-organization-queries';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  getInvoiceDownloadErrorMessage,
+  selectInvoiceRowState,
+  shareOrganizationInvoicePdf,
+} from '@/lib/organization-invoice-download';
 import { cn, firstNonEmpty, formatDate } from '@/lib/utils';
 
 const STATUS_META: Record<string, { label: string; pillClass: string; textClass: string }> = {
@@ -43,16 +50,25 @@ function InvoiceRowSkeleton() {
   );
 }
 
-function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
+function InvoiceRowContent({
+  invoice,
+  trailing,
+}: Readonly<{
+  invoice: OrgInvoice;
+  trailing?: ReactNode;
+}>) {
   const meta = statusMeta(invoice.status);
   const title = firstNonEmpty(invoice.number, invoice.description, 'Invoice');
 
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
+    <>
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
-          {title}
-        </Text>
+        <View className="min-w-0 flex-1 flex-row items-center gap-2">
+          {trailing}
+          <Text className="min-w-0 flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
         <Text className="text-sm font-medium text-foreground">
           {formatCents(invoice.amount_due)}
         </Text>
@@ -65,7 +81,69 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
           <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>
         </View>
       </View>
-    </View>
+    </>
+  );
+}
+
+function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
+  const colors = useThemeColors();
+  const [sharing, setSharing] = useState(false);
+  const rowState = selectInvoiceRowState({
+    invoicePdf: invoice.invoice_pdf,
+    sharing,
+  });
+
+  if (rowState === 'no-affordance') {
+    return (
+      <View className="gap-1 rounded-lg bg-secondary p-3">
+        <InvoiceRowContent invoice={invoice} />
+      </View>
+    );
+  }
+
+  async function handleDownload() {
+    if (invoice.invoice_pdf === null) {
+      return;
+    }
+    setSharing(true);
+    try {
+      await shareOrganizationInvoicePdf({
+        id: invoice.id,
+        number: invoice.number,
+        description: invoice.description,
+        invoice_pdf: invoice.invoice_pdf,
+      });
+    } catch (error) {
+      toast.error(getInvoiceDownloadErrorMessage(error));
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  const busy = rowState === 'busy';
+
+  return (
+    <Pressable
+      onPress={() => {
+        void handleDownload();
+      }}
+      disabled={busy}
+      accessibilityState={{ busy }}
+      accessibilityRole="button"
+      accessibilityLabel={`Download invoice ${firstNonEmpty(invoice.number, invoice.description, invoice.id)}`}
+      className="gap-1 rounded-lg bg-secondary p-3 active:opacity-80 disabled:opacity-60"
+    >
+      <InvoiceRowContent
+        invoice={invoice}
+        trailing={
+          busy ? (
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          ) : (
+            <Download size={14} color={colors.mutedForeground} />
+          )
+        }
+      />
+    </Pressable>
   );
 }
 

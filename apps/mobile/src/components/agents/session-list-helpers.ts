@@ -67,33 +67,53 @@ export function formatMeta(timestamp: string): string {
 }
 
 /**
- * Visible cost segment for a stored session row.
+ * Canonical visible cost for every mobile session surface (list row, detail
+ * header, context sheet total).
  *
- * Returns `null` whenever the row should not display a cost — caller omits
- * the segment entirely. Inputs that are `null`, `undefined`, zero, or not
- * finite (defensive against unexpected shapes from the server) all collapse
- * to `null` so the list row shows the timestamp alone.
+ * Returns `null` whenever the surface should not display a cost — caller
+ * omits the segment/row entirely. Inputs that are `null`, `undefined`, zero,
+ * non-positive, or not finite all collapse to `null`.
  *
- * Otherwise the microdollar count is converted to USD and formatted as a
- * two-decimal dollar amount (e.g. `$0.12`). Sub-half-cent values render as
- * `"<$0.01"` so the smallest visible charge is unambiguous — a $0.001 row
- * is not silently rendered as `$0.00`.
+ * Conversion: microdollars → USD. At or above half a cent (`>= 5000` µ$),
+ * two-decimal dollars (e.g. `$0.01`, `$1.23`). Below half a cent, four
+ * decimals (e.g. `$0.0031`); values that would render `$0.0000` (1..49 µ$)
+ * are omitted instead of a false zero.
  */
-export function formatSessionListCost(microdollars: number | null | undefined): string | null {
-  if (microdollars === null || microdollars === undefined) {
-    return null;
-  }
-  if (!Number.isFinite(microdollars)) {
-    return null;
-  }
-  if (microdollars <= 0) {
+export function formatSessionTotalCost(microdollars: number | null | undefined): string | null {
+  if (microdollars == null || !Number.isFinite(microdollars) || microdollars <= 0) {
     return null;
   }
   const usd = microdollars / 1_000_000;
-  if (usd < 0.005) {
-    return '<$0.01';
+  if (usd >= 0.005) {
+    return `$${usd.toFixed(2)}`;
   }
-  return `$${usd.toFixed(2)}`;
+  const fine = `$${usd.toFixed(4)}`;
+  return fine === '$0.0000' ? null : fine;
+}
+
+/**
+ * Derive the canonical session total (max of persisted DB µ$ and live client
+ * USD sum) plus the sanitized live breakdown input.
+ *
+ * Session cost is monotonically non-decreasing, so both inputs are lower
+ * bounds and `max` is strictly closer to truth. `breakdownCostUsd` is always
+ * the sanitized live sum — never the combined total — so per-model breakdown
+ * math stays aligned with the live message stream.
+ */
+export function selectSessionCostInputs(
+  persistedMicrodollars: number | null | undefined,
+  liveUsd: number
+): { totalMicrodollars: number | null; breakdownCostUsd: number } {
+  const persisted =
+    typeof persistedMicrodollars === 'number' && Number.isFinite(persistedMicrodollars)
+      ? Math.max(0, persistedMicrodollars)
+      : 0;
+  const live = Number.isFinite(liveUsd) ? Math.max(0, Math.round(liveUsd * 1_000_000)) : 0;
+  const total = Math.max(persisted, live);
+  return {
+    totalMicrodollars: total > 0 ? total : null,
+    breakdownCostUsd: Number.isFinite(liveUsd) ? Math.max(0, liveUsd) : 0,
+  };
 }
 
 /**
@@ -130,12 +150,13 @@ export function remoteAgentLabel(createdOnPlatform: string | undefined): string 
 }
 
 /**
- * Pinned-tray meta line for an active session. Mirrors `formatMeta` when an
- * `updatedAt` timestamp is available, otherwise falls back to the uppercased
- * status string (matches the legacy RemoteSessionRow behavior).
+ * Pinned-tray meta line for an active session. Returns the relative timestamp
+ * when `updatedAt` is present; otherwise `undefined` so `SessionRow` renders
+ * the live dot alone. Never the CLI status — status words in the timestamp
+ * slot were a defect (BUSY/IDLE/RETRY).
  */
-export function remoteMeta(session: { status: string; updatedAt?: string }): string {
-  return session.updatedAt ? formatMeta(session.updatedAt) : session.status.toUpperCase();
+export function remoteMeta(session: { updatedAt?: string }): string | undefined {
+  return session.updatedAt ? formatMeta(session.updatedAt) : undefined;
 }
 
 /**
@@ -185,10 +206,12 @@ const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;
 /**
  * Select which active sessions appear in the pinned "Active now" tray.
  *
- * Free-text search is not a parameter: the pinned set ignores search by
- * construction. Filters mirror the server-side platform/project narrowing
- * used by the stored-session list so the tray never shows a session that
- * the user has explicitly filtered out.
+ * `searchQuery` narrows the tray with the same semantics as the
+ * server-side history search: a case-insensitive substring match on the
+ * session's `title` OR `id` (`position()`/`includes` — LIKE wildcards
+ * match literally). Empty or whitespace-only queries perform no narrowing.
+ * The text query applies in conjunction with the platform/project filters,
+ * which mirror the server-side narrowing used by the stored-session list.
  *
  * No dedup against stored pages is performed here — exclusivity is enforced
  * on the history side by Task 3, so this helper stays pure and symmetric.
@@ -197,15 +220,25 @@ export function selectPinnedActiveSessions(params: {
   activeSessions: ActiveSession[];
   projectFilter: string[];
   platformFilter: string[];
+  searchQuery: string;
 }): ActiveSession[] {
-  const { activeSessions, projectFilter, platformFilter } = params;
+  const { activeSessions, projectFilter, platformFilter, searchQuery } = params;
   const projectActive = projectFilter.length > 0;
   const platformActive = platformFilter.length > 0;
+  const needle = searchQuery.trim().toLowerCase();
 
   const concretePlatforms = platformFilter.filter(p => p !== 'other');
   const includeOther = platformFilter.includes('other');
   const expanded = expandPlatformFilter(concretePlatforms);
   return activeSessions.filter(session => {
+    if (needle.length > 0) {
+      const hayTitle = session.title.toLowerCase();
+      const hayId = session.id.toLowerCase();
+      if (!hayTitle.includes(needle) && !hayId.includes(needle)) {
+        return false;
+      }
+    }
+
     if (projectActive && (!session.gitUrl || !projectFilter.includes(session.gitUrl))) {
       return false;
     }

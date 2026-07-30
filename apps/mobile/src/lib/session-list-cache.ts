@@ -1,6 +1,6 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 export type SessionsListPage = RouterOutputs['cliSessionsV2']['list'];
 export type SessionsListData = { pages: SessionsListPage[]; pageParams: unknown[] };
 

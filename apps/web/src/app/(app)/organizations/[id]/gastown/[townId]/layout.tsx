@@ -3,6 +3,7 @@ import { DrawerStackProvider } from '@/components/gastown/DrawerStack';
 import { renderDrawerContent } from '@/components/gastown/DrawerStackContent';
 import { TerminalBarPadding } from '@/components/gastown/TerminalBarPadding';
 import { HideAppTopbar } from '@/components/gastown/HideAppTopbar';
+import { GASTOWN_BILLING_ANNOUNCEMENT_ENABLED } from '@/lib/config.server';
 import { MayorTerminalBar } from '@/app/(app)/gastown/[townId]/MayorTerminalBar';
 import { OnboardingTooltips } from '@/components/gastown/OnboardingTooltips';
 
@@ -21,7 +22,11 @@ export default async function OrgTownLayout({
       <DrawerStackProvider renderContent={renderDrawerContent}>
         <HideAppTopbar />
         <TerminalBarPadding>{children}</TerminalBarPadding>
-        <MayorTerminalBar params={params} basePath={basePath} />
+        <MayorTerminalBar
+          params={params}
+          basePath={basePath}
+          billingAnnouncementEnabled={GASTOWN_BILLING_ANNOUNCEMENT_ENABLED}
+        />
         <OnboardingTooltips townId={townId} />
       </DrawerStackProvider>
     </TerminalBarProvider>

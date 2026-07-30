@@ -76,6 +76,7 @@ import {
   computeOpenRouterCostFields,
   drainSseStream,
   extractVercelIsByok,
+  extractVercelUpstreamId,
   isResponseInterruptedError,
 } from '@/lib/ai-gateway/processUsage.shared';
 import {
@@ -1119,7 +1120,7 @@ export async function parseMicrodollarUsageFromStream(
     responseContent,
     inference_provider,
     finish_reason,
-    upstream_id: null,
+    upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
     latency: null,
     moderation_latency: null,
     generation_time: null,
@@ -1152,6 +1153,7 @@ export function parseMicrodollarUsageFromString(
   }
   const choice = responseJson?.choices?.[0];
   const finish_reason = choice?.finish_reason ?? null;
+  const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
   const coreProps = {
     kiloUserId,
     messageId: responseJson?.id ?? null,
@@ -1159,10 +1161,8 @@ export function parseMicrodollarUsageFromString(
     model: responseJson?.model ?? null,
     responseContent: choice?.message.content ?? '',
     inference_provider:
-      responseJson?.provider ??
-      choice?.message?.provider_metadata?.gateway?.routing?.finalProvider ??
-      null,
-    upstream_id: null,
+      responseJson?.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
+    upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
     finish_reason,
     latency: null,
     moderation_latency: null,
@@ -1172,11 +1172,7 @@ export function parseMicrodollarUsageFromString(
     status_code: statusCode,
   };
 
-  const costs = processOpenRouterUsage(
-    responseJson?.usage,
-    coreProps,
-    choice?.message?.provider_metadata ?? null
-  );
+  const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);
 
   return { ...coreProps, ...costs };
 }
@@ -1252,15 +1248,24 @@ export async function processTokenData(
     }
 
     genStats.model = usageStats.model; // openrouter bug?
+    genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
     if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
+      // The provider's generation lookup and the response's own usage payload should
+      // yield the same cost. A mismatch means inconsistent token or pricing data from
+      // the provider; the generation lookup values win (see assignment below).
       console.warn(
-        `DEV ODDITY / WARNING: Usage stats do not match generation data:`,
-        genStats.model,
-        [genStats.cost_mUsd, usageStats.cost_mUsd],
-        [genStats.cacheDiscount_mUsd, usageStats.cacheDiscount_mUsd]
+        'Cost from provider generation lookup differs from cost computed from response usage data:',
+        {
+          model: genStats.model,
+          cost_mUsd: { generation: genStats.cost_mUsd, response: usageStats.cost_mUsd },
+          cacheDiscount_mUsd: {
+            generation: genStats.cacheDiscount_mUsd,
+            response: usageStats.cacheDiscount_mUsd,
+          },
+        }
       );
     }
     usageStats = genStats;

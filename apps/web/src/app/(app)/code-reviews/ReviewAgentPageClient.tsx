@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Brain, ExternalLink, ListChecks, Rocket, Settings2 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { CODE_REVIEW_MD_CONVERSION_FLAG } from '@/lib/code-reviews/core/constants';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PageContainer } from '@/components/layouts/PageContainer';
@@ -40,6 +42,11 @@ export function ReviewAgentPageClient({
   const trpc = useTRPC();
   const router = useRouter();
   const selectedPlatform = initialPlatform;
+
+  // Gates the Custom Instructions -> REVIEW.md conversion button/dialog (route enforces the same
+  // flag server-side; this just hides the entry point).
+  const conversionFlagEnabled = useFeatureFlagEnabled(CODE_REVIEW_MD_CONVERSION_FLAG);
+  const conversionUiEnabled = localCodeReviewDevelopmentEnabled || !!conversionFlagEnabled;
 
   const handlePlatformChange = (platform: Platform) => {
     const params = new URLSearchParams();
@@ -192,7 +199,7 @@ export function ReviewAgentPageClient({
             </TabsList>
 
             <TabsContent value="config" className="mt-6 space-y-4">
-              <ReviewConfigForm platform="github" />
+              <ReviewConfigForm platform="github" conversionUiEnabled={conversionUiEnabled} />
             </TabsContent>
 
             <TabsContent value="jobs" className="mt-6 space-y-4">
@@ -275,23 +282,7 @@ export function ReviewAgentPageClient({
             </TabsList>
 
             <TabsContent value="config" className="mt-6 space-y-4">
-              <ReviewConfigForm
-                platform="gitlab"
-                gitlabStatusData={
-                  gitlabStatusData
-                    ? {
-                        connected: gitlabStatusData.connected,
-                        integration: gitlabStatusData.integration
-                          ? {
-                              isValid: gitlabStatusData.integration.isValid,
-                              webhookSecret: gitlabStatusData.integration.webhookSecret,
-                              instanceUrl: gitlabStatusData.integration.instanceUrl,
-                            }
-                          : undefined,
-                      }
-                    : undefined
-                }
-              />
+              <ReviewConfigForm platform="gitlab" conversionUiEnabled={conversionUiEnabled} />
             </TabsContent>
 
             <TabsContent value="jobs" className="mt-6 space-y-4">

@@ -19,7 +19,7 @@ import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
-import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 export default function KiloClawTab() {
   const router = useRouter();
@@ -42,7 +42,11 @@ export default function KiloClawTab() {
 
   const showInstanceSkeleton = entryDecision.kind === 'loading' || onboardingQuery.isPending;
   const emptyStateContainerStyle = {
-    paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS, fontScale),
+    paddingBottom: getEffectiveTabBarHeight({
+      bottomInset: bottom,
+      platform: Platform.OS,
+      fontScale,
+    }),
   };
 
   const [manualRefreshing, handleRefresh] = useManualRefresh(

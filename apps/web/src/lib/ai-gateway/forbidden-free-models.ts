@@ -1,4 +1,5 @@
 import { claude_sonnet_clawsetup_model } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'auto:free', // this is not a free model, OpenRouter can map it to a paid model
@@ -6,6 +7,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'arcee-ai/trinity-large-thinking:free',
   'corethink:free',
   'arcee-ai/trinity-mini:free',
+  'bytedance-seed/dola-seed-2.0-code:free',
   'bytedance-seed/dola-seed-2.0-pro:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',
@@ -20,6 +22,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'google/gemma-4-26b-a4b-it:free', // usable through kilo-auto
   'google/gemma-4-31b-it:free',
   'kilo/auto-free', // discontinued variant of kilo-auto/free
+  'kwaipilot/kat-coder-pro-v2.5:free',
   'liquid/lfm-2.5-1.2b-instruct:free',
   'liquid/lfm-2.5-1.2b-thinking:free',
   'meta-llama/llama-3.2-3b-instruct:free',
@@ -55,4 +58,12 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
 
 export function isForbiddenFreeModel(modelId: string): boolean {
   return forbiddenFreeModelIds.has(modelId);
+}
+
+const forbiddenFreeModelFamilies: ReadonlySet<string> = new Set(
+  [...forbiddenFreeModelIds].map(normalizeModelId)
+);
+
+export function familyHasForbiddenFreeModel(modelId: string): boolean {
+  return forbiddenFreeModelFamilies.has(normalizeModelId(modelId));
 }

@@ -9,6 +9,7 @@ import type {
   ReviewAgentsConfig,
 } from '@kilocode/worker-utils/review-agents';
 import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
+import { CLOUD_AGENT_TERMINAL_REASONS } from '@kilocode/worker-utils/cloud-agent-next-client';
 import * as z from 'zod';
 
 export type { Owner, MCPServerConfig };
@@ -111,28 +112,14 @@ export interface CodeReviewStatusResponse {
 
 export type CodeReviewStatusResult = CodeReviewStatusResponse | null;
 
-// KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS (packages/db/src/schema-types.ts)
-// and CloudAgentTerminalReason (packages/worker-utils/src/cloud-agent-next-client.ts).
-// A value missing here is silently coerced to undefined by `.catch(undefined)`.
+// Derived from the single runtime list in worker-utils rather than retyped.
+// This schema ends in `.catch(undefined)`, so any reason missing from it is
+// silently dropped — which previously meant a new terminal reason would be
+// coerced to undefined here and lost from the Durable Object's in-memory state
+// (setLocalTerminalStateFromDB only assigns when the value is defined), even
+// though the DB row recorded it correctly.
 const InternalStatusTerminalReasonSchema = z
-  .enum([
-    'billing',
-    'model_not_found',
-    'github_installation_required',
-    'github_ip_allow_list',
-    'gitlab_project_access_required',
-    'byok_invalid_key',
-    'selected_model_unavailable',
-    'repeated_repository_clone_timeout',
-    'user_cancelled',
-    'superseded',
-    'interrupted',
-    'timeout',
-    'upstream_error',
-    'sandbox_error',
-    'workspace_capacity',
-    'unknown',
-  ])
+  .enum(CLOUD_AGENT_TERMINAL_REASONS)
   .nullable()
   .optional()
   .catch(undefined);

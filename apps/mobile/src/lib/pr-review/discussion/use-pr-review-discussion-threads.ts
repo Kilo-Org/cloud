@@ -12,8 +12,13 @@
 // AND the query has finished (no longer `isPending`). The
 // `firstPageErrorState` helper below encodes that distinction so
 // the tab UI doesn't have to.
+//
+// Conversation comments are returned on the first page only (backend
+// contract: later pages carry `conversation: []`). We read page 0
+// only — simpler than flatten-then-dedupe and matches the guarantee.
 
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useTRPC } from '@/lib/trpc';
@@ -44,13 +49,20 @@ export function usePrReviewDiscussionThreads(args: {
   const laterPageError = Boolean(query.error) && hasLoadedPages;
 
   // Flat list of all threads across all loaded pages, in page order.
-  // We return a fresh array on every render so the consumer can
-  // `.map` without memoizing; the rows themselves are stable.
-  const threads = (query.data?.pages ?? []).flatMap(page => page.threads);
+  // Ordering for display is applied by `mergeDiscussionListItems` in
+  // the tab (full re-sort of the entire loaded set).
+  // Memoized so identity changes only when page data changes (RQ
+  // structural sharing keeps `pages` stable across unrelated re-renders).
+  const pages = query.data?.pages;
+  const threads = useMemo(() => (pages ?? []).flatMap(page => page.threads), [pages]);
+
+  // First page only — backend guarantees later pages return [].
+  const conversation = query.data?.pages[0]?.conversation ?? [];
 
   return {
     query,
     threads,
+    conversation,
     firstPageErrorState,
     laterPageError,
   };

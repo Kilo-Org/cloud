@@ -22,6 +22,15 @@ export type SafeFailureProjectionSource = {
   failureSubtype?: WorkspaceFailureSubtype;
   attempts?: number;
   safeFailureMessage?: string;
+  /**
+   * Both are already resolved by classifyAssistantFailure and persisted on the
+   * session message state (providerOwnership via resolveTerminalProviderOwnership,
+   * which upgrades 'unknown' to 'managed' when the session used an admitted
+   * model). Forwarding them lets receivers classify assistant failures from
+   * structured values rather than matching the safe message text.
+   */
+  assistantFailureReason?: CloudAgentAssistantFailureReason;
+  providerOwnership?: CloudAgentProviderOwnership;
 };
 
 const GENERIC_FAILURE_MESSAGES = {
@@ -189,7 +198,9 @@ export function projectSafeFailure(
     source.failureCode === undefined &&
     subtype === undefined &&
     source.attempts === undefined &&
-    message === undefined
+    message === undefined &&
+    source.assistantFailureReason === undefined &&
+    source.providerOwnership === undefined
   ) {
     return undefined;
   }
@@ -200,5 +211,11 @@ export function projectSafeFailure(
     ...(subtype === undefined ? {} : { subtype }),
     ...(source.attempts === undefined ? {} : { attempts: source.attempts }),
     ...(message === undefined ? {} : { message }),
+    ...(source.assistantFailureReason === undefined
+      ? {}
+      : { assistantReason: source.assistantFailureReason }),
+    ...(source.providerOwnership === undefined
+      ? {}
+      : { providerOwnership: source.providerOwnership }),
   };
 }

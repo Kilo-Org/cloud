@@ -28,12 +28,20 @@ SESSION_STATUS="$(curl -sS -o "$SESSION_PROBE" -w '%{http_code}' \
 if [ "$SESSION_STATUS" != "401" ] || ! grep -Fq 'Invalid or expired token' "$SESSION_PROBE"; then
   printf 'session-ingest secret readiness probe failed with HTTP %s\n' "$SESSION_STATUS" >&2
   cat "$SESSION_PROBE" >&2
+  printf 'fix: pnpm dev:env -y cloudflare-session-ingest && pnpm dev:restart cloudflare-session-ingest (the binding exists but the running Worker has not picked it up)\n' >&2
   exit 1
 fi
 
-PLATFORM="ios"
-if (cd "$REPO_ROOT" && pnpm -s dev:mobile:android adb devices | awk -v device="$DEVICE" '$1 == device && $2 == "device" { found=1 } END { exit !found }'); then
-  PLATFORM="android"
+# login.sh/logout.sh pass the platform they already derived; the adb probe is
+# the fallback for direct invocations.
+PLATFORM="${KILO_E2E_PLATFORM:-}"
+if [ -z "$PLATFORM" ]; then
+  PLATFORM="ios"
+  if (cd "$REPO_ROOT" && pnpm -s dev:mobile:android adb devices | awk -v device="$DEVICE" '$1 == device && $2 == "device" { found=1 } END { exit !found }'); then
+    PLATFORM="android"
+  fi
+fi
+if [ "$PLATFORM" = "android" ]; then
   CLAIM="$(cd "$REPO_ROOT" && pnpm -s dev:mobile:android claim "$DEVICE")"
 else
   CLAIM="$(cd "$REPO_ROOT" && pnpm -s dev:mobile:simulator claim "$DEVICE")"
@@ -51,7 +59,9 @@ if ! grep -Fq "Starting project at $REPO_ROOT/apps/mobile" <<<"$MOBILE_LOG"; the
   printf 'Metro does not belong to this worktree: %s\n' "$REPO_ROOT" >&2
   exit 1
 fi
-if ! grep -Eq 'iOS Bundled|Starting Metro Bundler' <<<"$MOBILE_LOG"; then
+# "Starting Metro Bundler" scrolls out of the captured window on a long-lived
+# stack, leaving the per-platform bundle lines as the only readiness evidence.
+if ! grep -Eq '(iOS|Android) Bundled|Starting Metro Bundler' <<<"$MOBILE_LOG"; then
   printf 'Metro has not reached a usable state for %s\n' "$REPO_ROOT" >&2
   exit 1
 fi
@@ -79,7 +89,7 @@ NODE
 METRO_URL="http://${MOBILE_HOST}:${METRO_PORT}"
 MANIFEST="$(mktemp)"
 trap 'rm -f "$SESSION_PROBE" "$MANIFEST"' EXIT
-curl -sS -H 'expo-platform: ios' -H 'expo-protocol-version: 1' \
+curl -sS -H "expo-platform: $PLATFORM" -H 'expo-protocol-version: 1' \
   -H 'accept: application/expo+json,application/json' "$METRO_URL" >"$MANIFEST"
 node - "$MANIFEST" "http://${MOBILE_HOST}:${EXPECTED_API_PORT}" "$REPO_ROOT" <<'NODE'
 const fs = require('node:fs');

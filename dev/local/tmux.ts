@@ -455,6 +455,16 @@ function captureServicePane(sessionName: string, serviceName: string, historyLin
   );
 }
 
+function pipeServicePane(sessionName: string, serviceName: string, command: string): void {
+  const pane = findServicePane(sessionName, serviceName);
+  if (!pane) throw new Error(`Service ${serviceName} is not running in ${sessionName}`);
+  execFileSync(
+    'tmux',
+    ['pipe-pane', '-t', `${sessionName}:${pane.windowIndex}.${pane.paneIndex}`, command],
+    { stdio: 'ignore' }
+  );
+}
+
 function isPaneRunningCommand(sessionName: string, pane: PaneInfo): boolean {
   try {
     const command = execSync(
@@ -590,6 +600,7 @@ export {
   countPanes,
   findServicePane,
   captureServicePane,
+  pipeServicePane,
   isPaneRunningCommand,
   paneHasRunningChild,
   selectPane,

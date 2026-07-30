@@ -4,7 +4,7 @@ import {
   type KiloSessionId,
   type SessionSnapshotPage,
   type SessionSnapshotPageOutcome,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 import { trpcClient } from '@/lib/trpc';
 
 /**

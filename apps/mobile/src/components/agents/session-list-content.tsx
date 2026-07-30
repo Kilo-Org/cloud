@@ -1,6 +1,14 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { Bot, Plus } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import {
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -17,7 +25,9 @@ import {
   selectSessionListBodyModel,
   type SessionListBodyModel,
 } from '@/components/agents/session-list-body-model';
+import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
 import { type SessionSection } from '@/components/agents/session-list-helpers';
+import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { EmptyState } from '@/components/empty-state';
@@ -30,7 +40,7 @@ import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
-import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 type AgentSessionListContentProps = {
   sections: SessionSection[];
@@ -55,9 +65,17 @@ type AgentSessionListContentProps = {
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
   hasActiveQuery: boolean;
   isSearching: boolean;
+  /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
+  searchQuery: string;
   onClearQuery: () => void;
   onCreateSession: () => void;
   sortBy: AgentSessionSortBy;
+  /**
+   * Pinned "Active now" tray rendered as `ListHeaderComponent` so it scrolls
+   * with history in one continuous gesture. Not a virtualized cell — Reanimated
+   * layout transitions on the tray keep working. Pass `null` when empty.
+   */
+  activeNowSection: ReactElement | null;
 };
 
 export function AgentSessionListContent({
@@ -74,10 +92,29 @@ export function AgentSessionListContent({
   onSessionPress,
   hasActiveQuery,
   isSearching,
+  searchQuery,
   onClearQuery,
   onCreateSession,
   sortBy,
+  activeNowSection,
 }: Readonly<AgentSessionListContentProps>) {
+  const listRef = useRef<SectionList<StoredSession, SessionSection>>(null);
+  useScrollToTop(listRef);
+
+  // Scroll to top on committed-query change only. Skip the initial mount
+  // (offset is already 0). Must not fire on focus refetch, attention
+  // revision, sort remount, pagination, pull-to-refresh, or section-data
+  // identity changes with an unchanged query.
+  const prevSearchQueryRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevSearchQueryRef.current;
+    prevSearchQueryRef.current = searchQuery;
+    if (!shouldResetScrollOnCommittedQuery(prev, searchQuery)) {
+      return;
+    }
+    listRef.current?.getScrollResponder()?.scrollTo({ y: 0, animated: false });
+  }, [searchQuery]);
+
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -87,7 +124,13 @@ export function AgentSessionListContent({
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
-    () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS, fontScale) }),
+    () => ({
+      paddingBottom: getEffectiveTabBarHeight({
+        bottomInset: bottom,
+        platform: Platform.OS,
+        fontScale,
+      }),
+    }),
     [bottom, fontScale]
   );
 
@@ -105,6 +148,18 @@ export function AgentSessionListContent({
         activeIsError,
       }),
     [activeIsError, hasActiveQuery, hasHistoryContent, hasPinnedActive, isError, isSearching]
+  );
+
+  const surface = useMemo(
+    () =>
+      selectSessionListContentSurface({
+        isLoading,
+        isError,
+        hasAnySessions,
+        hasPinnedActive,
+        hasHistoryContent,
+      }),
+    [hasAnySessions, hasHistoryContent, hasPinnedActive, isError, isLoading]
   );
 
   const emptyStateAction = useMemo(
@@ -127,23 +182,18 @@ export function AgentSessionListContent({
   );
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
-  // is pushed the Agents list is frozen. react-freeze reveals the previously
-  // rendered (cached) cells on return WITHOUT re-running them, so the attention
-  // store's `useSyncExternalStore` subscription does not re-render the list and
-  // the detail-screen mount ack is not reflected. Snapshot the attention
-  // revision only when the tab (re)gains focus, via `useFocusEffect`, which
-  // fires reliably after unfreeze. Keying the list on that focus snapshot
-  // remounts it exactly when an ack/reconcile happened while the list was away
-  // (e.g. returning from a session that was just opened) so frozen cells re-read
-  // the ack store — while a revision bump for some unrelated session that occurs
-  // *during* browsing does not touch the snapshot, so scroll is preserved.
+  // is pushed the Agents list is frozen. On return, each row re-reads the ack
+  // store via its own `useSyncExternalStore` subscription
+  // (`useSessionAttentionRevision`). Snapshot the attention revision only when
+  // the tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and
+  // pass it as `extraData` so visible cells re-render without remounting the
+  // list — preserving scroll. Remount only on sort change (`key={sortBy}`).
   const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {
       setAttentionFocusRevision(getRevisionSnapshot());
     }, [])
   );
-  const attentionListKey = `${sortBy}:${attentionFocusRevision}`;
 
   const handleRefresh = useCallback(() => {
     void (async () => {
@@ -184,23 +234,12 @@ export function AgentSessionListContent({
 
   const keyExtractor = useCallback((item: StoredSession) => item.session_id, []);
 
-  if (isLoading) {
-    return (
-      <Animated.View exiting={FadeOut.duration(150)}>
-        {Array.from({ length: 8 }, (_, i) => (
-          <View key={i} className="py-1.5">
-            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
-          </View>
-        ))}
-      </Animated.View>
-    );
-  }
-
   // Full-screen error only when there is nothing cached to fall back on —
   // a background refetch/search failure with stale sessions already in
   // cache (keepPreviousData) must never blank out what's already rendered.
   // A populated tray counts as "something on screen" and also suppresses.
-  if (isError && !hasAnySessions && !hasPinnedActive) {
+  // Gated on !isLoading so a cold-open load never flashes this surface.
+  if (surface.kind === 'full-screen-error') {
     return (
       <Animated.View
         entering={FadeIn.duration(200)}
@@ -215,8 +254,9 @@ export function AgentSessionListContent({
   // The screen gates the search header on `hasAnySessions` to keep the
   // first-use "No sessions yet" empty state chrome-free, so when the user
   // has no sessions at all we skip the SectionList entirely here and just
-  // render the empty state.
-  if (!hasAnySessions) {
+  // render the empty state. Gated on !isLoading (via surface) so a cold
+  // open with an empty cache does not flash this while queries run.
+  if (surface.kind === 'first-use-empty') {
     return (
       <Animated.View
         entering={FadeIn.duration(200)}
@@ -233,8 +273,22 @@ export function AgentSessionListContent({
     );
   }
 
-  let emptyComponent: React.ReactNode = null;
-  if (bodyModel.kind !== 'render-list') {
+  // Single SectionList render site: tray stays in ListHeaderComponent across
+  // loading → rows so ActiveNowSection's local expanded state is not reset.
+  // While loading, sections are empty and skeletons fill ListEmptyComponent
+  // under the tray (active query may already have resolved).
+  let emptyComponent: ReactNode = null;
+  if (surface.listEmpty === 'loading-skeletons') {
+    emptyComponent = (
+      <Animated.View exiting={FadeOut.duration(150)}>
+        {Array.from({ length: 8 }, (_, i) => (
+          <View key={i} className="py-1.5">
+            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
+          </View>
+        ))}
+      </Animated.View>
+    );
+  } else if (surface.listEmpty === 'body-empty' && bodyModel.kind !== 'render-list') {
     emptyComponent = (
       <BodyEmpty
         kind={bodyModel.kind}
@@ -252,12 +306,14 @@ export function AgentSessionListContent({
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
       <SectionList<StoredSession, SessionSection>
-        key={attentionListKey}
+        ref={listRef}
+        key={sortBy}
         sections={sections}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
-        extraData={attentionListKey}
+        extraData={attentionFocusRevision}
+        ListHeaderComponent={activeNowSection}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (

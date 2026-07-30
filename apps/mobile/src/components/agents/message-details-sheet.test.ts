@@ -6,7 +6,7 @@ import {
   type StepFinishPart,
   type StoredMessage,
   type UserMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 

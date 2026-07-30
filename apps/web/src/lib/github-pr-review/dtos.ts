@@ -129,6 +129,7 @@ export const GitHubPrReviewReviewCommentSchema = z
     reactions: z.array(GitHubPrReviewReactionSchema),
   })
   .strict();
+export type GitHubPrReviewReviewComment = z.infer<typeof GitHubPrReviewReviewCommentSchema>;
 
 export const GitHubPrReviewReviewThreadSchema = z
   .object({
@@ -142,6 +143,7 @@ export const GitHubPrReviewReviewThreadSchema = z
     originalLine: z.number().int().nullable(),
     originalStartLine: z.number().int().nullable(),
     diffSide: z.enum(['LEFT', 'RIGHT']).nullable(),
+    diffHunk: z.string().nullable(),
     comments: z.array(GitHubPrReviewReviewCommentSchema),
   })
   .strict();
@@ -150,6 +152,7 @@ export type GitHubPrReviewReviewThread = z.infer<typeof GitHubPrReviewReviewThre
 export const GitHubPrReviewReviewThreadsResultSchema = z
   .object({
     threads: z.array(GitHubPrReviewReviewThreadSchema),
+    conversation: z.array(GitHubPrReviewReviewCommentSchema),
     nextCursor: z.string().nullable(),
   })
   .strict();
@@ -162,3 +165,9 @@ export const FILES_MAX_PAGES = 60;
 export const FILE_LINES_MAX = 500;
 export const REVIEW_THREADS_PAGE_SIZE = 50;
 export const REVIEW_THREAD_COMMENTS_PAGE_SIZE = 50;
+// Conversation (issue) comments on the first listReviewThreads page only.
+// Page size 100, at most 5 pages — same ceiling spirit as bot review-comment
+// pagination (bot/platforms/github.ts). Past the cap, remaining pages are
+// dropped and whatever was collected is returned (silent truncation).
+export const CONVERSATION_COMMENTS_PAGE_SIZE = 100;
+export const CONVERSATION_COMMENTS_MAX_PAGES = 5;

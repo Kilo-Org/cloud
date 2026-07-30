@@ -1,11 +1,11 @@
-import { ScrollView } from 'react-native';
 import { FilePlus } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
-import { getFilename, truncateText } from '../tool-card-utils';
+import { getFilename } from '../tool-card-utils';
 
 export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const input = part.state.input;
@@ -18,11 +18,7 @@ export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
   return (
     <ToolCardShell icon={FilePlus} title="write" subtitle={subtitle} status={part.state.status}>
       {content.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <Text selectable className="font-mono text-xs leading-4 text-foreground">
-            {truncateText(content, 2000)}
-          </Text>
-        </ScrollView>
+        <MonoScrollBlock content={content} maxLength={2000} textClassName="text-foreground" />
       ) : null}
       {error ? (
         <Text selectable className="text-xs text-destructive">

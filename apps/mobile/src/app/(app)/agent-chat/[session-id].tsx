@@ -1,4 +1,4 @@
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
@@ -7,6 +7,7 @@ import {
   SessionDetailContent,
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-content';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -21,6 +22,7 @@ export default function SessionDetailScreen() {
     organizationId: routeOrganizationId,
     via,
     spawned,
+    shareId: shareIdParam,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -36,7 +38,10 @@ export default function SessionDetailScreen() {
      * shows the same permanent state it always did.
      */
     spawned?: string;
+    shareId?: string;
   }>();
+  // Param can be string | string[] depending on how the route was opened.
+  const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const trpc = useTRPC();
   const router = useRouter();
   const sessionQuery = useQuery({
@@ -76,7 +81,17 @@ export default function SessionDetailScreen() {
   if (routeOrganizationId === undefined && sessionQuery.isPending) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Session" />
+        <ScreenHeader
+          title="Session"
+          headerRight={
+            <SessionContextMetrics
+              info={undefined}
+              totalCostMicrodollars={null}
+              hasMessages={false}
+              loading
+            />
+          }
+        />
         <SessionSkeletonMessages />
       </View>
     );
@@ -123,6 +138,7 @@ export default function SessionDetailScreen() {
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}
         openedVia={via === 'push' ? 'push' : 'app'}
+        shareId={shareId}
       />
     </AgentSessionProvider>
   );

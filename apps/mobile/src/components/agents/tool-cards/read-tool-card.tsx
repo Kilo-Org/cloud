@@ -1,9 +1,12 @@
-import { ScrollView } from 'react-native';
 import { Eye } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { MonoScrollBlock } from '../mono-scroll-block';
+import { ReadMarkdownPreview } from '../read-markdown-preview';
+import { isMarkdownPath, resolveMarkdownPreview } from '../read-tool-markdown';
+import { getToolImageAttachments } from '../tool-card-attachments';
 import { ToolCardShell } from '../tool-card-shell';
 import { getFilename } from '../tool-card-utils';
 
@@ -31,6 +34,8 @@ export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
 
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
+  const markdownPreview = isMarkdownPath(filePath) ? resolveMarkdownPreview(part) : undefined;
+  const hasImages = getToolImageAttachments(part).length > 0;
 
   return (
     <ToolCardShell
@@ -39,13 +44,13 @@ export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
       subtitle={subtitle}
       badge={badge}
       status={part.state.status}
+      part={part}
     >
-      {output ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <Text selectable className="font-mono text-xs leading-4 text-foreground">
-            {output.slice(0, 2000)}
-          </Text>
-        </ScrollView>
+      {markdownPreview ? <ReadMarkdownPreview preview={markdownPreview} /> : null}
+      {/* An image read's output is only "Image read successfully" — the image itself
+          is the content, so the mono block would be noise (plan D10). */}
+      {markdownPreview === undefined && !hasImages && output ? (
+        <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
       ) : null}
       {error ? (
         <Text selectable className="text-xs text-destructive">

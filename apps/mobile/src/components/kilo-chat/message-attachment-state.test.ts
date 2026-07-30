@@ -1,12 +1,11 @@
-import { ATTACHMENT_MAX_BYTES } from '@kilocode/kilo-chat';
 import { describe, expect, it } from 'vitest';
 
 import {
-  addFilesWithinAttachmentCapacity,
   buildAttachmentLimitToast,
   buildAttachmentSizeRejectionToast,
   getAttachmentActionSheetConfig,
   isImageMimeType,
+  MOBILE_ATTACHMENT_MAX_BYTES,
   normalizeAttachmentSelection,
   selectAllowedAttachments,
 } from './message-attachment-state';
@@ -58,114 +57,184 @@ describe('message attachment state helpers', () => {
     expect(isImageMimeType(undefined)).toBe(false);
   });
 
-  it('truncates selections to ten attachments and returns toast copy', () => {
-    const existing = Array.from({ length: 8 }, (_value, index) =>
-      normalizeAttachmentSelection({
-        uri: `file:///existing-${index}.txt`,
-        name: `existing-${index}.txt`,
-        mimeType: 'text/plain',
-        size: 1,
-      })
-    );
-    const selected = Array.from({ length: 4 }, (_value, index) => ({
-      uri: `file:///selected-${index}.txt`,
-      name: `selected-${index}.txt`,
-      mimeType: 'text/plain',
-      size: 1,
-    }));
-
-    expect(selectAllowedAttachments({ existing, selected })).toEqual({
-      accepted: [
-        normalizeAttachmentSelection({
-          uri: 'file:///selected-0.txt',
-          name: 'selected-0.txt',
-          mimeType: 'text/plain',
-          size: 1,
-        }),
-        normalizeAttachmentSelection({
-          uri: 'file:///selected-1.txt',
-          name: 'selected-1.txt',
-          mimeType: 'text/plain',
-          size: 1,
-        }),
-      ],
-      rejected: [],
-      truncatedCount: 2,
-      toast: 'You can attach up to 10 files.',
+  it('accepts a file at the mobile byte boundary', () => {
+    const attachment = normalizeAttachmentSelection({
+      uri: 'file:///boundary.bin',
+      name: 'boundary.bin',
+      mimeType: 'application/octet-stream',
+      size: MOBILE_ATTACHMENT_MAX_BYTES,
     });
+
+    const result = selectAllowedAttachments({
+      existingCount: 0,
+      selected: [attachment],
+    });
+
+    expect(result.accepted).toEqual([attachment]);
+    expect(result.rejected).toEqual([]);
+    expect(result.truncatedCount).toBe(0);
+    expect(result.toast).toBeUndefined();
   });
 
-  it('rejects oversized files using the shared byte limit in the toast copy', () => {
-    const result = selectAllowedAttachments({
-      existing: [],
-      selected: [
-        {
-          uri: 'file:///large.mov',
-          name: 'large.mov',
-          mimeType: 'video/quicktime',
-          size: ATTACHMENT_MAX_BYTES + 1,
-        },
-        {
-          uri: 'file:///small.txt',
-          name: 'small.txt',
-          mimeType: 'text/plain',
-          size: 12,
-        },
-      ],
+  it('rejects a file above the mobile byte boundary with exact toast copy', () => {
+    const attachment = normalizeAttachmentSelection({
+      uri: 'file:///huge.bin',
+      name: 'huge.bin',
+      mimeType: 'application/octet-stream',
+      size: MOBILE_ATTACHMENT_MAX_BYTES + 1,
     });
 
-    expect(result.accepted).toEqual([
-      {
-        uri: 'file:///small.txt',
-        filename: 'small.txt',
-        mimeType: 'text/plain',
-        size: 12,
-        isImage: false,
-      },
-    ]);
+    const result = selectAllowedAttachments({
+      existingCount: 0,
+      selected: [attachment],
+    });
+
+    expect(result.accepted).toEqual([]);
     expect(result.rejected).toEqual([
       {
-        attachment: {
-          uri: 'file:///large.mov',
-          filename: 'large.mov',
-          mimeType: 'video/quicktime',
-          size: ATTACHMENT_MAX_BYTES + 1,
-          isImage: false,
-        },
+        attachment,
         reason: 'too-large',
-        toast: 'large.mov exceeds the 100 MB attachment limit.',
+        toast: 'huge.bin exceeds the 10 MB attachment limit.',
       },
     ]);
     expect(result.truncatedCount).toBe(0);
-    expect(result.toast).toBe('large.mov exceeds the 100 MB attachment limit.');
-    expect(buildAttachmentSizeRejectionToast('large.mov')).toBe(
-      'large.mov exceeds the 100 MB attachment limit.'
+    expect(result.toast).toBe('huge.bin exceeds the 10 MB attachment limit.');
+    expect(buildAttachmentSizeRejectionToast('huge.bin')).toBe(
+      'huge.bin exceeds the 10 MB attachment limit.'
     );
     expect(buildAttachmentLimitToast()).toBe('You can attach up to 10 files.');
   });
 
-  it('only consumes attachment capacity when the queue accepts a selected file', () => {
-    const addFileCalls: string[] = [];
-    const acceptedFiles: { filename: string; tempId: string }[] = [];
-    let limitToastCount = 0;
-
-    addFilesWithinAttachmentCapacity({
-      inputs: [{ filename: 'large.mov' }, { filename: 'small.txt' }],
-      capacity: 1,
-      addFile: input => {
-        addFileCalls.push(input.filename);
-        return input.filename === 'large.mov' ? null : `temp-${input.filename}`;
-      },
-      onAcceptedFile: (input, tempId) => {
-        acceptedFiles.push({ filename: input.filename, tempId });
-      },
-      onLimitExceeded: () => {
-        limitToastCount += 1;
-      },
+  it('accepts small files and rejects oversized files in the same selection', () => {
+    const small = normalizeAttachmentSelection({
+      uri: 'file:///small.txt',
+      name: 'small.txt',
+      mimeType: 'text/plain',
+      size: 12,
+    });
+    const huge = normalizeAttachmentSelection({
+      uri: 'file:///huge.bin',
+      name: 'huge.bin',
+      mimeType: 'application/octet-stream',
+      size: MOBILE_ATTACHMENT_MAX_BYTES + 1,
     });
 
-    expect(addFileCalls).toEqual(['large.mov', 'small.txt']);
-    expect(acceptedFiles).toEqual([{ filename: 'small.txt', tempId: 'temp-small.txt' }]);
-    expect(limitToastCount).toBe(0);
+    const result = selectAllowedAttachments({
+      existingCount: 0,
+      selected: [small, huge],
+    });
+
+    expect(result.accepted).toEqual([small]);
+    expect(result.rejected).toEqual([
+      {
+        attachment: huge,
+        reason: 'too-large',
+        toast: 'huge.bin exceeds the 10 MB attachment limit.',
+      },
+    ]);
+    expect(result.truncatedCount).toBe(0);
+    expect(result.toast).toBe('huge.bin exceeds the 10 MB attachment limit.');
+  });
+
+  it('truncates selections to ten attachments and returns toast copy', () => {
+    const selected = [
+      normalizeAttachmentSelection({
+        uri: 'file:///a.txt',
+        name: 'a.txt',
+        mimeType: 'text/plain',
+        size: 12,
+      }),
+      normalizeAttachmentSelection({
+        uri: 'file:///b.txt',
+        name: 'b.txt',
+        mimeType: 'text/plain',
+        size: 12,
+      }),
+    ];
+
+    const result = selectAllowedAttachments({
+      existingCount: 9,
+      selected,
+    });
+
+    expect(result.accepted).toEqual([selected[0]]);
+    expect(result.rejected).toEqual([]);
+    expect(result.truncatedCount).toBe(1);
+    expect(result.toast).toBe('You can attach up to 10 files.');
+  });
+
+  it('prefers size rejection toast over capacity toast when both apply', () => {
+    const huge = normalizeAttachmentSelection({
+      uri: 'file:///huge.bin',
+      name: 'huge.bin',
+      mimeType: 'application/octet-stream',
+      size: MOBILE_ATTACHMENT_MAX_BYTES + 1,
+    });
+    const a = normalizeAttachmentSelection({
+      uri: 'file:///a.txt',
+      name: 'a.txt',
+      mimeType: 'text/plain',
+      size: 12,
+    });
+    const b = normalizeAttachmentSelection({
+      uri: 'file:///b.txt',
+      name: 'b.txt',
+      mimeType: 'text/plain',
+      size: 12,
+    });
+
+    const result = selectAllowedAttachments({
+      existingCount: 9,
+      selected: [huge, a, b],
+    });
+
+    expect(result.accepted).toEqual([a]);
+    expect(result.rejected).toEqual([
+      {
+        attachment: huge,
+        reason: 'too-large',
+        toast: 'huge.bin exceeds the 10 MB attachment limit.',
+      },
+    ]);
+    expect(result.truncatedCount).toBe(1);
+    expect(result.toast).toBe('huge.bin exceeds the 10 MB attachment limit.');
+  });
+
+  it('rejects unknown or zero size as unreadable', () => {
+    const unknownSize = normalizeAttachmentSelection({
+      uri: 'file:///mystery.bin',
+      name: 'mystery.bin',
+      mimeType: 'application/octet-stream',
+    });
+    const nullSize = normalizeAttachmentSelection({
+      uri: 'file:///mystery.bin',
+      name: 'mystery.bin',
+      mimeType: 'application/octet-stream',
+      size: null,
+    });
+    const zeroSize = normalizeAttachmentSelection({
+      uri: 'file:///mystery.bin',
+      name: 'mystery.bin',
+      mimeType: 'application/octet-stream',
+      size: 0,
+    });
+
+    for (const attachment of [unknownSize, nullSize, zeroSize]) {
+      const result = selectAllowedAttachments({
+        existingCount: 0,
+        selected: [attachment],
+      });
+
+      expect(result.accepted).toEqual([]);
+      expect(result.rejected).toEqual([
+        {
+          attachment,
+          reason: 'unreadable',
+          toast: "Couldn't read mystery.bin.",
+        },
+      ]);
+      expect(result.truncatedCount).toBe(0);
+      expect(result.toast).toBe("Couldn't read mystery.bin.");
+    }
   });
 });

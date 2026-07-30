@@ -10,7 +10,7 @@ import {
   type CachedActiveSession,
   type CachedActiveSessionsData,
 } from '@/lib/active-sessions-live';
-import { type UserWebSystemEvent } from 'cloud-agent-sdk';
+import { type UserWebSystemEvent } from '@kilocode/cloud-agent-sdk';
 
 export type { CachedActiveSessionsData };
 

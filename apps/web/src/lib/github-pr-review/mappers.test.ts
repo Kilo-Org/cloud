@@ -244,6 +244,7 @@ describe('buildReviewThreadsResult', () => {
       page: 1,
       hasNextPage: false,
       endCursor: null,
+      conversation: [],
       threads: [
         {
           id: 'thread-1',
@@ -269,6 +270,7 @@ describe('buildReviewThreadsResult', () => {
     expect(result.threads[0]?.line).toBeNull();
     expect(result.threads[0]?.path).toBe('src/file.ts');
     expect(result.threads[0]?.comments[0]?.reactions[0]?.count).toBe(2);
+    expect(result.conversation).toEqual([]);
     expect(result.nextCursor).toBeNull();
   });
 
@@ -277,6 +279,7 @@ describe('buildReviewThreadsResult', () => {
       page: 1,
       hasNextPage: false,
       endCursor: null,
+      conversation: [],
       threads: [
         {
           id: 'thread-2',
@@ -304,6 +307,7 @@ describe('buildReviewThreadsResult', () => {
       page: 1,
       hasNextPage: false,
       endCursor: null,
+      conversation: [],
       threads: [
         {
           id: 'thread-3',
@@ -330,6 +334,7 @@ describe('buildReviewThreadsResult', () => {
       page: 1,
       hasNextPage: true,
       endCursor: 'Y3Vyc29yOnYyOpHOAAAAAA==',
+      conversation: [],
       threads: [],
     });
     expect(result.nextCursor).toBe('Y3Vyc29yOnYyOpHOAAAAAA==');
@@ -342,6 +347,7 @@ describe('buildReviewThreadsResult', () => {
       page: 1,
       hasNextPage: false,
       endCursor: null,
+      conversation: [],
       threads: [
         {
           id: 'thread-4',
@@ -359,5 +365,86 @@ describe('buildReviewThreadsResult', () => {
       ],
     });
     expect(result.threads[0]?.comments).toHaveLength(120);
+  });
+
+  it('maps diffHunk through; empty string and absent become null', () => {
+    const withHunk = buildReviewThreadsResult({
+      page: 1,
+      hasNextPage: false,
+      endCursor: null,
+      conversation: [],
+      threads: [
+        {
+          id: 'thread-hunk',
+          isResolved: false,
+          isOutdated: false,
+          diffHunk: '@@ -1,3 +1,4 @@\n line',
+          comments: [],
+        },
+      ],
+    });
+    expect(withHunk.threads[0]?.diffHunk).toBe('@@ -1,3 +1,4 @@\n line');
+
+    const emptyHunk = buildReviewThreadsResult({
+      page: 1,
+      hasNextPage: false,
+      endCursor: null,
+      conversation: [],
+      threads: [
+        {
+          id: 'thread-empty-hunk',
+          isResolved: false,
+          isOutdated: false,
+          diffHunk: '',
+          comments: [],
+        },
+      ],
+    });
+    expect(emptyHunk.threads[0]?.diffHunk).toBeNull();
+
+    const absentHunk = buildReviewThreadsResult({
+      page: 1,
+      hasNextPage: false,
+      endCursor: null,
+      conversation: [],
+      threads: [
+        {
+          id: 'thread-no-hunk',
+          isResolved: false,
+          isOutdated: false,
+          comments: [],
+        },
+      ],
+    });
+    expect(absentHunk.threads[0]?.diffHunk).toBeNull();
+  });
+
+  it('maps conversation comments through the same DTO shape as thread comments', () => {
+    const result = buildReviewThreadsResult({
+      page: 1,
+      hasNextPage: false,
+      endCursor: null,
+      threads: [],
+      conversation: [
+        {
+          databaseId: 99,
+          id: 'IC_99',
+          author: { login: 'alice', avatarUrl: 'https://avatars.example/alice' },
+          body: 'top-level note',
+          createdAt: '2026-02-01T00:00:00Z',
+          reactions: [{ content: 'HEART', count: 1, viewerHasReacted: true }],
+        },
+      ],
+    });
+    expect(result.conversation).toEqual([
+      {
+        commentId: 99,
+        nodeId: 'IC_99',
+        author: { login: 'alice', avatarUrl: 'https://avatars.example/alice' },
+        bodyMarkdown: 'top-level note',
+        createdAt: '2026-02-01T00:00:00Z',
+        reactions: [{ content: 'HEART', count: 1, viewerHasReacted: true }],
+      },
+    ]);
   });
 });

@@ -7,7 +7,7 @@
 // ways the repo's vitest setup doesn't transform).
 
 export type PrMergeMethod = 'merge' | 'squash' | 'rebase';
-export type PrReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+type PrReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 
 export type PrOverviewRepoSettings = {
   allowMergeCommit: boolean;
@@ -49,7 +49,7 @@ export type MergeBlockedReasonId =
   | 'draft'
   | 'unknown-state';
 
-export type MergeBlockedReasonSeverity = 'info' | 'warn' | 'destructive';
+type MergeBlockedReasonSeverity = 'info' | 'warn' | 'destructive';
 
 export type MergeBlockedReason = {
   id: MergeBlockedReasonId;

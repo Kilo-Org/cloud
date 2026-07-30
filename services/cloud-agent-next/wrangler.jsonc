@@ -103,6 +103,11 @@
       "service": "notifications",
       "entrypoint": "NotificationsService",
     },
+    {
+      "binding": "CONTAINER_USAGE_METER",
+      "service": "container-usage-meter",
+      "entrypoint": "ContainerUsageMeter",
+    },
   ],
   "secrets_store_secrets": [
     {
@@ -161,7 +166,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.63",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 200,
       "rollout_active_grace_period": 1800,
@@ -175,7 +180,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.63",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 150,
       "rollout_active_grace_period": 1800,
@@ -189,7 +194,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.63",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 20,
       "rollout_active_grace_period": 1800,
@@ -203,7 +208,7 @@
         "disk_mb": 8000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.63",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 500,
       "rollout_active_grace_period": 1800,
@@ -217,7 +222,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.63",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 750,
       "rollout_active_grace_period": 1800,
@@ -231,7 +236,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.63",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 300,
       "rollout_active_grace_period": 1800,
@@ -245,7 +250,7 @@
         "disk_mb": 8000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.63",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
@@ -412,6 +417,7 @@
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
         "GITHUB_TOKEN_CONTAINMENT_ORG_IDS": "",
         "GITLAB_TOKEN_CONTAINMENT_ORG_IDS": "",
+        "BITBUCKET_TOKEN_CONTAINMENT_ORG_IDS": "",
         "KILOCODE_TOKEN_CONTAINMENT_ORG_IDS": "",
         "REPO_SNAPSHOT_ORG_IDS": "",
         "TOOL_CGROUP_ORG_IDS": "",
@@ -431,6 +437,11 @@
           "binding": "NOTIFICATIONS",
           "service": "notifications",
           "entrypoint": "NotificationsService",
+        },
+        {
+          "binding": "CONTAINER_USAGE_METER",
+          "service": "container-usage-meter",
+          "entrypoint": "ContainerUsageMeter",
         },
       ],
       "secrets_store_secrets": [
@@ -456,7 +467,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.63",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -466,7 +477,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.63",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -476,7 +487,7 @@
           "image": "./Dockerfile.dind",
           "instance_type": "standard-3",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.63",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -490,7 +501,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.63",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -500,7 +511,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.63",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -510,7 +521,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.63",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -524,7 +535,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.63",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,

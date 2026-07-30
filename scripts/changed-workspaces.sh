@@ -20,14 +20,76 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+# Compute the diff base SHA by GitHub event type.
+# - `push` event: use the BEFORE sha from $GITHUB_EVENT_PATH so the diff covers
+#   the pushed range. `git merge-base origin/main HEAD` on a push to main
+#   resolves to HEAD, which would produce an empty matrix and skip the
+#   workspace-tests job.
+# - `pull_request` event (and locally with no GitHub env): use the merge-base
+#   against origin/main to preserve prior PR behavior.
+# - All-zeros before-sha (force-push / first push / branch creation) or any
+#   invalid/unreachable before-sha falls back to HEAD~1.
+base=""
+if [ "${GITHUB_EVENT_NAME:-}" = "push" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+  before=$(jq -r '.before // ""' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+  if [ -n "$before" ] \
+      && [ "$before" != "0000000000000000000000000000000000000000" ] \
+      && git cat-file -e "$before" 2>/dev/null; then
+    base="$before"
+  else
+    base=$(git rev-parse --verify HEAD~1 2>/dev/null || true)
+  fi
+else
+  base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+fi
 
-# If shared inputs changed, treat all workspaces as changed — shared package or
-# lockfile updates can break any downstream workspace.
-shared_changed=false
+# Decide selection mode:
+#   force_all=true — include every workspace (lockfile/workspace-yaml changes
+#     genuinely can break any downstream workspace, and loose `packages/*` files
+#     outside any package dir don't have a single owner to derive dependents of).
+#   force_all=false and dependent_dirs_file populated — a `packages/<name>/**`
+#     path changed; only include that package plus its transitive workspace:*
+#     dependents.
+#   force_all=false and dependent_dirs_file empty — fall back to per-workspace
+#     direct file-diff check.
+force_all=false
+dependent_dirs_file=$(mktemp)
+trap 'rm -f "$dependent_dirs_file"' EXIT
 if [ -n "$base" ]; then
-  if git diff --name-only "$base" -- pnpm-lock.yaml pnpm-workspace.yaml 'packages/**' | grep -q .; then
-    shared_changed=true
+  if git diff --name-only "$base" -- pnpm-lock.yaml pnpm-workspace.yaml | grep -q .; then
+    force_all=true
+  else
+    # List files changed under packages/**. Anything that doesn't match
+    # `packages/<name>/` (e.g. `packages/README.md`) is a loose file with no
+    # single owning package — fall back to force_all.
+    pkg_changes=$(git diff --name-only "$base" -- 'packages/**' || true)
+    if [ -n "$pkg_changes" ]; then
+      loose=$(printf '%s\n' "$pkg_changes" | grep -vE '^packages/[^/]+/' | head -1 || true)
+      if [ -n "$loose" ]; then
+        force_all=true
+      else
+        # Collect the top-level changed package dirs and union their transitive
+        # workspace:* dependents via pnpm's `...^<name>` selector.
+        changed_pkg_dirs=$(printf '%s\n' "$pkg_changes" | awk -F/ '{print $1"/"$2}' | sort -u)
+        for pkg_dir in $changed_pkg_dirs; do
+          [ -f "$pkg_dir/package.json" ] || continue
+          pkg_name=$(node -e "console.log(require('./$pkg_dir/package.json').name)" 2>/dev/null) || continue
+          [ -n "$pkg_name" ] || continue
+          pnpm --filter "...^$pkg_name" ls --json --depth -1 2>/dev/null | node -e "
+            const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+            for (const p of pkgs) {
+              if (!p.path) continue;
+              const rel = require('path').relative(process.cwd(), p.path);
+              if (rel && rel !== '.') console.log(rel);
+            }
+          " 2>/dev/null >> "$dependent_dirs_file" || true
+          # Always include the changed package itself; `...^<name>` only matches
+          # true dependents, not the named package.
+          echo "$pkg_dir" >> "$dependent_dirs_file"
+        done
+        sort -u "$dependent_dirs_file" -o "$dependent_dirs_file"
+      fi
+    fi
   fi
 fi
 
@@ -67,9 +129,13 @@ for dir in $workspace_dirs; do
   [ -n "$test_file_count" ] || continue
 
   # Check for file changes (if we have a merge base)
-  if [ -n "$base" ] && ! $shared_changed; then
-    changed_file=$(git diff --name-only "$base" -- "$dir/" | head -1 || true)
-    [ -n "$changed_file" ] || continue
+  if [ -n "$base" ] && ! $force_all; then
+    if [ -s "$dependent_dirs_file" ] && grep -qxF "$dir" "$dependent_dirs_file"; then
+      : # include: workspace is a transitive dependent of a changed package
+    else
+      changed_file=$(git diff --name-only "$base" -- "$dir/" | head -1 || true)
+      [ -n "$changed_file" ] || continue
+    fi
   fi
 
   name=$(node -e "console.log(require('./$dir/package.json').name)" 2>/dev/null)

@@ -9,11 +9,15 @@ import { useTRPC } from '@/lib/trpc';
  * The current user's role in the active organization. `trpc.organizations.list`
  * requires auth (not an active org selection), so it's gated on the token
  * rather than on `organizationId` — mirrors profile-screen's `orgs` query.
+ *
+ * Pass `organizationIdOverride` to resolve role/membership against an explicit
+ * org id (e.g. a deep-link `?org=` param) instead of the persisted selection.
  */
-export function useOrgRole() {
+function useOrgRole(organizationIdOverride?: string) {
   const trpc = useTRPC();
   const { token } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId: contextOrganizationId } = useOrganization();
+  const organizationId = organizationIdOverride ?? contextOrganizationId;
   const {
     data: orgs,
     isLoading,
@@ -25,7 +29,17 @@ export function useOrgRole() {
     enabled: token != null,
   });
   const org = orgs?.find(entry => entry.organizationId === organizationId);
-  return { organizationId, role: org?.role, org, isLoading, isError, isFetching, refetch };
+  return {
+    organizationId,
+    contextOrganizationId,
+    role: org?.role,
+    org,
+    orgs,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  };
 }
 
 export type OrgListEntry = NonNullable<ReturnType<typeof useOrgRole>['org']>;
@@ -43,12 +57,36 @@ export const isMoneyRole = canManageOrganizationBilling;
  * firing mutations with it. Callers still check `organizationId`/`org` for
  * null themselves (rather than relying on a computed `isValid` flag) so
  * TypeScript narrows both to non-null after the guard.
+ *
+ * Optional `organizationIdOverride` replaces the context id end-to-end (list
+ * lookup and returned `organizationId`) for deep-link visits.
  */
-export function useOrgBoundary() {
+export function useOrgBoundary(organizationIdOverride?: string) {
   const { isLoaded } = useOrganization();
-  const { organizationId, role, org, isLoading, isError, isFetching, refetch } = useOrgRole();
+  const {
+    organizationId,
+    contextOrganizationId,
+    role,
+    org,
+    orgs,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useOrgRole(organizationIdOverride);
   const isResolving = !isLoaded || isLoading;
-  return { organizationId, role, org, isResolving, isError, isFetching, refetch };
+  return {
+    organizationId,
+    contextOrganizationId,
+    role,
+    org,
+    orgs,
+    isResolving,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  };
 }
 
 export function useOrgWithMembers(organizationId: string | null) {
@@ -62,7 +100,7 @@ export function useOrgWithMembers(organizationId: string | null) {
 }
 
 export type OrgWithMembers = NonNullable<ReturnType<typeof useOrgWithMembers>['data']>;
-export type OrgMember = OrgWithMembers['members'][number];
+type OrgMember = OrgWithMembers['members'][number];
 export type ActiveOrgMember = Extract<OrgMember, { status: 'active' }>;
 export type InvitedOrgMember = Extract<OrgMember, { status: 'invited' }>;
 

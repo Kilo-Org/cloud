@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildActiveSessionsInput,
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
@@ -61,6 +62,26 @@ describe('buildAgentSessionListInput', () => {
       gitUrl: ['https://github.com/foo/bar'],
       organizationId: 'org-1',
     });
+  });
+});
+
+describe('buildActiveSessionsInput', () => {
+  it('collapses null to { organizationId: null }', () => {
+    expect(buildActiveSessionsInput(null)).toEqual({ organizationId: null });
+  });
+
+  it('passes a uuid through unchanged', () => {
+    expect(buildActiveSessionsInput('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toEqual({
+      organizationId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    });
+  });
+
+  it('collapses undefined to { organizationId: null }', () => {
+    expect(buildActiveSessionsInput(undefined)).toEqual({ organizationId: null });
+  });
+
+  it('produces the same key for null and undefined (key-stability rule)', () => {
+    expect(buildActiveSessionsInput(null)).toEqual(buildActiveSessionsInput(undefined));
   });
 });
 

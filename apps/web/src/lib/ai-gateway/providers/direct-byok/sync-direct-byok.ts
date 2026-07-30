@@ -289,6 +289,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Morph BYOK',
     url: 'https://www.morphllm.com/api/models/json',
   }),
+  modelsDevFetcher('nvidia-byok', 'nvidia', 'https://integrate.api.nvidia.com/v1/models'),
   modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud', 'https://ollama.com/v1/models'),

@@ -127,8 +127,12 @@ describe('completeStoreKiloPassPurchase', () => {
     const first = await completeStoreKiloPassPurchase({ user, purchase });
     const replay = await completeStoreKiloPassPurchase({ user, purchase });
 
-    const { purchaseKind: _purchaseKind, ...firstWithoutKind } = first;
-    expect(replay).toEqual({ ...firstWithoutKind, alreadyProcessed: true });
+    expect(replay).toEqual({
+      subscriptionId: first.subscriptionId,
+      tier: first.tier,
+      cadence: first.cadence,
+      alreadyProcessed: true,
+    });
 
     const storePurchases = await db
       .select()

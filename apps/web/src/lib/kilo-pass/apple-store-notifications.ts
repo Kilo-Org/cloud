@@ -752,7 +752,7 @@ export async function processAppStoreKiloPassNotification(params: {
           );
       });
       // Post-commit only — never capture inside the transaction.
-      const trackedResult = completionResult;
+      const trackedResult = completionResult as CompleteStoreKiloPassPurchaseResult | null;
       if (trackedResult && !trackedResult.alreadyProcessed) {
         await runAfterResponse(async () => {
           trackKiloPassPurchaseCompleted({

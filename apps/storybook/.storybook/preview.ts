@@ -49,18 +49,6 @@ const withProductionFonts: Decorator = Story => {
   return Story();
 };
 
-const withStorybookViewMode: Decorator = (Story, context) => {
-  if (typeof document !== 'undefined') {
-    if (context.viewMode === 'docs') {
-      document.body.dataset.storybookViewMode = 'docs';
-    } else {
-      delete document.body.dataset.storybookViewMode;
-    }
-  }
-
-  return Story();
-};
-
 const preview: Preview = {
   parameters: {
     layout: 'fullscreen',
@@ -105,13 +93,7 @@ const preview: Preview = {
       },
     },
   },
-  decorators: [
-    withStorybookViewMode,
-    withProductionFonts,
-    withTRPC,
-    withQueryClient,
-    withSessionProvider,
-  ],
+  decorators: [withProductionFonts, withTRPC, withQueryClient, withSessionProvider],
 };
 
 export default preview;

@@ -12,7 +12,11 @@ function platformFor(device) {
 
 async function connect(device) {
   const platform = platformFor(device);
-  const ports = portsFor(device);
+  // The wrapper passes the port of the server it actually started (it bumps
+  // past occupied blocks); fall back to the deterministic default.
+  const derived = portsFor(device);
+  const serverPort = Number(process.env.APPIUM_PORT || derived.server);
+  const ports = { server: serverPort, wda: serverPort + 1, system: serverPort + 2 };
   const capabilities =
     platform === 'ios'
       ? {

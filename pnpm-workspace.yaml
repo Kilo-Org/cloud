@@ -162,6 +162,7 @@ allowBuilds:
   tree-sitter-bash: false
   geckodriver: true
   '@scarf/scarf': false
-  appium: set this to true or false
-  appium-ios-tuntap: set this to true or false
-  edgedriver: set this to true or false
+  # appium's postinstall no-ops for project installs; tuntap and edgedriver are unused
+  appium: false
+  appium-ios-tuntap: false
+  edgedriver: false

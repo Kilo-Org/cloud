@@ -5,14 +5,14 @@
 # Usage:
 #   e2e/logout.sh <device-udid>
 #
-# Requires: maestro. See e2e/AGENTS.md ("Sign In and Out").
+# See e2e/AGENTS.md ("Sign In and Out").
 set -euo pipefail
 
 DEVICE="${1:?usage: logout.sh <device-udid>}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ "${KILO_MAESTRO_LOCKED:-}" != "1" ]; then
-  exec "$SCRIPT_DIR/maestro.sh" "$DEVICE" --exec "$0" "$@"
+if [ "${KILO_APPIUM_LOCKED:-}" != "1" ]; then
+  exec "$SCRIPT_DIR/appium.sh" "$DEVICE" --exec "$0" "$@"
 fi
 "$SCRIPT_DIR/preflight.sh" "$DEVICE"
-"$SCRIPT_DIR/maestro.sh" "$DEVICE" test "$SCRIPT_DIR/flows/logout.yaml"
+"$SCRIPT_DIR/appium.sh" "$DEVICE" test "$SCRIPT_DIR/flows/logout.js"

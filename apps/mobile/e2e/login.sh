@@ -15,7 +15,8 @@
 # Env overrides:
 #   OUTBOX   outbox dir (default: <repo-root>/dev/logs/emails)
 #
-# Requires: maestro, perl. Run the backend + Metro first (see e2e/AGENTS.md).
+# Requires: perl (plus the repo install, which provides Appium). Run the
+# backend + Metro first (see e2e/AGENTS.md).
 set -euo pipefail
 
 DEVICE="${1:?usage: login.sh <device-udid> [email]}"
@@ -31,8 +32,8 @@ case "$DEVICE" in
 esac
 EMAIL="${2:-e2e-mobile-${WORKTREE_SLUG}-${PLATFORM}@example.com}"
 
-if [ "${KILO_MAESTRO_LOCKED:-}" != "1" ]; then
-  exec "$SCRIPT_DIR/maestro.sh" "$DEVICE" --exec "$0" "$@"
+if [ "${KILO_APPIUM_LOCKED:-}" != "1" ]; then
+  exec "$SCRIPT_DIR/appium.sh" "$DEVICE" --exec "$0" "$@"
 fi
 
 # Newest sign-in-code email for EMAIL, or empty.
@@ -62,7 +63,7 @@ fi
 LOCK="${TMPDIR:-/tmp}/kilo-otp-locks/$EMAIL_KEY"
 if [ "${KILO_OTP_LOCKED:-}" != "1" ]; then
   exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
-    --wait 1200 "$LOCK" -- env KILO_MAESTRO_LOCKED=1 KILO_OTP_LOCKED=1 "$0" "$@"
+    --wait 1200 "$LOCK" -- env KILO_APPIUM_LOCKED=1 KILO_OTP_LOCKED=1 "$0" "$@"
 fi
 
 "$SCRIPT_DIR/preflight.sh" "$DEVICE"
@@ -72,11 +73,11 @@ fi
 before="$(latest_email)"
 
 request_code() {
-  "$SCRIPT_DIR/maestro.sh" "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"
+  "$SCRIPT_DIR/appium.sh" "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.js"
 }
 
-# Say which half broke, so nobody reads Maestro's generic "could be a real
-# regression" advice as a product-bug lead.
+# Say which half broke, so nobody reads a generic automation failure as a
+# product-bug lead.
 diagnose_request() {
   local now
   now="$(latest_email)"
@@ -93,7 +94,7 @@ if ! request_code; then
   # One cold relaunch clears both known first-attempt failures: a half-started
   # dev client, and an email field left dirty by an earlier run.
   echo "==> retrying launch and sign-in request once after a cold relaunch"
-  "$SCRIPT_DIR/maestro.sh" "$DEVICE" test "$SCRIPT_DIR/flows/open-app.yaml" || true
+  "$SCRIPT_DIR/appium.sh" "$DEVICE" test "$SCRIPT_DIR/flows/open-app.js" || true
   request_code || { diagnose_request; exit 1; }
 fi
 
@@ -114,5 +115,5 @@ if [ -z "$code" ]; then
 fi
 
 echo "==> verifying sign-in code"
-"$SCRIPT_DIR/maestro.sh" "$DEVICE" test -e "OTP=$code" "$SCRIPT_DIR/flows/login-verify-code.yaml"
+"$SCRIPT_DIR/appium.sh" "$DEVICE" test -e "OTP=$code" "$SCRIPT_DIR/flows/login-verify-code.js"
 echo "==> signed in"

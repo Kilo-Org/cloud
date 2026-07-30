@@ -11,8 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
   Keyboard,
+  type LayoutChangeEvent,
   type TextInput,
-  type TextInputContentSizeChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
@@ -31,13 +31,10 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
-import {
-  resolveComposerHeightOnTextChange,
-  resolveComposerInputHeight,
-  shouldEnableComposerInputScroll,
-} from '@/components/agents/chat-composer-input-height';
+import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
+import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -61,6 +58,7 @@ import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-subm
 const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
 const TEXT_INPUT_VERTICAL_PADDING = 24;
+const TEXT_INPUT_HORIZONTAL_PADDING = 32;
 const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
@@ -132,10 +130,9 @@ export function ChatComposer({
   const inputFocusedRef = useRef(false);
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastContentHeightRef = useRef<number | null>(null);
   const [hasText, setHasText] = useState(false);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
-  const [inputHeight, setInputHeight] = useState(TEXT_INPUT_MIN_HEIGHT);
+  const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -164,6 +161,15 @@ export function ChatComposer({
   };
   const upload = useAgentAttachmentUpload({ organizationId });
 
+  const measure = useTextHeight({
+    minHeight: TEXT_INPUT_MIN_HEIGHT,
+    maxHeight: TEXT_INPUT_MAX_HEIGHT,
+    verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
+    textContentWidth: inputWidth - TEXT_INPUT_HORIZONTAL_PADDING,
+    fontSize: TEXT_INPUT_FONT_SIZE,
+    lineHeight: TEXT_INPUT_LINE_HEIGHT,
+  });
+
   // Compute base composer disabled before the voice hook so voice can react to it.
   // `isStreaming` is intentionally NOT a composer gate (see
   // `chat-composer-input-state.ts`); the user must remain able to type and
@@ -171,41 +177,11 @@ export function ChatComposer({
   const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
 
-  function applyHeightFromTextChange(previousDraftLength: number, nextDraftLength: number) {
-    const nextHeight = resolveComposerHeightOnTextChange({
-      previousDraftLength,
-      nextDraftLength,
-      lastContentHeight: lastContentHeightRef.current,
-      minHeight: TEXT_INPUT_MIN_HEIGHT,
-      maxHeight: TEXT_INPUT_MAX_HEIGHT,
-    });
-    if (nextHeight !== null) {
-      setInputHeight(nextHeight);
-    }
-    if (nextDraftLength === 0) {
-      lastContentHeightRef.current = null;
-    }
-  }
-
   function handleChangeText(value: string) {
-    const previousDraftLength = textRef.current.length;
     textRef.current = value;
-    applyHeightFromTextChange(previousDraftLength, value.length);
+    measure.setText(value);
     setHasText(value.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(value));
-  }
-
-  function handleContentSizeChange(event: TextInputContentSizeChangeEvent) {
-    const contentHeight = event.nativeEvent.contentSize.height;
-    lastContentHeightRef.current = contentHeight;
-    setInputHeight(
-      resolveComposerInputHeight({
-        draftLength: textRef.current.length,
-        contentHeight,
-        minHeight: TEXT_INPUT_MIN_HEIGHT,
-        maxHeight: TEXT_INPUT_MAX_HEIGHT,
-      })
-    );
   }
 
   const { addCandidates, removeAttachment, retryAttachment } = upload;
@@ -287,7 +263,7 @@ export function ChatComposer({
     };
   }, [disabled, isSending]);
 
-  const inputScrollable = shouldEnableComposerInputScroll(inputHeight, TEXT_INPUT_MAX_HEIGHT);
+  const inputScrollable = shouldEnableComposerInputScroll(measure.height, TEXT_INPUT_MAX_HEIGHT);
   const dismissKeyboardPan = useMemo(
     () =>
       // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
@@ -306,8 +282,7 @@ export function ChatComposer({
     textRef.current = '';
     setHasText(false);
     setSlashCommandInput(null);
-    lastContentHeightRef.current = null;
-    setInputHeight(TEXT_INPUT_MIN_HEIGHT);
+    measure.reset();
     inputRef.current?.clear();
   }
 
@@ -388,16 +363,15 @@ export function ChatComposer({
     if (sendLockRef.current.isLocked()) {
       return;
     }
-    const previousDraftLength = textRef.current.length;
     const value = `/${command.name} `;
     textRef.current = value;
+    measure.setText(value);
     setHasText(true);
     setSlashCommandInput(null);
     inputRef.current?.setNativeProps({
       text: value,
       selection: { start: value.length, end: value.length },
     });
-    applyHeightFromTextChange(previousDraftLength, value.length);
     inputRef.current?.focus();
   }
 
@@ -420,6 +394,11 @@ export function ChatComposer({
     void onStop?.();
   }
 
+  function handleInputLayout(event: LayoutChangeEvent) {
+    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
+    setInputWidth(current => (current === nextWidth ? current : nextWidth));
+  }
+
   const handleAddAttachment = useCallback(async () => {
     // Fire-and-forget: the upload hook owns its own progress + error toasts,
     // and the composer's send flow consults `upload.isUploading` /
@@ -430,7 +409,7 @@ export function ChatComposer({
   const textInputStyle: TextStyle = {
     color: colors.foreground,
     fontSize: TEXT_INPUT_FONT_SIZE,
-    height: inputHeight,
+    height: measure.height,
     includeFontPadding: false,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
     paddingHorizontal: 16,
@@ -441,6 +420,8 @@ export function ChatComposer({
 
   return (
     <BlurBar>
+      {measure.measureElement}
+
       {control.showToolbar ? (
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(100)}>
           <ChatToolbar
@@ -484,16 +465,15 @@ export function ChatComposer({
             disabled={disabled}
             inputAccessibilityDisabled={control.inputAccessibilityDisabled}
             inputEditable={control.inputEditable}
-            inputHeight={inputHeight}
             inputRef={inputRef}
             isSending={isSending}
             isStreaming={isStreaming}
             maxInputHeight={TEXT_INPUT_MAX_HEIGHT}
+            measureHeight={measure.height}
             onAddAttachment={() => {
               void handleAddAttachment();
             }}
             onChangeText={handleChangeText}
-            onContentSizeChange={handleContentSizeChange}
             onInputBlur={() => {
               inputFocusedRef.current = false;
               setIsFocused(false);
@@ -502,6 +482,7 @@ export function ChatComposer({
               inputFocusedRef.current = true;
               setIsFocused(true);
             }}
+            onInputLayout={handleInputLayout}
             onStop={handleStop}
             onSubmit={() => {
               void submit();

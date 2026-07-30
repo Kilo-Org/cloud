@@ -2,9 +2,9 @@ import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
 import { type RefObject } from 'react';
 import {
   ActivityIndicator,
+  type LayoutChangeEvent,
   Pressable,
   TextInput,
-  type TextInputContentSizeChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
@@ -24,16 +24,16 @@ type ChatComposerInputRowProps = {
   disabled: boolean;
   inputAccessibilityDisabled: boolean;
   inputEditable: boolean;
-  inputHeight: number;
   inputRef: RefObject<TextInput | null>;
   isSending: boolean;
   isStreaming: boolean;
   maxInputHeight: number;
+  measureHeight: number;
   onAddAttachment: () => void;
   onChangeText: (text: string) => void;
-  onContentSizeChange: (event: TextInputContentSizeChangeEvent) => void;
   onInputBlur: () => void;
   onInputFocus: () => void;
+  onInputLayout: (event: LayoutChangeEvent) => void;
   onStop: () => void;
   onSubmit: () => void;
   onToggleVoice: () => void;
@@ -58,16 +58,16 @@ export function ChatComposerInputRow({
   disabled,
   inputAccessibilityDisabled,
   inputEditable,
-  inputHeight,
   inputRef,
   isSending,
   isStreaming,
   maxInputHeight,
+  measureHeight,
   onAddAttachment,
   onChangeText,
-  onContentSizeChange,
   onInputBlur,
   onInputFocus,
+  onInputLayout,
   onStop,
   onSubmit,
   onToggleVoice,
@@ -79,7 +79,7 @@ export function ChatComposerInputRow({
   voiceInputStatus,
 }: Readonly<ChatComposerInputRowProps>) {
   const colors = useThemeColors();
-  const inputScrollable = shouldEnableComposerInputScroll(inputHeight, maxInputHeight);
+  const inputScrollable = shouldEnableComposerInputScroll(measureHeight, maxInputHeight);
 
   return (
     <View className="flex-row items-center p-2.5 px-3">
@@ -105,6 +105,7 @@ export function ChatComposerInputRow({
           'mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
           !inputEditable && 'opacity-50'
         )}
+        onLayout={onInputLayout}
       >
         <TextInput
           ref={inputRef}
@@ -113,7 +114,6 @@ export function ChatComposerInputRow({
           multiline
           maxLength={4000}
           onChangeText={onChangeText}
-          onContentSizeChange={onContentSizeChange}
           onFocus={onInputFocus}
           onBlur={onInputBlur}
           style={textInputStyle}

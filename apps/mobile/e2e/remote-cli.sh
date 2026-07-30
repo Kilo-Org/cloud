@@ -9,8 +9,8 @@
 #   - a passthrough for any one-off `kilo` command (remote, run, session, ...).
 #
 # Usage:
-#   apps/mobile/e2e/remote-cli.sh start [email] [--reinstall]   # interactive TUI in tmux
-#   apps/mobile/e2e/remote-cli.sh prepare [email] [--reinstall] # write env only, no launch
+#   apps/mobile/e2e/remote-cli.sh start <email> [--reinstall]   # interactive TUI in tmux
+#   apps/mobile/e2e/remote-cli.sh prepare <email> [--reinstall] # write env only, no launch
 #   apps/mobile/e2e/remote-cli.sh exec <kilo args...>           # run any kilo command
 #   apps/mobile/e2e/remote-cli.sh status
 #   apps/mobile/e2e/remote-cli.sh stop [--purge]
@@ -20,12 +20,10 @@
 #   apps/mobile/e2e/remote-cli.sh exec session list --pure
 #   apps/mobile/e2e/remote-cli.sh exec run "say hello"
 #
-# When no email is given, defaults to the per-worktree-unique login account
-# (e2e-mobile-<worktree-slug>@example.com), matching e2e/login.sh. The user must
-# already exist (sign in on the device first, or seed one). Pass an explicit
-# email to target a specific account (e.g. the one the app is signed in as).
-# `exec` reuses an already-prepared env and only prepares (mints a token) when
-# none exists yet.
+# The email is required and must be the account the app is signed in as —
+# e2e/login.sh's default is e2e-mobile-<worktree-slug>-<ios|android>@example.com.
+# The user must already exist (sign in on the device first, or seed one).
+# `exec` reuses an already-prepared env; run `start <email>` once first.
 #
 # Env overrides:
 #   KILO_CLI_VERSION   npm version/tag of @kilocode/cli to install (default: latest)
@@ -40,7 +38,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 WORKTREE_SLUG="$(basename "$REPO_ROOT" | tr -cs 'a-zA-Z0-9' '-' | sed 's/^-*//;s/-*$//')"
-DEFAULT_EMAIL="e2e-mobile-$(printf '%s' "$WORKTREE_SLUG" | tr 'A-Z' 'a-z')@example.com"
 SESSION="kilo-e2e-cli-${WORKTREE_SLUG}"
 CLI_HOME="$REPO_ROOT/dev/.dev-logs/remote-cli/${WORKTREE_SLUG}"
 ENV_FILE="$CLI_HOME/.cli-env"
@@ -72,7 +69,8 @@ prepare_env() {
 
   if [ -z "$nextjs_port" ] || [ -z "$ingest_port" ]; then
     echo "Required services are not up for $REPO_ROOT." >&2
-    echo "Start them first, e.g.: pnpm dev:start --no-attach mobile cloud-agent-next event-service" >&2
+    echo "If you hold no E2E slot: take one, then .kilo_workflow/e2e-start-resource.sh stack mobile cloud-agent-next kiloclaw event-service" >&2
+    echo "If a bundle owner already runs this stack, use it — never start a second one." >&2
     exit 1
   fi
   if [ -z "$event_port" ]; then
@@ -150,7 +148,7 @@ EOF
   PREP_NEXTJS="$nextjs_port" PREP_INGEST="$ingest_port" PREP_EVENT="$event_port"
 }
 
-# Parse "[email] [--reinstall]" for start/prepare. Sets OPT_EMAIL, OPT_REINSTALL.
+# Parse "<email> [--reinstall]" for start/prepare. Sets OPT_EMAIL, OPT_REINSTALL.
 parse_prepare_args() {
   OPT_EMAIL="" OPT_REINSTALL=0
   local arg
@@ -161,7 +159,7 @@ parse_prepare_args() {
       *) if [ -z "$OPT_EMAIL" ]; then OPT_EMAIL="$arg"; else echo "Unexpected argument: $arg" >&2; exit 2; fi ;;
     esac
   done
-  [ -n "$OPT_EMAIL" ] || OPT_EMAIL="$DEFAULT_EMAIL"
+  [ -n "$OPT_EMAIL" ] || { echo "usage: remote-cli.sh start|prepare <email> [--reinstall] — pass the account the app is signed in as" >&2; exit 2; }
 }
 
 cmd_prepare() {
@@ -208,8 +206,8 @@ cmd_exec() {
     exit 2
   fi
   if [ ! -f "$ENV_FILE" ]; then
-    echo "==> no prepared env for this worktree; preparing with $DEFAULT_EMAIL" >&2
-    prepare_env "$DEFAULT_EMAIL" 0
+    echo "no prepared env for this worktree — run: remote-cli.sh start <email> (the account the app is signed in as)" >&2
+    exit 1
   fi
   # Run kilo with the prepared env in a subshell so it does not leak into the
   # caller. Command stdout/stderr and exit code pass straight through.
@@ -219,10 +217,10 @@ cmd_exec() {
 cmd_status() {
   if tmux has-session -t "$SESSION" 2>/dev/null; then
     echo "Remote CLI session '$SESSION' is running."
-    tmux capture-pane -p -t "$SESSION" -S -40 | sed -e 's/[[:space:]]*$//' | grep -v '^$' | tail -20
+    tmux capture-pane -p -t "$SESSION" -S -40 | sed -e 's/[[:space:]]*$//' | grep -v '^$' | tail -20 || true
   else
     echo "No remote CLI session '$SESSION' is running."
-    [ -f "$ENV_FILE" ] && echo "(env is prepared; run 'remote-cli.sh exec <args>' or 'start')"
+    [ -f "$ENV_FILE" ] && echo "(env is prepared; run 'remote-cli.sh exec <args>' or 'start')" || true
   fi
 }
 
@@ -246,8 +244,8 @@ case "${1:-start}" in
   start) shift || true; cmd_start "$@" ;;
   prepare) shift || true; cmd_prepare "$@" ;;
   exec) shift || true; cmd_exec "$@" ;;
-  status) shift || true; cmd_status ;;
+  status) shift || true; [ "$#" -eq 0 ] || { echo "status takes no arguments" >&2; exit 2; }; cmd_status ;;
   stop) shift || true; cmd_stop "$@" ;;
   -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//' | sed '1d' ;;
-  *) cmd_start "$@" ;;
+  *) echo "unknown command: ${1} (expected start|prepare|exec|status|stop)" >&2; exit 2 ;;
 esac

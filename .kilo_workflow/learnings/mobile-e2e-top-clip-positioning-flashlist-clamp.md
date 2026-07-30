@@ -12,15 +12,17 @@ Cause: two independent constraints.
    y228 until page 2 was loaded via "Load more" — r1's own flow-4 setup dump shows page-2
    threads (zeta/eta) already loaded for the same reason. On Android (2424px), zeta could
    not be clipped until theta (below it) was expanded, adding ~850px below.
-2. Short Maestro swipes (<~10% of screen height, e.g. 1-6%) are silently ignored on both
+2. Short swipes (<~10% of screen height, e.g. 1-6%) are silently ignored on both
    platforms (velocity/distance below the scroll-recognition threshold); hierarchy bounds
    stay byte-identical. Do not retry them in a loop — they never land.
 
 Working sequence per platform:
-- Load page 2 first (`scrollUntilVisible` 'Load more comments' + tap), or expand a thread
+- Load page 2 first (`scrollUntilVisible('Load more comments')` + tap), or expand a thread
   below the target to grow content.
-- Approach with 30% Maestro swipes, one command at a time with a hierarchy probe between
-  (back-to-back commands after big swipes get ignored intermittently).
+- Approach with long drags (~30% of screen height) via a raw W3C-actions swipe — the helpers
+  expose only `swipeUp(sign)` flicks, so build the drag with `driver.performActions` — one
+  gesture at a time with an `appium.sh <device> hierarchy` probe between (back-to-back
+  gestures after big swipes get ignored intermittently).
 - Final 40-100px positioning: iOS — a 6-8% swipe usually lands once the clamp is released;
   Android — `adb shell input swipe x y1 x y2 300` works reliably but ONLY once the offset
   can grow (it is also clamped, not broken).

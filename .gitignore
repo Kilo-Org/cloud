@@ -135,3 +135,4 @@ run-milvus-test.sh
 !.env.*.example
 !.env.test
 !.envrc
+.playwright-mcp

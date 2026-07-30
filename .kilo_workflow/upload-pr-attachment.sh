@@ -4,31 +4,28 @@
 set -euo pipefail
 
 VERSION=v1.2.0
-[ "$#" -eq 1 ] && [ "$1" = "--version" ] && VERSION_ONLY=1 || VERSION_ONLY=0
-if [ "$VERSION_ONLY" -eq 0 ]; then
-  [ "$#" -eq 3 ] && [ "$2" = "--repo" ] || {
-    echo "usage: $0 <screenshot> --repo <owner/repo>" >&2
-    exit 1
-  }
-  SCREENSHOT=$1
-  REPO=$3
-  [ -f "$SCREENSHOT" ] && [ ! -L "$SCREENSHOT" ] || {
-    echo "screenshot must be a regular, non-symlink file" >&2
-    exit 1
-  }
-  [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || {
-    echo "repository must be owner/repo" >&2
-    exit 1
-  }
-  case "$(file -b --mime-type "$SCREENSHOT")" in
-    image/png | image/jpeg | image/gif | image/webp) ;;
-    *) echo "only PNG, JPEG, GIF, or WebP screenshots are allowed" >&2; exit 1 ;;
-  esac
-  [ "$(wc -c < "$SCREENSHOT")" -le 10485760 ] || {
-    echo "screenshot exceeds GitHub's 10 MB image limit" >&2
-    exit 1
-  }
-fi
+[ "$#" -eq 3 ] && [ "$2" = "--repo" ] || {
+  echo "usage: $0 <screenshot> --repo <owner/repo>" >&2
+  exit 1
+}
+SCREENSHOT=$1
+REPO=$3
+[ -f "$SCREENSHOT" ] && [ ! -L "$SCREENSHOT" ] || {
+  echo "screenshot must be a regular, non-symlink file" >&2
+  exit 1
+}
+[[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || {
+  echo "repository must be owner/repo" >&2
+  exit 1
+}
+case "$(file -b --mime-type "$SCREENSHOT")" in
+  image/png | image/jpeg | image/gif | image/webp) ;;
+  *) echo "only PNG, JPEG, GIF, or WebP screenshots are allowed" >&2; exit 1 ;;
+esac
+[ "$(wc -c < "$SCREENSHOT")" -le 10485760 ] || {
+  echo "screenshot exceeds GitHub's 10 MB image limit" >&2
+  exit 1
+}
 
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) ASSET=darwin-arm64; EXPECTED=e0d7670f263dc495cca358b3676f049c51e3c1bafcab7836ba1d0557c099c15b ;;
@@ -58,11 +55,9 @@ else
   ACTUAL=$(checksum "$KILO_IMAGE_TMP/$ASSET")
   [ "$ACTUAL" = "$EXPECTED" ] || { echo "gh-image checksum mismatch" >&2; exit 1; }
   mkdir -p "$(dirname "$BINARY")"
-  install -m 0755 "$KILO_IMAGE_TMP/$ASSET" "$BINARY"
+  install -m 0755 "$KILO_IMAGE_TMP/$ASSET" "$BINARY.tmp.$$"
+  mv -f "$BINARY.tmp.$$" "$BINARY"
 fi
 
-[ "$ACTUAL" = "$EXPECTED" ] || { echo "cached gh-image checksum mismatch" >&2; exit 1; }
-if [ "$VERSION_ONLY" -eq 1 ]; then
-  exec "$BINARY" --version
-fi
+[ "$ACTUAL" = "$EXPECTED" ] || { echo "cached gh-image checksum mismatch" >&2; rm -f "$BINARY"; exit 1; }
 exec "$BINARY" "$SCREENSHOT" --repo "$REPO"

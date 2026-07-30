@@ -274,10 +274,11 @@ function isPrimaryWorktree(): boolean {
 
 export function computePortOffset(args: {
   explicit: string | undefined;
+  persisted?: number;
   isPrimary: boolean;
   slug: string;
 }): number {
-  const { explicit, isPrimary, slug } = args;
+  const { explicit, persisted, isPrimary, slug } = args;
   if (explicit !== undefined && explicit !== 'auto') {
     const value = Number(explicit);
     if (!Number.isInteger(value) || value < 0) {
@@ -285,6 +286,11 @@ export function computePortOffset(args: {
     }
     return value;
   }
+  // A previously started stack persisted the offset it actually used; keep it
+  // so every later port-computing command agrees without a KILO_PORT_OFFSET
+  // prefix. Stability beats reshuffling — dev:start re-probes only when these
+  // ports turn out to be foreign-occupied.
+  if (persisted !== undefined) return persisted;
   if (isPrimary) return 0;
   let hash = 0;
   for (let i = 0; i < slug.length; i++) {
@@ -294,16 +300,59 @@ export function computePortOffset(args: {
   return (bucket === 0 ? 50 : bucket) * 100;
 }
 
+// Offset persisted by dev:start alongside the running-stack manifest. Reading
+// it back keeps dev:restart, dev:env, dev:status, and the dev:start reuse path
+// on the ports of the stack that was actually started, even when dev:start
+// auto-probed away from the hash default.
+export function readPersistedPortOffset(repoRoot: string): number | undefined {
+  try {
+    const value = Number(
+      fs.readFileSync(path.join(repoRoot, 'dev', 'logs', 'port-offset'), 'utf-8').trim()
+    );
+    if (Number.isInteger(value) && value >= 0) return value;
+  } catch {
+    // A stack started before the dedicated file may still have a manifest.
+  }
+  try {
+    const raw = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, 'dev', 'logs', 'manifest.json'), 'utf-8')
+    );
+    const value = raw?.portOffset;
+    return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function writePersistedPortOffset(repoRoot: string, value: number): void {
+  const logs = path.join(repoRoot, 'dev', 'logs');
+  fs.mkdirSync(logs, { recursive: true });
+  const target = path.join(logs, 'port-offset');
+  const temp = `${target}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, `${value}\n`);
+  fs.renameSync(temp, target);
+}
+
+export function clearDevLogs(repoRoot: string): void {
+  const logs = path.join(repoRoot, 'dev', 'logs');
+  fs.mkdirSync(logs, { recursive: true });
+  for (const entry of fs.readdirSync(logs)) {
+    if (entry === 'port-offset' || entry === 'start.lock') continue;
+    fs.rmSync(path.join(logs, entry), { recursive: true, force: true });
+  }
+}
+
 function getPortOffset(): number {
   const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
   return computePortOffset({
     explicit: process.env.KILO_PORT_OFFSET,
+    persisted: readPersistedPortOffset(root),
     isPrimary: isPrimaryWorktree(),
     slug: path.basename(root),
   });
 }
 
-export const portOffset = getPortOffset();
+export let portOffset = getPortOffset();
 
 function getNextjsTargetPort(): number {
   const explicit = process.env.PORT;
@@ -317,7 +366,7 @@ function getNextjsTargetPort(): number {
   return port;
 }
 
-const nextjsTargetPort = getNextjsTargetPort();
+let nextjsTargetPort = getNextjsTargetPort();
 
 // When a port offset is active the web app binds to a non-3000 port, but
 // .env.local still hardcodes NEXTAUTH_URL=http://localhost:3000, so NextAuth
@@ -621,7 +670,7 @@ function buildServiceDefs(): ServiceDef[] {
   return defs;
 }
 
-const serviceDefs = buildServiceDefs();
+let serviceDefs = buildServiceDefs();
 
 export const services = new Map<string, ServiceDef>(serviceDefs.map(s => [s.name, s]));
 
@@ -639,6 +688,31 @@ export const shortcuts: Record<string, string[]> = {
   agents: ['cloud-agent-next', 'nextjs', 'cloudflare-session-ingest'],
   all: serviceDefs.map(s => s.name),
 };
+
+// Rebuild every port-derived service definition (ports, commands) for a new
+// offset. Used by the dev:start collision re-probe; ESM live bindings keep
+// importers of portOffset and services current.
+export function applyPortOffset(offset: number): void {
+  portOffset = offset;
+  nextjsTargetPort = getNextjsTargetPort();
+  serviceDefs = buildServiceDefs();
+  services.clear();
+  for (const def of serviceDefs) services.set(def.name, def);
+  shortcuts.all = serviceDefs.map(s => s.name);
+}
+
+// Successive +100 candidate offsets through the same (0, 5000] range the slug
+// hash draws from, wrapping around and excluding the starting offset.
+export function candidatePortOffsets(start: number): number[] {
+  const startBucket = Math.floor(start / 100);
+  const candidates: number[] = [];
+  for (let step = 1; step <= 50; step++) {
+    const bucket = (startBucket + step) % 50;
+    const offset = bucket === 0 ? 5000 : bucket * 100;
+    if (offset !== start) candidates.push(offset);
+  }
+  return candidates;
+}
 
 export function resolveTransitiveDeps(targets: string[]): string[] {
   const result = new Set<string>();

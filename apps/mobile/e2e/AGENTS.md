@@ -2,23 +2,22 @@
 
 Interactive verification against a local backend. Run commands from the repository root unless a step says otherwise. Long-lived services live in a worktree-specific tmux session owned by the repository dev runner; use it, never loose background processes.
 
-## Device Slot: Required First Step
+## E2E Bundle: Required First Step
 
-This machine is shared by parallel workflows. Before starting a stack, booting a simulator or emulator, or running a native build — on every run, whether or not you can see another workflow active — acquire a slot:
+E2E device/stack work runs only inside a slot bundle. Bundle contents,
+ownership, blocked-take, and release rules: `.kilo_workflow/WORKFLOW.md` "E2E
+Slots". Before dispatching verifiers, the owner runs:
 
 ```bash
-.kilo_workflow/e2e-slot.sh acquire <your-tmux-session>   # blocks until a slot frees
-.kilo_workflow/e2e-slot.sh status                        # current holders
-.kilo_workflow/e2e-slot.sh release <your-tmux-session>   # the moment the device phase ends
-.kilo_workflow/e2e-slot.sh stacks                        # any stack running with no slot
+.kilo_workflow/e2e-take-slot.sh      # run from your own tmux session; blocks until a slot frees
+.kilo_workflow/e2e-slot-status.sh    # live holders; stale slots and unaccounted resources
 ```
 
-A slot, this worktree's dev stack, and the simulators it claims are one resource: the slot is what entitles you to all three, and `release` takes all three back — it stops the stack and releases every simulator this worktree claimed, powering off the ones your claims booted. Release when your device phase is genuinely over, not partway through a round you still need services or a device for.
-
-- Default 3 slots, machine-global, owned by tmux session name; a dead session's slot is reclaimed automatically, so a crash cannot wedge the queue.
-- `acquire` blocking is correct behavior, not a hang and not a wedge. Wait for it. Never start device work unslotted because the queue was busy, because your phase looks small, or because a stack is already up.
-- Acquiring is idempotent per session; every device phase (repro gate, each E2E round) needs a slot.
-- Release as soon as the device phase ends. Planning, implementation, review, checks, and CI waits are uncapped — never hold a slot through them.
+The owner starts every bundle resource through `e2e-start-resource.sh`, passes
+the ready services and device identifiers in each verifier handoff, then stops
+every resource through `e2e-stop-resource.sh` before freeing the slot. Taking
+is idempotent per session. Parallel iOS and Android verifiers share this bundle
+and never take another slot.
 
 ## Fresh Worktree Quickstart
 
@@ -29,7 +28,7 @@ node --version   # must be v24; activate the root .nvmrc first if needed
 pnpm dev:worktree:prepare
 ```
 
-Record pre-existing state so you later clean up only resources you created:
+Record pre-existing state so you later clean up only resources you own:
 
 ```bash
 pnpm dev:status --json
@@ -37,21 +36,30 @@ tmux ls
 xcrun simctl list devices booted
 ```
 
-If a complete stack is already running for this worktree, reuse it. Never start a competing stack or stop an unrelated `kilo-dev-*` session.
+Reuse an existing stack only when it belongs to the current live slot bundle.
+An unaccounted stack whose `kilo-dev-<slug>` slug matches this worktree's
+basename is yours: stop it through `e2e-stop-resource.sh stack`, then take a
+slot and start fresh. An unaccounted stack from another worktree is not yours —
+leave it alone and never stop an unrelated `kilo-dev-*` session.
 
-If this worktree has no stack, start the complete mobile flow — after acquiring a device slot (see above):
+If this worktree has no stack, the bundle owner starts the complete mobile flow
+after taking its slot:
 
 ```bash
-pnpm dev:env -y cloudflare-session-ingest
-pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw event-service
-pnpm drizzle migrate
-pnpm dev:status --json
+.kilo_workflow/e2e-start-resource.sh stack mobile cloud-agent-next kiloclaw event-service
+```
+
+The script also refreshes the session-ingest Secrets Store binding, applies migrations, and fails fast when a requested service or the kiloclaw docker bridge never comes up.
+
+To bring the whole bundle up at once (stack, iOS claim+build, Android start+claim+build — three chains in parallel, the slowest sets the wall time instead of the sum):
+
+```bash
+.kilo_workflow/e2e-start-resource.sh bundle <avd-name> [--gpu host]
 ```
 
 Rules:
 
-- Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts. If the automatic offset lands on an occupied port, use a per-command prefix — see `.kilo_workflow/learnings/worktree-port-offset-airplay-collision.md`.
-- The `dev:env` step creates the JWT Secrets Store binding. Without it, session-ingest looks healthy but rejects every session request.
+- Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts. When the automatic offset lands on occupied ports (AirPlay on 5000/7000, another worktree's stack), `dev:start` probes for a free offset itself and persists it before services launch; later `dev:restart`/`dev:env` reuse the persisted value, so no manual prefix is needed. A per-command `KILO_PORT_OFFSET=<n>` prefix still overrides everything when you must pin one — never `export` it.
 - Secrets Store state is local to each Worker directory. `dev:start` refreshes every source-backed secret for its service graph before launching Workers; a secret-creation failure is fatal, not something to retry past.
 - `event-service` is required for presence and notification behavior.
 - Never run bare `wrangler secrets-store` commands. Use `pnpm dev:env -y <group>` from the repository root so values come from the canonical local source.
@@ -84,23 +92,31 @@ pnpm dev:capture mobile
 PR-review E2E needs a local GitHub API instead of `api.github.com`. Three steps, all reversible:
 
 1. Set `GITHUB_API_BASE_URL` in the **worktree root** `.env.local` to the stub's base URL (for example `http://127.0.0.1:<port>`). Next.js reads it via `apps/web/src/lib/github-pr-review/client.ts` (the web `dev` script symlinks root `.env.local` into `apps/web/` when that file is missing). Remove the variable after the run.
-2. Seed a GitHub user token with the dev-only tRPC mutation `githubApps.devSeedUserGithubToken`. Any non-empty token string works. Use the stable fake `githubUserId` `999001` so the upsert matches across worktrees; a `false` upsert result means a sibling already seeded it, not failure.
+2. Seed a GitHub user token with the dev-only tRPC mutation `githubApps.devSeedUserGithubToken` (the PR-review entry screen only shows the URL input once the user has a token row). Authenticate curl as the E2E user via next-auth fake-login with a cookie jar: `GET /api/auth/csrf`, then `POST /api/auth/callback/fake-login` with `csrfToken`, `email`, and `json=true`, then `POST /api/trpc/githubApps.devSeedUserGithubToken` with the jar. Any non-empty token string works. Use a FRESH random `githubUserId` (e.g. `9$(date +%s | tail -c 6)` — the stub never validates it): all worktrees share one postgres, `github_user_id` is unique, and the upsert's conflict target is `(kilo_user_id, github_app_type)`, so reusing a sibling's id errors with a raw drizzle duplicate-key insert instead of returning `false`. Relaunch the app afterwards so the connection query refetches.
 3. Start the stub in a `kilo-e2e-*` tmux session, for example:
    `tmux new-session -d -s "kilo-e2e-github-stub-$(basename "$PWD")" -c "$PWD/apps/mobile/e2e/github-api-stub" "node server.mjs <port>"`.
    Stop that session when finished. Request logs go to `GITHUB_STUB_LOG` or `./github-api-stub-requests.log` under the process cwd — keep them out of the tree (temp dir) and delete them after the run.
 
-Pinned surface only: REST pull/repo/check-runs/statuses plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`.
+If the app stalls on "GitHub connection expired" with nextjs logging repeated
+`githubPrReview.getPullRequest 412` and the stub log shows only the first fetch,
+git-token-service is missing its per-worktree Secrets Store binding:
+`pnpm dev:env -y cloudflare-git-token-service && pnpm dev:restart cloudflare-git-token-service`.
+Note nextjs reads `GIT_TOKEN_SERVICE_API_URL` from `apps/web/.env.development.local`, not root `.env.local`.
+
+Pinned surface only: REST pull/repo/check-runs/statuses/`pulls/{n}/files` (paginated via `page`/`per_page`) plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`.
 
 ## iOS Simulator
 
-Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the claim command prefers an unclaimed shutdown iPhone and boots it:
+The bundle owner claims and builds before dispatch. Never share a simulator
+with another worktree; the claim command prefers an unclaimed shutdown iPhone
+and boots it:
 
 ```bash
-pnpm dev:mobile:simulator claim [udid]   # idempotent per worktree
-pnpm dev:mobile:simulator release-all    # this worktree's claims; the slot release runs it for you
+.kilo_workflow/e2e-start-resource.sh ios [udid]  # idempotent per worktree
+.kilo_workflow/e2e-stop-resource.sh ios          # this worktree's claims
 ```
 
-The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted. Releasing the slot releases the claims, so an explicit `release-all` is only for handing a device back mid-slot.
+The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted. A claim killed mid-boot boots the Shutdown device again on reclaim automatically; give claims a >=10-minute timeout under parallel-workflow load (booting is slow).
 
 Install a validated cached native build. A compatible fingerprint skips rebuilding; a cache miss serializes through the host-wide native compiler semaphore. Never install an arbitrary DerivedData app or run a separate Expo native build:
 
@@ -115,6 +131,8 @@ xcrun simctl openurl <udid> \
   "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
 ```
 
+Never append an app route to the dev-client `url` param — the dev client treats the whole param as the Metro packager root and the manifest fetch 404s. Connect with the BARE Metro URL, wait for `iOS Bundled`, then drive routes via `xcrun simctl openurl <udid> "kiloapp://<route>"` (app scheme `kiloapp`, no SpringBoard confirmation) — only after cold-boot finishes; a link fired during boot is dropped.
+
 - Prefer `simctl openurl` for scheme reconnection; it skips Safari's external-app confirmation. Since universal links (`associatedDomains`) were configured, iOS may instead show a SpringBoard confirmation with the exact message `Open in "Kilo"?` (curly or straight quotes) — the shared launch flows match both wordings and tap `Open`. When a flow intentionally goes through Safari or a WebView, look for the exact message `Open this page in "Kilo"?` and tap the exact `Open` accessibility action — one bounded optional prompt inside the existing five-second optional-prompt budget, never a new fixed wait.
 - Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen does not prove the bundle came from this worktree.
 - The dev client reads `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` from Metro's manifest; the login preflight checks both against this worktree. After env changes: regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config or plugins changed.
@@ -122,16 +140,16 @@ xcrun simctl openurl <udid> \
 
 ## Sign In and Out
 
-Backend and Metro must be running. These idempotent wrappers verify simulator ownership, required services, the generated API port, and Metro project provenance, then reconnect the dev client to this worktree's exact Metro URL before Maestro runs. Never bypass their preflight or call the login YAML flows directly:
+Backend and Metro must be running. These idempotent wrappers verify simulator ownership, required services, the generated API port, and Metro project provenance, then reconnect the dev client to this worktree's exact Metro URL before Appium runs. Never bypass their preflight or call the flow files directly:
 
 ```bash
-apps/mobile/e2e/login.sh <udid> [email]   # default: e2e-mobile-<worktree-basename>@example.com
+apps/mobile/e2e/login.sh <udid> [email]   # default: e2e-mobile-<worktree>-<ios|android>@example.com
 apps/mobile/e2e/logout.sh <udid>
 ```
 
-The default email is `e2e-mobile-<worktree-basename>@example.com`, derived deterministically from the worktree directory name. Hyphens are preserved by `normalizeEmail`, so each worktree signs into a distinct backend user. Pass an explicit email only when a test needs a specific account.
+The default email is `e2e-mobile-<worktree-basename>-<ios|android>@example.com`, derived from the worktree and device serial. Parallel platform shards therefore use separate backend users. Pass an explicit email only when a test needs a specific account.
 
-Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. If the request half fails it cold-relaunches through `flows/open-app.yaml` and retries once — that clears both a half-started dev client and an email field left dirty by an earlier run — and if the retry fails too it says which half broke: no outbox email means the app never reached `POST /api/auth/native/otp`, a new outbox email means the request worked and only the code screen was never reached. `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app; `flows/open-app.yaml` is the standalone cold-launch flow.
+Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. If the request half fails it cold-relaunches through `flows/open-app.js` and retries once — that clears both a half-started dev client and an email field left dirty by an earlier run — and if the retry fails too it says which half broke: no outbox email means the app never reached `POST /api/auth/native/otp`, a new outbox email means the request worked and only the code screen was never reached. `flows/settle-app.js` handles late tracking and Expo developer-menu prompts without restarting the app; `flows/open-app.js` is the standalone cold-launch flow.
 
 Native prompts are states in the flow, not errors to tap through blindly:
 
@@ -140,7 +158,7 @@ Native prompts are states in the flow, not errors to tap through blindly:
 - Feature-triggered prompts (speech recognition, microphone): handle only when the flow reaches that feature. Inspect the hierarchy, copy the exact button accessibility text (`Allow` or `Don’t Allow`), and choose the state the test requires.
 - Never use a generic `tapOn: 'Allow'` before identifying which prompt is visible.
 
-Maestro can emit a large interactive transcript. Keep successful output out of context; show only a bounded failure tail:
+Appium can emit a large server and driver transcript. Keep successful output out of context; show only a bounded failure tail:
 
 ```bash
 LOGIN_LOG=$(mktemp /tmp/kilo-login.XXXXXX)
@@ -150,12 +168,11 @@ apps/mobile/e2e/login.sh <udid> >"$LOGIN_LOG" 2>&1 || \
 
 When editing the flows, preserve these device-tested constraints:
 
-- Tap the Kilo home-screen icon; Maestro `launchApp` can bounce the Expo dev client to SpringBoard.
-- Pass `EMAIL` and `OTP` with `-e`; flow-level defaults override `-e` values in the installed Maestro version.
+- Pass `EMAIL` and `OTP` with `-e`; the flows require them and fail fast when absent.
 - Target the email field by its placeholder `you@example.com`, and tap `Verify code` without trying to dismiss the number pad.
-- The email field is uncontrolled, so a login page left on screen by an earlier run still holds its address, and `inputText` inserts at the caret the tap just dropped mid-string. Erase the field first and assert the typed address before submitting; without that, two attempts interleave into one malformed address and the flow dies 15s later on a missing `Verify code`.
-- Keep every control a flow taps clear of the keyboard. Maestro taps an element's centre, and iOS hands a touch inside `UIRemoteKeyboardWindow` to the keyboard while Maestro still logs the tap `COMPLETED` — a silent no-op. Verify with `maestro --device <udid> hierarchy`: the control's centre must be above the keyboard window's top bound. See `.kilo_workflow/learnings/maestro-tap-swallowed-by-ios-keyboard.md`.
-- The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`).
+- The email field is uncontrolled, so a login page left on screen by an earlier run still holds its address, and typing inserts at the caret the tap just dropped mid-string. Erase the field first and assert the typed address before submitting; without that, two attempts interleave into one malformed address and the flow dies 15s later on a missing `Verify code`.
+- Keep every control a flow taps clear of the keyboard. Taps land on the element's centre, and iOS hands a touch inside `UIRemoteKeyboardWindow` to the keyboard while the driver still reports the tap delivered — a silent no-op. Verify with `e2e/appium.sh <udid> hierarchy`: the control's centre must be above the keyboard window's top bound. The same mechanism creates a dead zone under fixed header chrome; never read a swallowed tap as a product regression.
+- The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`, topmost by position).
 
 Seed only when needed. `pnpm dev:seed` with no arguments lists every topic and its usage:
 
@@ -166,23 +183,31 @@ pnpm dev:seed app:add-credits <user-id> <usd>    # grant credits
 pnpm dev:seed app:api-token <email>              # mint a bearer token (used by remote-cli.sh)
 ```
 
-## Maestro
+## Foreign Data on Your Device
 
-One-time machine setup: `brew install maestro`. For MCP, use stdio command `maestro mcp`, then restart the agent session so its tools appear.
+A hierarchy or screenshot that shows another worktree's data (rows, sessions, searches that cannot belong to the signed-in `e2e-mobile-*` account) is never a product defect on its own. Prove it against the backend first: row ownership in Postgres, this worktree's nextjs/ingest logs, and whether a pull-to-refresh reproduces it. Re-confirm the signed-in account (Profile tab) and Metro provenance before continuing. Backend evidence contradicting the capture means cross-device environment noise: re-run the affected check cleanly and report both.
 
-- Maestro is the primary automation driver on both iOS and Android. Fall back to `xcrun simctl` (iOS) or repository-wrapped ADB (Android) only when Maestro cannot inspect or operate a native state, or when low-level device control is required. Setup still uses `simctl`/ADB for boot, install, dev-client URL reconnection, screenshots, shutdown, and cleanup.
-- With more than one simulator booted (parallel worktrees), always target by UDID: `maestro --device <udid>` — without it Maestro picks an arbitrary booted simulator and taps silently land on another worktree's device. The Maestro MCP tools mis-target the same way; prefer the CLI plus `simctl` screenshots when several simulators are up.
+## Appium + WebdriverIO
+
+Setup is automatic: the repository install provides Appium and the webdriverio client, and the wrapper below installs the XCUITest / UiAutomator2 drivers into a machine-global `APPIUM_HOME` (`~/.cache/kilo-appium`, override with `KILO_APPIUM_HOME`) on first use. Never use MCP automation tools or a hand-rolled driver connection: they bypass the per-device lock; use the repository wrapper.
+
+- Appium is the primary automation driver on both iOS and Android. Fall back to `xcrun simctl` (iOS) or repository-wrapped ADB (Android) only when Appium cannot inspect or operate a native state, or when low-level device control is required. Setup still uses `simctl`/ADB for boot, install, dev-client URL reconnection, and screenshots; the repository wrappers own shutdown and cleanup.
+- With more than one device booted (parallel worktrees), always go through `e2e/appium.sh <udid> ...` — it serializes per device (one Appium server per device on a deterministic port, one session at a time), so taps can never silently land on another worktree's device.
 - Inspect the screen before selecting elements; re-inspect after UI changes.
-- Never guess a selector from a visible label or screenshot. Copy the exact `txt` or `a11y` value from `maestro_inspect_screen` (`a11y` maps to Maestro `text:`). Maestro text matching is full-string regex, not substring.
-- Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before relying on these examples; the count and labels can change.
+- Never guess a selector from a visible label or screenshot. Copy the exact text or accessibility value from `e2e/appium.sh <udid> hierarchy` (writes the XML page source; redirect to a file and grep it). Matching is full-string regex against the element label (iOS) or text / content-desc (Android), not substring.
+- Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn('Agents')` is wrong. Inspect again before relying on these examples; the count and labels can change.
+- Flows are plain node modules in `e2e/flows/*.js` using the helpers in `e2e/wdio/helpers.js` (`tapOn`, `assertVisible`, `waitVisible`, `inputText`, `eraseText`, `scrollUntilVisible`, `stopApp`/`launchApp`, `when`/`whenNot`). A failed helper throws and the process exit code is the verdict — no report files to inspect.
 
-CLI fallback:
+CLI usage — always through `e2e/appium.sh`, which serializes per device (two concurrent sessions against one UDID interleave taps and fail flows in ways that read as product defects):
 
 ```bash
-maestro --device <udid|emulator-5554> test -e KEY=VALUE <flow.yaml>
+apps/mobile/e2e/appium.sh <udid|emulator-5554> test -e KEY=VALUE <flow.js>
+apps/mobile/e2e/appium.sh <udid> hierarchy > /tmp/hierarchy.xml
 xcrun simctl io <udid> screenshot <path>      # iOS
-adb exec-out screencap -p > <path>            # Android
+pnpm dev:mobile:android adb -s <serial> exec-out screencap -p > <path>  # Android
 ```
+
+The Appium server per device starts on demand and keeps running for the bundle's lifetime; stop it during bundle cleanup with `apps/mobile/e2e/appium.sh <udid> server stop`.
 
 Attach a screenshot of a changed flow to the PR when it helps review. For transitions, prefer a short screenshot loop over `simctl io recordVideo`, which can produce one-frame recordings.
 
@@ -193,10 +218,10 @@ Use this only when testing session discovery, mirroring, or mobile-to-CLI messag
 The orchestrator starts a local CLI as a remote session for this worktree:
 
 ```bash
-apps/mobile/e2e/remote-cli.sh start [email]
+apps/mobile/e2e/remote-cli.sh start <email>
 ```
 
-The helper resolves this worktree's stack ports, mints a token for the given user (default: the per-worktree login account, `e2e-mobile-<worktree-slug>@example.com`), installs the CLI into a disposable per-worktree directory, and launches it in a `kilo-e2e-cli-<worktree-slug>` tmux session already pointed at the local API, session-ingest, and event-service. Pass the account the app is signed in as when it differs from the default. Manage it with `remote-cli.sh status` and `remote-cli.sh stop`.
+The helper resolves this worktree's stack ports, mints a token for the given user, installs the CLI into a disposable per-worktree directory, and launches it in a `kilo-e2e-cli-<worktree-slug>` tmux session already pointed at the local API, session-ingest, and event-service. The email is required — pass the account the app is signed in as (`login.sh`'s default is `e2e-mobile-<worktree-slug>-<ios|android>@example.com`). Manage it with `remote-cli.sh status` and `remote-cli.sh stop`.
 
 Run any one-off CLI command against the same prepared stack with `exec` instead of the interactive TUI:
 
@@ -207,6 +232,8 @@ apps/mobile/e2e/remote-cli.sh exec run "say hello"     # non-interactive run
 
 The real-time relay (`remote`) blocks until SIGTERM — a one-shot `exec remote` exits and the relay dies with it. Run it persistently in its own `kilo-e2e-*` tmux window (or send `/remote` to the running TUI session) and keep it alive for the whole flow.
 
+`-m` takes CLI provider/model ids, not in-app ids: use `kilo/kilo-auto/efficient`, never `kilo-auto/efficient` (that fails `ProviderModelNotFoundError` and leaves an empty `New session - <ts>` row — harmless, but do not confuse it with the content session). Run `remote-cli.sh exec models` and copy the exact id. A fresh E2E account has $0 credit — seed with `pnpm dev:seed app:add-credits <user-id> 10` first.
+
 Role agents reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
 
 ```bash
@@ -214,7 +241,7 @@ CLI_SESSION="kilo-e2e-cli-$(basename "$PWD")"
 tmux capture-pane -p -t "$CLI_SESSION" -S -100
 ```
 
-Drive the session with `tmux send-keys`; slash commands need one Enter for autocomplete and another to submit. Type a prompt to create a session; the mobile list updates after the CLI WebSocket connects and its first heartbeat (about 12 seconds). If no session is prepared for this worktree, stop and ask the orchestrator to run `remote-cli.sh start`.
+Drive the session with `tmux send-keys`; slash commands need one Enter for autocomplete and another to submit. Type a prompt to create a session; the mobile list updates after the CLI WebSocket connects and its first heartbeat (about 12 seconds). If no session is prepared for this worktree, stop and ask the orchestrator to run `remote-cli.sh start <email>`.
 
 ## Android Emulator
 
@@ -224,36 +251,34 @@ Do not conclude Android is unavailable from `command -v adb` or the inherited `P
 pnpm dev:mobile:android doctor
 ```
 
-Use the wrappers for all Android tooling, including the Expo/Gradle build, so the resolved SDK/JDK environment is applied. Ordered glue: acquire e2e slot → launch emulator → bounded boot wait (serial discovered at visibility) → `claim` → `build` → `login.sh`. Never unbounded `adb wait-for-device`. Never put manual `adb reverse` or dev-client `am start` on the primary path — `login.sh` preflight does both.
+The bundle owner uses the wrappers for emulator lifecycle and the Expo/Gradle
+build before dispatch. `e2e-start-resource.sh android` starts the emulator and
+waits for `sys.boot_completed=1` (process-liveness checked, 8-minute envelope)
+— device visibility is not readiness, and there is no manual boot polling.
+The verifier starts with `login.sh`. Never use unbounded `adb wait-for-device`,
+manual `adb reverse`, or dev-client `am start`; `login.sh` preflight handles
+the last two.
 
 ### Launch and GPU policy
 
-Two launch attempts total, then a test-environment blocker with the tail of `$EMULATOR_LOG`. Attempt 1 uses `-gpu host` (Mac GPU; fastest; software rendering competes for the CPU under parallel-workflow load). Keep `-no-snapshot-save -no-boot-anim` on every launch. Attempt 2 switches GPU only on an observed process-death signal (`pgrep -f "qemu.*<avd-name>"` empty, or the log shows the emulator exiting/erroring — the pane mirrors it live but dies with the session) → `-gpu swiftshader_indirect`. If the process is still alive but the boot envelope expired → repeat `-gpu host`. Never a third launch.
+Two launch attempts total, then a test-environment blocker with the recorded log tail. Attempt 1 uses the Mac GPU. Attempt 2 switches to software rendering only when the recorded PID died; a live process that missed the boot envelope retries the Mac GPU. `emulator-start` atomically allocates the console port, creates the worktree session, and records its exact PID/session; never launch with raw `tmux`, `emulator`, or a hand-picked port.
 
 ```bash
-# After e2e-slot acquire (see Device Slot: Required First Step)
-ANDROID_SESSION="kilo-e2e-android-$(basename "$PWD")"
-EMULATOR_LOG="/tmp/${ANDROID_SESSION}.log"
-GPU_FLAG=host   # attempt 2: swiftshader_indirect only after process death; else host again
-tmux new-session -d -s "$ANDROID_SESSION" -c "$PWD" \
-  "pnpm dev:mobile:android emulator -avd <avd-name> -no-snapshot-save -no-boot-anim -gpu $GPU_FLAG 2>&1 | tee \"$EMULATOR_LOG\""
+EMULATOR=$(.kilo_workflow/e2e-start-resource.sh android <avd-name> --gpu host)
+SERIAL=$(jq -r .serial <<<"$EMULATOR")
+EMULATOR_PID=$(jq -r .pid <<<"$EMULATOR")
+EMULATOR_LOG=$(jq -r .log <<<"$EMULATOR")
 ```
 
-### Bounded boot wait
+Record `SERIAL`, `EMULATOR_PID`, and `EMULATOR_LOG` in the round handoff. Never drive or kill a device claimed by another worktree, and never delete a foreign claim file.
 
-From the moment of launch, poll about every 15 s until the envelope expires. Cold boot on an idle host ≈ 1–3 minutes; under parallel-workflow load allow up to 8 minutes before declaring the attempt failed (relaunch-rule bounds, not SLAs). Each poll, check in order:
+### Failed attempt → stop exactly yours → relaunch once
 
-1. **Liveness** — `pgrep -f "qemu.*<avd-name>"` still prints a PID. If empty, the attempt failed with the process-death signal.
-2. **Visibility** — device appears with state `device` in `pnpm dev:mobile:android adb devices -l` (this is where the serial is discovered; a single local emulator is `emulator-5554`).
-3. **Readiness** — once visible, `pnpm dev:mobile:android adb -s <serial> shell getprop sys.boot_completed` prints `1`.
+On failure run `.kilo_workflow/e2e-stop-resource.sh android`; it uses the recorded session and verifies the recorded PID before sending a signal, so it cannot kill a sibling's same-AVD emulator. Relaunch once per the GPU policy with the same envelope. If the second attempt also fails, stop and return a test-environment blocker with `tail -200 "$EMULATOR_LOG"`; never a third launch.
 
-Device visibility is not readiness. Never gate on `adb devices` output alone, and never wait on any one stage without the liveness check.
+### Build and login
 
-### Failed attempt → kill hard → relaunch once
-
-On failure: `tmux kill-session -t "$ANDROID_SESSION" 2>/dev/null` (session may already be gone if the emulator exited), then confirm the emulator process is actually gone — `pgrep -f "qemu.*<avd-name>"` prints nothing. If it survives: with a known serial, `pnpm dev:mobile:android adb -s <serial> emu kill`; with no serial yet (process died or never became visible to adb), `pkill -f "qemu.*<avd-name>"`. Re-check `pgrep` either way — a surviving emulator holds the AVD lock and dooms any relaunch. Then relaunch once per the GPU policy with the same envelope. If the second attempt also fails to boot, stop and return a test-environment blocker with the tail of `$EMULATOR_LOG` (survives session death; never a third launch, never an early give-up).
-
-### Claim, build, login
+Claim the serial (idempotent), then build:
 
 ```bash
 pnpm dev:mobile:android claim <serial>
@@ -289,7 +314,7 @@ pnpm dev:mobile:android adb -s <serial> shell am start -a android.intent.action.
 
 Drives a real App Link through Android intent resolution.
 
-### ADB fallback (Maestro stays primary)
+### ADB fallback (Appium stays primary)
 
 Derive tap coordinates from the current `uiautomator` bounds, never from screenshots or remembered positions. Re-dump after every navigation or prompt.
 
@@ -305,19 +330,31 @@ pnpm dev:mobile:android adb -s <serial> shell input keyevent KEYCODE_BACK
 
 ## Cleanup
 
-Clean up only resources you started. The remote CLI session and its disposable install belong to the orchestrator; never kill `kilo-e2e-cli-*` sessions or remove CLI scratch directories you did not create.
+Each verifier removes only its own temporary files:
 
 ```bash
-tmux kill-session -t "$ANDROID_SESSION"      # if created
-rm -f "$LOGIN_LOG"                           # if created
-rm -f "$EMULATOR_LOG"                        # if created
-pnpm dev:mobile:android release <serial>     # every Android device you claimed
-.kilo_workflow/e2e-slot.sh release <tmux-session>   # always, as soon as the device phase ends
+rm -f "$LOGIN_LOG"
 ```
 
-The slot release is the teardown. It stops this worktree's dev stack and releases every simulator this worktree claimed — powering off the ones your claims booted, restoring their names, and leaving a device that was already running before your claim alone. So there is no `pnpm dev:stop`, no `xcrun simctl shutdown`, and no `pnpm dev:mobile:simulator release <udid>` on this list: releasing the slot does all three, and forgetting one is how simulators used to stay booted all day. Never call `xcrun simctl shutdown` on an E2E device yourself — the claim, not your memory of what you booted, is what knows whether the device is yours to power off.
+After all verifiers return, the bundle owner stops everything it started —
+conditional resources first (skip any never started), then the bundle — and
+frees the slot:
 
-Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, or use `pnpm dev:stop --force` while sibling worktrees are active.
+```bash
+apps/mobile/e2e/remote-cli.sh stop                                                 # only after remote-cli.sh start
+tmux kill-session -t "kilo-e2e-github-stub-$(basename "$PWD")" 2>/dev/null || true  # only after the GitHub stub
+.kilo_workflow/e2e-stop-resource.sh android
+.kilo_workflow/e2e-stop-resource.sh ios
+.kilo_workflow/e2e-stop-resource.sh stack
+.kilo_workflow/e2e-free-slot.sh   # refuses while any resource above is still live
+rm -f "$EMULATOR_LOG"
+```
+
+The wrappers release only this worktree's claims and power off only devices
+they started. Never call `xcrun simctl shutdown` or kill an emulator session
+yourself.
+
+Also stop recorders and log followers you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, or use `pnpm dev:stop --force` while sibling worktrees are active.
 
 Verify cleanup, and confirm no generated E2E fixtures remain tracked or untracked:
 

@@ -5,8 +5,8 @@ patches or recreate deleted `.pnpm` package dirs — even `pnpm install --force`
 removing `node_modules/.modules.yaml` no-op. Hand-edited files under
 `node_modules/.pnpm/<pkg>/` stay edited; deleted package dirs stay deleted (symlinks
 dangle), and stale duplicate peer-hash instances (react-native-css, nativewind,
-react-native) accumulate and poison Metro bundling (see
-mobile-metro-file-map-stale-after-node-modules-relayout.md).
+react-native) accumulate and poison Metro bundling (the stale file-map side of
+that wedge now self-heals: `pnpm dev:restart mobile` clears it).
 
 Cause: pnpm v11 short-circuits headless install when
 `node_modules/.pnpm-workspace-state-v1.json` matches the lockfile; it never

@@ -21,10 +21,11 @@ more severe failure mode. Diagnose with a temporary console.log of
 settle-resolved, and +600ms post-expand (the D3R5 trace pattern, 7 anchored insertions in
 `pr-review-discussion-tab.tsx`); the -997949 offset is the smoking gun. Verify blank vs
 flown with a screenshot pixel scan (uniform (251,250,245) below the chrome = blank) plus
-`maestro hierarchy` showing no `Discussion thread` rows.
+the driver hierarchy showing no `Discussion thread` rows.
 
 iOS tap gotcha recorded on the same runs: coordinate taps at y ≤ ~182pt just under the PR
-screen's tab chrome are silently swallowed (Maestro logs COMPLETED, handler never runs);
+screen's tab chrome are silently swallowed (the driver reports delivery, the handler never runs —
+see `ios-tap-swallowed-by-keyboard.md`);
 taps at y ≥ 187pt land. Place clipped-thread expand taps at ≥ y190pt.
 
 Fix direction for the product (not applied): do not toggle `disabled` around the commit on

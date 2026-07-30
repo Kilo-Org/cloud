@@ -16,5 +16,5 @@ Cause: the guest's system_server restarted under memory/CPU pressure — treat t
 (`restarting adbd as root`), then `pnpm dev:mobile:android adb -s <serial> shell kill -9
 <systemui-pid>`; system_server restarts SystemUI in ~20 s, the ANR dialog clears, and the
 app process, adb reverse mappings, login session, and conversation state all survive. No emulator relaunch
-(never consume a launch attempt for this). Afterwards the repository Maestro wrapper, which also wedges
-under the load (hierarchy empty/timing out, test never writing its first log line), works again.
+(never consume a launch attempt for this). Afterwards the automation driver, which also wedges
+under the load (hierarchy empty/timing out, sessions never establishing), works again.

@@ -4,6 +4,7 @@ import {
   rewriteModelResponse_Messages,
   rewriteModelResponse_Responses,
   rewriteModelResponse,
+  logUnrewrittenResponse,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -116,6 +117,14 @@ function dataObjects(sse: string): unknown[] {
     .map(payload => JSON.parse(payload));
 }
 
+function streamErrorDetails(event: unknown): Record<string, unknown> {
+  if (typeof event !== 'object' || event === null) return {};
+  if ('error' in event && typeof event.error === 'object' && event.error !== null) {
+    return event.error as Record<string, unknown>;
+  }
+  return event as Record<string, unknown>;
+}
+
 const rewriters = [
   ['Chat Completions', rewriteModelResponse_ChatCompletions],
   ['Messages', rewriteModelResponse_Messages],
@@ -130,11 +139,11 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     const result = await rewrite(failingResponse('application/json', errorName), true, null, null);
 
     expect(result.status).toBe(503);
-    expect(await result.json()).toEqual({
-      error: expect.stringContaining(messageFragment),
-      error_type: errorType,
+    const details = streamErrorDetails(await result.json());
+    expect(details).toMatchObject({
       message: expect.stringContaining(messageFragment),
     });
+    expect(Object.values(details)).toContain(errorType);
   });
 
   test('includes the vercel request id in the JSON read error', async () => {
@@ -146,13 +155,9 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     );
 
     expect(result.status).toBe(503);
-    expect(await result.json()).toEqual({
-      error:
-        'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
-      error_type: 'upstream_disconnect',
+    expect(streamErrorDetails(await result.json())).toMatchObject({
       message:
         'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
-      vercel_request_id: 'iad1::iad1::request-id',
     });
   });
 
@@ -163,15 +168,12 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       null,
       'iad1::iad1::request-id'
     );
-    const events = dataObjects(await readOutputStream(result)) as {
-      error: { message: string; vercel_request_id?: string };
-    }[];
+    const events = dataObjects(await readOutputStream(result));
 
     expect(events).toHaveLength(1);
-    expect(events[0].error.message).toBe(
+    expect(streamErrorDetails(events[0]).message).toBe(
       'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)'
     );
-    expect(events[0].error.vercel_request_id).toBe('iad1::iad1::request-id');
   });
 
   test('omits the request id suffix when no vercel request id is available', async () => {
@@ -181,14 +183,11 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       null,
       null
     );
-    const events = dataObjects(await readOutputStream(result)) as {
-      error: { message: string; vercel_request_id?: string };
-    }[];
+    const events = dataObjects(await readOutputStream(result));
 
-    expect(events[0].error.message).toBe(
+    expect(streamErrorDetails(events[0]).message).toBe(
       'The upstream provider disconnected while sending the response.'
     );
-    expect(events[0].error.vercel_request_id).toBeUndefined();
   });
 });
 
@@ -303,7 +302,10 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       expect(events[0]).toMatchObject({ model: 'upstream-model' });
       expect(events[1]).toMatchObject({ id: 'gen-chat' });
-      expect(events[1]?.error).toMatchObject({ code: 503, type: errorType });
+      expect(events[1]?.error).toMatchObject({
+        code: 503,
+        type: errorType,
+      });
       expect(dataPayloads(sse)).not.toContain('[DONE]');
     });
 
@@ -338,6 +340,45 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       expect(sse).toContain('still streaming');
       expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('forwards a final event without a trailing blank line', async () => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-chat","choices":[{"delta":{"content":"final €"}}]}'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+
+      expect(await readOutputStream(result)).toContain('final €');
+    });
+
+    test('does not eagerly drain upstream while the client is idle', async () => {
+      const encoder = new TextEncoder();
+      let pullCount = 0;
+      const cancel = jest.fn();
+      const upstream = new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pullCount += 1;
+            controller.enqueue(
+              encoder.encode(
+                `data: {"id":"gen-chat","choices":[{"delta":{"content":"${pullCount}"}}]}\n\n`
+              )
+            );
+          },
+          cancel,
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const reader = result.body?.getReader();
+      await reader?.read();
+      await Promise.resolve();
+
+      expect(pullCount).toBeLessThan(10);
+      await reader?.cancel();
+      expect(cancel).toHaveBeenCalledTimes(1);
     });
 
     test('cancels upstream and closes immediately after [DONE]', async () => {
@@ -604,14 +645,11 @@ describe('rewriteModelResponse_Responses', () => {
         response: { id: 'gen-response' },
       },
       {
-        id: 'gen-response',
         type: 'error',
         sequence_number: 5,
-        error: {
-          type: errorType,
-          code: errorType === 'timeout' ? '504' : '503',
-          message: expect.any(String),
-        },
+        code: errorType,
+        message: expect.any(String),
+        param: null,
       },
     ]);
   });
@@ -682,7 +720,13 @@ describe('rewriteModelResponse_Responses', () => {
 
       expect(dataObjects(sse)).toEqual([{ type }]);
       expect(cancel).toHaveBeenCalledTimes(1);
-      expect(capture.setBody).toHaveBeenCalledWith(body);
+      if (type === 'response.completed') {
+        expect(capture.setBody).toHaveBeenCalledWith(body);
+      } else {
+        expect(capture.setBody).toHaveBeenCalledWith(body, {
+          upstream_stream_error: { event_type: type },
+        });
+      }
       expect(capture.setReadError).not.toHaveBeenCalled();
       expect(mockedLog).toHaveBeenCalledWith(
         '[rewriteModelResponse] received terminal stream event',
@@ -736,7 +780,9 @@ describe.each([
       expect(sse).toContain('rate limited');
       expect(sse).not.toContain('ignored');
       expect(cancel).toHaveBeenCalledTimes(1);
-      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setBody).toHaveBeenCalledWith(body, {
+        upstream_stream_error: { event_type: 'error' },
+      });
       expect(capture.setReadError).not.toHaveBeenCalled();
       expect(mockedLog).toHaveBeenCalledWith(
         '[rewriteModelResponse] received terminal stream event',
@@ -750,6 +796,95 @@ describe.each([
     });
   }
 );
+
+describe.each(rewriters)('%s response compatibility', (_name, rewrite) => {
+  test.each(['application/problem+json', 'text/plain', null])(
+    'passes through non-SSE content type %s',
+    async contentType => {
+      const capture = makeCapture();
+      const body = '{"upstream":"error details"}';
+      const headers = contentType ? { 'content-type': contentType } : undefined;
+      const upstream = new Response(contentType === null ? new TextEncoder().encode(body) : body, {
+        status: 502,
+        headers,
+      });
+
+      const result = await rewrite(upstream, true, capture, null);
+
+      expect(result.status).toBe(502);
+      expect(await result.text()).toBe(body);
+      if (contentType) expect(result.headers.get('content-type')).toBe(contentType);
+      await Promise.resolve();
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+    }
+  );
+
+  test('cancels a non-SSE upstream and captures its raw partial body', async () => {
+    const capture = makeCapture();
+    const cancel = jest.fn();
+    const rawBody = 'partial upstream body';
+    const upstream = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(rawBody));
+        },
+        cancel,
+      }),
+      { headers: { 'content-type': 'text/plain' } }
+    );
+
+    const result = await rewrite(upstream, true, capture, null);
+    const reader = result.body?.getReader();
+    await reader?.read();
+    await reader?.cancel();
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), rawBody, {
+      client_disconnected: true,
+    });
+  });
+
+  test('cancels a non-SSE upstream while its first read is pending', async () => {
+    const capture = makeCapture();
+    const cancel = jest.fn();
+    const upstream = new Response(
+      new ReadableStream<Uint8Array>({
+        start() {},
+        cancel,
+      }),
+      { headers: { 'content-type': 'text/plain' } }
+    );
+
+    const result = await rewrite(upstream, true, capture, null);
+    const reader = result.body?.getReader();
+    const pendingRead = reader?.read();
+    await Promise.resolve();
+    await reader?.cancel();
+    await pendingRead;
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setReadError).toHaveBeenCalledTimes(1);
+    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined, {
+      client_disconnected: true,
+    });
+    expect(capture.setBody).not.toHaveBeenCalled();
+  });
+
+  test('turns malformed SSE JSON into a protocol error and cancels upstream', async () => {
+    const capture = makeCapture();
+    const rawBody = 'data: not-json\n\n';
+    const { response: upstream, cancel } = hangingSseResponse(rawBody);
+
+    const result = await rewrite(upstream, true, capture, null);
+    const events = dataObjects(await readOutputStream(result));
+
+    expect(streamErrorDetails(events[0]).message).toContain('invalid response');
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), rawBody, {
+      gateway_stream_error: { error_type: 'invalid_response' },
+    });
+  });
+});
 
 function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingParams {
   return {
@@ -868,10 +1003,28 @@ describe('rewriteModelResponse', () => {
 });
 
 function makeCapture() {
-  return { setBody: jest.fn(), setReadError: jest.fn() };
+  return { setBody: jest.fn(), setReadError: jest.fn(), setError: jest.fn() };
 }
 
 describe('request log capture', () => {
+  test('starts unrewritten response capture without blocking the client response', async () => {
+    mockedOptIn.mockResolvedValueOnce(true);
+    let upstreamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          upstreamController = controller;
+        },
+      })
+    );
+
+    await expect(
+      logUnrewrittenResponse(response, 'openai/gpt-5', 'openrouter', makeLogging())
+    ).resolves.toBeUndefined();
+
+    upstreamController?.close();
+  });
+
   test.each(rewriters)('%s: captures the raw JSON body', async (_name, rewrite) => {
     const capture = makeCapture();
     const body = { model: 'upstream-model' };
@@ -882,6 +1035,31 @@ describe('request log capture', () => {
     expect(capture.setBody).toHaveBeenCalledTimes(1);
     expect(capture.setBody).toHaveBeenCalledWith(JSON.stringify(body));
     expect(capture.setReadError).not.toHaveBeenCalled();
+  });
+
+  test('keeps the raw upstream JSON when the client response is rewritten', async () => {
+    const capture = makeCapture();
+    const body = {
+      model: 'upstream-model',
+      usage: {
+        cost: 0.5,
+        is_byok: false,
+        prompt_tokens: 1,
+        completion_tokens: 1,
+        total_tokens: 2,
+        prompt_tokens_details: {},
+      },
+    };
+
+    const result = await rewriteModelResponse_ChatCompletions(
+      jsonResponse(body),
+      true,
+      capture,
+      null
+    );
+
+    expect((await result.json()).usage.cost).toBeUndefined();
+    expect(capture.setBody).toHaveBeenCalledWith(JSON.stringify(body));
   });
 
   test.each(rewriters)('%s: captures the raw event stream', async (_name, rewrite) => {
@@ -930,7 +1108,9 @@ describe('request log capture', () => {
       await readOutputStream(result);
 
       expect(capture.setReadError).toHaveBeenCalledTimes(1);
-      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks, {
+        gateway_stream_error: { error_type: 'upstream_disconnect' },
+      });
       expect(capture.setBody).not.toHaveBeenCalled();
     }
   );
@@ -949,7 +1129,9 @@ describe('request log capture', () => {
       await readOutputStream(result);
 
       expect(capture.setReadError).toHaveBeenCalledTimes(1);
-      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined, {
+        gateway_stream_error: { error_type: 'upstream_disconnect' },
+      });
       expect(capture.setBody).not.toHaveBeenCalled();
     }
   );
@@ -974,16 +1156,58 @@ describe('request log capture', () => {
 
   test('records a read error when the response stream is cancelled', async () => {
     const capture = makeCapture();
-    const upstream = new Response(new ReadableStream<Uint8Array>({ start() {} }), {
-      headers: { 'content-type': 'text/event-stream' },
-    });
+    const cancel = jest.fn();
+    const upstream = new Response(
+      new ReadableStream<Uint8Array>({
+        start() {},
+        cancel,
+      }),
+      { headers: { 'content-type': 'text/event-stream' } }
+    );
 
     const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null);
     const reader = result.body?.getReader();
     await reader?.cancel();
 
-    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined);
+    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined, {
+      client_disconnected: true,
+    });
     expect(capture.setBody).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not wait for a hanging upstream cancellation', async () => {
+    const upstream = new Response(
+      new ReadableStream<Uint8Array>({
+        start() {},
+        cancel: () => new Promise<void>(() => {}),
+      }),
+      { headers: { 'content-type': 'text/event-stream' } }
+    );
+
+    const result = await rewriteModelResponse_ChatCompletions(upstream, true, makeCapture(), null);
+
+    await expect(result.body?.getReader().cancel()).resolves.toBeUndefined();
+  });
+
+  test('settles capture when the upstream response body is already locked', async () => {
+    const capture = makeCapture();
+    const upstream = sseResponse('data: {"choices":[]}\n\n');
+    const upstreamReader = upstream.body?.getReader();
+
+    try {
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null);
+      const events = dataObjects(await readOutputStream(result));
+
+      expect(streamErrorDetails(events[0]).message).toContain('invalid response');
+      expect(capture.setReadError).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'TypeError' }),
+        undefined,
+        { gateway_stream_error: { error_type: 'invalid_response' } }
+      );
+    } finally {
+      upstreamReader?.releaseLock();
+    }
   });
 
   test.each(rewriters)(
@@ -991,7 +1215,7 @@ describe('request log capture', () => {
     async (_name, rewrite) => {
       const capture = makeCapture();
       const receivedChunks = 'data: {"id":"gen-1","choices":[]}\n\n';
-      const { response: upstream } = hangingSseResponse(receivedChunks);
+      const { response: upstream, cancel } = hangingSseResponse(receivedChunks);
 
       const result = await rewrite(upstream, true, capture, null);
       const reader = result.body?.getReader();
@@ -999,8 +1223,11 @@ describe('request log capture', () => {
       await reader?.cancel();
 
       expect(capture.setReadError).toHaveBeenCalledTimes(1);
-      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks, {
+        client_disconnected: true,
+      });
       expect(capture.setBody).not.toHaveBeenCalled();
+      expect(cancel).toHaveBeenCalledTimes(1);
     }
   );
 });

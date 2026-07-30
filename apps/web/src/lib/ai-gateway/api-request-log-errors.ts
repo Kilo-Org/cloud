@@ -25,7 +25,14 @@ export const toolCallArgumentErrorSchema = z.discriminatedUnion('kind', [
 ]);
 
 export const apiRequestLogErrorSchema = z.object({
-  invalid_tool_call_arguments: z.array(toolCallArgumentErrorSchema),
+  invalid_tool_call_arguments: z.array(toolCallArgumentErrorSchema).optional(),
+  response_body_read_error: z.string().optional(),
+  upstream_stream_error: z.object({ event_type: z.string() }).optional(),
+  gateway_stream_error: z
+    .object({ error_type: z.enum(['timeout', 'upstream_disconnect', 'invalid_response']) })
+    .optional(),
+  upstream_request_error: z.enum(['fetch_failed']).optional(),
+  client_disconnected: z.literal(true).optional(),
 });
 
 export type ApiRequestLogError = z.infer<typeof apiRequestLogErrorSchema>;

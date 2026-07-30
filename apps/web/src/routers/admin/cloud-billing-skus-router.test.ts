@@ -780,6 +780,7 @@ describe('admin.cloudBillingSkus usage records', () => {
       providerMemorySeconds: 10,
       providerDiskSeconds: 11,
       status: 'comparison_unavailable',
+      statusDetail: expect.stringContaining('imply different active durations'),
     });
   });
 

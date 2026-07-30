@@ -10,7 +10,6 @@
 #
 #   --assignee   gate-fail unless this handle is among the assignees
 #   --label      gate-fail unless this label is present (monitors: human-ready)
-#                substring 'bot' matching would let any bot vouch for the head
 #   --wait       poll every 30s up to this budget for the bot summary (or
 #                waiver) to appear before reporting; retriggering stays the
 #                orchestrator's move — this only waits

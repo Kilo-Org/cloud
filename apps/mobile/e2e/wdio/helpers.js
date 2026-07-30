@@ -108,7 +108,9 @@ function make(driver, platform) {
     const els = await findAll(pattern, { ci, sort: true });
     if (els.length === 0) throw new Error(`no element matching ${describe(pattern)}`);
     if (index >= els.length) {
-      throw new Error(`index ${index} out of range (${els.length} matches) for ${describe(pattern)}`);
+      throw new Error(
+        `index ${index} out of range (${els.length} matches) for ${describe(pattern)}`
+      );
     }
     await driver.elementClick(elementIdOf(els[index]));
   }

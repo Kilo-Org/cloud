@@ -68,7 +68,11 @@ NODE
       echo "recorded emulator not booted; starting fresh" >&2
       pnpm dev:mobile:android emulator-stop || true
     fi
-    exec pnpm dev:mobile:android emulator-start "$@" --wait
+    case " $* " in
+      *" --wait "*) ;;
+      *) set -- "$@" --wait ;;
+    esac
+    exec pnpm dev:mobile:android emulator-start "$@"
     ;;
   bundle)
     # Whole E2E bundle at once: stack ∥ iOS chain ∥ Android chain, one log per

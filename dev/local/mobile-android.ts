@@ -479,7 +479,9 @@ async function waitForAndroidBoot(env: AndroidEnvironment, record: EmulatorRecor
         throw new Error(`${record.session} died while booting; see ${record.log}`);
     }
     if (Date.now() > deadline)
-      throw new Error(`${record.serial} did not reach sys.boot_completed=1 within 8 minutes; see ${record.log}`);
+      throw new Error(
+        `${record.serial} did not reach sys.boot_completed=1 within 8 minutes; see ${record.log}`
+      );
     await delay(15_000);
   }
 }

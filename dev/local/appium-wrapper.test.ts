@@ -18,7 +18,10 @@ test('appium port assignment is deterministic and block-shaped', () => {
 });
 
 test('appium device slug is filesystem- and tmux-safe', () => {
-  assert.equal(slugFor('A1B2C3D4-0000-0000-0000-000000000000'), 'A1B2C3D4-0000-0000-0000-000000000000');
+  assert.equal(
+    slugFor('A1B2C3D4-0000-0000-0000-000000000000'),
+    'A1B2C3D4-0000-0000-0000-000000000000'
+  );
   assert.equal(slugFor('emulator-5554'), 'emulator-5554');
   assert.equal(slugFor('192.168.1.10:5555'), '192-168-1-10-5555');
 });

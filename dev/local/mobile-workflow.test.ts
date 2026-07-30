@@ -138,8 +138,11 @@ test('settle flow polls for the next state immediately after every prompt answer
     const gateIndex = flow.indexOf('h.waitVisible(', actionIndex);
     const gate = flow.slice(gateIndex, flow.indexOf('}', gateIndex));
     assert.ok(gateIndex > actionIndex, `settle-app should gate after ${action}`);
-    assert.match(gate, new RegExp(nextState.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-      `settle-app should poll for ${nextState} after ${action}`);
+    assert.match(
+      gate,
+      new RegExp(nextState.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      `settle-app should poll for ${nextState} after ${action}`
+    );
     assert.match(gate, /timeout: 5000/);
     assert.doesNotMatch(gate, /optional: true/);
     searchFrom = gateIndex;

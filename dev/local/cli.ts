@@ -960,7 +960,6 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 }
 
-
 // Metro's jest-haste-map cache ($TMPDIR/metro-file-map-*) persists per project
 // root across dependency relayouts and then serves stale module instances
 // (deterministic white screen + metroRequire stack overflow). Clearing this

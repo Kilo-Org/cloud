@@ -21,9 +21,12 @@ module.exports = async function verifyCode(ctx) {
   await h.tapOn('Verify code');
 
   // A brand-new account's first sign-in shows a consent screen before Home.
-  await h.waitVisible(new RegExp([S.CONSENT.source, S.NOTIF_PROMPT.source, S.HOME.source].join('|')), {
-    timeout: 20000,
-  });
+  await h.waitVisible(
+    new RegExp([S.CONSENT.source, S.NOTIF_PROMPT.source, S.HOME.source].join('|')),
+    {
+      timeout: 20000,
+    }
+  );
   await when(ctx, S.CONSENT, () => h.tapOn(S.CONSENT));
   await h.waitVisible(new RegExp([S.NOTIF_PROMPT.source, S.HOME.source].join('|')), {
     timeout: 15000,

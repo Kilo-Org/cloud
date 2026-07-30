@@ -15,6 +15,8 @@ if [ "${1:-}" = "--locked" ]; then
   last=$(cat "$GATE/last" 2>/dev/null || echo 0)
   case "$last" in ''|*[!0-9]*) last=0 ;; esac
   remaining=$(( 3 - (now - last) ))
+  # A future timestamp (clock skew, hand-edited file) must not sleep forever.
+  [ "$remaining" -le 3 ] || remaining=3
   [ "$remaining" -le 0 ] || sleep "$remaining"
   date +%s > "$GATE/last"
   exit 0

@@ -10,8 +10,10 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
+  type GestureResponderEvent,
   Keyboard,
   type LayoutChangeEvent,
+  Platform,
   type TextInput,
   type TextStyle,
   View,
@@ -64,6 +66,16 @@ const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_FONT_SIZE = 16;
 const COMPOSER_FOCUS_RESTORE_DELAY_MS = 100;
+/** Match RNGH pan activeOffsetY / failOffsetX so Android JS path and iOS pan agree. */
+const DISMISS_KEYBOARD_ACTIVE_OFFSET_Y = 24;
+const DISMISS_KEYBOARD_FAIL_OFFSET_X = 16;
+
+type AndroidDismissKeyboardGesture = {
+  startPageX: number;
+  startPageY: number;
+  dismissed: boolean;
+  failed: boolean;
+};
 
 type ChatComposerProps = {
   onSend: (
@@ -269,14 +281,79 @@ export function ChatComposer({
       // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
       Gesture.Pan()
         .runOnJS(true)
-        .activeOffsetY(24)
-        .failOffsetX([-16, 16])
+        .activeOffsetY(DISMISS_KEYBOARD_ACTIVE_OFFSET_Y)
+        .failOffsetX([-DISMISS_KEYBOARD_FAIL_OFFSET_X, DISMISS_KEYBOARD_FAIL_OFFSET_X])
         .enabled(!inputScrollable)
         .onStart(() => {
           Keyboard.dismiss();
         }),
     [inputScrollable]
   );
+
+  // Android: ReactEditText.requestDisallowInterceptTouchEvent(true) on ACTION_DOWN
+  // (ReactEditText.kt) blocks RNGH Pan from seeing the stream start when the drag
+  // begins on the focused EditText. JS onTouch* still bubbles to this host View
+  // (BaseViewConfig.android.js topTouchStart/Move), so track pageY here and dismiss
+  // once dy crosses the same threshold as the pan. iOS keeps the RNGH path only.
+  const androidDismissGestureRef = useRef<AndroidDismissKeyboardGesture | null>(null);
+
+  const resetAndroidDismissGesture = useCallback(() => {
+    androidDismissGestureRef.current = null;
+  }, []);
+
+  const handleAndroidDismissTouchStart = useCallback((event: GestureResponderEvent) => {
+    androidDismissGestureRef.current = {
+      startPageX: event.nativeEvent.pageX,
+      startPageY: event.nativeEvent.pageY,
+      dismissed: false,
+      failed: false,
+    };
+  }, []);
+
+  const tryAndroidDismissKeyboardFromTouchMove = useCallback(
+    (event: GestureResponderEvent): boolean => {
+      const gesture = androidDismissGestureRef.current;
+      if (!gesture || gesture.dismissed || gesture.failed || inputScrollable) {
+        return false;
+      }
+      const dx = event.nativeEvent.pageX - gesture.startPageX;
+      const dy = event.nativeEvent.pageY - gesture.startPageY;
+      if (Math.abs(dx) > DISMISS_KEYBOARD_FAIL_OFFSET_X) {
+        gesture.failed = true;
+        return false;
+      }
+      if (dy < DISMISS_KEYBOARD_ACTIVE_OFFSET_Y) {
+        return false;
+      }
+      gesture.dismissed = true;
+      Keyboard.dismiss();
+      return true;
+    },
+    [inputScrollable]
+  );
+
+  const handleAndroidDismissTouchMove = useCallback(
+    (event: GestureResponderEvent) => {
+      tryAndroidDismissKeyboardFromTouchMove(event);
+    },
+    [tryAndroidDismissKeyboardFromTouchMove]
+  );
+
+  const shouldCaptureAndroidDismissMove = useCallback(
+    (event: GestureResponderEvent) => tryAndroidDismissKeyboardFromTouchMove(event),
+    [tryAndroidDismissKeyboardFromTouchMove]
+  );
+
+  const androidDismissKeyboardTouchProps =
+    Platform.OS === 'android'
+      ? {
+          onTouchStart: handleAndroidDismissTouchStart,
+          onTouchMove: handleAndroidDismissTouchMove,
+          onTouchEnd: resetAndroidDismissGesture,
+          onTouchCancel: resetAndroidDismissGesture,
+          onMoveShouldSetResponderCapture: shouldCaptureAndroidDismissMove,
+        }
+      : undefined;
 
   function clearDraft() {
     textRef.current = '';
@@ -458,7 +535,7 @@ export function ChatComposer({
       </View>
 
       <GestureDetector gesture={dismissKeyboardPan}>
-        <View collapsable={false} className="w-full">
+        <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
           <ChatComposerInputRow
             attachmentsEnabled={attachmentsEnabled}
             canSend={control.canSend}

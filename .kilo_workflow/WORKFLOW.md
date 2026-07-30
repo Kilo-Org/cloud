@@ -30,10 +30,10 @@ These apply to every role. Later sections do not repeat them.
 |---|---|---|---|
 | Starter | user picks | `kilo/x-ai/grok-4.5`, high (user may override at launch) | unlimited |
 | Planner | user picks | `kilo/moonshotai/kimi-k3`, high (user may override at launch) | unlimited |
-| Plan reviewer | kilo CLI | `kilo/kilo-auto/efficient` | 40 |
+| Plan reviewer | kilo CLI | `kilo/x-ai/grok-4.5`, high | 40 |
 | Orchestrator | kilo CLI | `kilo/x-ai/grok-4.5`, high | unlimited |
 | Implementer | kilo CLI | `kilo/kilo-auto/efficient` | 80 |
-| Impl reviewer | kilo CLI | `kilo/kilo-auto/efficient` | 50 |
+| Impl reviewer | kilo CLI | `kilo/x-ai/grok-4.5`, high | 50 |
 | E2E verifier | kilo CLI | `kilo/x-ai/grok-4.5`, high | 100 |
 
 Every kilo-CLI role above has a definition in `.kilo/agent/` (including `starter`, `planner`, and `orchestrator`) pinning its permissions and its model and step limit. The definition is authoritative: dispatches pass `--model`/`--variant` only for the starter and planner, where the user may override the pinned model at launch. Never use `kilo/kilo-auto/free` — it is rate-limited. Not even as a fallback: if a call stalls or errors, retry or relaunch on the assigned model, never a different one. Product-side LLM calls in E2E flows follow "Real LLM responses" below.

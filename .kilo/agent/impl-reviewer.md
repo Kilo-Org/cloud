@@ -1,7 +1,8 @@
 ---
 description: Reviews an implementation slice produced for an approved plan, including cross-repository changes
 mode: all
-model: kilo/kilo-auto/efficient
+model: kilo/x-ai/grok-4.5
+variant: high
 steps: 50
 permission:
   edit: allow

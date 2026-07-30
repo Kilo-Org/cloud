@@ -912,12 +912,20 @@ describe('StoreKiloPassPurchaseProvider', () => {
     const provider = renderStoreKiloPassPurchaseProvider();
     const initialValue = provider.render();
 
-    await initialValue.purchase(product, { onCompleted: noop });
+    const completedSpy = vi.fn();
+    await initialValue.purchase(product, {
+      onCompleted: () => {
+        completedSpy();
+      },
+    });
     expect(captureEvent).toHaveBeenCalledWith(KILO_PASS_PURCHASE_STARTED_EVENT);
 
     mockedIap.handlers?.onPurchaseSuccess(createPurchase());
     await flushPromises();
 
+    // Anchor: proves the completion callback (where the client capture used to
+    // live) actually ran, so the negative assertion below is not vacuous.
+    expect(completedSpy).toHaveBeenCalledTimes(1);
     expect(captureEvent).not.toHaveBeenCalledWith(KILO_PASS_PURCHASE_COMPLETED_EVENT);
 
     const afterSuccess = provider.render();

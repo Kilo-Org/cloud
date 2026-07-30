@@ -19,7 +19,7 @@ import {
   type ContainerUsageSegment,
 } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, gt, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 
 export type SerializedCloudBillingSku = Omit<CloudBillingSku, 'created_at'> & {
@@ -79,6 +79,8 @@ const segmentSearchSchema = z
   })
   .strict();
 
+const MAX_RECONCILIATION_RUNS = 15;
+
 const usageSummarySchema = z
   .object({
     subjectType: z.enum(['user', 'org']),
@@ -97,7 +99,7 @@ const usageReconciliationSchema = z
     subjectId: z.string().trim().min(1).max(256),
     start: z.iso.datetime(),
     end: z.iso.datetime(),
-    intervalIds: z.array(z.string().trim().min(1).max(512)).min(1).max(25),
+    intervalIds: z.array(z.string().trim().min(1).max(512)).min(1).max(MAX_RECONCILIATION_RUNS),
   })
   .strict()
   .superRefine((input, context) => {
@@ -106,7 +108,6 @@ const usageReconciliationSchema = z
 
 const BILLING_HEALTH_WINDOW_MS = 24 * 60 * 60 * 1_000;
 const STALE_OPEN_INTERVAL_MS = 15 * 60 * 1_000;
-const MAX_RECONCILIATION_RUNS = 25;
 const PROVIDER_BOUNDARY_PADDING_MS = 5_000;
 const MEBIBYTE_BYTES = 1024 ** 2;
 const MEGABYTE_BYTES = 1_000_000;
@@ -320,7 +321,7 @@ function addMeterReconciliationRow(
   }
 ): void {
   const providerIdentity = providerIdentityForMeterRow(meter);
-  const key = `run\0${meter.intervalId}`;
+  const key = meter.intervalId;
   let row = rows.get(key);
   if (!row) {
     row = {
@@ -364,6 +365,9 @@ function normalizedReconciliationRows(
 ) {
   const providerByRun = new Map<string, ContainerUsageAnalyticsResult['rows']>();
   const partialUsageRunKeys = new Set(provider?.usagePartialRunKeys ?? []);
+  const unavailableRuns = new Map(
+    provider?.usageUnavailableRuns.map(run => [run.runKey, run.reason] as const) ?? []
+  );
   for (const row of provider?.rows ?? []) {
     const existing = providerByRun.get(row.runKey);
     if (existing) existing.push(row);
@@ -391,6 +395,9 @@ function normalizedReconciliationRows(
     if (meter.identityIssue) {
       status = 'comparison_unavailable';
       statusDetail = meter.identityIssue;
+    } else if (unavailableRuns.get(meter.key) === 'outside_retention') {
+      status = 'comparison_unavailable';
+      statusDetail = 'This run is outside Cloudflare Analytics retention.';
     } else if (candidates.length === 0) {
       const usagePartial = partialUsageRunKeys.has(meter.key);
       status = usagePartial ? 'provider_partial' : 'missing_from_cloudflare';
@@ -512,7 +519,8 @@ export async function reconcileUsageWithCloudflare(
       container_usage_interval.started_at,
       container_usage_interval.last_seen_at,
       container_usage_interval.stopped_at
-    );
+    )
+    .orderBy(asc(container_usage_interval.started_at), asc(container_usage_interval.id));
 
   const grouped = new Map<string, MeterReconciliationRow>();
   for (const meterSegment of meterSegments) {

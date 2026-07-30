@@ -9,7 +9,8 @@ const DATASET = 'containersUsageAdaptiveGroups' as const;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_RAW_RESPONSE_BYTES = 1024 * 1024;
 const MAX_RETAINED_RAW_BYTES = 4 * 1024 * 1024;
-const MAX_PROVIDER_REQUESTS = 100;
+const MAX_PROVIDER_QUERY_PLANS = 100;
+const MAX_RUN_WINDOWS_PER_REQUEST = 15;
 
 export type ContainerUsageAnalyticsInput = {
   runs: Array<{
@@ -39,10 +40,13 @@ export type ContainerDatasetSettings = {
 
 export type ContainerUsageAnalyticsRawResponse = {
   dataset: typeof DATASET | 'settings';
-  runKey: string | null;
-  windowIndex: number;
   batchIndex: number;
-  window: { start: string; end: string } | null;
+  queries: Array<{
+    alias: string;
+    runKey: string;
+    windowIndex: number;
+    window: { start: string; end: string };
+  }>;
   body: unknown;
 };
 
@@ -62,6 +66,7 @@ export type ContainerUsageAnalyticsResult = {
   rows: ContainerUsageAnalyticsRow[];
   partial: boolean;
   usagePartialRunKeys: string[];
+  usageUnavailableRuns: Array<{ runKey: string; reason: 'outside_retention' }>;
   issues: string[];
   settings: { containersUsageAdaptiveGroups: ContainerDatasetSettings };
   rawResponses: ContainerUsageAnalyticsRawResponse[];
@@ -87,7 +92,14 @@ const DatasetSettingsSchema = z.object({
 });
 
 const GraphqlErrorsSchema = z
-  .array(z.object({ message: z.string().optional() }).passthrough())
+  .array(
+    z
+      .object({
+        message: z.string().optional(),
+        path: z.array(z.union([z.string(), z.number()])).optional(),
+      })
+      .passthrough()
+  )
   .nullish();
 
 const SettingsResponseSchema = z.object({
@@ -127,9 +139,7 @@ const UsageResponseSchema = z.object({
       viewer: z
         .object({
           accounts: z
-            .array(
-              z.object({ containersUsageAdaptiveGroups: z.array(UsageGroupSchema).optional() })
-            )
+            .array(z.record(z.string(), z.array(UsageGroupSchema).nullable()).nullable())
             .optional(),
         })
         .optional(),
@@ -156,27 +166,43 @@ query ContainerUsageAnalyticsSettings($accountTag: String!) {
   }
 }`;
 
-function usageQuery(limit: number): string {
-  return `
-query ContainerUsage(
-  $accountTag: String!
-  $datetimeStart: Time!
-  $datetimeEnd: Time!
-  $instanceIds: [String!]
-) {
-  viewer {
-    accounts(filter: { accountTag: $accountTag }) {
-      containersUsageAdaptiveGroups(
+type QueryPlan = {
+  run: { key: string; instanceId: string };
+  window: { start: string; end: string };
+  windowIndex: number;
+};
+
+function usageQuery(limit: number, plans: QueryPlan[]): string {
+  const variableDefinitions = plans
+    .map(
+      (_plan, index) =>
+        `$datetimeStart${index}: Time!\n  $datetimeEnd${index}: Time!\n  $instanceIds${index}: [String!]`
+    )
+    .join('\n  ');
+  const fields = plans
+    .map(
+      (_plan, index) => `
+      u${index}: containersUsageAdaptiveGroups(
         limit: ${limit}
         filter: {
-          datetime_geq: $datetimeStart
-          datetime_lt: $datetimeEnd
-          instanceId_in: $instanceIds
+          datetime_geq: $datetimeStart${index}
+          datetime_lt: $datetimeEnd${index}
+          instanceId_in: $instanceIds${index}
         }
       ) {
         dimensions { applicationId instanceId }
         sum { cpuTimeSec allocatedMemory allocatedDisk txBytes }
-      }
+      }`
+    )
+    .join('\n');
+  return `
+query ContainerUsage(
+  $accountTag: String!
+  ${variableDefinitions}
+) {
+  viewer {
+    accounts(filter: { accountTag: $accountTag }) {
+      ${fields}
     }
   }
 }`;
@@ -211,6 +237,14 @@ function windows(startMs: number, endMs: number, maxDurationSeconds: number) {
       start: new Date(cursor).toISOString(),
       end: new Date(Math.min(cursor + maxDurationMs, endMs)).toISOString(),
     });
+  }
+  return result;
+}
+
+function batches<T>(items: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
   }
   return result;
 }
@@ -357,6 +391,7 @@ export async function queryContainerUsageAnalytics(
   const rawResponses: ContainerUsageAnalyticsRawResponse[] = [];
   const issues: string[] = [];
   const partialIds = new Set<string>();
+  const unavailableRuns: ContainerUsageAnalyticsResult['usageUnavailableRuns'] = [];
 
   const settingsBody = await postGraphql({
     fetchImpl,
@@ -375,10 +410,8 @@ export async function queryContainerUsageAnalytics(
   }
   rawResponses.push({
     dataset: 'settings',
-    runKey: null,
-    windowIndex: 0,
     batchIndex: 0,
-    window: null,
+    queries: [],
     body: settingsBody,
   });
   const settingsErrors = graphqlErrors(settingsResponse.data.errors);
@@ -405,6 +438,7 @@ export async function queryContainerUsageAnalytics(
       rows: [],
       partial: issues.length > 0,
       usagePartialRunKeys: [],
+      usageUnavailableRuns: [],
       issues,
       settings: settingsSummary,
       rawResponses,
@@ -413,10 +447,9 @@ export async function queryContainerUsageAnalytics(
 
   const queryPlans = runs.flatMap(run => {
     if (run.endMs <= oldestAllowedMs) {
-      throw new ContainerUsageAnalyticsError(
-        'outside_retention',
-        `Run ${run.key} is outside Cloudflare Analytics retention.`
-      );
+      unavailableRuns.push({ runKey: run.key, reason: 'outside_retention' });
+      issues.push(`Run ${run.key} is outside Cloudflare Analytics retention.`);
+      return [];
     }
     const effectiveStartMs = Math.max(run.startMs, oldestAllowedMs);
     if (effectiveStartMs !== run.startMs) {
@@ -431,35 +464,43 @@ export async function queryContainerUsageAnalytics(
       })
     );
   });
-  const requestCount = 1 + queryPlans.length;
-  if (requestCount > MAX_PROVIDER_REQUESTS) {
+  if (queryPlans.length > MAX_PROVIDER_QUERY_PLANS) {
     throw new ContainerUsageAnalyticsError(
       'request_limit_exceeded',
-      `The selected run windows require ${requestCount} Cloudflare Analytics requests (max ${MAX_PROVIDER_REQUESTS}). Select fewer or shorter runs and retry.`
+      `The selected runs require ${queryPlans.length} Cloudflare Analytics query plans (max ${MAX_PROVIDER_QUERY_PLANS}). Select fewer or shorter runs and retry.`
     );
   }
 
   const rows = new Map<string, ContainerUsageAnalyticsRow>();
-  for (const { run, window, windowIndex } of queryPlans) {
+  const queryBatches = batches(queryPlans, MAX_RUN_WINDOWS_PER_REQUEST);
+  for (let batchIndex = 0; batchIndex < queryBatches.length; batchIndex += 1) {
+    const batch = queryBatches[batchIndex];
+    if (!batch) continue;
+    const variables: Record<string, unknown> = { accountTag: accountId };
+    for (let index = 0; index < batch.length; index += 1) {
+      const plan = batch[index];
+      if (!plan) continue;
+      variables[`datetimeStart${index}`] = plan.window.start;
+      variables[`datetimeEnd${index}`] = plan.window.end;
+      variables[`instanceIds${index}`] = [plan.run.instanceId];
+    }
     const body = await postGraphql({
       fetchImpl,
       token,
       timeoutMs,
-      query: usageQuery(settings.maxPageSize),
-      variables: {
-        accountTag: accountId,
-        datetimeStart: window.start,
-        datetimeEnd: window.end,
-        instanceIds: [run.instanceId],
-      },
+      query: usageQuery(settings.maxPageSize, batch),
+      variables,
       retainedBytes,
     });
     rawResponses.push({
       dataset: DATASET,
-      runKey: run.key,
-      windowIndex,
-      batchIndex: 0,
-      window,
+      batchIndex: batchIndex + 1,
+      queries: batch.map((plan, index) => ({
+        alias: `u${index}`,
+        runKey: plan.run.key,
+        windowIndex: plan.windowIndex,
+        window: plan.window,
+      })),
       body,
     });
     const response = UsageResponseSchema.safeParse(body);
@@ -470,8 +511,8 @@ export async function queryContainerUsageAnalytics(
       );
     }
     const errors = graphqlErrors(response.data.errors);
-    const groups = response.data.data?.viewer?.accounts?.[0]?.containersUsageAdaptiveGroups;
-    if (!groups) {
+    const account = response.data.data?.viewer?.accounts?.[0];
+    if (!account) {
       throw new ContainerUsageAnalyticsError(
         'graphql_error',
         errors.length > 0
@@ -479,29 +520,58 @@ export async function queryContainerUsageAnalytics(
           : 'Cloudflare Analytics usage query returned no account data.'
       );
     }
-    if (errors.length > 0 || groups.length >= settings.maxPageSize) {
-      partialIds.add(run.key);
-      issues.push(
-        errors.length > 0
-          ? `${DATASET} run ${run.key} window ${windowIndex} returned partial data: ${errors.join('; ')}`
-          : `${DATASET} run ${run.key} window ${windowIndex} reached the page limit.`
-      );
-    }
-    for (const group of groups) {
-      const key = `${run.key}\0${group.dimensions.applicationId}\0${group.dimensions.instanceId}`;
-      const existing = rows.get(key);
-      if (existing) {
-        existing.usage.cpuTimeSec += group.sum.cpuTimeSec;
-        existing.usage.allocatedMemory += group.sum.allocatedMemory;
-        existing.usage.allocatedDisk += group.sum.allocatedDisk;
-        existing.usage.txBytes += group.sum.txBytes;
-      } else {
-        rows.set(key, {
-          runKey: run.key,
-          applicationId: group.dimensions.applicationId,
-          instanceId: group.dimensions.instanceId,
-          usage: { ...group.sum },
-        });
+    const errorAliases = new Set(
+      (response.data.errors ?? []).flatMap(error => {
+        const alias = error.path?.find(part => typeof part === 'string' && /^u\d+$/.test(part));
+        return typeof alias === 'string' ? [alias] : [];
+      })
+    );
+    const hasUnscopedError = (response.data.errors ?? []).some(
+      error => !error.path?.some(part => typeof part === 'string' && /^u\d+$/.test(part))
+    );
+    for (let index = 0; index < batch.length; index += 1) {
+      const plan = batch[index];
+      if (!plan) continue;
+      const alias = `u${index}`;
+      const groups = account[alias];
+      const aliasPartial = hasUnscopedError || errorAliases.has(alias);
+      if (groups === null || groups === undefined) {
+        if (!aliasPartial) {
+          throw new ContainerUsageAnalyticsError(
+            'invalid_response_shape',
+            `Cloudflare Analytics usage response omitted ${alias}.`
+          );
+        }
+        partialIds.add(plan.run.key);
+        issues.push(
+          `${DATASET} run ${plan.run.key} window ${plan.windowIndex} returned no usable data: ${errors.join('; ')}`
+        );
+        continue;
+      }
+      if (aliasPartial || groups.length >= settings.maxPageSize) {
+        partialIds.add(plan.run.key);
+        issues.push(
+          aliasPartial
+            ? `${DATASET} run ${plan.run.key} window ${plan.windowIndex} returned partial data: ${errors.join('; ')}`
+            : `${DATASET} run ${plan.run.key} window ${plan.windowIndex} reached the page limit.`
+        );
+      }
+      for (const group of groups) {
+        const key = `${plan.run.key}\0${group.dimensions.applicationId}\0${group.dimensions.instanceId}`;
+        const existing = rows.get(key);
+        if (existing) {
+          existing.usage.cpuTimeSec += group.sum.cpuTimeSec;
+          existing.usage.allocatedMemory += group.sum.allocatedMemory;
+          existing.usage.allocatedDisk += group.sum.allocatedDisk;
+          existing.usage.txBytes += group.sum.txBytes;
+        } else {
+          rows.set(key, {
+            runKey: plan.run.key,
+            applicationId: group.dimensions.applicationId,
+            instanceId: group.dimensions.instanceId,
+            usage: { ...group.sum },
+          });
+        }
       }
     }
   }
@@ -513,8 +583,9 @@ export async function queryContainerUsageAnalytics(
         a.applicationId.localeCompare(b.applicationId) ||
         a.instanceId.localeCompare(b.instanceId)
     ),
-    partial: partialIds.size > 0,
+    partial: partialIds.size > 0 || unavailableRuns.length > 0,
     usagePartialRunKeys: [...partialIds].sort(),
+    usageUnavailableRuns: unavailableRuns.sort((a, b) => a.runKey.localeCompare(b.runKey)),
     issues,
     settings: settingsSummary,
     rawResponses,

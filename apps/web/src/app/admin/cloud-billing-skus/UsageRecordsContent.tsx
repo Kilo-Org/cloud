@@ -323,7 +323,7 @@ export default function UsageRecordsContent() {
     closeReason: submitted.closeReason,
     skuId: submitted.skuId,
     cursor,
-    limit: submitted.kind === 'recent' ? 10 : 25,
+    limit: submitted.kind === 'recent' ? 10 : 15,
   };
   const results = useQuery(trpc.admin.cloudBillingSkus.searchUsageIntervals.queryOptions(input));
   const rows = results.data?.items ?? [];
@@ -1016,15 +1016,13 @@ export default function UsageRecordsContent() {
                             <CollapsibleContent className="mt-3 space-y-3">
                               {reconciliation.data.provider.rawResponses.map((raw, index) => (
                                 <section
-                                  key={`${raw.dataset}:${raw.runKey ?? 'settings'}:${raw.windowIndex}:${raw.batchIndex}:${index}`}
+                                  key={`${raw.dataset}:${raw.batchIndex}:${index}`}
                                   className="space-y-2"
                                 >
                                   <h4 className="text-muted-foreground type-label">
                                     {raw.dataset}
-                                    {raw.runKey ? ` · run ${raw.runKey}` : ''} · window{' '}
-                                    {raw.windowIndex + 1}
-                                    {raw.window
-                                      ? ` · ${formatTimestamp(raw.window.start)} to ${formatTimestamp(raw.window.end)}`
+                                    {raw.queries.length > 0
+                                      ? ` · batch ${raw.batchIndex} · ${raw.queries.length} run${raw.queries.length === 1 ? '' : 's'}`
                                       : ''}
                                   </h4>
                                   <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface-inset p-4 whitespace-pre type-code">

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react-native';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -98,7 +99,9 @@ export function PrReviewEntryScreen() {
     const clipboard = await Clipboard.getStringAsync();
     const decision = decidePrLinkPaste(clipboard);
     if (decision.kind === 'empty') {
-      setHelperMessage('clipboard-empty');
+      // Clipboard-empty is a toast, not an inline helper (layout slot stays
+      // reserved for invalid only).
+      toast.error(PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY);
       return;
     }
     // Replace entire field (never append-at-cursor): native field + ref + hasInput.
@@ -130,12 +133,8 @@ export function PrReviewEntryScreen() {
   const isInvalid = helperMessage === 'invalid';
   // Stable always-mounted slot (D6): same Text line box every state — only
   // string + color token change. NBSP keeps the line box at every font scale.
-  let helperSlotCopy = '\u00A0';
-  if (slotState === 'invalid') {
-    helperSlotCopy = PR_LINK_HELPER_INVALID_COPY;
-  } else if (slotState === 'clipboard-empty') {
-    helperSlotCopy = PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY;
-  }
+  // Clipboard-empty is a toast; slot is reserved for invalid only.
+  const helperSlotCopy = slotState === 'invalid' ? PR_LINK_HELPER_INVALID_COPY : '\u00A0';
 
   let recentsBody: ReactNode = null;
   if (recent === null) {
@@ -229,15 +228,8 @@ export function PrReviewEntryScreen() {
                     }
                     inputValueRef.current = value;
                     setHasInput(value.length > 0);
-                    // Any real edit clears transient helper messages (invalid /
-                    // clipboard-empty). Last-set message is replaced by null.
+                    // Any real edit clears the invalid helper message.
                     if (helperMessage !== null) {
-                      setHelperMessage(null);
-                    }
-                  }}
-                  onFocus={() => {
-                    // clipboard-empty clears on input focus; invalid stays until edit.
-                    if (helperMessage === 'clipboard-empty') {
                       setHelperMessage(null);
                     }
                   }}
@@ -292,6 +284,10 @@ export function PrReviewEntryScreen() {
                 'text-sm',
                 slotState === 'invalid' ? 'text-destructive' : 'text-muted-foreground'
               )}
+              // NBSP placeholder is blank to screen readers — hide only that state.
+              accessible={slotState !== 'none'}
+              accessibilityElementsHidden={slotState === 'none'}
+              importantForAccessibility={slotState === 'none' ? 'no-hide-descendants' : 'yes'}
             >
               {helperSlotCopy}
             </Text>

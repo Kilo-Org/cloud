@@ -1,11 +1,11 @@
-export type PrLinkHelperMessage = 'invalid' | 'clipboard-empty';
+export type PrLinkHelperMessage = 'invalid';
 
-type PrLinkHelperSlotState = 'invalid' | 'clipboard-empty' | 'none';
+type PrLinkHelperSlotState = 'invalid' | 'none';
 
 type PrLinkHelperSlotInput = {
   /**
-   * Active transient message. `invalid` and `clipboard-empty` are mutually
-   * exclusive at the call site (last-set wins); `null` means no message.
+   * Active transient message. `null` means no message. Clipboard-empty
+   * surfaces as a toast at the paste call site, not via this slot.
    */
   readonly message: PrLinkHelperMessage | null;
 };
@@ -13,18 +13,18 @@ type PrLinkHelperSlotInput = {
 /**
  * Select the helper-message content for the PR-link entry field.
  *
- * Priority: active message (invalid / clipboard-empty) wins over none.
- * No active message selects none — the input placeholder already shows the
- * example URL. The UI keeps one always-mounted Text in a reserved slot and
- * only swaps the string (active copy or a non-breaking-space placeholder)
- * and color token, so appear/clear never shifts the input row or Open button.
+ * Priority: active `invalid` message wins over none. No active message
+ * selects none — the input placeholder already shows the example URL.
+ * Clipboard-empty is a toast (see paste handler), not a slot state.
+ * The UI keeps one always-mounted Text in a reserved slot and only
+ * swaps the string (active copy or a non-breaking-space placeholder)
+ * and color token, so appear/clear never shifts the input row or Open
+ * button. The reservation is for `invalid`; placeholder stays mounted
+ * when none.
  */
 export function selectPrLinkHelperSlotState(input: PrLinkHelperSlotInput): PrLinkHelperSlotState {
   if (input.message === 'invalid') {
     return 'invalid';
-  }
-  if (input.message === 'clipboard-empty') {
-    return 'clipboard-empty';
   }
   return 'none';
 }
@@ -43,4 +43,5 @@ export function selectPrLinkClearButtonVisible(input: PrLinkClearButtonInput): b
 }
 
 export const PR_LINK_HELPER_INVALID_COPY = 'Not a GitHub pull request link';
+/** Toast copy when paste finds an empty clipboard (not an inline helper). */
 export const PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY = 'Clipboard is empty';

@@ -5,6 +5,11 @@ const { BUNDLE_ID } = require('../wdio/client');
 const settleApp = require('./settle-app');
 const S = require('./states');
 
+// Under parallel-workflow host load a cold Android launch can sit on a blank
+// splash for minutes and the emulator throws `Process system isn't responding`
+// ANR dialogs; answer Wait and keep waiting instead of failing the round.
+const ANR_DIALOG = /.*isn.t responding.*/;
+
 module.exports = async function openApp(ctx) {
   const { h, when } = ctx;
 
@@ -19,7 +24,22 @@ module.exports = async function openApp(ctx) {
   await h.stopApp(BUNDLE_ID);
   await h.launchApp(BUNDLE_ID);
 
-  // Cold launch and bundling are slow; wait for any known state before settling.
-  await h.waitVisible(S.ANY_STATE, { timeout: 30000 });
+  // Cold launch and bundling are slow; wait for any known state before
+  // settling. Android under load gets the long budget; it returns as soon as
+  // a state renders, so healthy runs never pay it.
+  const launchTimeout = ctx.platform === 'android' ? 420000 : 30000;
+  for (let anr = 0; ; anr++) {
+    try {
+      await h.waitVisible(S.ANY_STATE, { timeout: launchTimeout });
+      break;
+    } catch (err) {
+      if (anr < 3 && (await ctx.h.visible(ANR_DIALOG))) {
+        await h.tapOn('Wait');
+        continue;
+      }
+      throw err;
+    }
+  }
+  await when(ctx, ANR_DIALOG, () => h.tapOn('Wait'));
   await settleApp(ctx);
 };

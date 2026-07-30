@@ -5,7 +5,6 @@ import {
   credit_transactions,
   organization_seats_purchases,
   organization_memberships,
-  kilo_pass_subscriptions,
   platform_integrations,
   kilo_pass_org_agreements,
   kilo_pass_org_allocation_plans,

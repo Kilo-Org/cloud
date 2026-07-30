@@ -79,9 +79,7 @@ export function OrganizationAdminKiloPass({ organizationId }: { organizationId: 
             </div>
             {agreement ? (
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary-outline">
-                  {agreement.tierName}
-                </Badge>
+                <Badge variant="secondary-outline">{agreement.tierName}</Badge>
                 <span className="text-muted-foreground type-label">
                   {agreement.purchasedPassCapacity} passes · {agreement.state.replace(/_/g, ' ')}
                 </span>

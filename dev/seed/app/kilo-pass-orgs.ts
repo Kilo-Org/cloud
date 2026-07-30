@@ -13,11 +13,16 @@ import {
   organization_memberships,
   organization_seats_purchases,
   organizations,
+  user_auth_provider,
 } from '@kilocode/db/schema';
-import { eq, ilike, inArray } from 'drizzle-orm';
+import { eq, ilike, inArray, or } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
-import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
+import {
+  createSeedSeatSubscription,
+  createSeedStripeCustomer,
+  deleteSeedStripeCustomer,
+} from '../lib/stripe';
 import type { SeedResult } from '../index';
 
 const PREFIX = 'dev-seed:kilo-pass-orgs';
@@ -54,11 +59,36 @@ function isoAtUtcMonthOffset(offset: number): string {
 
 async function cleanup(): Promise<void> {
   const db = getSeedDb();
+  const seedUsers = await db
+    .select({ id: kilocode_users.id, stripeCustomerId: kilocode_users.stripe_customer_id })
+    .from(kilocode_users)
+    .where(ilike(kilocode_users.google_user_email, USER_EMAIL_PATTERN));
+  const userIds = seedUsers.map(user => user.id);
   const seedOrganizations = await db
     .select({ id: organizations.id })
     .from(organizations)
-    .where(ilike(organizations.name, `${ORG_PREFIX}%`));
-  const organizationIds = seedOrganizations.map(organization => organization.id);
+    .where(
+      userIds.length > 0
+        ? or(
+            ilike(organizations.name, `${ORG_PREFIX}%`),
+            inArray(organizations.created_by_kilo_user_id, userIds)
+          )
+        : ilike(organizations.name, `${ORG_PREFIX}%`)
+    );
+  const rootOrganizationIds = seedOrganizations.map(organization => organization.id);
+  const childOrganizations =
+    rootOrganizationIds.length > 0
+      ? await db
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(inArray(organizations.parent_organization_id, rootOrganizationIds))
+      : [];
+  const organizationIds = [
+    ...new Set([
+      ...rootOrganizationIds,
+      ...childOrganizations.map(organization => organization.id),
+    ]),
+  ];
 
   if (organizationIds.length > 0) {
     const agreements = await db
@@ -109,15 +139,16 @@ async function cleanup(): Promise<void> {
     .delete(kilo_pass_org_term_versions)
     .where(eq(kilo_pass_org_term_versions.version_key, CUSTOM_TERM_KEY));
 
-  const seedUsers = await db
-    .select({ id: kilocode_users.id, stripeCustomerId: kilocode_users.stripe_customer_id })
-    .from(kilocode_users)
-    .where(ilike(kilocode_users.google_user_email, USER_EMAIL_PATTERN));
   if (seedUsers.length > 0) {
-    const userIds = seedUsers.map(user => user.id);
+    await db
+      .delete(credit_transactions)
+      .where(inArray(credit_transactions.created_by_kilo_user_id, userIds));
     await db
       .delete(organization_memberships)
       .where(inArray(organization_memberships.kilo_user_id, userIds));
+  }
+  await db.delete(user_auth_provider).where(ilike(user_auth_provider.email, USER_EMAIL_PATTERN));
+  if (seedUsers.length > 0) {
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
     await Promise.all(seedUsers.map(user => deleteSeedStripeCustomer(user.stripeCustomerId)));
   }
@@ -129,23 +160,33 @@ async function insertUser(input: {
   name: string;
   isAdmin: boolean;
 }): Promise<string> {
-  const db = getSeedDb();
   const customer = await createSeedStripeCustomer({
     email: input.email,
     name: input.name,
     kiloUserId: input.id,
   });
   try {
-    await db.insert(kilocode_users).values({
-      id: input.id,
-      google_user_email: input.email,
-      google_user_name: input.name,
-      google_user_image_url: `https://example.com/${input.id}.png`,
-      normalized_email: input.email,
-      stripe_customer_id: customer.id,
-      has_validation_stytch: true,
-      customer_source: 'dev-seed',
-      is_admin: input.isAdmin,
+    const avatarUrl = `https://example.com/${input.id}.png`;
+    await getSeedDb().transaction(async tx => {
+      await tx.insert(kilocode_users).values({
+        id: input.id,
+        google_user_email: input.email,
+        google_user_name: input.name,
+        google_user_image_url: avatarUrl,
+        normalized_email: input.email,
+        stripe_customer_id: customer.id,
+        has_validation_stytch: true,
+        customer_source: 'dev-seed',
+        is_admin: input.isAdmin,
+      });
+      await tx.insert(user_auth_provider).values({
+        kilo_user_id: input.id,
+        provider: 'fake-login',
+        provider_account_id: `fake-${input.email}`,
+        email: input.email,
+        avatar_url: avatarUrl,
+        hosted_domain: '@@fake@@',
+      });
     });
     return customer.id;
   } catch (error) {
@@ -188,6 +229,7 @@ async function insertSeatPurchase(input: {
   organizationId: string;
   seatCount: number;
   subscriptionId?: string;
+  amountUsd?: number;
 }): Promise<string> {
   const subscriptionId = input.subscriptionId ?? `sub_dev_seed_kpo_${randomUUID()}`;
   await getSeedDb()
@@ -196,7 +238,7 @@ async function insertSeatPurchase(input: {
       organization_id: input.organizationId,
       subscription_stripe_id: subscriptionId,
       seat_count: input.seatCount,
-      amount_usd: input.seatCount * 49,
+      amount_usd: input.amountUsd ?? input.seatCount * 49,
       subscription_status: 'active',
       starts_at: isoAtUtcMonthOffset(-1),
       expires_at: isoAtUtcMonthOffset(1),
@@ -208,6 +250,7 @@ async function insertSeatPurchase(input: {
 
 async function insertScenarioParent(input: {
   label: string;
+  name?: string;
   ownerId: string;
   stripeCustomerId: string;
   seatCount: number;
@@ -215,7 +258,7 @@ async function insertScenarioParent(input: {
   const [organization] = await getSeedDb()
     .insert(organizations)
     .values({
-      name: `${ORG_PREFIX} ${input.label}`,
+      name: input.name ?? `${ORG_PREFIX} ${input.label}`,
       created_by_kilo_user_id: input.ownerId,
       stripe_customer_id: input.stripeCustomerId,
       plan: 'teams',
@@ -358,21 +401,22 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     if (!customTerm) throw new Error('custom Kilo Pass organization term insert failed');
 
     const setupParentId = await insertScenarioParent({
-      label: 'Setup parent',
+      label: 'Acme Co',
+      name: 'Acme Co',
       ownerId,
       stripeCustomerId: ownerStripeCustomerId,
-      seatCount: 6,
+      seatCount: 10,
     });
     const [setupChildOne, setupChildTwo] = await db
       .insert(organizations)
       .values([
         {
-          name: `${ORG_PREFIX} Setup child one`,
+          name: 'Engineering',
           parent_organization_id: setupParentId,
           plan: 'teams',
         },
         {
-          name: `${ORG_PREFIX} Setup child two`,
+          name: 'Sales',
           parent_organization_id: setupParentId,
           plan: 'teams',
         },
@@ -384,10 +428,26 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       { organization_id: setupParentId, kilo_user_id: memberId, role: 'member' },
       { organization_id: setupChildOne.id, kilo_user_id: childOwnerId, role: 'owner' },
     ]);
-    const setupSeatSubscriptionId = await insertSeatPurchase({
+    const teamsMonthlyPriceId = process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID;
+    if (!suppliedSeatSubscriptionId && !teamsMonthlyPriceId) {
+      throw new Error('STRIPE_TEAMS_MONTHLY_PRICE_ID is required to seed the seat subscription');
+    }
+    const setupSeatSubscriptionId = suppliedSeatSubscriptionId
+      ? suppliedSeatSubscriptionId
+      : (
+          await createSeedSeatSubscription({
+            stripeCustomerId: ownerStripeCustomerId,
+            priceId: teamsMonthlyPriceId,
+            seatCount: 10,
+            kiloUserId: ownerId,
+            organizationId: setupParentId,
+          })
+        ).id;
+    await insertSeatPurchase({
       organizationId: setupParentId,
-      seatCount: 6,
-      subscriptionId: suppliedSeatSubscriptionId,
+      seatCount: 10,
+      subscriptionId: setupSeatSubscriptionId,
+      amountUsd: 180,
     });
 
     const unrelatedOrganizationId = await insertScenarioParent({
@@ -802,7 +862,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     console.log(
       suppliedSeatSubscriptionId
         ? 'The setup parent uses the supplied Stripe test subscription for the real purchase flow.'
-        : 'The setup parent uses a placeholder seat subscription; setup UI works, but checkout does not.'
+        : 'The setup parent uses a generated Stripe test subscription for the real purchase flow.'
     );
     console.log(
       'Provider actions on prebuilt pending/cancellation/payment-review fixtures are visual-only.'
@@ -835,7 +895,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       setupChildOneOrganizationId: setupChildOne.id,
       setupChildTwoOrganizationId: setupChildTwo.id,
       setupSeatSubscriptionId,
-      setupStripeCheckoutReady: suppliedSeatSubscriptionId !== undefined,
+      setupStripeCheckoutReady: true,
       setupSubscriptionsPath: `/organizations/${setupParentId}/subscriptions`,
       setupKiloPassPath: `/organizations/${setupParentId}/subscriptions/kilo-pass/setup`,
       unrelatedOrganizationId,

@@ -43,9 +43,9 @@ export default {
         max_completion_tokens: 131_072,
       },
       {
-        id: 'qwen3.7-plus',
-        name: 'Qwen3.7-Plus',
-        flags: ['vision', 'reasoning'],
+        id: 'qwen3.7-max',
+        name: 'Qwen3.7-Max',
+        flags: ['reasoning'],
         context_length: 1_000_000,
         max_completion_tokens: 64_000,
       },

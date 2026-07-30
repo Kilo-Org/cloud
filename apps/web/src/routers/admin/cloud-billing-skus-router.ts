@@ -6,6 +6,11 @@ import {
   normalizeCloudBillingSkuRate,
 } from '@/lib/cloud-billing-sku';
 import {
+  ContainerUsageAnalyticsError,
+  queryContainerUsageAnalytics,
+  type ContainerUsageAnalyticsResult,
+} from '@/lib/cloudflare/container-usage-analytics';
+import {
   cloud_billing_sku,
   container_usage_interval,
   container_usage_segment,
@@ -88,6 +93,12 @@ const usageSummarySchema = z
 
 const BILLING_HEALTH_WINDOW_MS = 24 * 60 * 60 * 1_000;
 const STALE_OPEN_INTERVAL_MS = 15 * 60 * 1_000;
+const MAX_RECONCILIATION_INSTANCES = 100;
+const MEBIBYTE_BYTES = 1024 ** 2;
+const MEGABYTE_BYTES = 1_000_000;
+const CAPACITY_CROSS_CHECK_RELATIVE_TOLERANCE = 1e-6;
+const COMPARISON_METHOD =
+  'Cloudflare allocated resource sums include overlapping container and micro-VM records, so they cannot be normalized to awake wall-clock seconds. Capacity-equivalent memory and disk seconds are diagnostic only.';
 const usageMetadataSchema = z
   .record(z.string().min(1).max(64), z.string().max(512))
   .refine(
@@ -190,6 +201,345 @@ function postgresErrorCode(error: unknown): string | undefined {
   if ('code' in error && typeof error.code === 'string') return error.code;
   if ('cause' in error) return postgresErrorCode(error.cause);
   return undefined;
+}
+
+export type ReconciliationStatus =
+  | 'missing_from_cloudflare'
+  | 'ambiguous_application'
+  | 'provider_partial'
+  | 'comparison_unavailable';
+
+type MeterReconciliationRow = {
+  key: string;
+  providerInstanceId: string | null;
+  meterInstanceIds: Set<string>;
+  services: Set<string>;
+  skuIds: Set<string>;
+  intervalIds: Set<string>;
+  acceptedSeconds: number;
+  identityIssue: string | null;
+};
+
+const cloudAgentProviderIdentitySchema = z
+  .object({ durable_object_id: z.string().trim().min(1).max(256) })
+  .passthrough();
+
+function providerIdentityForMeterRow(row: {
+  service: string;
+  instanceId: string;
+  metadata: unknown;
+}): { instanceId: string | null; issue: string | null } {
+  if (row.service === 'gastown') {
+    return { instanceId: row.instanceId, issue: null };
+  }
+  if (row.service === 'cloud-agent-next' || row.service.startsWith('cloud-agent-next-')) {
+    const metadata = cloudAgentProviderIdentitySchema.safeParse(row.metadata);
+    if (!metadata.success) {
+      return {
+        instanceId: null,
+        issue: 'Cloud Agent usage metadata does not contain a valid durable_object_id.',
+      };
+    }
+    return {
+      instanceId: metadata.data.durable_object_id,
+      issue: null,
+    };
+  }
+  return {
+    instanceId: null,
+    issue: `Service ${row.service} has no Cloudflare physical-identity mapping.`,
+  };
+}
+
+// Cloud Agent values mirror services/cloud-agent-next/wrangler.jsonc. Gastown
+// uses Cloudflare standard-4, documented as 12 GiB of provisioned memory.
+type ProvisionedCapacity = { memoryBytes: number; diskBytes: number };
+
+function provisionedCapacityForService(service: string): ProvisionedCapacity | null {
+  switch (service) {
+    case 'gastown':
+    case 'cloud-agent-next-sandbox':
+    case 'cloud-agent-next-sandbox-containment':
+      return { memoryBytes: 12_288 * MEBIBYTE_BYTES, diskBytes: 20_000 * MEGABYTE_BYTES };
+    case 'cloud-agent-next-sandbox-small':
+    case 'cloud-agent-next-sandbox-dind':
+    case 'cloud-agent-next-sandbox-small-containment':
+      return { memoryBytes: 6_144 * MEBIBYTE_BYTES, diskBytes: 10_000 * MEGABYTE_BYTES };
+    case 'cloud-agent-next-sandbox-code-review':
+    case 'cloud-agent-next-sandbox-code-review-containment':
+      return { memoryBytes: 4_096 * MEBIBYTE_BYTES, diskBytes: 8_000 * MEGABYTE_BYTES };
+    default:
+      return null;
+  }
+}
+
+function sharedProvisionedCapacity(services: Set<string>): ProvisionedCapacity | null {
+  let shared: ProvisionedCapacity | null = null;
+  for (const service of services) {
+    const capacity = provisionedCapacityForService(service);
+    if (!capacity) return null;
+    if (
+      shared &&
+      (shared.memoryBytes !== capacity.memoryBytes || shared.diskBytes !== capacity.diskBytes)
+    ) {
+      return null;
+    }
+    shared = capacity;
+  }
+  return shared;
+}
+
+function addMeterReconciliationRow(
+  rows: Map<string, MeterReconciliationRow>,
+  meter: {
+    intervalId: string;
+    service: string;
+    instanceId: string;
+    skuId: string;
+    metadata: unknown;
+    acceptedSeconds: number;
+  }
+): void {
+  const providerIdentity = providerIdentityForMeterRow(meter);
+  const key = providerIdentity.instanceId
+    ? `provider\0${providerIdentity.instanceId}`
+    : `meter\0${meter.service}\0${meter.instanceId}`;
+  let row = rows.get(key);
+  if (!row) {
+    row = {
+      key,
+      providerInstanceId: providerIdentity.instanceId,
+      meterInstanceIds: new Set(),
+      services: new Set(),
+      skuIds: new Set(),
+      intervalIds: new Set(),
+      acceptedSeconds: 0,
+      identityIssue: providerIdentity.issue,
+    };
+    rows.set(key, row);
+  }
+  row.meterInstanceIds.add(meter.instanceId);
+  row.services.add(meter.service);
+  row.skuIds.add(meter.skuId);
+  row.intervalIds.add(meter.intervalId);
+  row.acceptedSeconds += meter.acceptedSeconds;
+  if (providerIdentity.issue) row.identityIssue = providerIdentity.issue;
+}
+
+function providerErrorCode(
+  error: ContainerUsageAnalyticsError
+): 'PRECONDITION_FAILED' | 'BAD_GATEWAY' {
+  return error.code === 'missing_config' ||
+    error.code === 'outside_retention' ||
+    error.code === 'request_limit_exceeded' ||
+    error.code === 'dataset_unavailable' ||
+    error.code === 'dataset_disabled' ||
+    error.code === 'fields_unavailable'
+    ? 'PRECONDITION_FAILED'
+    : 'BAD_GATEWAY';
+}
+
+function normalizedReconciliationRows(
+  meterRows: MeterReconciliationRow[],
+  provider: ContainerUsageAnalyticsResult | null
+) {
+  const providerByInstance = new Map<string, ContainerUsageAnalyticsResult['rows']>();
+  const partialUsageInstanceIds = new Set(provider?.usagePartialInstanceIds ?? []);
+  for (const row of provider?.rows ?? []) {
+    const existing = providerByInstance.get(row.instanceId);
+    if (existing) existing.push(row);
+    else providerByInstance.set(row.instanceId, [row]);
+  }
+
+  return meterRows.map(meter => {
+    const candidates = meter.providerInstanceId
+      ? (providerByInstance.get(meter.providerInstanceId) ?? [])
+      : [];
+    const providerApplicationIds = candidates.map(candidate => candidate.applicationId).sort();
+    let status: ReconciliationStatus;
+    let statusDetail: string;
+    let matchedProvider: ContainerUsageAnalyticsResult['rows'][number] | null = null;
+    let providerMemorySeconds: number | null = null;
+    let providerDiskSeconds: number | null = null;
+    let provisionedMemoryBytes: number | null = null;
+    let provisionedDiskBytes: number | null = null;
+    if (meter.identityIssue) {
+      status = 'comparison_unavailable';
+      statusDetail = meter.identityIssue;
+    } else if (candidates.length === 0) {
+      const usagePartial =
+        meter.providerInstanceId !== null && partialUsageInstanceIds.has(meter.providerInstanceId);
+      status = usagePartial ? 'provider_partial' : 'missing_from_cloudflare';
+      statusDetail = usagePartial
+        ? 'Cloudflare returned partial data, so this instance cannot be classified as missing.'
+        : 'No Cloudflare row matched this recorded physical instance in the selected window.';
+    } else if (candidates.length !== 1) {
+      status = 'ambiguous_application';
+      statusDetail = 'Multiple Cloudflare applications returned this physical instance ID.';
+    } else if (
+      meter.providerInstanceId !== null &&
+      partialUsageInstanceIds.has(meter.providerInstanceId)
+    ) {
+      status = 'provider_partial';
+      statusDetail = 'Cloudflare returned only part of the required provider data.';
+    } else {
+      matchedProvider = candidates[0] ?? null;
+      const provisionedCapacity = sharedProvisionedCapacity(meter.services);
+      if (!provisionedCapacity) {
+        status = 'comparison_unavailable';
+        statusDetail = 'The recorded service has no single verified provisioned-capacity mapping.';
+      } else {
+        provisionedMemoryBytes = provisionedCapacity.memoryBytes;
+        provisionedDiskBytes = provisionedCapacity.diskBytes;
+        providerMemorySeconds =
+          matchedProvider.usage.allocatedMemory / provisionedCapacity.memoryBytes;
+        providerDiskSeconds = matchedProvider.usage.allocatedDisk / provisionedCapacity.diskBytes;
+        const capacityCrossCheckDifference = Math.abs(providerMemorySeconds - providerDiskSeconds);
+        const capacityCrossCheckScale = Math.max(1, providerMemorySeconds, providerDiskSeconds);
+        if (
+          capacityCrossCheckDifference / capacityCrossCheckScale >
+          CAPACITY_CROSS_CHECK_RELATIVE_TOLERANCE
+        ) {
+          status = 'comparison_unavailable';
+          statusDetail =
+            'Provider memory and disk byte-seconds imply different active durations for this service capacity.';
+        } else {
+          status = 'comparison_unavailable';
+          statusDetail =
+            'Cloudflare memory and disk allocation equivalents agree, but overlapping billing records prevent an awake-time comparison.';
+        }
+      }
+    }
+
+    return {
+      instanceId: meter.providerInstanceId ?? [...meter.meterInstanceIds].sort()[0] ?? 'unknown',
+      providerInstanceId: meter.providerInstanceId,
+      meterInstanceIds: [...meter.meterInstanceIds].sort(),
+      services: [...meter.services].sort(),
+      providerApplicationIds,
+      skuIds: [...meter.skuIds].sort(),
+      intervalCount: meter.intervalIds.size,
+      meterAcceptedSeconds: meter.acceptedSeconds,
+      providerMemorySeconds,
+      providerDiskSeconds,
+      provisionedMemoryBytes,
+      provisionedDiskBytes,
+      providerCpuTimeSec: matchedProvider?.usage.cpuTimeSec ?? null,
+      providerAllocatedMemoryByteSeconds: matchedProvider?.usage.allocatedMemory ?? null,
+      providerAllocatedDiskByteSeconds: matchedProvider?.usage.allocatedDisk ?? null,
+      providerTxBytes: matchedProvider?.usage.txBytes ?? null,
+      status,
+      statusDetail,
+    };
+  });
+}
+
+type UsageSummaryInput = z.infer<typeof usageSummarySchema>;
+type QueryContainerUsageAnalytics = typeof queryContainerUsageAnalytics;
+
+export async function reconcileUsageWithCloudflare(
+  input: UsageSummaryInput,
+  queryProvider: QueryContainerUsageAnalytics = queryContainerUsageAnalytics
+) {
+  const meterSegments = await db
+    .select({
+      intervalId: container_usage_interval.id,
+      service: container_usage_interval.service,
+      instanceId: container_usage_interval.instance_id,
+      skuId: container_usage_interval.cloud_billing_sku_id,
+      metadata: container_usage_interval.metadata,
+      acceptedSeconds:
+        sql<number>`coalesce(sum(${container_usage_segment.usage_seconds}), 0)`.mapWith(Number),
+    })
+    .from(container_usage_segment)
+    .innerJoin(
+      container_usage_interval,
+      eq(container_usage_segment.interval_id, container_usage_interval.id)
+    )
+    .where(
+      and(
+        eq(container_usage_interval.subject_type, input.subjectType),
+        eq(container_usage_interval.subject_id, input.subjectId),
+        sql`${container_usage_segment.received_at} >= ${input.start}`,
+        lt(container_usage_segment.received_at, input.end)
+      )
+    )
+    .groupBy(
+      container_usage_interval.id,
+      container_usage_interval.service,
+      container_usage_interval.instance_id,
+      container_usage_interval.cloud_billing_sku_id,
+      container_usage_interval.metadata
+    );
+
+  const grouped = new Map<string, MeterReconciliationRow>();
+  for (const meterSegment of meterSegments) addMeterReconciliationRow(grouped, meterSegment);
+  const meterRows = [...grouped.values()];
+  const providerInstanceIds = [
+    ...new Set(meterRows.flatMap(row => (row.providerInstanceId ? [row.providerInstanceId] : []))),
+  ];
+  if (providerInstanceIds.length > MAX_RECONCILIATION_INSTANCES) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `This window contains ${providerInstanceIds.length} unique Cloudflare instances (maximum ${MAX_RECONCILIATION_INSTANCES}). Narrow the window and retry.`,
+    });
+  }
+
+  let provider: ContainerUsageAnalyticsResult | null = null;
+  if (providerInstanceIds.length > 0) {
+    try {
+      provider = await queryProvider({
+        instanceIds: providerInstanceIds,
+        start: input.start,
+        end: input.end,
+      });
+    } catch (error) {
+      if (error instanceof ContainerUsageAnalyticsError) {
+        throw new TRPCError({
+          code: providerErrorCode(error),
+          message: error.message,
+          cause: error,
+        });
+      }
+      throw error;
+    }
+  }
+
+  const rows = normalizedReconciliationRows(meterRows, provider);
+  const countStatus = (status: ReconciliationStatus) =>
+    rows.filter(row => row.status === status).length;
+  const totalMeterSeconds = rows.reduce((total, row) => total + row.meterAcceptedSeconds, 0);
+  return {
+    subjectType: input.subjectType,
+    subjectId: input.subjectId,
+    start: input.start,
+    end: input.end,
+    generatedAt: new Date().toISOString(),
+    comparison: {
+      available: false as const,
+      method: 'unavailable' as const,
+      description: COMPARISON_METHOD,
+    },
+    totals: {
+      meterAcceptedSeconds: totalMeterSeconds,
+      intervalCount: new Set(meterSegments.map(row => row.intervalId)).size,
+      uniqueMeterInstances: rows.length,
+      queriedCloudflareInstances: providerInstanceIds.length,
+    },
+    counts: {
+      missing: countStatus('missing_from_cloudflare'),
+      ambiguous: countStatus('ambiguous_application'),
+      partial: countStatus('provider_partial'),
+      comparisonUnavailable: countStatus('comparison_unavailable'),
+    },
+    provider: {
+      requested: provider !== null,
+      partial: provider?.partial ?? false,
+      issues: provider?.issues ?? [],
+      rawResponses: provider?.rawResponses ?? [],
+    },
+    rows,
+  };
 }
 
 export const cloudBillingSkusRouter = createTRPCRouter({
@@ -380,6 +730,10 @@ export const cloudBillingSkusRouter = createTRPCRouter({
       estimatedCents: normalizeCloudBillingSkuRate(totals?.totalEstimatedCents ?? '0'),
     };
   }),
+
+  reconcileUsageWithCloudflare: adminProcedure
+    .input(usageSummarySchema)
+    .mutation(async ({ input }) => reconcileUsageWithCloudflare(input)),
 
   usageHealth: adminProcedure.query(async () => {
     const end = new Date();

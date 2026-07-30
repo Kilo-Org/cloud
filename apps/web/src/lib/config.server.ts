@@ -276,6 +276,8 @@ export const CLOUDFLARE_TOWN_DO_NAMESPACE_ID = getEnvVariable('CLOUDFLARE_TOWN_D
 export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
   'CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID'
 );
+// Cloudflare Containers GraphQL Analytics (admin reconciliation). Point-of-use only; do not throw at module load.
+export const CLOUDFLARE_ANALYTICS_API_TOKEN = getEnvVariable('CLOUDFLARE_ANALYTICS_API_TOKEN');
 
 // KiloClaw Worker
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';

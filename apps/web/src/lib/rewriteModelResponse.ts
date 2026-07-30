@@ -412,11 +412,12 @@ export async function rewriteModelResponse_ChatCompletions(
       }
 
       let doneReceived = false;
+      let terminalEventReceived = false;
       let generationId: string | undefined;
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
-          if (doneReceived) {
+          if (doneReceived || terminalEventReceived) {
             return;
           }
           progress.eventProcessed();
@@ -453,9 +454,13 @@ export async function rewriteModelResponse_ChatCompletions(
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+          terminalEventReceived = 'error' in json && json.error != null;
+          if (terminalEventReceived) {
+            logTerminalStreamEvent('chat_completions', 'error', generationId, vercelRequestId);
+          }
         },
         onComment() {
-          if (doneReceived) {
+          if (doneReceived || terminalEventReceived) {
             return;
           }
           controller.enqueue(': KILO PROCESSING\n\n');
@@ -467,7 +472,7 @@ export async function rewriteModelResponse_ChatCompletions(
         parser,
         controller,
         () => doneReceived,
-        () => doneReceived,
+        () => doneReceived || terminalEventReceived,
         responseReadError =>
           'data: ' +
           JSON.stringify({
@@ -518,6 +523,11 @@ type MessagesApiMessageDelta = {
   type: 'message_delta';
   usage: MessagesApiUsage;
   delta: Anthropic.Messages.MessageDeltaEvent['delta'];
+};
+
+type MessagesApiError = {
+  type: 'error';
+  error: unknown;
 };
 
 function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
@@ -599,6 +609,7 @@ export async function rewriteModelResponse_Messages(
           const json = JSON.parse(event.data) as
             | MessagesApiMessageStart
             | MessagesApiMessageDelta
+            | MessagesApiError
             | Anthropic.Messages.MessageStreamEvent;
 
           if (json.type === 'message_start') {
@@ -624,7 +635,7 @@ export async function rewriteModelResponse_Messages(
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
-          terminalEventReceived = json.type === 'message_stop';
+          terminalEventReceived = json.type === 'message_stop' || json.type === 'error';
           if (terminalEventReceived) {
             logTerminalStreamEvent('messages', json.type, generationId, vercelRequestId);
           }
@@ -776,7 +787,8 @@ export async function rewriteModelResponse_Responses(
           terminalEventReceived =
             json.type === 'response.completed' ||
             json.type === 'response.incomplete' ||
-            json.type === 'response.failed';
+            json.type === 'response.failed' ||
+            json.type === 'error';
           if (terminalEventReceived) {
             logTerminalStreamEvent('responses', json.type, generationId, vercelRequestId);
           }

@@ -29,6 +29,7 @@ import {
 import {
   computeRunningAssistantCostUsd,
   computeSessionMetrics,
+  COST_PERSIST_THROTTLE_MS,
   decideLivePersist,
   INACTIVITY_TIMEOUT_MS,
   POST_CLOSE_DRAIN_MS,
@@ -465,7 +466,8 @@ export class SessionIngestDO extends DurableObject<Env> {
     const costWindowOpen =
       idleTransition ||
       (wroteAssistantMessageItem &&
-        (lastCostPersistedAtMs === null || nowMs - lastCostPersistedAtMs >= 30_000));
+        (lastCostPersistedAtMs === null ||
+          nowMs - lastCostPersistedAtMs >= COST_PERSIST_THROTTLE_MS));
 
     let currentCostMicrodollars: number | null = null;
     if (costWindowOpen) {

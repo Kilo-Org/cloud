@@ -345,7 +345,7 @@ export function computeRunningAssistantCostUsd(rows: Array<{ item_data: string }
 }
 
 const ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
-const COST_PERSIST_THROTTLE_MS = 30_000;
+export const COST_PERSIST_THROTTLE_MS = 30_000;
 
 export type DecideLivePersistArgs = {
   nowMs: number;

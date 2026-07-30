@@ -1126,13 +1126,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       },
     });
 
-    await harness.durableObject.ingest(
-      [userItem('u1')],
-      'usr_live',
-      'ses_live',
-      1,
-      3_000
-    );
+    await harness.durableObject.ingest([userItem('u1')], 'usr_live', 'ses_live', 1, 3_000);
     await harness.settle();
 
     expect(harness.costScanCount).toBe(0);

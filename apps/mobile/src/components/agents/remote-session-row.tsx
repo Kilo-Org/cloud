@@ -11,7 +11,11 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { remoteMeta, remoteSessionEyebrowLabel } from './session-list-helpers';
+import {
+  activeSessionMetaTimestamp,
+  remoteMeta,
+  remoteSessionEyebrowLabel,
+} from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { type RowVariant } from './session-row';
 import { copySessionId } from './session-row-actions';
@@ -53,10 +57,10 @@ export function RemoteSessionRow({
 
   // Spoken meta mirrors the visible meta the row renders. When `needsInput`
   // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it. Otherwise announce the relative timestamp only
-  // when `updatedAt` is present — never the CLI status (same as `remoteMeta`).
-  const spokenMeta =
-    !needsInput && session.updatedAt ? formatSpokenTimeAgo(session.updatedAt) : null;
+  // so the label omits it. Otherwise announce the same timestamp as
+  // `remoteMeta` (prefer lastActivityAt, fall back to updatedAt).
+  const metaTimestamp = activeSessionMetaTimestamp(session);
+  const spokenMeta = !needsInput && metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
 
   const { iconKind: platformIconKind, spokenPlatform } = selectRowPlatformPresentation({
     platform: session.createdOnPlatform,

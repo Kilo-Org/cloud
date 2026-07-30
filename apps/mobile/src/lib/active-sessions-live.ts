@@ -30,7 +30,25 @@ import {
   sessionStatusUpdatedPayloadSchema,
 } from '@kilocode/cloud-agent-sdk/schemas';
 
+import { buildActiveSessionsInput } from '@/lib/agent-session-input';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+
+/**
+ * Sentinel `connectionId` for cloud-agent rows merged into `activeSessions.list`
+ * when `includeCloudAgentSessions` is on. Must match the router contract in
+ * `apps/web/src/routers/active-sessions-router.ts`. Real CLI connection ids are
+ * generated and never equal this literal.
+ */
+export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
+
+/**
+ * Tray list input: the org context plus the cloud-merge opt-in. The live-sync
+ * mount and the useAgentSessions hook MUST build identical keys — the WS
+ * owner writes into this key, so any mismatch silently splits the cache.
+ */
+export function buildActiveSessionsTrayInput(organizationId: string | null | undefined) {
+  return { ...buildActiveSessionsInput(organizationId), includeCloudAgentSessions: true as const };
+}
 
 /** Incoming WS row; carries `parentSessionId` for the root filter. */
 type IncomingWsSession = {
@@ -145,6 +163,12 @@ type PreservedFields = {
   createdOnPlatform: string | undefined;
   createdAt: string | undefined;
   updatedAt: string | undefined;
+  /**
+   * Sticky like the three above: WS payloads never carry activity time.
+   * Not part of `ENRICHMENT_FIELDS` — the router always sets those three,
+   * but `lastActivityAt` may be legitimately absent (NULL in DB).
+   */
+  lastActivityAt: string | undefined;
   /** Sticky like the three above: WS payloads never carry an org id. */
   organizationId: string | null | undefined;
 };
@@ -155,6 +179,8 @@ function readEnrichment(current: CachedActiveSession | undefined): PreservedFiel
       typeof current?.createdOnPlatform === 'string' ? current.createdOnPlatform : undefined,
     createdAt: typeof current?.createdAt === 'string' ? current.createdAt : undefined,
     updatedAt: typeof current?.updatedAt === 'string' ? current.updatedAt : undefined,
+    lastActivityAt:
+      typeof current?.lastActivityAt === 'string' ? current.lastActivityAt : undefined,
     // Pass through as-is: `null` means "the server said personal". Do not
     // collapse with a `typeof === 'string'` guard — that would hide every
     // personal row from the personal tray (see filter helper).
@@ -193,12 +219,11 @@ function withEnrichmentAndConnectionId(
 }
 
 /**
- * Replace the entire cache with the snapshot. Rows whose id is in both
- * the snapshot and the cache keep the three enrichment fields and any
- * held attention status from the cache; `capabilities` comes from the
- * snapshot when present and from the cache when omitted; every other
- * field (including `connectionId`) comes from the snapshot. Rows absent
- * from the snapshot are dropped.
+ * Merge a `sessions.list` WS snapshot into the cache. Snapshot rows own the
+ * CLI channel only: enrichment/attention/`capabilities` rules match the prior
+ * wholesale merge, but cloud-agent sentinel rows absent from the snapshot are
+ * preserved. Cloud rows are added/dropped exclusively by tRPC fetches — a
+ * CLI-only snapshot must never wipe them.
  */
 export function mergeSnapshotForActiveSessions(
   current: readonly CachedActiveSession[],
@@ -209,13 +234,16 @@ export function mergeSnapshotForActiveSessions(
     currentById.set(row.id, row);
   }
   const snapshotIds = new Set<string>();
-  const result: CachedActiveSession[] = [];
-  for (const row of snapshot) {
+  const merged = snapshot.map(row => {
     snapshotIds.add(row.id);
-    const enriched = withEnrichmentAndConnectionId(row, currentById.get(row.id), row.connectionId);
-    result.push(enriched);
-  }
-  return result.filter(row => snapshotIds.has(row.id));
+    return withEnrichmentAndConnectionId(row, currentById.get(row.id), row.connectionId);
+  });
+  // A sessions.list snapshot owns CLI-channel rows only; cloud rows are
+  // added/dropped exclusively by tRPC fetches.
+  const preservedCloud = current.filter(
+    row => row.connectionId === CLOUD_AGENT_CONNECTION_ID && !snapshotIds.has(row.id)
+  );
+  return [...merged, ...preservedCloud];
 }
 
 /**
@@ -230,6 +258,10 @@ export function mergeSnapshotForActiveSessions(
  *
  * A non-attention heartbeat status does not overwrite a currently-held
  * attention status (sticky overlay for released CLIs).
+ *
+ * No cloud-sentinel special case needed: heartbeat payloads never carry
+ * `connectionId === CLOUD_AGENT_CONNECTION_ID`, and the keep-loop already
+ * retains foreign-connection rows (including the sentinel).
  */
 export function mergeHeartbeatForActiveSessions(
   current: readonly CachedActiveSession[],
@@ -311,6 +343,10 @@ export function filterActiveSessionsByOrganization<T extends { organizationId?: 
   return sessions.filter(session => session.organizationId === organizationId);
 }
 
+/**
+ * Drop rows for a disconnected CLI connection. No cloud-sentinel special
+ * case needed: CLI disconnect ids never equal `CLOUD_AGENT_CONNECTION_ID`.
+ */
 export function removeActiveSessionsForConnection(
   current: readonly CachedActiveSession[],
   connectionId: string

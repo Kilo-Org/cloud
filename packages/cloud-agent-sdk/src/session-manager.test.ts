@@ -3572,13 +3572,9 @@ describe('createSessionManager', () => {
       mgr.clearTranscript();
       expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
 
-      latestStorage?.upsertMessage(
-        stubUserMessage({ id: 'msg_post_live', sessionID: 'ses-1' })
-      );
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_post_live', sessionID: 'ses-1' }));
       mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
-      latestStorage?.upsertMessage(
-        stubUserMessage({ id: 'msg_pre_history', sessionID: 'ses-1' })
-      );
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_pre_history', sessionID: 'ses-1' }));
       mockSessionCallbacks.onReplayComplete?.();
 
       expect(
@@ -3603,12 +3599,8 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
 
       mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
-      latestStorage?.upsertMessage(
-        stubUserMessage({ id: 'msg_pre_clear', sessionID: 'ses-1' })
-      );
-      latestStorage?.upsertMessage(
-        stubUserMessage({ id: 'msg_post_clear', sessionID: 'ses-1' })
-      );
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_pre_clear', sessionID: 'ses-1' }));
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_post_clear', sessionID: 'ses-1' }));
       mockSessionCallbacks.onReplayComplete?.();
 
       expect(

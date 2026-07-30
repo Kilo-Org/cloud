@@ -1,31 +1,48 @@
 import { describe, expect, it } from '@jest/globals';
 import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from './model-api-kinds';
-import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type * as ModelsModule from '@/lib/ai-gateway/models';
 
 // Stub the catalog so the rejection test doesn't depend on any specific provider file.
 // 'test-exclusive/alibaba-only' resolves to a KiloExclusiveModel on the alibaba gateway,
 // which only supports chat_completions, exercising the rejection branch.
+// 'test-exclusive/disabled' is filtered out by findKiloExclusiveModel, mirroring how
+// disabled catalog models fall back to OpenRouter.
 jest.mock('@/lib/ai-gateway/models', () => {
   const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
-  const stubModel: KiloExclusiveModel = {
-    public_id: 'test-exclusive/alibaba-only',
-    display_name: 'Test Alibaba-only',
-    description: 'stub for unit tests',
-    context_length: 8192,
-    max_completion_tokens: 4096,
-    status: 'public',
-    flags: [],
-    gateway: 'alibaba',
-    internal_id: 'stub-internal',
-    pricing: null,
-    inference_provider_restriction: [],
-  };
+  const stubModels: KiloExclusiveModel[] = [
+    {
+      public_id: 'test-exclusive/alibaba-only',
+      display_name: 'Test Alibaba-only',
+      description: 'stub for unit tests',
+      context_length: 8192,
+      max_completion_tokens: 4096,
+      status: 'public',
+      flags: [],
+      gateway: 'alibaba',
+      internal_id: 'stub-internal',
+      pricing: null,
+      inference_provider_restriction: [],
+    },
+    {
+      public_id: 'test-exclusive/disabled',
+      display_name: 'Test Disabled',
+      description: 'stub for unit tests',
+      context_length: 8192,
+      max_completion_tokens: 4096,
+      status: 'disabled',
+      flags: [],
+      gateway: 'alibaba',
+      internal_id: 'stub-internal-disabled',
+      pricing: null,
+      inference_provider_restriction: [],
+    },
+  ];
   return {
     ...actual,
     findKiloExclusiveModel: (id: string) =>
-      id === 'test-exclusive/alibaba-only' ? stubModel : actual.findKiloExclusiveModel(id),
+      stubModels.find(m => m.public_id === id && m.status !== 'disabled') ??
+      actual.findKiloExclusiveModel(id),
   };
 });
 
@@ -40,7 +57,7 @@ describe('modelServesAllGatewayChatApis', () => {
   });
 
   it('treats disabled Kilo-exclusive models like plain OpenRouter models, matching get-provider', () => {
-    expect(modelServesAllGatewayChatApis(seed_20_code_free_model.public_id)).toBe(true);
+    expect(modelServesAllGatewayChatApis('test-exclusive/disabled')).toBe(true);
   });
 
   it('falls back to OpenRouter for unknown model ids', () => {

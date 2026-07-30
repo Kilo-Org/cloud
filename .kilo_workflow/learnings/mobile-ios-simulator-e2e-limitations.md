@@ -4,7 +4,7 @@ Symptom: an E2E flow stalls typing into a composer, waits forever for speech rec
 
 Cause: simulator and environment limits, verified on iPhone 17 / iOS 26.5:
 
-- The software keyboard stays hidden while the simulator's hardware-keyboard setting is on, so Maestro cannot tap keys. The session-detail composer also resists programmatic focus.
+- The software keyboard stays hidden while the simulator's hardware-keyboard setting is on, so automation cannot tap keys. The session-detail composer also resists programmatic focus.
 - The speech recognizer never reaches `listening` on a simulator — voice flows cannot be driven end to end.
 - Notification banners cannot be screenshot: the simulator lacks notification authorization for pixel-level banner capture.
 - Real push delivery (and tap-through) requires `EXPO_ACCESS_TOKEN` in the environment; without it only the deterministic in-app UI and session behaviors are testable.

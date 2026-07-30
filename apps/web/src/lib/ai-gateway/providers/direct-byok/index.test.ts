@@ -28,6 +28,16 @@ jest.mock('./direct-byok-definitions', () => ({
         {
           id: 'supported-model',
           name: 'Supported Model',
+          flags: ['reasoning'],
+          context_length: 4096,
+          max_completion_tokens: 1024,
+          variants: {
+            high: { reasoning: { enabled: true, effort: 'high' } },
+          },
+        },
+        {
+          id: 'non-reasoning-model',
+          name: 'Non-reasoning Model',
           context_length: 4096,
           max_completion_tokens: 1024,
         },
@@ -56,9 +66,9 @@ jest.mock('./direct-byok-definitions', () => ({
 
 async function loadDirectByokModule() {
   const directByokProviders = (await import('./direct-byok-definitions')).default;
-  const { getDirectByokModel } = await import('.');
+  const { getDirectByokModel, getDirectByokModelsForUser } = await import('.');
 
-  return { directByokProviders, getDirectByokModel };
+  return { directByokProviders, getDirectByokModel, getDirectByokModelsForUser };
 }
 
 describe('getDirectByokModel', () => {
@@ -87,5 +97,47 @@ describe('getDirectByokModel', () => {
     expect(result.provider?.id).toBe('chutes-byok');
     expect(directByokProviders[0].models).toHaveBeenCalledTimes(1);
     expect(directByokProviders[1].models).not.toHaveBeenCalled();
+  });
+
+  test('advertises only the reasoning parameter for reasoning models', async () => {
+    const { getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+
+    const models = await getDirectByokModelsForUser('user-id');
+
+    expect(models[0].supported_parameters).toEqual([
+      'max_tokens',
+      'temperature',
+      'tools',
+      'reasoning',
+    ]);
+    expect(models[1].supported_parameters).toEqual(['max_tokens', 'temperature', 'tools']);
+    expect(models.flatMap(model => model.supported_parameters)).not.toContain('include_reasoning');
+    expect(models[0].opencode.variants).toEqual({
+      high: { reasoning: { enabled: true, effort: 'high' } },
+    });
+  });
+
+  test('falls back to model-name variants when synced variants are unavailable', async () => {
+    const { getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
+    const { getModelVariants } = await import('@/lib/ai-gateway/providers/model-settings');
+    const fallback = { thinking: { reasoning: { enabled: true, effort: 'high' as const } } };
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+    jest.mocked(getModelVariants).mockReturnValue(fallback);
+
+    const models = await getDirectByokModelsForUser('user-id');
+
+    expect(models[0].opencode.variants).toEqual({
+      high: { reasoning: { enabled: true, effort: 'high' } },
+    });
+    expect(models[1].opencode.variants).toBe(fallback);
+    expect(getModelVariants).toHaveBeenCalledTimes(1);
+    expect(getModelVariants).toHaveBeenCalledWith('chutes-byok/non-reasoning-model');
   });
 });

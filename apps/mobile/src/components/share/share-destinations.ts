@@ -9,8 +9,8 @@ export type ShareDestinationRow = StoredSession & {
 
 /**
  * Derive the share-gate destination list from the org-scoped stored page.
- * `activeSessionIds` is used only to mark and hoist live rows — never as a
- * source of rows (activeSessions.list has no organizationId filter).
+ * The tray query is context-filtered; `activeSessionIds` is still used only
+ * to mark and hoist live rows — never as a source of rows.
  */
 export function selectShareDestinations(
   storedSessions: readonly StoredSession[],

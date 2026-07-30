@@ -33,6 +33,25 @@ test('does not identify an arbitrary TCP listener as the Docker API proxy', asyn
   }
 });
 
+test('retries a timed-out probe and reuses a Docker API that answers on the second attempt', async () => {
+  let requests = 0;
+  const server = http.createServer((request, response) => {
+    requests++;
+    if (requests === 1) return; // hold the first response past the probe timeout
+    assert.equal(request.url, '/_ping');
+    response.setHeader('Api-Version', '1.48');
+    response.end('OK');
+  });
+  const port = await listen(server);
+
+  try {
+    assert.equal(await probeDockerApi(port, 200), true);
+    assert.equal(requests, 2);
+  } finally {
+    await close(server);
+  }
+});
+
 test('identifies a ready Docker API listener by its ping response', async () => {
   const server = http.createServer((request, response) => {
     assert.equal(request.url, '/_ping');

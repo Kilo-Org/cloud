@@ -19,7 +19,7 @@ export default {
       {
         id: 'moonshotai/Kimi-K2.6-TEE',
         name: 'Kimi-K2.6',
-        flags: ['vision'],
+        flags: ['vision', 'reasoning'],
         context_length: 262144,
         max_completion_tokens: 65535,
       },

@@ -551,7 +551,7 @@ describe('prepareSession endpoint', () => {
           sandboxId: 'crv-abcdef',
           sandboxProvider: 'cloudflare',
           shallow: true,
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         },
       })
     );
@@ -803,7 +803,7 @@ describe('prepareSession endpoint', () => {
           sandboxId: failoverSandboxId,
           sandboxProvider: 'cloudflare',
           shallow: undefined,
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
           sandboxRoute: {
             kind: 'shared',
             routeKey,
@@ -880,7 +880,12 @@ describe('prepareSession endpoint', () => {
           sandboxId: 'dind-abcdef',
           sandboxProvider: 'cloudflare',
           shallow: false,
-          credentialContainment: { github: false, gitlab: false, kilocode: false },
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
           devcontainerRequested: true,
         },
       })
@@ -916,7 +921,7 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         }),
       })
     );
@@ -942,7 +947,12 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, kilocode: false },
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
         }),
       })
     );
@@ -966,7 +976,7 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, kilocode: true },
+          credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: true },
         }),
       })
     );
@@ -993,7 +1003,12 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, kilocode: false },
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
         }),
       })
     );
@@ -1018,7 +1033,7 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         }),
       })
     );
@@ -1372,7 +1387,7 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         }),
       })
     );
@@ -1393,7 +1408,7 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: true, kilocode: false },
+          credentialContainment: { github: false, gitlab: true, bitbucket: false, kilocode: false },
         }),
       })
     );
@@ -1418,7 +1433,12 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, kilocode: false },
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
         }),
       })
     );

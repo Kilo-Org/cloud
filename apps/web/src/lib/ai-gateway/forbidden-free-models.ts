@@ -7,6 +7,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'arcee-ai/trinity-large-thinking:free',
   'corethink:free',
   'arcee-ai/trinity-mini:free',
+  'bytedance-seed/dola-seed-2.0-code:free',
   'bytedance-seed/dola-seed-2.0-pro:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',
@@ -21,6 +22,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'google/gemma-4-26b-a4b-it:free', // usable through kilo-auto
   'google/gemma-4-31b-it:free',
   'kilo/auto-free', // discontinued variant of kilo-auto/free
+  'kwaipilot/kat-coder-pro-v2.5:free',
   'liquid/lfm-2.5-1.2b-instruct:free',
   'liquid/lfm-2.5-1.2b-thinking:free',
   'meta-llama/llama-3.2-3b-instruct:free',

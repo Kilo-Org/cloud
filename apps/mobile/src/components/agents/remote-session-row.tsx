@@ -53,17 +53,10 @@ export function RemoteSessionRow({
 
   // Spoken meta mirrors the visible meta the row renders. When `needsInput`
   // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it. The remote row's `live` eyebrow (`live-and-meta`)
-  // renders the timestamp when `updatedAt` is present, otherwise the
-  // uppercased status. For speech we expand the timestamp via
-  // `formatSpokenTimeAgo` and lowercase/underscore-strip the status so
-  // VoiceOver doesn't read it letter-by-letter.
-  let spokenMeta: string | null = null;
-  if (!needsInput) {
-    spokenMeta = session.updatedAt
-      ? formatSpokenTimeAgo(session.updatedAt)
-      : session.status.toLowerCase().replaceAll('_', ' ');
-  }
+  // so the label omits it. Otherwise announce the relative timestamp only
+  // when `updatedAt` is present — never the CLI status (same as `remoteMeta`).
+  const spokenMeta =
+    !needsInput && session.updatedAt ? formatSpokenTimeAgo(session.updatedAt) : null;
 
   const { iconKind: platformIconKind, spokenPlatform } = selectRowPlatformPresentation({
     platform: session.createdOnPlatform,

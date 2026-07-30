@@ -15,13 +15,22 @@ export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 const GITHUB_CAPABILITY_PREFIXES = ['kgh1.', 'kgh2.'];
 const GITLAB_CAPABILITY_PREFIXES = ['kgl1.', 'kgl2.'];
 const KILO_CAPABILITY_PREFIXES = ['kka1.'];
+const BITBUCKET_CAPABILITY_PREFIXES = ['kbb1.'];
 const MAX_KILO_SESSION_BOOTSTRAP_BYTES = 16_000;
 
 type GitHubTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitHubSessionCapability'>;
 type GitLabTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitLabSessionCapability'>;
 type KiloTokenRedemptionBinding = Pick<GitTokenService, 'redeemKiloSessionCapability'>;
+type BitbucketTokenRedemptionBinding = {
+  redeemBitbucketSessionCapability: NonNullable<
+    GitTokenService['redeemBitbucketSessionCapability']
+  >;
+};
 type ManagedScmOutboundContext = { containerId: string };
-type RedeemableAuthorization = { provider: 'github' | 'gitlab' | 'kilo'; capability: string };
+type RedeemableAuthorization = {
+  provider: 'github' | 'gitlab' | 'kilo' | 'bitbucket';
+  capability: string;
+};
 type AuthorizationExtraction =
   | { type: 'none' }
   | { type: 'capability'; value: RedeemableAuthorization }
@@ -31,10 +40,11 @@ const NO_AUTHORIZATION_CAPABILITY = { type: 'none' } satisfies AuthorizationExtr
 
 type ScmClient = 'github-cli' | 'gitlab-cli' | 'git-lfs' | 'git' | 'other';
 type ScmMethod = 'GET' | 'HEAD' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' | 'OPTIONS' | 'other';
-type ScmTarget = 'github-api' | 'github-git' | 'gitlab' | 'other';
+type ScmTarget = 'github-api' | 'github-git' | 'gitlab' | 'bitbucket' | 'other';
 type AuthorizationClass =
   | 'github-managed'
   | 'gitlab-managed'
+  | 'bitbucket-managed'
   | 'unsupported-managed'
   | 'mixed'
   | 'unmanaged'
@@ -90,6 +100,7 @@ function classifyScmTarget(url: URL): ScmTarget {
   if (url.hostname === 'api.github.com') return 'github-api';
   if (url.hostname === 'github.com') return 'github-git';
   if (url.hostname === 'gitlab.com') return 'gitlab';
+  if (url.hostname === 'bitbucket.org') return 'bitbucket';
   return 'other';
 }
 
@@ -107,7 +118,9 @@ function classifyScmRoute(url: URL, target: ScmTarget): string {
     if (url.pathname.endsWith('/git-receive-pack')) return 'git-receive-pack';
     return 'github-git-other';
   }
-  return target === 'gitlab' ? 'gitlab' : 'other';
+  if (target === 'gitlab') return 'gitlab';
+  if (target === 'bitbucket') return 'bitbucket';
+  return 'other';
 }
 
 function getSafeRequestLogFields(request: Request) {
@@ -250,6 +263,17 @@ function supportsKiloSessionCapabilityRedemption(
   );
 }
 
+function supportsBitbucketSessionCapabilityRedemption(
+  service: unknown
+): service is BitbucketTokenRedemptionBinding {
+  return (
+    typeof service === 'object' &&
+    service !== null &&
+    'redeemBitbucketSessionCapability' in service &&
+    typeof service.redeemBitbucketSessionCapability === 'function'
+  );
+}
+
 function classifyCapability(capability: string): AuthorizationExtraction {
   if (GITHUB_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
     return { type: 'capability', value: { provider: 'github', capability } };
@@ -260,7 +284,10 @@ function classifyCapability(capability: string): AuthorizationExtraction {
   if (KILO_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
     return { type: 'capability', value: { provider: 'kilo', capability } };
   }
-  return /^(?:kgh|kgl|kka)\d+\./.test(capability)
+  if (BITBUCKET_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
+    return { type: 'capability', value: { provider: 'bitbucket', capability } };
+  }
+  return /^(?:kgh|kgl|kka|kbb)\d+\./.test(capability)
     ? { type: 'unsupported_capability' }
     : NO_AUTHORIZATION_CAPABILITY;
 }
@@ -285,6 +312,9 @@ function extractGitCapability(authorization: string | null): AuthorizationExtrac
     return extraction;
   }
   if (username === 'oauth2' && extraction.value.provider === 'gitlab') {
+    return extraction;
+  }
+  if (username === 'x-token-auth' && extraction.value.provider === 'bitbucket') {
     return extraction;
   }
   return { type: 'unsupported_capability' };
@@ -330,7 +360,11 @@ function getAuthorizationClass(
   ) {
     return 'mixed';
   }
-  return capability.provider === 'github' ? 'github-managed' : 'gitlab-managed';
+  return capability.provider === 'github'
+    ? 'github-managed'
+    : capability.provider === 'bitbucket'
+      ? 'bitbucket-managed'
+      : 'gitlab-managed';
 }
 
 async function forwardRedeemedRequest(
@@ -667,6 +701,82 @@ async function handleManagedGitLabOutbound(
   return response;
 }
 
+async function handleManagedBitbucketOutbound(
+  request: Request,
+  env: Cloudflare.Env,
+  capability: { capability: string },
+  outboundContainerId: string
+): Promise<Response> {
+  const logFields = {
+    ...getSafeRequestLogFields(request),
+    provider: 'bitbucket',
+    capabilityVersion: getCapabilityVersion(capability.capability),
+    outboundContainerId,
+  };
+  logDiagnostic('debug', logFields, 'Redeeming managed Bitbucket outbound request');
+
+  const tokenService = env.GIT_TOKEN_SERVICE;
+  if (!supportsBitbucketSessionCapabilityRedemption(tokenService)) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, failureStage: 'redemption-binding' },
+      'Managed Bitbucket outbound redemption unavailable'
+    );
+    return new Response('Bitbucket authorization unavailable', { status: 502 });
+  }
+
+  let result: Awaited<
+    ReturnType<BitbucketTokenRedemptionBinding['redeemBitbucketSessionCapability']>
+  >;
+  try {
+    result = await tokenService.redeemBitbucketSessionCapability({
+      capability: capability.capability,
+      outboundContainerId,
+      requestMethod: request.method,
+      requestUrl: request.url,
+    });
+  } catch (error) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, failureStage: 'redemption-rpc', errorClass: classifyDiagnosticError(error) },
+      'Managed Bitbucket outbound redemption failed'
+    );
+    return new Response('Bitbucket authorization unavailable', { status: 502 });
+  }
+
+  if (!result.success) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
+      'Managed Bitbucket outbound redemption rejected'
+    );
+    return new Response('Bitbucket authorization unavailable', { status: 502 });
+  }
+
+  let response: Response;
+  try {
+    response = await forwardRedeemedRequest(request, result.headers);
+  } catch (error) {
+    logDiagnostic(
+      'warn',
+      {
+        ...logFields,
+        failureStage: 'upstream-forward',
+        errorClass: classifyDiagnosticError(error),
+      },
+      'Managed Bitbucket outbound forwarding failed'
+    );
+    return new Response('Bitbucket authorization unavailable', { status: 502 });
+  }
+
+  logDiagnostic(
+    'info',
+    { ...logFields, upstreamStatus: response.status },
+    'Managed Bitbucket outbound request forwarded'
+  );
+  return response;
+}
+
 export function handleManagedScmOutbound(
   request: Request,
   env: Cloudflare.Env,
@@ -724,6 +834,9 @@ export function handleManagedScmOutbound(
   }
   if (capability.provider === 'kilo') {
     return handleManagedKiloOutbound(request, env, capability, ctx.containerId);
+  }
+  if (capability.provider === 'bitbucket') {
+    return handleManagedBitbucketOutbound(request, env, capability, ctx.containerId);
   }
   return handleManagedGitLabOutbound(request, env, capability, ctx.containerId);
 }

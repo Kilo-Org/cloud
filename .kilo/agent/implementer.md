@@ -16,7 +16,7 @@ You implement one bounded slice from an approved plan (see `.kilo_workflow/WORKF
 
 Before editing:
 
-1. Read the `AGENTS.md` files for every directory and repository you will touch.
+1. Read the `AGENTS.md` files for every directory and repository you will touch. When a tool or environment failure blocks you at any point, grep `.kilo_workflow/learnings/` (and `~/Projects/cloud/.kilo_workflow/learnings/system/`) for the error text before debugging from scratch — a prior run has usually already recorded the fix.
 2. Inspect the existing implementation and tests. Do not infer APIs or conventions from the task text alone.
 3. Restate the acceptance criteria. Flag ambiguity instead of making product or architecture decisions.
 4. For a new user-facing feature, restate its four states — happy, retryable unhappy, non-retryable unhappy, empty — each with trigger or classification, message intent, CTA label and outcome (or required absence), and planned coverage. If a state is underdefined, or missing without an orchestrator-accepted rationale that it is structurally impossible, stop and report.

@@ -4,9 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { createProjectHashAsync, DEFAULT_SOURCE_SKIPS, SourceSkips } from '@expo/fingerprint';
+import {
+  createProjectHashAsync,
+  DEFAULT_SOURCE_SKIPS,
+  SourceSkips,
+  type HashSourceContents,
+} from '@expo/fingerprint';
 
-import { withNativeBuildSemaphore } from './mobile-native-build';
+import { hashRootNativeInputs, withNativeBuildSemaphore } from './mobile-native-build';
 
 // Compatibility dimensions hashed into the cache key. Any change must
 // invalidate the key so cached artifacts are not reused for an
@@ -138,15 +143,26 @@ export type CliArgs =
 // Build the option bag used to compute the native project hash. Only
 // the Expo `extra` section is skipped beyond the library defaults —
 // versions, schemes, bundle ID, plugins, assets, permissions, and
-// optional native config all remain in the hash.
+// optional native config all remain in the hash. Repo-root inputs that
+// shape the native build but live outside apps/mobile (pnpm patches,
+// pnpm-workspace.yaml, pnpm-lock.yaml) are mixed in as an extra source.
 export function buildFingerprintOptions(): {
   platforms: ['ios'];
   sourceSkips: number;
+  extraSources: HashSourceContents[];
   silent: boolean;
 } {
   return {
     platforms: ['ios'],
     sourceSkips: DEFAULT_SOURCE_SKIPS | SourceSkips.ExpoConfigExtraSection,
+    extraSources: [
+      {
+        type: 'contents',
+        id: 'repoRootNativeInputs',
+        contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+        reasons: ['repo-root patches/, pnpm-workspace.yaml, and pnpm-lock.yaml'],
+      },
+    ],
     silent: true,
   };
 }

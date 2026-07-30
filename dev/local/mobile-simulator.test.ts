@@ -11,6 +11,7 @@ import {
   listIosDevices,
   parseClaimArgs,
   releaseSimulator,
+  releaseWorktreeSimulators,
   type SimulatorDevice,
 } from './mobile-simulator';
 
@@ -35,6 +36,11 @@ function recordingRename(behavior?: (deviceId: string, name: string) => void) {
     behavior?.(deviceId, name);
   };
   return { rename, calls };
+}
+
+function recordingShutdown() {
+  const calls: string[] = [];
+  return { shutdown: (deviceId: string): void => void calls.push(deviceId), calls };
 }
 
 function tempDir(prefix: string): string {
@@ -99,7 +105,10 @@ test('claim boots, labels, and records a free device', () => {
     lockRoot,
     worktreeRoot,
     rename,
-    prepare: d => prepared.push(d.id),
+    prepare: d => {
+      prepared.push(d.id);
+      return true;
+    },
   });
 
   assert.equal(result.alreadyOwned, false);
@@ -110,7 +119,26 @@ test('claim boots, labels, and records a free device', () => {
   assert.equal(record.worktreeRoot, worktreeRoot);
   assert.equal(record.originalDeviceName, 'iPhone 16');
   assert.equal(record.currentDeviceName, buildSimulatorLabel(worktreeRoot));
+  assert.equal(record.bootedByClaim, true);
   assert.ok(!Number.isNaN(Date.parse(record.claimedAt as string)));
+});
+
+test('claim records that it did not boot a device it adopted already running', () => {
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  const { rename } = recordingRename();
+
+  claimSimulator({
+    devices: [device({ state: 'Booted' })],
+    lockRoot,
+    worktreeRoot,
+    rename,
+    // Mirrors `bootSimulator`, which returns false for a device it found
+    // already booted.
+    prepare: () => false,
+  });
+
+  assert.equal(readRecord(lockRoot, 'UDID-1').bootedByClaim, false);
 });
 
 test('claim only auto-selects iPhone simulators and prefers shutdown devices', () => {
@@ -211,11 +239,13 @@ test('same-worktree reclaim is idempotent: no boot, no rename when the label is 
   const { rename, calls: renames } = recordingRename();
   const prepared: string[] = [];
   const args = {
-    devices: [device()],
+    devices: [device({ state: 'Booted' })],
     lockRoot,
     worktreeRoot,
     rename,
-    prepare: (d: SimulatorDevice) => prepared.push(d.id),
+    prepare: (d: SimulatorDevice) => {
+      prepared.push(d.id);
+    },
   };
 
   claimSimulator(args);
@@ -225,6 +255,42 @@ test('same-worktree reclaim is idempotent: no boot, no rename when the label is 
   assert.equal(again.device.name, buildSimulatorLabel(worktreeRoot));
   assert.equal(prepared.length, 1);
   assert.equal(renames.length, 1);
+});
+
+test('same-worktree reclaim boots a device the previous claim left Shutdown', () => {
+  // A claim killed mid-boot leaves the record but not the device; the next
+  // claim must boot it again instead of returning alreadyOwned over a
+  // Shutdown device (the old behavior failed the build with code=405).
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  const { rename } = recordingRename();
+  fs.writeFileSync(
+    path.join(lockRoot, 'UDID-1.json'),
+    JSON.stringify({
+      deviceId: 'UDID-1',
+      worktreeRoot,
+      claimedAt: new Date().toISOString(),
+      originalDeviceName: 'iPhone 16',
+      currentDeviceName: buildSimulatorLabel(worktreeRoot),
+      bootedByClaim: false,
+    })
+  );
+  const prepared: string[] = [];
+
+  const result = claimSimulator({
+    devices: [device({ state: 'Shutdown' })],
+    lockRoot,
+    worktreeRoot,
+    rename,
+    prepare: (d: SimulatorDevice) => {
+      prepared.push(d.id);
+      return true;
+    },
+  });
+
+  assert.equal(result.alreadyOwned, true);
+  assert.deepEqual(prepared, ['UDID-1']);
+  assert.equal(readRecord(lockRoot, 'UDID-1').bootedByClaim, true);
 });
 
 test('same-worktree reclaim reapplies a stale label and preserves the original name', () => {
@@ -351,23 +417,25 @@ test('claim throws when no unclaimed simulator is available', () => {
 
 // ── bootSimulator ────────────────────────────────────────────────────
 
-test('bootSimulator skips an already booted device', () => {
+test('bootSimulator skips an already booted device and disclaims the boot', () => {
   const { exec, calls } = recordingExec();
-  bootSimulator(device({ state: 'Booted' }), exec, () => ({
+  const booted = bootSimulator(device({ state: 'Booted' }), exec, () => ({
     stdout: '',
     stderr: '',
     status: 0,
   }));
   assert.equal(calls.length, 0);
+  assert.equal(booted, false);
 });
 
 test('bootSimulator boots and waits for bootstatus', () => {
   const { exec, calls } = recordingExec();
   const statusCalls: string[] = [];
-  bootSimulator(device(), exec, (_command, args) => {
+  const booted = bootSimulator(device(), exec, (_command, args) => {
     statusCalls.push(args.join(' '));
     return { stdout: 'Status=0, isTerminal=YES', stderr: '', status: 0 };
   });
+  assert.equal(booted, true);
   assert.deepEqual(
     calls.map(call => call.args.join(' ')),
     ['simctl boot UDID-1']
@@ -521,6 +589,130 @@ test('release without a stored original name skips the rename', () => {
 
   assert.equal(renames.length, 0);
   assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-1.json')), false);
+});
+
+test('release powers off a device its own claim booted', () => {
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  fs.writeFileSync(
+    path.join(lockRoot, 'UDID-1.json'),
+    JSON.stringify({ deviceId: 'UDID-1', worktreeRoot, bootedByClaim: true })
+  );
+  const { rename } = recordingRename();
+  const { shutdown, calls: shutdowns } = recordingShutdown();
+
+  releaseSimulator({ deviceId: 'UDID-1', lockRoot, worktreeRoot, rename, shutdown });
+
+  assert.deepEqual(shutdowns, ['UDID-1']);
+  assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-1.json')), false);
+});
+
+test('release leaves a device that was already booted before the claim running', () => {
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  fs.writeFileSync(
+    path.join(lockRoot, 'UDID-1.json'),
+    JSON.stringify({ deviceId: 'UDID-1', worktreeRoot, bootedByClaim: false })
+  );
+  const { rename } = recordingRename();
+  const { shutdown, calls: shutdowns } = recordingShutdown();
+
+  releaseSimulator({ deviceId: 'UDID-1', lockRoot, worktreeRoot, rename, shutdown });
+
+  assert.deepEqual(shutdowns, []);
+  assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-1.json')), false);
+});
+
+test('release keeps the claim when the shutdown fails', () => {
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  fs.writeFileSync(
+    path.join(lockRoot, 'UDID-1.json'),
+    JSON.stringify({ deviceId: 'UDID-1', worktreeRoot, bootedByClaim: true })
+  );
+  const { rename } = recordingRename();
+
+  assert.throws(
+    () =>
+      releaseSimulator({
+        deviceId: 'UDID-1',
+        lockRoot,
+        worktreeRoot,
+        rename,
+        shutdown: () => {
+          throw new Error('shutdown failed');
+        },
+      }),
+    /shutdown failed/
+  );
+  assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-1.json')), true);
+});
+
+// ── releaseWorktreeSimulators ────────────────────────────────────────
+
+test('release-all powers off every device this worktree booted and skips foreign claims', () => {
+  const lockRoot = tempDir('sim-claims-');
+  const mine = tempDir('worktree-');
+  const theirs = tempDir('worktree-');
+  const claim = (deviceId: string, worktreeRoot: string, bootedByClaim: boolean) =>
+    fs.writeFileSync(
+      path.join(lockRoot, `${deviceId}.json`),
+      JSON.stringify({ deviceId, worktreeRoot, bootedByClaim })
+    );
+  claim('MINE-BOOTED', mine, true);
+  claim('MINE-ADOPTED', mine, false);
+  claim('THEIRS', theirs, true);
+  fs.writeFileSync(path.join(lockRoot, 'not-a-claim.txt'), 'ignored');
+  const { rename } = recordingRename();
+  const { shutdown, calls: shutdowns } = recordingShutdown();
+
+  const released = releaseWorktreeSimulators({ lockRoot, worktreeRoot: mine, rename, shutdown });
+
+  assert.deepEqual(released.sort(), ['MINE-ADOPTED', 'MINE-BOOTED']);
+  assert.deepEqual(shutdowns, ['MINE-BOOTED']);
+  assert.equal(fs.existsSync(path.join(lockRoot, 'MINE-BOOTED.json')), false);
+  assert.equal(fs.existsSync(path.join(lockRoot, 'MINE-ADOPTED.json')), false);
+  assert.equal(fs.existsSync(path.join(lockRoot, 'THEIRS.json')), true);
+});
+
+test('release-all releases every other device before reporting one failure', () => {
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  for (const deviceId of ['UDID-A', 'UDID-B']) {
+    fs.writeFileSync(
+      path.join(lockRoot, `${deviceId}.json`),
+      JSON.stringify({ deviceId, worktreeRoot, bootedByClaim: true })
+    );
+  }
+
+  assert.throws(
+    () =>
+      releaseWorktreeSimulators({
+        lockRoot,
+        worktreeRoot,
+        shutdown: deviceId => {
+          if (deviceId === 'UDID-A') throw new Error('stuck device');
+        },
+      }),
+    /stuck device/
+  );
+  // The wedged device keeps its claim; the healthy one is still handed back.
+  assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-A.json')), true);
+  assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-B.json')), false);
+});
+
+test('release-all is a no-op when the claim directory does not exist', () => {
+  const worktreeRoot = tempDir('worktree-');
+  const { shutdown, calls: shutdowns } = recordingShutdown();
+  assert.deepEqual(
+    releaseWorktreeSimulators({
+      lockRoot: path.join(worktreeRoot, 'missing'),
+      worktreeRoot,
+      shutdown,
+    }),
+    []
+  );
+  assert.deepEqual(shutdowns, []);
 });
 
 // ── listIosDevices ───────────────────────────────────────────────────

@@ -165,6 +165,10 @@ async function allocateNewSession(
       !devcontainerRequested &&
       input.repository.type === 'gitlab' &&
       isOrgInList(ctx.env.GITLAB_TOKEN_CONTAINMENT_ORG_IDS, orgId),
+    bitbucket:
+      !devcontainerRequested &&
+      input.repository.type === 'bitbucket' &&
+      isOrgInList(ctx.env.BITBUCKET_TOKEN_CONTAINMENT_ORG_IDS, orgId),
     kilocode:
       !devcontainerRequested && isOrgInList(ctx.env.KILOCODE_TOKEN_CONTAINMENT_ORG_IDS, orgId),
   };

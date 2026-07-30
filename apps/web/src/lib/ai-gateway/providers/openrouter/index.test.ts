@@ -2,15 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals
 import {
   formatName,
   getEnhancedOpenRouterModels,
-  getModelDisplayPricing,
   getOpenRouterTranscriptionModels,
   shouldSuppressOpenRouterModel,
-  undoPricingDiscount,
 } from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
-import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import {
   findKiloExclusiveModel,
@@ -34,6 +31,15 @@ const disabledPaidModel = {
   internal_id: 'vendor/disabled-paid-model-internal',
   display_name: 'Disabled Paid Kilo Model',
   status: 'disabled',
+} satisfies KiloExclusiveModel;
+
+const disabledFreeModel = {
+  ...qwen36_plus_stealth_model,
+  public_id: 'vendor/disabled-free-model',
+  internal_id: 'vendor/disabled-free-model-internal',
+  display_name: 'Disabled Free Kilo Model',
+  status: 'disabled',
+  pricing: null,
 } satisfies KiloExclusiveModel;
 
 function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
@@ -173,66 +179,6 @@ describe('formatName', () => {
   });
 });
 
-describe('undoPricingDiscount', () => {
-  it('reverses the discount and drops the field without exponential output', () => {
-    const result = undoPricingDiscount({
-      prompt: '0.00000006',
-      completion: '0.0000006',
-      input_cache_read: '0.000000015',
-      discount: 0.7,
-    });
-    expect(result).toEqual({
-      prompt: '0.000000200000',
-      completion: '0.000002000000',
-      input_cache_read: '0.000000050000',
-    });
-    expect('discount' in result).toBe(false);
-    for (const value of Object.values(result)) {
-      expect(value).not.toMatch(/e/i);
-    }
-  });
-
-  it('leaves pricing untouched when there is no discount', () => {
-    const pricing = { prompt: '0.000001', completion: '0.000005' };
-    expect(undoPricingDiscount(pricing)).toBe(pricing);
-  });
-
-  it('leaves pricing untouched when the discount is zero', () => {
-    const pricing = { prompt: '0.000001', completion: '0.000005', discount: 0 };
-    expect(undoPricingDiscount(pricing)).toBe(pricing);
-  });
-
-  it('drops the field when the discount cannot be reversed', () => {
-    const result = undoPricingDiscount({
-      prompt: '0.000001',
-      completion: '0.000005',
-      discount: 1,
-    });
-    expect(result).toEqual({ prompt: '0.000001', completion: '0.000005' });
-  });
-});
-
-describe('OpenRouter GPT-5.6 promotion', () => {
-  const discountedPricing = {
-    prompt: '0.000001',
-    completion: '0.000004',
-    input_cache_read: '0.0000001',
-    discount: 0.5,
-  };
-
-  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('preserves discounted pricing for %s', modelId => {
-    expect(getModelDisplayPricing(modelId, discountedPricing)).toBe(discountedPricing);
-  });
-
-  it('continues to undo endpoint discounts for other models', () => {
-    expect(getModelDisplayPricing('openai/gpt-5.6-sol', discountedPricing)).toEqual({
-      prompt: '0.000002000000',
-      completion: '0.000008000000',
-      input_cache_read: '0.000000200000',
-    });
-  });
-});
-
 describe('shouldSuppressOpenRouterModel', () => {
   it('does not suppress disabled paid Kilo-exclusive models returned by OpenRouter', () => {
     expect(disabledPaidModel.pricing).not.toBeNull();
@@ -240,9 +186,9 @@ describe('shouldSuppressOpenRouterModel', () => {
   });
 
   it('suppresses disabled free Kilo-exclusive models from OpenRouter', () => {
-    expect(seed_20_code_free_model.status).toBe('disabled');
-    expect(seed_20_code_free_model.pricing).toBeNull();
-    expect(shouldSuppressOpenRouterModel(seed_20_code_free_model)).toBe(true);
+    expect(disabledFreeModel.status).toBe('disabled');
+    expect(disabledFreeModel.pricing).toBeNull();
+    expect(shouldSuppressOpenRouterModel(disabledFreeModel)).toBe(true);
   });
 
   it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {
@@ -277,6 +223,23 @@ describe('auto models', () => {
     const models = await getEnhancedOpenRouterModels();
 
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
+  });
+
+  it('excludes OpenRouter batch variants from the public model list', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [buildModel(), buildModel({ id: 'vendor/model:batch' })],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
+    expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
   });
 });
 

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { ImageViewerModal } from '@/components/image-viewer-modal';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -16,7 +17,6 @@ import {
   shareRemoteAttachment,
 } from './message-attachment-open';
 import { isImageMimeType } from './message-attachment-state';
-import { MessageImagePreviewModal } from './message-image-preview-modal';
 
 type Props = {
   client: KiloChatClient;
@@ -122,7 +122,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
         >
           {renderImageThumbnail()}
         </Pressable>
-        <MessageImagePreviewModal
+        <ImageViewerModal
           visible={previewUrl !== null}
           uri={previewUrl}
           filename={block.filename}

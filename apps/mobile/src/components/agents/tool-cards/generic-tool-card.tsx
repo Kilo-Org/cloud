@@ -31,7 +31,13 @@ export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const hasExpandedContent = Boolean(inputStr) || Boolean(output) || Boolean(error);
 
   return (
-    <ToolCardShell icon={Plug} title={part.tool} subtitle={subtitle} status={part.state.status}>
+    <ToolCardShell
+      icon={Plug}
+      title={part.tool}
+      subtitle={subtitle}
+      status={part.state.status}
+      part={part}
+    >
       {hasExpandedContent ? (
         <View className="gap-2">
           {inputStr ? (

@@ -107,6 +107,6 @@ describe('buildMessageBubbleAccessibilityProps', () => {
  * focusable and whether the navigation order avoids double-announcement — can
  * only be verified on a real device or simulator with VoiceOver running. Unit
  * tests here cover the prop contract; the visual/accessibility tree layout must
- * be confirmed with an on-device pass (Maestro + VoiceOver or Accessibility
+ * be confirmed with an on-device pass (Appium + VoiceOver or Accessibility
  * Inspector).
  */

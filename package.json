@@ -10,7 +10,7 @@
     "preinstall": "npx only-allow pnpm",
     "typecheck": "scripts/typecheck-all.sh",
     "build": "pnpm --filter web build",
-    "test": "pnpm --filter web test && pnpm run test:web-env",
+    "test": "pnpm --filter web test && pnpm run test:web-env && pnpm run test:dev-local",
     "test:web-env": "tsx --tsconfig scripts/web-env/tsconfig.json --test scripts/web-env/shared.test.ts",
     "test:setup-smoke": "pnpm --filter web run test:setup-smoke",
     "lint": "scripts/lint-all.sh",
@@ -23,7 +23,7 @@
     "test:e2e": "pnpm --filter web run test:e2e",
     "dependency-cycle-check": "pnpm --filter web run dependency-cycle-check",
     "dev:worktree:prepare": "bash scripts/worktree-prepare.sh",
-    "test:db": "docker compose -f dev/docker-compose.yml up -d --wait postgres && pnpm drizzle migrate",
+    "test:db": "docker compose -f dev/docker-compose.yml up -d --wait postgres && POSTGRES_URL=${POSTGRES_URL:-postgresql://postgres:postgres@localhost:5432/postgres} pnpm drizzle migrate",
     "dev:db:reset": "pnpm --filter web db:empty-database",
     "dev:start": "tsx dev/local/cli.ts up",
     "dev:stop": "tsx dev/local/cli.ts stop",
@@ -35,7 +35,8 @@
     "dev:mobile:simulator": "tsx dev/local/mobile-simulator.ts",
     "dev:mobile:android": "tsx dev/local/mobile-android.ts",
     "dev:mobile:ios": "tsx dev/local/mobile-ios-build.ts",
-    "test:mobile-workflow": "tsx --test dev/local/mobile-simulator.test.ts dev/local/mobile-native-build.test.ts dev/local/mobile-ios-build.test.ts dev/local/mobile-android-build.test.ts dev/local/mobile-android.test.ts dev/local/mobile-workflow.test.ts",
+    "test:dev-local": "tsx --test dev/local/*.test.ts dev/local/env-sync/*.test.ts dev/local/scripts/*.test.ts",
+    "test:mobile-workflow": "tsx --test dev/local/mobile-simulator.test.ts dev/local/mobile-native-build.test.ts dev/local/mobile-ios-build.test.ts dev/local/mobile-android-build.test.ts dev/local/mobile-android.test.ts dev/local/mobile-workflow.test.ts dev/local/appium-wrapper.test.ts",
     "dev:setup-env": "tsx dev/local/setup-env.ts",
     "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
@@ -48,6 +49,7 @@
     "@types/node": "catalog:",
     "@types/proper-lockfile": "4.1.4",
     "@typescript/native-preview": "catalog:",
+    "appium": "catalog:",
     "husky": "9.1.7",
     "ink": "6.8.0",
     "oxfmt": "0.40.0",
@@ -57,6 +59,7 @@
     "proper-lockfile": "4.1.2",
     "react": "19.2.6",
     "tsx": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "webdriverio": "catalog:"
   }
 }

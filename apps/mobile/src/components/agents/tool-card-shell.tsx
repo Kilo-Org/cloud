@@ -1,3 +1,4 @@
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { ChevronDown, type LucideIcon, XCircle } from 'lucide-react-native';
@@ -12,6 +13,9 @@ import Animated, {
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { getToolImageAttachments } from './tool-card-attachments';
+import { ToolCardImageAttachments } from './tool-card-image-attachments';
+
 type ToolCardShellProps = {
   icon: LucideIcon;
   title: string;
@@ -19,6 +23,8 @@ type ToolCardShellProps = {
   badge?: string;
   status: 'pending' | 'running' | 'completed' | 'error';
   defaultExpanded?: boolean;
+  /** When set, completed image attachments render above children in the expanded body. */
+  part?: ToolPart;
   children?: React.ReactNode;
 };
 
@@ -29,11 +35,13 @@ export function ToolCardShell({
   badge,
   status,
   defaultExpanded = false,
+  part,
   children,
 }: Readonly<ToolCardShellProps>) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const colors = useThemeColors();
-  const hasContent = Boolean(children);
+  const imageAttachments = part ? getToolImageAttachments(part) : [];
+  const hasContent = Boolean(children) || imageAttachments.length > 0;
 
   const rotation = useSharedValue(defaultExpanded ? 180 : 0);
 
@@ -90,8 +98,12 @@ export function ToolCardShell({
         ) : null}
       </Pressable>
 
-      {isExpanded && children ? (
-        <Animated.View entering={FadeIn.duration(150)} className="border-t border-border px-3 py-2">
+      {isExpanded && hasContent ? (
+        <Animated.View
+          entering={FadeIn.duration(150)}
+          className="gap-2 border-t border-border px-3 py-2"
+        >
+          {imageAttachments.length > 0 && part ? <ToolCardImageAttachments part={part} /> : null}
           {children}
         </Animated.View>
       ) : null}

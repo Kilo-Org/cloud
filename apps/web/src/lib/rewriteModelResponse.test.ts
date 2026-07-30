@@ -318,6 +318,24 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(dataPayloads(sse)).toContain('[DONE]');
     });
 
+    test('cancels upstream and closes immediately after [DONE]', async () => {
+      const capture = makeCapture();
+      const body =
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n' +
+        'data: [DONE]\n\n' +
+        'data: {"id":"ignored","model":"upstream-model","choices":[]}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null);
+      const sse = await readOutputStream(result);
+
+      expect(dataObjects(sse)).toEqual([{ id: 'gen-chat', model: 'upstream-model', choices: [] }]);
+      expect(dataPayloads(sse)).toContain('[DONE]');
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+    });
+
     test('adds an empty choices array and strips cost on usage-only chunks', async () => {
       const upstream = sseResponse(
         'data: {"model":"upstream-model","usage":{"cost":1,"is_byok":true,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{}}}\n\n'
@@ -479,6 +497,40 @@ describe('rewriteModelResponse_Messages', () => {
     const sse = await readOutputStream(result);
 
     expect(dataPayloads(sse)).not.toContain('[DONE]');
+  });
+
+  test('cancels upstream and closes immediately after message_stop', async () => {
+    const capture = makeCapture();
+    const body =
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n' +
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":10},"delta":{}}\n\n';
+    const { response: upstream, cancel } = hangingSseResponse(body);
+
+    const result = await rewriteModelResponse_Messages(upstream, true, capture, null);
+    const sse = await readOutputStream(result);
+
+    expect(dataObjects(sse)).toEqual([{ type: 'message_stop' }]);
+    expect(dataPayloads(sse)).not.toContain('[DONE]');
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setBody).toHaveBeenCalledWith(body);
+    expect(capture.setReadError).not.toHaveBeenCalled();
+  });
+
+  test('cancels upstream and closes immediately after a compatible [DONE] sentinel', async () => {
+    const capture = makeCapture();
+    const body =
+      'data: [DONE]\n\n' +
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":10},"delta":{}}\n\n';
+    const { response: upstream, cancel } = hangingSseResponse(body);
+
+    const result = await rewriteModelResponse_Messages(upstream, true, capture, null);
+    const sse = await readOutputStream(result);
+
+    expect(dataObjects(sse)).toEqual([]);
+    expect(dataPayloads(sse)).toEqual(['[DONE]']);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setBody).toHaveBeenCalledWith(body);
+    expect(capture.setReadError).not.toHaveBeenCalled();
   });
 });
 

@@ -293,6 +293,9 @@ async function rewriteSseStream(
       capturedChunks?.push(chunk);
       parser.feed(chunk);
       if (terminalEventReceived()) {
+        if (doneReceived()) {
+          controller.enqueue('data: [DONE]\n\n');
+        }
         const cancellation = reader.cancel();
         controller.close();
         settleBody();
@@ -395,6 +398,9 @@ export async function rewriteModelResponse_ChatCompletions(
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          if (doneReceived) {
+            return;
+          }
           progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
@@ -430,6 +436,9 @@ export async function rewriteModelResponse_ChatCompletions(
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
         },
         onComment() {
+          if (doneReceived) {
+            return;
+          }
           controller.enqueue(': KILO PROCESSING\n\n');
         },
       });
@@ -439,7 +448,7 @@ export async function rewriteModelResponse_ChatCompletions(
         parser,
         controller,
         () => doneReceived,
-        () => false,
+        () => doneReceived,
         responseReadError =>
           'data: ' +
           JSON.stringify({
@@ -545,10 +554,14 @@ export async function rewriteModelResponse_Messages(
       }
 
       let doneReceived = false;
+      let terminalEventReceived = false;
       let generationId: string | undefined;
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          if (doneReceived || terminalEventReceived) {
+            return;
+          }
           progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
@@ -582,8 +595,12 @@ export async function rewriteModelResponse_Messages(
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+          terminalEventReceived = json.type === 'message_stop';
         },
         onComment() {
+          if (doneReceived || terminalEventReceived) {
+            return;
+          }
           controller.enqueue(': KILO PROCESSING\n\n');
         },
       });
@@ -593,7 +610,7 @@ export async function rewriteModelResponse_Messages(
         parser,
         controller,
         () => doneReceived,
-        () => false,
+        () => doneReceived || terminalEventReceived,
         responseReadError =>
           'event: error\n' +
           'data: ' +
@@ -688,7 +705,7 @@ export async function rewriteModelResponse_Responses(
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
-          if (terminalEventReceived) {
+          if (doneReceived || terminalEventReceived) {
             return;
           }
           progress.eventProcessed();
@@ -720,7 +737,7 @@ export async function rewriteModelResponse_Responses(
             json.type === 'response.failed';
         },
         onComment() {
-          if (terminalEventReceived) {
+          if (doneReceived || terminalEventReceived) {
             return;
           }
           controller.enqueue(': KILO PROCESSING\n\n');
@@ -732,7 +749,7 @@ export async function rewriteModelResponse_Responses(
         parser,
         controller,
         () => doneReceived,
-        () => terminalEventReceived,
+        () => doneReceived || terminalEventReceived,
         responseReadError =>
           'event: error\n' +
           'data: ' +

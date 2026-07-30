@@ -36,7 +36,7 @@
     "dev:mobile:android": "tsx dev/local/mobile-android.ts",
     "dev:mobile:ios": "tsx dev/local/mobile-ios-build.ts",
     "test:dev-local": "tsx --test dev/local/*.test.ts dev/local/env-sync/*.test.ts dev/local/scripts/*.test.ts",
-    "test:mobile-workflow": "tsx --test dev/local/mobile-simulator.test.ts dev/local/mobile-native-build.test.ts dev/local/mobile-ios-build.test.ts dev/local/mobile-android-build.test.ts dev/local/mobile-android.test.ts dev/local/mobile-workflow.test.ts dev/local/maestro-wrapper.test.ts",
+    "test:mobile-workflow": "tsx --test dev/local/mobile-simulator.test.ts dev/local/mobile-native-build.test.ts dev/local/mobile-ios-build.test.ts dev/local/mobile-android-build.test.ts dev/local/mobile-android.test.ts dev/local/mobile-workflow.test.ts dev/local/appium-wrapper.test.ts",
     "dev:setup-env": "tsx dev/local/setup-env.ts",
     "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",

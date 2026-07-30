@@ -51,23 +51,44 @@ server_status() {
   curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:$APPIUM_PORT/status"
 }
 
+port_free() {
+  ! nc -z 127.0.0.1 "$1" 2>/dev/null
+}
+
 ensure_server() {
+  # Reconnect to a previously bumped server when one was recorded.
+  if [ -f "$STATE_DIR/server.port" ]; then
+    APPIUM_PORT=$(cat "$STATE_DIR/server.port")
+  fi
   if server_status; then return 0; fi
   ensure_drivers
-  echo "appium.sh: starting appium server for $DEVICE on port $APPIUM_PORT" >&2
-  nohup "$APPIUM_BIN" --port "$APPIUM_PORT" --log-level warn \
-    >"$STATE_DIR/appium.log" 2>&1 &
-  echo $! >"$STATE_DIR/appium.pid"
-  for _ in $(seq 1 60); do
-    if server_status; then return 0; fi
-    if ! kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null; then
-      echo "appium.sh: appium server died at launch; last log lines:" >&2
-      tail -n 20 "$STATE_DIR/appium.log" >&2
-      return 1
+  local base_port=$APPIUM_PORT attempt
+  # Hash collisions and foreign listeners both resolve by bumping one block.
+  for attempt in $(seq 0 49); do
+    APPIUM_PORT=$((base_port + attempt * 10))
+    port_free "$APPIUM_PORT" || continue
+    if [ "$attempt" -gt 0 ]; then
+      echo "appium.sh: bumping to port block $APPIUM_PORT" >&2
     fi
-    sleep 1
+    echo "appium.sh: starting appium server for $DEVICE on port $APPIUM_PORT" >&2
+    nohup "$APPIUM_BIN" --port "$APPIUM_PORT" --log-level warn \
+      >"$STATE_DIR/appium.log" 2>&1 &
+    echo $! >"$STATE_DIR/appium.pid"
+    for _ in $(seq 1 60); do
+      if server_status; then
+        echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
+        return 0
+      fi
+      if ! kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+    stop_server
+    echo "appium.sh: server attempt on port $APPIUM_PORT failed; last log lines:" >&2
+    tail -n 10 "$STATE_DIR/appium.log" >&2
   done
-  echo "appium.sh: appium server did not answer /status within 60s ($STATE_DIR/appium.log)" >&2
+  echo "appium.sh: no appium server came up after 50 port blocks ($STATE_DIR/appium.log)" >&2
   return 1
 }
 
@@ -75,7 +96,7 @@ stop_server() {
   if [ -f "$STATE_DIR/appium.pid" ] && kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null; then
     kill "$(cat "$STATE_DIR/appium.pid")" || true
   fi
-  rm -f "$STATE_DIR/appium.pid"
+  rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
 }
 
 cmd="${1:-}"

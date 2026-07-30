@@ -326,6 +326,20 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(dataPayloads(sse)).toContain('[DONE]');
     });
 
+    test('does not treat a null error field as terminal', async () => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-chat","error":null,"choices":[]}\n\n' +
+          'data: {"id":"gen-chat","choices":[{"delta":{"content":"still streaming"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const sse = await readOutputStream(result);
+
+      expect(sse).toContain('still streaming');
+      expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
     test('cancels upstream and closes immediately after [DONE]', async () => {
       const capture = makeCapture();
       const body =

@@ -454,7 +454,7 @@ export async function rewriteModelResponse_ChatCompletions(
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
-          terminalEventReceived = 'error' in json;
+          terminalEventReceived = 'error' in json && json.error != null;
           if (terminalEventReceived) {
             logTerminalStreamEvent('chat_completions', 'error', generationId, vercelRequestId);
           }

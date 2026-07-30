@@ -2,6 +2,7 @@ import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
 
 type SlashCommandSuggestionsProps = {
   commands: SlashCommandInfo[];
@@ -30,7 +31,7 @@ export function SlashCommandSuggestions({
       className="max-h-48 border-t border-border bg-card"
       keyboardShouldPersistTaps="handled"
     >
-      {commands.map(command => (
+      {commands.map((command, index) => (
         <Pressable
           key={command.name}
           onPress={() => {
@@ -40,7 +41,10 @@ export function SlashCommandSuggestions({
           accessibilityLabel={`Use /${command.name}`}
           accessibilityHint={command.description ?? undefined}
           hitSlop={4}
-          className="min-h-[44px] flex-row items-center justify-between gap-3 border-b border-black/5 px-4 py-2 active:bg-muted dark:border-white/5"
+          className={cn(
+            'min-h-[44px] flex-row items-center justify-between gap-3 px-4 py-2 active:bg-muted',
+            index < commands.length - 1 && 'border-b border-border'
+          )}
         >
           <View className="flex-1">
             <Text className="text-sm font-semibold text-foreground">/{command.name}</Text>

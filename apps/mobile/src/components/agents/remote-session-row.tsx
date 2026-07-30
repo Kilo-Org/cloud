@@ -1,10 +1,14 @@
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
-import { useEffect } from 'react';
-import { ActionSheetIOS, Alert, Platform, Pressable, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Platform, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
@@ -18,7 +22,7 @@ import {
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { type RowVariant } from './session-row';
-import { copySessionId } from './session-row-actions';
+import { copySessionId, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import {
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
@@ -40,7 +44,11 @@ export function RemoteSessionRow({
   interactive = true,
 }: Readonly<RemoteSessionRowProps>) {
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
+  const { showActionSheetWithOptions } = useActionSheet();
+  const { renameSession } = useSessionMutations();
   const title = session.title.length > 0 ? session.title : 'Untitled session';
+  const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);
 
@@ -81,55 +89,69 @@ export function RemoteSessionRow({
 
   const handleLongPress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Copy session ID', 'Cancel'], cancelButtonIndex: 1 },
-        buttonIndex => {
-          if (buttonIndex === 0) {
-            void copySessionId(session.id);
-          }
+    showSessionActionMenu({
+      showActionSheetWithOptions,
+      bottomInset: bottom,
+      onCopySessionId: () => {
+        void copySessionId(session.id);
+      },
+      onRename: () => {
+        if (Platform.OS === 'ios') {
+          showRenamePrompt(title, newTitle => {
+            renameSession(session.id, newTitle);
+          });
+        } else {
+          setRenameVisible(true);
         }
-      );
-    } else {
-      Alert.alert('Session actions', undefined, [
-        {
-          text: 'Copy session ID',
-          onPress: () => {
-            void copySessionId(session.id);
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
+      },
+    });
   };
 
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={canManage ? handleLongPress : undefined}
-      accessibilityLabel={sessionRowAccessibilityLabel({
-        title,
-        needsInput,
-        badge: agentLabel,
-        meta: spokenMeta,
-        platform: spokenPlatform,
-      })}
-      className="active:opacity-70"
-    >
-      <SessionRow
-        agentLabel={agentLabel}
-        title={title}
-        subtitle={session.gitBranch ?? null}
-        meta={remoteMeta(session)}
-        live
-        needsInput={needsInput}
-        metaWhileLive
-        platformIcon={platformIcon}
-        stripMode={variant === 'card' ? 'edge' : 'inline'}
-        last={variant === 'card' ? true : undefined}
-        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
-      />
-    </Pressable>
+    <>
+      <Pressable
+        onPress={onPress}
+        onLongPress={canManage ? handleLongPress : undefined}
+        accessibilityLabel={sessionRowAccessibilityLabel({
+          title,
+          needsInput,
+          badge: agentLabel,
+          meta: spokenMeta,
+          platform: spokenPlatform,
+        })}
+        className="active:opacity-70"
+      >
+        <SessionRow
+          agentLabel={agentLabel}
+          title={title}
+          subtitle={session.gitBranch ?? null}
+          meta={remoteMeta(session)}
+          live
+          needsInput={needsInput}
+          metaWhileLive
+          platformIcon={platformIcon}
+          stripMode={variant === 'card' ? 'edge' : 'inline'}
+          last={variant === 'card' ? true : undefined}
+          className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
+        />
+      </Pressable>
+
+      {renameVisible && (
+        <RenameModal
+          title="Rename session"
+          placeholder="Session name"
+          initialValue={title}
+          onClose={() => {
+            setRenameVisible(false);
+          }}
+          onSave={async name => {
+            // Fire-and-forget: modal closes immediately like stored rows.
+            // Mutation owns toast + cache rollback on error (r5b-3).
+            renameSession(session.id, name);
+            await Promise.resolve();
+          }}
+        />
+      )}
+    </>
   );
 }

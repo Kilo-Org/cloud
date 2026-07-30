@@ -181,15 +181,24 @@ if [ "$MODE" = "upgrade" ] && ! docker image inspect "$IMAGE_BEFORE" >/dev/null 
 fi
 
 ROOTDIR="$(mktemp -d)"
+# Every root this run allocates, so cleanup can remove them all at EXIT. Roots are
+# never deleted mid-run: see the fresh-root leg below.
+ROOTDIRS=("$ROOTDIR")
 CID=""
 PASS=0
 FAIL=0
 
 cleanup() {
+  local dir
   if [ -n "$CID" ]; then
     docker rm -f "$CID" >/dev/null 2>&1 || true
   fi
-  rm -rf "$ROOTDIR"
+  # The container writes /root as uid 0, so on native Linux Docker these trees can
+  # be root-owned and unremovable by a non-root host user. Cleanup must never be
+  # able to fail the run, hence `|| true` on every removal.
+  for dir in "${ROOTDIRS[@]}"; do
+    rm -rf "$dir" 2>/dev/null || true
+  done
 }
 trap cleanup EXIT
 
@@ -696,6 +705,12 @@ assert_root_shape() {
         check "$label root carries baseline state" "seeded" "empty"
       fi
       ;;
+    *)
+      # Without this branch an unrecognized shape (a typo, or a future label) would
+      # fall through asserting nothing, so the leg would pass while covering
+      # nothing — precisely the silent no-coverage this function exists to stop.
+      check "$label root shape" "$expected" "unknown shape argument"
+      ;;
   esac
 }
 
@@ -794,8 +809,14 @@ if [ "$MODE" = "upgrade" ]; then
   # provisioned after the release gets, and nothing else in the gate covers it.
   # Asserts the swap actually produced an empty root, or this silently duplicates
   # the upgrade leg above.
-  rm -rf "$ROOTDIR"
+  #
+  # Allocate a second root rather than deleting the first. The baseline container
+  # wrote /root as uid 0, so on native Linux Docker `rm -rf` here would fail with
+  # EACCES for a non-root host user, and as a bare command under `set -e` that
+  # would abort the run after two legs had already passed and before the results
+  # summary. Both roots are tracked and removed at EXIT instead.
   ROOTDIR="$(mktemp -d)"
+  ROOTDIRS+=("$ROOTDIR")
   run_phase "after-image fresh-root (new instance)" \
     "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER" 1 1 empty
 else

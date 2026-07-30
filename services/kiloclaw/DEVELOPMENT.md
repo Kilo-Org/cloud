@@ -591,7 +591,7 @@ Then run one of:
     no token -> `401`, correct proxy token -> pass-through.
   - Use this when changing proxy token logic or route/auth ordering.
 - `bash scripts/tests/smoke-live-provider.sh`
-  - Runs the packaged image against the real Kilo Gateway with `kilocode/kilo-auto/free`, verifying `openclaw config validate --json`, Control UI proxying, packaged Kilo Chat loading, and one live agent turn.
+  - Runs the packaged image against the real Kilo Gateway with a paid route (`kilocode/kilo-auto/balanced` by default; free routes are rejected), verifying `openclaw config validate --json`, Control UI proxying, packaged Kilo Chat loading, and one live agent turn per leg. In `--upgrade` mode the candidate is asserted both on the baseline's persisted root and on a fresh root.
   - Reads `KILOCODE_API_KEY` from the environment, or falls back locally to the active `kilocodeToken` and matching organization scope in `~/.kilocode/cli/config.json`. The credential is passed to the temporary container as an environment variable; the script does not print it or dump potentially sensitive controller logs on startup failure.
   - Publishes the temporary controller only on loopback and generates a random controller/proxy token unless `TOKEN` is explicitly set.
   - Uses a generated non-sensitive nonce prompt because Auto Free can route to upstream providers that log prompts.

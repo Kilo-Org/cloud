@@ -76,8 +76,20 @@ type SecurityAgentContextValue = {
   refetchConfig: () => Promise<unknown>;
 
   // Repositories
-  allRepositories: Array<{ id: number; fullName: string; name: string; private: boolean }>;
-  filteredRepositories: Array<{ id: number; fullName: string; name: string; private: boolean }>;
+  allRepositories: Array<{
+    id: number;
+    fullName: string;
+    name: string;
+    private: boolean;
+    dependabotAlerts: 'enabled' | 'disabled' | 'unknown';
+  }>;
+  filteredRepositories: Array<{
+    id: number;
+    fullName: string;
+    name: string;
+    private: boolean;
+    dependabotAlerts: 'enabled' | 'disabled' | 'unknown';
+  }>;
 
   // Mutation handlers
   trackUiInteraction: (interaction: SecurityAgentUiInteraction) => void;

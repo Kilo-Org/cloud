@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { RepositoryMultiSelect } from '@/components/code-reviews/RepositoryMultiSelect';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -334,6 +336,18 @@ export function RepositorySection({
   repositories: SecurityRepository[];
   isLoading?: boolean;
 }) {
+  const dependabotAlertsByRepositoryId = new Map(
+    repositories.map(repository => [repository.id, repository.dependabotAlerts])
+  );
+  const disabledRepositories = repositories.filter(
+    repository => repository.dependabotAlerts === 'disabled'
+  );
+  const selectedRepositoryIds = new Set(state.selectedRepositoryIds);
+  const selectedDisabledRepositories =
+    state.repositorySelectionMode === 'all'
+      ? disabledRepositories
+      : disabledRepositories.filter(repository => selectedRepositoryIds.has(repository.id));
+
   return (
     <Card>
       <SectionHeader
@@ -375,6 +389,24 @@ export function RepositorySection({
                 </Label>
               </div>
             </RadioGroup>
+            {selectedDisabledRepositories.length > 0 && (
+              <Alert variant="warning">
+                <AlertTriangle aria-hidden="true" />
+                <AlertTitle>
+                  Dependabot alerts disabled for {selectedDisabledRepositories.length}{' '}
+                  {selectedDisabledRepositories.length === 1 ? 'repository' : 'repositories'}
+                </AlertTitle>
+                <AlertDescription>
+                  <p>
+                    Security Agent cannot import findings from{' '}
+                    {selectedDisabledRepositories.length === 1
+                      ? selectedDisabledRepositories[0]?.fullName
+                      : 'these repositories'}{' '}
+                    until Dependabot alerts are enabled in GitHub repository settings.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
             {state.repositorySelectionMode === 'selected' && (
               <div className="space-y-2">
                 <Label>Repositories</Label>
@@ -384,6 +416,20 @@ export function RepositorySection({
                   onSelectionChange={selectedRepositoryIds =>
                     setState(current => ({ ...current, selectedRepositoryIds }))
                   }
+                  renderRepositoryAccessory={repository => {
+                    if (dependabotAlertsByRepositoryId.get(repository.id) !== 'disabled') {
+                      return null;
+                    }
+
+                    return (
+                      <Badge
+                        variant="outline"
+                        className="border-status-warning-border bg-status-warning-surface text-status-warning ml-auto shrink-0"
+                      >
+                        Dependabot alerts off
+                      </Badge>
+                    );
+                  }}
                 />
               </div>
             )}

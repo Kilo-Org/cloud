@@ -14,11 +14,14 @@ export type AutoRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type NotificationMinSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type RepositorySelectionMode = 'all' | 'selected';
 
+export type DependabotAlertsAvailability = 'enabled' | 'disabled' | 'unknown';
+
 export type SecurityRepository = {
   id: number;
   fullName: string;
   name: string;
   private: boolean;
+  dependabotAlerts: DependabotAlertsAvailability;
 };
 
 export type SecurityConfigFormState = {

@@ -5,7 +5,11 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
+import pLimit from 'p-limit';
+import {
+  generateGitHubInstallationToken,
+  type GitHubAppType,
+} from '@/lib/integrations/platforms/github/adapter';
 import type { DependabotAlertRaw, DependabotAlertState } from '../core/types';
 import { errorExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
 
@@ -117,6 +121,13 @@ type FetchAlertsSkipStatus =
   | 'access_blocked'
   | 'auth_invalid';
 
+export type DependabotAlertsAvailability = 'enabled' | 'disabled' | 'unknown';
+
+export type RepositoryDependabotAlertsAvailability = {
+  id: number;
+  status: DependabotAlertsAvailability;
+};
+
 // Permanent repo-level settings — safe to skip without blocking freshness.
 const DEPENDABOT_DISABLED_HINTS = [
   'dependabot alerts are disabled',
@@ -167,6 +178,69 @@ export function classifyFetchAlertsError(
   }
 
   return null;
+}
+
+/**
+ * Checks whether GitHub's Dependabot alerts API is available for each repository.
+ * A successful request is enough to prove alerts are enabled, even when no alerts exist.
+ * Ambiguous permission, authentication, and transient failures remain unknown so the UI
+ * never labels a repository as disabled without a definitive GitHub response.
+ */
+export async function checkDependabotAlertsAvailability(
+  installationId: string,
+  appType: GitHubAppType,
+  repositories: ReadonlyArray<{ id: number; fullName: string }>
+): Promise<RepositoryDependabotAlertsAvailability[]> {
+  if (repositories.length === 0) return [];
+
+  let token: string;
+  try {
+    token = (await generateGitHubInstallationToken(installationId, appType)).token;
+  } catch {
+    warnExceptInTest('Unable to authenticate while checking Dependabot alerts availability');
+    return repositories.map(repository => ({ id: repository.id, status: 'unknown' }));
+  }
+
+  const octokit = new Octokit({ auth: token });
+  const limit = pLimit(5);
+
+  const results = await Promise.all(
+    repositories.map(repository =>
+      limit(async (): Promise<RepositoryDependabotAlertsAvailability> => {
+        const [owner, repo, ...extraParts] = repository.fullName.split('/');
+        if (!owner || !repo || extraParts.length > 0) {
+          return { id: repository.id, status: 'unknown' };
+        }
+
+        try {
+          await octokit.rest.dependabot.listAlertsForRepo({
+            owner,
+            repo,
+            state: 'open',
+            per_page: 1,
+          });
+          return { id: repository.id, status: 'enabled' };
+        } catch (error) {
+          const httpStatus = (error as { status?: number }).status;
+          const message = (error as { message?: string }).message;
+          if (classifyFetchAlertsError(httpStatus, message) === 'alerts_disabled') {
+            return { id: repository.id, status: 'disabled' };
+          }
+
+          return { id: repository.id, status: 'unknown' };
+        }
+      })
+    )
+  );
+
+  const unknownCount = results.filter(result => result.status === 'unknown').length;
+  if (unknownCount > 0) {
+    warnExceptInTest('Unable to determine Dependabot alerts availability for some repositories', {
+      repositoryCount: unknownCount,
+    });
+  }
+
+  return results;
 }
 
 /**

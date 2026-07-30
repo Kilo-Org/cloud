@@ -3,9 +3,11 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { useEffect, useMemo, useRef } from 'react';
 
 import { sortActiveSessionsByCreatedAt } from '@/lib/active-session-order';
-import { filterActiveSessionsByOrganization } from '@/lib/active-sessions-live';
 import {
-  buildActiveSessionsInput,
+  buildActiveSessionsTrayInput,
+  filterActiveSessionsByOrganization,
+} from '@/lib/active-sessions-live';
+import {
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
@@ -88,19 +90,19 @@ function useStoredSessions(options?: UseAgentSessionsOptions) {
 
 function useActiveSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
-  // While the shared WS is connected, the app-level `ActiveSessionsLiveSync`
-  // owner pushes tray updates through `setQueryData` and triggers refreshes
-  // on connect/enrichment/etc. — the 10s poll would only mask the WS as
-  // the source of truth. When the socket is down, fall back to the 10s
-  // interval so a transient outage still updates the tray.
+  // Cloud rows have no WS channel — discovery from other devices and departure
+  // on session stop need a floor poll even while connected. WS writes remain
+  // the instant path for CLI rows; the poll uses the same wholesale-replace
+  // semantics as the existing enrichment refresh. When the socket is down,
+  // poll every 10s so a transient outage still updates the tray.
   const wsConnected = useUserWebConnectionState();
   const input = useMemo(
-    () => buildActiveSessionsInput(options?.organizationId),
+    () => buildActiveSessionsTrayInput(options?.organizationId),
     [options?.organizationId]
   );
   return useQuery(
     trpc.activeSessions.list.queryOptions(input, {
-      refetchInterval: wsConnected ? false : 10_000,
+      refetchInterval: wsConnected ? 30_000 : 10_000,
       staleTime: 5000,
       enabled: options?.enabled,
     })

@@ -3,8 +3,10 @@ import { type QueryFunction, useQueryClient } from '@tanstack/react-query';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import { ActiveSessionsLiveSync } from '@/lib/active-sessions-live-sync';
-import { type CachedActiveSessionsData } from '@/lib/active-sessions-live';
-import { buildActiveSessionsInput } from '@/lib/agent-session-input';
+import {
+  buildActiveSessionsTrayInput,
+  type CachedActiveSessionsData,
+} from '@/lib/active-sessions-live';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 
@@ -27,7 +29,7 @@ function useActiveSessionsLiveSync(): void {
   // exactly as it does today. `retain()` returns its own release function.
   useEffect(() => connection.retain(), [connection]);
 
-  const input = useMemo(() => buildActiveSessionsInput(organizationId), [organizationId]);
+  const input = useMemo(() => buildActiveSessionsTrayInput(organizationId), [organizationId]);
   const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
   const queryFn = useMemo(
     () =>

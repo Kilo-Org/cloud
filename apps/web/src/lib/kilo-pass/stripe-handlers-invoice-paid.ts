@@ -72,6 +72,12 @@ import {
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
 import { processPersonalKiloPassStripePaidConversion } from '@/lib/impact/kilo-pass-referrals';
+import {
+  runAfterResponse,
+  trackKiloPassPurchaseCompleted,
+  type KiloPassPurchaseKind,
+} from '@/lib/kilo-pass/posthog-tracking';
+
 type DuplicateCardEnforcement = {
   kiloUserId: string;
   stripeInvoiceId: string;
@@ -394,6 +400,43 @@ async function maybeIssueYearlyRemainingCredits(params: {
   return true;
 }
 
+/**
+ * Whether this invoice already has a successful KiloPassInvoicePaidHandled audit row.
+ *
+ * HARD INVARIANT: MUST be called after the `kilo_pass_subscriptions` upsert (whose
+ * row lock serializes same-subscription webhook concurrency) and before this run's
+ * own Success-row append — moving it reopens a double-emit race.
+ */
+async function hasHandledKiloPassInvoicePaid(
+  tx: DrizzleTransaction,
+  stripeInvoiceId: string
+): Promise<boolean> {
+  const existing = await tx.query.kilo_pass_audit_log.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.KiloPassInvoicePaidHandled),
+      eq(kilo_pass_audit_log.result, KiloPassAuditLogResult.Success),
+      eq(kilo_pass_audit_log.stripe_invoice_id, stripeInvoiceId)
+    ),
+  });
+  return existing !== undefined;
+}
+
+function purchaseKindFromBillingReason(
+  billingReason: Stripe.Invoice['billing_reason']
+): KiloPassPurchaseKind {
+  switch (billingReason) {
+    case 'subscription_create':
+      return 'initial';
+    case 'subscription_cycle':
+      return 'renewal';
+    case 'subscription_update':
+      return 'upgrade';
+    default:
+      return 'unknown';
+  }
+}
+
 export async function handleKiloPassInvoicePaid(params: {
   eventId: string;
   invoice: Stripe.Invoice;
@@ -435,6 +478,7 @@ export async function handleKiloPassInvoicePaid(params: {
   // Track context for failure audit logging
   let kiloUserIdForAudit: string | null = null;
   let stripeSubscriptionIdForAudit: string | null = null;
+  let shouldTrackPurchase = false;
 
   let duplicateCardEnforcement: DuplicateCardEnforcement | null = null;
 
@@ -700,6 +744,11 @@ export async function handleKiloPassInvoicePaid(params: {
             })
           : null;
 
+      // Emit order: blocked early-return → subscription upsert (row lock) →
+      // hasHandledKiloPassInvoicePaid check → append this run's Success row →
+      // commit → emit via after().
+      shouldTrackPurchase = !(await hasHandledKiloPassInvoicePaid(tx, invoice.id));
+
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.KiloPassInvoicePaidHandled,
         result: KiloPassAuditLogResult.Success,
@@ -825,6 +874,56 @@ export async function handleKiloPassInvoicePaid(params: {
     }
 
     throw error;
+  }
+
+  if (shouldTrackPurchase) {
+    await runAfterResponse(async () => {
+      if (!kiloUserIdForAudit) {
+        captureException(
+          new Error('kilo_pass_purchase_completed skipped: missing purchaser or state'),
+          {
+            tags: { source: 'kilo_pass_purchase_tracking' },
+            extra: { stripeInvoiceId: invoice.id },
+          }
+        );
+        return;
+      }
+
+      const [purchaser] = await db
+        .select({ email: kilocode_users.google_user_email })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, kiloUserIdForAudit))
+        .limit(1);
+
+      if (
+        !purchaser?.email ||
+        !referralConversionState.userId ||
+        !referralConversionState.tier ||
+        !referralConversionState.cadence
+      ) {
+        captureException(
+          new Error('kilo_pass_purchase_completed skipped: missing purchaser or state'),
+          {
+            tags: { source: 'kilo_pass_purchase_tracking' },
+            extra: { stripeInvoiceId: invoice.id },
+          }
+        );
+        return;
+      }
+
+      trackKiloPassPurchaseCompleted({
+        channel: 'stripe',
+        distinctId: purchaser.email,
+        userId: referralConversionState.userId,
+        tier: referralConversionState.tier,
+        cadence: referralConversionState.cadence,
+        purchaseKind: purchaseKindFromBillingReason(invoice.billing_reason),
+        stripeInvoiceId: invoice.id,
+        amountPaidUsd: invoice.amount_paid / 100,
+        currency: (invoice.currency ?? 'usd').toLowerCase(),
+        livemode: invoice.livemode,
+      });
+    });
   }
 
   if (duplicateCardEnforcement) {

@@ -65,7 +65,8 @@ test('login retry resets an already-open verification screen to the email form',
   assert.ok(verificationIndex >= 0);
   assert.ok(backIndex > verificationIndex);
   assert.ok(signedOutGuardIndex > backIndex);
-  assert.match(logout, /assertVisible\('you@example\.com'\)/);
+  // Signing out is an API call plus navigation; the terminal check waits.
+  assert.match(logout, /waitVisible\('you@example\.com', \{ timeout: 15000 \}\)/);
 });
 
 test('login reuses the app state established by logout instead of relaunching each step', () => {
@@ -111,9 +112,11 @@ test('settle flow handles the exact iOS external-app prompt within existing wait
   assert.match(flow, /when\(ctx, S\.OPEN_IN_KILO, \(\) => h\.tapOn\('Open'\)\)/);
   assert.deepEqual(
     timeouts,
-    [15000, 3000, 5000, 5000, 5000, 5000, 15000],
+    [3000, 5000, 5000, 5000, 5000, 15000],
     'settle-app should keep its wait budget and add no fixed wait'
   );
+  // The first wait is platform-aware: 15s on iOS, long-but-early-return on Android.
+  assert.match(flow, /timeout: ctx\.platform === 'android' \? 300000 : 15000/);
   assert.doesNotMatch(flow, /when\(ctx, '(?:Allow|Open)'/);
   assert.doesNotMatch(flow, /tapOn\('(?:Allow\|Open|Open\|Allow)'\)/);
 });

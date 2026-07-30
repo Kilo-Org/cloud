@@ -18,7 +18,9 @@ stop_appium_servers() {
       [ -f "$json" ] || continue
       grep -q ""worktreeRoot": "$PWD"" "$json" 2>/dev/null || continue
       id=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1]));process.stdout.write(r.deviceId||r.serial||"")' "$json" 2>/dev/null || true)
-      [ -n "$id" ] && apps/mobile/e2e/appium.sh "$id" server stop || true
+      [ -n "$id" ] || continue
+      apps/mobile/e2e/appium.sh "$id" server stop || \
+        echo "e2e-stop-resource: appium server for $id still up — retry: apps/mobile/e2e/appium.sh $id server stop" >&2
     done
   done
 }

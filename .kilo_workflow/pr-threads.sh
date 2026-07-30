@@ -120,5 +120,5 @@ case $CMD in
     do_reply "${3:?thread id}" "$BODY"
     do_resolve "$3"
     ;;
-  *) echo "usage: pr-threads.sh list|unresolved|close|reply|resolve ..." >&2; exit 1 ;;
+  *) echo "usage: pr-threads.sh list|unresolved|close ..." >&2; exit 1 ;;
 esac

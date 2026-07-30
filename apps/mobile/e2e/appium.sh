@@ -56,11 +56,13 @@ port_free() {
 }
 
 ensure_server() {
-  # Reconnect to a previously bumped server when one was recorded.
+  # Adopt only our own recorded server: an unrecorded Appium answering on the
+  # base port belongs to another device whose hash collided with this block,
+  # and attaching here would interleave taps across devices.
   if [ -f "$STATE_DIR/server.port" ]; then
     APPIUM_PORT=$(cat "$STATE_DIR/server.port")
+    if server_status; then return 0; fi
   fi
-  if server_status; then return 0; fi
   ensure_drivers
   local base_port=$APPIUM_PORT attempt
   # Hash collisions and foreign listeners both resolve by bumping one block.
@@ -121,7 +123,8 @@ case "$cmd" in
     while [ $# -gt 0 ]; do
       case "$1" in
         -e) ENV_ARGS+=("$2"); shift 2 ;;
-        *) FLOW="$1"; shift ;;
+        *) [ -z "$FLOW" ] || { echo "appium.sh: one flow per test invocation (got '$FLOW' and '$1')" >&2; exit 1; }
+           FLOW="$1"; shift ;;
       esac
     done
     [ -n "$FLOW" ] || { echo "usage: appium.sh <device> test [-e K=V]... <flow.js>" >&2; exit 1; }

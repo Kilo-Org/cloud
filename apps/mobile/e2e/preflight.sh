@@ -28,6 +28,7 @@ SESSION_STATUS="$(curl -sS -o "$SESSION_PROBE" -w '%{http_code}' \
 if [ "$SESSION_STATUS" != "401" ] || ! grep -Fq 'Invalid or expired token' "$SESSION_PROBE"; then
   printf 'session-ingest secret readiness probe failed with HTTP %s\n' "$SESSION_STATUS" >&2
   cat "$SESSION_PROBE" >&2
+  printf 'fix: pnpm dev:env -y cloudflare-session-ingest && pnpm dev:restart cloudflare-session-ingest (the binding exists but the running Worker has not picked it up)\n' >&2
   exit 1
 fi
 

@@ -23,7 +23,7 @@ set -euo pipefail
 
 TARGET=${1:?tmux target} SCRATCH=${2:?scratch dir}
 shift 2
-# 25 minutes per invocation; 20 quiet transcript seconds reports QUIET.
+# 25 minutes per invocation; 20 quiet transcript minutes (QUIET=1200) reports QUIET.
 # Tune by editing these two numbers — never by adding call-site options.
 LOGFILE="" TIMEOUT=1500 QUIET=1200
 while [ $# -gt 0 ]; do

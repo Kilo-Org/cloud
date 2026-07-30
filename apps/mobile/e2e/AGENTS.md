@@ -37,8 +37,10 @@ xcrun simctl list devices booted
 ```
 
 Reuse an existing stack only when it belongs to the current live slot bundle.
-Otherwise it is unaccounted: stop it through `e2e-stop-resource.sh stack`, then
-take a slot and start fresh. Never stop an unrelated `kilo-dev-*` session.
+An unaccounted stack whose `kilo-dev-<slug>` slug matches this worktree's
+basename is yours: stop it through `e2e-stop-resource.sh stack`, then take a
+slot and start fresh. An unaccounted stack from another worktree is not yours —
+leave it alone and never stop an unrelated `kilo-dev-*` session.
 
 If this worktree has no stack, the bundle owner starts the complete mobile flow
 after taking its slot:
@@ -331,14 +333,17 @@ Each verifier removes only its own temporary files:
 rm -f "$LOGIN_LOG"
 ```
 
-After all verifiers return, the bundle owner stops everything it started, then
+After all verifiers return, the bundle owner stops everything it started —
+conditional resources first (skip any never started), then the bundle — and
 frees the slot:
 
 ```bash
+apps/mobile/e2e/remote-cli.sh stop                                                 # only after remote-cli.sh start
+tmux kill-session -t "kilo-e2e-github-stub-$(basename "$PWD")" 2>/dev/null || true  # only after the GitHub stub
 .kilo_workflow/e2e-stop-resource.sh android
 .kilo_workflow/e2e-stop-resource.sh ios
 .kilo_workflow/e2e-stop-resource.sh stack
-.kilo_workflow/e2e-free-slot.sh
+.kilo_workflow/e2e-free-slot.sh   # refuses while any resource above is still live
 rm -f "$EMULATOR_LOG"
 ```
 

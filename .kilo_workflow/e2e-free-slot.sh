@@ -6,7 +6,8 @@
 set -euo pipefail
 HERE=$(dirname "$0")
 ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
-SLUG_="$(basename "$ROOT" | tr -cs 'a-zA-Z0-9_-' '_' | sed 's/_*$//')"
+# Per-character replacement, matching dev/local/tmux.ts getSessionName.
+SLUG_="$(basename "$ROOT" | sed 's/[^A-Za-z0-9_-]/_/g')"
 SLUG_DASH="$(basename "$ROOT" | tr -cs 'a-zA-Z0-9' '-' | sed 's/^-*//;s/-*$//')"
 
 leftovers=()
@@ -31,7 +32,7 @@ done
 if [ "${#leftovers[@]}" -gt 0 ]; then
   printf 'refusing to free the slot while this worktree still owns resources:\n' >&2
   printf '  %s\n' "${leftovers[@]}" >&2
-  printf 'stop them first: %s/e2e-stop-resource.sh stack|ios|android\n' "$HERE" >&2
+  printf 'stop each by kind: stack/device claim -> %s/e2e-stop-resource.sh stack|ios|android; kilo-e2e-cli-* -> apps/mobile/e2e/remote-cli.sh stop; kilo-e2e-github-stub-* -> tmux kill-session -t <name>\n' "$HERE" >&2
   exit 1
 fi
 

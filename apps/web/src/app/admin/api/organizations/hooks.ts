@@ -128,6 +128,15 @@ export function useAdminOrganizationDetails(organizationId: string) {
   );
 }
 
+export function useAdminOrganizationKiloPassSummary(organizationId: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.getKiloPassSummary.queryOptions({
+      organizationId,
+    })
+  );
+}
+
 export function useAdminOrganizationHierarchy(organizationId: string, enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(

@@ -283,9 +283,9 @@ describe('createRemoteSessionOnConnection', () => {
       new CommandDeliveredError('invalid create_session command')
     );
 
-    await expect(
-      createRemoteSessionOnConnection(connection, 'cli-owner-1')
-    ).rejects.toBeInstanceOf(CommandDeliveredError);
+    await expect(createRemoteSessionOnConnection(connection, 'cli-owner-1')).rejects.toBeInstanceOf(
+      CommandDeliveredError
+    );
     expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
     expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
       command: 'create_session',

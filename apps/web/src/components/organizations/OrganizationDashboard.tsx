@@ -5,6 +5,7 @@ import { OrganizationInfoCard } from './OrganizationInfoCard';
 import { OrganizationAdminMembers } from './OrganizationMembersCard';
 import { OrganizationDataCollectionCard } from './OrganizationDataCollectionCard';
 import { SeatUsageCard } from './SeatUsageCard';
+import { KiloPassUsageCard } from './KiloPassUsageCard';
 import { SSOSignupCard } from './SSOSignupCard';
 import { LockableContainer } from './LockableContainer';
 import { OrganizationAdminContextProvider } from './OrganizationContextWrapper';
@@ -166,6 +167,7 @@ export function OrganizationDashboard({
               <OrganizationAdminMembers organizationId={organizationId} />
             </LockableContainer>
             <SeatUsageCard organizationId={organizationId} />
+            <KiloPassUsageCard organizationId={organizationId} />
             {canManageOrganizationBilling(currentRole) && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}

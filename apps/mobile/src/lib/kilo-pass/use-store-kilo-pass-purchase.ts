@@ -24,7 +24,6 @@ import { z } from 'zod';
 
 import {
   captureEvent,
-  KILO_PASS_PURCHASE_COMPLETED_EVENT,
   KILO_PASS_PURCHASE_FAILED_EVENT,
   KILO_PASS_PURCHASE_STARTED_EVENT,
 } from '@/lib/analytics/posthog';
@@ -498,9 +497,8 @@ function IosStoreKiloPassPurchaseProvider({ children }: { children: ReactNode })
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
-          // Only user-initiated purchases reach here — recovery and restore
-          // flows pass notifyCompletion: false.
-          captureEvent(KILO_PASS_PURCHASE_COMPLETED_EVENT);
+          // Completed is emitted server-side by completeAppStorePurchase — do not
+          // re-add a client capture (double counting).
           setErrorMessage(null);
           const onCompleted = pendingPurchaseCompletedCallbackRef.current;
           pendingPurchaseCompletedCallbackRef.current = null;

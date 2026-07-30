@@ -24,6 +24,7 @@ catalog:
   '@vitest/coverage-v8': 4.1.6
   '@vitest/ui': 4.1.6
   '@workos-inc/node': 8.13.0
+  appium: 3.6.0
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
   drizzle-orm: 0.45.2
@@ -36,6 +37,7 @@ catalog:
   typescript: 5.9.3
   ulid: 3.0.2
   vitest: 4.1.6
+  webdriverio: 9.30.0
   workers-tagged-logger: 1.0.0
   wrangler: 4.112.0
   zod: 4.4.3
@@ -43,6 +45,8 @@ catalog:
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  - appium
+  - webdriverio
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -158,3 +162,6 @@ allowBuilds:
   tree-sitter-bash: false
   geckodriver: true
   '@scarf/scarf': false
+  appium: set this to true or false
+  appium-ios-tuntap: set this to true or false
+  edgedriver: set this to true or false

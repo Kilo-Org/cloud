@@ -21,9 +21,14 @@ const USAGE_FIELDS = [
   'sum_txBytes',
 ];
 const input = {
-  instanceIds: ['instance-1'],
-  start: '2026-07-01T00:00:00.000Z',
-  end: '2026-07-01T01:00:00.000Z',
+  runs: [
+    {
+      key: 'run-1',
+      instanceId: 'instance-1',
+      start: '2026-07-01T00:00:00.000Z',
+      end: '2026-07-01T01:00:00.000Z',
+    },
+  ],
 };
 const options: ContainerUsageAnalyticsOptions = {
   accountId: ACCOUNT_ID,
@@ -124,12 +129,13 @@ describe('queryContainerUsageAnalytics', () => {
     expect(requests[1]?.body.query).toContain('instanceId_in: $instanceIds');
     expect(requests[1]?.body.variables).toEqual({
       accountTag: ACCOUNT_ID,
-      datetimeStart: input.start,
-      datetimeEnd: input.end,
+      datetimeStart: input.runs[0]?.start,
+      datetimeEnd: input.runs[0]?.end,
       instanceIds: ['instance-1'],
     });
     expect(result.rows).toEqual([
       {
+        runKey: 'run-1',
         applicationId: 'observed-app',
         instanceId: 'instance-1',
         usage: providerRow.sum,
@@ -178,7 +184,7 @@ describe('queryContainerUsageAnalytics', () => {
     );
     const result = await queryContainerUsageAnalytics(input, { ...options, fetch: partial.fetch });
     expect(result.partial).toBe(true);
-    expect(result.usagePartialInstanceIds).toEqual(['instance-1']);
+    expect(result.usagePartialRunKeys).toEqual(['run-1']);
     expect(result.rows).toHaveLength(1);
   });
 
@@ -207,22 +213,38 @@ describe('queryContainerUsageAnalytics', () => {
     }
   });
 
-  it('chunks by live duration and batches exact IDs below the page limit', async () => {
-    const ids = Array.from({ length: 51 }, (_, index) => `instance-${index}`);
+  it('chunks each run by the live duration and keeps its exact instance ID', async () => {
     const { fetch, requests } = requestCapture((_request, index) =>
       response(index === 0 ? settingsBody({ maxDuration: 3_600, maxPageSize: 100 }) : usageBody())
     );
 
     await queryContainerUsageAnalytics(
-      { instanceIds: ids, start: input.start, end: '2026-07-01T02:00:00.000Z' },
+      {
+        runs: [
+          {
+            key: 'run-1',
+            instanceId: 'instance-1',
+            start: '2026-07-01T00:00:00.000Z',
+            end: '2026-07-01T02:00:00.000Z',
+          },
+          {
+            key: 'run-2',
+            instanceId: 'instance-2',
+            start: '2026-07-01T00:00:00.000Z',
+            end: '2026-07-01T01:00:00.000Z',
+          },
+        ],
+      },
       { ...options, fetch }
     );
 
-    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(fetch).toHaveBeenCalledTimes(4);
     const queries = requests.slice(1);
-    expect(new Set(queries.map(item => item.body.variables.instanceIds.length))).toEqual(
-      new Set([1, 50])
-    );
+    expect(queries.map(item => item.body.variables.instanceIds)).toEqual([
+      ['instance-1'],
+      ['instance-1'],
+      ['instance-2'],
+    ]);
     expect(new Set(queries.map(item => item.body.variables.datetimeStart))).toEqual(
       new Set(['2026-07-01T00:00:00.000Z', '2026-07-01T01:00:00.000Z'])
     );
@@ -249,7 +271,7 @@ describe('queryContainerUsageAnalytics', () => {
       ...options,
       fetch: fullPage.fetch,
     });
-    expect(partial.usagePartialInstanceIds).toEqual(['instance-1']);
+    expect(partial.usagePartialRunKeys).toEqual(['run-1']);
 
     const requestCap = requestCapture((_request, index) =>
       response(index === 0 ? settingsBody({ maxPageSize: 2, maxDuration: 3_600 }) : usageBody())
@@ -257,9 +279,12 @@ describe('queryContainerUsageAnalytics', () => {
     await expect(
       queryContainerUsageAnalytics(
         {
-          instanceIds: Array.from({ length: 50 }, (_, index) => `instance-${index}`),
-          start: input.start,
-          end: '2026-07-02T00:00:00.000Z',
+          runs: Array.from({ length: 5 }, (_, index) => ({
+            key: `run-${index}`,
+            instanceId: `instance-${index}`,
+            start: '2026-07-01T00:00:00.000Z',
+            end: '2026-07-02T00:00:00.000Z',
+          })),
         },
         { ...options, fetch: requestCap.fetch }
       )
@@ -324,7 +349,7 @@ describe('queryContainerUsageAnalytics', () => {
       fetch: retained.fetch,
     });
     expect(partial.partial).toBe(true);
-    expect(partial.usagePartialInstanceIds).toEqual(['instance-1']);
+    expect(partial.usagePartialRunKeys).toEqual(['run-1']);
 
     const expired = requestCapture(() => response(settingsBody({ notOlderThan: 3_600 })));
     await expect(

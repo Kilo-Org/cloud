@@ -311,7 +311,8 @@ validate_fixture "validator still rejects a malformed config (self-check)" \
 #
 # So assert the packaged conditions are exactly the set the controller mirrors.
 # A new or reworded condition fails here, on the bump PR, rather than silently
-# leaving the mirror incomplete. Verified identical on 2026.6.11 and 2026.7.2.
+# leaving the mirror incomplete. Verified identical on 2026.6.11, 2026.7.1, and
+# 2026.7.2.
 #
 # Matches on the throw SITES (`throw new Error("hooks.…"`) rather than on the
 # wording of each message. Matching wording would silently pass when upstream

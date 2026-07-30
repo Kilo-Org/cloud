@@ -290,6 +290,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     url: 'https://www.morphllm.com/api/models/json',
   }),
   modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
+  modelsDevFetcher('hyper', 'hyper', 'https://hyper.charm.land/v1/models'),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud', 'https://ollama.com/v1/models'),
   modelsDevFetcher('opencode-go', 'opencode-go', 'https://opencode.ai/zen/go/v1/models'),

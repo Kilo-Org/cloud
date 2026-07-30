@@ -16,6 +16,10 @@ describe('getAiSdkProvider', () => {
     expect(getAiSdkProvider('morph/morph-gpt-compatible', 'morph-byok')).toBe('openai-compatible');
   });
 
+  test('uses Chat Completions for Hyper MiniMax models instead of Anthropic Messages', () => {
+    expect(getAiSdkProvider('hyper/minimax-m2.7', 'hyper')).toBeUndefined();
+  });
+
   test('uses the Anthropic Messages API for MiniMax models through the gateway', () => {
     expect(getAiSdkProvider('minimax/minimax-m2.5', null)).toBe('anthropic');
   });

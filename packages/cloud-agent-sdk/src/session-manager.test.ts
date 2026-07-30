@@ -3488,7 +3488,7 @@ describe('createSessionManager', () => {
 
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
       expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
-      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).not.toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
       expect(
         atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
       ).toEqual(
@@ -3520,43 +3520,42 @@ describe('createSessionManager', () => {
       expect(fetchSnapshotPage).not.toHaveBeenCalled();
     });
 
-    it('drops only pre-clear messages on reconnect replay while marker is set', async () => {
+    it('purges all replayed history on reconnect with no post-clear send', async () => {
+      // E2E case 4: /clear → kill/reconnect, no send → view stays cleared.
       const fetchSnapshotPage = jest.fn().mockResolvedValue({
         kind: 'success',
         info: { id: 'ses-1' },
-        messages: [],
+        messages: [
+          {
+            info: stubUserMessage({ id: 'msg_b_view', sessionID: 'ses-1' }),
+            parts: [],
+          },
+        ],
         nextCursor: 'cursor-older',
         omittedItemCount: 0,
       });
       const config = createMockConfig({ fetchSnapshotPage });
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       mgr.clearTranscript();
-      const clearedAt = atomValue<number | null>(config.store, mgr.atoms.transcriptCleared);
-      expect(clearedAt).not.toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
 
-      // Reconnect snapshot includes pre-clear history and post-clear turns.
+      // Real reconnect order: session.created (empty survivors) → snapshot → onReplayComplete.
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
       latestStorage?.upsertMessage(
-        stubUserMessage({
-          id: 'msg-pre-clear',
-          sessionID: 'ses-1',
-          time: { created: (clearedAt as number) - 1000 },
-        })
+        stubUserMessage({ id: 'msg_a_never_loaded', sessionID: 'ses-1' })
       );
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_b_view', sessionID: 'ses-1' }));
       latestStorage?.upsertMessage(
-        stubUserMessage({
-          id: 'msg-post-clear',
-          sessionID: 'ses-1',
-          time: { created: (clearedAt as number) + 1000 },
-        })
+        stubUserMessage({ id: 'msg_c_only_in_snapshot', sessionID: 'ses-1' })
       );
-      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).length).toBe(2);
-
       mockSessionCallbacks.onReplayComplete?.();
 
-      const remaining = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(remaining.map(m => m.info.id)).toEqual(['msg-post-clear']);
-      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).toBe(clearedAt);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
 
       // Older-page loads stay blocked while the marker is set.
       fetchSnapshotPage.mockClear();
@@ -3564,15 +3563,118 @@ describe('createSessionManager', () => {
       expect(fetchSnapshotPage).not.toHaveBeenCalled();
     });
 
+    it('keeps live post-clear turns that landed before reconnect replay', async () => {
+      // No successful send() yet (marker still set) but a live turn is already
+      // in local storage when replay starts — that id is a survivor.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      latestStorage?.upsertMessage(
+        stubUserMessage({ id: 'msg_post_live', sessionID: 'ses-1' })
+      );
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
+      latestStorage?.upsertMessage(
+        stubUserMessage({ id: 'msg_pre_history', sessionID: 'ses-1' })
+      );
+      mockSessionCallbacks.onReplayComplete?.();
+
+      expect(
+        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+      ).toEqual(['msg_post_live']);
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+    });
+
+    it('resets marker on first successful send so reconnect keeps full history', async () => {
+      // /clear → send → reconnect: marker cleared; full snapshot (incl. pre-clear) stays.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'after clear', mode: 'code' },
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
+      latestStorage?.upsertMessage(
+        stubUserMessage({ id: 'msg_pre_clear', sessionID: 'ses-1' })
+      );
+      latestStorage?.upsertMessage(
+        stubUserMessage({ id: 'msg_post_clear', sessionID: 'ses-1' })
+      );
+      mockSessionCallbacks.onReplayComplete?.();
+
+      expect(
+        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+      ).toEqual(['msg_post_clear', 'msg_pre_clear']);
+    });
+
+    it('re-sets marker on a second /clear after send so reconnect purges again', async () => {
+      // /clear → send → /clear → reconnect: second clear re-arms purge.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mgr.clearTranscript();
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'between clears', mode: 'code' },
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_pre', sessionID: 'ses-1' }));
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_mid', sessionID: 'ses-1' }));
+      mockSessionCallbacks.onReplayComplete?.();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+    });
+
+    it('does not reset marker when send fails', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.clearTranscript();
+      mockSession.send.mockRejectedValue(new Error('offline'));
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'will fail', mode: 'code' },
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+    });
+
     it('clears the marker on switchSession so history can reload', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
       mgr.clearTranscript();
-      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).not.toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
 
       await mgr.switchSession(kiloId('ses-2'));
-      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+    });
+
+    it('clears the marker on destroy', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      mgr.destroy();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
     });
 
     it('intercepts /clear command for remote sessions without hitting the transport', async () => {
@@ -3588,7 +3690,7 @@ describe('createSessionManager', () => {
 
       expect(ok).toBe(true);
       expect(mockSession.send).not.toHaveBeenCalled();
-      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).not.toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
     });
 
     it('does not intercept /clear for cloud-agent sessions', async () => {
@@ -3603,7 +3705,7 @@ describe('createSessionManager', () => {
       });
 
       expect(mockSession.send).toHaveBeenCalled();
-      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
     });
 
     it('does not intercept /clear with non-empty arguments', async () => {
@@ -3618,7 +3720,7 @@ describe('createSessionManager', () => {
       });
 
       expect(mockSession.send).toHaveBeenCalled();
-      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
     });
 
     it('resets isLoadingOlderMessages when /clear races an in-flight older-page fetch', async () => {

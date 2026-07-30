@@ -322,11 +322,14 @@ type SessionManagerAtoms = {
   /** Total items omitted across every page loaded so far (initial + older). */
   olderMessagesOmittedItemCount: W<number>;
   /**
-   * Timestamp when the user cleared the local transcript view (`/clear`), or
-   * null when not cleared. Blocks older-page loads for this visit; cleared on
-   * switch/destroy so history reappears on re-entry.
+   * True after `/clear` this visit until the first successful post-clear
+   * `send()`, switch, or destroy. While set: older-page loads are blocked,
+   * and reconnect replay purges everything except ids already in local
+   * storage when the replay started (live post-clear turns). First successful
+   * send clears the marker so a later reconnect shows full server history
+   * (pre-clear messages may reappear — accepted tradeoff).
    */
-  transcriptCleared: W<number | null>;
+  transcriptCleared: W<boolean>;
 };
 
 type SessionManager = {
@@ -537,7 +540,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const isLoadingOlderMessagesAtom = atom<boolean>(false);
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
-  const transcriptClearedAtom = atom<number | null>(null);
+  const transcriptClearedAtom = atom(false);
 
   // Derived atoms
   const messagesListAtom = atom<StoredMessage[]>(get => {
@@ -610,6 +613,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // True while a connect/reconnect cycle is still replaying its message
   // history; false once live events are flowing. See clearOverrideIfDiverged.
   let remoteHistoryReplaying = true;
+  /**
+   * Message ids already in local storage when a reconnect replay starts while
+   * `/clear` is active. Those are live post-clear turns for this visit and
+   * must survive purge; everything else in the replayed snapshot is dropped.
+   * Null when the marker is not set (no purge) or survivors were not
+   * snapshotted (should not purge blindly).
+   */
+  let postClearSurvivorIds: ReadonlySet<string> | null = null;
   let stateUnsub: (() => void) | null = null;
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
   let childSessionHydrationGeneration = 0;
@@ -657,6 +668,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(observedModelAtom, null);
     observedModelSource = null;
     remoteHistoryReplaying = true;
+    postClearSurvivorIds = null;
     store.set(remoteModelOverrideAtom, null);
     store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
@@ -688,7 +700,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isLoadingOlderMessagesAtom, false);
     store.set(olderMessagesErrorAtom, null);
     store.set(olderMessagesOmittedItemCountAtom, 0);
-    store.set(transcriptClearedAtom, null);
+    store.set(transcriptClearedAtom, false);
     olderMessagesCursor = null;
     loadOlderGeneration += 1;
     olderMessagesInFlight = null;
@@ -1019,7 +1031,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // switchSession (which resets `olderMessagesTerminal`).
     if (olderMessagesTerminal) return;
     // `/clear` keeps the local view empty for this visit — do not page history back in.
-    if (store.get(transcriptClearedAtom) !== null) return;
+    if (store.get(transcriptClearedAtom)) return;
     // No cursor means nothing left to load.
     if (olderMessagesCursor === null) return;
     // Dedupe: if a load is already in flight, every caller awaits the
@@ -1183,6 +1195,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // A fresh replay is starting (initial connect or a reconnect);
           // onReplayComplete flips this back off once it's done.
           remoteHistoryReplaying = true;
+          // Snapshot live post-clear ids before snapshot upserts land.
+          postClearSurvivorIds = store.get(transcriptClearedAtom)
+            ? new Set(session.storage.getMessageIds())
+            : null;
           if (info.model) {
             updateObservedModel(
               toModelSelection(
@@ -1269,16 +1285,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (expectedGeneration !== switchGeneration) return;
         remoteHistoryReplaying = false;
         store.set(isLoadingAtom, false);
-        // `/clear` view must survive reconnect snapshot replay: drop only
-        // messages older than the clear marker so post-clear turns stay
-        // (Decision 3 / round 5; scoped purge keeps post-clear history).
-        const clearedAt = store.get(transcriptClearedAtom);
-        if (clearedAt !== null) {
-          for (const messageId of session.storage.getMessageIds()) {
-            const info = session.storage.getMessageInfo(messageId);
-            if (info !== undefined && info.time.created < clearedAt) {
-              session.storage.deleteMessage(messageId);
-            }
+        // `/clear` with no successful post-clear send: drop the replayed
+        // snapshot down to live post-clear ids only. No id/timestamp
+        // comparison across hosts — survivors were local when replay started.
+        // First successful send clears the marker, so this path does not run
+        // after the user continues the conversation.
+        const survivors = postClearSurvivorIds;
+        postClearSurvivorIds = null;
+        if (!store.get(transcriptClearedAtom) || survivors === null) return;
+        for (const messageId of session.storage.getMessageIds()) {
+          if (!survivors.has(messageId)) {
+            session.storage.deleteMessage(messageId);
           }
         }
       },
@@ -1489,6 +1506,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           : {}),
       });
 
+      // User continued after `/clear`: drop the marker so a later reconnect
+      // replays full history (pre-clear may reappear — accepted tradeoff).
+      if (store.get(transcriptClearedAtom)) {
+        store.set(transcriptClearedAtom, false);
+      }
+
       if (sessionType === 'remote' && kiloSessionId) {
         config.onRemoteSessionMessageSent?.({ kiloSessionId });
       }
@@ -1557,7 +1580,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(olderMessagesErrorAtom, null);
     olderMessagesInFlight = null;
     loadOlderGeneration += 1;
-    store.set(transcriptClearedAtom, Date.now());
+    store.set(transcriptClearedAtom, true);
     store.set(chatUIAtom, { shouldAutoScroll: true });
     setIndicator({
       type: 'info',

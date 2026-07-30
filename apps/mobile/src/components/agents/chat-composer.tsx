@@ -147,6 +147,13 @@ export function ChatComposer({
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  // Live gates for the AppState focus-restore timeout: read at fire time so a
+  // disabled/isSending flip cannot re-run the subscription effect and cancel a
+  // pending restore after the restore flag was already consumed.
+  const disabledRef = useRef(disabled);
+  const isSendingRef = useRef(isSending);
+  disabledRef.current = disabled;
+  isSendingRef.current = isSending;
 
   // Single send-admission authority. `settleVoiceInputBeforeSubmit` owns
   // this lock for the full voice-settle + asynchronous send sequence, and
@@ -260,10 +267,16 @@ export function ChatComposer({
         inputRef.current?.blur();
       }
 
-      if (transition.shouldFocus && !disabled && !isSending) {
+      // Schedule unconditionally when the transition asks for focus; gate at
+      // fire time via refs so disabled/isSending flips never cancel a pending
+      // restore after the flag was consumed.
+      if (transition.shouldFocus) {
         clearRestoreFocusTimeout();
         restoreFocusTimeoutRef.current = setTimeout(() => {
           restoreFocusTimeoutRef.current = null;
+          if (disabledRef.current || isSendingRef.current) {
+            return;
+          }
           inputRef.current?.focus();
         }, COMPOSER_FOCUS_RESTORE_DELAY_MS);
       }
@@ -273,7 +286,7 @@ export function ChatComposer({
       subscription.remove();
       clearRestoreFocusTimeout();
     };
-  }, [disabled, isSending]);
+  }, []);
 
   const inputScrollable = shouldEnableComposerInputScroll(measure.height, TEXT_INPUT_MAX_HEIGHT);
   const dismissKeyboardPan = useMemo(

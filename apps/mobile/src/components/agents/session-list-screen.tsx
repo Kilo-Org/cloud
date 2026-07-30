@@ -176,13 +176,20 @@ export function AgentSessionListScreen() {
   // `isSearchPending` drives a lightweight inline indicator instead.
   const effectiveSearchQuery = isSearchPending ? '' : searchQuery;
 
-  // Pinned "Active now" tray. Free-text search is intentionally NOT a
-  // narrowing input here — the tray persists while the user types. The
-  // helper applies only the platform/project filters so the tray never
-  // shows a session the user has explicitly filtered out.
+  // Pinned "Active now" tray. The committed effective search query narrows
+  // the tray together with the history data source (blank while the first
+  // fetch for the text is pending), in conjunction with the platform/project
+  // filters, so the tray never shows a session the user has searched or
+  // filtered away.
   const pinnedActive = useMemo(
-    () => selectPinnedActiveSessions({ activeSessions, projectFilter, platformFilter }),
-    [activeSessions, platformFilter, projectFilter]
+    () =>
+      selectPinnedActiveSessions({
+        activeSessions,
+        projectFilter,
+        platformFilter,
+        searchQuery: effectiveSearchQuery,
+      }),
+    [activeSessions, effectiveSearchQuery, platformFilter, projectFilter]
   );
   const hasPinnedActive = pinnedActive.length > 0;
 
@@ -223,8 +230,9 @@ export function AgentSessionListScreen() {
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
   const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
 
-  // Search header is rendered at the screen level (above the pinned tray)
-  // so it's always visible. Recompute the body's `showInlineError` here
+  // Search header is rendered at the screen level (above the scrolling list)
+  // so it stays reachable without scrolling. The Active now tray scrolls
+  // inside the list header. Recompute the body's `showInlineError` here
   // via the SAME pure selector, with the same inputs, so the inline
   // "Couldn't refresh" line stays identical and the body-model test keeps
   // covering it.
@@ -289,11 +297,6 @@ export function AgentSessionListScreen() {
           onClearSearch={handleClearSearchInput}
         />
       ) : null}
-      <ActiveNowSection
-        pinned={pinnedActive}
-        organizationIdBySessionId={organizationIdBySessionId}
-        onSessionPress={navigateToSession}
-      />
       <Animated.View layout={LinearTransition} className="flex-1">
         <AgentSessionListContent
           sections={sections}
@@ -309,11 +312,19 @@ export function AgentSessionListScreen() {
           onSessionPress={navigateToSession}
           hasActiveQuery={isSearching || hasActiveFilter}
           isSearching={isSearching}
+          searchQuery={searchQuery}
           onClearQuery={handleClearQuery}
           onCreateSession={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}
           sortBy={sortBy}
+          activeNowSection={
+            <ActiveNowSection
+              pinned={pinnedActive}
+              organizationIdBySessionId={organizationIdBySessionId}
+              onSessionPress={navigateToSession}
+            />
+          }
         />
       </Animated.View>
       {showFilterModal && (

@@ -62,6 +62,10 @@ export type ConnectedInstanceRow = {
   name: string;
   projectName: string;
   version?: string;
+  // Latest capabilities from the CLI socket attachment. Omitted when the
+  // attachment has no capabilities (legacy CLI / pre-field build) so the
+  // response stays byte-identical for those clients.
+  capabilities?: ConnectionCapabilities;
 };
 
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
@@ -331,26 +335,32 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  webSocketClose(ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {
+  webSocketClose(
+    ws: WebSocket,
+    _code: number,
+    _reason: string,
+    _wasClean: boolean
+  ): void | Promise<void> {
     this.ensureState();
 
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     if (!attachment) return;
 
     if (attachment.role === 'cli') {
-      this.handleCliDisconnect(ws, attachment);
-    } else {
-      this.handleWebDisconnect(ws);
+      // Await attention resets so cli.disconnected is not broadcast until the
+      // stored status write has committed (mobile history refetch races otherwise).
+      return this.handleCliDisconnect(ws, attachment);
     }
+    this.handleWebDisconnect(ws);
   }
 
-  webSocketError(ws: WebSocket): void {
+  webSocketError(ws: WebSocket): void | Promise<void> {
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     console.error('WebSocket error', {
       role: attachment?.role ?? 'unknown',
       connectionId: attachment?.connectionId ?? 'unknown',
     });
-    this.webSocketClose(ws, 0, '', false);
+    return this.webSocketClose(ws, 0, '', false);
   }
 
   async alarm(): Promise<void> {
@@ -832,21 +842,25 @@ export class UserConnectionDO extends DurableObject<Env> {
   // Disconnect handling
   // ---------------------------------------------------------------------------
 
-  private handleCliDisconnect(
+  private async handleCliDisconnect(
     disconnectedWs: WebSocket,
     attachment: WSAttachment & { role: 'cli' }
-  ): void {
+  ): Promise<void> {
     const { connectionId } = attachment;
 
     // If another CLI socket already has this connectionId, this is a stale
     // close from a reconnect — the replacement socket is already active.
+    // Exclude the closing socket: under wrangler/workerd, getWebSockets() still
+    // includes it during webSocketClose, so matching self would always look "replaced"
+    // and skip ownership cleanup + attention reset (DEF-5 E2E failure).
     const replaced = this.ctx.getWebSockets('cli').some(ws => {
+      if (ws === disconnectedWs) return false;
       const att = ws.deserializeAttachment() as WSAttachment | null;
       return att?.role === 'cli' && att.connectionId === connectionId;
     });
 
     // Fail pending commands that targeted this specific socket
-    this.failPendingCommandsForSocket(disconnectedWs);
+    this.failPendingCommandsForSocket(disconnectedWs, !replaced);
 
     if (replaced) {
       console.log('Stale CLI socket closed (already replaced)', { connectionId });
@@ -875,11 +889,51 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     // Leave webSubscriptions intact — a reconnecting CLI can resume
 
+    // Reset stored attention before broadcasting disconnect so the mobile
+    // departure refetch observes `retry` rather than a stuck `question`.
+    // kiloUserId comes from the CLI attachment (authenticated /user/cli route);
+    // without it we cannot safely target rows and must no-op.
+    await this.resetOwnedSessionAttentionOnDisconnect(attachment.kiloUserId, ownedSessions);
+
     this.broadcastToWeb({
       type: 'system',
       event: 'cli.disconnected',
       data: { connectionId },
     });
+  }
+
+  /**
+   * Commit attention clears for owned sessions before `cli.disconnected`.
+   * Identity: attachment `kiloUserId` only — never guess from DO name.
+   */
+  private async resetOwnedSessionAttentionOnDisconnect(
+    kiloUserId: string | undefined,
+    ownedSessions: ReadonlySet<string>
+  ): Promise<void> {
+    if (ownedSessions.size === 0) return;
+
+    if (!kiloUserId) {
+      console.warn(
+        'Skipping attention status reset on CLI disconnect: missing kiloUserId on attachment',
+        { ownedSessionCount: ownedSessions.size }
+      );
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      [...ownedSessions].map(async sessionId => {
+        const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
+        await stub.resetAttentionStatusOnCliDisconnect(kiloUserId, sessionId);
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('Failed to reset attention status on CLI disconnect', {
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+      }
+    }
   }
 
   private handleWebDisconnect(ws: WebSocket): void {
@@ -957,6 +1011,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         name: att.instance.name,
         projectName: att.instance.projectName,
         ...(att.instance.version ? { version: att.instance.version } : {}),
+        ...(att.capabilities ? { capabilities: att.capabilities } : {}),
       });
     }
     return { instances };
@@ -1028,7 +1083,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       const att = ws.deserializeAttachment() as WSAttachment | null;
       if (att?.role === 'cli' && att.connectionId === connectionId) {
         console.log('Closing stale CLI socket for reconnect', { connectionId });
-        this.failPendingCommandsForSocket(ws);
+        this.failPendingCommandsForSocket(ws, false);
         // Preserve session ownership — the reconnecting CLI still owns these sessions
         ws.close(1000, 'replaced by reconnect');
         return true;
@@ -1077,16 +1132,25 @@ export class UserConnectionDO extends DurableObject<Env> {
     return undefined;
   }
 
-  private failPendingCommandsForSocket(targetWs: WebSocket): void {
+  private failPendingCommandsForSocket(targetWs: WebSocket, cliGone: boolean): void {
     for (const [id, entry] of this.pendingCommands) {
-      if (entry.targetCliWs === targetWs) {
-        this.sendToWeb(entry.ws, {
-          type: 'response',
-          id: entry.originalId,
-          error: entry.expectedOwnerConnectionId ? SESSION_OWNER_CHANGED_ERROR : 'CLI disconnected',
-        });
-        this.pendingCommands.delete(id);
-      }
+      if (entry.targetCliWs !== targetWs) continue;
+      // The owning CLI is really gone, so a forwarded `exit_cli` got what it
+      // asked for: this session is no longer owned by anyone.
+      const exited = cliGone && entry.command === 'exit_cli';
+      this.sendToWeb(
+        entry.ws,
+        exited
+          ? { type: 'response', id: entry.originalId, result: {} }
+          : {
+              type: 'response',
+              id: entry.originalId,
+              error: entry.expectedOwnerConnectionId
+                ? SESSION_OWNER_CHANGED_ERROR
+                : 'CLI disconnected',
+            }
+      );
+      this.pendingCommands.delete(id);
     }
   }
 
@@ -1099,11 +1163,15 @@ export class UserConnectionDO extends DurableObject<Env> {
         continue;
       }
       this.pendingCommands.delete(id);
-      this.sendToWeb(entry.ws, {
-        type: 'response',
-        id: entry.originalId,
-        error: SESSION_OWNER_CHANGED_ERROR,
-      });
+      // `exit_cli` asked for exactly this: the session is no longer owned.
+      // Ownership moving to another CLI is a genuine owner change and still fails.
+      const exited = entry.command === 'exit_cli' && nextOwnerConnectionId === undefined;
+      this.sendToWeb(
+        entry.ws,
+        exited
+          ? { type: 'response', id: entry.originalId, result: {} }
+          : { type: 'response', id: entry.originalId, error: SESSION_OWNER_CHANGED_ERROR }
+      );
     }
   }
 

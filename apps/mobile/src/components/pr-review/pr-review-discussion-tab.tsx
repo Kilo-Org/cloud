@@ -1,8 +1,11 @@
 // PR review Discussion tab body.
 //
-// State matrix (per S7b §6 Discussion):
-//   - happy:        threads render, grouped by file path; first
-//                   page auto-loads, "Load more" paginates.
+// State matrix (per S7b §6 Discussion + Batch F item 2):
+//   - happy:        one merged ascending list of review threads and
+//                   conversation comments; first page auto-loads,
+//                   "Load more" paginates threads. Full re-sort of
+//                   the entire loaded set on every update (R4: a
+//                   later page can insert rows mid-list).
 //   - loading:      first page in flight; render `Skeleton`
 //                   placeholders matching the row dimensions.
 //   - retryable:    first page failed with a transient error;
@@ -19,29 +22,31 @@
 //                   connect gate (the connect flow is owned by the
 //                   screen-level `PrReviewConnectGate`, which is
 //                   already mounted by the parent screen).
-//   - empty:        first page returned zero threads AND no
-//                   terminal error; render `EmptyState` with the
-//                   "No review comments yet" copy and a "Review
-//                   files" CTA that switches to the Files tab via
-//                   the `onRequestFiles` prop (the screen must
-//                   pass it; we degrade gracefully if it's
-//                   omitted).
+//   - empty:        first page returned zero threads AND zero
+//                   conversation comments AND no terminal error;
+//                   render `EmptyState` with copy covering both
+//                   kinds and a "Review files" CTA that switches
+//                   to the Files tab via `onRequestFiles`.
 //
 //   - later-page error: a per-page refetch failure during a
 //                       "Load more" tap. The current loaded
-//                       threads are kept and a small retry row
+//                       items are kept and a small retry row
 //                       renders at the bottom of the list.
 //
 // The component does NOT own a ScrollView — the tab is mounted
 // inside the screen's tab shell and needs a fresh FlatList so the
 // list can virtualize when a PR has hundreds of threads. (Same
 // approach as the Files tab.)
+//
+// Happy-path list lives in discussion/pr-review-discussion-list.tsx
+// (max-lines extraction). Expansion settle bookkeeping stays here.
 
-import { FlashList } from '@shopify/flash-list';
+import { type FlashListRef } from '@shopify/flash-list';
 import { MessageSquarePlus } from 'lucide-react-native';
-import { View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, View } from 'react-native';
 
-import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
+import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -49,25 +54,32 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
-  groupThreadsByPath,
+  type DiscussionListItem,
+  isDiscussionEmpty,
+  mergeDiscussionListItems,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import {
+  expandedForThread,
+  expandThread,
+  seedThreadExpansion,
+  shouldDeferExpand,
+  toggleThreadExpanded,
+} from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
-import { cn } from '@/lib/utils';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;
   /**
-   * Invoked by the empty state ("No review comments yet") to switch
-   * to the Files tab. Optional; if absent, the CTA is hidden.
+   * Invoked by the empty state to switch to the Files tab.
+   * Optional; if absent, the CTA is hidden.
    */
   readonly onRequestFiles?: () => void;
 };
 
 const SKELETON_ROW_COUNT = 4;
-const DISCUSSION_LIST_CONTENT_STYLE = { paddingTop: 12 };
 
 export function PrReviewDiscussionTab({
   owner,
@@ -75,11 +87,115 @@ export function PrReviewDiscussionTab({
   number,
   onRequestFiles,
 }: PrReviewDiscussionTabProps) {
-  const { query, threads, firstPageErrorState, laterPageError } = usePrReviewDiscussionThreads({
-    owner,
-    repo,
-    number,
-  });
+  const { query, threads, conversation, firstPageErrorState, laterPageError } =
+    usePrReviewDiscussionThreads({
+      owner,
+      repo,
+      number,
+    });
+
+  const [expansion, setExpansion] = useState<Record<string, boolean>>({});
+  const [suppressContentPosition, setSuppressContentPosition] = useState(false);
+  const expansionRef = useRef(expansion);
+  const listRef = useRef<FlashListRef<DiscussionListItem>>(null);
+  const settleGenerationRef = useRef(0);
+  const settleThreadIdRef = useRef<string | null>(null);
+
+  // Single write path: the ref is the tap-time source of truth (render-closure
+  // state can lag a queued update on rapid taps).
+  const applyExpansion = (next: Record<string, boolean>) => {
+    expansionRef.current = next;
+    setExpansion(next);
+  };
+
+  // First-sight seeding: a resolve/unresolve must NOT change expansion (see
+  // thread-expansion.ts). No-op on the loading branch (threads is []).
+  useEffect(() => {
+    const seeded = seedThreadExpansion(expansionRef.current, threads);
+    if (seeded !== expansionRef.current) {
+      applyExpansion(seeded);
+    }
+  }, [threads]);
+
+  // A data change mid-settle (load-more re-sort, optimistic mutation) cancels the
+  // settle: the captured scroll index can point at a different row after a re-sort.
+  // The user taps again; a wrong-row settle is worse.
+  useEffect(() => {
+    settleGenerationRef.current += 1;
+    settleThreadIdRef.current = null;
+  }, [threads]);
+
+  // Unmount cancels any in-flight settle.
+  useEffect(
+    () => () => {
+      settleGenerationRef.current += 1;
+      settleThreadIdRef.current = null;
+    },
+    []
+  );
+
+  const invalidateSettle = () => {
+    settleGenerationRef.current += 1;
+    settleThreadIdRef.current = null;
+  };
+
+  const handleToggleExpand = (thread: ReviewThread, index: number) => {
+    // Same-thread retap during an in-flight settle: cancel that settle, then run
+    // THIS tap's path below (cancel + supersede — never two concurrent settles,
+    // and exactly one expand results, which E2E flow 7a asserts).
+    if (settleThreadIdRef.current === thread.threadId) {
+      invalidateSettle();
+    }
+    const expanded = expandedForThread(expansionRef.current, thread.threadId, thread.isResolved);
+    if (!expanded) {
+      const layout = listRef.current?.getLayout(index);
+      const rowTop = layout ? layout.y + (listRef.current?.getFirstItemOffset() ?? 0) : null;
+      const offset = listRef.current?.getAbsoluteLastScrollOffset() ?? 0;
+      if (shouldDeferExpand(rowTop, offset)) {
+        settleGenerationRef.current += 1;
+        const generation = settleGenerationRef.current;
+        settleThreadIdRef.current = thread.threadId;
+        void (async () => {
+          // Settle target, verified on-device (iOS, calibrated ±1.3pt — E2E r3):
+          // maintainVisibleContentPosition anchors the first FULLY visible row, and a
+          // row parked at the visible top edge still loses the anchor to the next row —
+          // the expansion then scrolls the list by the full expansion height and the
+          // tapped header flies off screen. viewOffset: +firstItemOffset parks the row
+          // ~|firstItemOffset| below the viewport top (fully inside the visible region,
+          // with rows above it visible), so a row above stays the anchor and the
+          // post-expand adjustment measures ≈ 0; the header never leaves the screen.
+          const firstItemOffset = listRef.current?.getFirstItemOffset() ?? 0;
+          await listRef.current?.scrollToIndex({
+            index,
+            viewPosition: 0,
+            viewOffset: firstItemOffset,
+            animated: true,
+          });
+          if (settleGenerationRef.current === generation) {
+            settleThreadIdRef.current = null;
+            // Android only: suppress maintainVisibleContentPosition for exactly
+            // the expand commit. Measured across E2E rounds r1-r5: every
+            // top-clipped flight equals the expansion height — the post-expand
+            // native mVCP adjustment, not a settle-target error. Android's
+            // shallower park loses the anchor without this (r4); with it the
+            // adjustment cannot fire (r5: all Android flows pass). iOS must
+            // NOT cycle the prop: removing and re-adding native mVCP blanks
+            // the whole list (r5, deterministic -997949 offset), and iOS's
+            // deeper park is anchor-safe without suppression (r4: 3/3 pass).
+            if (Platform.OS === 'android') {
+              setSuppressContentPosition(true);
+            }
+            applyExpansion(expandThread(expansionRef.current, thread.threadId));
+            setTimeout(() => {
+              setSuppressContentPosition(false);
+            }, 150);
+          }
+        })();
+        return;
+      }
+    }
+    applyExpansion(toggleThreadExpanded(expansionRef.current, thread.threadId, thread.isResolved));
+  };
 
   // ── First-page error / terminal states ─────────────────────────────
   if (firstPageErrorState) {
@@ -139,14 +255,14 @@ export function PrReviewDiscussionTab({
     );
   }
 
-  // ── Empty ──────────────────────────────────────────────────────────
-  if (threads.length === 0) {
+  // ── Empty (neither threads nor conversation comments) ──────────────
+  if (isDiscussionEmpty(threads, conversation)) {
     return (
       <View className="flex-1 px-4 pb-6">
         <EmptyState
           icon={MessageSquarePlus}
-          title="No review comments yet"
-          description="Reviewers haven't left any inline comments on this pull request."
+          title="No discussion yet"
+          description="No review threads or conversation comments on this pull request."
           action={
             onRequestFiles ? (
               <Button variant="outline" onPress={onRequestFiles} accessibilityLabel="Review files">
@@ -160,130 +276,30 @@ export function PrReviewDiscussionTab({
   }
 
   // ── Happy / paginated list ─────────────────────────────────────────
-  const groups = groupThreadsByPath(threads);
-  // Flatten the grouped list into a single list with separator
-  // rows between groups. Separator rows have `type: 'separator'`
-  // and the threads have `type: 'thread'`.
-  const listItems: ListItem[] = [];
-  for (const group of groups) {
-    if (groups.length > 1) {
-      listItems.push({ type: 'separator', path: group.path });
-    }
-    for (const thread of group.threads) {
-      listItems.push({ type: 'thread', thread });
-    }
-  }
+  // Full re-sort of every loaded thread + first-page conversation
+  // comments (R4: "Load more" may insert rows mid-list; accepted).
+  const listItems = mergeDiscussionListItems(threads, conversation);
 
   return (
-    <FlashList
-      data={listItems}
-      keyExtractor={keyForItem}
-      getItemType={item => item.type}
-      renderItem={({ item }) => {
-        if (item.type === 'separator') {
-          return <GroupSeparator path={item.path} />;
-        }
-        return (
-          <View className="px-4 pb-3">
-            <DiscussionThread owner={owner} repo={repo} number={number} thread={item.thread} />
-          </View>
-        );
+    <PrReviewDiscussionList
+      owner={owner}
+      repo={repo}
+      number={number}
+      listItems={listItems}
+      listRef={listRef}
+      expansion={expansion}
+      suppressContentPosition={suppressContentPosition}
+      onToggleExpand={handleToggleExpand}
+      onScrollBeginDrag={invalidateSettle}
+      hasNextPage={query.hasNextPage}
+      isFetchingNextPage={query.isFetchingNextPage}
+      laterPageError={laterPageError}
+      onLoadMore={() => {
+        void query.fetchNextPage();
       }}
-      contentContainerStyle={DISCUSSION_LIST_CONTENT_STYLE}
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-      ListFooterComponent={
-        <ListFooter
-          hasNextPage={query.hasNextPage}
-          isFetchingNextPage={query.isFetchingNextPage}
-          laterPageError={laterPageError}
-          onLoadMore={() => {
-            void query.fetchNextPage();
-          }}
-          onRetryLoadMore={() => {
-            void query.refetch();
-          }}
-        />
-      }
+      onRetryLoadMore={() => {
+        void query.refetch();
+      }}
     />
-  );
-}
-
-// ── List item shape ──────────────────────────────────────────────────
-
-type ListItem =
-  | { readonly type: 'separator'; readonly path: string }
-  | {
-      readonly type: 'thread';
-      readonly thread: ReviewThread;
-    };
-
-function keyForItem(item: ListItem): string {
-  return item.type === 'separator' ? `sep:${item.path}` : `thread:${item.thread.threadId}`;
-}
-
-function GroupSeparator({ path }: Readonly<{ path: string }>) {
-  return (
-    <View className="flex-row items-center gap-2 px-4 pb-2 pt-3">
-      <Text
-        className={cn('font-mono-medium text-[11px] uppercase tracking-wide text-muted-foreground')}
-        numberOfLines={1}
-      >
-        {path}
-      </Text>
-      <View className="h-px flex-1 bg-border" />
-    </View>
-  );
-}
-
-// ── Footer (Load more / error row) ───────────────────────────────────
-
-type ListFooterProps = {
-  readonly hasNextPage: boolean;
-  readonly isFetchingNextPage: boolean;
-  readonly laterPageError: boolean;
-  readonly onLoadMore: () => void;
-  readonly onRetryLoadMore: () => void;
-};
-
-function ListFooter({
-  hasNextPage,
-  isFetchingNextPage,
-  laterPageError,
-  onLoadMore,
-  onRetryLoadMore,
-}: Readonly<ListFooterProps>) {
-  if (laterPageError) {
-    return (
-      <View className="items-center gap-2 px-4 pb-8 pt-2">
-        <Text variant="muted" className="text-center text-xs">
-          Could not load more comments.
-        </Text>
-        <Button
-          size="sm"
-          variant="outline"
-          onPress={onRetryLoadMore}
-          accessibilityLabel="Retry loading more comments"
-        >
-          <Text>Retry</Text>
-        </Button>
-      </View>
-    );
-  }
-  if (!hasNextPage) {
-    return <View className="h-6" />;
-  }
-  return (
-    <View className="items-center px-4 pb-8 pt-2">
-      <Button
-        size="sm"
-        variant="outline"
-        loading={isFetchingNextPage}
-        onPress={onLoadMore}
-        accessibilityLabel="Load more comments"
-      >
-        <Text>Load more</Text>
-      </Button>
-    </View>
   );
 }

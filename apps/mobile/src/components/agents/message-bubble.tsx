@@ -1,4 +1,4 @@
-import { type MessageDeliveryState, type StoredMessage } from 'cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from 'lucide-react-native';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -10,6 +10,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
+import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { PartRenderer } from './part-renderer';
 import { isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
@@ -24,13 +25,8 @@ type MessageBubbleProps = {
   onOpenChildSession?: OpenChildSession;
   /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
   deliveryState?: MessageDeliveryState;
-  /**
-   * Subtle model label for an assistant message, precomputed by the parent
-   * via `computeMessageModelLabels`. Only the assistant branch renders it
-   * (and only when truthy); the user branch and the unlabelled
-   * same-model follow-ups render nothing.
-   */
-  modelLabel?: string;
+  /** Opens the message-details sheet; long-press never triggers the copy ActionSheet. */
+  onLongPressDetails?: (message: StoredMessage) => void;
 };
 
 export function MessageBubble({
@@ -41,20 +37,24 @@ export function MessageBubble({
   defaultReasoningExpanded,
   onOpenChildSession,
   deliveryState,
-  modelLabel,
+  onLongPressDetails,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
 
   const handleLongPress = () => {
-    void copyMessage(message);
+    onLongPressDetails?.(message);
   };
 
-  // Long-press is an accelerator; expose the same "copy" action to
-  // accessibility tooling (VoiceOver/TalkBack rotor) since a long-press
-  // gesture isn't reliably discoverable there.
-  const copyAccessibilityActions = [{ name: 'copy', label: 'Copy message' }];
+  // Long-press opens the details sheet; the VoiceOver/TalkBack rotor "copy"
+  // action stays available so a11y tooling still reaches the existing
+  // ActionSheet copy path. The wrapping `Pressable` is explicitly
+  // `accessible={false}` so iOS does not collapse the message subtree
+  // (permission/question `Button`s, child-session "open" `Pressable`, tool
+  // cards, file parts, markdown link handlers) into a single, unnavigable
+  // node; the role/label/hint/copy action live on a dedicated,
+  // non-interactive focusable overlay so the rotor still has a target.
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === 'copy') {
       void copyMessage(message);
@@ -78,17 +78,10 @@ export function MessageBubble({
       .join('');
     const fileParts = message.parts.filter(isFilePart);
     const showQueuedBadge = deliveryState?.status === 'queued';
+    const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: true, canCopy: true });
 
     return (
-      <Pressable
-        onLongPress={handleLongPress}
-        className="px-4 py-1"
-        accessibilityRole="text"
-        accessibilityLabel="User message"
-        accessibilityHint="Long press to copy message text"
-        accessibilityActions={copyAccessibilityActions}
-        onAccessibilityAction={handleAccessibilityAction}
-      >
+      <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
         <View className="items-end gap-1">
           <Bubble side="user">
             {textContent ? (
@@ -111,23 +104,28 @@ export function MessageBubble({
             </Animated.View>
           ) : null}
         </View>
+        {a11y.accessibilityActions.length > 0 ? (
+          <View
+            accessible
+            accessibilityRole={a11y.accessibilityRole}
+            accessibilityLabel={a11y.accessibilityLabel}
+            accessibilityHint={a11y.accessibilityHint}
+            accessibilityActions={a11y.accessibilityActions}
+            onAccessibilityAction={handleAccessibilityAction}
+            className="absolute inset-0 opacity-0"
+            pointerEvents="none"
+          />
+        ) : null}
       </Pressable>
     );
   }
 
   // Assistant messages: render parts sequentially without a bubble
   const isStreaming = isLastAssistantMessage && isSessionStreaming;
+  const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: false, canCopy: true });
 
   return (
-    <Pressable
-      className="px-4 py-2"
-      onLongPress={handleLongPress}
-      accessibilityRole="text"
-      accessibilityLabel="Assistant message"
-      accessibilityHint="Long press to copy message text"
-      accessibilityActions={copyAccessibilityActions}
-      onAccessibilityAction={handleAccessibilityAction}
-    >
+    <Pressable className="px-4 py-2" onLongPress={handleLongPress} accessible={a11y.accessible}>
       <View className="gap-2">
         {message.parts.map(part => (
           <PartRenderer
@@ -139,16 +137,19 @@ export function MessageBubble({
             onOpenChildSession={onOpenChildSession}
           />
         ))}
-        {modelLabel ? (
-          <Text
-            className="text-xs text-muted-foreground"
-            accessibilityRole="text"
-            accessibilityLabel={`Model: ${modelLabel}`}
-          >
-            {modelLabel}
-          </Text>
-        ) : null}
       </View>
+      {a11y.accessibilityActions.length > 0 ? (
+        <View
+          accessible
+          accessibilityRole={a11y.accessibilityRole}
+          accessibilityLabel={a11y.accessibilityLabel}
+          accessibilityHint={a11y.accessibilityHint}
+          accessibilityActions={a11y.accessibilityActions}
+          onAccessibilityAction={handleAccessibilityAction}
+          className="absolute inset-0 opacity-0"
+          pointerEvents="none"
+        />
+      ) : null}
     </Pressable>
   );
 }

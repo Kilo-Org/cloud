@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type SlashCommandInfo } from 'cloud-agent-sdk';
+import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 
 import {
   LOCAL_NEW_SLASH_COMMAND,

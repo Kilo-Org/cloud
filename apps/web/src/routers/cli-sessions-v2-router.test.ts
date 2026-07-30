@@ -857,6 +857,36 @@ describe('cli-sessions-v2-router', () => {
       expect(result.title).toBe('renamed by current member');
     });
 
+    it('rename always overwrites the title, whether it is still the creation placeholder or an existing (e.g. agent-generated) title', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // Session starts with title NULL (the creation placeholder) — rename must succeed.
+      const [beforeAnyTitle] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(beforeAnyTitle?.title).toBeNull();
+
+      const firstRename = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'agent-generated title',
+      });
+      expect(firstRename.title).toBe('agent-generated title');
+
+      // A subsequent user rename must overwrite an already non-null (agent-generated) title too.
+      const secondRename = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'user renamed title',
+      });
+      expect(secondRename.title).toBe('user renamed title');
+
+      const [persisted] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(persisted?.title).toBe('user renamed title');
+    });
+
     it('rename rejects an organization session after its creator loses membership', async () => {
       const originalTitle = 'organization session title';
       await db
@@ -1711,6 +1741,140 @@ describe('cli-sessions-v2-router', () => {
         newerCreatedOlderUpdated,
         olderCreatedNewerUpdated,
       ]);
+    });
+  });
+
+  describe('list / search hide never-ingested placeholders', () => {
+    // Bare POST /api/session placeholders: title/status/cost NULL and platform
+    // still at the column default 'unknown'. Content may still exist in DO/R2;
+    // the four-column conjunction is only a list/search visibility predicate.
+    const placeholderId = 'ses_hide_placeholder_bare_0001';
+    const titledUnknownId = 'ses_hide_placeholder_titled_0001';
+    const statusUnknownId = 'ses_hide_placeholder_status_0001';
+    const costOnlyZeroId = 'ses_hide_placeholder_cost0_0001';
+    const normalCliId = 'ses_hide_placeholder_cli_0001';
+    const allSessionIds = [
+      placeholderId,
+      titledUnknownId,
+      statusUnknownId,
+      costOnlyZeroId,
+      normalCliId,
+    ];
+
+    beforeEach(async () => {
+      const baseTime = Date.parse('2026-06-01T12:00:00.000Z');
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: placeholderId,
+          kilo_user_id: regularUser.id,
+          // defaults: created_on_platform 'unknown', title/status/cost NULL
+          created_at: new Date(baseTime).toISOString(),
+          updated_at: new Date(baseTime).toISOString(),
+        },
+        {
+          session_id: titledUnknownId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'unknown',
+          title: 'titled but still unknown platform',
+          created_at: new Date(baseTime + 1000).toISOString(),
+          updated_at: new Date(baseTime + 1000).toISOString(),
+        },
+        {
+          session_id: statusUnknownId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'unknown',
+          status: 'running',
+          created_at: new Date(baseTime + 2000).toISOString(),
+          updated_at: new Date(baseTime + 2000).toISOString(),
+        },
+        {
+          session_id: costOnlyZeroId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'unknown',
+          // Metrics emission can persist 0 (writer clamps with Math.max(0, …))
+          // while no metadata projection ever succeeded.
+          total_cost_microdollars: 0,
+          created_at: new Date(baseTime + 3000).toISOString(),
+          updated_at: new Date(baseTime + 3000).toISOString(),
+        },
+        {
+          session_id: normalCliId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'normal cli session',
+          status: 'completed',
+          created_at: new Date(baseTime + 4000).toISOString(),
+          updated_at: new Date(baseTime + 4000).toISOString(),
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, allSessionIds));
+    });
+
+    it('list omits bare placeholder rows', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).not.toContain(placeholderId);
+    });
+
+    it('list returns a row with a title even when platform is still unknown', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).toContain(titledUnknownId);
+    });
+
+    it('list returns a row with a status even when title is null and platform is unknown', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).toContain(statusUnknownId);
+    });
+
+    it('list returns a row with only total_cost_microdollars set (including zero)', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).toContain(costOnlyZeroId);
+      const costOnly = result.cliSessions.find(session => session.session_id === costOnlyZeroId);
+      expect(costOnly?.total_cost_microdollars).toBe(0);
+    });
+
+    it('list returns a normal cli session and keeps pagination stable with placeholders interleaved', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      // Fixtures are ordered by created_at; placeholders sit between visible
+      // rows. limit=2 over created_at should page only visible rows.
+      const page1 = await caller.cliSessionsV2.list({ limit: 2, orderBy: 'created_at' });
+      const page1Ids = page1.cliSessions.map(session => session.session_id);
+
+      expect(page1Ids).toEqual([normalCliId, costOnlyZeroId]);
+      expect(page1Ids).not.toContain(placeholderId);
+      expect(page1.nextCursor).not.toBeNull();
+
+      const page2 = await caller.cliSessionsV2.list({
+        limit: 2,
+        orderBy: 'created_at',
+        cursor: page1.nextCursor!,
+      });
+      const page2Ids = page2.cliSessions.map(session => session.session_id);
+
+      expect(page2Ids).toEqual([statusUnknownId, titledUnknownId]);
+      expect(page2Ids).not.toContain(placeholderId);
+    });
+
+    it('search by exact session_id does not return a bare placeholder', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: placeholderId });
+
+      expect(result.results.map(session => session.session_id)).not.toContain(placeholderId);
+      expect(result.total).toBe(0);
     });
   });
 });

@@ -1,7 +1,7 @@
 /* eslint-disable import/no-nodejs-modules, max-lines */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
+import { mockKiloApi, readSidePanelScrollState, safeToolNames } from './kilo-api-fixture';
 import {
   holdConversationScrolledUp,
   launchExtensionContext,
@@ -11,8 +11,6 @@ import {
   waitForStoredConversationText,
 } from './extension-context-fixture';
 
-const safeReadToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
-
 test('upward wheel on a non-scrollable conversation keeps auto-scroll enabled', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -20,7 +18,7 @@ test('upward wheel on a non-scrollable conversation keeps auto-scroll enabled', 
   try {
     await mockKiloApi(context, {
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Still pinned.' } }] }],
-      toolNames: safeReadToolNames,
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -59,7 +57,7 @@ test('manual scroll up shows jump to latest without following new messages', asy
     await mockKiloApi(context, {
       beforeFirstCompletion: () => pendingFirstCompletion,
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Delayed reply arrived.' } }] }],
-      toolNames: safeReadToolNames,
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -143,7 +141,7 @@ test('dragging the scrollbar up pauses auto-scroll while a reply is being pinned
       firstCompletionEvents: [
         { choices: [{ delta: { content: 'Reply that must not steal scroll.' } }] },
       ],
-      toolNames: safeReadToolNames,
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -207,7 +205,7 @@ test('the jump to latest button reactivates automatic scroll to new messages', a
       secondCompletionEvents: [
         { choices: [{ delta: { content: 'Second reply after returning to bottom.' } }] },
       ],
-      toolNames: safeReadToolNames,
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -289,7 +287,7 @@ test('scrolling back to the bottom by wheel reactivates automatic scroll', async
   try {
     await mockKiloApi(context, {
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Reply after wheeling back.' } }] }],
-      toolNames: safeReadToolNames,
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();

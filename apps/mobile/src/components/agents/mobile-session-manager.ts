@@ -10,7 +10,7 @@ import {
   type SessionManager,
   type SessionSnapshot,
   type UserWebConnection,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
 import {
   formatSafeCloudAgentFailureDiagnostic,
@@ -21,6 +21,7 @@ import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { trpcClient } from '@/lib/trpc';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
+import { cacheToolCardImage } from '@/components/agents/tool-card-image-cache';
 
 type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
@@ -43,6 +44,7 @@ export function createMobileAgentSessionManager({
     websocketHeaders: { Origin: WEB_BASE_URL },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
+    onImageAttachment: cacheToolCardImage,
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
       // Read-only is only ever returned once we have successful evidence the
       // session isn't cloud-agent or remote. A failed query here must
@@ -271,6 +273,8 @@ export function createMobileAgentSessionManager({
         initialMessageId: rs?.initialMessageId ?? null,
         associatedPr: sessionResult.associatedPr,
         runtimeAgents: rs?.runtimeAgents,
+        totalCostMicrodollars: sessionResult.total_cost_microdollars,
+        createdOnPlatform: sessionResult.created_on_platform,
       };
     },
   });

@@ -1,4 +1,4 @@
-import { type Part, type StoredMessage } from 'cloud-agent-sdk';
+import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
@@ -8,6 +8,7 @@ import {
   isFilePart,
   isPartStreaming,
   isReasoningPart,
+  isSnapshotProgressPart,
   isTextPart,
   isToolPart,
   shouldRenderReasoningPart,
@@ -33,6 +34,11 @@ export function PartRenderer({
   onOpenChildSession,
 }: Readonly<PartRendererProps>) {
   if (isTextPart(part)) {
+    // Snapshot-init progress is shown only in the fixed WorkingIndicator row.
+    // Hide unconditionally so a persisted part never lingers in the transcript.
+    if (isSnapshotProgressPart(part)) {
+      return null;
+    }
     return (
       <MessageErrorBoundary>
         <TextPartRenderer text={part.text} />

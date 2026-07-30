@@ -7,16 +7,21 @@ import { type SessionContextInfo } from '@/lib/session-context-info';
 import { ContextUsageRing } from './context-usage-ring';
 import {
   type ContextTone,
-  getArcFraction,
-  getContextTone,
-  getHeaderSummary,
+  getHeaderPillContent,
   getMetricsAccessibilityLabel,
 } from './context-usage-display';
 
 type SessionContextMetricsProps = {
-  info: SessionContextInfo;
-  totalCost: number;
-  onPress: () => void;
+  info: SessionContextInfo | undefined;
+  totalCostMicrodollars: number | null;
+  /** When false (empty session), the pill stays hidden — an empty session has no usage or cost to show. */
+  hasMessages: boolean;
+  onPress?: () => void;
+  /**
+   * Hide the pill while the session page loads; the layout box stays reserved so the header does not
+   * shift.
+   */
+  loading?: boolean;
 };
 
 const RING_SIZE = 28;
@@ -35,65 +40,84 @@ function toneTextClass(tone: ContextTone): string {
 
 export function SessionContextMetrics({
   info,
-  totalCost,
+  totalCostMicrodollars,
+  hasMessages,
   onPress,
+  loading = false,
 }: Readonly<SessionContextMetricsProps>) {
-  const summary = getHeaderSummary(info, totalCost);
-  if (!summary) {
-    return null;
-  }
-  const tone = getContextTone(info.percentage);
-  const arcFraction = getArcFraction(info.percentage);
-  const accessibilityLabel = getMetricsAccessibilityLabel(info, totalCost);
+  const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages });
+  // A session with no messages has neither context usage nor cost to show. Keep
+  // the pill's layout box reserved (same mechanism as `loading`) so the header
+  // does not shift when the first message lands, but keep it invisible and out
+  // of the accessibility tree.
+  const hidden = loading || !hasMessages;
+  // Single source for element kind and a11y affordance wording so a future
+  // caller with interactive content but no onPress cannot advertise a tap.
+  const pressable = !hidden && content.interactive && onPress != null;
+  const accessibilityLabel = getMetricsAccessibilityLabel({
+    info,
+    totalCostMicrodollars,
+    interactive: pressable,
+  });
 
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      hitSlop={8}
-      // 44pt minimum touch target without losing the compact single-line rhythm.
-      className={cn(
-        'min-h-11 flex-row items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1.5 active:opacity-70'
-      )}
-      testID="session-context-metrics"
-    >
+  // Exactly 44pt via h-[44px]. rem-scaled h-11 measured ~38.7pt on device with
+  // NativeWind 5 preview (rem ≈ 14px here), so an arbitrary px value is required
+  // for the 44pt minimum touch target; height is identical in every pill state.
+  const pillClassName =
+    'h-[44px] flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
+
+  const body = (
+    <>
       <ContextUsageRing
         size={RING_SIZE}
         strokeWidth={RING_STROKE}
-        arcFraction={arcFraction}
-        tone={tone}
+        arcFraction={content.arcFraction}
+        tone={content.tone}
       />
-      <View className="flex-row items-baseline gap-1">
-        <Text className={cn('text-xs font-semibold tabular-nums', toneTextClass(tone))}>
-          {summary.primary}
-        </Text>
-        {summary.hasCost && summary.secondary ? (
-          <Text
-            className="text-xs tabular-nums text-muted-foreground"
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          >
-            {summary.secondary}
+      {content.primary != null ? (
+        <View className="flex-row items-baseline gap-1">
+          <Text className={cn('text-xs font-semibold tabular-nums', toneTextClass(content.tone))}>
+            {content.primary}
           </Text>
-        ) : null}
-      </View>
-    </Pressable>
+          {content.hasCost && content.secondary ? (
+            <Text
+              className="text-xs tabular-nums text-muted-foreground"
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              {content.secondary}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+    </>
   );
-}
 
-// Preserves the legacy positive-cost header text when no completed context
-// usage exists. Marked noninteractive; VoiceOver reads the cost directly.
-export function SessionContextCostFallback({ totalCost }: Readonly<{ totalCost: number }>) {
-  if (totalCost <= 0) {
-    return null;
+  if (pressable) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        hitSlop={8}
+        className={cn(pillClassName, 'active:opacity-70')}
+        testID="session-context-metrics"
+      >
+        {body}
+      </Pressable>
+    );
   }
+
   return (
-    <Text
-      className="text-sm text-muted-foreground"
-      accessibilityLabel={`Session cost $${totalCost.toFixed(4)}`}
+    <View
+      accessibilityLabel={accessibilityLabel || undefined}
+      {...(hidden
+        ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+        : {})}
+      className={cn(pillClassName, hidden && 'opacity-0')}
+      testID="session-context-metrics"
     >
-      ${totalCost.toFixed(4)}
-    </Text>
+      {body}
+    </View>
   );
 }

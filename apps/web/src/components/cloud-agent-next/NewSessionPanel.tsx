@@ -69,8 +69,8 @@ import {
   detectGitPlatform,
 } from '@/components/cloud-agent-next/utils/git-utils';
 import type { AgentMode } from './types';
-import { formatSessionError } from '@/lib/cloud-agent-sdk';
-import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
+import { formatSessionError } from '@kilocode/cloud-agent-sdk';
+import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { useCloudAgentAttachmentUpload } from '@/hooks/useCloudAgentAttachmentUpload';
 import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import {

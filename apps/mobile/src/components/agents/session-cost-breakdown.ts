@@ -1,12 +1,15 @@
-import { getStepFinishRoutedModel, type RoutedModelRef } from 'cloud-agent-sdk/part-utils';
+import {
+  getStepFinishRoutedModel,
+  type RoutedModelRef,
+} from '@kilocode/cloud-agent-sdk/part-utils';
 import {
   type AssistantMessage,
   type Part,
   type StepFinishPart,
   type StoredMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
-export type SessionCostBreakdownTotals = {
+type SessionCostBreakdownTotals = {
   input: number;
   output: number;
   reasoning: number;
@@ -166,6 +169,38 @@ export function getSessionCostBreakdown(
   const subagentCostUsd = costResidualUsd > COST_RECONCILIATION_EPSILON_USD ? costResidualUsd : 0;
 
   return { totals, models, attributedCostUsd, subagentCostUsd };
+}
+
+/**
+ * Models-section display filter (R8): hide the session's selected auto model
+ * so the list only shows concrete routed models. Render-only — never applied
+ * when computing totals or the subagent residual.
+ *
+ * Hidden iff provider is `kilo` and modelID starts with `kilo-auto/`.
+ * Routed rows (`providerID: 'kilo'`, concrete `modelID` e.g. `anthropic/...`)
+ * always pass. Info-fallback steps that resolve only to an auto id are hidden
+ * by the same rule.
+ */
+export function isHiddenAutoModelRow(model: { providerID: string; modelID: string }): boolean {
+  return model.providerID === 'kilo' && model.modelID.startsWith('kilo-auto/');
+}
+
+/** Models rows that should render in the context-sheet Models section. */
+export function getVisibleSessionCostModels(
+  models: SessionCostBreakdownModel[]
+): SessionCostBreakdownModel[] {
+  return models.filter(model => !isHiddenAutoModelRow(model));
+}
+
+/**
+ * Section title count and visibility source: filtered model rows + optional
+ * Subagents residual. Never derived from the unfiltered list.
+ */
+export function getModelsSectionCount(
+  models: SessionCostBreakdownModel[],
+  subagentCostUsd: number
+): number {
+  return getVisibleSessionCostModels(models).length + (subagentCostUsd > 0 ? 1 : 0);
 }
 
 function collectStepFinishParts(parts: Part[]): StepFinishPart[] {

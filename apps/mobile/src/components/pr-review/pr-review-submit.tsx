@@ -8,11 +8,15 @@
 
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, type TextInput, View } from 'react-native';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Alert, Keyboard, Pressable, ScrollView, type TextInput, View } from 'react-native';
 
+import {
+  PrFormSheetFooter,
+  PrFormSheetHeader,
+  useFormSheetKeyboardVisible,
+} from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
-import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { Text } from '@/components/ui/text';
 import {
   PendingQueueHint,
@@ -22,12 +26,14 @@ import {
 import {
   buildSubmitReviewInput,
   type ReviewEvent,
+  reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
+import { cn } from '@/lib/utils';
 
 const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
 
@@ -36,6 +42,8 @@ type PrReviewSubmitProps = Readonly<{
   repo: string;
   number: number;
   headSha: string;
+  title: string;
+  eyebrow: string;
   onDismiss: () => void;
 }>;
 
@@ -46,12 +54,13 @@ const EVENT_OPTIONS: readonly { value: ReviewEvent; label: string }[] = [
 ];
 
 export function PrReviewSubmit(props: PrReviewSubmitProps) {
-  const { owner, repo, number, headSha, onDismiss } = props;
+  const { owner, repo, number, headSha, title, eyebrow, onDismiss } = props;
   const router = useRouter();
   const pending = usePendingReview();
   const submitReview = useSubmitReviewMutation({ owner, repo, number });
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
+  const [hasSummary, setHasSummary] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineErrorKind, setInlineErrorKind] = useState<
     'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
@@ -59,10 +68,16 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
 
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
   const hasStaleItems = pending.items.some(item => item.commitSha !== headSha);
+  const blockReason = reviewSubmitBlockReason({
+    event,
+    hasSummary,
+    commentCount: queuedCount,
+  });
 
   useEffect(() => {
     if (submitReview.error) {
@@ -72,6 +87,17 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       setInlineErrorKind(display.kind);
     }
   }, [submitReview.error]);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      });
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
 
   function clearRecoverableError() {
     // bad-request / retryable clear on edit; forbidden stays for the session.
@@ -137,94 +163,169 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const submitDisabled =
     isSubmitting ||
+    blockReason !== null ||
     inlineErrorKind === 'bad-request' ||
     inlineErrorKind === 'forbidden' ||
     inlineErrorKind === 'reconnect';
 
+  const keyboardVisible = useFormSheetKeyboardVisible();
+  // Keyboard-open viewport is tight; keep count, hide per-item rows so
+  // Submit + Cancel stay above the keyboard at scroll offset 0.
+  const showPendingRows = !keyboardVisible;
+
+  // Hint only when empty/stale — skips the long happy-path line that
+  // pushed footer CTAs below half-detent. blockReason replaces
+  // PendingQueueHint so empty-queue + COMMENT is not contradictory.
+  let queueHint: ReactNode = null;
+  if (blockReason !== null) {
+    queueHint = (
+      <Text variant="muted" className="text-xs">
+        {blockReason}
+      </Text>
+    );
+  } else if (!keyboardVisible && (queuedCount === 0 || hasStaleItems)) {
+    queueHint = <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />;
+  }
+
+  // PickerSheet invariant: [header, ScrollView]; footer is trailing content.
   return (
-    <View className="flex-1 bg-background">
+    <>
+      <PrFormSheetHeader title={title} eyebrow={eyebrow} onBack={onDismiss} />
       <ScrollView
-        className="flex-1"
-        contentContainerClassName="gap-4 px-6 pb-8 pt-2"
+        ref={scrollRef}
+        className="flex-1 bg-background"
+        contentContainerClassName="pb-2"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <PillGroup
-          label="Review event"
-          options={EVENT_OPTIONS}
-          value={event}
-          disabled={isSubmitting}
-          onChange={next => {
-            setEvent(next);
-            clearRecoverableError();
-          }}
-        />
-        <View className="gap-2">
-          <Text className="text-sm font-medium text-foreground">Summary (optional)</Text>
-          <ReviewSummaryField
-            bodyRef={bodyRef}
-            inputRef={bodyInputRef}
-            isDisabled={isSubmitting}
-            onChange={clearRecoverableError}
+        <View className="gap-2 px-6 pt-2">
+          <ReviewEventChips
+            value={event}
+            disabled={isSubmitting}
+            onChange={next => {
+              setEvent(next);
+              clearRecoverableError();
+            }}
           />
-        </View>
-
-        <View className="gap-2 rounded-lg border border-hair-soft bg-secondary p-3">
-          <Text className="text-sm font-medium text-foreground">
-            {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
-          </Text>
-          <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />
-          {pending.items.map(item => (
-            <PrReviewPendingCommentRow
-              key={item.id}
-              item={item}
-              disabled={isSubmitting}
-              onPress={() => {
-                openEditComposer(item);
-              }}
-              onDelete={() => {
-                confirmDelete(item);
+          <View className="gap-1.5">
+            <Text className="text-sm font-medium text-foreground">Summary (optional)</Text>
+            <ReviewSummaryField
+              bodyRef={bodyRef}
+              inputRef={bodyInputRef}
+              isDisabled={isSubmitting}
+              onChange={() => {
+                setHasSummary(bodyRef.current.trim().length > 0);
+                clearRecoverableError();
               }}
             />
-          ))}
+          </View>
+
+          <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
+            <Text className="text-sm font-medium text-foreground">
+              {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
+            </Text>
+            {queueHint}
+            {showPendingRows
+              ? pending.items.map(item => (
+                  <PrReviewPendingCommentRow
+                    key={item.id}
+                    item={item}
+                    disabled={isSubmitting}
+                    onPress={() => {
+                      openEditComposer(item);
+                    }}
+                    onDelete={() => {
+                      confirmDelete(item);
+                    }}
+                  />
+                ))
+              : null}
+          </View>
+
+          {inlineError && inlineErrorKind !== 'reconnect' ? (
+            <View
+              className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-2"
+              accessibilityLiveRegion="polite"
+            >
+              <Text className="text-xs text-destructive">{inlineError}</Text>
+            </View>
+          ) : null}
+          {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
         </View>
 
-        {inlineError && inlineErrorKind !== 'reconnect' ? (
-          <View
-            className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 p-3"
-            accessibilityLiveRegion="polite"
+        <PrFormSheetFooter>
+          <Button
+            onPress={() => {
+              void handleSubmit();
+            }}
+            loading={isSubmitting}
+            disabled={submitDisabled}
+            accessibilityLabel="Submit review"
           >
-            <Text className="text-sm text-destructive">{inlineError}</Text>
-          </View>
-        ) : null}
-        {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+            <Text>Submit review</Text>
+          </Button>
+          <Button
+            variant="ghost"
+            onPress={() => {
+              if (!isSubmitting) {
+                onDismiss();
+              }
+            }}
+            disabled={isSubmitting}
+            className="mt-1"
+            accessibilityLabel="Cancel"
+          >
+            <Text>Cancel</Text>
+          </Button>
+        </PrFormSheetFooter>
       </ScrollView>
+    </>
+  );
+}
 
-      <View className="border-t-[0.5px] border-hair-soft bg-background px-6 pb-6 pt-3">
-        <Button
-          onPress={() => {
-            void handleSubmit();
-          }}
-          loading={isSubmitting}
-          disabled={submitDisabled}
-          accessibilityLabel="Submit review"
-        >
-          <Text>Submit review</Text>
-        </Button>
-        <Button
-          variant="ghost"
-          onPress={() => {
-            if (!isSubmitting) {
-              onDismiss();
-            }
-          }}
-          disabled={isSubmitting}
-          className="mt-2"
-          accessibilityLabel="Cancel"
-        >
-          <Text>Cancel</Text>
-        </Button>
+/** Horizontal event chips — vertical PillGroup is too tall for half-detent. */
+function ReviewEventChips(props: {
+  value: ReviewEvent;
+  disabled: boolean;
+  onChange: (next: ReviewEvent) => void;
+}) {
+  return (
+    <View className="gap-1.5">
+      <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Review event
+      </Text>
+      <View className="flex-row flex-wrap gap-1.5">
+        {EVENT_OPTIONS.map(option => {
+          const active = props.value === option.value;
+          return (
+            <Pressable
+              key={option.value}
+              disabled={props.disabled}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                props.onChange(option.value);
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active, disabled: props.disabled }}
+              accessibilityLabel={option.label}
+              className={cn(
+                'min-h-9 items-center justify-center rounded-full border px-3 py-1.5 active:opacity-70',
+                active ? 'border-primary bg-primary' : 'border-border bg-secondary',
+                props.disabled && 'opacity-50'
+              )}
+            >
+              <Text
+                className={cn(
+                  'text-xs font-medium',
+                  active ? 'text-primary-foreground' : 'text-foreground'
+                )}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );

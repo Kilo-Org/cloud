@@ -13,6 +13,8 @@ import {
   sliceFileLines,
 } from '@/lib/github-pr-review/mappers';
 import {
+  CONVERSATION_COMMENTS_MAX_PAGES,
+  CONVERSATION_COMMENTS_PAGE_SIZE,
   FILE_LINES_MAX,
   FILES_MAX_PAGES,
   FILES_PAGE_SIZE,
@@ -126,7 +128,11 @@ const SubmitReviewInput = ownerRepoSchema
     body: z.string().min(1).max(65_535).optional(),
     commitSha: z.string().min(40).max(64),
     comments: z
-      .array(CommentPositionSchema.extend({ body: z.string().min(1).max(65_535) }).strict())
+      .array(
+        CommentPositionSchema.extend({
+          body: z.string().min(1).max(65_535),
+        }).strict()
+      )
       .max(100)
       .optional(),
   })
@@ -141,6 +147,14 @@ const ReactionInput = z
   })
   .strict();
 
+// `headRef` and `isCrossRepo` were required in an earlier wire version. Older
+// shipped mobile clients still send them; newer clients omit them entirely.
+// The schema stays `.strict()` (so genuinely unknown fields are still
+// rejected) and tolerates these two legacy fields — they are accepted and
+// IGNORED. The server derives the authoritative head ref / same-repo
+// identity from `octokit.pulls.get` so a caller cannot spoof which ref gets
+// deleted. Aligns with the tolerate-not-reject pattern near `direction`
+// above.
 const MergePullRequestInput = ownerRepoSchema
   .extend({
     number: prNumberSchema,
@@ -149,8 +163,9 @@ const MergePullRequestInput = ownerRepoSchema
     commitMessage: z.string().min(1).max(65_535).optional(),
     deleteBranch: z.boolean(),
     expectedHeadSha: z.string().min(40).max(64),
-    headRef: z.string().min(1).max(255),
-    isCrossRepo: z.boolean(),
+    // Legacy fields — accepted for backward compat, ignored by the server.
+    headRef: z.string().min(1).max(255).optional(),
+    isCrossRepo: z.boolean().optional(),
   })
   .strict();
 
@@ -221,6 +236,7 @@ const REVIEW_THREADS_QUERY = /* GraphQL */ `
                 databaseId
                 id
                 body
+                diffHunk
                 createdAt
                 author {
                   login
@@ -246,6 +262,48 @@ const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY = /* GraphQL */ `
   query PrReviewThreadComments($threadId: ID!, $first: Int!, $after: String) {
     node(id: $threadId) {
       ... on PullRequestReviewThread {
+        comments(first: $first, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            databaseId
+            id
+            body
+            createdAt
+            author {
+              login
+              avatarUrl
+            }
+            reactionGroups {
+              content
+              viewerHasReacted
+              reactors(first: 0) {
+                totalCount
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+// PR conversation (issue) comments — separate from reviewThreads so this
+// connection can be paginated to completion on the first listReviewThreads
+// page only. Node selection matches the live review-comment selection so
+// normalizeComment / normalizeReactions apply unchanged.
+const CONVERSATION_COMMENTS_QUERY = /* GraphQL */ `
+  query PrReviewConversationComments(
+    $owner: String!
+    $name: String!
+    $number: Int!
+    $first: Int!
+    $after: String
+  ) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
         comments(first: $first, after: $after) {
           pageInfo {
             hasNextPage
@@ -348,6 +406,7 @@ type GraphQlCommentNode = {
   databaseId: number;
   id: string;
   body: string;
+  diffHunk?: string | null;
   createdAt: string;
   author: { login: string; avatarUrl: string } | null;
   reactionGroups: GraphQlReactionGroup[];
@@ -395,6 +454,32 @@ function normalizeComment(node: GraphQlCommentNode) {
 
 // Exported for unit testing the follow-up pagination loop.
 export const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST = REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY;
+export const CONVERSATION_COMMENTS_QUERY_FOR_TEST = CONVERSATION_COMMENTS_QUERY;
+
+// All raw PR-Review GraphQL documents defined in this router, collected as a
+// single exported record so the schema-validity test enumerates docs from
+// module exports (newly added docs are auto-covered). Keys are the
+// operation name / mutation tag; values are the unchanged document strings.
+export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
+  PULL_REQUEST_FRAGMENT_QUERY,
+  REVIEW_THREADS_QUERY,
+  REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
+  CONVERSATION_COMMENTS_QUERY,
+  ENABLE_AUTO_MERGE_MUTATION,
+  DISABLE_AUTO_MERGE_MUTATION,
+  RESOLVE_THREAD_MUTATION,
+  UNRESOLVE_THREAD_MUTATION,
+  ADD_REACTION_MUTATION,
+  REMOVE_REACTION_MUTATION,
+} as const;
+
+// Exported for unit testing the reaction DTO invariant pinned against
+// GitHub's actual `reactionGroups` shape. The downstream DTO contract —
+// `Array<{ content: string; count: number; viewerHasReacted: boolean }>` —
+// is consumed by `mappers.ts` and the mobile reactions row and must NOT
+// change shape; see `normalize-reactions.test.ts`.
+export const normalizeReactions_FOR_TEST = normalizeReactions;
+export const normalizeComment_FOR_TEST = normalizeComment;
 
 export async function fetchAllThreadComments(args: {
   octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
@@ -424,6 +509,71 @@ export async function fetchAllThreadComments(args: {
     collected.push(...node.comments.nodes.map(normalizeComment));
     hasNext = node.comments.pageInfo.hasNextPage;
     cursor = node.comments.pageInfo.endCursor;
+  }
+  return collected;
+}
+
+async function fetchConversationCommentsPage(args: {
+  octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
+  owner: string;
+  repo: string;
+  number: number;
+  cursor: string | null;
+}): Promise<GraphQlCommentConnection | null> {
+  const { octokit, owner, repo, number, cursor } = args;
+  const response = (await octokit.request('POST /graphql', {
+    query: CONVERSATION_COMMENTS_QUERY,
+    variables: {
+      owner,
+      name: repo,
+      number,
+      first: CONVERSATION_COMMENTS_PAGE_SIZE,
+      after: cursor ?? null,
+    },
+  })) as {
+    data: {
+      data: {
+        repository: {
+          pullRequest: {
+            comments: GraphQlCommentConnection;
+          } | null;
+        } | null;
+      } | null;
+      errors?: unknown;
+    };
+  };
+  throwTrpcFromGraphQlErrors(response.data.errors as never);
+  return response.data.data?.repository?.pullRequest?.comments ?? null;
+}
+
+// First-page-only conversation comments. Loops against pageInfo up to
+// CONVERSATION_COMMENTS_MAX_PAGES × CONVERSATION_COMMENTS_PAGE_SIZE (5 × 100).
+// Past the cap, remaining pages are dropped and whatever was collected is
+// returned (silent truncation) — same ceiling spirit as bot review-comment
+// pagination (bot/platforms/github.ts).
+export async function fetchAllConversationComments(args: {
+  octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
+  owner: string;
+  repo: string;
+  number: number;
+}): Promise<ReturnType<typeof normalizeComment>[]> {
+  const { octokit, owner, repo, number } = args;
+  const collected: ReturnType<typeof normalizeComment>[] = [];
+  let cursor: string | null = null;
+  for (let page = 1; page <= CONVERSATION_COMMENTS_MAX_PAGES; page += 1) {
+    const connection = await fetchConversationCommentsPage({
+      octokit,
+      owner,
+      repo,
+      number,
+      cursor,
+    });
+    if (!connection) break;
+    collected.push(...connection.nodes.map(normalizeComment));
+    if (!connection.pageInfo.hasNextPage || !connection.pageInfo.endCursor) {
+      return collected;
+    }
+    cursor = connection.pageInfo.endCursor;
   }
   return collected;
 }
@@ -525,14 +675,20 @@ export const githubPrReviewRouter = createTRPCRouter({
         const repo = repoResp.data;
         // GraphQL for reviewDecision + viewer.login
         type OverviewGraphQl = {
-          repository: { pullRequest: { reviewDecision: string | null } | null } | null;
+          repository: {
+            pullRequest: { reviewDecision: string | null } | null;
+          } | null;
           viewer: { login: string } | null;
         };
         let graphQl: OverviewGraphQl | null = null;
         try {
           const gqlResp = (await octokit.request('POST /graphql', {
             query: PULL_REQUEST_FRAGMENT_QUERY,
-            variables: { owner: input.owner, name: input.repo, number: input.number },
+            variables: {
+              owner: input.owner,
+              name: input.repo,
+              number: input.number,
+            },
           })) as { data: { data: OverviewGraphQl | null; errors?: unknown } };
           throwTrpcFromGraphQlErrors(gqlResp.data.errors as never);
           graphQl = gqlResp.data.data ?? null;
@@ -640,15 +796,33 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        const connection = await fetchReviewThreadsPage({
-          octokit,
-          owner: input.owner,
-          repo: input.repo,
-          number: input.number,
-          cursor: input.cursor ?? null,
-        });
+        const isFirstPage = input.cursor == null;
+        const [connection, conversation] = await Promise.all([
+          fetchReviewThreadsPage({
+            octokit,
+            owner: input.owner,
+            repo: input.repo,
+            number: input.number,
+            cursor: input.cursor ?? null,
+          }),
+          // Conversation comments only on the first page; cursored pages get [].
+          isFirstPage
+            ? fetchAllConversationComments({
+                octokit,
+                owner: input.owner,
+                repo: input.repo,
+                number: input.number,
+              })
+            : Promise.resolve([]),
+        ]);
         if (!connection) {
-          return { threads: [], nextCursor: null };
+          return buildReviewThreadsResult({
+            threads: [],
+            conversation,
+            page: 1,
+            hasNextPage: false,
+            endCursor: null,
+          });
         }
         const threads = await Promise.all(
           connection.nodes.map(async node => {
@@ -668,12 +842,14 @@ export const githubPrReviewRouter = createTRPCRouter({
               originalLine: node.originalLine,
               originalStartLine: node.originalStartLine,
               diffSide: node.diffSide,
+              diffHunk: node.comments.nodes[0]?.diffHunk ?? null,
               comments,
             };
           })
         );
         return buildReviewThreadsResult({
           threads: threads as never,
+          conversation,
           page: 1,
           hasNextPage: connection.pageInfo.hasNextPage,
           endCursor: connection.pageInfo.endCursor,
@@ -765,9 +941,13 @@ export const githubPrReviewRouter = createTRPCRouter({
     const result = await withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        const variables = buildResolveThreadVariables({ threadId: input.threadId });
+        const variables = buildResolveThreadVariables({
+          threadId: input.threadId,
+        });
         const payload = await runGraphQlMutation<{
-          resolveReviewThread: { thread: { id: string; isResolved: boolean } } | null;
+          resolveReviewThread: {
+            thread: { id: string; isResolved: boolean };
+          } | null;
         }>({ octokit, query: RESOLVE_THREAD_MUTATION, variables });
         const thread = requireGraphQlOperation(
           payload.resolveReviewThread?.thread,
@@ -783,9 +963,13 @@ export const githubPrReviewRouter = createTRPCRouter({
     const result = await withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        const variables = buildUnresolveThreadVariables({ threadId: input.threadId });
+        const variables = buildUnresolveThreadVariables({
+          threadId: input.threadId,
+        });
         const payload = await runGraphQlMutation<{
-          unresolveReviewThread: { thread: { id: string; isResolved: boolean } } | null;
+          unresolveReviewThread: {
+            thread: { id: string; isResolved: boolean };
+          } | null;
         }>({ octokit, query: UNRESOLVE_THREAD_MUTATION, variables });
         const thread = requireGraphQlOperation(
           payload.unresolveReviewThread?.thread,
@@ -841,10 +1025,41 @@ export const githubPrReviewRouter = createTRPCRouter({
   // returns 409 and the caller should re-fetch. The branch delete after a
   // successful merge is BEST-EFFORT: failures are reported in the result
   // (never thrown) so the mobile client can surface a banner.
+  //
+  // P0-D-09: the head ref + same-repo identity are derived from
+  // `octokit.pulls.get` rather than the client input. A caller must not be
+  // able to merge PR #N with a valid `expectedHeadSha` and then delete an
+  // arbitrary same-repo ref (e.g. `main`) by spoofing `headRef`. The delete
+  // is fenced on the server-derived head sha matching `expectedHeadSha`,
+  // same-repo identity, and the merge actually completing.
   mergePullRequest: baseProcedure.input(MergePullRequestInput).mutation(async ({ ctx, input }) => {
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
+        // Fetch the PR first so we know the authoritative head ref, head sha,
+        // and whether the head repo is the same as the base repo. A merge
+        // does not move the head branch, so the ref/sha derived here are
+        // valid for the post-merge delete decision.
+        const prResp = await octokit.pulls.get({
+          owner: input.owner,
+          repo: input.repo,
+          pull_number: input.number,
+        });
+        const pr = prResp.data;
+        const headRepo = pr.head?.repo ?? null;
+        const baseRepo = pr.base?.repo ?? null;
+        // Treat a null/absent head repo (e.g. deleted fork) as not-deletable;
+        // also bail if base.repo is missing for the same reason. Compare the
+        // numeric repo id — robust against name/owner changes.
+        const sameRepo =
+          headRepo !== null &&
+          baseRepo !== null &&
+          typeof headRepo.id === 'number' &&
+          typeof baseRepo.id === 'number' &&
+          headRepo.id === baseRepo.id;
+        const fetchedHeadSha = typeof pr.head?.sha === 'string' ? pr.head.sha : null;
+        const headRefName = typeof pr.head?.ref === 'string' ? pr.head.ref : null;
+
         const params = buildMergePullRequestParams({
           owner: input.owner,
           repo: input.repo,
@@ -856,22 +1071,30 @@ export const githubPrReviewRouter = createTRPCRouter({
         });
         const response = await octokit.pulls.merge(params);
         const merged = Boolean(response.data.merged);
-        if (!merged || !input.deleteBranch || input.isCrossRepo) {
+        if (
+          !merged ||
+          !input.deleteBranch ||
+          !sameRepo ||
+          headRefName === null ||
+          fetchedHeadSha === null ||
+          fetchedHeadSha !== input.expectedHeadSha
+        ) {
           return {
             merged,
             sha: response.data.sha,
             branchDeleted: false as const,
           };
         }
-        // Best-effort: only call deleteRef when the head is same-repo.
-        // Catch every error and surface it in the result instead of
-        // failing the whole mutation.
+        // Best-effort: only call deleteRef when the server-derived head is
+        // same-repo AND the head sha we fetched matches what the caller
+        // claimed to merge. Catch every error and surface it in the result
+        // instead of failing the whole mutation.
         try {
           await octokit.git.deleteRef(
             buildDeleteRefParams({
               owner: input.owner,
               repo: input.repo,
-              headRef: input.headRef,
+              headRef: headRefName,
             })
           );
           return {
@@ -941,7 +1164,9 @@ export const githubPrReviewRouter = createTRPCRouter({
     const result = await withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        const variables = buildDisableAutoMergeVariables({ prNodeId: input.prNodeId });
+        const variables = buildDisableAutoMergeVariables({
+          prNodeId: input.prNodeId,
+        });
         const payload = await runGraphQlMutation<{
           disablePullRequestAutoMerge: { pullRequest: { id: string } } | null;
         }>({ octokit, query: DISABLE_AUTO_MERGE_MUTATION, variables });

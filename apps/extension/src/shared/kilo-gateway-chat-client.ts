@@ -2,8 +2,10 @@ export type KiloGatewayToolName =
   | 'eval'
   | 'find_in_page'
   | 'get_element_details'
+  | 'get_memory'
   | 'get_page_snapshot'
   | 'get_viewport_screenshot'
+  | 'search_memories'
   | `mcp_${string}`;
 
 export type KiloGatewayChatContentPart =
@@ -56,6 +58,7 @@ export interface KiloGatewayChatCompletion {
   readonly reasoningDetails?: readonly unknown[];
   readonly toolCalls: KiloGatewayToolCallRequest[];
   readonly usage?: {
+    readonly costUsd?: number;
     readonly promptTokens: number;
   };
 }

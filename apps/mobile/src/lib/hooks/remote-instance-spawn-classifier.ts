@@ -1,4 +1,4 @@
-import { type KiloSessionId, type UserWebConnection } from 'cloud-agent-sdk';
+import { type KiloSessionId, type UserWebConnection } from '@kilocode/cloud-agent-sdk';
 // kilocode_change - K1/C2: these two runtime imports must come from their
 // narrow subpaths, not the `cloud-agent-sdk` barrel. The barrel's index.ts
 // also re-exports web-only transport code (`cloud-agent-connection.ts` ->
@@ -16,11 +16,14 @@ import { type KiloSessionId, type UserWebConnection } from 'cloud-agent-sdk';
 // syntax the Node vitest environment cannot parse. Splitting keeps this
 // file's pure functions testable "without a React renderer" (per the
 // accepted plan) while the hook itself stays UI-only and untested here.
-import { CommandDeliveredError, UserWebCommandError } from 'cloud-agent-sdk/user-web-connection';
+import {
+  CommandDeliveredError,
+  UserWebCommandError,
+} from '@kilocode/cloud-agent-sdk/user-web-connection';
 import {
   createRemoteSessionOnConnection,
   parseCreateSessionResponse,
-} from 'cloud-agent-sdk/create-session';
+} from '@kilocode/cloud-agent-sdk/create-session';
 
 /**
  * Pure outcome classifier for the `create_session` reply (connection-scoped

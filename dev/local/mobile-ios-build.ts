@@ -4,9 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { createProjectHashAsync, DEFAULT_SOURCE_SKIPS, SourceSkips } from '@expo/fingerprint';
+import {
+  createProjectHashAsync,
+  DEFAULT_SOURCE_SKIPS,
+  SourceSkips,
+  type HashSourceContents,
+} from '@expo/fingerprint';
 
-import { withNativeBuildSemaphore } from './mobile-native-build';
+import { hashRootNativeInputs, withNativeBuildSemaphore } from './mobile-native-build';
 
 // Compatibility dimensions hashed into the cache key. Any change must
 // invalidate the key so cached artifacts are not reused for an
@@ -138,15 +143,26 @@ export type CliArgs =
 // Build the option bag used to compute the native project hash. Only
 // the Expo `extra` section is skipped beyond the library defaults —
 // versions, schemes, bundle ID, plugins, assets, permissions, and
-// optional native config all remain in the hash.
+// optional native config all remain in the hash. Repo-root inputs that
+// shape the native build but live outside apps/mobile (pnpm patches,
+// pnpm-workspace.yaml, pnpm-lock.yaml) are mixed in as an extra source.
 export function buildFingerprintOptions(): {
   platforms: ['ios'];
   sourceSkips: number;
+  extraSources: HashSourceContents[];
   silent: boolean;
 } {
   return {
     platforms: ['ios'],
     sourceSkips: DEFAULT_SOURCE_SKIPS | SourceSkips.ExpoConfigExtraSection,
+    extraSources: [
+      {
+        type: 'contents',
+        id: 'repoRootNativeInputs',
+        contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+        reasons: ['repo-root patches/, pnpm-workspace.yaml, and pnpm-lock.yaml'],
+      },
+    ],
     silent: true,
   };
 }
@@ -643,8 +659,7 @@ function defaultProcessIdentity(pid: number): string | undefined {
 
 // Read-only validation of a claim recorded by the simulator
 // wrapper. Accepts the caller's current worktree as the exclusive
-// owner; any other recorded worktree (including legacy claims without
-// `status`) is rejected.
+// owner; any other recorded worktree is rejected.
 export function validateSimulatorClaim(
   udid: string,
   worktreeRoot: string,
@@ -675,19 +690,6 @@ export function validateSimulatorClaim(
   }
   if (o.worktreeRoot !== worktreeRoot) {
     throw new Error(`Simulator ${udid} is claimed by ${o.worktreeRoot}`);
-  }
-  // For the build cache we require a current-format ready claim. A
-  // preparing claim (same worktree or not) cannot be used to install
-  // an app; legacy claims (no status) are also rejected — the E2E
-  // simulator wrapper must reclaim/upgrade them first.
-  if (typeof o.status !== 'string' || o.status !== 'ready') {
-    throw new Error(`Simulator ${udid} is not ready for build (status=${String(o.status)})`);
-  }
-  if (typeof o.claimId !== 'string' || o.claimId.length === 0) {
-    throw new Error(`Simulator ${udid} claim is corrupt`);
-  }
-  if (typeof o.claimedAt !== 'string' || Number.isNaN(Date.parse(o.claimedAt))) {
-    throw new Error(`Simulator ${udid} claim is corrupt`);
   }
 }
 

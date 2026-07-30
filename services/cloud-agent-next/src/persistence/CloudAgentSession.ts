@@ -93,6 +93,8 @@ import { renderExecutionTurnContent } from '../execution/types.js';
 import type { Env as WorkerEnv, SandboxId } from '../types.js';
 import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
 import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
+import { nextMetadataAfterAdmittedAgentModel } from './persist-admitted-agent-model.js';
+import { dispatchedKilocodeModelId } from './model-utils.js';
 
 import { resolveSecret, validateStreamTicket } from '../auth.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
@@ -2684,10 +2686,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     // Server has been idle too long and no wrapper/pending work remains, stop it
     logger
+      .withTags({ logTag: 'idle_kilo_server_stopped' })
       .withFields({
         sessionId: this.sessionId,
         idleMs,
         idleTimeoutMs,
+        // How late this sweep ran against its own deadline; aggregate to spot a
+        // sweeper that is firing well past idleTimeoutMs.
+        overdueMs: Math.max(0, idleMs - idleTimeoutMs),
       })
       .info('Stopping idle kilo server');
 
@@ -3231,7 +3237,52 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult> {
     const deletionPending = await this.deletionPendingAdmissionFailure();
-    return deletionPending ?? this.getSessionMessageQueue().admitSubmittedMessage(request);
+    if (deletionPending) return deletionPending;
+    const result = await this.getSessionMessageQueue().admitSubmittedMessage(request);
+    if (result.success) {
+      await this.persistAdmittedAgentModelIfChanged(request);
+    }
+    return result;
+  }
+
+  /**
+   * After a successful admit, update stored agent.model/variant when the run's
+   * resolved selection differs. Single owning write site for post-registration
+   * model persistence — do not duplicate from the message queue.
+   */
+  private async persistAdmittedAgentModelIfChanged(
+    request: SubmittedSessionMessageRequest
+  ): Promise<void> {
+    const metadata = await this.getMetadata();
+    if (!metadata?.agent) return;
+
+    // Mirror the queue's resolve at admit time (read-only there): requested
+    // override wins, else stored default. Normalize like the queue so we store
+    // the same dispatched model id the run actually uses.
+    const resolvedModel = dispatchedKilocodeModelId(request.agent?.model ?? metadata.agent.model);
+    if (!resolvedModel) return;
+    const resolvedVariant = request.agent?.variant ?? metadata.agent.variant;
+
+    const next = nextMetadataAfterAdmittedAgentModel(metadata, {
+      model: resolvedModel,
+      variant: resolvedVariant,
+    });
+    if (!next) return;
+
+    try {
+      await this.updateMetadata(next);
+    } catch (err) {
+      // Admission already succeeded; do not fail the client for a metadata
+      // bookkeeping write. Cold relaunch may show the previous model until the
+      // next successful persist.
+      logger
+        .withFields({
+          error: err instanceof Error ? err.message : String(err),
+          model: resolvedModel,
+          variant: resolvedVariant,
+        })
+        .warn('Failed to persist admitted agent model on session metadata');
+    }
   }
 
   async replayPreparedInitialMessage(

@@ -6,8 +6,8 @@ import {
   type RemoteModelOverride,
   type RemoteModelState,
   type ResolvedSession,
-} from 'cloud-agent-sdk';
-import { sortRemoteModelCatalogProviders } from 'cloud-agent-sdk/remote-model-order';
+} from '@kilocode/cloud-agent-sdk';
+import { sortRemoteModelCatalogProviders } from '@kilocode/cloud-agent-sdk/remote-model-order';
 
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 

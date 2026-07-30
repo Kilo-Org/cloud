@@ -1,7 +1,7 @@
 /* eslint-disable import/no-nodejs-modules, max-lines */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import type { Page } from '@playwright/test';
 import {
   launchExtensionContext,
@@ -10,8 +10,6 @@ import {
   startFixtureServer,
   waitForStoredConversationText,
 } from './extension-context-fixture';
-
-const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
 
 /*
  * Read the persisted conversation store as a JSON string. Storage is the source of truth and is
@@ -182,7 +180,10 @@ test('manual "Compact now" compacts the conversation', async () => {
        */
       firstCompletionEvents: [
         { choices: [{ delta: { content: 'Normal reply.' } }] },
-        { choices: [], usage: { completion_tokens: 10, prompt_tokens: 300, total_tokens: 310 } },
+        {
+          choices: [],
+          usage: { completion_tokens: 10, cost: 0.0123, prompt_tokens: 300, total_tokens: 310 },
+        },
       ],
       models: modelWithContextLength,
       // Second call: summarization triggered by "Compact now"
@@ -227,12 +228,111 @@ test('manual "Compact now" compacts the conversation', async () => {
     const [, summarizationBody] = seenChatBodies;
     expect(summarizationBody).toMatchObject({ tool_choice: 'none' });
 
+    // Session cost survives compaction while context usage resets
+    await sidePanel.getByLabel(/^Context usage:/u).click();
+    await expect(sidePanel.getByText('$0.0123')).toBeVisible();
+
     /*
      * Compaction released the input lock: with a fresh draft, Send is enabled again. It stays
      * disabled on an empty draft, which is unrelated to compaction.
      */
     await sidePanel.getByLabel('Message agent').fill('After compaction');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('session cost accumulates across completions and turns', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: [
+        { choices: [{ delta: { content: 'I will read the page.' } }] },
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    function: {
+                      arguments: JSON.stringify({}),
+                      name: 'get_page_snapshot',
+                    },
+                    id: 'call_snapshot_1',
+                    index: 0,
+                    type: 'function',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          choices: [],
+          usage: { completion_tokens: 10, cost: 0.0123, prompt_tokens: 300, total_tokens: 310 },
+        },
+      ],
+      models: modelWithContextLength,
+      secondCompletionEvents: [
+        { choices: [{ delta: { content: 'Turn one complete.' } }] },
+        {
+          choices: [],
+          usage: { completion_tokens: 10, cost: 0.0007, prompt_tokens: 320, total_tokens: 330 },
+        },
+      ],
+      thirdCompletionEvents: [
+        { choices: [{ delta: { content: 'Turn two complete.' } }] },
+        {
+          choices: [],
+          usage: { completion_tokens: 10, cost: 0.001, prompt_tokens: 340, total_tokens: 350 },
+        },
+      ],
+      toolNames: safeToolNames,
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    const donut = sidePanel.getByLabel(/^Context usage:/u);
+
+    // Empty state before any turn (open → assert → close so later opens are deterministic)
+    await donut.click();
+    await expect(sidePanel.getByText('Session cost')).toBeVisible();
+    await expect(sidePanel.getByText('$0.0000')).toBeVisible();
+    await donut.click();
+
+    // Turn 1: tool-call completion + follow-up (calls 1–2)
+    await sidePanel.getByLabel('Message agent').fill('Turn one');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('get_page_snapshot completed')).toBeVisible();
+    await expect(sidePanel.getByText('Turn one complete.')).toBeVisible();
+
+    await donut.click();
+    await expect(sidePanel.getByText('$0.0130')).toBeVisible();
+    await donut.click();
+
+    // Turn 2: single completion (call 3)
+    await sidePanel.getByLabel('Message agent').fill('Turn two');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('Turn two complete.')).toBeVisible();
+
+    await donut.click();
+    await expect(sidePanel.getByText('$0.0140')).toBeVisible();
+
+    // Donut usage reflects the latest prompt_tokens from turn 2; cost accumulation is independent
+    await expect(donut).toHaveAttribute('aria-label', 'Context usage: 340 / 1,000 tokens (34%)');
   } finally {
     await context.close();
     await fixture.close();

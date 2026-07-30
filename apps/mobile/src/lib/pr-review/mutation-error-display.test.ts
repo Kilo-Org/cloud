@@ -39,7 +39,7 @@ describe('mutationErrorDisplay', () => {
     expect(mutationErrorDisplay('submit', classification)).toEqual({
       kind: 'bad-request',
       message:
-        "This review can't be submitted as is. The PR may have changed, or you can't approve your own pull request.",
+        "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
     });
   });
 

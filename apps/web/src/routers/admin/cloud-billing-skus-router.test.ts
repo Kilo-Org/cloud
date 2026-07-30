@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
+import type { ContainerUsageAnalyticsResult } from '@/lib/cloudflare/container-usage-analytics';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -10,16 +11,27 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
+  reconcileUsageWithCloudflare,
   serializeCloudBillingSku,
   serializeUsageInterval,
   serializeUsageSegment,
 } from './cloud-billing-skus-router';
+
+const mockQueryContainerUsageAnalytics =
+  jest.fn<
+    (input: {
+      instanceIds: string[];
+      start: string;
+      end: string;
+    }) => Promise<ContainerUsageAnalyticsResult>
+  >();
 
 let admin: User;
 let nonAdmin: User;
 
 beforeEach(async () => {
   await cleanupDbForTest();
+  mockQueryContainerUsageAnalytics.mockReset();
   [admin, nonAdmin] = await Promise.all([insertTestUser({ is_admin: true }), insertTestUser()]);
 });
 
@@ -38,15 +50,19 @@ async function insertUsageInterval(params: {
   subjectType?: 'user' | 'org';
   subjectId?: string;
   startedAt?: string;
+  service?: string;
+  instanceId?: string;
+  skuId?: string;
+  metadata?: Record<string, string>;
 }) {
   const subjectType = params.subjectType ?? 'user';
   const subjectId = params.subjectId ?? admin.id;
   await db.insert(container_usage_interval).values({
     id: params.id,
-    service: 'cloud-agent-next',
-    instance_id: params.id,
+    service: params.service ?? 'cloud-agent-next',
+    instance_id: params.instanceId ?? params.id,
     start_epoch_ms: 123,
-    cloud_billing_sku_id: 'usage-search-sku',
+    cloud_billing_sku_id: params.skuId ?? 'usage-search-sku',
     context_fingerprint: 'a'.repeat(64),
     subject_type: subjectType,
     subject_id: subjectId,
@@ -54,7 +70,46 @@ async function insertUsageInterval(params: {
     actor_id: subjectType === 'user' ? subjectId : admin.id,
     started_at: params.startedAt ?? '2026-07-22T10:00:00.000Z',
     last_seen_at: params.startedAt ?? '2026-07-22T10:00:00.000Z',
+    metadata: params.metadata,
   });
+}
+
+function providerSettings() {
+  return {
+    enabled: true,
+    availableFields: [],
+    maxPageSize: 100,
+    maxNumberOfFields: 30,
+    notOlderThan: 2_678_400,
+    maxDuration: 86_400,
+  };
+}
+
+function providerResult(
+  rows: ContainerUsageAnalyticsResult['rows'],
+  options: { partial?: boolean; issues?: string[]; usagePartialInstanceIds?: string[] } = {}
+) {
+  return {
+    rows,
+    partial: options.partial ?? false,
+    usagePartialInstanceIds: options.usagePartialInstanceIds ?? [],
+    issues: options.issues ?? [],
+    settings: {
+      containersUsageAdaptiveGroups: providerSettings(),
+    },
+    rawResponses: [
+      {
+        dataset: 'containersUsageAdaptiveGroups' as const,
+        windowIndex: 0,
+        batchIndex: 0,
+        window: {
+          start: '2026-07-22T09:00:00.000Z',
+          end: '2026-07-22T11:00:00.000Z',
+        },
+        body: { data: { viewer: { accounts: [] } }, errors: null },
+      },
+    ],
+  };
 }
 
 describe('admin.cloudBillingSkus.list', () => {
@@ -209,20 +264,570 @@ describe('admin.cloudBillingSkus usage records', () => {
     await insertUsageInterval({ id: 'interval-b', subjectId: 'subject-1' });
     await insertUsageInterval({ id: 'interval-a', subjectId: 'subject-1' });
     await insertUsageInterval({ id: 'interval-other', subjectId: 'subject-2' });
+    await db.insert(container_usage_segment).values([
+      {
+        interval_id: 'interval-b',
+        seq: 1,
+        idempotency_key: 'interval-b-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+      {
+        interval_id: 'interval-a',
+        seq: 1,
+        idempotency_key: 'interval-a-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+      {
+        interval_id: 'interval-other',
+        seq: 1,
+        idempotency_key: 'interval-other-segment',
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+    ]);
     const caller = await createCallerForUser(admin.id);
     const first = await caller.admin.cloudBillingSkus.searchUsageIntervals({
-      search: { kind: 'subject', subjectType: 'user', subjectId: 'subject-1' },
+      search: {
+        kind: 'subject',
+        subjectType: 'user',
+        subjectId: 'subject-1',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      },
       limit: 1,
     });
     expect(first.items.map(item => item.id)).toEqual(['interval-b']);
     expect(first.nextCursor).not.toBeNull();
     if (!first.nextCursor) throw new Error('Expected an interval cursor');
     const second = await caller.admin.cloudBillingSkus.searchUsageIntervals({
-      search: { kind: 'subject', subjectType: 'user', subjectId: 'subject-1' },
+      search: {
+        kind: 'subject',
+        subjectType: 'user',
+        subjectId: 'subject-1',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      },
       limit: 1,
       cursor: first.nextCursor,
     });
     expect(second.items.map(item => item.id)).toEqual(['interval-a']);
+  });
+
+  it('summarizes only an exact subject and bounded activity window by SKU', async () => {
+    await db.insert(cloud_billing_sku).values({
+      ...validInput('usage-summary-sku'),
+      rate_cents_per_unit: '0.125',
+      created_by_user_id: admin.id,
+    });
+    await insertUsageInterval({
+      id: 'summary-in-window',
+      subjectId: 'summary-subject',
+      startedAt: '2026-07-22T10:00:00.000Z',
+    });
+    await db
+      .update(container_usage_interval)
+      .set({ cloud_billing_sku_id: 'usage-summary-sku', confirmed_seconds: 999 })
+      .where(eq(container_usage_interval.id, 'summary-in-window'));
+    await db.insert(container_usage_segment).values([
+      {
+        interval_id: 'summary-in-window',
+        seq: 1,
+        idempotency_key: 'summary-start-boundary',
+        reported_seconds: 12,
+        usage_seconds: 12,
+        received_at: '2026-07-22T09:00:00.000Z',
+      },
+      {
+        interval_id: 'summary-in-window',
+        seq: 2,
+        idempotency_key: 'summary-end-boundary',
+        reported_seconds: 100,
+        usage_seconds: 100,
+        received_at: '2026-07-22T11:00:00.000Z',
+      },
+    ]);
+    await insertUsageInterval({
+      id: 'summary-other-subject',
+      subjectId: 'other-subject',
+      startedAt: '2026-07-22T10:00:00.000Z',
+    });
+    await db
+      .update(container_usage_interval)
+      .set({ confirmed_seconds: 999 })
+      .where(eq(container_usage_interval.id, 'summary-other-subject'));
+    await db.insert(container_usage_segment).values({
+      interval_id: 'summary-other-subject',
+      seq: 1,
+      idempotency_key: 'summary-other-subject',
+      reported_seconds: 999,
+      usage_seconds: 999,
+      received_at: '2026-07-22T10:00:00.000Z',
+    });
+    await insertUsageInterval({
+      id: 'summary-outside-window',
+      subjectId: 'summary-subject',
+      startedAt: '2026-07-23T10:00:00.000Z',
+    });
+    await db
+      .update(container_usage_interval)
+      .set({ confirmed_seconds: 999 })
+      .where(eq(container_usage_interval.id, 'summary-outside-window'));
+    await db.insert(container_usage_segment).values({
+      interval_id: 'summary-outside-window',
+      seq: 1,
+      idempotency_key: 'summary-outside-window',
+      reported_seconds: 999,
+      usage_seconds: 999,
+      received_at: '2026-07-23T10:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const summary = await caller.admin.cloudBillingSkus.getUsageSummary({
+      subjectType: 'user',
+      subjectId: 'summary-subject',
+      start: '2026-07-22T09:00:00.000Z',
+      end: '2026-07-22T11:00:00.000Z',
+    });
+
+    expect(summary).toMatchObject({
+      acceptedSeconds: 12,
+      estimatedCents: '1.5',
+      items: [
+        {
+          skuId: 'usage-summary-sku',
+          acceptedSeconds: 12,
+          estimatedCents: '1.5',
+          intervals: 1,
+        },
+      ],
+    });
+
+    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    await expect(
+      nonAdminCaller.admin.cloudBillingSkus.getUsageSummary({
+        subjectType: 'user',
+        subjectId: 'summary-subject',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('rejects invalid and oversized usage summary windows', async () => {
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.cloudBillingSkus.getUsageSummary({
+        subjectType: 'user',
+        subjectId: 'summary-subject',
+        start: '2026-07-22T11:00:00.000Z',
+        end: '2026-07-22T10:00:00.000Z',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      caller.admin.cloudBillingSkus.getUsageSummary({
+        subjectType: 'user',
+        subjectId: 'summary-subject',
+        start: '2026-06-01T00:00:00.000Z',
+        end: '2026-07-03T00:00:00.000Z',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('reconciles only exact subject activity, resolves provider identities, and deduplicates generations', async () => {
+    await db.insert(cloud_billing_sku).values({
+      ...validInput('usage-reconciliation-sku'),
+      created_by_user_id: admin.id,
+    });
+    await insertUsageInterval({
+      id: 'cloud-generation-1',
+      subjectId: 'reconcile-subject',
+      service: 'cloud-agent-next-sandbox',
+      instanceId: 'sandbox-name',
+      metadata: { durable_object_id: 'cloud-physical-id' },
+    });
+    await db
+      .update(container_usage_interval)
+      .set({
+        status: 'closed',
+        close_reason: 'exit',
+        stopped_at: '2026-07-22T10:30:00.000Z',
+        last_seen_at: '2026-07-22T10:30:00.000Z',
+      })
+      .where(eq(container_usage_interval.id, 'cloud-generation-1'));
+    await insertUsageInterval({
+      id: 'cloud-generation-2',
+      subjectId: 'reconcile-subject',
+      service: 'cloud-agent-next-sandbox',
+      instanceId: 'sandbox-name',
+      skuId: 'usage-reconciliation-sku',
+      metadata: { durable_object_id: 'cloud-physical-id' },
+    });
+    await insertUsageInterval({
+      id: 'gastown-generation',
+      subjectType: 'org',
+      subjectId: 'reconcile-org',
+      service: 'gastown',
+      instanceId: 'gastown-physical-id',
+    });
+    await insertUsageInterval({
+      id: 'other-subject-generation',
+      subjectId: 'other-subject',
+      service: 'gastown',
+      instanceId: 'unrelated-physical-id',
+    });
+    await db.insert(container_usage_segment).values([
+      {
+        interval_id: 'cloud-generation-1',
+        seq: 1,
+        idempotency_key: 'cloud-generation-1-start',
+        reported_seconds: 10,
+        usage_seconds: 10,
+        received_at: '2026-07-22T09:00:00.000Z',
+      },
+      {
+        interval_id: 'cloud-generation-2',
+        seq: 1,
+        idempotency_key: 'cloud-generation-2-middle',
+        reported_seconds: 20,
+        usage_seconds: 20,
+        received_at: '2026-07-22T10:00:00.000Z',
+      },
+      {
+        interval_id: 'cloud-generation-2',
+        seq: 2,
+        idempotency_key: 'cloud-generation-2-end',
+        reported_seconds: 200,
+        usage_seconds: 200,
+        received_at: '2026-07-22T11:00:00.000Z',
+      },
+      {
+        interval_id: 'gastown-generation',
+        seq: 1,
+        idempotency_key: 'gastown-middle',
+        reported_seconds: 30,
+        usage_seconds: 30,
+        received_at: '2026-07-22T10:00:00.000Z',
+      },
+      {
+        interval_id: 'other-subject-generation',
+        seq: 1,
+        idempotency_key: 'unrelated-middle',
+        reported_seconds: 999,
+        usage_seconds: 999,
+        received_at: '2026-07-22T10:00:00.000Z',
+      },
+    ]);
+    mockQueryContainerUsageAnalytics.mockImplementation(async input =>
+      providerResult(
+        input.instanceIds.map(instanceId => ({
+          applicationId:
+            instanceId === 'cloud-physical-id' ? 'observed-cloud-app' : 'observed-gastown-app',
+          instanceId,
+          usage: {
+            cpuTimeSec: instanceId === 'cloud-physical-id' ? 3 : 4,
+            allocatedMemory: 12 * 1024 ** 3 * 30,
+            allocatedDisk: 20_000_000_000 * 30,
+            txBytes: 3_000,
+          },
+        }))
+      )
+    );
+
+    const userResult = await reconcileUsageWithCloudflare(
+      {
+        subjectType: 'user',
+        subjectId: 'reconcile-subject',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      },
+      mockQueryContainerUsageAnalytics
+    );
+    expect(mockQueryContainerUsageAnalytics).toHaveBeenLastCalledWith({
+      instanceIds: ['cloud-physical-id'],
+      start: '2026-07-22T09:00:00.000Z',
+      end: '2026-07-22T11:00:00.000Z',
+    });
+    expect(userResult.totals).toMatchObject({
+      meterAcceptedSeconds: 30,
+      intervalCount: 2,
+      uniqueMeterInstances: 1,
+      queriedCloudflareInstances: 1,
+    });
+    expect(userResult.rows).toEqual([
+      expect.objectContaining({
+        providerInstanceId: 'cloud-physical-id',
+        meterAcceptedSeconds: 30,
+        intervalCount: 2,
+        services: ['cloud-agent-next-sandbox'],
+        skuIds: ['usage-reconciliation-sku', 'usage-search-sku'],
+        providerCpuTimeSec: 3,
+        providerMemorySeconds: 30,
+        providerDiskSeconds: 30,
+        provisionedMemoryBytes: 12 * 1024 ** 3,
+        provisionedDiskBytes: 20_000_000_000,
+        status: 'comparison_unavailable',
+      }),
+    ]);
+    expect(userResult.provider.rawResponses).toHaveLength(1);
+
+    const orgResult = await reconcileUsageWithCloudflare(
+      {
+        subjectType: 'org',
+        subjectId: 'reconcile-org',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      },
+      mockQueryContainerUsageAnalytics
+    );
+    expect(mockQueryContainerUsageAnalytics).toHaveBeenLastCalledWith({
+      instanceIds: ['gastown-physical-id'],
+      start: '2026-07-22T09:00:00.000Z',
+      end: '2026-07-22T11:00:00.000Z',
+    });
+    expect(orgResult.rows[0]).toMatchObject({
+      providerInstanceId: 'gastown-physical-id',
+      providerApplicationIds: ['observed-gastown-app'],
+      meterAcceptedSeconds: 30,
+      providerMemorySeconds: 30,
+      providerDiskSeconds: 30,
+      status: 'comparison_unavailable',
+    });
+  });
+
+  it('keeps missing, ambiguous, partial, and unresolved provider data explicit', async () => {
+    await Promise.all([
+      insertUsageInterval({
+        id: 'missing-provider',
+        subjectId: 'status-subject',
+        service: 'gastown',
+        instanceId: 'missing-id',
+      }),
+      insertUsageInterval({
+        id: 'ambiguous-provider',
+        subjectId: 'status-subject',
+        service: 'gastown',
+        instanceId: 'ambiguous-id',
+      }),
+      insertUsageInterval({
+        id: 'partial-provider',
+        subjectId: 'status-subject',
+        service: 'gastown',
+        instanceId: 'partial-id',
+      }),
+      insertUsageInterval({
+        id: 'cloud-without-provider-id',
+        subjectId: 'status-subject',
+        service: 'cloud-agent-next-sandbox',
+        instanceId: 'sandbox-without-metadata',
+      }),
+    ]);
+    await db.insert(container_usage_segment).values(
+      [
+        'missing-provider',
+        'ambiguous-provider',
+        'partial-provider',
+        'cloud-without-provider-id',
+      ].map((intervalId, index) => ({
+        interval_id: intervalId,
+        seq: 1,
+        idempotency_key: `status-${index}`,
+        reported_seconds: 5,
+        usage_seconds: 5,
+        received_at: '2026-07-22T10:00:00.000Z',
+      }))
+    );
+    mockQueryContainerUsageAnalytics.mockResolvedValue(
+      providerResult(
+        [
+          {
+            applicationId: 'app-gastown',
+            instanceId: 'ambiguous-id',
+            usage: { cpuTimeSec: 1, allocatedMemory: 2, allocatedDisk: 3, txBytes: 4 },
+          },
+          {
+            applicationId: 'app-other',
+            instanceId: 'ambiguous-id',
+            usage: { cpuTimeSec: 10, allocatedMemory: 20, allocatedDisk: 30, txBytes: 40 },
+          },
+          {
+            applicationId: 'app-gastown',
+            instanceId: 'partial-id',
+            usage: { cpuTimeSec: 0, allocatedMemory: 0, allocatedDisk: 0, txBytes: 0 },
+          },
+        ],
+        {
+          partial: true,
+          issues: ['Provider usage response was partial.'],
+          usagePartialInstanceIds: ['partial-id'],
+        }
+      )
+    );
+
+    const result = await reconcileUsageWithCloudflare(
+      {
+        subjectType: 'user',
+        subjectId: 'status-subject',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      },
+      mockQueryContainerUsageAnalytics
+    );
+    expect(mockQueryContainerUsageAnalytics).toHaveBeenCalledWith({
+      instanceIds: expect.arrayContaining(['missing-id', 'ambiguous-id', 'partial-id']),
+      start: '2026-07-22T09:00:00.000Z',
+      end: '2026-07-22T11:00:00.000Z',
+    });
+    expect(mockQueryContainerUsageAnalytics.mock.calls[0]?.[0].instanceIds).toHaveLength(3);
+    expect(result.counts).toEqual({
+      missing: 1,
+      ambiguous: 1,
+      partial: 1,
+      comparisonUnavailable: 1,
+    });
+    expect(result.rows.find(row => row.instanceId === 'missing-id')).toMatchObject({
+      status: 'missing_from_cloudflare',
+      providerCpuTimeSec: null,
+    });
+    expect(result.rows.find(row => row.instanceId === 'ambiguous-id')).toMatchObject({
+      status: 'ambiguous_application',
+      providerCpuTimeSec: null,
+      providerApplicationIds: ['app-gastown', 'app-other'],
+    });
+    expect(result.rows.find(row => row.instanceId === 'partial-id')).toMatchObject({
+      status: 'provider_partial',
+      providerCpuTimeSec: null,
+    });
+    expect(result.rows.find(row => row.instanceId === 'sandbox-without-metadata')).toMatchObject({
+      status: 'comparison_unavailable',
+      providerInstanceId: null,
+    });
+  });
+
+  it('does not call Cloudflare for empty meter usage and rejects non-admin reconciliation', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.cloudBillingSkus.reconcileUsageWithCloudflare({
+      subjectType: 'user',
+      subjectId: 'no-usage-subject',
+      start: '2026-07-22T09:00:00.000Z',
+      end: '2026-07-22T11:00:00.000Z',
+    });
+    expect(result.rows).toEqual([]);
+    expect(result.provider).toEqual({
+      requested: false,
+      partial: false,
+      issues: [],
+      rawResponses: [],
+    });
+    expect(mockQueryContainerUsageAnalytics).not.toHaveBeenCalled();
+
+    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    await expect(
+      nonAdminCaller.admin.cloudBillingSkus.reconcileUsageWithCloudflare({
+        subjectType: 'user',
+        subjectId: 'no-usage-subject',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('does not normalize provider seconds when memory and disk durations disagree', async () => {
+    await insertUsageInterval({
+      id: 'capacity-mismatch',
+      subjectId: 'capacity-subject',
+      service: 'gastown',
+      instanceId: 'capacity-instance',
+    });
+    await db.insert(container_usage_segment).values({
+      interval_id: 'capacity-mismatch',
+      seq: 1,
+      idempotency_key: 'capacity-mismatch-segment',
+      reported_seconds: 10,
+      usage_seconds: 10,
+      received_at: '2026-07-22T10:00:00.000Z',
+    });
+    mockQueryContainerUsageAnalytics.mockResolvedValue(
+      providerResult([
+        {
+          applicationId: 'app-gastown',
+          instanceId: 'capacity-instance',
+          usage: {
+            cpuTimeSec: 1,
+            allocatedMemory: 12 * 1024 ** 3 * 10,
+            allocatedDisk: 20_000_000_000 * 11,
+            txBytes: 0,
+          },
+        },
+      ])
+    );
+
+    const result = await reconcileUsageWithCloudflare(
+      {
+        subjectType: 'user',
+        subjectId: 'capacity-subject',
+        start: '2026-07-22T09:00:00.000Z',
+        end: '2026-07-22T11:00:00.000Z',
+      },
+      mockQueryContainerUsageAnalytics
+    );
+
+    expect(result.rows[0]).toMatchObject({
+      providerMemorySeconds: 10,
+      providerDiskSeconds: 11,
+      status: 'comparison_unavailable',
+      statusDetail: expect.stringContaining('imply different active durations'),
+    });
+  });
+
+  it('rejects reconciliation above the unique physical instance cap', async () => {
+    const intervalIds = Array.from({ length: 101 }, (_, index) => `capped-instance-${index}`);
+    await db.insert(container_usage_interval).values(
+      intervalIds.map((id, index) => ({
+        id,
+        service: 'gastown',
+        instance_id: `physical-${index}`,
+        start_epoch_ms: index + 1,
+        cloud_billing_sku_id: 'usage-search-sku',
+        context_fingerprint: 'a'.repeat(64),
+        subject_type: 'user' as const,
+        subject_id: 'capped-subject',
+        actor_type: 'user' as const,
+        actor_id: 'capped-subject',
+        started_at: '2026-07-22T10:00:00.000Z',
+        last_seen_at: '2026-07-22T10:00:00.000Z',
+      }))
+    );
+    await db.insert(container_usage_segment).values(
+      intervalIds.map((intervalId, index) => ({
+        interval_id: intervalId,
+        seq: 1,
+        idempotency_key: `capped-segment-${index}`,
+        reported_seconds: 1,
+        usage_seconds: 1,
+        received_at: '2026-07-22T10:00:00.000Z',
+      }))
+    );
+
+    await expect(
+      reconcileUsageWithCloudflare(
+        {
+          subjectType: 'user',
+          subjectId: 'capped-subject',
+          start: '2026-07-22T09:00:00.000Z',
+          end: '2026-07-22T11:00:00.000Z',
+        },
+        mockQueryContainerUsageAnalytics
+      )
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('maximum 100'),
+    });
+    expect(mockQueryContainerUsageAnalytics).not.toHaveBeenCalled();
   });
 
   it('returns ordered, safe segment details and rejects unknown intervals', async () => {

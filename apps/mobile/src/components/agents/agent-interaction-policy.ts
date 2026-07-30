@@ -1,6 +1,6 @@
 type ActiveRequest = { requestId: string } | null | undefined;
 
-type BlockingInteraction = 'question' | 'permission' | 'none';
+export type BlockingInteraction = 'question' | 'permission' | 'none';
 
 export function getBlockingInteraction(input: {
   activeQuestion: ActiveRequest;

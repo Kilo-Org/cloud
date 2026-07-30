@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -14,9 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
+import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
+import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 function MetaRow({
@@ -52,6 +56,8 @@ export function ReviewDetailScreen({
   scope,
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
+  const router = useRouter();
+  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
@@ -158,6 +164,16 @@ export function ReviewDetailScreen({
           <Button
             variant="secondary"
             onPress={() => {
+              const destination = resolveCodeReviewerOpenPrDestination(
+                review.pr_url,
+                prReviewEnabled
+              );
+              if (destination.kind === 'in-app') {
+                router.push(
+                  getPrReviewPath(destination.owner, destination.repo, destination.number)
+                );
+                return;
+              }
               void openExternalUrl(review.pr_url, { label: 'pull request' });
             }}
           >

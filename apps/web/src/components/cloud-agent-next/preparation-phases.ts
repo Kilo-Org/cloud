@@ -2,7 +2,7 @@ import type {
   PreparationAttempt,
   PreparationStepSnapshot,
   PreparationStepStatus,
-} from '@/lib/cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 export function humanizePhaseLabel(step: Pick<PreparationStepSnapshot, 'label'>): string {
   return step.label

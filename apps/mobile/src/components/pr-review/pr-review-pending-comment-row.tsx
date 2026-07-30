@@ -6,6 +6,7 @@ import { type RefObject } from 'react';
 import { Trash2 } from 'lucide-react-native';
 import { Pressable, TextInput, View } from 'react-native';
 
+import { useFormSheetKeyboardVisible } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
@@ -28,18 +29,18 @@ export function PrReviewPendingCommentRow({
   const location = pendingCommentLocationLabel(item);
 
   return (
-    <View className="flex-row items-start gap-2 border-t border-hair-soft pt-3">
+    <View className="flex-row items-center gap-2 border-t border-hair-soft pt-2">
       <Pressable
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={`Edit pending comment on ${location}`}
-        className="min-h-11 flex-1 gap-1 active:opacity-70"
+        className="min-h-9 flex-1 gap-0.5 active:opacity-70"
       >
         <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
           {location}
         </Text>
-        <Text className="text-sm leading-5 text-foreground" numberOfLines={2}>
+        <Text className="text-xs leading-4 text-foreground" numberOfLines={1}>
           {item.body.trim().length > 0 ? item.body : '(empty)'}
         </Text>
       </Pressable>
@@ -49,9 +50,9 @@ export function PrReviewPendingCommentRow({
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={`Delete pending comment on ${location}`}
-        className="h-9 w-9 items-center justify-center rounded-md active:opacity-60"
+        className="h-8 w-8 items-center justify-center rounded-md active:opacity-60"
       >
-        <Trash2 size={16} color={colors.mutedForeground} />
+        <Trash2 size={14} color={colors.mutedForeground} />
       </Pressable>
     </View>
   );
@@ -104,6 +105,7 @@ export function ReviewSummaryField({
   onChange: () => void;
 }) {
   const colors = useThemeColors();
+  const keyboardVisible = useFormSheetKeyboardVisible();
   return (
     <TextInput
       ref={inputRef}
@@ -118,9 +120,11 @@ export function ReviewSummaryField({
       }}
       multiline
       textAlignVertical="top"
+      // Compact so half-detent and keyboard-open keep footer CTAs at y=0.
       className={cn(
-        'min-h-24 rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground',
-        'focus:border-ring'
+        'rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
+        'focus:border-ring',
+        keyboardVisible ? 'max-h-16 min-h-12' : 'min-h-14 max-h-24'
       )}
     />
   );

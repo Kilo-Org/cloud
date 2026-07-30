@@ -105,6 +105,39 @@ export type BitbucketRuntimeTokenResolverDependencies = {
   }): Promise<CachedRepositoryLookupResult>;
 };
 
+// Select a single repository from the cached workspace repository list by UUID.
+// The resolver only ever needs the one repository under review, so we look it up
+// directly and validate just that entry. Validating the whole array (and capping
+// its length) would reject the cache for any workspace larger than the cap even
+// though the target repository is present and well-formed.
+export function selectCachedBitbucketRepository(
+  repositoriesValue: unknown,
+  input: { workspaceUuid: string; repositoryUuid: string }
+): CachedRepositoryLookupResult {
+  if (!Array.isArray(repositoriesValue)) return { status: 'temporarily_unavailable' };
+  const entries = repositoriesValue as unknown[];
+  const match = entries.find(
+    candidate =>
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      (candidate as { id?: unknown }).id === input.repositoryUuid
+  );
+  const parsed = CachedRepositorySchema.safeParse(match);
+  if (!parsed.success) return { status: 'repository_not_found' };
+  const repository = parsed.data;
+  return {
+    status: 'available',
+    repository: {
+      id: repository.id,
+      workspaceUuid: input.workspaceUuid,
+      name: repository.name,
+      fullName: repository.full_name,
+      private: repository.private,
+      ...(repository.default_branch ? { defaultBranch: repository.default_branch } : {}),
+    },
+  };
+}
+
 async function findCachedBitbucketRepository(
   env: CloudflareEnv,
   input: {
@@ -146,24 +179,10 @@ async function findCachedBitbucketRepository(
       return { status: 'temporarily_unavailable' };
     }
 
-    const repositories = z
-      .array(CachedRepositorySchema)
-      .max(500)
-      .safeParse(integration.repositories);
-    if (!repositories.success) return { status: 'temporarily_unavailable' };
-    const repository = repositories.data.find(candidate => candidate.id === input.repositoryUuid);
-    if (!repository) return { status: 'repository_not_found' };
-    return {
-      status: 'available',
-      repository: {
-        id: repository.id,
-        workspaceUuid: input.workspace.uuid,
-        name: repository.name,
-        fullName: repository.full_name,
-        private: repository.private,
-        ...(repository.default_branch ? { defaultBranch: repository.default_branch } : {}),
-      },
-    };
+    return selectCachedBitbucketRepository(integration.repositories, {
+      workspaceUuid: input.workspace.uuid,
+      repositoryUuid: input.repositoryUuid,
+    });
   } catch {
     return { status: 'temporarily_unavailable' };
   }
@@ -311,11 +330,16 @@ export async function listBitbucketRepositories(
   }
 }
 
-export async function resolveBitbucketToken(
+type BitbucketTokenFailure = Extract<GetBitbucketTokenResult, { success: false }>;
+
+async function resolveBitbucketAuthorizedRepository(
   env: CloudflareEnv,
   params: GetBitbucketTokenParams,
   dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
-): Promise<GetBitbucketTokenResult> {
+): Promise<
+  | { success: true; authorization: RuntimeAuthorization; repository: BitbucketRepository }
+  | BitbucketTokenFailure
+> {
   if (!params.orgId) return { success: false, reason: 'invalid_request' };
   const workspaceUuid = normalizeBitbucketUuid(params.workspaceUuid);
   const repositoryUuid = normalizeBitbucketUuid(params.repositoryUuid);
@@ -364,5 +388,49 @@ export async function resolveBitbucketToken(
   ) {
     return { success: false, reason: 'repository_mismatch' };
   }
-  return { success: true, token: authorization.token };
+  return { success: true, authorization, repository };
+}
+
+export async function resolveBitbucketToken(
+  env: CloudflareEnv,
+  params: GetBitbucketTokenParams,
+  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
+): Promise<GetBitbucketTokenResult> {
+  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides);
+  if (!resolved.success) return resolved;
+  return { success: true, token: resolved.authorization.token };
+}
+
+export type BitbucketCapabilitySubject = {
+  integrationId: string;
+  workspaceUuid: string;
+  workspaceSlug: string;
+  repositoryUuid: string;
+  repositoryFullName: string;
+  token: string;
+};
+
+// Resolve the same authorized repository as resolveBitbucketToken, but return
+// the identity needed to mint an outbound session capability (and the token, so
+// the caller can bind a rotation digest). Used at capability issue time and, on
+// the redeem path, to re-resolve the current token for comparison.
+export async function resolveBitbucketCapabilitySubject(
+  env: CloudflareEnv,
+  params: GetBitbucketTokenParams,
+  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
+): Promise<{ success: true; subject: BitbucketCapabilitySubject } | BitbucketTokenFailure> {
+  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides);
+  if (!resolved.success) return resolved;
+  const { authorization, repository } = resolved;
+  return {
+    success: true,
+    subject: {
+      integrationId: authorization.integrationId,
+      workspaceUuid: authorization.workspace.uuid,
+      workspaceSlug: authorization.workspace.slug,
+      repositoryUuid: repository.id,
+      repositoryFullName: repository.fullName,
+      token: authorization.token,
+    },
+  };
 }

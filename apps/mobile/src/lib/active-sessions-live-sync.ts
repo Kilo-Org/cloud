@@ -1,23 +1,9 @@
 /**
- * App-level owner for the active-sessions live-sync. The owner:
- *
- *  - retains the shared `UserWebConnection` while mounted;
- *  - subscribes to `onSystemEvent` and applies the WS payloads to the
- *    shared `trpc.activeSessions.list` cache through ONE serialized
- *    pipeline (`cancelQueries` + `setQueryData`); the pipeline never
- *    awaits a network fetch, so a stalled tRPC refetch cannot block
- *    later heartbeats;
- *  - requests explicit refreshes (`cli.connected`, `cli.disconnected`,
- *    reconnect, enrichment) through a coalescing `scheduleRefresh` with
- *    durable per-reason pending state. Refreshes call
- *    `queryClient.fetchQuery({ queryKey, queryFn, staleTime: 0 })` so
- *    the network call is forced even after a preceding `setQueryData`.
- *  - observes the connection-state rising edge and triggers exactly
- *    one reconnect refresh per disconnect → connect transition.
- *
- * This module is framework-agnostic: it does not import React or the
- * `UserWebConnectionProvider`. The thin React glue that wires it into the
- * provider lives in `active-sessions-live-sync-mount.tsx`.
+ * App-level owner for active-sessions live-sync: retains UserWebConnection,
+ * applies onSystemEvent payloads to trpc.activeSessions.list via a serialized
+ * cancelQueries+setQueryData pipeline, and coalesces refreshes (cli.connected /
+ * disconnected, reconnect, enrichment) with fetchQuery staleTime:0.
+ * Framework-agnostic; React glue is active-sessions-live-sync-mount.tsx.
  */
 
 import { type QueryClient, type QueryFunction, type QueryKey } from '@tanstack/react-query';
@@ -26,16 +12,10 @@ import {
   type CachedActiveSession,
   type CachedActiveSessionsData,
   hasUnenrichedLiveId,
-  mergeHeartbeatForActiveSessions,
-  mergeSnapshotForActiveSessions,
-  parseCliConnectionPayload,
-  parseHeartbeatPayload,
-  parseSessionsListPayload,
-  removeActiveSessionsForConnection,
-  selectRootWsSessions,
+  planLiveSystemEventActions,
 } from './active-sessions-live';
 
-import { type UserWebConnection, type UserWebSystemEvent } from 'cloud-agent-sdk';
+import { type UserWebConnection, type UserWebSystemEvent } from '@kilocode/cloud-agent-sdk';
 
 const ENRICHMENT_RETRY_MIN_INTERVAL_MS = 10_000;
 
@@ -45,11 +25,7 @@ type SystemEvent = UserWebSystemEvent;
 
 type WriteUpdater = (current: CachedActiveSession[]) => CachedActiveSession[];
 
-/**
- * Minimal contract this owner needs from the SDK. Mirrors the public
- * surface of `UserWebConnection`; the test double in
- * `mobile-session-manager.test.ts` already conforms (see S2).
- */
+/** Minimal UserWebConnection surface used by this owner. */
 export type LiveSyncConnection = Pick<
   UserWebConnection,
   'retain' | 'isConnected' | 'onConnectionChange' | 'onSystemEvent'
@@ -68,11 +44,7 @@ type CreateLiveSyncOptions = {
   now?: () => number;
 };
 
-/**
- * The owner as a plain class. Exposed so the test suite can exercise
- * the serialized pipeline, pending-reason state, and reconnect
- * detection without a React renderer.
- */
+/** Testable owner: serialized pipeline, pending reasons, reconnect edge. */
 export class ActiveSessionsLiveSync {
   private readonly connection: LiveSyncConnection;
   private readonly queryClient: LiveSyncQueryClient;
@@ -111,12 +83,7 @@ export class ActiveSessionsLiveSync {
     this.lastConnectedState = this.connection.isConnected();
   }
 
-  /**
-   * Subscribes to WS events, retains the connection, and tracks the
-   * initial connection state for the reconnect-rising-edge detector.
-   * Returns a detach function that releases all listeners and the
-   * retain.
-   */
+  /** Subscribe, retain; detach releases listeners + retain. */
   attach(): () => void {
     if (this.releaseRetain) {
       throw new Error('ActiveSessionsLiveSync already attached');
@@ -188,48 +155,17 @@ export class ActiveSessionsLiveSync {
   }
 
   private handleSystemEvent(event: SystemEvent): void {
-    if (event.event === 'sessions.list') {
-      const sessions = parseSessionsListPayload(event.data);
-      if (sessions) {
-        const roots = selectRootWsSessions(sessions);
-        this.enqueueWrite(current => mergeSnapshotForActiveSessions(current, roots));
+    for (const action of planLiveSystemEventActions(event)) {
+      if (action.type === 'write') {
+        this.enqueueWrite(current => action.updater(current));
+      } else {
+        this.scheduleRefresh(action.reason);
       }
-      return;
-    }
-    if (event.event === 'sessions.heartbeat') {
-      const payload = parseHeartbeatPayload(event.data);
-      if (payload) {
-        const roots = selectRootWsSessions(payload.sessions);
-        this.enqueueWrite(current =>
-          mergeHeartbeatForActiveSessions(current, {
-            connectionId: payload.connectionId,
-            sessions: roots,
-          })
-        );
-      }
-      return;
-    }
-    if (event.event === 'cli.disconnected') {
-      const payload = parseCliConnectionPayload(event.data);
-      if (payload) {
-        this.enqueueWrite(current =>
-          removeActiveSessionsForConnection(current, payload.connectionId)
-        );
-        this.scheduleRefresh('cli-disconnected');
-      }
-      return;
-    }
-    if (event.event === 'cli.connected' && parseCliConnectionPayload(event.data)) {
-      this.scheduleRefresh('cli-connected');
     }
   }
 
   private handleConnectionChange(connected: boolean): void {
-    // Rising-edge detector: a false → true transition triggers exactly
-    // one reconnect refresh. A true → false transition does not
-    // schedule a refresh (the conditional `refetchInterval` covers
-    // the WS-down window; re-scheduling here would either duplicate
-    // the work or be absorbed by the next refresh regardless).
+    // Rising edge only; disconnect relies on refetchInterval.
     if (!this.lastConnectedState && connected) {
       this.scheduleRefresh('reconnect');
     }
@@ -241,18 +177,13 @@ export class ActiveSessionsLiveSync {
       return;
     }
     const attachmentEpoch = this.attachmentEpoch;
-    // Serialize ALL cache writes (cancel + setQueryData) on one queue.
-    // The pipeline never awaits a network fetch — that is the
-    // cancel-based fencing model.
+    // Serialized cancel+setQueryData; never awaits network.
     this.writeQueue = (async () => {
       await this.writeQueue;
       if (attachmentEpoch !== this.attachmentEpoch) {
         return;
       }
-      // A write always cancels the in-flight fetch so the new cache
-      // state can never be overwritten by a stale result. Record that
-      // this cancellation was intentional, so the fetch queue can retry
-      // immediately rather than waiting for the next external trigger.
+      // Cancel in-flight fetch so stale results cannot overwrite.
       if (this.isFetchInFlight) {
         this.inFlightFetchCanceled = true;
       }
@@ -282,15 +213,13 @@ export class ActiveSessionsLiveSync {
       this.pendingReasons.delete('enrichment');
       return;
     }
-
     if (this.inFlightReasons?.has('enrichment')) {
       return;
     }
-
-    if (
+    const due =
       this.lastEnrichmentAttemptAt === null ||
-      this.now() - this.lastEnrichmentAttemptAt >= ENRICHMENT_RETRY_MIN_INTERVAL_MS
-    ) {
+      this.now() - this.lastEnrichmentAttemptAt >= ENRICHMENT_RETRY_MIN_INTERVAL_MS;
+    if (due) {
       this.pendingReasons.add('enrichment');
     } else {
       this.pendingReasons.delete('enrichment');
@@ -319,12 +248,8 @@ export class ActiveSessionsLiveSync {
       return;
     }
     const attachmentEpoch = this.attachmentEpoch;
-    // Cancel any in-flight fetch so a newly scheduled refresh can start
-    // immediately instead of being queued behind a stale one.
+    // Cancel in-flight fetch so a new refresh starts immediately.
     if (this.isFetchInFlight) {
-      // Record that this cancellation was intentional, so the fetch
-      // queue can retry immediately rather than waiting for the next
-      // external trigger.
       this.inFlightFetchCanceled = true;
       void this.queryClient.cancelQueries({ queryKey: this.queryKey });
     }
@@ -342,8 +267,6 @@ export class ActiveSessionsLiveSync {
       return;
     }
     this.isFetchInFlight = true;
-    // Reset the cancellation flag for THIS fetch instance. Any cancel
-    // that targets this fetch will set it back to true before the catch.
     this.inFlightFetchCanceled = false;
     const inFlightReasons = new Set(this.pendingReasons);
     this.inFlightReasons = inFlightReasons;
@@ -351,24 +274,18 @@ export class ActiveSessionsLiveSync {
     try {
       await this.queryClient.cancelQueries({ queryKey: this.queryKey });
       if (attachmentEpoch === this.attachmentEpoch) {
-        // fetchQuery with staleTime: 0 forces a network call regardless
-        // of any preceding setQueryData.
+        // staleTime:0 forces a network call after setQueryData.
         const fetchPromise = this.queryClient.fetchQuery({
           queryKey: this.queryKey,
           queryFn: this.queryFn,
           staleTime: 0,
         });
-        // The fetch is now in flight: let tests waiting on getFetchQueue()
-        // observe the pending state and/or issue cancellations.
         this.notifyFetchStart();
         await fetchPromise;
         success = true;
       }
     } catch {
-      // Either the query was canceled by a later WS write, or the
-      // network call itself failed. In either case, the reasons stay
-      // pending so a future scheduleRefresh (or the trailing
-      // re-kick) re-attempts.
+      // Canceled or network failure: keep reasons pending for retry.
     } finally {
       this.isFetchInFlight = false;
     }
@@ -387,16 +304,11 @@ export class ActiveSessionsLiveSync {
       this.updateEnrichmentReason();
     }
     const hasNewReasons = [...this.pendingReasons].some(reason => !inFlightReasons.has(reason));
-    // Read via helper so control-flow analysis does not treat the field as
-    // stuck at the `false` written above — other methods flip it during await.
+    // Helper so CFA does not treat the field as stuck at false after await.
     const wasCanceled = this.readInFlightFetchCanceled();
     this.inFlightReasons = null;
     this.notifyFetchCompletion();
-    // Re-kick immediately only when a replacement fetch is genuinely
-    // warranted: either the in-flight fetch was intentionally canceled by
-    // newer work, or new reasons were raised while it was in flight. On a
-    // genuine failure without either condition, stay quiet and let the
-    // next scheduled trigger (WS event / fallback poll) retry.
+    // Re-kick only after intentional cancel or new reasons mid-flight.
     if (this.pendingReasons.size > 0 && (wasCanceled || hasNewReasons)) {
       this.kickFetch();
     }

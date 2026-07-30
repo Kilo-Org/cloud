@@ -19,7 +19,7 @@ export function ActionTile({
 }) {
   return (
     <Pressable
-      className={`flex-1 items-center gap-2 rounded-lg bg-secondary py-4 active:opacity-70 ${disabled ? 'opacity-50' : ''}`}
+      className={`w-full flex-row items-center gap-3 rounded-lg bg-secondary px-4 py-4 active:opacity-70 ${disabled ? 'opacity-50' : ''}`}
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={label}
@@ -27,7 +27,9 @@ export function ActionTile({
       accessibilityState={{ disabled: Boolean(disabled) }}
     >
       <Icon size={20} color={color} />
-      <Text className={`text-sm ${destructive ? 'text-destructive' : 'text-muted-foreground'}`}>
+      <Text
+        className={`min-w-0 flex-1 text-sm ${destructive ? 'text-destructive' : 'text-muted-foreground'}`}
+      >
         {label}
       </Text>
     </Pressable>

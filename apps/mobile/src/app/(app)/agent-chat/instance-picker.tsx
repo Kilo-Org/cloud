@@ -241,7 +241,7 @@ export default function InstancePickerScreen() {
               icon={Server}
               placement="top"
               title="No CLI instances connected"
-              description="Run `kilo remote` in a project on your computer to connect one."
+              description="Run `kilo remote` in a project on your computer, or update Kilo CLI if one is already running."
               action={
                 <Button
                   variant="outline"

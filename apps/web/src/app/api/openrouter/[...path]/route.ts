@@ -47,7 +47,6 @@ import {
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
-  wrapInSafeNextResponse,
   forbiddenFreeModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
@@ -56,7 +55,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import { rewriteModelResponse, logUnrewrittenResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -69,7 +68,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
 import {
   classifyAbuse,
   awaitClassifyAbuse,
@@ -256,14 +254,27 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // non-kilocode clients). `taskId` still wins when both are present.
   const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
   const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
+  // Vercel's per-invocation request id. Logged on the disconnect and upstream
+  // failure paths so a client disconnect can be correlated with the upstream
+  // error it causes, and with the platform logs for the same invocation.
+  const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
 
   const logClientDisconnect = () => {
-    console.log('AI gateway client disconnected, requested model: %s', requestedModelLowerCased, {
-      path,
-      elapsed_ms: Math.round(performance.now() - requestStartedAt),
-      client_request_id: clientRequestId,
-      session_id: taskId ?? sessionHeader,
-    });
+    // The request signal is forwarded to the upstream fetch and to the response
+    // stream reader, so this disconnect also aborts them. Any abort/cancellation
+    // logged for this request after this line is a consequence of the client
+    // going away, not an upstream provider failure.
+    console.log(
+      'AI gateway client disconnected (aborting in-flight upstream work for this request), requested model: %s',
+      requestedModelLowerCased,
+      {
+        path,
+        elapsed_ms: Math.round(performance.now() - requestStartedAt),
+        client_request_id: clientRequestId,
+        session_id: taskId ?? sessionHeader,
+        vercel_request_id: vercelRequestId,
+      }
+    );
   };
   if (request.signal.aborted) {
     logClientDisconnect();
@@ -874,6 +885,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     extraHeaders,
     provider: effectiveProviderContext.provider,
     signal: request.signal,
+    vercelRequestId,
   });
   if (upstreamResult.type === 'error') {
     return upstreamResult.response;
@@ -957,16 +969,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  await handleRequestLogging({
-    clonedResponse: response.clone(),
+  const requestLogging = {
     user: maybeUser,
     organization_id: organizationId || null,
-    provider: effectiveProviderContext.provider.id,
-    model: effectiveModelIdLowerCased,
     session_id: usageContext.session_id,
-    vercel_request_id: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+    vercel_request_id: vercelRequestId,
     request: requestBodyParsed,
-  });
+  };
 
   {
     const errorResponse = await makeErrorReadable({
@@ -977,20 +986,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
+      await logUnrewrittenResponse(
+        response,
+        effectiveModelIdLowerCased,
+        effectiveProviderContext.provider.id,
+        requestLogging
+      );
       return errorResponse;
     }
   }
 
-  const rewrittenResponse = await rewriteModelResponse(
+  return await rewriteModelResponse(
     response,
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,
     requestBodyParsed.kind,
-    organizationId
+    requestLogging
   );
-  if (rewrittenResponse) {
-    return rewrittenResponse;
-  }
-
-  return wrapInSafeNextResponse(response);
 }

@@ -8,12 +8,20 @@ import { GASTOWN_URL } from '@/lib/constants';
 export function MayorTerminalBar({
   params,
   basePath,
+  billingAnnouncementEnabled,
 }: {
   params: Promise<{ townId: string }>;
   basePath?: string;
+  billingAnnouncementEnabled?: boolean;
 }) {
   const { townId } = use(params);
   // Track dashboard navigation context and sync to TownDO
   useGastownUiContext(townId, GASTOWN_URL);
-  return <TerminalBar townId={townId} basePath={basePath} />;
+  return (
+    <TerminalBar
+      townId={townId}
+      basePath={basePath}
+      billingAnnouncementEnabled={billingAnnouncementEnabled}
+    />
+  );
 }

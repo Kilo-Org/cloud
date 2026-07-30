@@ -1,4 +1,6 @@
-import { type Part } from 'cloud-agent-sdk';
+import { type Part } from '@kilocode/cloud-agent-sdk';
+
+import { isSnapshotProgressPart } from './part-types';
 
 const toolStatusMap: Record<string, string> = {
   read: 'Exploring',
@@ -17,6 +19,9 @@ const toolStatusMap: Record<string, string> = {
   question: 'Asking a question',
 };
 
+/** Matches CLI PROGRESS_INITIALIZING typography (U+2026 ellipsis). */
+export const SNAPSHOT_PROGRESS_STATUS = 'Initializing snapshot…';
+
 export function computeStatus(part: Part): string {
   if (part.type === 'tool') {
     return toolStatusMap[part.tool] ?? 'Considering next steps';
@@ -25,6 +30,9 @@ export function computeStatus(part: Part): string {
     return 'Thinking';
   }
   if (part.type === 'text') {
+    if (isSnapshotProgressPart(part)) {
+      return SNAPSHOT_PROGRESS_STATUS;
+    }
     return 'Writing response';
   }
   return 'Considering next steps';

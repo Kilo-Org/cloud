@@ -1,5 +1,5 @@
 import { modelsByProvider } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { readDb } from '@/lib/drizzle';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import type { NormalizedOpenRouterResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { desc } from 'drizzle-orm';
@@ -88,7 +88,7 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
 export async function fetchLatestModelsByProviderSnapshotFromDb(): Promise<
   NormalizedOpenRouterResponse | undefined
 > {
-  const result = await db
+  const result = await readDb
     .select({ data: modelsByProvider.data })
     .from(modelsByProvider)
     .orderBy(desc(modelsByProvider.id))

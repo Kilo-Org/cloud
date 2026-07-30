@@ -6,7 +6,7 @@ import {
   seedExtensionAuth,
   startFixtureServer,
 } from './extension-context-fixture';
-import { mockKiloApi } from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi } from './kilo-api-fixture';
 
 test('settings organization picker sends org context to the gateway', async () => {
   const fixture = await startFixtureServer();
@@ -17,6 +17,7 @@ test('settings organization picker sends org context to the gateway', async () =
     await mockKiloApi(context, {
       organizations: [{ id: 'org-1', name: 'Acme' }],
       seenChatOrganizationIds,
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

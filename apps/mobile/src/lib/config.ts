@@ -30,3 +30,14 @@ export const POSTHOG_API_KEY: string = required('posthogApiKey');
 
 export const GOOGLE_WEB_CLIENT_ID: string | undefined = optional('googleWebClientId');
 export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClientId');
+export const SENTRY_ENVIRONMENT: string | undefined = optional('sentryEnvironment');
+
+function optionalLatencyMs(key: keyof typeof OPTIONAL_ENV_KEYS): number {
+  const parsed = Number.parseInt(optional(key) ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/** E2E-only artificial backend latency (see lib/trpc.ts). 0 = disabled. */
+export const E2E_LATENCY_SESSION_MS: number = optionalLatencyMs('e2eLatencySessionMs');
+export const E2E_LATENCY_MESSAGES_MS: number = optionalLatencyMs('e2eLatencyMessagesMs');
+export const E2E_LATENCY_WS_MS: number = optionalLatencyMs('e2eLatencyWsMs');

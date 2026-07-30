@@ -4,7 +4,8 @@ import type {
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-5';
-export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.8';
+export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-5';
+export const CLAUDE_OPUS_FALLBACK_MODEL_ID = 'anthropic/claude-opus-4.8';
 export const CLAUDE_HAIKU_CURRENT_MODEL_ID = 'anthropic/claude-haiku-4.5';
 export const CLAUDE_FABLE_CURRENT_MODEL_ID = 'anthropic/claude-fable-5';
 export const CLAUDE_OPUS_4_8_STEALTH_MODEL_ID = 'stealth/claude-opus-4.8';
@@ -121,4 +122,8 @@ export function isClaudeModel(requestedModel: string) {
 
 export function isFableModel(requestedModel: string) {
   return requestedModel.includes('claude-fable');
+}
+
+export function isOpus5Model(requestedModel: string) {
+  return requestedModel.includes('claude-opus-5');
 }

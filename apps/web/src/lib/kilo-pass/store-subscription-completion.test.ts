@@ -53,6 +53,7 @@ describe('completeStoreKiloPassPurchase', () => {
       tier: KiloPassTier.Tier49,
       cadence: KiloPassCadence.Monthly,
       alreadyProcessed: false,
+      purchaseKind: 'initial',
     });
 
     const subscriptions = await db
@@ -126,7 +127,12 @@ describe('completeStoreKiloPassPurchase', () => {
     const first = await completeStoreKiloPassPurchase({ user, purchase });
     const replay = await completeStoreKiloPassPurchase({ user, purchase });
 
-    expect(replay).toEqual({ ...first, alreadyProcessed: true });
+    expect(replay).toEqual({
+      subscriptionId: first.subscriptionId,
+      tier: first.tier,
+      cadence: first.cadence,
+      alreadyProcessed: true,
+    });
 
     const storePurchases = await db
       .select()
@@ -283,7 +289,9 @@ describe('completeStoreKiloPassPurchase', () => {
         purchasedAtIso: '2026-01-05T12:00:00.000Z',
       }),
     });
-    await completeStoreKiloPassPurchase({
+    expect(first).toMatchObject({ alreadyProcessed: false, purchaseKind: 'initial' });
+
+    const renewal = await completeStoreKiloPassPurchase({
       user,
       purchase: applePurchase({
         providerSubscriptionId,
@@ -292,6 +300,7 @@ describe('completeStoreKiloPassPurchase', () => {
         purchasedAtIso: '2026-02-05T12:00:00.000Z',
       }),
     });
+    expect(renewal).toMatchObject({ alreadyProcessed: false, purchaseKind: 'renewal' });
 
     const subscription = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.id, first.subscriptionId),
@@ -363,7 +372,7 @@ describe('completeStoreKiloPassPurchase', () => {
       }),
     });
 
-    await completeStoreKiloPassPurchase({
+    const upgrade = await completeStoreKiloPassPurchase({
       user,
       purchase: applePurchase({
         productId: 'kilopass.tier49.monthly.v1',
@@ -375,6 +384,7 @@ describe('completeStoreKiloPassPurchase', () => {
         tier: KiloPassTier.Tier49,
       }),
     });
+    expect(upgrade).toMatchObject({ alreadyProcessed: false, purchaseKind: 'upgrade' });
 
     const subscription = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId),

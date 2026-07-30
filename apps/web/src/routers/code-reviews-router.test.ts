@@ -2251,3 +2251,620 @@ describe('review agent config repository model overrides', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 });
+
+describe('personalReviewAgent.patchReviewConfig', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.owned_by_user_id, testUser.id)
+        )
+      );
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+    mockSyncWebhooksForRepositories.mockReset();
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  beforeEach(() => {
+    mockGetValidGitLabToken.mockReset();
+    mockSyncWebhooksForRepositories.mockReset();
+    mockSyncWebhooksForRepositories.mockResolvedValue({
+      result: { created: [], updated: [], deleted: [], errors: [] },
+      updatedWebhooks: {},
+    });
+  });
+
+  // Seeds a GitHub personal config with values that the patch should NOT
+  // touch: manuallyAddedRepositories, repositoryModelOverrides, and the
+  // review_memory_enabled / review_analytics_enabled feature flags. Each
+  // round-trip test asserts all of these survive a mobile-shaped patch.
+  async function seedPersonalGithubConfig() {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_style: 'balanced',
+        focus_areas: ['bugs'],
+        custom_instructions: 'be terse',
+        model_slug: 'anthropic/claude-sonnet-5',
+        thinking_effort: null,
+        gate_threshold: 'off',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [101, 202],
+        manually_added_repositories: [
+          { id: 9, name: 'manual', full_name: 'manual/repo', private: true },
+        ],
+        repository_model_overrides: [
+          {
+            repository_id: 101,
+            repo_full_name: 'acme/api',
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+        disable_review_md: true,
+        // Web-only setting the patch schema never carries; `false` proves
+        // the patch passes it through instead of resetting to the default.
+        skip_bot_pull_requests: false,
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+  }
+
+  it('returns NOT_FOUND when no stored personal config exists', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.personalReviewAgent.patchReviewConfig({
+        platform: 'github',
+        reviewStyle: 'strict',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    // PATCH must not have created a row.
+    expect(stored).toBeUndefined();
+  });
+
+  it('preserves manuallyAddedRepositories and repositoryModelOverrides when the patch omits them', async () => {
+    await seedPersonalGithubConfig();
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+      focusAreas: ['security'],
+      modelSlug: 'openai/gpt-5',
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        focus_areas: ['security'],
+        model_slug: 'openai/gpt-5',
+        // Preserved by the field-merge:
+        manually_added_repositories: [
+          { id: 9, name: 'manual', full_name: 'manual/repo', private: true },
+        ],
+        repository_model_overrides: [
+          {
+            repository_id: 101,
+            repo_full_name: 'acme/api',
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+        selected_repository_ids: [101, 202],
+        repository_selection_mode: 'all',
+        gate_threshold: 'off',
+        disable_review_md: true,
+        // Web-only setting preserved by the patch pass-through:
+        skip_bot_pull_requests: false,
+        // Feature flags preserved by `preserveCodeReviewFeatureSettings`:
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      })
+    );
+  });
+
+  it('forces GitLab repository_selection_mode to selected when the patch omits it', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [101],
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      // `repositorySelectionMode` deliberately omitted — GitLab forcing
+      // must still clamp to 'selected' post-merge.
+      modelSlug: 'openai/gpt-5',
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        model_slug: 'openai/gpt-5',
+      })
+    );
+  });
+
+  it('does not run GitLab webhook sync when selectedRepositoryIds is absent from the patch', async () => {
+    await seedPersonalGithubConfig();
+    // Switch the stored row to gitlab so the proc's gitlab branch is
+    // reachable. The patch only sends focusAreas — selection is untouched,
+    // so webhook sync must NOT run.
+    await db
+      .update(agent_configs)
+      .set({ platform: 'gitlab' })
+      .where(
+        and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.owned_by_user_id, testUser.id)
+        )
+      );
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      focusAreas: ['performance'],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.webhookSync).toBeNull();
+    expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
+  });
+
+  it('runs GitLab webhook sync only when selectedRepositoryIds is present in the patch', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      selectedRepositoryIds: [202, 303],
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
+
+  // P0-B-13b: real mobile→server contract guard. The mobile
+  // useSaveReviewConfig hook now sends a partial patch whose shape is
+  // exactly { platform, ...editedFields } — no manuallyAddedRepositories,
+  // no repositoryModelOverrides, no autoConfigureWebhooks. The server
+  // PATCH must field-merge those absent keys from the stored config.
+  it('preserves a config seeded with manuallyAddedRepositories + overrides when a mobile-shaped patch is applied', async () => {
+    await seedPersonalGithubConfig();
+    const caller = await createCallerForUser(testUser.id);
+
+    // Mobile-shaped patch: ONLY the keys the mobile UI lets the user edit.
+    // The personal PATCH schema does not even accept
+    // manuallyAddedRepositories / repositoryModelOverrides /
+    // autoConfigureWebhooks here — the contract guard is that the server
+    // never asks for them.
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+      focusAreas: ['security'],
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    // Patched fields applied.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        focus_areas: ['security'],
+      })
+    );
+    // Stored fields NOT in the mobile-shaped patch must round-trip
+    // unchanged. The personal schema has no council/councilEnabled, so
+    // the mobile contract is specifically about manuallyAddedRepositories
+    // and repositoryModelOverrides.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        manually_added_repositories: [
+          { id: 9, name: 'manual', full_name: 'manual/repo', private: true },
+        ],
+        repository_model_overrides: [
+          {
+            repository_id: 101,
+            repo_full_name: 'acme/api',
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+      })
+    );
+    // Other stored fields that the mobile client never read or sent must
+    // also be preserved.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        selected_repository_ids: [101, 202],
+        repository_selection_mode: 'all',
+        gate_threshold: 'off',
+        disable_review_md: true,
+      })
+    );
+  });
+});
+
+// ============================================================================
+// P1-D-32: GitLab webhook secret handling on the personal surface.
+//
+// Regression guards for two security fixes:
+//   1. `personalReviewAgent.getGitLabStatus` MUST NOT return the webhook
+//      secret. (Lower risk than the org path because the caller is the
+//      secret owner, but still a status-read leak that this slice removes.)
+//   2. `gitlab.regenerateWebhookSecret` MUST re-sync the Kilo-managed
+//      webhooks so the integration keeps working with the new secret. The
+//      previous shape persisted a new secret and never re-synced, so live
+//      webhooks kept carrying the old secret and stopped validating.
+// ============================================================================
+
+async function seedPersonalGitLabIntegration(userId: string, metadata: Record<string, unknown>) {
+  await db.insert(platform_integrations).values({
+    owned_by_user_id: userId,
+    platform: 'gitlab',
+    integration_type: 'oauth',
+    integration_status: 'active',
+    platform_installation_id: `inst-${crypto.randomUUID()}`,
+    metadata: { ...metadata, webhook_secret: 'old-secret-do-not-leak' },
+  });
+}
+
+async function readPersonalWebhookSecret(userId: string): Promise<string | undefined> {
+  const row = await db.query.platform_integrations.findFirst({
+    where: and(
+      eq(platform_integrations.owned_by_user_id, userId),
+      eq(platform_integrations.platform, 'gitlab')
+    ),
+  });
+  return (row?.metadata as Record<string, unknown> | null)?.webhook_secret as string | undefined;
+}
+
+async function readPersonalConfiguredWebhooks(
+  userId: string
+): Promise<Record<string, { hook_id: number; created_at: string; updated_at?: string }>> {
+  const row = await db.query.platform_integrations.findFirst({
+    where: and(
+      eq(platform_integrations.owned_by_user_id, userId),
+      eq(platform_integrations.platform, 'gitlab')
+    ),
+  });
+  return (
+    ((row?.metadata as Record<string, unknown> | null)?.configured_webhooks as
+      | Record<string, { hook_id: number; created_at: string; updated_at?: string }>
+      | undefined) ?? {}
+  );
+}
+
+describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  beforeEach(() => {
+    mockGetValidGitLabToken.mockReset();
+    mockSyncWebhooksForRepositories.mockReset();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('returns the integration shape WITHOUT webhookSecret for the self caller', async () => {
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: { '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' } },
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    expect(status.connected).toBe(true);
+    expect(status.integration).toBeDefined();
+    // Regression guard: the secret must NEVER appear in the status
+    // payload, even for the secret's owner. If this assertion fails,
+    // the leak has been re-introduced.
+    expect(status.integration).not.toHaveProperty('webhookSecret');
+    expect((status.integration as Record<string, unknown>).webhookSecret).toBeUndefined();
+    // The rest of the shape is preserved (non-secret fields still ship;
+    // account/repositorySelection/installedAt pass through verbatim from the
+    // stored integration row regardless of their concrete values).
+    expect(status.integration).toEqual(
+      expect.objectContaining({
+        isValid: true,
+        instanceUrl: 'https://gitlab.example.com',
+      })
+    );
+    expect(status.integration).toHaveProperty('accountLogin');
+    expect(status.integration).toHaveProperty('repositorySelection');
+    expect(status.integration).toHaveProperty('installedAt');
+  });
+});
+
+describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
+  let testUser: User;
+  let otherUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    otherUser = await insertTestUser();
+  });
+
+  beforeEach(() => {
+    mockGetValidGitLabToken.mockReset();
+    mockSyncWebhooksForRepositories.mockReset();
+    // Default sync outcome: every currently-configured repo was "updated"
+    // (mirrors the `previous=[]` "treat all as added" path used by rotate).
+    mockSyncWebhooksForRepositories.mockImplementation(
+      async (_token, _secret, selectedIds, _previous, configuredWebhooks) => {
+        const updatedWebhooks: Record<
+          string,
+          { hook_id: number; created_at: string; updated_at?: string }
+        > = {};
+        for (const id of selectedIds) {
+          const existing = configuredWebhooks[String(id)];
+          updatedWebhooks[String(id)] = {
+            hook_id: existing?.hook_id ?? 1000 + Number(id),
+            created_at: existing?.created_at ?? new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return {
+          result: {
+            created: [],
+            updated: selectedIds.map((id: number) => ({ projectId: id, hookId: 1000 + id })),
+            deleted: [],
+            errors: [],
+          },
+          updatedWebhooks,
+        };
+      }
+    );
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-access-token');
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, otherUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [testUser.id, otherUser.id]));
+  });
+
+  it('persists a NEW secret, re-syncs webhooks with the new secret and previous=[]', async () => {
+    const configured = {
+      '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+      '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    expect(typeof result.webhookSecret).toBe('string');
+    expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.webhookSecret).not.toBe('old-secret-do-not-leak');
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-access-token',
+      result.webhookSecret,
+      [101, 202],
+      [],
+      configured,
+      'https://gitlab.example.com'
+    );
+    expect(result.webhookSync.updated).toBe(2);
+    expect(result.webhookSync.created).toBe(0);
+    expect(result.webhookSync.deleted).toBe(0);
+    expect(result.webhookSync.errors).toEqual([]);
+    expect(result.configuredWebhookCount).toBe(2);
+
+    // Persistence: metadata.webhook_secret is the NEW secret and
+    // metadata.configured_webhooks was updated with the sync output.
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+    const stored = await readPersonalConfiguredWebhooks(testUser.id);
+    expect(Object.keys(stored).sort()).toEqual(['101', '202']);
+    expect(stored['101']?.updated_at).toBeDefined();
+    expect(stored['202']?.updated_at).toBeDefined();
+  });
+
+  it('with empty configured_webhooks returns the new secret and does NOT call sync', async () => {
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: {},
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.webhookSync).toEqual({
+      created: 0,
+      updated: 0,
+      deleted: 0,
+      errors: [],
+    });
+    expect(result.configuredWebhookCount).toBe(0);
+    expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
+    // No token lookup needed when there are no webhooks to re-sync.
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
+
+  it('is self-only: the callers own integration is rotated, never another users', async () => {
+    const configuredSelf = { '1': { hook_id: 1, created_at: '2026-01-01T00:00:00Z' } };
+    const configuredOther = { '2': { hook_id: 2, created_at: '2026-01-01T00:00:00Z' } };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.com',
+      configured_webhooks: configuredSelf,
+    });
+    await seedPersonalGitLabIntegration(otherUser.id, {
+      gitlab_instance_url: 'https://gitlab.com',
+      configured_webhooks: configuredOther,
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    // Self was rotated; other user is untouched.
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+    expect(await readPersonalWebhookSecret(otherUser.id)).toBe('old-secret-do-not-leak');
+
+    // Sync was called only once, for the caller's configured repo id.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-access-token',
+      result.webhookSecret,
+      [1],
+      [],
+      configuredSelf,
+      'https://gitlab.com'
+    );
+  });
+
+  it('persists the NEW secret even when the webhook re-sync throws (no lost-secret state)', async () => {
+    const configured = {
+      '404': { hook_id: 9040, created_at: '2026-03-01T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+    mockSyncWebhooksForRepositories.mockRejectedValueOnce(new Error('gitlab responded 500'));
+
+    const caller = await createCallerForUser(testUser.id);
+    // Must not throw: losing the just-rotated secret while GitLab may
+    // already carry it would strand the caller's integration.
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.webhookSecret).not.toBe('old-secret-do-not-leak');
+    expect(result.webhookSync.errors).toHaveLength(1);
+    expect(result.webhookSync.updated).toBe(0);
+    // New secret persisted for manual recovery; surfaced error omits it.
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+    expect(JSON.stringify(result.webhookSync.errors)).not.toContain(result.webhookSecret);
+  });
+
+  it('persists the NEW secret even when the access-token lookup throws', async () => {
+    const configured = {
+      '505': { hook_id: 9050, created_at: '2026-03-02T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+    mockGetValidGitLabToken.mockRejectedValueOnce(new Error('token expired'));
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.webhookSync.errors).toHaveLength(1);
+    expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
+});

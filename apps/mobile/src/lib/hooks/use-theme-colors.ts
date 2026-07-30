@@ -1,10 +1,10 @@
-import { DarkTheme, DefaultTheme } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
 // These values must stay in sync with src/global.css design tokens.
 // They exist as raw strings because React Navigation header/tab options
 // and Lucide icons require plain color values (not Tailwind classes).
-const lightColors = {
+export const lightColors = {
   background: '#FBFAF5',
   foreground: '#14130F',
   primary: '#4F5A10',
@@ -37,7 +37,7 @@ const lightColors = {
   agentSky: '#2C7FB0',
 } as const;
 
-const darkColors = {
+export const darkColors = {
   background: '#0E0E10',
   foreground: '#F2F0EB',
   primary: '#E8F27A',

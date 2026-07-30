@@ -27,6 +27,9 @@ import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { getContributorChampionProfileBadgeForUser } from '@/lib/contributor-champions/service';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
+import { smartAppBannerItunes } from '@/lib/smart-app-banner';
+
+export const metadata = { itunes: smartAppBannerItunes('/profile') };
 
 export default async function ProfilePage({ searchParams }: AppPageProps) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');

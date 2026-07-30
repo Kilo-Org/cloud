@@ -237,7 +237,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                       : 'Enter a whole number between 1 and 365'
                   }
                   className={cn(
-                    'h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground',
+                    'h-11 rounded-lg bg-secondary px-3 text-sm leading-[normal] text-foreground',
                     !canManage && 'opacity-50'
                   )}
                   editable={canManage}

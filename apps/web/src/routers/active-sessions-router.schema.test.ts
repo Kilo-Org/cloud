@@ -1,5 +1,18 @@
 import { describe, it, expect } from '@jest/globals';
-import { activeSessionSchema } from './active-sessions-router';
+import { activeSessionSchema, resolveActiveSessionStatus } from './active-sessions-router';
+
+describe('resolveActiveSessionStatus', () => {
+  it('prefers stored question/permission over live', () => {
+    expect(resolveActiveSessionStatus('busy', 'question')).toBe('question');
+    expect(resolveActiveSessionStatus('idle', 'permission')).toBe('permission');
+  });
+
+  it('keeps live when stored is not attention', () => {
+    expect(resolveActiveSessionStatus('busy', 'idle')).toBe('busy');
+    expect(resolveActiveSessionStatus('idle', null)).toBe('idle');
+    expect(resolveActiveSessionStatus('busy', undefined)).toBe('busy');
+  });
+});
 
 describe('activeSessionSchema capabilities', () => {
   it('accepts a session row with capabilities.attachments: true', () => {
@@ -46,6 +59,35 @@ describe('activeSessionSchema capabilities', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.capabilities).toBeUndefined();
+    }
+  });
+
+  it('accepts optional lastActivityAt as a raw DB timestamp string', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+      lastActivityAt: '2026-07-20 08:00:00+00',
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.lastActivityAt).toBe('2026-07-20 08:00:00+00');
+    }
+  });
+
+  it('accepts a session row without lastActivityAt', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.lastActivityAt).toBeUndefined();
     }
   });
 

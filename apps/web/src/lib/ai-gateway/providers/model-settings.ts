@@ -3,7 +3,6 @@ import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google'
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
-import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrokModel, isGrok42Model, isGrok45Model } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
@@ -17,7 +16,6 @@ import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
-import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
 
 const REASONING_VARIANTS_THINKING_ONLY = {
   thinking: { reasoning: { enabled: true, effort: 'high' } },
@@ -50,11 +48,6 @@ export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH = {
   ...REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
 } as const;
 
-export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
-  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
-} as const;
-
 export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
   none: { reasoning: { enabled: false, effort: 'none' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
@@ -68,11 +61,6 @@ const REASONING_VARIANTS_CLAUDE = {
   high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
   max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
-} as const;
-
-export const REASONING_VARIANTS_SEED = {
-  none: { reasoning: { enabled: false, effort: 'minimal' } },
-  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
 } as const;
 
 export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
@@ -119,9 +107,6 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   ) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (model === seed_20_code_free_model.public_id) {
-    return REASONING_VARIANTS_SEED;
-  }
   if (model.startsWith('inception/mercury-2')) {
     return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
   }
@@ -141,12 +126,6 @@ export function getAiSdkProvider(
   model: string,
   directProviderId: DirectUserByokInferenceProviderId | null
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
-  if (
-    seed_20_code_free_model.public_id === model ||
-    kat_coder_pro_v2_5_free_model.public_id === model
-  ) {
-    return 'openai-compatible';
-  }
   if (directProviderId === 'morph-byok') {
     return 'openai-compatible';
   }

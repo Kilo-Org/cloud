@@ -61,6 +61,8 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
+import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
+import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
@@ -348,12 +350,52 @@ function normalizePayload(raw: StatusUpdatePayload): {
     terminalReason = 'billing';
   }
 
+  // Infer workspace capacity (transient sandbox disk pressure) so it is
+  // classified distinctly instead of counted as an unknown delivery failure.
+  // Capacity arrives either with no terminal reason (delivery path) or with a
+  // generic 'sandbox_error' (orchestrator session-start path), so override that
+  // one generic value too — otherwise the column stays 'sandbox_error' and only
+  // the admin router's message match recovers the category.
+  if (
+    (!terminalReason || terminalReason === 'sandbox_error') &&
+    isWorkspaceCapacityFailure(failure, raw.errorMessage)
+  ) {
+    terminalReason = 'workspace_capacity';
+  }
+
   if (
     (raw.status === 'failed' || raw.status === 'interrupted') &&
     isModelNotFoundCodeReviewTerminalReason(terminalReason, raw.errorMessage)
   ) {
     status = 'cancelled';
     terminalReason = 'model_not_found';
+  }
+
+  // Consume the structured failure cloud-agent-next already sends. This runs
+  // after the specific inferences above so they keep priority, and before the
+  // generic 'interrupted' fallback so an interrupt with a known cause is still
+  // attributed to that cause.
+  if (!terminalReason) {
+    const structuredReason = terminalReasonFromCloudAgentFailure(failure, raw.errorMessage);
+    if (structuredReason) {
+      terminalReason = structuredReason;
+      // The billing and model-not-found blocks above own status normalization
+      // for those reasons, but both key off the error text. A structured-only
+      // payload carries a generic message ('No model was selected' for
+      // model_missing), so those checks miss and the status would stay
+      // unnormalized while terminal_reason is correct — leaving the customer
+      // with generic failure copy from mapStatusToCheckRun instead of the
+      // actionable message. Apply the same normalization here.
+      if (structuredReason === 'billing' && status === 'cancelled') {
+        status = 'failed'; // billing is not a user cancellation
+      }
+      if (
+        structuredReason === 'model_not_found' &&
+        (raw.status === 'failed' || raw.status === 'interrupted')
+      ) {
+        status = 'cancelled';
+      }
+    }
   }
 
   if (!terminalReason && raw.status === 'interrupted') {
@@ -369,6 +411,29 @@ function normalizePayload(raw: StatusUpdatePayload): {
     gateResult: raw.gateResult,
     failure,
   };
+}
+
+/**
+ * Detects a workspace disk-capacity failure so it is recorded with a distinct
+ * `workspace_capacity` terminal reason. Prefers the structured failure subtype
+ * from cloud-agent-next and falls back to the safe error message for older
+ * payloads.
+ *
+ * The message fallback is intentionally broad ('admission rejected'); a stricter,
+ * phrasing-anchored variant lives in
+ * services/code-review-infra/src/code-review-orchestrator.ts
+ * (isWorkspaceAdmissionCapacityFailure). Keep the two in mind together if the
+ * admission-rejection message format ever changes.
+ */
+export function isWorkspaceCapacityFailure(
+  failure: CloudAgentSafeFailure | undefined,
+  errorMessage: string | undefined
+): boolean {
+  if (failure?.code === 'workspace_setup_failed' && failure.subtype === 'sandbox_storage_full') {
+    return true;
+  }
+  const message = (errorMessage ?? '').toLowerCase();
+  return message.includes('sandbox storage full') || message.includes('admission rejected');
 }
 
 function isBillingCodeReviewTerminalReason(
@@ -418,6 +483,14 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
     terminalReason === 'interrupted' ||
+    // The customer's own provider quota is exhausted, so an immediate retry
+    // burns a second review against the same closed door. hasKnownUnretryableFailureMessage
+    // below already tries to catch this, but only by matching the raw '[BYOK] Your
+    // API key has hit its rate limit...' text, which safe-failure projection
+    // replaces with 'Assistant request was rate limited' before the callback ever
+    // sees it. That check has therefore never fired; the structured reason makes
+    // the existing intent actually work.
+    terminalReason === 'assistant_rate_limited_byok' ||
     isCodeReviewActionRequiredReason(terminalReason)
   );
 }
@@ -713,6 +786,13 @@ function mapStatusToCheckRun(
   const actionRequiredCopy = actionRequiredReason
     ? getCodeReviewActionRequiredCopy(actionRequiredReason)
     : null;
+  // Notification only. Unlike actionRequiredCopy this does not change the
+  // conclusion to 'action_required' and does not disable Code Reviewer: a
+  // provider rate limit is transient and there is nothing to reconfigure.
+  const terminalReasonCopy =
+    reviewStatus === 'failed' && !actionRequiredCopy && !billingFailure
+      ? getCodeReviewTerminalReasonCopy(terminalReason)
+      : null;
 
   const conclusionMap: Record<string, CheckRunConclusion> = {
     completed: reviewFailed ? 'failure' : 'success',
@@ -727,7 +807,7 @@ function mapStatusToCheckRun(
       ? actionRequiredCopy.checkTitle
       : billingFailure
         ? 'Insufficient credits to run review'
-        : 'Kilo Code Review failed',
+        : (terminalReasonCopy?.checkTitle ?? 'Kilo Code Review failed'),
     cancelled: modelNotFoundCancellation
       ? MODEL_NOT_FOUND_CHECK_TITLE
       : 'Kilo Code Review cancelled',
@@ -742,9 +822,8 @@ function mapStatusToCheckRun(
       ? actionRequiredCopy.checkSummary
       : billingFailure
         ? 'Review could not start because the account has insufficient credits.'
-        : errorMessage
-          ? `Review failed: ${errorMessage}`
-          : 'Review failed.',
+        : (terminalReasonCopy?.checkSummary ??
+          (errorMessage ? `Review failed: ${errorMessage}` : 'Review failed.')),
     cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
   };
 
@@ -803,6 +882,10 @@ function getGitLabStatusDescription(
       : null;
   if (actionRequiredReason) {
     return getCodeReviewActionRequiredCopy(actionRequiredReason).gitlabDescription;
+  }
+  if (reviewStatus === 'failed') {
+    const terminalReasonCopy = getCodeReviewTerminalReasonCopy(terminalReason);
+    if (terminalReasonCopy) return terminalReasonCopy.checkSummary;
   }
   if (reviewStatus === 'failed' && errorMessage) {
     const desc = `Review failed: ${errorMessage}`;

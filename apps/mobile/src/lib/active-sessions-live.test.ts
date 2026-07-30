@@ -4,6 +4,7 @@ import {
   parseCliConnectionPayload,
   parseHeartbeatPayload,
   parseSessionsListPayload,
+  parseSessionStatusUpdatedPayload,
   selectRootWsSessions,
 } from '@/lib/active-sessions-live';
 
@@ -89,5 +90,51 @@ describe('parseCliConnectionPayload', () => {
   });
   it('rejects unknown shape', () => {
     expect(parseCliConnectionPayload({})).toBeNull();
+  });
+});
+
+describe('parseSessionStatusUpdatedPayload', () => {
+  it('parses the lightweight sessionId shape', () => {
+    expect(
+      parseSessionStatusUpdatedPayload({
+        source: 'v2',
+        sessionId: 'ses-1',
+        previousStatus: 'question',
+        status: 'idle',
+        statusUpdatedAt: 'now',
+        changedAt: 'now',
+      })
+    ).toEqual({ sessionId: 'ses-1', status: 'idle' });
+  });
+
+  it('parses the full session-row shape', () => {
+    expect(
+      parseSessionStatusUpdatedPayload({
+        source: 'v2',
+        session: {
+          source: 'v2',
+          sessionId: 'ses-2',
+          createdAt: 'now',
+          updatedAt: 'now',
+          title: 't',
+          createdOnPlatform: null,
+          organizationId: null,
+          gitUrl: null,
+          gitBranch: null,
+          parentSessionId: null,
+          status: 'permission',
+          statusUpdatedAt: 'now',
+        },
+        previousStatus: 'busy',
+        status: 'permission',
+        statusUpdatedAt: 'now',
+        changedAt: 'now',
+      })
+    ).toEqual({ sessionId: 'ses-2', status: 'permission' });
+  });
+
+  it('rejects a malformed payload', () => {
+    expect(parseSessionStatusUpdatedPayload({ sessionId: 'ses-1' })).toBeNull();
+    expect(parseSessionStatusUpdatedPayload(null)).toBeNull();
   });
 });

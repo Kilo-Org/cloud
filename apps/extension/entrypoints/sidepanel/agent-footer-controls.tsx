@@ -2,9 +2,11 @@ import { useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { Shield, TriangleAlert } from 'lucide-react';
 import { getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
+import type { StoredAuth } from '@/src/shared/auth';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import type { InspectableTab } from '@/src/shared/tab-debugger';
+import { ModelPicker } from './model-picker';
 
 const modeOptions = [
   { label: 'Safe', value: 'safe' },
@@ -22,7 +24,7 @@ const ModeIcon = ({
   icon: ReturnType<typeof getFooterControlDisplay>['modeIcon'];
   tone: ReturnType<typeof getFooterControlDisplay>['modeIconTone'];
 }): JSX.Element => {
-  const toneClassName = tone === 'safe' ? 'text-[#EDFF00]' : 'text-red-400';
+  const toneClassName = tone === 'safe' ? 'text-status-green-500' : 'text-status-yellow-500';
 
   const Icon = icon === 'shield' ? Shield : TriangleAlert;
 
@@ -46,7 +48,7 @@ const CompactSelectControl = ({
 }): JSX.Element => (
   <select
     aria-label={ariaLabel}
-    className={`h-8 min-w-0 rounded-md border border-zinc-800 bg-zinc-950 text-xs font-medium text-zinc-200 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30 disabled:cursor-not-allowed disabled:text-zinc-600 ${className}`}
+    className={`h-8 min-w-0 rounded-md border border-border-strong bg-input-bg type-label text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:text-foreground-subtle ${className}`}
     disabled={disabled}
     onChange={event => {
       onChange(event.currentTarget.value);
@@ -74,7 +76,7 @@ const ModeControl = ({
       <button
         aria-expanded={isOpen}
         aria-label={`${display.modeLabel} mode: ${display.modeDescription}`}
-        className="flex h-8 w-10 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
+        className="flex h-8 w-10 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
         disabled={disabled}
         onClick={() => {
           setIsOpen(current => !current);
@@ -86,7 +88,7 @@ const ModeControl = ({
       </button>
 
       {isOpen && !disabled ? (
-        <div className="absolute bottom-10 left-0 z-10 grid w-56 gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-1">
+        <div className="absolute bottom-10 left-0 z-10 grid w-56 gap-1 rounded-lg border border-border bg-surface-overlay p-1 shadow-lg shadow-black/50">
           {modeOptions.map(option => {
             const optionDisplay = getFooterControlDisplay({
               mode: option.value,
@@ -98,8 +100,8 @@ const ModeControl = ({
               <button
                 className={
                   option.value === mode
-                    ? 'flex items-start gap-2 rounded-sm bg-zinc-900 px-2 py-2 text-left text-zinc-100'
-                    : 'flex items-start gap-2 rounded-sm px-2 py-2 text-left text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-1 focus:ring-offset-zinc-950'
+                    ? 'flex items-start gap-2 rounded-sm bg-surface-selected px-2 py-2 text-left text-foreground'
+                    : 'flex items-start gap-2 rounded-sm px-2 py-2 text-left text-foreground-muted outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background'
                 }
                 key={option.value}
                 onClick={() => {
@@ -115,7 +117,7 @@ const ModeControl = ({
                 />
                 <span className="grid gap-0.5">
                   <span className="text-xs font-medium">{option.label}</span>
-                  <span className="text-[11px] leading-4 text-zinc-500">
+                  <span className="type-label text-foreground-muted">
                     {optionDisplay.modeDescription}
                   </span>
                 </span>
@@ -129,6 +131,7 @@ const ModeControl = ({
 };
 
 export const AgentFooterControls = ({
+  auth,
   contextDonut,
   inspectableTabs,
   isLoadingTabs,
@@ -145,11 +148,13 @@ export const AgentFooterControls = ({
   onRetryModels,
   onSelectedTabChange,
   onThinkingEffortChange,
+  organizationId,
   selectedTabId,
   tabDebuggerError,
   thinkingEffort,
   thinkingOptions,
 }: {
+  auth: StoredAuth;
   contextDonut?: ReactNode;
   inspectableTabs: InspectableTab[];
   isLoadingTabs: boolean;
@@ -166,6 +171,7 @@ export const AgentFooterControls = ({
   onRetryModels: () => Promise<void>;
   onSelectedTabChange: (tabId: number) => void;
   onThinkingEffortChange: (thinkingEffort: string) => void;
+  organizationId: string | undefined;
   selectedTabId: number | undefined;
   tabDebuggerError: string | undefined;
   thinkingEffort: string;
@@ -209,7 +215,7 @@ export const AgentFooterControls = ({
         </CompactSelectControl>
       </div>
       {tabDebuggerError === undefined ? null : (
-        <p className="text-xs leading-4 text-red-300">{tabDebuggerError}</p>
+        <p className="type-label text-status-red-400">{tabDebuggerError}</p>
       )}
       <div className="flex min-w-0 items-center gap-2">
         <ModeControl
@@ -217,23 +223,14 @@ export const AgentFooterControls = ({
           mode={mode}
           onChange={onModeChange}
         />
-        <CompactSelectControl
-          ariaLabel="Model"
-          className="flex-1 pl-2 pr-6"
+        <ModelPicker
+          auth={auth}
           disabled={isConversationControlDisabled || isModelSelectDisabled}
-          onChange={onModelChange}
-          value={model}
-        >
-          {modelOptions.length === 0 ? (
-            <option value="">Loading models...</option>
-          ) : (
-            modelOptions.map(option => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))
-          )}
-        </CompactSelectControl>
+          model={model}
+          modelOptions={modelOptions}
+          onModelChange={onModelChange}
+          organizationId={organizationId}
+        />
         <CompactSelectControl
           ariaLabel="Thinking effort"
           className="w-24 pl-2 pr-6"
@@ -255,9 +252,9 @@ export const AgentFooterControls = ({
       </div>
       {modelLoadError === undefined ? null : (
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs leading-4 text-red-300">{modelLoadError}</p>
+          <p className="type-label text-status-red-400">{modelLoadError}</p>
           <button
-            className="h-7 shrink-0 rounded-md border border-zinc-700 px-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+            className="h-8 shrink-0 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
             onClick={() => {
               void onRetryModels();
             }}

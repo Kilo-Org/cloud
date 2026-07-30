@@ -1,4 +1,4 @@
-/* eslint-disable import/no-nodejs-modules */
+/* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import {
@@ -7,6 +7,7 @@ import {
   startFixtureServer,
 } from './extension-context-fixture';
 import {
+  dangerousToolNames,
   installChatCompletionAbortObserver,
   mockKiloApi,
   wasChatCompletionAborted,
@@ -21,7 +22,13 @@ test('new conversation keeps the running request in its original tab', async () 
     await mockKiloApi(context, {
       beforeFirstCompletion: () => pendingCompletion,
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Original tab completed.' } }] }],
-      toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+      toolNames: [
+        'get_page_snapshot',
+        'get_element_details',
+        'find_in_page',
+        'search_memories',
+        'get_memory',
+      ],
     });
 
     const page = await context.newPage();
@@ -39,7 +46,13 @@ test('new conversation keeps the running request in its original tab', async () 
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
     await sidePanel.getByLabel('New conversation').click();
 
-    await expect(sidePanel.getByText('Pick a tab and ask Kilo to inspect it.')).toBeVisible();
+    const emptyHint = sidePanel
+      .getByLabel('Agent conversation')
+      .getByText('Pick a tab and ask Kilo to inspect it.');
+    await expect(emptyHint).toBeVisible();
+    const hintBox = await emptyHint.boundingBox();
+    expect(hintBox).not.toBeNull();
+    expect(hintBox?.height ?? 0).toBeGreaterThan(0);
     await expect.poll(() => wasChatCompletionAborted(sidePanel)).toBe(false);
     await sidePanel.getByRole('tab', { name: /Original tab/u }).click();
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
@@ -61,6 +74,7 @@ test('closing the selected tab aborts a running request', async () => {
   try {
     await mockKiloApi(context, {
       beforeFirstCompletion: () => pendingCompletion,
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

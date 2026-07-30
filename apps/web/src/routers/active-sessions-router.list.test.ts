@@ -1,8 +1,9 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { db } from '@/lib/drizzle';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 
 jest.mock('@/lib/config.server', () => {
@@ -14,13 +15,17 @@ jest.mock('@/lib/config.server', () => {
 });
 
 let regularUser: User;
+let otherUser: User;
 
 function mockWorkerSessions(sessions: Array<Record<string, unknown>>): jest.SpyInstance {
-  return jest.spyOn(global, 'fetch').mockResolvedValue(
-    new Response(JSON.stringify({ sessions }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
+  // Fresh Response per call — a single Response body can only be read once.
+  return jest.spyOn(global, 'fetch').mockImplementation(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ sessions }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
   );
 }
 
@@ -38,6 +43,11 @@ describe('active-sessions-router.list', () => {
     regularUser = await insertTestUser({
       google_user_email: 'active-sessions-router-user@example.com',
       google_user_name: 'Active Sessions Router User',
+      is_admin: false,
+    });
+    otherUser = await insertTestUser({
+      google_user_email: 'active-sessions-router-other@example.com',
+      google_user_name: 'Active Sessions Router Other',
       is_admin: false,
     });
   });
@@ -86,6 +96,7 @@ describe('active-sessions-router.list', () => {
           createdOnPlatform: 'cli',
           createdAt,
           updatedAt,
+          organizationId: null,
         },
       ]);
       // Assert the explicit camelCase keys exist (not snake_case).
@@ -96,6 +107,92 @@ describe('active-sessions-router.list', () => {
       expect(Object.keys(row)).not.toEqual(
         expect.arrayContaining(['created_on_platform', 'created_at', 'updated_at'])
       );
+    } finally {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    }
+  });
+
+  it('overlays stored question status over a live busy heartbeat status', async () => {
+    const sessionId = 'ses_active_attention_question_1234';
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: regularUser.id,
+      created_on_platform: 'cli',
+      status: 'question',
+    });
+
+    fetchSpy = mockWorkerSessions([
+      {
+        id: sessionId,
+        status: 'busy',
+        title: 'needs input',
+        connectionId: 'conn-attn',
+      },
+    ]);
+
+    try {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions).toHaveLength(1);
+      expect(result.sessions[0]?.status).toBe('question');
+      expect(result.sessions[0]?.title).toBe('needs input');
+    } finally {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    }
+  });
+
+  it('overlays stored permission status over a live idle heartbeat status', async () => {
+    const sessionId = 'ses_active_attention_permission_1234';
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: regularUser.id,
+      created_on_platform: 'cli',
+      status: 'permission',
+    });
+
+    fetchSpy = mockWorkerSessions([
+      {
+        id: sessionId,
+        status: 'idle',
+        title: 'needs permission',
+        connectionId: 'conn-perm',
+      },
+    ]);
+
+    try {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions[0]?.status).toBe('permission');
+    } finally {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    }
+  });
+
+  it('keeps the live status when the stored DB status is not attention', async () => {
+    const sessionId = 'ses_active_attention_non_attn_1234';
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: regularUser.id,
+      created_on_platform: 'cli',
+      status: 'idle',
+    });
+
+    fetchSpy = mockWorkerSessions([
+      {
+        id: sessionId,
+        status: 'busy',
+        title: 'working',
+        connectionId: 'conn-busy',
+      },
+    ]);
+
+    try {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions[0]?.status).toBe('busy');
     } finally {
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
     }
@@ -125,6 +222,7 @@ describe('active-sessions-router.list', () => {
         createdOnPlatform: undefined,
         createdAt: undefined,
         updatedAt: undefined,
+        organizationId: null,
       },
     ]);
   });
@@ -191,5 +289,379 @@ describe('active-sessions-router.list', () => {
     const result = await caller.activeSessions.list();
 
     expect(result).toEqual({ sessions: [] });
+  });
+
+  describe('organization context filter and title enrichment', () => {
+    const personalId = 'ses_active_ctx_personal_1234';
+    const orgId = 'ses_active_ctx_org_1234';
+    const noRowId = 'ses_active_ctx_norow_1234';
+    const titledId = 'ses_active_ctx_titled_1234';
+    const nullTitleId = 'ses_active_ctx_nulltitle_1234';
+
+    afterEach(async () => {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          inArray(cli_sessions_v2.session_id, [personalId, orgId, noRowId, titledId, nullTitleId])
+        );
+    });
+
+    it('list({ organizationId: null }) excludes org sessions and includes personal ones', async () => {
+      const organization = await createTestOrganization(
+        'Active Sessions Filter Org',
+        regularUser.id,
+        0
+      );
+
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: personalId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          organization_id: null,
+        },
+        {
+          session_id: orgId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          organization_id: organization.id,
+        },
+      ]);
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: personalId,
+          status: 'busy',
+          title: 'personal',
+          connectionId: 'conn-p',
+        },
+        {
+          id: orgId,
+          status: 'busy',
+          title: 'org',
+          connectionId: 'conn-o',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list({ organizationId: null });
+
+      expect(result.sessions.map(s => s.id)).toEqual([personalId]);
+      expect(result.sessions[0]).toHaveProperty('organizationId', null);
+    });
+
+    it('list({ organizationId: null }) includes a live session with no cli_sessions_v2 row', async () => {
+      fetchSpy = mockWorkerSessions([
+        {
+          id: noRowId,
+          status: 'busy',
+          title: 'unattributable',
+          connectionId: 'conn-nr',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list({ organizationId: null });
+
+      expect(result.sessions).toHaveLength(1);
+      expect(result.sessions[0]?.id).toBe(noRowId);
+      expect(result.sessions[0]).toHaveProperty('organizationId', null);
+    });
+
+    it('list({ organizationId: <org> }) includes only that org and excludes personal and no-row', async () => {
+      const organization = await createTestOrganization(
+        'Active Sessions Org-Only Filter Org',
+        regularUser.id,
+        0
+      );
+
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: personalId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          organization_id: null,
+        },
+        {
+          session_id: orgId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          organization_id: organization.id,
+        },
+      ]);
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: personalId,
+          status: 'busy',
+          title: 'personal',
+          connectionId: 'conn-p',
+        },
+        {
+          id: orgId,
+          status: 'busy',
+          title: 'org',
+          connectionId: 'conn-o',
+        },
+        {
+          id: noRowId,
+          status: 'busy',
+          title: 'unattributable',
+          connectionId: 'conn-nr',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list({
+        organizationId: organization.id,
+      });
+
+      expect(result.sessions.map(s => s.id)).toEqual([orgId]);
+      expect(result.sessions[0]).toHaveProperty('organizationId', organization.id);
+    });
+
+    it('list() with no input returns personal + org + no-row sessions', async () => {
+      const organization = await createTestOrganization(
+        'Active Sessions Unfiltered Org',
+        regularUser.id,
+        0
+      );
+
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: personalId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          organization_id: null,
+        },
+        {
+          session_id: orgId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          organization_id: organization.id,
+        },
+      ]);
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: personalId,
+          status: 'busy',
+          title: 'personal',
+          connectionId: 'conn-p',
+        },
+        {
+          id: orgId,
+          status: 'busy',
+          title: 'org',
+          connectionId: 'conn-o',
+        },
+        {
+          id: noRowId,
+          status: 'busy',
+          title: 'unattributable',
+          connectionId: 'conn-nr',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions.map(s => s.id).sort()).toEqual([personalId, orgId, noRowId].sort());
+    });
+
+    it('rejects list for an organization the user is not a member of', async () => {
+      const foreignOrg = await createTestOrganization(
+        'Active Sessions Foreign Org',
+        otherUser.id,
+        0
+      );
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: noRowId,
+          status: 'busy',
+          title: 'should not matter',
+          connectionId: 'conn-x',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      // ensureOrganizationAccess throws UNAUTHORIZED for non-members.
+      await expect(
+        caller.activeSessions.list({ organizationId: foreignOrg.id })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('emits organizationId on every returned row including null for no-row sessions', async () => {
+      const organization = await createTestOrganization(
+        'Active Sessions OrgId Emit Org',
+        regularUser.id,
+        0
+      );
+
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: personalId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          organization_id: null,
+        },
+        {
+          session_id: orgId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          organization_id: organization.id,
+        },
+      ]);
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: personalId,
+          status: 'busy',
+          title: 'personal',
+          connectionId: 'conn-p',
+        },
+        {
+          id: orgId,
+          status: 'busy',
+          title: 'org',
+          connectionId: 'conn-o',
+        },
+        {
+          id: noRowId,
+          status: 'busy',
+          title: 'unattributable',
+          connectionId: 'conn-nr',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      const byId = new Map(result.sessions.map(s => [s.id, s]));
+      expect(byId.get(personalId)).toHaveProperty('organizationId', null);
+      expect(byId.get(orgId)).toHaveProperty('organizationId', organization.id);
+      // toHaveProperty with null fails on undefined — the client filter depends on this.
+      expect(byId.get(noRowId)).toHaveProperty('organizationId', null);
+    });
+
+    it('uses cli_sessions_v2 title when set and falls back to the worker title when NULL', async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: titledId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'db renamed title',
+        },
+        {
+          session_id: nullTitleId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: null,
+        },
+      ]);
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: titledId,
+          status: 'busy',
+          title: 'cli stale title',
+          connectionId: 'conn-t',
+        },
+        {
+          id: nullTitleId,
+          status: 'busy',
+          title: 'cli live title',
+          connectionId: 'conn-nt',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      const byId = new Map(result.sessions.map(s => [s.id, s]));
+      expect(byId.get(titledId)?.title).toBe('db renamed title');
+      expect(byId.get(nullTitleId)?.title).toBe('cli live title');
+    });
+
+    it('on enrichment DB failure: unfiltered degrades, filtered contexts reject', async () => {
+      const organization = await createTestOrganization(
+        'Active Sessions Enrich Fail Org',
+        regularUser.id,
+        0
+      );
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: personalId,
+          status: 'running',
+          title: 'db fail filtered',
+          connectionId: 'conn-fail',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      // Capture the real select before any spy replaces it. Filtered org
+      // calls run ensureOrganizationAccess first (two selects); only the
+      // enrichment select must throw.
+      const originalSelect = db.select;
+
+      // Unfiltered: best-effort unenriched passthrough (same contract as the
+      // existing enrichment-failure test). No auth selects → first select is
+      // enrichment.
+      const unfilteredSelectSpy = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+        throw new Error('synthetic enrichment db failure unfiltered');
+      });
+      try {
+        const unfiltered = await caller.activeSessions.list();
+        expect(unfiltered.sessions).toEqual([
+          {
+            id: personalId,
+            status: 'running',
+            title: 'db fail filtered',
+            connectionId: 'conn-fail',
+            createdOnPlatform: undefined,
+            createdAt: undefined,
+            updatedAt: undefined,
+          },
+        ]);
+      } finally {
+        unfilteredSelectSpy.mockRestore();
+      }
+
+      // Personal filter: no auth selects → first select is enrichment → reject.
+      const personalSelectSpy = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+        throw new Error('synthetic enrichment db failure personal');
+      });
+      try {
+        await expect(caller.activeSessions.list({ organizationId: null })).rejects.toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to resolve the organization context for active sessions',
+        });
+      } finally {
+        personalSelectSpy.mockRestore();
+      }
+
+      // Org filter: ensureOrganizationAccess issues two selects, then
+      // enrichment is the third. Pass the auth selects through.
+      const orgSelectSpy = jest.spyOn(db, 'select');
+      orgSelectSpy.mockImplementation(fields => {
+        if (orgSelectSpy.mock.calls.length <= 2) {
+          return Reflect.apply(originalSelect, db, fields === undefined ? [] : [fields]);
+        }
+        throw new Error('synthetic enrichment db failure org');
+      });
+      try {
+        await expect(
+          caller.activeSessions.list({ organizationId: organization.id })
+        ).rejects.toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to resolve the organization context for active sessions',
+        });
+      } finally {
+        orgSelectSpy.mockRestore();
+      }
+    });
   });
 });

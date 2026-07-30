@@ -5549,11 +5549,13 @@ export const cli_sessions_v2 = pgTable(
       onDelete: 'set null',
     }),
     cloud_agent_session_id: text(),
+    cloud_agent_session_scope_id: text(),
     created_on_platform: text().notNull().default('unknown'),
     git_url: text(),
     git_branch: text(),
     status: text(),
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
     total_cost_microdollars: bigint({ mode: 'number' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -8947,6 +8949,8 @@ export const user_notification_preferences = pgTable('user_notification_preferen
   agent_attention_enabled: boolean().default(true).notNull(),
   session_status_enabled: boolean().default(true).notNull(),
   kiloclaw_activity_enabled: boolean().default(true).notNull(),
+  balance_alerts_enabled: boolean().default(true).notNull(),
+  security_findings_enabled: boolean().default(true).notNull(),
   created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp({ withTimezone: true, mode: 'string' })
     .defaultNow()

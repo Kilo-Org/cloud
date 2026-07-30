@@ -53,6 +53,8 @@ const DEFAULT_PREFERENCES: UserNotificationPreferences = {
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
   kiloclawActivityEnabled: true,
+  balanceAlertsEnabled: true,
+  securityFindingsEnabled: true,
 };
 
 export type DispatchAgentSessionNotificationPushDeps = {

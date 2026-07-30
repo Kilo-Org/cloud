@@ -43,7 +43,7 @@ data-contract caveats, even when changed code is outside `packages/db`.
 | `pnpm format` | Format supported files |
 | `pnpm typecheck` | Run repository TypeScript checks |
 | `pnpm lint` | Run repository lint checks |
-| `pnpm test` | Run root test script; currently web and web-env tests, not every package suite |
+| `pnpm test` | Run web, web-env, and local development-tool tests; not every package suite |
 | `pnpm validate` | Run root typecheck, lint, and test scripts |
 
 Package-level scripts are in the relevant `package.json`. Read root and relevant
@@ -63,7 +63,7 @@ package manifests before running repository JavaScript or package scripts. Load
 | Service, Durable Object, or Worker code | `services/AGENTS.md`, nearest owning service's `AGENTS.md`, and relevant Durable Objects or Workers skills |
 | Domain language and ownership | `CONTEXT.md`, when its scope applies |
 | Business requirements | Relevant `.specs/*.md`, indexed by `specs` skill |
-| UI and product design | `DESIGN.md`, relevant app `AGENTS.md`, and `kilo-design` skill |
+| UI and product design | `DESIGN.md`, relevant app `AGENTS.md`; for `apps/web`, the `kilo-design-cloud` skill synced from `Kilo-Org/kilo-design` |
 | Contribution and PR workflow | `CONTRIBUTING.md` and relevant Git or PR skill |
 
 ## Security Baseline

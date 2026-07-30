@@ -1,4 +1,4 @@
-import { type RemoteAttachmentPart, type ResolvedSession } from 'cloud-agent-sdk';
+import { type RemoteAttachmentPart, type ResolvedSession } from '@kilocode/cloud-agent-sdk';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 
@@ -41,6 +41,18 @@ export function resolveSendAttachmentKind(
     return 'remote-capable';
   }
   return 'none';
+}
+
+/**
+ * True when the send path would omit attachments from the wire while the
+ * composer still holds uploaded files — refuse that silent drop so the user
+ * can remove attachments and retry.
+ */
+export function shouldRefuseSilentAttachmentDrop(
+  kind: 'cloud' | 'remote-capable' | 'none',
+  hasAttachments: boolean
+): boolean {
+  return kind === 'none' && hasAttachments;
 }
 
 /**

@@ -64,6 +64,46 @@ describe('useActiveSessions live payload helpers', () => {
     ]);
   });
 
+  it('keeps the cached title for a known id and takes every other field from the heartbeat', () => {
+    const sessions = applyActiveSessionsHeartbeat(
+      [
+        { id: 'root-1', status: 'idle', title: 'DB title', connectionId: 'conn-1' },
+        { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
+      ],
+      {
+        connectionId: 'conn-1',
+        sessions: [
+          {
+            id: 'root-1',
+            status: 'busy',
+            title: 'Stale CLI title',
+            connectionId: 'conn-1',
+          },
+        ],
+      }
+    );
+
+    expect(sessions).toEqual([
+      { id: 'root-1', status: 'busy', title: 'DB title', connectionId: 'conn-1' },
+      { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
+    ]);
+  });
+
+  it('uses the heartbeat title for a brand-new session id', () => {
+    const sessions = applyActiveSessionsHeartbeat(
+      [{ id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' }],
+      {
+        connectionId: 'conn-1',
+        sessions: [{ id: 'root-3', status: 'busy', title: 'CLI title', connectionId: 'conn-1' }],
+      }
+    );
+
+    expect(sessions).toEqual([
+      { id: 'root-3', status: 'busy', title: 'CLI title', connectionId: 'conn-1' },
+      { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
+    ]);
+  });
+
   it('removes all cached rows for a disconnected connection', () => {
     const sessions = removeActiveSessionsForConnection(
       [

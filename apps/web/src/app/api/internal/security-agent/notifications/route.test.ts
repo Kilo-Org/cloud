@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { after, NextRequest } from 'next/server';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { RawHtml, send as sendEmail } from '@/lib/email';
@@ -29,9 +29,38 @@ jest.mock('@/lib/email', () => {
   };
 });
 
+jest.mock('@/lib/notifications-worker-client', () => ({
+  dispatchSecurityFindingPush: jest.fn().mockResolvedValue(undefined),
+  dispatchLowBalancePush: jest.fn().mockResolvedValue(undefined),
+}));
+
+// Mock next/server's after function which requires request context.
+// Track async after bodies on the mock so tests can drain push work.
+jest.mock('next/server', () => {
+  const pending: Promise<unknown>[] = [];
+  const afterMock = jest.fn((fn: () => void | Promise<void>) => {
+    const result = fn();
+    if (result != null && typeof (result as Promise<unknown>).then === 'function') {
+      pending.push(Promise.resolve(result));
+    }
+  });
+  return {
+    ...jest.requireActual('next/server'),
+    after: Object.assign(afterMock, { pending }),
+  };
+});
+
 import { POST } from './route';
+import { dispatchSecurityFindingPush } from '@/lib/notifications-worker-client';
 
 const mockSendEmail = jest.mocked(sendEmail);
+const mockDispatchSecurityFindingPush = jest.mocked(dispatchSecurityFindingPush);
+
+async function drainAfterCallbacks(): Promise<void> {
+  const mock = after as typeof after & { pending: Promise<unknown>[] };
+  const batch = mock.pending.splice(0);
+  await Promise.all(batch);
+}
 
 function createRequest(notificationId: string, secret = 'security-notification-secret') {
   return new NextRequest('http://localhost:3000/api/internal/security-agent/notifications', {
@@ -193,7 +222,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
   });
 
   it('sends eligible personal new-finding notifications', async () => {
-    const { notification, user } = await insertPersonalNotification({});
+    const { notification, user, finding } = await insertPersonalNotification({});
 
     const response = await POST(createRequest(notification.id));
 
@@ -225,6 +254,42 @@ describe('POST /api/internal/security-agent/notifications', () => {
     );
     expect(findingDetails.html).toContain('CVSS 7.5');
     expect(findingDetails.html).not.toContain('Lodash merge allows prototype pollution');
+    // Push is scheduled via after() so it does not block the route response.
+    expect(jest.mocked(after)).toHaveBeenCalledTimes(1);
+    await drainAfterCallbacks();
+    expect(mockDispatchSecurityFindingPush).toHaveBeenCalledTimes(1);
+    expect(mockDispatchSecurityFindingPush).toHaveBeenCalledWith({
+      recipientUserId: user.id,
+      notificationId: notification.id,
+      findingId: finding.id,
+      scope: 'personal',
+      notificationKind: 'new_finding',
+      severity: 'high',
+      repoFullName: 'acme/api',
+      title: 'Prototype Pollution in lodash',
+    });
+  });
+
+  it('keeps sent response when security-finding push dispatch rejects', async () => {
+    mockDispatchSecurityFindingPush.mockRejectedValueOnce(new Error('push worker down'));
+    const { notification, user, finding } = await insertPersonalNotification({});
+
+    const response = await POST(createRequest(notification.id));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ outcome: 'sent' });
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    await drainAfterCallbacks();
+    expect(mockDispatchSecurityFindingPush).toHaveBeenCalledWith({
+      recipientUserId: user.id,
+      notificationId: notification.id,
+      findingId: finding.id,
+      scope: 'personal',
+      notificationKind: 'new_finding',
+      severity: 'high',
+      repoFullName: 'acme/api',
+      title: 'Prototype Pollution in lodash',
+    });
   });
 
   it('cancels new-finding notifications when they are disabled by default', async () => {
@@ -285,6 +350,18 @@ describe('POST /api/internal/security-agent/notifications', () => {
           action_url: `https://app.example.test/organizations/${organization.id}/security-agent/findings`,
           manage_notifications_url: `https://app.example.test/organizations/${organization.id}/security-agent/config?tab=notifications`,
         }),
+      })
+    );
+    await drainAfterCallbacks();
+    expect(mockDispatchSecurityFindingPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: recipient.id,
+        notificationId: notification.id,
+        scope: organization.id,
+        notificationKind: 'new_finding',
+        severity: 'critical',
+        repoFullName: 'acme/org-api',
+        title: 'Unauthenticated admin token exchange',
       })
     );
   });
@@ -356,6 +433,8 @@ describe('POST /api/internal/security-agent/notifications', () => {
       outcome: 'retryable_failure',
       reason: 'provider_unavailable',
     });
+    expect(jest.mocked(after)).not.toHaveBeenCalled();
+    expect(mockDispatchSecurityFindingPush).not.toHaveBeenCalled();
   });
 
   it('returns cancelled when notification was no longer claimed', async () => {
@@ -368,12 +447,15 @@ describe('POST /api/internal/security-agent/notifications', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ outcome: 'cancelled', reason: 'not_sending' });
     expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(jest.mocked(after)).not.toHaveBeenCalled();
+    expect(mockDispatchSecurityFindingPush).not.toHaveBeenCalled();
   });
 
   it('persists no mutation itself; sweep owns state transition', async () => {
     const { notification } = await insertPersonalNotification({});
 
     await POST(createRequest(notification.id));
+    await drainAfterCallbacks();
 
     const [row] = await db
       .select()

@@ -13,11 +13,10 @@
 // dismisses (cancel) or the mutation succeeds (auto-dismiss).
 
 import * as Haptics from 'expo-haptics';
-import { Alert, ScrollView, type TextInput, View } from 'react-native';
+import { Alert, Keyboard, ScrollView, type TextInput, useWindowDimensions } from 'react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import {
   type AllowedMergeMethod,
   type PrMergeMethod,
@@ -27,18 +26,13 @@ import {
   useEnableAutoMergeMutation,
   useMergePullRequestMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
-import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { applyMergeSuccessEffects } from '@/lib/pr-review/merge/merge-success-effects';
 import {
   defaultMergeMethodOptionFor,
   mergeMethodOptionsFor,
 } from '@/components/pr-review/merge/pr-merge-icons';
-import {
-  CommitMessageField,
-  CommitTitleField,
-  DeleteBranchToggle,
-  MethodPicker,
-} from '@/components/pr-review/merge/pr-merge-sheet-parts';
+import { MergeSheetFormBody } from '@/components/pr-review/merge/pr-merge-sheet-parts';
 import {
   defaultCommitMessage,
   defaultCommitTitle,
@@ -61,6 +55,8 @@ type PrMergeSheetProps = Readonly<{
   repo: PrOverviewRepoSettings;
   initialMethod: PrMergeMethod;
   mode: PrMergeSheetMode;
+  sheetTitle: string;
+  eyebrow: string;
   /** Called after a successful merge / auto-merge enable so the orchestrator can refetch. */
   onRefetch: () => Promise<void>;
   /** Called when the user cancels or after a successful submit. */
@@ -76,8 +72,6 @@ type MergePullRequestInput = {
   commitMessage?: string;
   deleteBranch: boolean;
   expectedHeadSha: string;
-  headRef: string;
-  isCrossRepo: boolean;
 };
 
 type AutoMergeInput = {
@@ -96,7 +90,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     repoName,
     number,
     headSha,
-    headRef,
     isCrossRepo,
     prNodeId,
     title,
@@ -104,6 +97,8 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     repo: repoSettings,
     initialMethod,
     mode,
+    sheetTitle,
+    eyebrow,
     onRefetch,
     onDismiss,
   } = props;
@@ -125,8 +120,14 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   // read the ref on submit. `defaultValue` is for the first commit only.
   const titleInputRef = useRef<TextInput>(null);
   const messageInputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
   const titleRef = useRef(defaultCommitTitle(title, number));
   const messageRef = useRef(defaultCommitMessage(bodyMarkdown));
+  const { height: windowHeight } = useWindowDimensions();
+  // Half detent (~0.5) vs full: hide delete-branch + tighten message so
+  // Merge/Cancel stay above the closed-sheet limit without scrolling.
+  const [scrollViewportHeight, setScrollViewportHeight] = useState(0);
+  const isHalfDetent = scrollViewportHeight > 0 && scrollViewportHeight < windowHeight * 0.65;
 
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineErrorKind, setInlineErrorKind] = useState<
@@ -168,6 +169,17 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     }
   }, [lastError]);
 
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      });
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
   function resetForNewMethod(next: AllowedMergeMethod) {
     setMethod(next);
   }
@@ -182,8 +194,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       commitMessage: messageRef.current.trim().length > 0 ? messageRef.current.trim() : undefined,
       deleteBranch: showDeleteBranchToggle ? deleteBranch : false,
       expectedHeadSha: headSha,
-      headRef,
-      isCrossRepo,
     };
   }
 
@@ -212,18 +222,32 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     setInlineError(null);
     setInlineErrorKind(null);
     try {
+      let celebrate = false;
       // eslint-disable-next-line typescript-eslint/prefer-ternary -- awaits inside branches can't be a ternary expression
       if (mode === 'merge') {
-        await mergeMutation.mutateAsync(buildMergeInput());
+        // P0-B-08: only resolved here when `merged: true` (the hook's
+        // `assertMergeResult` throws on `merged: false` so a "not
+        // mergeable" reply is treated as a retryable mutation error,
+        // NOT a success). The pure helper decides whether the post-merge
+        // step (branch delete) is a partial success that needs a
+        // persistent banner on the PR review screen, then the sheet
+        // celebrates in BOTH clean and partial cases. The `incomplete`
+        // gate never reaches here because `mutateAsync` would have
+        // rejected.
+        const result = await mergeMutation.mutateAsync(buildMergeInput());
+        ({ celebrate } = applyMergeSuccessEffects(result, ref));
       } else {
         await enableAutoMergeMutation.mutateAsync(buildAutoMergeInput());
+        celebrate = true;
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await onRefetch();
-      // Dismiss exactly this merge route; `onDismiss` (router.back) leaves the
-      // refreshed PR review screen visible. Do NOT also call router.back()
-      // here or it would pop the review screen too.
-      onDismiss();
+      if (celebrate) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await onRefetch();
+        // Dismiss exactly this merge route; `onDismiss` (router.back) leaves the
+        // refreshed PR review screen visible. Do NOT also call router.back()
+        // here or it would pop the review screen too.
+        onDismiss();
+      }
     } catch {
       // The effect above classifies the mutation error into inlineError;
       // swallow here to avoid an unhandled promise rejection.
@@ -264,82 +288,43 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   // rather than sending a method the repo does not allow.
   const noMethodsAllowed = methodOptions.length === 0;
 
+  // PickerSheet invariant: [header, ScrollView]; footer is trailing content.
   return (
-    <View className="flex-1 bg-background">
+    <>
+      <PrFormSheetHeader title={sheetTitle} eyebrow={eyebrow} onBack={onDismiss} />
       <ScrollView
-        className="flex-1"
-        contentContainerClassName="gap-5 px-6 pb-10 pt-2"
+        ref={scrollRef}
+        className="flex-1 bg-background"
+        contentContainerClassName="pb-1"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
+        onLayout={event => {
+          setScrollViewportHeight(event.nativeEvent.layout.height);
+        }}
       >
-        {noMethodsAllowed ? (
-          <View className="rounded-md border border-border bg-secondary p-3">
-            <Text className="text-sm text-muted-foreground">
-              This repository has no enabled merge methods. Ask a repository admin to enable merge,
-              squash, or rebase merging.
-            </Text>
-          </View>
-        ) : (
-          <MethodPicker
-            methodOptions={methodOptions}
-            method={method}
-            isDisabled={isMutating}
-            onChange={resetForNewMethod}
-          />
-        )}
-        <CommitTitleField
+        <MergeSheetFormBody
+          noMethodsAllowed={noMethodsAllowed}
+          methodOptions={methodOptions}
+          method={method}
+          isMutating={isMutating}
+          onMethodChange={resetForNewMethod}
           titleRef={titleRef}
-          inputRef={titleInputRef}
-          placeholder={defaultCommitTitle(title, number)}
-          isDisabled={isMutating}
-        />
-        <CommitMessageField
+          titleInputRef={titleInputRef}
+          titlePlaceholder={defaultCommitTitle(title, number)}
           messageRef={messageRef}
-          inputRef={messageInputRef}
-          isDisabled={isMutating}
+          messageInputRef={messageInputRef}
+          isHalfDetent={isHalfDetent}
+          showDeleteBranchToggle={showDeleteBranchToggle}
+          deleteBranch={deleteBranch}
+          onDeleteBranchChange={setDeleteBranch}
+          inlineError={inlineError}
+          inlineErrorKind={inlineErrorKind}
+          submitLabel={submitLabel}
+          onConfirm={handleConfirmPress}
+          onDismiss={onDismiss}
         />
-        {showDeleteBranchToggle ? (
-          <DeleteBranchToggle
-            value={deleteBranch}
-            onChange={setDeleteBranch}
-            isDisabled={isMutating}
-          />
-        ) : null}
-        {inlineError && inlineErrorKind !== 'reconnect' ? (
-          <View
-            className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 p-3"
-            accessibilityLiveRegion="polite"
-          >
-            <Text className="text-sm text-destructive">{inlineError}</Text>
-          </View>
-        ) : null}
-        {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
       </ScrollView>
-
-      <View className="border-t-[0.5px] border-hair-soft bg-background px-6 pb-6 pt-3">
-        <Button
-          onPress={handleConfirmPress}
-          loading={isMutating}
-          disabled={
-            noMethodsAllowed ||
-            inlineErrorKind === 'non-retryable' ||
-            inlineErrorKind === 'reconnect'
-          }
-          accessibilityLabel={submitLabel}
-        >
-          <Text>{submitLabel}</Text>
-        </Button>
-        <Button
-          variant="ghost"
-          onPress={onDismiss}
-          disabled={isMutating}
-          className="mt-2"
-          accessibilityLabel="Cancel"
-        >
-          <Text>Cancel</Text>
-        </Button>
-      </View>
-    </View>
+    </>
   );
 }

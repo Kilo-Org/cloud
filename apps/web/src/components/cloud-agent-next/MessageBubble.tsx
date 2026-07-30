@@ -4,7 +4,7 @@ import React, { useCallback } from 'react';
 import { Scissors, Image, FileText, AlertCircle, Clock } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
-import type { MessageDeliveryState } from '@/lib/cloud-agent-sdk';
+import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage, Part, CompactionPart } from './types';
 import {
   isUserMessage,

@@ -84,6 +84,7 @@ beforeEach(() => {
 
 describe('ContainerUsageMeter', () => {
   it('writes an admitted start directly to PostgreSQL', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     await expect(createMeter().recordStart(validStart())).resolves.toEqual({
       success: true,
       ack: { intervalId: 'cloud-agent-next:instance-1:123', durable: 'pg', dedup: false },
@@ -95,9 +96,20 @@ describe('ContainerUsageMeter', () => {
       expect.stringMatching(/^[a-f0-9]{64}$/),
       expect.any(Number)
     );
+    expect(log).toHaveBeenCalledWith(
+      JSON.stringify({
+        message: 'Container usage meter RPC completed',
+        event: 'container_usage_rpc',
+        operation: 'start',
+        service: 'cloud-agent-next',
+        outcome: 'accepted',
+        dedup: false,
+      })
+    );
   });
 
   it('returns permanent SKU admission failures', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.mocked(applyStart).mockResolvedValue({
       kind: 'rejected',
       code: 'sku_not_accepting_new_usage',
@@ -110,6 +122,9 @@ describe('ContainerUsageMeter', () => {
         message: 'Billing SKU is not accepting new usage',
       },
     });
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('"rejectionCode":"sku_not_accepting_new_usage"')
+    );
   });
 
   it('writes heartbeats directly and returns the shadow budget verdict', async () => {
@@ -132,9 +147,20 @@ describe('ContainerUsageMeter', () => {
   });
 
   it('propagates transient PostgreSQL failures for bounded client retry', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.mocked(applyHeartbeat).mockRejectedValue(new Error('postgres unavailable'));
     await expect(createMeter().recordHeartbeat(validHeartbeat())).rejects.toThrow(
       'postgres unavailable'
+    );
+    expect(log).toHaveBeenCalledWith(
+      JSON.stringify({
+        message: 'Container usage meter RPC completed',
+        event: 'container_usage_rpc',
+        operation: 'heartbeat',
+        service: 'cloud-agent-next',
+        outcome: 'failed',
+        errorName: 'Error',
+      })
     );
   });
 });

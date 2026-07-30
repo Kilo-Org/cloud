@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { File as FileIcon } from 'lucide-react-native';
-import { type FilePart } from 'cloud-agent-sdk';
+import { type FilePart } from '@kilocode/cloud-agent-sdk';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';

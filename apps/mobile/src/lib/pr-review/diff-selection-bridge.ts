@@ -11,7 +11,7 @@
 // mounted in the navigation stack: `getDiffSelection` returns null unless
 // the requested PR matches the stored selection.
 
-export type DiffSelectionSide = 'LEFT' | 'RIGHT';
+type DiffSelectionSide = 'LEFT' | 'RIGHT';
 
 export type PrIdentity = {
   owner: string;

@@ -102,8 +102,11 @@ export function RenameModal({
             ref={inputRef}
             accessible
             accessibilityLabel={placeholder}
+            // leading-[normal] (not leading-5) so no lineHeight reaches the style: a
+            // lineHeight above the font's natural one makes iOS draw the placeholder
+            // lower than the typed text and clip its bottom.
             className={cn(
-              'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground',
+              'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-[normal] text-foreground',
               pending && 'opacity-50'
             )}
             placeholder={placeholder}

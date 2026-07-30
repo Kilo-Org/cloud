@@ -1920,6 +1920,7 @@ export const CustomLlmDefinitionSchema = z
     display_name: z.string(),
     api_key: z.string(),
     organization_ids: z.array(z.string()),
+    ip_allow_list: z.array(z.union([z.ipv4(), z.ipv6()])).optional(),
     pricing: CustomLlmPricingSchema.optional(),
   })
   .and(CustomLlmMetadataSchema)

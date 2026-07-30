@@ -22,6 +22,7 @@ import {
   pickModelExperimentVariant,
   type AllocationSubject,
 } from '@/lib/ai-gateway/experiments/pick-variant';
+import { canAccessCustomLlm } from '@/lib/ai-gateway/custom-llm/access';
 
 /**
  * Metadata about the experiment that resolved this provider, attached when
@@ -91,8 +92,9 @@ async function checkDirectBYOK(
 
 async function checkCustomLlm(
   requestedModel: string,
-  organizationId: string
-): Promise<GetProviderProviderResult | null> {
+  organizationId: string,
+  clientIp: string | null
+): Promise<GetProviderResult> {
   const [row] = await readDb
     .select()
     .from(custom_llm2)
@@ -102,8 +104,8 @@ async function checkCustomLlm(
     console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
   }
   const customLlm = parsedCustomLlm.data;
-  if (!customLlm || !customLlm.organization_ids.includes(organizationId)) {
-    return null;
+  if (!customLlm || !canAccessCustomLlm(customLlm, organizationId, clientIp)) {
+    return { kind: 'not-found' };
   }
   return {
     kind: 'provider',
@@ -219,11 +221,10 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     // this id. Fall through to non-experiment routing.
   }
 
-  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId) {
-    const customLlmResult = await checkCustomLlm(requestedModel, organizationId);
-    if (customLlmResult) {
-      return customLlmResult;
-    }
+  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX)) {
+    return organizationId
+      ? checkCustomLlm(requestedModel, organizationId, clientIp)
+      : { kind: 'not-found' };
   }
 
   const eligibleForVercelRouting =

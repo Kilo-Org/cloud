@@ -1,5 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
-import { CodeReviewCouncilConfigSchema, OrganizationSettingsSchema } from './schema-types';
+import {
+  CodeReviewCouncilConfigSchema,
+  CustomLlmDefinitionSchema,
+  OrganizationSettingsSchema,
+} from './schema-types';
 
 describe('CodeReviewCouncilConfigSchema', () => {
   const specialist = (id: string) => ({
@@ -61,6 +65,49 @@ describe('OrganizationSettingsSchema org_auto_model', () => {
         routes,
         fallback_model: 'kilo-auto/balanced',
       },
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('CustomLlmDefinitionSchema ip_allow_list', () => {
+  const definition = {
+    internal_id: 'upstream-model',
+    display_name: 'Custom model',
+    context_length: 128_000,
+    max_completion_tokens: 8_192,
+    base_url: 'https://example.com/v1',
+    api_key: 'test-key',
+    organization_ids: ['organization-id'],
+  };
+
+  it('accepts definitions without an IP allow list', () => {
+    expect(CustomLlmDefinitionSchema.safeParse(definition).success).toBe(true);
+  });
+
+  it('accepts IPv4 and IPv6 addresses', () => {
+    const result = CustomLlmDefinitionSchema.safeParse({
+      ...definition,
+      ip_allow_list: ['203.0.113.10', '2001:db8::1'],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid IP addresses', () => {
+    const result = CustomLlmDefinitionSchema.safeParse({
+      ...definition,
+      ip_allow_list: ['not-an-ip'],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects CIDR ranges', () => {
+    const result = CustomLlmDefinitionSchema.safeParse({
+      ...definition,
+      ip_allow_list: ['203.0.113.0/24'],
     });
 
     expect(result.success).toBe(false);

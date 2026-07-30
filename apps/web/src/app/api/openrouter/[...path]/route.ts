@@ -106,6 +106,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { logExceptInTest } from '@/lib/utils.server';
+import { getTrustedClientIp } from '@/lib/client-ip';
 
 export const maxDuration = 1800;
 
@@ -244,6 +245,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Extract IP early (needed for free model routing fallback and rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const trustedClientIp = getTrustedClientIp(request.headers);
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
@@ -564,7 +566,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user,
     organizationId,
     taskId,
-    clientIp: ipAddress ?? null,
+    clientIp: trustedClientIp,
     machineId: machineIdHeader,
   });
   if (initialProviderResultForAbuseService.kind === 'not-found') {
@@ -689,7 +691,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       user,
       organizationId,
       taskId,
-      clientIp: ipAddress ?? null,
+      clientIp: trustedClientIp,
       machineId: machineIdHeader,
     });
     if (quarantineProviderResult.kind === 'not-found') {

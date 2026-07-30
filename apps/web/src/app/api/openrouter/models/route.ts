@@ -10,6 +10,7 @@ import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
 import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
+import { getTrustedClientIp } from '@/lib/client-ip';
 
 async function tryGetUserFromAuth() {
   try {
@@ -25,12 +26,15 @@ async function tryGetUserFromAuth() {
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
 export async function GET(
-  _request: NextRequest
+  request: NextRequest
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId
-      ? await getAvailableModelsForOrganization(auth.organizationId)
+      ? await getAvailableModelsForOrganization(
+          auth.organizationId,
+          getTrustedClientIp(request.headers)
+        )
       : null;
     if (result) {
       return NextResponse.json({

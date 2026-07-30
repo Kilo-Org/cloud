@@ -19,7 +19,8 @@ import { addUserByokAvailability, getOrganizationByokProviderIds } from '@/lib/a
 import { readDb } from '@/lib/drizzle';
 
 export async function getAvailableModelsForOrganization(
-  organizationId: string
+  organizationId: string,
+  clientIp?: string | null
 ): Promise<OpenRouterModelsResponse | null> {
   const organization = await getOrganizationById(organizationId);
   if (!organization) {
@@ -65,7 +66,7 @@ export async function getAvailableModelsForOrganization(
   }
 
   filteredModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
-  filteredModels.push(...(await listAvailableCustomLlms(organizationId)));
+  filteredModels.push(...(await listAvailableCustomLlms(organizationId, clientIp)));
 
   return {
     ...responseData,

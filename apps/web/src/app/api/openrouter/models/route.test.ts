@@ -195,9 +195,15 @@ describe('GET /api/openrouter/models', () => {
       },
     } as never);
 
-    const response = await GET(request());
+    const response = await GET(
+      request({
+        'x-forwarded-for': '198.51.100.20',
+        'x-vercel-forwarded-for': '203.0.113.10',
+      })
+    );
 
     expect(response.status).toBe(200);
+    expect(mockedGetAvailableModelsForOrganization).toHaveBeenCalledWith('org-1', '203.0.113.10');
     await expect(response.json()).resolves.toEqual({
       data: [
         {

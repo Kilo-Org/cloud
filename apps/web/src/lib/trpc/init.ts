@@ -9,17 +9,19 @@ import { AuthContextError, trpcErrorFormatter } from '@/lib/trpc/transport';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { getTrustedClientIp } from '@/lib/client-ip';
 
 export { UpstreamApiError } from '@/lib/trpc/transport';
 // Define the context type
 export type TRPCContext = {
   user: User;
+  clientIp?: string | null;
 };
 
 /**
  * @see: https://trpc.io/docs/server/context
  */
-export const createTRPCContext = async (): Promise<TRPCContext> => {
+export const createTRPCContext = async (options?: { req?: Request }): Promise<TRPCContext> => {
   const { user } = await getUserFromAuth({ adminOnly: false });
   if (!user) {
     throw new TRPCError({
@@ -34,6 +36,7 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
   setTag('userId', user.id);
   return {
     user,
+    clientIp: options?.req ? getTrustedClientIp(options.req.headers) : null,
   };
 };
 

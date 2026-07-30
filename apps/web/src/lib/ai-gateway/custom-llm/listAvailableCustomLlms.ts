@@ -2,6 +2,7 @@ import { custom_llm2 } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { orderOpenCodeSettings } from './order-opencode-variants';
+import { canAccessCustomLlm } from './access';
 
 function convert(publicId: string, model: CustomLlmDefinition) {
   return {
@@ -41,7 +42,10 @@ function convert(publicId: string, model: CustomLlmDefinition) {
   };
 }
 
-export async function listAvailableCustomLlms(organizationId: string) {
+export async function listAvailableCustomLlms(
+  organizationId: string,
+  clientIp: string | null | undefined
+) {
   const rows = await readDb.select().from(custom_llm2);
   return rows
     .map(row => {
@@ -52,6 +56,12 @@ export async function listAvailableCustomLlms(organizationId: string) {
       return parsed.success ? { public_id: row.public_id, definition: parsed.data } : null;
     })
     .filter(row => row !== null)
-    .filter(row => row.definition.organization_ids.includes(organizationId))
+    .filter(row =>
+      // Request catalogs pass an IP or null and fail closed. Undefined is reserved
+      // for organization configuration checks that are not tied to a request.
+      clientIp === undefined
+        ? row.definition.organization_ids.includes(organizationId)
+        : canAccessCustomLlm(row.definition, organizationId, clientIp)
+    )
     .map(row => convert(row.public_id, row.definition));
 }

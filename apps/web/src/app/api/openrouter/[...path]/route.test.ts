@@ -119,6 +119,7 @@ function makeRequest(body: unknown, headers?: HeadersInit) {
     headers: {
       'Content-Type': 'application/json',
       'x-forwarded-for': '127.0.0.1',
+      'x-vercel-forwarded-for': '127.0.0.1',
       ...headers,
     },
     body: JSON.stringify(body),
@@ -268,6 +269,22 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       expect.anything(),
       expect.anything(),
       expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' })
+    );
+  });
+
+  it('uses the Vercel client IP for provider access checks', async () => {
+    const { POST } = await import('./route');
+
+    const response = await POST(
+      makeRequest(makeBody(), {
+        'x-forwarded-for': '198.51.100.20',
+        'x-vercel-forwarded-for': '203.0.113.10',
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ clientIp: '203.0.113.10' })
     );
   });
 

@@ -81,6 +81,7 @@ import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
 import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
+import { trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import {
   getInitialWelcomePromoContextForSubscription,
   getKiloPassWelcomePromoPolicy,
@@ -1051,7 +1052,21 @@ export const kiloPassRouter = createTRPCRouter({
           appAccountToken: purchase.appAccountToken,
           userAppStoreAccountToken: ctx.user.app_store_account_token,
         });
-        return await completeStoreKiloPassPurchase({ user: ctx.user, purchase });
+        const result = await completeStoreKiloPassPurchase({ user: ctx.user, purchase });
+        if (!result.alreadyProcessed) {
+          trackKiloPassPurchaseCompleted({
+            channel: 'app_store',
+            distinctId: ctx.user.google_user_email,
+            userId: ctx.user.id,
+            tier: result.tier,
+            cadence: result.cadence,
+            purchaseKind: result.purchaseKind,
+            providerTransactionId: purchase.providerTransactionId,
+            productId: purchase.productId,
+            environment: purchase.environment,
+          });
+        }
+        return result;
       } catch (error) {
         throw mapAppStoreCompletionError(error, ctx.user.id);
       }

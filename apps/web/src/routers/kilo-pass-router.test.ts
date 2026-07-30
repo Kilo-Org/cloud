@@ -100,6 +100,11 @@ type StoreCompletionMock = {
   completeStoreKiloPassPurchase: ReturnType<typeof jest.fn>;
 };
 
+type PosthogTrackingMock = {
+  trackKiloPassPurchaseCompleted: ReturnType<typeof jest.fn>;
+  runAfterResponse: (work: () => Promise<void>) => Promise<void>;
+};
+
 type SentryMock = {
   captureException: ReturnType<typeof jest.fn>;
 };
@@ -115,6 +120,10 @@ function getAppStoreVerifierMock(): AppStoreVerifierMock {
 
 function getStoreCompletionMock(): StoreCompletionMock {
   return jest.requireMock('@/lib/kilo-pass/store-subscription-completion') as StoreCompletionMock;
+}
+
+function getPosthogTrackingMock(): PosthogTrackingMock {
+  return jest.requireMock('@/lib/kilo-pass/posthog-tracking') as PosthogTrackingMock;
 }
 
 function getSentryMock(): SentryMock {
@@ -335,6 +344,13 @@ jest.mock('@/lib/kilo-pass/apple-store-verifier', () => ({
 
 jest.mock('@/lib/kilo-pass/store-subscription-completion', () => ({
   completeStoreKiloPassPurchase: jest.fn(),
+}));
+
+jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
+  runAfterResponse: async (work: () => Promise<void>) => {
+    await work();
+  },
+  trackKiloPassPurchaseCompleted: jest.fn(),
 }));
 
 async function insertSubscription(params: {
@@ -572,6 +588,7 @@ describe('kiloPassRouter', () => {
     stripeMock.invoices.list.mockReset();
     getAppStoreVerifierMock().verifyAppleKiloPassTransactionJws.mockReset();
     getStoreCompletionMock().completeStoreKiloPassPurchase.mockReset();
+    getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockReset();
     getSentryMock().captureException.mockReset();
   });
 
@@ -611,27 +628,78 @@ describe('kiloPassRouter', () => {
     it('succeeds when the transaction appAccountToken matches the signed-in user', async () => {
       const verifierMock = getAppStoreVerifierMock();
       const completionMock = getStoreCompletionMock();
+      const trackingMock = getPosthogTrackingMock();
       const sentryMock = getSentryMock();
       const user = await insertTestUser();
-      verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(
-        appStorePurchaseFixture({ appAccountToken: user.app_store_account_token })
-      );
-      const expectedResult = {
+      const purchase = appStorePurchaseFixture({
+        appAccountToken: user.app_store_account_token,
+      });
+      verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(purchase);
+      // Completion mock includes purchaseKind (server internal); tRPC output strips it.
+      const completionResult = {
         subscriptionId: 'sub-test-id',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
+        alreadyProcessed: false as const,
+        purchaseKind: 'initial' as const,
+      };
+      const expectedClientResult = {
+        subscriptionId: completionResult.subscriptionId,
+        tier: completionResult.tier,
+        cadence: completionResult.cadence,
         alreadyProcessed: false,
       };
-      completionMock.completeStoreKiloPassPurchase.mockResolvedValue(expectedResult);
+      completionMock.completeStoreKiloPassPurchase.mockResolvedValue(completionResult);
 
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.completeAppStorePurchase({
         signedTransactionJws: 'signed-jws',
       });
 
-      expect(result).toEqual(expectedResult);
+      expect(result).toEqual(expectedClientResult);
       expect(completionMock.completeStoreKiloPassPurchase).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith({
+        channel: 'app_store',
+        distinctId: user.google_user_email,
+        userId: user.id,
+        tier: completionResult.tier,
+        cadence: completionResult.cadence,
+        purchaseKind: 'initial',
+        providerTransactionId: purchase.providerTransactionId,
+        productId: purchase.productId,
+        environment: purchase.environment,
+      });
       expect(sentryMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it('does not track when completeStoreKiloPassPurchase reports alreadyProcessed', async () => {
+      const verifierMock = getAppStoreVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const trackingMock = getPosthogTrackingMock();
+      const user = await insertTestUser();
+      verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(
+        appStorePurchaseFixture({ appAccountToken: user.app_store_account_token })
+      );
+      completionMock.completeStoreKiloPassPurchase.mockResolvedValue({
+        subscriptionId: 'sub-test-id',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        alreadyProcessed: true,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.completeAppStorePurchase({
+        signedTransactionJws: 'signed-jws',
+      });
+
+      expect(result).toEqual({
+        subscriptionId: 'sub-test-id',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        alreadyProcessed: true,
+      });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).not.toHaveBeenCalled();
     });
 
     it('keeps account mismatch copy stable and does not log it as an internal failure', async () => {

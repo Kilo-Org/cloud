@@ -20,18 +20,25 @@ export default {
     providerId: 'hyper',
     recommendedModels: [
       {
-        id: 'qwen3.7-plus',
-        name: 'Qwen3.7 Plus',
-        flags: ['vision'],
-        context_length: 1_000_000,
-        max_completion_tokens: 64_000,
-      },
-      {
         id: 'deepseek-v4-flash',
         name: 'DeepSeek V4 Flash',
         flags: ['reasoning'],
         context_length: 1_000_000,
         max_completion_tokens: 384_000,
+      },
+      {
+        id: 'qwen3.7-flash',
+        name: 'Qwen3.7 Flash',
+        flags: ['vision'],
+        context_length: 1_000_000,
+        max_completion_tokens: 64_000,
+      },
+      {
+        id: 'qwen3.7-plus',
+        name: 'Qwen3.7 Plus',
+        flags: ['vision'],
+        context_length: 1_000_000,
+        max_completion_tokens: 64_000,
       },
       {
         id: 'glm-5.2',
@@ -46,12 +53,6 @@ export default {
         flags: ['vision', 'reasoning'],
         context_length: 262_000,
         max_completion_tokens: 262_000,
-      },
-      {
-        id: 'minimax-m2.7',
-        name: 'MiniMax M2.7',
-        context_length: 204_800,
-        max_completion_tokens: 20_480,
       },
     ],
   }),

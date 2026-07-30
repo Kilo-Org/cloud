@@ -26,13 +26,16 @@ redispatch about a minute later ran cleanly.
 
 Before redispatching, confirm the model is actually back rather than guessing, because
 `kilo/x-ai/grok-4.5` now backs **three** roles — `starter`, `orchestrator` and `e2e-verifier`.
-If it were truly gone, intake, orchestration, and E2E verification would be blocked, but planning
-and implementation could continue. The cheapest confirmation is a throwaway `kilo run` on
-`kilo/x-ai/grok-4.5`, or the next real dispatch of one of those roles; do not use an E2E verifier
-as an availability probe because it requires a slot bundle, stack, and devices. Check its log
-grows with zero `ProviderModelNotFoundError`:
+If it were truly gone, intake, orchestration, and E2E verification would be blocked. Planning and
+implementation on their own models could continue, except a defect section's repro gate — that
+gate is the planner's first act and dispatches an `e2e-verifier` on `grok-4.5`, so defect planning
+stalls too. Do not use an E2E verifier as an availability probe (it needs a slot bundle, stack,
+and devices). Cheapest confirmation: a throwaway probe with an explicit log, or the next real
+dispatch of a `grok-4.5` role (whose `$LOG` comes from `dispatch-role.sh` / `launch-interactive.sh`):
 
 ```bash
+LOG=/tmp/grok-probe.log
+kilo run 'ping' --model kilo/x-ai/grok-4.5 --variant high --auto >"$LOG" 2>&1
 grep -c "ProviderModelNotFoundError\|Model not found" "$LOG"   # want 0
 wc -l < "$LOG"; stat -f "%Sm" -t "%H:%M:%S" "$LOG"             # want growth, recent mtime
 ```

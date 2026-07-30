@@ -724,9 +724,21 @@ export function createIngestHandler(
         }
 
         if (now - attachment.lastHeartbeatUpdate >= HEARTBEAT_DEBOUNCE_MS) {
+          const sinceLastRenewalMs = now - attachment.lastHeartbeatUpdate;
           attachment.lastHeartbeatUpdate = now;
           ws.serializeAttachment(attachment);
           doContext.keepContainerAlive?.();
+          // Wrapper heartbeats bypass container fetches, so this is the only thing renewing
+          // the sandbox sleep timer. A gap in this series is a container about to expire.
+          logger
+            .withTags({ logTag: 'sandbox_keepalive_renewed', sessionId })
+            .withFields({
+              wrapperRunId: attachment.wrapperRunId,
+              wrapperGeneration: attachment.wrapperGeneration,
+              sinceLastRenewalMs,
+              eventType,
+            })
+            .debug('Sandbox sleep timer renewal requested from wrapper heartbeat');
         }
         if (eventType !== 'heartbeat') {
           if (now - attachment.lastEventAtUpdate >= HEARTBEAT_DEBOUNCE_MS) {

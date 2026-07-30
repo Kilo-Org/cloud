@@ -752,6 +752,23 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   }): Promise<StopWrappersResult> {
     const sandbox = await this.getSandbox();
     const initial = await this.observeTarget(request.target);
+    // Inspection is a container fetch, so it wakes a sleeping container. An `absent`
+    // result therefore means we booted a container only to learn nothing was running
+    // in it — the signal for how much idle container time this path is creating.
+    logger
+      .withTags({
+        logTag: 'wrapper_stop_inspection',
+        sessionId: this.metadata.identity.sessionId,
+        sandboxId: await this.resolveSandboxId(),
+      })
+      .withFields({
+        reason: request.reason,
+        attemptId: request.attemptId,
+        target: request.target.kind,
+        observation: initial.status,
+        observedWrapperCount: initial.status === 'present' ? initial.observed.length : 0,
+      })
+      .info('Wrapper stop inspection completed');
     if (initial.status !== 'present') return initial;
 
     try {

@@ -345,14 +345,30 @@ function isBitbucketReviewSession(
   return isCodeReviewSession(request) && repo?.kind === 'git' && repo.platform === 'bitbucket';
 }
 
+// Wire-format prefix of a Bitbucket outbound session capability (see the
+// git-token-service BitbucketSessionCapabilityCodec). A capability in the origin
+// stays authenticated through the outbound interceptor, unlike a raw token which
+// is stripped after bootstrap.
+const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
+
+function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): boolean {
+  return (
+    isBitbucketReviewSession(request) &&
+    typeof request.repo.token === 'string' &&
+    request.repo.token.startsWith(BITBUCKET_CAPABILITY_PREFIX)
+  );
+}
+
 function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
   if (!isCodeReviewSession(request)) return false;
   const repo = request.repo;
-  // Only GitHub and GitLab: their session origin keeps working credentials via
-  // outbound injection, so blobs deferred by a partial clone can be fetched
-  // lazily during the review. Bitbucket's origin is credential-stripped, and
-  // other/unknown git remotes have no such guarantee, so they keep a full clone.
-  return repo?.kind === 'github' || (repo?.kind === 'git' && repo.platform === 'gitlab');
+  // GitHub/GitLab keep working credentials via outbound injection. Bitbucket
+  // keeps them only when the session uses an outbound capability (a raw-token
+  // origin is credential-stripped after bootstrap). Other/unknown git remotes
+  // have no such guarantee, so they keep a full clone.
+  if (repo?.kind === 'github') return true;
+  if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
+  return hasBitbucketReviewCapability(request);
 }
 
 async function cloneRepository(
@@ -369,14 +385,14 @@ async function cloneRepository(
   const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
   const platform = repo.kind === 'git' ? repo.platform : 'github';
   const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
-  // GitHub/GitLab code review reads changed files from the working tree and gets
-  // the PR diff from the provider API or a local `git diff <prev>..HEAD`. It needs
-  // the full commit graph but not every historical file blob, so a blobless
-  // partial clone keeps the clone bounded by the current working tree (git fetches
-  // blobs lazily on demand) instead of full history, which on large repositories
-  // otherwise exceeds the clone timeout. Full history is retained, so incremental
-  // diffs and merge-base still work. See isBloblessReviewCloneEligible for why
-  // only GitHub/GitLab qualify.
+  // Code review reads changed files from the working tree and gets the PR diff
+  // from the provider API or a local `git diff <prev>..HEAD`. It needs the full
+  // commit graph but not every historical file blob, so a blobless partial clone
+  // fetches blobs lazily on demand instead of downloading every historical blob,
+  // which on large repositories otherwise exceeds the clone timeout. Full history
+  // is retained, so incremental diffs and merge-base still work. See
+  // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
+  // capability-backed Bitbucket, whose origin stays authenticated for lazy fetch).
   const useBlobless = isBloblessReviewCloneEligible(request);
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {
@@ -539,11 +555,16 @@ async function sanitizeBitbucketCodeReviewRemote(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
 ): Promise<boolean> {
-  // Single source of truth with the blobless-skip check in cloneRepository: the
-  // filter is skipped for exactly this session type because this function strips
-  // origin credentials, which would break a partial clone's later blob fetches.
   if (!isBitbucketReviewSession(request)) {
     return false;
+  }
+  // A capability origin stays authenticated through the outbound interceptor and
+  // is safe to expose (scoped to one repo, useless outside this container), so it
+  // must stay in place for a blobless clone's later lazy blob fetches. Only a raw
+  // workspace token needs stripping. Either way this is a handled code-review
+  // remote (return true), so callers do not refresh a token over it.
+  if (hasBitbucketReviewCapability(request)) {
+    return true;
   }
   const canonicalUrl = new URL(request.repo.url);
   canonicalUrl.username = '';

@@ -1,8 +1,15 @@
-// Single review-thread card: anchor header + comments list + reply input.
+// Single review-thread card: anchor header + optional quoted diff +
+// comments list + reply input.
 //
 //   - The thread header shows the anchor label ("src/a.ts L10 (RIGHT)"
 //     or "File comment on src/a.ts" or "Outdated on ...") and the
-//     "Outdated" / "Resolved" badges when applicable.
+//     "Outdated" / "Resolved" badges when applicable. The "Resolved"
+//     badge is the sole Resolved text indicator; the resolve control
+//     is an icon-only circular button (a11y: "Resolve thread" /
+//     "Unresolve thread").
+//   - Expanded LINE-anchored threads render a capped quoted diff
+//     snippet (from thread.diffHunk) above the comments list. File-
+//     level / empty / unparseable hunks show no snippet.
 //   - Resolved threads are COLLAPSED by default (tapping the header
 //     expands them). The repo's UI/UX rule for compact product rhythm
 //     is to keep the noise level down on the happy path, so an
@@ -21,6 +28,7 @@ import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
+import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
 import { Text } from '@/components/ui/text';
 import {
   type ReviewComment,
@@ -29,6 +37,7 @@ import {
   selectThreadAnchorLabel,
   selectThreadBadges,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { selectThreadDiffSnippet } from '@/lib/pr-review/discussion/thread-diff-snippet';
 import {
   useAddReactionMutation,
   useRemoveReactionMutation,
@@ -65,6 +74,7 @@ export function DiscussionThread({
 
   const anchorLabel = selectThreadAnchorLabel(thread);
   const badges = selectThreadBadges(thread);
+  const diffSnippet = selectThreadDiffSnippet(thread);
   const firstComment = thread.comments[0];
   const isResolving = resolve.isPending || unresolve.isPending;
   const isReacting = addReaction.isPending || removeReaction.isPending;
@@ -110,6 +120,7 @@ export function DiscussionThread({
       />
       {expanded ? (
         <>
+          {diffSnippet ? <ThreadDiffSnippet snippet={diffSnippet} /> : null}
           <View className="gap-4">
             {thread.comments.map((comment, index) => (
               <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-4')}>
@@ -247,14 +258,9 @@ function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveTogglePr
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}
-      className="flex-row items-center gap-1.5 self-start rounded-full border border-border bg-card px-2.5 py-1"
+      className="h-7 w-7 items-center justify-center rounded-full border border-border bg-card"
     >
-      <Check size={12} color={resolved ? colors.good : colors.mutedForeground} />
-      <Text
-        className={cn('text-[11px] font-medium', resolved ? 'text-good' : 'text-muted-foreground')}
-      >
-        {resolved ? 'Resolved' : 'Resolve'}
-      </Text>
+      <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
     </Pressable>
   );
 }

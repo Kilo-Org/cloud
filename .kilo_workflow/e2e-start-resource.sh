@@ -21,7 +21,18 @@ case "$resource" in
     # fast when a requested service never comes up or the kiloclaw docker
     # bridge is dead.
     pnpm dev:env -y cloudflare-session-ingest
-    pnpm dev:start --no-attach --reuse-running "$@"
+    # The reuse check rejects a live stack whose never-startable services
+    # (stripe/tunnel without secrets) are down. The runner's own remedy:
+    # retry once, then stop and start fresh — safe here because the slot
+    # owner starts the stack before any verifier uses it.
+    if ! pnpm dev:start --no-attach --reuse-running "$@"; then
+      echo "e2e-start-resource: retrying stack start once" >&2
+      if ! pnpm dev:start --no-attach --reuse-running "$@"; then
+        echo "e2e-start-resource: stopping the partial stack and starting fresh" >&2
+        pnpm dev:stop || true
+        pnpm dev:start --no-attach "$@"
+      fi
+    fi
     pnpm drizzle migrate
     STATUS="$(pnpm -s dev:status --json)"
     node - "$STATUS" "$@" <<'NODE'
@@ -42,7 +53,23 @@ NODE
     esac
     ;;
   ios) exec pnpm dev:mobile:simulator claim "$@" ;;
-  android) exec pnpm dev:mobile:android emulator-start --wait "$@" ;;
+  android)
+    # Idempotent per bundle: reuse a live own emulator, start otherwise.
+    RECORD_DIR="${TMPDIR:-/tmp}/kilo-mobile-android-emulators"
+    SLUG=$(basename "$PWD" | sed 's/[^A-Za-z0-9_-]/_/g')
+    RECORD="$RECORD_DIR/$SLUG.json"
+    if [ -f "$RECORD" ]; then
+      SERIAL=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).serial)' "$RECORD")
+      if pnpm -s dev:mobile:android adb -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | grep -q '^1'; then
+        echo "reusing running emulator $SERIAL ($RECORD)" >&2
+        cat "$RECORD"
+        exit 0
+      fi
+      echo "recorded emulator not booted; starting fresh" >&2
+      pnpm dev:mobile:android emulator-stop || true
+    fi
+    exec pnpm dev:mobile:android emulator-start "$@" --wait
+    ;;
   bundle)
     # Whole E2E bundle at once: stack ∥ iOS chain ∥ Android chain, one log per
     # chain. The slowest chain sets the wall time, not the sum of the three.

@@ -16,7 +16,7 @@ stop_appium_servers() {
     [ -d "$claims_dir" ] || continue
     for json in "$claims_dir"/*.json; do
       [ -f "$json" ] || continue
-      grep -q ""worktreeRoot": "$PWD"" "$json" 2>/dev/null || continue
+      grep -q "\"worktreeRoot\": *\"$PWD\"" "$json" 2>/dev/null || continue
       id=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1]));process.stdout.write(r.deviceId||r.serial||"")' "$json" 2>/dev/null || true)
       [ -n "$id" ] || continue
       apps/mobile/e2e/appium.sh "$id" server stop || \

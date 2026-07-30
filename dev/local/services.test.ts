@@ -1,15 +1,21 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
+  candidatePortOffsets,
+  clearDevLogs,
   computePortOffset,
   getAlwaysOnGroupIds,
   getService,
   portOffset,
+  readPersistedPortOffset,
   resolveGroups,
   resolveSessionNextAuthUrl,
   resolveTargets,
+  writePersistedPortOffset,
 } from './services';
 
 test('uses an automatic port offset for secondary worktrees by default', () => {
@@ -29,6 +35,86 @@ test('keeps the primary worktree on the default ports', () => {
 
 test('honors an explicit port offset', () => {
   assert.equal(computePortOffset({ explicit: '1200', isPrimary: false, slug: 'anything' }), 1200);
+});
+
+test('prefers the persisted manifest offset over the slug hash', () => {
+  assert.equal(
+    computePortOffset({
+      explicit: undefined,
+      persisted: 700,
+      isPrimary: false,
+      slug: 'mobile-context-info',
+    }),
+    700
+  );
+  // Stability beats reshuffling: a probed offset sticks for the primary too.
+  assert.equal(
+    computePortOffset({ explicit: undefined, persisted: 700, isPrimary: true, slug: 'cloud' }),
+    700
+  );
+});
+
+test('an explicit port offset beats the persisted manifest offset', () => {
+  assert.equal(
+    computePortOffset({ explicit: '1200', persisted: 700, isPrimary: false, slug: 'anything' }),
+    1200
+  );
+});
+
+test('reads the persisted offset back from the running-stack manifest', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-manifest-'));
+  try {
+    const manifestPath = path.join(dir, 'dev', 'logs', 'manifest.json');
+    fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({ session: 'kilo-dev', portOffset: 700, services: [] })
+    );
+    assert.equal(readPersistedPortOffset(dir), 700);
+
+    fs.writeFileSync(manifestPath, '{"portOffset":"garbage"}');
+    assert.equal(readPersistedPortOffset(dir), undefined);
+
+    assert.equal(readPersistedPortOffset(path.join(dir, 'missing')), undefined);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('persists the selected offset before a stack manifest exists', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-port-offset-'));
+  try {
+    writePersistedPortOffset(dir, 900);
+    assert.equal(readPersistedPortOffset(dir), 900);
+    assert.equal(fs.readFileSync(path.join(dir, 'dev/logs/port-offset'), 'utf8'), '900\n');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('log cleanup preserves startup coordination state', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-log-cleanup-'));
+  const logs = path.join(dir, 'dev/logs');
+  try {
+    fs.mkdirSync(path.join(logs, 'start.lock'), { recursive: true });
+    fs.writeFileSync(path.join(logs, 'port-offset'), '900\n');
+    fs.writeFileSync(path.join(logs, 'service.log'), 'old\n');
+    clearDevLogs(dir);
+    assert.equal(fs.readFileSync(path.join(logs, 'port-offset'), 'utf8'), '900\n');
+    assert.ok(fs.existsSync(path.join(logs, 'start.lock')));
+    assert.ok(!fs.existsSync(path.join(logs, 'service.log')));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('candidate offsets step by 100 and wrap within the valid range', () => {
+  const candidates = candidatePortOffsets(4900);
+  assert.equal(candidates[0], 5000);
+  assert.equal(candidates[1], 100);
+  assert.equal(candidates.length, 49);
+  assert.ok(!candidates.includes(4900));
+  assert.ok(!candidates.includes(0));
 });
 
 test('points NEXTAUTH_URL at the offset port when the web app runs without a tunnel', () => {

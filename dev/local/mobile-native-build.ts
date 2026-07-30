@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -54,6 +55,46 @@ export async function withNativeBuildSemaphore<T>(args: NativeBuildSemaphoreArgs
     }
     await sleep(args.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
   }
+}
+
+// Root-level inputs that change the native build but live outside
+// apps/mobile, so @expo/fingerprint never sees them: pnpm patches and
+// the workspace/lockfile that pin dependency resolution. Hashed as
+// sorted relative paths plus contents so the result is deterministic.
+export function hashRootNativeInputs(repoRoot: string): string {
+  const hash = createHash('sha256');
+  const add = (label: string, filePath: string): void => {
+    hash.update(label);
+    hash.update('\0');
+    try {
+      hash.update(fs.readFileSync(filePath));
+    } catch (error) {
+      if (!hasCode(error, 'ENOENT')) throw error;
+      hash.update('<missing>');
+    }
+    hash.update('\0');
+  };
+  add('pnpm-workspace.yaml', path.join(repoRoot, 'pnpm-workspace.yaml'));
+  add('pnpm-lock.yaml', path.join(repoRoot, 'pnpm-lock.yaml'));
+  const patchesRoot = path.join(repoRoot, 'patches');
+  for (const relativePath of listFilesRecursively(patchesRoot)) {
+    add(`patches/${relativePath}`, path.join(patchesRoot, relativePath));
+  }
+  return hash.digest('hex');
+}
+
+function listFilesRecursively(root: string): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(root, { recursive: true, withFileTypes: true });
+  } catch (error) {
+    if (hasCode(error, 'ENOENT')) return [];
+    throw error;
+  }
+  return entries
+    .filter(entry => entry.isFile())
+    .map(entry => path.relative(root, path.join(entry.parentPath, entry.name)))
+    .sort();
 }
 
 function acquire(

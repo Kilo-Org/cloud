@@ -58,11 +58,42 @@ const conversationComment = (databaseId, login, body, minutes) => ({
   reactionGroups: reactionGroups(),
 });
 
+/** REST pull-request file entry (GET /repos/{owner}/{repo}/pulls/{n}/files shape). */
+const prFile = (filename, additions, deletions, patch) => ({
+  sha: 'cccccccccccccccccccccccccccccccccccccccc',
+  filename,
+  status: 'modified',
+  additions,
+  deletions,
+  changes: additions + deletions,
+  blob_url: `https://github.com/kilo-stub/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/${filename}`,
+  raw_url: `https://github.com/kilo-stub/raw/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/${filename}`,
+  contents_url: `https://api.github.com/repos/kilo-stub/contents/${filename}?ref=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
+  patch,
+});
+
+// Two files per fixture, matching restPull's changed_files: 2 / additions: 10 / deletions: 2.
+const stubFiles = () => [
+  prFile(
+    'src/alpha.ts',
+    6,
+    1,
+    '@@ -8,4 +8,9 @@ export function alpha() {\n-  return 1;\n+  // stub change\n+  return 2;\n+}\n+\n+export function alphaExtra() {\n+  return 3;\n }'
+  ),
+  prFile(
+    'src/beta.ts',
+    4,
+    1,
+    '@@ -18,3 +18,6 @@ export function beta() {\n-  return 1;\n+  return 2;\n+}\n+\n+export function betaExtra() {\n+  return 3;\n }'
+  ),
+];
+
 /** @type {Record<string, object>} */
 const FIXTURES = {
   'kilo-stub/discussion-mixed/1': {
     title: 'Mixed discussion fixture',
     body: 'PR body for mixed fixture.',
+    files: stubFiles(),
     threads: [
       {
         id: 'PRRT_thread_a',
@@ -134,6 +165,7 @@ const FIXTURES = {
   'kilo-stub/discussion-conversation-only/2': {
     title: 'Conversation-only fixture',
     body: 'PR body for conversation-only fixture.',
+    files: stubFiles(),
     threads: [],
     conversationComments: [
       conversationComment(3001, 'dave', 'Only conversation comment one', 2),
@@ -143,6 +175,7 @@ const FIXTURES = {
   'kilo-stub/discussion-empty/3': {
     title: 'Empty discussion fixture',
     body: 'PR body for empty fixture.',
+    files: stubFiles(),
     threads: [],
     conversationComments: [],
   },
@@ -384,8 +417,20 @@ const server = http.createServer(async (req, res) => {
       return handleGraphql(body, res);
     }
 
+    // GET /repos/{owner}/{repo}/pulls/{number}/files
+    let m = pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)\/files$/);
+    if (method === 'GET' && m) {
+      const [, owner, repo, number] = m;
+      const perPage = Math.max(1, Number(url.searchParams.get('per_page')) || 30);
+      const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
+      logLine({ method, path: pathname, owner, repo, number, page, per_page: perPage });
+      const fx = getFixture(owner, repo, number);
+      if (!fx) return json(res, 404, { message: 'Not Found' });
+      return json(res, 200, fx.files.slice((page - 1) * perPage, page * perPage));
+    }
+
     // GET /repos/{owner}/{repo}/pulls/{number}
-    let m = pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)$/);
+    m = pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)$/);
     if (method === 'GET' && m) {
       const [, owner, repo, number] = m;
       logLine({ method, path: pathname, owner, repo, number });

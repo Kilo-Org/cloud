@@ -6,6 +6,12 @@
       "sourceType": "github",
       "computedHash": "72efa2277fea08f43b393c74abaacc9fa575e20bc63bdc9d46829b8a39352852"
     },
+    "kilo-design-cloud": {
+      "source": "Kilo-Org/kilo-design",
+      "sourceType": "github",
+      "skillPath": "skills/kilo-design-cloud/SKILL.md",
+      "computedHash": "8d4efadfae142c0db44367c48e12cf9e46d0d322692335a2f159c2f0ca169f33"
+    },
     "workers-best-practices": {
       "source": "cloudflare/skills",
       "sourceType": "github",

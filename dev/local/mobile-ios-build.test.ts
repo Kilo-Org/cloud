@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { hashRootNativeInputs } from './mobile-native-build';
+
 import {
   buildCompatibilityKey,
   buildFingerprintOptions,
@@ -99,6 +101,20 @@ test('fingerprint options include iOS platform and only skip the Expo extra sect
   assert.equal(options.silent, true);
   // SourceSkips.ExpoConfigExtraSection === 4096
   assert.equal(options.sourceSkips & 4096, 4096);
+  assert.deepEqual(
+    options.extraSources.map(source => ({
+      type: source.type,
+      id: source.id,
+      contents: source.contents,
+    })),
+    [
+      {
+        type: 'contents',
+        id: 'repoRootNativeInputs',
+        contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+      },
+    ]
+  );
 });
 
 // ── Compatibility key ────────────────────────────────────────────────
@@ -1788,7 +1804,9 @@ test('validateSimulatorClaim enforces worktree ownership and rejects corrupt rec
 
 test('defaultIsLockActive requires both pidAlive and processIdentity match', () => {
   const aliveRecord: LockRecord = { key: 'k', pid: 1, identity: 'a', startedAt: '' };
-  const deadRecord: LockRecord = { key: 'k', pid: 2, identity: 'b', startedAt: '' };
+  // PID 9999999 exceeds the max PID on macOS (99998) and Linux (2^22), so the
+  // default probe reports it dead on both — a low "dead" pid is alive on Linux.
+  const deadRecord: LockRecord = { key: 'k', pid: 9999999, identity: 'b', startedAt: '' };
 
   // Both probes agree: active
   let active = defaultIsLockActive({

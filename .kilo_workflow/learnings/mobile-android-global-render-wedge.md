@@ -13,6 +13,6 @@ Metro process (restarted; serves android bundle 200 10.3MB to host curl).
 
 Suspected: serving-side dev-handshake/bundle state regression on a shared machine with a
 concurrent verifier active ("Cannot connect to Expo CLI" seen in ReactNativeJS near a Metro
-restart). If it recurs: capture `adb logcat -s ReactNativeJS` for the Expo CLI warning, curl
+restart). If it recurs: capture `pnpm dev:mobile:android adb -s <serial> logcat -s ReactNativeJS` for the Expo CLI warning, curl
 localhost:<metro>/status, and compare against an iOS control app before burning hours on
 emulator-level recoveries — none of them work.

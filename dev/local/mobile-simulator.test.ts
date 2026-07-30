@@ -239,7 +239,7 @@ test('same-worktree reclaim is idempotent: no boot, no rename when the label is 
   const { rename, calls: renames } = recordingRename();
   const prepared: string[] = [];
   const args = {
-    devices: [device()],
+    devices: [device({ state: 'Booted' })],
     lockRoot,
     worktreeRoot,
     rename,
@@ -255,6 +255,42 @@ test('same-worktree reclaim is idempotent: no boot, no rename when the label is 
   assert.equal(again.device.name, buildSimulatorLabel(worktreeRoot));
   assert.equal(prepared.length, 1);
   assert.equal(renames.length, 1);
+});
+
+test('same-worktree reclaim boots a device the previous claim left Shutdown', () => {
+  // A claim killed mid-boot leaves the record but not the device; the next
+  // claim must boot it again instead of returning alreadyOwned over a
+  // Shutdown device (the old behavior failed the build with code=405).
+  const lockRoot = tempDir('sim-claims-');
+  const worktreeRoot = tempDir('worktree-');
+  const { rename } = recordingRename();
+  fs.writeFileSync(
+    path.join(lockRoot, 'UDID-1.json'),
+    JSON.stringify({
+      deviceId: 'UDID-1',
+      worktreeRoot,
+      claimedAt: new Date().toISOString(),
+      originalDeviceName: 'iPhone 16',
+      currentDeviceName: buildSimulatorLabel(worktreeRoot),
+      bootedByClaim: false,
+    })
+  );
+  const prepared: string[] = [];
+
+  const result = claimSimulator({
+    devices: [device({ state: 'Shutdown' })],
+    lockRoot,
+    worktreeRoot,
+    rename,
+    prepare: (d: SimulatorDevice) => {
+      prepared.push(d.id);
+      return true;
+    },
+  });
+
+  assert.equal(result.alreadyOwned, true);
+  assert.deepEqual(prepared, ['UDID-1']);
+  assert.equal(readRecord(lockRoot, 'UDID-1').bootedByClaim, true);
 });
 
 test('same-worktree reclaim reapplies a stale label and preserves the original name', () => {

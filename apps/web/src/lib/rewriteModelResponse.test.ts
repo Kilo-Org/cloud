@@ -683,6 +683,60 @@ describe('rewriteModelResponse_Responses', () => {
   );
 });
 
+describe.each([
+  [
+    'Chat Completions',
+    'chat_completions',
+    rewriteModelResponse_ChatCompletions,
+    'data: {"id":"gen-chat","choices":[]}\n\n',
+    'data: {"error":{"code":429,"message":"rate limited"}}\n\n',
+    'gen-chat',
+  ],
+  [
+    'Messages',
+    'messages',
+    rewriteModelResponse_Messages,
+    'event: message_start\ndata: {"type":"message_start","message":{"id":"gen-message","usage":{"input_tokens":1,"output_tokens":0}}}\n\n',
+    'event: error\ndata: {"type":"error","error":{"type":"api_error","message":"rate limited"}}\n\n',
+    'gen-message',
+  ],
+  [
+    'Responses',
+    'responses',
+    rewriteModelResponse_Responses,
+    'event: response.created\ndata: {"type":"response.created","response":{"id":"gen-response"}}\n\n',
+    'event: error\ndata: {"type":"error","error":{"type":"server_error","message":"rate limited"}}\n\n',
+    'gen-response',
+  ],
+] as const)(
+  '%s terminal stream errors',
+  (_name, kind, rewrite, initialEvent, errorEvent, generationId) => {
+    test('logs the error event and closes without waiting for EOF', async () => {
+      const capture = makeCapture();
+      const body = initialEvent + errorEvent + 'data: {"ignored":true}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewrite(upstream, true, capture, 'iad1::error-request');
+      const sse = await readOutputStream(result);
+
+      expect(sse).toContain('rate limited');
+      expect(sse).not.toContain('ignored');
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind,
+          eventType: 'error',
+          generationId,
+          vercelRequestId: 'iad1::error-request',
+        }
+      );
+    });
+  }
+);
+
 function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingParams {
   return {
     user: null,

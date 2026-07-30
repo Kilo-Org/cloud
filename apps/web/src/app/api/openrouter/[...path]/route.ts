@@ -898,7 +898,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     usageContext.session_id || '<none>'
   );
 
-  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  const upstreamResponseReceivedAt = performance.now();
+  const ttfbMs = Math.max(0, Math.round(upstreamResponseReceivedAt - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
 
   emitApiMetricsForResponse(
@@ -967,7 +968,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     usageContext.abuse_request_id = classifyResult.request_id;
   }
 
-  accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  accountForMicrodollarUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    upstreamResponseReceivedAt
+  );
 
   const requestLogging = {
     user: maybeUser,

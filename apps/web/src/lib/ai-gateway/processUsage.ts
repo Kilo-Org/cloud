@@ -926,7 +926,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
 export function countAndStoreUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  generationStartedAtMs: number | null
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
 
@@ -983,7 +984,28 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(usageStats =>
+    processTokenData(
+      withGenerationTimeFallback(usageStats, generationStartedAtMs, performance.now()),
+      usageContext
+    )
+  );
+}
+
+/** Uses response-body duration when provider generation metadata has no timing. */
+export function withGenerationTimeFallback(
+  usageStats: MicrodollarUsageStats | null,
+  generationStartedAtMs: number | null,
+  generationCompletedAtMs: number
+): MicrodollarUsageStats | null {
+  if (!usageStats || usageStats.generation_time !== null || generationStartedAtMs === null) {
+    return usageStats;
+  }
+
+  return {
+    ...usageStats,
+    generation_time: Math.max(0, Math.round(generationCompletedAtMs - generationStartedAtMs)),
+  };
 }
 
 export function processOpenRouterUsage(
@@ -1249,6 +1271,7 @@ export async function processTokenData(
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
+    genStats.generation_time ??= usageStats.generation_time;
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;

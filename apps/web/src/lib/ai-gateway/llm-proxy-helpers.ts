@@ -372,34 +372,38 @@ export function wrapInSafeNextResponse(response: Response) {
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  generationStartedAtMs: number
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
   after(
-    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan).then(
-      async usageIdentity => {
-        // Chain the experiment-attribution write after the microdollar
-        // write. This is best-effort analytics: failures here MUST NOT
-        // roll back the billing write, which has already succeeded by
-        // the time we reach here. `persistExperimentAttribution`
-        // swallows errors internally.
-        if (
-          usageIdentity &&
-          usageContext.modelExperimentVariantVersionId &&
-          usageContext.modelExperimentAllocationSubject
-        ) {
-          await persistExperimentAttribution({
-            usageId: usageIdentity.usageId,
-            createdAt: usageIdentity.createdAt,
-            variantVersionId: usageContext.modelExperimentVariantVersionId,
-            allocationSubject: usageContext.modelExperimentAllocationSubject,
-            clientRequestId: usageContext.clientRequestId ?? null,
-            capture: usageContext.experimentPromptCapture ?? null,
-          });
-        }
+    countAndStoreUsage(
+      clonedReponse,
+      usageContext,
+      openrouterRequestSpan,
+      generationStartedAtMs
+    ).then(async usageIdentity => {
+      // Chain the experiment-attribution write after the microdollar
+      // write. This is best-effort analytics: failures here MUST NOT
+      // roll back the billing write, which has already succeeded by
+      // the time we reach here. `persistExperimentAttribution`
+      // swallows errors internally.
+      if (
+        usageIdentity &&
+        usageContext.modelExperimentVariantVersionId &&
+        usageContext.modelExperimentAllocationSubject
+      ) {
+        await persistExperimentAttribution({
+          usageId: usageIdentity.usageId,
+          createdAt: usageIdentity.createdAt,
+          variantVersionId: usageContext.modelExperimentVariantVersionId,
+          allocationSubject: usageContext.modelExperimentAllocationSubject,
+          clientRequestId: usageContext.clientRequestId ?? null,
+          capture: usageContext.experimentPromptCapture ?? null,
+        });
       }
-    )
+    })
   );
 }
 

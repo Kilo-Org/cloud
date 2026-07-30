@@ -13,6 +13,7 @@ import {
   stripNulBytesInPlace,
   toInsertableDbUsageRecord,
   usageTransactionIdleTimeoutQuery,
+  withGenerationTimeFallback,
 } from './processUsage';
 import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '../../tests/helpers/approval.helper';
@@ -99,6 +100,58 @@ describe('processOpenRouterUsage', () => {
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
+  });
+});
+
+describe('withGenerationTimeFallback', () => {
+  const usageStats: MicrodollarUsageStats = {
+    messageId: 'test-message-id',
+    model: 'test-model',
+    responseContent: 'test-response',
+    hasError: false,
+    inference_provider: 'test-provider',
+    upstream_id: null,
+    finish_reason: 'stop',
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: true,
+    cancelled: null,
+    status_code: 200,
+    cost_mUsd: 1,
+    inputTokens: 1,
+    outputTokens: 1,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+  };
+
+  test('measures generation time in milliseconds', () => {
+    const result = withGenerationTimeFallback(usageStats, 1_000, 3_500.4);
+
+    expect(result?.generation_time).toBe(2_500);
+  });
+
+  test('preserves provider-reported generation time', () => {
+    const result = withGenerationTimeFallback(
+      { ...usageStats, generation_time: 1_234 },
+      1_000,
+      3_500
+    );
+
+    expect(result?.generation_time).toBe(1_234);
+  });
+
+  test('leaves generation time absent without a start time', () => {
+    const result = withGenerationTimeFallback(usageStats, null, 3_500);
+
+    expect(result?.generation_time).toBeNull();
+  });
+
+  test('clamps generation time when the monotonic clock moves backwards', () => {
+    const result = withGenerationTimeFallback(usageStats, 3_500, 1_000);
+
+    expect(result?.generation_time).toBe(0);
   });
 });
 
@@ -270,7 +323,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
           api_kind: apiKind,
           isStreaming: false,
         } as MicrodollarUsageContext,
-        undefined
+        undefined,
+        performance.now()
       )
     ).resolves.toBeNull();
   });

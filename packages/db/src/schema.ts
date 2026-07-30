@@ -36,6 +36,12 @@ import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
+  KiloPassOrgAgreementState,
+  KiloPassOrgProcessingCondition,
+  KiloPassOrgPurchaseChannel,
+  KiloPassOrgProcessingRunState,
+  KiloPassOrgBonusMode,
+  KiloPassOrgIssuanceKind,
   FeedbackFor,
   FeedbackSource,
   CliSessionSharedState,
@@ -202,6 +208,12 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
+  KiloPassOrgAgreementState,
+  KiloPassOrgProcessingCondition,
+  KiloPassOrgPurchaseChannel,
+  KiloPassOrgProcessingRunState,
+  KiloPassOrgBonusMode,
+  KiloPassOrgIssuanceKind,
   CliSessionSharedState,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
@@ -2743,6 +2755,462 @@ export const organizations = pgTable(
 );
 
 export type Organization = typeof organizations.$inferSelect;
+
+export const kilo_pass_org_term_versions = pgTable(
+  'kilo_pass_org_term_versions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    version_key: text().notNull(),
+    tier: text().notNull().$type<KiloPassTier>(),
+    cadence: text().notNull().$type<KiloPassCadence>(),
+    billing_price_microdollars_per_pass: bigint({ mode: 'number' }).notNull(),
+    base_credit_microdollars_per_pass: bigint({ mode: 'number' }).notNull(),
+    bonus_credit_microdollars_per_pass: bigint({ mode: 'number' }).notNull(),
+    unlock_spend_microdollars_per_pass: bigint({ mode: 'number' }).notNull(),
+    bonus_mode: text().notNull().$type<KiloPassOrgBonusMode>(),
+    created_by_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_term_versions_version_key').on(table.version_key),
+    check(
+      'kilo_pass_org_term_versions_amounts_non_negative_check',
+      sql`${table.billing_price_microdollars_per_pass} >= 0 AND ${table.base_credit_microdollars_per_pass} >= 0 AND ${table.bonus_credit_microdollars_per_pass} >= 0 AND ${table.unlock_spend_microdollars_per_pass} >= 0`
+    ),
+    enumCheck('kilo_pass_org_term_versions_tier_check', table.tier, KiloPassTier),
+    enumCheck('kilo_pass_org_term_versions_cadence_check', table.cadence, KiloPassCadence),
+    enumCheck(
+      'kilo_pass_org_term_versions_bonus_mode_check',
+      table.bonus_mode,
+      KiloPassOrgBonusMode
+    ),
+  ]
+);
+
+export const kilo_pass_org_agreements = pgTable(
+  'kilo_pass_org_agreements',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    parent_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    term_version_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_term_versions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    state: text().notNull().$type<KiloPassOrgAgreementState>(),
+    processing_condition: text()
+      .notNull()
+      .$type<KiloPassOrgProcessingCondition>()
+      .default(KiloPassOrgProcessingCondition.Ready),
+    purchase_channel: text().notNull().$type<KiloPassOrgPurchaseChannel>(),
+    cadence: text().notNull().$type<KiloPassCadence>(),
+    purchased_pass_capacity: integer().notNull(),
+    next_purchased_pass_capacity: integer(),
+    next_capacity_effective_at: timestamp({ withTimezone: true, mode: 'string' }),
+    paid_from: timestamp({ withTimezone: true, mode: 'string' }),
+    paid_until: timestamp({ withTimezone: true, mode: 'string' }),
+    issuance_anchor_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    provider_subscription_id: text(),
+    provider_seat_add_on_item_id: text(),
+    activation_provider_event_id: text(),
+    external_contract_id: text(),
+    payment_review_required_at: timestamp({ withTimezone: true, mode: 'string' }),
+    cancellation_effective_at: timestamp({ withTimezone: true, mode: 'string' }),
+    manually_issued_through: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_kilo_pass_org_agreements_one_non_ended_parent')
+      .on(table.parent_organization_id)
+      .where(sql`${table.state} <> 'ended'`),
+    uniqueIndex('UQ_kilo_pass_org_agreements_provider_subscription')
+      .on(table.provider_subscription_id)
+      .where(sql`${table.provider_subscription_id} IS NOT NULL`),
+    uniqueIndex('UQ_kilo_pass_org_agreements_provider_seat_add_on_item')
+      .on(table.provider_seat_add_on_item_id)
+      .where(sql`${table.provider_seat_add_on_item_id} IS NOT NULL`),
+    uniqueIndex('UQ_kilo_pass_org_agreements_external_contract')
+      .on(table.external_contract_id)
+      .where(sql`${table.external_contract_id} IS NOT NULL`),
+    uniqueIndex('UQ_kilo_pass_org_agreements_activation_provider_event')
+      .on(table.activation_provider_event_id)
+      .where(sql`${table.activation_provider_event_id} IS NOT NULL`),
+    index('IDX_kilo_pass_org_agreements_processing').on(table.processing_condition),
+    check(
+      'kilo_pass_org_agreements_purchased_capacity_non_negative_check',
+      sql`${table.purchased_pass_capacity} >= 0`
+    ),
+    check(
+      'kilo_pass_org_agreements_next_capacity_check',
+      sql`(${table.next_purchased_pass_capacity} IS NULL AND ${table.next_capacity_effective_at} IS NULL) OR (${table.next_purchased_pass_capacity} >= 0 AND ${table.next_capacity_effective_at} IS NOT NULL)`
+    ),
+    check(
+      'kilo_pass_org_agreements_paid_interval_check',
+      sql`(${table.paid_from} IS NULL AND ${table.paid_until} IS NULL) OR (${table.paid_from} IS NOT NULL AND ${table.paid_until} IS NOT NULL AND ${table.paid_from} < ${table.paid_until})`
+    ),
+    enumCheck('kilo_pass_org_agreements_state_check', table.state, KiloPassOrgAgreementState),
+    enumCheck(
+      'kilo_pass_org_agreements_processing_condition_check',
+      table.processing_condition,
+      KiloPassOrgProcessingCondition
+    ),
+    enumCheck(
+      'kilo_pass_org_agreements_purchase_channel_check',
+      table.purchase_channel,
+      KiloPassOrgPurchaseChannel
+    ),
+    enumCheck('kilo_pass_org_agreements_cadence_check', table.cadence, KiloPassCadence),
+  ]
+);
+
+export const kilo_pass_org_term_transitions = pgTable(
+  'kilo_pass_org_term_transitions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    agreement_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_agreements.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    from_term_version_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_term_versions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    to_term_version_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_term_versions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    effective_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_by_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    reason: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_term_transitions_agreement_effective').on(
+      table.agreement_id,
+      table.effective_at
+    ),
+    check(
+      'kilo_pass_org_term_transitions_changes_version_check',
+      sql`${table.from_term_version_id} <> ${table.to_term_version_id}`
+    ),
+  ]
+);
+
+export const kilo_pass_org_allocation_plans = pgTable(
+  'kilo_pass_org_allocation_plans',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    agreement_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_agreements.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    effective_window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    version: integer().notNull(),
+    created_by_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_allocation_plans_agreement_window').on(
+      table.agreement_id,
+      table.effective_window_start
+    ),
+    unique('UQ_kilo_pass_org_allocation_plans_agreement_version').on(
+      table.agreement_id,
+      table.version
+    ),
+    check('kilo_pass_org_allocation_plans_version_positive_check', sql`${table.version} > 0`),
+  ]
+);
+
+export const kilo_pass_org_allocation_plan_rows = pgTable(
+  'kilo_pass_org_allocation_plan_rows',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    allocation_plan_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_allocation_plans.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    allocation_container_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    pass_capacity: integer().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_allocation_plan_rows_plan_container').on(
+      table.allocation_plan_id,
+      table.allocation_container_organization_id
+    ),
+    check(
+      'kilo_pass_org_allocation_plan_rows_capacity_non_negative_check',
+      sql`${table.pass_capacity} >= 0`
+    ),
+  ]
+);
+
+export const kilo_pass_org_processing_runs = pgTable(
+  'kilo_pass_org_processing_runs',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    agreement_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_agreements.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    window_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    state: text().notNull().$type<KiloPassOrgProcessingRunState>(),
+    idempotency_key: text().notNull(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    attempt_count: integer().notNull().default(0),
+    failure_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_processing_runs_agreement_window').on(
+      table.agreement_id,
+      table.window_start
+    ),
+    unique('UQ_kilo_pass_org_processing_runs_idempotency').on(table.idempotency_key),
+    index('IDX_kilo_pass_org_processing_runs_state_lease').on(table.state, table.lease_expires_at),
+    check(
+      'kilo_pass_org_processing_runs_window_check',
+      sql`${table.window_start} < ${table.window_end}`
+    ),
+    check(
+      'kilo_pass_org_processing_runs_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    enumCheck(
+      'kilo_pass_org_processing_runs_state_check',
+      table.state,
+      KiloPassOrgProcessingRunState
+    ),
+  ]
+);
+
+export const kilo_pass_org_issuance_snapshots = pgTable(
+  'kilo_pass_org_issuance_snapshots',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    agreement_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_agreements.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    processing_run_id: uuid().references(() => kilo_pass_org_processing_runs.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    allocation_plan_id: uuid().references(() => kilo_pass_org_allocation_plans.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    term_version_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_term_versions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    allocation_container_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    window_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    qualifying_spend_starts_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    kind: text().notNull().$type<KiloPassOrgIssuanceKind>(),
+    tranche_key: text().notNull(),
+    allocated_pass_capacity: integer().notNull(),
+    base_credit_microdollars: bigint({ mode: 'number' }).notNull(),
+    bonus_credit_microdollars: bigint({ mode: 'number' }).notNull(),
+    unlock_spend_microdollars: bigint({ mode: 'number' }).notNull(),
+    qualifying_spend_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    bonus_mode: text().notNull().$type<KiloPassOrgBonusMode>(),
+    bonus_unlocked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    bonus_credit_transaction_id: uuid().references(() => credit_transactions.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    base_credit_transaction_id: uuid().references(() => credit_transactions.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_issuance_snapshots_container_window_tranche').on(
+      table.agreement_id,
+      table.allocation_container_organization_id,
+      table.window_start,
+      table.tranche_key
+    ),
+    uniqueIndex('UQ_kilo_pass_org_issuance_snapshots_base_credit_transaction')
+      .on(table.base_credit_transaction_id)
+      .where(sql`${table.base_credit_transaction_id} IS NOT NULL`),
+    uniqueIndex('UQ_kilo_pass_org_issuance_snapshots_bonus_credit_transaction')
+      .on(table.bonus_credit_transaction_id)
+      .where(sql`${table.bonus_credit_transaction_id} IS NOT NULL`),
+    index('IDX_kilo_pass_org_issuance_snapshots_window').on(table.agreement_id, table.window_start),
+    check(
+      'kilo_pass_org_issuance_snapshots_window_check',
+      sql`${table.window_start} < ${table.window_end}`
+    ),
+    check(
+      'kilo_pass_org_issuance_snapshots_qualifying_spend_window_check',
+      sql`${table.window_start} <= ${table.qualifying_spend_starts_at} AND ${table.qualifying_spend_starts_at} < ${table.window_end}`
+    ),
+    check(
+      'kilo_pass_org_issuance_snapshots_values_non_negative_check',
+      sql`${table.allocated_pass_capacity} >= 0 AND ${table.base_credit_microdollars} >= 0 AND ${table.bonus_credit_microdollars} >= 0 AND ${table.unlock_spend_microdollars} >= 0 AND ${table.qualifying_spend_microdollars} >= 0`
+    ),
+    enumCheck('kilo_pass_org_issuance_snapshots_kind_check', table.kind, KiloPassOrgIssuanceKind),
+    enumCheck(
+      'kilo_pass_org_issuance_snapshots_bonus_mode_check',
+      table.bonus_mode,
+      KiloPassOrgBonusMode
+    ),
+  ]
+);
+
+export const kilo_pass_org_supplements = pgTable(
+  'kilo_pass_org_supplements',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    issuance_snapshot_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_issuance_snapshots.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    provider_invoice_line_id: text().notNull(),
+    remaining_service_numerator: bigint({ mode: 'number' }).notNull(),
+    remaining_service_denominator: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_supplements_provider_invoice_line').on(table.provider_invoice_line_id),
+    check(
+      'kilo_pass_org_supplements_ratio_check',
+      sql`${table.remaining_service_numerator} > 0 AND ${table.remaining_service_denominator} > 0 AND ${table.remaining_service_numerator} <= ${table.remaining_service_denominator}`
+    ),
+  ]
+);
+
+export const kilo_pass_org_qualifying_spend_events = pgTable(
+  'kilo_pass_org_qualifying_spend_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    issuance_snapshot_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_issuance_snapshots.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    allocation_container_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    credit_transaction_id: uuid()
+      .notNull()
+      .references(() => credit_transactions.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    spent_microdollars: bigint({ mode: 'number' }).notNull(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_qualifying_spend_events_snapshot_credit_transaction').on(
+      table.issuance_snapshot_id,
+      table.credit_transaction_id
+    ),
+    index('IDX_kilo_pass_org_qualifying_spend_events_snapshot_occurred').on(
+      table.issuance_snapshot_id,
+      table.occurred_at
+    ),
+    check(
+      'kilo_pass_org_qualifying_spend_events_amount_positive_check',
+      sql`${table.spent_microdollars} > 0`
+    ),
+  ]
+);
+
+export const kilo_pass_org_audit_records = pgTable(
+  'kilo_pass_org_audit_records',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    agreement_id: uuid().references(() => kilo_pass_org_agreements.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    actor_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    action: text().notNull(),
+    reason: text(),
+    before_json: jsonb().$type<Record<string, unknown> | null>(),
+    after_json: jsonb().$type<Record<string, unknown> | null>(),
+    idempotency_key: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_kilo_pass_org_audit_records_idempotency')
+      .on(table.idempotency_key)
+      .where(sql`${table.idempotency_key} IS NOT NULL`),
+    index('IDX_kilo_pass_org_audit_records_agreement_created').on(
+      table.agreement_id,
+      table.created_at
+    ),
+  ]
+);
 
 export const cost_insight_owner_hour_totals = pgTable(
   'cost_insight_owner_hour_totals',

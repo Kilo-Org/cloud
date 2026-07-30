@@ -1018,6 +1018,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,
     requestBodyParsed.kind,
-    requestLogging
+    requestLogging,
+    request.signal
   );
 }

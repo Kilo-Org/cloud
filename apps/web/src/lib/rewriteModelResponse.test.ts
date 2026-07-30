@@ -5,12 +5,15 @@ import {
   rewriteModelResponse_Responses,
   rewriteModelResponse,
   logUnrewrittenResponse,
+  logUpstreamRequestFailure,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
+import { after } from 'next/server';
+import { db } from '@/lib/drizzle';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -21,6 +24,10 @@ jest.mock('@/lib/ai-gateway/request-logging-opt-ins', () => ({
   isDynamicallyOptedIntoRequestLogging: jest.fn(async () => false),
 }));
 
+jest.mock('@/lib/drizzle', () => ({
+  db: { insert: jest.fn() },
+}));
+
 jest.mock('@/lib/utils.server', () => ({
   ...(jest.requireActual('@/lib/utils.server') as Record<string, unknown>),
   logExceptInTest: jest.fn(),
@@ -28,10 +35,21 @@ jest.mock('@/lib/utils.server', () => ({
 
 const mockedOptIn = jest.mocked(isDynamicallyOptedIntoRequestLogging);
 const mockedLog = jest.mocked(logExceptInTest);
+const mockedAfter = jest.mocked(after);
+const mockedInsert = jest.mocked(db.insert);
+const mockedValues = jest.fn();
+const mockedReturning = jest.fn();
 
 beforeEach(() => {
   mockedOptIn.mockClear();
   mockedLog.mockClear();
+  mockedAfter.mockClear();
+  mockedInsert.mockReset();
+  mockedValues.mockReset();
+  mockedReturning.mockReset();
+  mockedInsert.mockReturnValue({ values: mockedValues } as never);
+  mockedValues.mockReturnValue({ returning: mockedReturning } as never);
+  mockedReturning.mockResolvedValue([{ id: 'request-log-id' }]);
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -139,7 +157,12 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     const result = await rewrite(failingResponse('application/json', errorName), true, null, null);
 
     expect(result.status).toBe(503);
-    const details = streamErrorDetails(await result.json());
+    const errorResponse = await result.json();
+    expect(errorResponse).toMatchObject({
+      error_type: errorType,
+      message: expect.stringContaining(messageFragment),
+    });
+    const details = streamErrorDetails(errorResponse);
     expect(details).toMatchObject({
       message: expect.stringContaining(messageFragment),
     });
@@ -155,7 +178,14 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     );
 
     expect(result.status).toBe(503);
-    expect(streamErrorDetails(await result.json())).toMatchObject({
+    const errorResponse = await result.json();
+    expect(errorResponse).toMatchObject({
+      error_type: 'upstream_disconnect',
+      vercel_request_id: 'iad1::iad1::request-id',
+      message:
+        'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
+    });
+    expect(streamErrorDetails(errorResponse)).toMatchObject({
       message:
         'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
     });
@@ -171,6 +201,10 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     const events = dataObjects(await readOutputStream(result));
 
     expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      error_type: 'upstream_disconnect',
+      vercel_request_id: 'iad1::iad1::request-id',
+    });
     expect(streamErrorDetails(events[0]).message).toBe(
       'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)'
     );
@@ -342,6 +376,31 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(dataPayloads(sse)).toContain('[DONE]');
     });
 
+    test('rewrites a successful SSE stream with a non-standard content type', async () => {
+      const upstream = new Response(
+        'data: {"id":"gen-chat","choices":[],"usage":{"cost":0.5,"is_byok":false,"prompt_tokens_details":{}}}\n\n' +
+          'data: [DONE]\n\n',
+        { headers: { 'content-type': 'text/plain' } }
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        usage: {
+          cost?: number;
+          is_byok?: boolean;
+          prompt_tokens_details: { cached_tokens?: number };
+        };
+      }>;
+
+      expect(chunk.usage.cost).toBeUndefined();
+      expect(chunk.usage.is_byok).toBeUndefined();
+      expect(chunk.usage.prompt_tokens_details.cached_tokens).toBe(0);
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] rewriting successful response with unexpected content type',
+        { status: 200, contentType: 'text/plain' }
+      );
+    });
+
     test('forwards a final event without a trailing blank line', async () => {
       const upstream = sseResponse(
         'data: {"id":"gen-chat","choices":[{"delta":{"content":"final €"}}]}'
@@ -379,6 +438,95 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(pullCount).toBeLessThan(10);
       await reader?.cancel();
       expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    test('settles a stalled stream when the incoming request is aborted', async () => {
+      const capture = makeCapture();
+      const requestController = new AbortController();
+      const cancel = jest.fn();
+      const upstream = new Response(
+        new ReadableStream<Uint8Array>({
+          start() {},
+          cancel,
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(
+        upstream,
+        true,
+        capture,
+        null,
+        requestController.signal
+      );
+      const pendingRead = result.body?.getReader().read();
+      requestController.abort();
+
+      await expect(pendingRead).rejects.toBeDefined();
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined, {
+        client_disconnected: true,
+      });
+    });
+
+    test('settles a stream when output remains buffered for an idle consumer', async () => {
+      jest.useFakeTimers();
+      try {
+        const capture = makeCapture();
+        const { response: upstream, cancel } = hangingSseResponse(
+          'data: {"id":"gen-chat","choices":[]}\n\n'
+        );
+
+        const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null);
+        await Promise.resolve();
+        await jest.advanceTimersByTimeAsync(15 * 60 * 1000);
+
+        await expect(result.body?.getReader().read()).rejects.toThrow(
+          'response consumer remained idle'
+        );
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).toHaveBeenCalledWith(
+          expect.objectContaining({ message: 'response consumer remained idle' }),
+          'data: {"id":"gen-chat","choices":[]}\n\n',
+          { client_stalled: true }
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    test('does not classify a slow upstream read as a stalled consumer', async () => {
+      jest.useFakeTimers();
+      try {
+        const capture = makeCapture();
+        const requestController = new AbortController();
+        const cancel = jest.fn();
+        const upstream = new Response(
+          new ReadableStream<Uint8Array>({
+            start() {},
+            cancel,
+          }),
+          { headers: { 'content-type': 'text/event-stream' } }
+        );
+
+        const result = await rewriteModelResponse_ChatCompletions(
+          upstream,
+          true,
+          capture,
+          null,
+          requestController.signal
+        );
+        const pendingRead = result.body?.getReader().read();
+        await jest.advanceTimersByTimeAsync(15 * 60 * 1000);
+
+        expect(cancel).not.toHaveBeenCalled();
+        expect(capture.setReadError).not.toHaveBeenCalled();
+
+        requestController.abort();
+        await expect(pendingRead).rejects.toBeDefined();
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     test('cancels upstream and closes immediately after [DONE]', async () => {
@@ -490,6 +638,8 @@ describe('rewriteModelResponse_Messages', () => {
       {
         id: 'gen-message',
         type: 'error',
+        error_type: errorType,
+        message: expect.any(String),
         error: {
           type: 'api_error',
           message: expect.any(String),
@@ -647,6 +797,7 @@ describe('rewriteModelResponse_Responses', () => {
       {
         type: 'error',
         sequence_number: 5,
+        error_type: errorType,
         code: errorType,
         message: expect.any(String),
         param: null,
@@ -830,7 +981,7 @@ describe.each(rewriters)('%s response compatibility', (_name, rewrite) => {
         },
         cancel,
       }),
-      { headers: { 'content-type': 'text/plain' } }
+      { status: 502, headers: { 'content-type': 'text/plain' } }
     );
 
     const result = await rewrite(upstream, true, capture, null);
@@ -852,7 +1003,7 @@ describe.each(rewriters)('%s response compatibility', (_name, rewrite) => {
         start() {},
         cancel,
       }),
-      { headers: { 'content-type': 'text/plain' } }
+      { status: 502, headers: { 'content-type': 'text/plain' } }
     );
 
     const result = await rewrite(upstream, true, capture, null);
@@ -1007,6 +1158,91 @@ function makeCapture() {
 }
 
 describe('request log capture', () => {
+  test.each([
+    [499, { client_disconnected: true }],
+    [503, { upstream_request_error: 'fetch_failed' }],
+  ] as const)(
+    'classifies an upstream request status %i in error metadata',
+    async (status, error) => {
+      mockedOptIn.mockResolvedValueOnce(true);
+
+      await logUpstreamRequestFailure(status, 'openai/gpt-5', 'openrouter', makeLogging());
+      const callback = mockedAfter.mock.calls[0]?.[0] as () => Promise<void>;
+      await callback();
+
+      expect(mockedValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status_code: status,
+          response: undefined,
+          error,
+        })
+      );
+    }
+  );
+
+  test('settles a captured passthrough response when the request is aborted', async () => {
+    const capture = makeCapture();
+    const requestController = new AbortController();
+    const cancel = jest.fn();
+    const upstream = new Response(
+      new ReadableStream<Uint8Array>({
+        start() {},
+        cancel,
+      }),
+      { status: 502, headers: { 'content-type': 'text/plain' } }
+    );
+
+    const result = await rewriteModelResponse_ChatCompletions(
+      upstream,
+      true,
+      capture,
+      null,
+      requestController.signal
+    );
+    const pendingRead = result.body?.getReader().read();
+    requestController.abort();
+
+    await expect(pendingRead).rejects.toBeDefined();
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined, {
+      client_disconnected: true,
+    });
+  });
+
+  test('settles a captured passthrough response when its consumer stalls', async () => {
+    jest.useFakeTimers();
+    try {
+      const capture = makeCapture();
+      const cancel = jest.fn();
+      const rawBody = 'buffered upstream body';
+      const upstream = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(rawBody));
+          },
+          cancel,
+        }),
+        { status: 502, headers: { 'content-type': 'text/plain' } }
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null);
+      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(15 * 60 * 1000);
+
+      await expect(result.body?.getReader().read()).rejects.toThrow(
+        'response consumer remained idle'
+      );
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'response consumer remained idle' }),
+        rawBody,
+        { client_stalled: true }
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('starts unrewritten response capture without blocking the client response', async () => {
     mockedOptIn.mockResolvedValueOnce(true);
     let upstreamController: ReadableStreamDefaultController<Uint8Array> | undefined;

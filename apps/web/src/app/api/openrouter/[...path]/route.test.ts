@@ -275,7 +275,8 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       expect.anything(),
       expect.anything(),
       expect.anything(),
-      expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' })
+      expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' }),
+      expect.anything()
     );
   });
 
@@ -829,6 +830,24 @@ describe('upstream request failure and unrewritten response logging', () => {
     );
     expect(mockedLogUnrewrittenResponse).not.toHaveBeenCalled();
     expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+  });
+
+  it('preserves status 499 so request logging classifies a client disconnect', async () => {
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'error',
+      response: new Response(null, { status: 499 }) as never,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('openai/gpt-4o')) as never);
+
+    expect(response.status).toBe(499);
+    expect(mockedLogUpstreamRequestFailure).toHaveBeenCalledWith(
+      499,
+      'openai/gpt-4o',
+      'openrouter',
+      expect.anything()
+    );
   });
 
   it('logs non-BYOK upstream 402 via logUnrewrittenResponse before returning service unavailable', async () => {

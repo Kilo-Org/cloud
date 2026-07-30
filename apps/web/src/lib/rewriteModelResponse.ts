@@ -182,7 +182,9 @@ export async function logUpstreamRequestFailure(
   logging: RequestLoggingParams
 ): Promise<void> {
   const capture = await createRequestLogCapture(status, model, providerId, logging);
-  capture?.setError({ upstream_request_error: 'fetch_failed' });
+  capture?.setError(
+    status === 499 ? { client_disconnected: true } : { upstream_request_error: 'fetch_failed' }
+  );
 }
 
 type ResponseReadError = {
@@ -193,6 +195,7 @@ type ResponseReadError = {
 };
 
 const STREAM_PROGRESS_LOG_INTERVAL_MS = 30_000;
+const STREAM_CONSUMER_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 function createStreamProgressLogger() {
   let eventCount = 0;
@@ -267,6 +270,14 @@ function invalidResponseReadError(vercelRequestId: string | null | undefined): R
   };
 }
 
+function legacyGatewayErrorFields(error: ResponseReadError) {
+  return {
+    error_type: error.errorType,
+    message: error.message,
+    ...(error.vercelRequestId && { vercel_request_id: error.vercelRequestId }),
+  };
+}
+
 async function readResponseText(
   response: Response,
   vercelRequestId: string | null | undefined
@@ -291,6 +302,19 @@ function isEventStreamContentType(contentType: string | null): boolean {
   return contentType?.split(';', 1)[0].trim().toLowerCase() === 'text/event-stream';
 }
 
+function shouldRewriteAsEventStream(response: Response, contentType: string | null): boolean {
+  if (isEventStreamContentType(contentType)) return true;
+  if (!response.ok) return false;
+  logExceptInTest(
+    '[rewriteModelResponse] rewriting successful response with unexpected content type',
+    {
+      status: response.status,
+      contentType: contentType ?? '<none>',
+    }
+  );
+  return true;
+}
+
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -298,13 +322,14 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
 function passThroughResponse(
   response: Response,
   headers: Headers,
-  capture: RequestLogCapture | null
+  capture: RequestLogCapture | null,
+  signal?: AbortSignal
 ): NextResponse {
   let body = response.body;
   if (!body) {
     capture?.setBody('');
   } else if (capture) {
-    body = createCapturedPassThroughBody(body, capture);
+    body = createCapturedPassThroughBody(body, capture, signal);
   }
   return new NextResponse(body, {
     status: response.status,
@@ -315,16 +340,21 @@ function passThroughResponse(
 
 function createCapturedPassThroughBody(
   upstreamBody: ReadableStream<Uint8Array<ArrayBuffer>>,
-  capture: RequestLogCapture
+  capture: RequestLogCapture,
+  signal?: AbortSignal
 ): ReadableStream<Uint8Array<ArrayBuffer>> {
   let reader: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>> | null = null;
   const decoder = new TextDecoder();
   const capturedChunks: string[] = [];
   let finalized = false;
+  let streamController: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>> | null = null;
+  let consumerIdleTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const flushCapture = () => {
     if (finalized) return;
     finalized = true;
+    if (consumerIdleTimeout) clearTimeout(consumerIdleTimeout);
+    signal?.removeEventListener('abort', handleRequestAbort);
     const trailingText = decoder.decode();
     if (trailingText) capturedChunks.push(trailingText);
   };
@@ -352,11 +382,45 @@ function createCapturedPassThroughBody(
       errorExceptInTest('[rewriteModelResponse] failed to cancel passthrough stream', error);
     });
   };
+  const clearConsumerIdleTimeout = () => {
+    if (consumerIdleTimeout) clearTimeout(consumerIdleTimeout);
+    consumerIdleTimeout = null;
+  };
+  const armConsumerIdleTimeout = () => {
+    clearConsumerIdleTimeout();
+    if (finalized) return;
+    consumerIdleTimeout = setTimeout(() => {
+      if (finalized) return;
+      const timeoutError = new Error('response consumer remained idle');
+      flushCapture();
+      capture.setReadError(timeoutError, partialCapturedBody(capturedChunks), {
+        client_stalled: true,
+      });
+      streamController?.error(timeoutError);
+      cancelReader(timeoutError);
+    }, STREAM_CONSUMER_IDLE_TIMEOUT_MS);
+  };
+  function handleRequestAbort() {
+    if (finalized) return;
+    const abortError = new Error('request was aborted by the client');
+    flushCapture();
+    capture.setReadError(abortError, partialCapturedBody(capturedChunks), {
+      client_disconnected: true,
+    });
+    streamController?.error(signal?.reason ?? abortError);
+    cancelReader(signal?.reason);
+  }
 
   return new ReadableStream<Uint8Array<ArrayBuffer>>({
     start(controller) {
+      streamController = controller;
       try {
         reader = upstreamBody.getReader();
+        if (signal?.aborted) {
+          handleRequestAbort();
+          return;
+        }
+        signal?.addEventListener('abort', handleRequestAbort, { once: true });
       } catch (error) {
         flushCapture();
         capture.setReadError(error);
@@ -366,6 +430,7 @@ function createCapturedPassThroughBody(
     async pull(controller) {
       const activeReader = reader;
       if (!activeReader || finalized) return;
+      clearConsumerIdleTimeout();
       try {
         const { done, value } = await activeReader.read();
         if (finalized) return;
@@ -379,6 +444,7 @@ function createCapturedPassThroughBody(
         }
         capturedChunks.push(decoder.decode(value, { stream: true }));
         controller.enqueue(value);
+        armConsumerIdleTimeout();
       } catch (error) {
         if (finalized) return;
         flushCapture();
@@ -419,6 +485,7 @@ function createRewrittenSseStream({
   vercelRequestId,
   capture,
   capturedChunks,
+  signal,
 }: {
   response: Response;
   createEventParser: (
@@ -431,12 +498,15 @@ function createRewrittenSseStream({
   vercelRequestId: string | null | undefined;
   capture: RequestLogCapture | null;
   capturedChunks: string[] | null;
+  signal?: AbortSignal;
 }): ReadableStream<string> {
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   let parser: ReturnType<typeof createParser> | null = null;
   const decoder = new TextDecoder();
   let decoderFlushed = false;
   let finalized = false;
+  let streamController: ReadableStreamDefaultController<string> | null = null;
+  let consumerIdleTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const flushDecoder = () => {
     if (decoderFlushed) return '';
@@ -475,6 +545,8 @@ function createRewrittenSseStream({
   const finalize = (activeReader?: ReadableStreamDefaultReader<Uint8Array>) => {
     if (finalized) return;
     finalized = true;
+    if (consumerIdleTimeout) clearTimeout(consumerIdleTimeout);
+    signal?.removeEventListener('abort', handleRequestAbort);
     onFinally();
     if (activeReader) releaseReader(activeReader);
   };
@@ -513,9 +585,39 @@ function createRewrittenSseStream({
     controller.close();
     cancelUpstream(error);
   };
+  const clearConsumerIdleTimeout = () => {
+    if (consumerIdleTimeout) clearTimeout(consumerIdleTimeout);
+    consumerIdleTimeout = null;
+  };
+  const armConsumerIdleTimeout = () => {
+    clearConsumerIdleTimeout();
+    if (finalized) return;
+    consumerIdleTimeout = setTimeout(() => {
+      if (finalized) return;
+      const timeoutError = new Error('response consumer remained idle');
+      flushDecoder();
+      capture?.setReadError(timeoutError, partialCapturedBody(capturedChunks), {
+        client_stalled: true,
+      });
+      streamController?.error(timeoutError);
+      cancelUpstream(timeoutError);
+    }, STREAM_CONSUMER_IDLE_TIMEOUT_MS);
+  };
+  function handleRequestAbort() {
+    if (finalized) return;
+    flushDecoder();
+    capture?.setReadError(
+      new Error('request was aborted by the client'),
+      partialCapturedBody(capturedChunks),
+      { client_disconnected: true }
+    );
+    streamController?.error(signal?.reason ?? new Error('request was aborted by the client'));
+    cancelUpstream(signal?.reason);
+  }
 
   return new ReadableStream<string>({
     start(controller) {
+      streamController = controller;
       try {
         reader = response.body?.getReader() ?? null;
         if (!reader) {
@@ -525,6 +627,11 @@ function createRewrittenSseStream({
           return;
         }
         parser = createEventParser(controller);
+        if (signal?.aborted) {
+          handleRequestAbort();
+          return;
+        }
+        signal?.addEventListener('abort', handleRequestAbort, { once: true });
       } catch (error) {
         emitReadError(controller, error);
       }
@@ -533,6 +640,7 @@ function createRewrittenSseStream({
       const activeReader = reader;
       const activeParser = parser;
       if (finalized || !activeReader || !activeParser) return;
+      clearConsumerIdleTimeout();
 
       try {
         const { done, value } = await activeReader.read();
@@ -556,7 +664,10 @@ function createRewrittenSseStream({
         capturedChunks?.push(chunk);
         activeParser.feed(chunk);
         const terminalEvent = getTerminalEvent();
-        if (!terminalEvent) return;
+        if (!terminalEvent) {
+          armConsumerIdleTimeout();
+          return;
+        }
         if (doneReceived()) {
           controller.enqueue('data: [DONE]\n\n');
         }
@@ -596,7 +707,8 @@ export async function rewriteModelResponse_ChatCompletions(
   response: Response,
   removeCost: boolean,
   capture: RequestLogCapture | null,
-  vercelRequestId: string | null
+  vercelRequestId: string | null,
+  signal?: AbortSignal
 ) {
   const headers = getOutputHeaders(response);
   const contentType = response.headers.get('content-type');
@@ -611,6 +723,7 @@ export async function rewriteModelResponse_ChatCompletions(
       });
       return NextResponse.json(
         {
+          ...legacyGatewayErrorFields(textResult.responseReadError),
           error: {
             code: 503,
             message: textResult.responseReadError.message,
@@ -650,8 +763,8 @@ export async function rewriteModelResponse_ChatCompletions(
     });
   }
 
-  if (!isEventStreamContentType(contentType)) {
-    return passThroughResponse(response, headers, capture);
+  if (!shouldRewriteAsEventStream(response, contentType)) {
+    return passThroughResponse(response, headers, capture, signal);
   }
 
   // Accumulate the raw upstream text for request logging while the stream is
@@ -725,6 +838,7 @@ export async function rewriteModelResponse_ChatCompletions(
       'data: ' +
       JSON.stringify({
         ...(generationId ? { id: generationId } : {}),
+        ...legacyGatewayErrorFields(responseReadError),
         error: {
           code: responseReadError.errorType === 'invalid_response' ? 502 : 503,
           message: responseReadError.message,
@@ -739,6 +853,7 @@ export async function rewriteModelResponse_ChatCompletions(
     vercelRequestId,
     capture,
     capturedChunks,
+    signal,
   });
 
   return new NextResponse(stream, {
@@ -782,7 +897,8 @@ export async function rewriteModelResponse_Messages(
   response: Response,
   removeCost: boolean,
   capture: RequestLogCapture | null,
-  vercelRequestId: string | null
+  vercelRequestId: string | null,
+  signal?: AbortSignal
 ) {
   const headers = getOutputHeaders(response);
   const contentType = response.headers.get('content-type');
@@ -795,6 +911,7 @@ export async function rewriteModelResponse_Messages(
       });
       return NextResponse.json(
         {
+          ...legacyGatewayErrorFields(textResult.responseReadError),
           type: 'error',
           error: {
             type: 'api_error',
@@ -831,8 +948,8 @@ export async function rewriteModelResponse_Messages(
     });
   }
 
-  if (!isEventStreamContentType(contentType)) {
-    return passThroughResponse(response, headers, capture);
+  if (!shouldRewriteAsEventStream(response, contentType)) {
+    return passThroughResponse(response, headers, capture, signal);
   }
 
   // Accumulate the raw upstream text for request logging while the stream is
@@ -908,6 +1025,7 @@ export async function rewriteModelResponse_Messages(
       'data: ' +
       JSON.stringify({
         ...(generationId ? { id: generationId } : {}),
+        ...legacyGatewayErrorFields(responseReadError),
         type: 'error',
         error: {
           type: 'api_error',
@@ -923,6 +1041,7 @@ export async function rewriteModelResponse_Messages(
     vercelRequestId,
     capture,
     capturedChunks,
+    signal,
   });
 
   return new NextResponse(stream, {
@@ -942,7 +1061,8 @@ export async function rewriteModelResponse_Responses(
   response: Response,
   removeCost: boolean,
   capture: RequestLogCapture | null,
-  vercelRequestId: string | null
+  vercelRequestId: string | null,
+  signal?: AbortSignal
 ) {
   const headers = getOutputHeaders(response);
   const contentType = response.headers.get('content-type');
@@ -955,6 +1075,7 @@ export async function rewriteModelResponse_Responses(
       });
       return NextResponse.json(
         {
+          ...legacyGatewayErrorFields(textResult.responseReadError),
           error: {
             code: textResult.responseReadError.errorType,
             message: textResult.responseReadError.message,
@@ -991,8 +1112,8 @@ export async function rewriteModelResponse_Responses(
     });
   }
 
-  if (!isEventStreamContentType(contentType)) {
-    return passThroughResponse(response, headers, capture);
+  if (!shouldRewriteAsEventStream(response, contentType)) {
+    return passThroughResponse(response, headers, capture, signal);
   }
 
   // Accumulate the raw upstream text for request logging while the stream is
@@ -1067,8 +1188,8 @@ export async function rewriteModelResponse_Responses(
       JSON.stringify({
         type: 'error',
         sequence_number: nextSequenceNumber,
+        ...legacyGatewayErrorFields(responseReadError),
         code: responseReadError.errorType,
-        message: responseReadError.message,
         param: null,
       }) +
       '\n\n',
@@ -1076,6 +1197,7 @@ export async function rewriteModelResponse_Responses(
     vercelRequestId,
     capture,
     capturedChunks,
+    signal,
   });
 
   return new NextResponse(stream, {
@@ -1090,7 +1212,8 @@ export async function rewriteModelResponse(
   model: string,
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
-  logging: RequestLoggingParams
+  logging: RequestLoggingParams,
+  signal?: AbortSignal
 ): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response.status, model, providerId, logging);
   const requiresCostRemoval =
@@ -1104,14 +1227,27 @@ export async function rewriteModelResponse(
       response,
       requiresCostRemoval,
       capture,
-      vercelRequestId
+      vercelRequestId,
+      signal
     );
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(response, requiresCostRemoval, capture, vercelRequestId);
+    return rewriteModelResponse_Responses(
+      response,
+      requiresCostRemoval,
+      capture,
+      vercelRequestId,
+      signal
+    );
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(response, requiresCostRemoval, capture, vercelRequestId);
+    return rewriteModelResponse_Messages(
+      response,
+      requiresCostRemoval,
+      capture,
+      vercelRequestId,
+      signal
+    );
   }
 
   const error = new Error(`implementation error: unrecognized API kind ${kind}`);

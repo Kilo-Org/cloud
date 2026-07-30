@@ -33,6 +33,7 @@ export const apiRequestLogErrorSchema = z.object({
     .optional(),
   upstream_request_error: z.enum(['fetch_failed']).optional(),
   client_disconnected: z.literal(true).optional(),
+  client_stalled: z.literal(true).optional(),
 });
 
 export type ApiRequestLogError = z.infer<typeof apiRequestLogErrorSchema>;

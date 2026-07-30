@@ -27,10 +27,8 @@ import {
   KiloPassPaymentProvider,
   KiloPassTier,
 } from './enums';
-import type {
-  AppleStoreDecodedNotification,
-  processAppStoreKiloPassNotification as ProcessAppStoreKiloPassNotificationFn,
-} from './apple-store-notifications';
+import type * as AppleStoreNotifications from './apple-store-notifications';
+import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import { toMicrodollars } from '@/lib/utils';
 
@@ -52,7 +50,7 @@ function getPosthogTrackingMock(): PosthogTrackingMock {
   return jest.requireMock('@/lib/kilo-pass/posthog-tracking') as PosthogTrackingMock;
 }
 
-let processAppStoreKiloPassNotification: ProcessAppStoreKiloPassNotificationFn;
+let processAppStoreKiloPassNotification: typeof AppleStoreNotifications.processAppStoreKiloPassNotification;
 
 const APP_STORE_NOTIFICATION_TEST_NOW_MS = Date.parse('2026-05-15T00:00:00.000Z');
 
@@ -318,17 +316,15 @@ describe('processAppStoreKiloPassNotification', () => {
 
       expect(result).toEqual({ processed: true });
       expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
-      const trackCall = trackingMock.trackKiloPassPurchaseCompleted.mock.calls[0]?.[0] as {
-        purchaseKind: string;
-      };
-      expect(trackCall.purchaseKind).toBeDefined();
-      expect(['initial', 'renewal', 'upgrade']).toContain(trackCall.purchaseKind);
+      // tier19 → tier49 within the previous purchase's period classifies as a
+      // same-period upgrade in completeStoreKiloPassPurchase (pinned in slice 1);
+      // this asserts the kind is forwarded through the ASSN path.
       expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith(
         expect.objectContaining({
           channel: 'app_store',
           distinctId: user.google_user_email,
           userId: user.id,
-          purchaseKind: trackCall.purchaseKind,
+          purchaseKind: 'upgrade',
           providerTransactionId: upgradeTransaction.transactionId,
           productId: upgradeTransaction.productId,
           environment: upgradeTransaction.environment,

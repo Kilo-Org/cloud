@@ -8,7 +8,7 @@ jest.mock('@/lib/kiloclaw/setup-promo', () => ({
   userIsWithinFirstKiloClawInstanceWindow: jest.fn(async () => false),
 }));
 
-import { resolveAutoModel } from './resolution';
+import { resolveAutoModel, selectAutoFreeCandidate } from './resolution';
 import {
   BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
@@ -16,6 +16,7 @@ import {
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import { autoFreeModelRoutes } from '@/lib/ai-gateway/models';
 
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,
@@ -36,6 +37,41 @@ const sampleDecision: AutoRoutingDecision = {
   tableVersion: 'v1',
   sticky: false,
 };
+
+describe('selectAutoFreeCandidate', () => {
+  it('follows the configured routing percentages', () => {
+    const selectionCounts = new Map(autoFreeModelRoutes.map(route => [route.model, 0]));
+    const sampleSize = 10_000;
+
+    for (let seed = 0; seed < sampleSize; seed++) {
+      const selected = selectAutoFreeCandidate(
+        autoFreeModelRoutes.map(route => route.model),
+        String(seed)
+      );
+      if (selected) selectionCounts.set(selected, (selectionCounts.get(selected) ?? 0) + 1);
+    }
+
+    for (const route of autoFreeModelRoutes) {
+      expect((selectionCounts.get(route.model) ?? 0) / sampleSize).toBeCloseTo(
+        route.percentage / 100,
+        1
+      );
+    }
+  });
+
+  it('only selects from available candidates', () => {
+    const model = autoFreeModelRoutes[1]?.model;
+    expect(model).toBeDefined();
+
+    for (let seed = 0; seed < 100; seed++) {
+      expect(selectAutoFreeCandidate(model ? [model] : [], String(seed))).toBe(model);
+    }
+  });
+
+  it('returns null when no configured candidates are available', () => {
+    expect(selectAutoFreeCandidate([], 'seed')).toBeNull();
+  });
+});
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   it('resolves to decision.model when the thunk returns a decision', async () => {

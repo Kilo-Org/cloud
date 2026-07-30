@@ -1,5 +1,10 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, findKiloExclusiveModel, kiloExclusiveModels } from './models';
+import {
+  autoFreeModelRoutes,
+  autoFreeModels,
+  findKiloExclusiveModel,
+  kiloExclusiveModels,
+} from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import { getAiSdkProvider } from './providers/model-settings';
@@ -129,6 +134,11 @@ describe('isFreeModel', () => {
       expect(autoFreeModels.length).toBeGreaterThan(0);
       const providers = new Set(autoFreeModels.map(model => getAiSdkProvider(model, null)));
       expect(providers.size).toBe(1);
+    });
+
+    test('auto-free routing percentages should total 100', () => {
+      expect(autoFreeModelRoutes.every(route => route.percentage > 0)).toBe(true);
+      expect(autoFreeModelRoutes.reduce((total, route) => total + route.percentage, 0)).toBe(100);
     });
 
     test('should return true for disabled Kilo exclusive models that end with :free', async () => {

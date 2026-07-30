@@ -31,6 +31,7 @@ import {
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {
+  autoFreeModelRoutes,
   autoFreeModels,
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
@@ -101,6 +102,26 @@ function gatewaySupportsApiKind(
   if (apiKind === null) return true;
   const provider = Object.values(PROVIDERS).find(p => p.id === gateway);
   return provider?.supportedChatApis.some(k => k === apiKind) ?? false;
+}
+
+export function selectAutoFreeCandidate(
+  candidates: ReadonlyArray<string>,
+  randomSeed: string
+): string | null {
+  const availableCandidates = new Set(candidates);
+  const routes = autoFreeModelRoutes.filter(route => availableCandidates.has(route.model));
+  const totalPercentage = routes.reduce((total, route) => total + route.percentage, 0);
+  if (totalPercentage <= 0) return null;
+
+  const percentageBucket =
+    (getRandomNumber('free_routing_' + randomSeed, 10_000) / 10_000) * totalPercentage;
+  let cumulativePercentage = 0;
+  for (const route of routes) {
+    cumulativePercentage += route.percentage;
+    if (percentageBucket < cumulativePercentage) return route.model;
+  }
+
+  return routes.at(-1)?.model ?? null;
 }
 
 type OrganizationAutoContext = {
@@ -242,14 +263,12 @@ export async function resolveAutoModel(
   }
   if (model === KILO_AUTO_FREE_MODEL.id) {
     const candidates = await getAutoFreeCandidates(apiKind);
-    if (candidates.length === 0) {
+    const randomSeed = sessionId ?? (await userPromise)?.id ?? clientIp;
+    const candidate = selectAutoFreeCandidate(candidates, String(randomSeed));
+    if (!candidate) {
       return { kind: 'no_free_models_available' };
     }
-    const randomNumber = getRandomNumber(
-      'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp),
-      candidates.length
-    );
-    return { kind: 'ok', resolved: { model: candidates[randomNumber] } };
+    return { kind: 'ok', resolved: { model: candidate } };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {

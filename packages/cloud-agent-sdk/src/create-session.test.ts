@@ -277,6 +277,23 @@ describe('createRemoteSessionOnConnection', () => {
     });
   });
 
+  it('does not retry invalid create_session when wire data had no extended fields', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockRejectedValue(
+      new CommandDeliveredError('invalid create_session command')
+    );
+
+    await expect(
+      createRemoteSessionOnConnection(connection, 'cli-owner-1')
+    ).rejects.toBeInstanceOf(CommandDeliveredError);
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
+    expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+  });
+
   it('does not retry other CommandDeliveredError messages', async () => {
     const connection = makeFakeConnection();
     connection.sendCommandToConnection.mockRejectedValue(

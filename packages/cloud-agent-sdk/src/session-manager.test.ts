@@ -3520,20 +3520,48 @@ describe('createSessionManager', () => {
       expect(fetchSnapshotPage).not.toHaveBeenCalled();
     });
 
-    it('re-clears storage when onReplayComplete fires while marker is set', async () => {
-      const config = createMockConfig();
+    it('drops only pre-clear messages on reconnect replay while marker is set', async () => {
+      const fetchSnapshotPage = jest.fn().mockResolvedValue({
+        kind: 'success',
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: 'cursor-older',
+        omittedItemCount: 0,
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
       mgr.clearTranscript();
+      const clearedAt = atomValue<number | null>(config.store, mgr.atoms.transcriptCleared);
+      expect(clearedAt).not.toBeNull();
 
-      // Simulate reconnect replay writing history back into storage.
-      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg-replay', sessionID: 'ses-1' }));
-      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).length).toBe(1);
+      // Reconnect snapshot includes pre-clear history and post-clear turns.
+      latestStorage?.upsertMessage(
+        stubUserMessage({
+          id: 'msg-pre-clear',
+          sessionID: 'ses-1',
+          time: { created: (clearedAt as number) - 1000 },
+        })
+      );
+      latestStorage?.upsertMessage(
+        stubUserMessage({
+          id: 'msg-post-clear',
+          sessionID: 'ses-1',
+          time: { created: (clearedAt as number) + 1000 },
+        })
+      );
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).length).toBe(2);
 
       mockSessionCallbacks.onReplayComplete?.();
 
-      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
-      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).not.toBeNull();
+      const remaining = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(remaining.map(m => m.info.id)).toEqual(['msg-post-clear']);
+      expect(atomValue<number | null>(config.store, mgr.atoms.transcriptCleared)).toBe(clearedAt);
+
+      // Older-page loads stay blocked while the marker is set.
+      fetchSnapshotPage.mockClear();
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).not.toHaveBeenCalled();
     });
 
     it('clears the marker on switchSession so history can reload', async () => {

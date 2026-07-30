@@ -1269,10 +1269,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (expectedGeneration !== switchGeneration) return;
         remoteHistoryReplaying = false;
         store.set(isLoadingAtom, false);
-        // `/clear` view must survive reconnect snapshot replay: re-clear once
-        // per completed replay while the marker is set (Decision 3 / round 5).
-        if (store.get(transcriptClearedAtom) !== null) {
-          session.storage.clear();
+        // `/clear` view must survive reconnect snapshot replay: drop only
+        // messages older than the clear marker so post-clear turns stay
+        // (Decision 3 / round 5; scoped purge keeps post-clear history).
+        const clearedAt = store.get(transcriptClearedAtom);
+        if (clearedAt !== null) {
+          for (const messageId of session.storage.getMessageIds()) {
+            const info = session.storage.getMessageInfo(messageId);
+            if (info !== undefined && info.time.created < clearedAt) {
+              session.storage.deleteMessage(messageId);
+            }
+          }
         }
       },
 

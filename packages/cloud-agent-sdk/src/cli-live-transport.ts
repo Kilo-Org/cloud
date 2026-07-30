@@ -860,11 +860,18 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // Extended fields degrade via a single bare retry on the exact
         // old-CLI delivered error; other failures are hard rejects.
         const wireData = buildCreateSessionWireData(input);
+        const hasExtendedFields =
+          wireData.agent !== undefined ||
+          wireData.model !== undefined ||
+          wireData.orgId !== undefined;
         let result: unknown;
         try {
           result = await sendCommand('create_session', wireData);
         } catch (error) {
+          // Only bare-retry when extended fields made the original wire differ
+          // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
           if (
+            hasExtendedFields &&
             error instanceof CommandDeliveredError &&
             error.message === INVALID_CREATE_SESSION_COMMAND
           ) {

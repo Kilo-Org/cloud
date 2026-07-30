@@ -2565,6 +2565,30 @@ describe('CliLiveTransport createSession', () => {
     transport.destroy();
   });
 
+  it('does not retry invalid create_session when wire data had no extended fields', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValue(new CommandDeliveredError('invalid create_session command'));
+
+    await expect(transport.createSession?.()).rejects.toBeInstanceOf(CommandDeliveredError);
+    const createCalls = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'create_session');
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]?.[2]).toEqual({ protocolVersion: 1 });
+    transport.destroy();
+  });
+
   it('does not retry other delivered errors', async () => {
     const connection = createConnection();
     const { transport, userWebConnection } = createTransportWithSinks({ connection });

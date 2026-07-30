@@ -77,6 +77,8 @@ export async function createRemoteSessionOnConnection(
     ...(input?.model !== undefined ? { model: input.model } : {}),
     ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
   };
+  const hasExtendedFields =
+    data.agent !== undefined || data.model !== undefined || data.orgId !== undefined;
   try {
     return await connection.sendCommandToConnection({
       command: 'create_session',
@@ -84,7 +86,10 @@ export async function createRemoteSessionOnConnection(
       expectedConnectionId: connectionId,
     });
   } catch (error) {
+    // Only bare-retry when extended fields made the original wire differ from
+    // `{ protocolVersion: 1 }`; otherwise the retry is byte-identical noise.
     if (
+      hasExtendedFields &&
       error instanceof CommandDeliveredError &&
       error.message === INVALID_CREATE_SESSION_COMMAND
     ) {

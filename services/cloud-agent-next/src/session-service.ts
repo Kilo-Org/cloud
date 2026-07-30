@@ -2674,6 +2674,13 @@ export class SessionService {
     if (metadata.identity.createdOnPlatform !== 'code-review' || git?.type !== 'bitbucket') {
       return false;
     }
+    // A contained session's origin carries a kbb1. capability that stays
+    // authenticated through the outbound interceptor, so it must stay in place for
+    // a blobless clone's later lazy blob fetches (mirrors the wrapper's
+    // sanitizeBitbucketCodeReviewRemote). Only a raw workspace token is stripped.
+    if (getEffectiveCredentialContainment(metadata).bitbucket) {
+      return true;
+    }
     await updateGitRemoteUrl(session, workspacePath, git.url);
     return true;
   }

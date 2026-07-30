@@ -986,19 +986,30 @@ export function countAndStoreUsage(
 
   return usageStatsPromise.then(usageStats =>
     processTokenData(
-      withGenerationTimeFallback(usageStats, generationStartedAtMs, performance.now()),
+      withGenerationTimeFallback(
+        usageStats,
+        usageContext.isStreaming,
+        generationStartedAtMs,
+        performance.now()
+      ),
       usageContext
     )
   );
 }
 
-/** Uses response-body duration when provider generation metadata has no timing. */
+/** Uses streamed response-body duration when provider generation metadata has no timing. */
 export function withGenerationTimeFallback(
   usageStats: MicrodollarUsageStats | null,
+  isStreaming: boolean,
   generationStartedAtMs: number | null,
   generationCompletedAtMs: number
 ): MicrodollarUsageStats | null {
-  if (!usageStats || usageStats.generation_time !== null || generationStartedAtMs === null) {
+  if (
+    !usageStats ||
+    !isStreaming ||
+    usageStats.generation_time !== null ||
+    generationStartedAtMs === null
+  ) {
     return usageStats;
   }
 

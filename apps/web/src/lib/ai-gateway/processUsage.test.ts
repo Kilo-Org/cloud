@@ -127,14 +127,21 @@ describe('withGenerationTimeFallback', () => {
   };
 
   test('measures generation time in milliseconds', () => {
-    const result = withGenerationTimeFallback(usageStats, 1_000, 3_500.4);
+    const result = withGenerationTimeFallback(usageStats, true, 1_000, 3_500.4);
 
     expect(result?.generation_time).toBe(2_500);
+  });
+
+  test('leaves generation time absent for non-streaming responses', () => {
+    const result = withGenerationTimeFallback(usageStats, false, 1_000, 3_500);
+
+    expect(result?.generation_time).toBeNull();
   });
 
   test('preserves provider-reported generation time', () => {
     const result = withGenerationTimeFallback(
       { ...usageStats, generation_time: 1_234 },
+      true,
       1_000,
       3_500
     );
@@ -143,13 +150,13 @@ describe('withGenerationTimeFallback', () => {
   });
 
   test('leaves generation time absent without a start time', () => {
-    const result = withGenerationTimeFallback(usageStats, null, 3_500);
+    const result = withGenerationTimeFallback(usageStats, true, null, 3_500);
 
     expect(result?.generation_time).toBeNull();
   });
 
   test('clamps generation time when the monotonic clock moves backwards', () => {
-    const result = withGenerationTimeFallback(usageStats, 3_500, 1_000);
+    const result = withGenerationTimeFallback(usageStats, true, 3_500, 1_000);
 
     expect(result?.generation_time).toBe(0);
   });

@@ -38,6 +38,7 @@ function makeThread(overrides: Partial<ReviewThread> = {}): ReviewThread {
     originalLine: null,
     originalStartLine: null,
     diffSide: 'RIGHT',
+    diffHunk: null,
     comments: [makeComment()],
     ...overrides,
   };

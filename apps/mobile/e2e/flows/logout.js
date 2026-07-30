@@ -36,5 +36,6 @@ module.exports = async function logout(ctx) {
     await h.tapOn('Sign out', { index: 0, ci: true });
   });
 
-  await h.assertVisible('you@example.com');
+  // Signing out is an API call plus navigation back to the login page.
+  await h.waitVisible('you@example.com', { timeout: 15000 });
 };

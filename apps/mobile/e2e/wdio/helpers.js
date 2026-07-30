@@ -113,15 +113,34 @@ function make(driver, platform) {
     }
   }
 
+  // Types into the focused field via Element Send Keys — driver.keys uses
+  // the W3C actions API, whose per-character key-downs XCUITest rejects.
   async function inputText(text) {
+    try {
+      const active = await driver.getActiveElement();
+      await driver.elementSendKeys(elementIdOf(active), String(text));
+      return;
+    } catch {
+      // No focused element — fall back to key events.
+    }
     await driver.keys(String(text));
   }
 
-  // Types backspaces into the focused field. iOS wants the raw backspace
-  // character; Android wants the WebDriver BACKSPACE key.
+  // Empties the focused field: a direct element clear, with a bounded
+  // backspace loop as fallback. (Batches of BACKSPACE key actions are
+  // rejected by XCUITest as unpaired key-downs, and the raw control
+  // character is not typeable — the flows only ever erase to empty.)
   async function eraseText(count = 100) {
-    const key = platform === 'ios' ? '\u0008' : '\uE003';
-    await driver.keys(new Array(count).fill(key));
+    try {
+      const active = await driver.getActiveElement();
+      await driver.elementClear(elementIdOf(active));
+      return;
+    } catch {
+      // No clearable focused element — fall through to key events.
+    }
+    for (let i = 0; i < count; i++) {
+      await driver.keys(['\uE003']);
+    }
   }
 
   // One flick of the content; sign=1 scrolls DOWN (content moves up).

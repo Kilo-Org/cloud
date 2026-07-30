@@ -25,10 +25,8 @@ switching would silently change the role's assigned model and invalidate the rev
 redispatch about a minute later ran cleanly.
 
 Before redispatching, confirm the model is actually back rather than guessing, because
-`kilo/x-ai/grok-4.5` backs **three** roles — `plan-reviewer`, `implementer` and `impl-reviewer`.
-If it were truly gone, the whole execution phase would be blocked, not just review. The cheapest
-confirmation is a live probe: dispatch one cheap round and check that its log grows with zero
-`ProviderModelNotFoundError`:
+`kilo/x-ai/grok-4.5` now backs **three** roles — `starter`, `orchestrator` and `e2e-verifier`.
+If it were truly gone, the whole planning, execution, and verification phases would be blocked, not just one role. The cheapest confirmation is a live probe on one of the smaller roles that still uses `grok-4.5` (for example, `e2e-verifier` with its 100-step ceiling) and check that its log grows with zero `ProviderModelNotFoundError`:
 
 ```bash
 grep -c "ProviderModelNotFoundError\|Model not found" "$LOG"   # want 0

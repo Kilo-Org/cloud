@@ -28,15 +28,15 @@ These apply to every role. Later sections do not repeat them.
 
 | Role | Harness | Model | Steps |
 |---|---|---|---|
-| Starter | user picks | user picks (prefer SOTA) | unlimited |
-| Planner | user picks | user picks (SOTA) | unlimited |
-| Plan reviewer | kilo CLI | `kilo/x-ai/grok-4.5`, high | 40 |
-| Orchestrator | kilo CLI | `kilo/moonshotai/kimi-k3`, high | unlimited |
-| Implementer | kilo CLI | `kilo/x-ai/grok-4.5`, high | 80 |
-| Impl reviewer | kilo CLI | `kilo/x-ai/grok-4.5`, high | 50 |
-| E2E verifier | kilo CLI | `kilo/moonshotai/kimi-k3`, high | unlimited |
+| Starter | user picks | `kilo/x-ai/grok-4.5`, high (user may override at launch) | unlimited |
+| Planner | user picks | `kilo/moonshotai/kimi-k3`, high (user may override at launch) | unlimited |
+| Plan reviewer | kilo CLI | `kilo/kilo-auto/efficient` | 40 |
+| Orchestrator | kilo CLI | `kilo/x-ai/grok-4.5`, high | unlimited |
+| Implementer | kilo CLI | `kilo/kilo-auto/efficient` | 80 |
+| Impl reviewer | kilo CLI | `kilo/kilo-auto/efficient` | 50 |
+| E2E verifier | kilo CLI | `kilo/x-ai/grok-4.5`, high | 100 |
 
-Every kilo-CLI role above has a definition in `.kilo/agent/` (including `starter`, `planner`, and `orchestrator`) pinning its permissions, and — except the starter and planner, whose models are the user's pick at launch — its model and step limit. The definition is authoritative: dispatches pass `--model`/`--variant` only for the starter and planner. Never use `kilo/kilo-auto/free` — it is rate-limited. Not even as a fallback: if a call stalls or errors, retry or relaunch on the assigned model, never a different one. Product-side LLM calls in E2E flows follow "Real LLM responses" below.
+Every kilo-CLI role above has a definition in `.kilo/agent/` (including `starter`, `planner`, and `orchestrator`) pinning its permissions and its model and step limit. The definition is authoritative: dispatches pass `--model`/`--variant` only for the starter and planner, where the user may override the pinned model at launch. Never use `kilo/kilo-auto/free` — it is rate-limited. Not even as a fallback: if a call stalls or errors, retry or relaunch on the assigned model, never a different one. Product-side LLM calls in E2E flows follow "Real LLM responses" below.
 
 ### Step Limits
 
@@ -135,20 +135,17 @@ Write handoffs to temporary files outside every repository, and never ask a role
 
 The session the user invokes the workflow from is the starter, running on the harness and model the user picked; a kilo starter launches as `kilo run --agent starter --interactive --model <model>` (the definition pins its permissions). Its job is to turn a raw request into approved, sectioned work:
 
-1. Collect the initial body of work from the user, and ask exactly one process question: is this run `hands on` or `hands off`? The mode governs every later role. Planner harness and model: whatever the user picked; absent an explicit pick, reuse the starter's own.
+1. Collect the initial body of work from the user, and ask exactly one process question: is this run `hands on` or `hands off`? The mode governs every later role. Planner model: default to the planner agent definition's pinned model (`kilo/moonshotai/kimi-k3`, high). Only use the starter's own model or another explicit user pick when the user specifically requested a different planner model; do not reuse the starter's model by default.
 2. Explore the relevant parts of the codebase.
 3. Interrogate the requirements — in `hands on` mode, load the `grilling` skill and follow its contract: inspect the codebase instead of asking anything the repository can answer, then ask the user one remaining question at a time with a recommended answer. In `hands off` mode, apply the same questions to itself, answer from repository evidence, and record material assumptions. Always drive toward the simplest solution that achieves the user's goals, and challenge the request itself: "should we even do this?", "why not do this instead?", "we could achieve the same thing simpler, like this".
 4. Divide the finalized work into related, **disjoint** sections — no two sections may touch the same files or contracts.
 5. For each section: run `.kilo_workflow/init-section.sh <name> [sibling-repo...]` (Ground Rules) and use the manifest it prints, write the section brief to `$SCRATCH/brief.md` — the work, the mode, acceptance criteria and constraints gathered so far, the requesting human's GitHub handle for PR assignment, the worktree path, and the scratch path — and launch a planner on the planner harness and model with [`launch-interactive.sh`](launch-interactive.sh). The script encodes the launch traps (env strip, TTY, tmux targeting — details in its header), lands the window in your own session when you are inside tmux and a fresh session otherwise, prints the tmux target for `steer.sh` and `capture-pane`, and fails loudly if the command dies at launch:
 
 ```bash
-# kilo planner (the planner agent definition pins permissions; the model is the user's pick):
+# kilo planner (defaults to the planner agent definition's pinned model; pass --model/--variant only for an explicit user override):
 .kilo_workflow/launch-interactive.sh <section>-planner <worktree> --log "$SCRATCH/planner.log" \
   kilo run 'Plan the work in the attached brief.' --agent planner \
-  --interactive --model <planner-model> --variant high --title '<section> planner' --file "$SCRATCH/brief.md"
-# claude planner:
-.kilo_workflow/launch-interactive.sh <section>-planner <worktree> --log "$SCRATCH/planner.log" \
-  claude "You are the planner in .kilo_workflow/WORKFLOW.md. Plan the work in the brief at $SCRATCH/brief.md."
+  --interactive --title '<section> planner' --file "$SCRATCH/brief.md"
 ```
 
 One planner per section; each section flows through its own planner, orchestrator, and PR. A single-section run launches a single planner. If the starter's own session already fits the planner role (right model, user agrees), it may become the single planner itself instead of launching one — only when the starter already runs inside tmux on the default server: the repro gate's slot scripts refuse to run outside tmux, and a starter-turned-planner has no separate monitor to relaunch it. After launch, the starter follows Monitor Mode below for its planners until every section reaches a terminal state.

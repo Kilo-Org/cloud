@@ -1,8 +1,7 @@
 ---
 description: Implements one bounded slice of an approved plan, anywhere in the monorepo or a sibling repository
 mode: all
-model: kilo/x-ai/grok-4.5
-variant: high
+model: kilo/kilo-auto/efficient
 steps: 80
 permission:
   edit: allow

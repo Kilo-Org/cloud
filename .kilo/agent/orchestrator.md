@@ -1,7 +1,7 @@
 ---
 description: Drives an approved plan to a mergeable PR per .kilo_workflow/WORKFLOW.md section 3
 mode: all
-model: kilo/moonshotai/kimi-k3
+model: kilo/x-ai/grok-4.5
 variant: high
 permission:
   edit: allow

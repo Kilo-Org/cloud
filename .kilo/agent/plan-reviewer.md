@@ -1,8 +1,7 @@
 ---
 description: Reviews a drafted implementation plan for ambiguity, unsupported claims, unnecessary complexity, and missing execution detail
 mode: all
-model: kilo/x-ai/grok-4.5
-variant: high
+model: kilo/kilo-auto/efficient
 steps: 40
 permission:
   edit: allow

@@ -55,7 +55,11 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import { rewriteModelResponse, logUnrewrittenResponse } from '@/lib/rewriteModelResponse';
+import {
+  rewriteModelResponse,
+  logUnrewrittenResponse,
+  logUpstreamRequestFailure,
+} from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -877,6 +881,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
   }
 
+  const requestLogging = {
+    user: maybeUser,
+    organization_id: organizationId || null,
+    session_id: usageContext.session_id,
+    vercel_request_id: vercelRequestId,
+    request: requestBodyParsed,
+  };
+
   const upstreamResult = await upstreamRequest({
     path,
     search: url.search,
@@ -888,6 +900,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     vercelRequestId,
   });
   if (upstreamResult.type === 'error') {
+    await logUpstreamRequestFailure(
+      upstreamResult.response.status,
+      effectiveModelIdLowerCased,
+      effectiveProviderContext.provider.id,
+      requestLogging
+    );
     return upstreamResult.response;
   }
   const response = upstreamResult.response;
@@ -935,6 +953,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       trackInSentry: true,
     });
 
+    await logUnrewrittenResponse(
+      response,
+      effectiveModelIdLowerCased,
+      effectiveProviderContext.provider.id,
+      requestLogging
+    );
+
     // Return a service unavailable error instead of the 402
     return temporarilyUnavailableResponse();
   }
@@ -968,14 +993,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
-
-  const requestLogging = {
-    user: maybeUser,
-    organization_id: organizationId || null,
-    session_id: usageContext.session_id,
-    vercel_request_id: vercelRequestId,
-    request: requestBodyParsed,
-  };
 
   {
     const errorResponse = await makeErrorReadable({

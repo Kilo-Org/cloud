@@ -14,7 +14,11 @@ import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decisi
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import {
+  logUnrewrittenResponse,
+  logUpstreamRequestFailure,
+  rewriteModelResponse,
+} from '@/lib/rewriteModelResponse';
 
 jest.mock('next/server', () => {
   return {
@@ -63,6 +67,8 @@ jest.mock('@/lib/rewriteModelResponse', () => {
     // Mirror the production passthrough; these tests exercise the route, not
     // the response rewrite.
     rewriteModelResponse: jest.fn(async (response: Response) => wrapInSafeNextResponse(response)),
+    logUpstreamRequestFailure: jest.fn(),
+    logUnrewrittenResponse: jest.fn(),
   };
 });
 jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
@@ -104,6 +110,8 @@ const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
+const mockedLogUpstreamRequestFailure = jest.mocked(logUpstreamRequestFailure);
+const mockedLogUnrewrittenResponse = jest.mocked(logUnrewrittenResponse);
 
 const provider = {
   id: 'openrouter',
@@ -762,5 +770,105 @@ describe('auto-routing shadow classifier', () => {
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
     expect(mockedAfter).not.toHaveBeenCalled();
+  });
+});
+
+describe('upstream request failure and unrewritten response logging', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
+    mockedRedisGet.mockResolvedValue(null);
+    mockedRedisSet.mockResolvedValue('OK');
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedLogUpstreamRequestFailure.mockResolvedValue(undefined);
+    mockedLogUnrewrittenResponse.mockResolvedValue(undefined);
+  });
+
+  it('logs upstreamRequest type:error failures with status, model, provider, and logging context', async () => {
+    const errorResponse = new Response(
+      JSON.stringify({
+        error: 'upstream failed',
+        error_type: 'upstream_disconnect',
+      }),
+      { status: 503, headers: { 'content-type': 'application/json' } }
+    );
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'error',
+      response: errorResponse as never,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody('openai/gpt-4o'), { 'x-vercel-id': 'iad1::req-upstream-fail' }) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockedLogUpstreamRequestFailure).toHaveBeenCalledTimes(1);
+    expect(mockedLogUpstreamRequestFailure).toHaveBeenCalledWith(
+      503,
+      'openai/gpt-4o',
+      'openrouter',
+      expect.objectContaining({
+        user: expect.objectContaining({ id: 'user-123' }),
+        organization_id: null,
+        session_id: null,
+        vercel_request_id: 'iad1::req-upstream-fail',
+        request: expect.objectContaining({
+          body: expect.objectContaining({ model: 'openai/gpt-4o' }),
+        }),
+      })
+    );
+    expect(mockedLogUnrewrittenResponse).not.toHaveBeenCalled();
+    expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+  });
+
+  it('logs non-BYOK upstream 402 via logUnrewrittenResponse before returning service unavailable', async () => {
+    const paymentRequiredBody = { error: { message: 'Payment Required', code: 402 } };
+    const upstream402 = new Response(JSON.stringify(paymentRequiredBody), {
+      status: 402,
+      headers: { 'content-type': 'application/json', 'request-id': 'or-req-402' },
+    });
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstream402,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(), { 'x-vercel-id': 'iad1::req-402' }) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: 'Service Unavailable',
+      error_type: 'temporarily_unavailable',
+      message: 'The service is temporarily unavailable. Please try again later.',
+    });
+    expect(mockedLogUnrewrittenResponse).toHaveBeenCalledTimes(1);
+    expect(mockedLogUnrewrittenResponse).toHaveBeenCalledWith(
+      upstream402,
+      'openai/gpt-4o',
+      'openrouter',
+      expect.objectContaining({
+        user: expect.objectContaining({ id: 'user-123' }),
+        organization_id: null,
+        session_id: null,
+        vercel_request_id: 'iad1::req-402',
+        request: expect.objectContaining({
+          body: expect.objectContaining({ model: 'openai/gpt-4o' }),
+        }),
+      })
+    );
+    expect(mockedLogUpstreamRequestFailure).not.toHaveBeenCalled();
+    expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
   });
 });

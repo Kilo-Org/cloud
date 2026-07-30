@@ -182,6 +182,20 @@ function createStreamProgressLogger() {
   };
 }
 
+function logTerminalStreamEvent(
+  kind: GatewayRequest['kind'],
+  eventType: string,
+  generationId: string | undefined,
+  vercelRequestId: string | null | undefined
+) {
+  logExceptInTest('[rewriteModelResponse] received terminal stream event', {
+    kind,
+    eventType,
+    generationId: generationId ?? '<none>',
+    vercelRequestId: vercelRequestId ?? '<none>',
+  });
+}
+
 function getResponseReadError(
   error: unknown,
   vercelRequestId: string | null | undefined
@@ -403,6 +417,7 @@ export async function rewriteModelResponse_ChatCompletions(
           }
           progress.eventProcessed();
           if (event.data === '[DONE]') {
+            logTerminalStreamEvent('chat_completions', event.data, generationId, vercelRequestId);
             doneReceived = true;
             return;
           }
@@ -564,6 +579,7 @@ export async function rewriteModelResponse_Messages(
           }
           progress.eventProcessed();
           if (event.data === '[DONE]') {
+            logTerminalStreamEvent('messages', event.data, generationId, vercelRequestId);
             doneReceived = true;
             return;
           }
@@ -596,6 +612,9 @@ export async function rewriteModelResponse_Messages(
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
           terminalEventReceived = json.type === 'message_stop';
+          if (terminalEventReceived) {
+            logTerminalStreamEvent('messages', json.type, generationId, vercelRequestId);
+          }
         },
         onComment() {
           if (doneReceived || terminalEventReceived) {
@@ -710,6 +729,7 @@ export async function rewriteModelResponse_Responses(
           }
           progress.eventProcessed();
           if (event.data === '[DONE]') {
+            logTerminalStreamEvent('responses', event.data, generationId, vercelRequestId);
             doneReceived = true;
             return;
           }
@@ -735,6 +755,9 @@ export async function rewriteModelResponse_Responses(
             json.type === 'response.completed' ||
             json.type === 'response.incomplete' ||
             json.type === 'response.failed';
+          if (terminalEventReceived) {
+            logTerminalStreamEvent('responses', json.type, generationId, vercelRequestId);
+          }
         },
         onComment() {
           if (doneReceived || terminalEventReceived) {

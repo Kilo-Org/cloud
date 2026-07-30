@@ -9,6 +9,7 @@ import {
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import { logExceptInTest } from '@/lib/utils.server';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -19,10 +20,17 @@ jest.mock('@/lib/ai-gateway/request-logging-opt-ins', () => ({
   isDynamicallyOptedIntoRequestLogging: jest.fn(async () => false),
 }));
 
+jest.mock('@/lib/utils.server', () => ({
+  ...(jest.requireActual('@/lib/utils.server') as Record<string, unknown>),
+  logExceptInTest: jest.fn(),
+}));
+
 const mockedOptIn = jest.mocked(isDynamicallyOptedIntoRequestLogging);
+const mockedLog = jest.mocked(logExceptInTest);
 
 beforeEach(() => {
   mockedOptIn.mockClear();
+  mockedLog.mockClear();
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -326,7 +334,12 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"id":"ignored","model":"upstream-model","choices":[]}\n\n';
       const { response: upstream, cancel } = hangingSseResponse(body);
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null);
+      const result = await rewriteModelResponse_ChatCompletions(
+        upstream,
+        true,
+        capture,
+        'iad1::terminal-request'
+      );
       const sse = await readOutputStream(result);
 
       expect(dataObjects(sse)).toEqual([{ id: 'gen-chat', model: 'upstream-model', choices: [] }]);
@@ -334,6 +347,15 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(cancel).toHaveBeenCalledTimes(1);
       expect(capture.setBody).toHaveBeenCalledWith(body);
       expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind: 'chat_completions',
+          eventType: '[DONE]',
+          generationId: 'gen-chat',
+          vercelRequestId: 'iad1::terminal-request',
+        }
+      );
     });
 
     test('adds an empty choices array and strips cost on usage-only chunks', async () => {
@@ -514,6 +536,15 @@ describe('rewriteModelResponse_Messages', () => {
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(capture.setBody).toHaveBeenCalledWith(body);
     expect(capture.setReadError).not.toHaveBeenCalled();
+    expect(mockedLog).toHaveBeenCalledWith(
+      '[rewriteModelResponse] received terminal stream event',
+      {
+        kind: 'messages',
+        eventType: 'message_stop',
+        generationId: '<none>',
+        vercelRequestId: '<none>',
+      }
+    );
   });
 
   test('cancels upstream and closes immediately after a compatible [DONE] sentinel', async () => {
@@ -639,6 +670,15 @@ describe('rewriteModelResponse_Responses', () => {
       expect(cancel).toHaveBeenCalledTimes(1);
       expect(capture.setBody).toHaveBeenCalledWith(body);
       expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind: 'responses',
+          eventType: type,
+          generationId: '<none>',
+          vercelRequestId: '<none>',
+        }
+      );
     }
   );
 });

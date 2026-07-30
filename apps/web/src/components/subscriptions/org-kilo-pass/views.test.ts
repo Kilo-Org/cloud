@@ -12,7 +12,7 @@ const starterTerms: OrgKiloPassTerms = {
   unlockSpendPerPassUsd: 19,
   bonusMode: 'after_base',
 };
-import { OrgKiloPassActivationView } from './OrgKiloPassActivationView';
+import { isPassAssignmentSaveDisabled } from './allocation-dialog-state';
 import { OrgKiloPassDetailView } from './OrgKiloPassDetailView';
 import { OrgKiloPassSetupView } from './OrgKiloPassSetupView';
 
@@ -313,6 +313,11 @@ describe('OrgKiloPassDetailView', () => {
     expect(html).not.toContain('Upcoming Kilo Pass assignments');
   });
 
+  test('enables saving after an overallocated assignment is repaired', () => {
+    expect(isPassAssignmentSaveDisabled({ reductionRequired: 0, isBusy: false })).toBe(false);
+    expect(isPassAssignmentSaveDisabled({ reductionRequired: 1, isBusy: false })).toBe(true);
+  });
+
   test('does not show reset assignments when there are no upcoming changes', () => {
     const html = render({ onResetDistribution: () => undefined });
 
@@ -558,44 +563,5 @@ describe('OrgKiloPassSetupView', () => {
     expect(html).toContain('Processing payment');
     expect(html).not.toContain('Purchase Kilo Pass');
     expect(buttonTag(html, 'Processing payment')).toContain('disabled=""');
-  });
-});
-
-describe('OrgKiloPassActivationView', () => {
-  function render(state: Parameters<typeof OrgKiloPassActivationView>[0]['state']) {
-    return renderToStaticMarkup(
-      React.createElement(OrgKiloPassActivationView, {
-        state,
-        title: `${state} title`,
-        description: `${state} description`,
-        actionLabel: 'Continue',
-        onAction: () => undefined,
-      })
-    );
-  }
-
-  test('marks pending, activating, and failed states as busy for assistive technology', () => {
-    expect(render('awaiting_payment')).toContain('aria-busy="true"');
-    expect(render('activating')).toContain('aria-busy="true"');
-    expect(render('failed')).toContain('aria-busy="true"');
-  });
-
-  test('does not mark action-required or terminal states as busy', () => {
-    expect(render('requires_action')).toContain('aria-busy="false"');
-    expect(render('blocked')).toContain('aria-busy="false"');
-    expect(render('succeeded')).toContain('aria-busy="false"');
-    expect(render('ended')).toContain('aria-busy="false"');
-  });
-
-  test('only shows the leave-safely hint while activation can still resolve on its own', () => {
-    expect(render('failed')).toContain('You can leave this page safely');
-    expect(render('blocked')).not.toContain('You can leave this page safely');
-    expect(render('succeeded')).not.toContain('You can leave this page safely');
-  });
-
-  test('renders the action button for every state that provides one', () => {
-    for (const state of ['requires_action', 'blocked', 'succeeded', 'ended'] as const) {
-      expect(render(state)).toContain('Continue');
-    }
   });
 });

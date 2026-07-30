@@ -4,7 +4,7 @@ import {
   kilo_pass_org_allocation_plans,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, gt, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, ne } from 'drizzle-orm';
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
 
@@ -36,21 +36,33 @@ export async function assertOrganizationHierarchyChangeAllowed(
     return;
   }
 
-  const [allocation] = await tx
-    .select({ agreementId: kilo_pass_org_agreements.id })
+  const [latestPlan] = await tx
+    .select({ id: kilo_pass_org_allocation_plans.id })
     .from(kilo_pass_org_agreements)
     .innerJoin(
       kilo_pass_org_allocation_plans,
       eq(kilo_pass_org_allocation_plans.agreement_id, kilo_pass_org_agreements.id)
     )
-    .innerJoin(
-      kilo_pass_org_allocation_plan_rows,
-      eq(kilo_pass_org_allocation_plan_rows.allocation_plan_id, kilo_pass_org_allocation_plans.id)
-    )
     .where(
       and(
         eq(kilo_pass_org_agreements.parent_organization_id, organization.parentOrganizationId),
-        ne(kilo_pass_org_agreements.state, 'ended'),
+        ne(kilo_pass_org_agreements.state, 'ended')
+      )
+    )
+    .orderBy(
+      desc(kilo_pass_org_allocation_plans.effective_window_start),
+      desc(kilo_pass_org_allocation_plans.version)
+    )
+    .limit(1)
+    .for('update');
+
+  if (!latestPlan) return;
+  const [allocation] = await tx
+    .select({ id: kilo_pass_org_allocation_plan_rows.id })
+    .from(kilo_pass_org_allocation_plan_rows)
+    .where(
+      and(
+        eq(kilo_pass_org_allocation_plan_rows.allocation_plan_id, latestPlan.id),
         eq(kilo_pass_org_allocation_plan_rows.allocation_container_organization_id, organizationId),
         gt(kilo_pass_org_allocation_plan_rows.pass_capacity, 0)
       )

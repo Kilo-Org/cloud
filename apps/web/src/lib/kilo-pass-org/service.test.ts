@@ -437,6 +437,67 @@ describe('Kilo Pass organization agreement service', () => {
     });
   });
 
+  it('clears a scheduled decrease when a partial paid increase supersedes it', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(
+      `kpo-partial-reincrease-${crypto.randomUUID()}`,
+      owner.id
+    );
+    organizationIds.push(parent.id);
+    const anchor = new Date('2026-07-01T00:00:00.000Z');
+    const paidUntil = new Date('2026-08-01T00:00:00.000Z');
+    const pending = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 25,
+      issuanceAnchorAt: anchor,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [],
+    });
+    await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: anchor,
+      paidUntil,
+      paidSeatCount: 25,
+      firstWindow: { start: anchor, end: paidUntil },
+      isBridge: false,
+    });
+    await scheduleOrganizationPassCapacity({ organizationId: parent.id, paidSeatCount: 10 });
+    const increaseStart = new Date('2026-07-15T00:00:00.000Z');
+    await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: increaseStart,
+      paidUntil,
+      paidSeatCount: 12,
+      firstWindow: { start: anchor, end: paidUntil },
+      isBridge: true,
+      paidBridgeInterval: { start: increaseStart, end: paidUntil },
+    });
+
+    const [agreement] = await db
+      .select()
+      .from(kilo_pass_org_agreements)
+      .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+    expect(agreement).toMatchObject({
+      purchased_pass_capacity: 12,
+      next_purchased_pass_capacity: null,
+      next_capacity_effective_at: null,
+    });
+    await expect(
+      organizationKiloPassService.updateAllocation({
+        organizationId: parent.id,
+        actorUserId: owner.id,
+        expectedPlanVersion: 1,
+        allocations: [],
+      })
+    ).resolves.toMatchObject({ planVersion: 2 });
+  });
+
   it('allows paid pass capacity to decrease for a later renewal period', async () => {
     const owner = await insertTestUser();
     const parent = await createOrganization(
@@ -562,14 +623,6 @@ describe('Kilo Pass organization agreement service', () => {
         agreement: expect.objectContaining({ tier: 'tier_49', paidSeatCount: 7 }),
       })
     );
-    await expect(
-      organizationKiloPassService.getActivation({
-        organizationId: parent.id,
-        checkoutSessionId: 'cs_ended',
-      })
-    ).resolves.toEqual(
-      expect.objectContaining({ state: 'ended', agreementId: pending.agreementId })
-    );
     await db.insert(organization_seats_purchases).values({
       organization_id: parent.id,
       subscription_stripe_id: `sub_${crypto.randomUUID()}`,
@@ -664,17 +717,12 @@ describe('Kilo Pass organization agreement service', () => {
     });
     await scheduleOrganizationPassCapacity({ organizationId: parent.id, paidSeatCount: 0 });
 
-    const [summary, detail, status, activation] = await Promise.all([
+    const [summary, detail] = await Promise.all([
       organizationKiloPassService.getSummary({ organizationId: parent.id }),
       organizationKiloPassService.getDetail({ organizationId: parent.id }),
-      organizationKiloPassService.getStatus({ organizationId: parent.id }),
-      organizationKiloPassService.getActivation({
-        organizationId: parent.id,
-        checkoutSessionId: 'cs_test',
-      }),
     ]);
 
-    for (const projection of [summary, detail, status, activation]) {
+    for (const projection of [summary, detail]) {
       expect(projection.state).toBe('active');
       expect(projection.commercialState).toBe('active');
       expect(projection.processingCondition).toBe('overallocated');

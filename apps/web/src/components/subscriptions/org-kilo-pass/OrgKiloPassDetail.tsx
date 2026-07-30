@@ -203,11 +203,6 @@ export function OrgKiloPassDetail({
       nextWindowStarts={formatDateLabel(detail.nextWindowStartsAt, 'Not scheduled')}
       nextAllocations={nextAllocations}
       editingAllocations={editingAllocations}
-      pendingTransitions={detail.pendingTermTransitions.map(transition => ({
-        id: transition.id,
-        toVersionKey: transition.toVersionKey,
-        effectiveAt: formatDateLabel(transition.effectiveAt),
-      }))}
       cancellationEffectiveAt={
         detail.commercialState === 'cancel_at_period_end'
           ? formatDateLabel(detail.paidThrough)

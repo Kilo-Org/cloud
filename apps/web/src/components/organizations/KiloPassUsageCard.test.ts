@@ -47,18 +47,4 @@ describe('KiloPassUsageCardView', () => {
       'href="/organizations/4d2f6bf9-9a5e-4614-8e5e-39e68d747acd/subscriptions/kilo-pass"'
     );
   });
-
-  test('hides subscription management from members', () => {
-    const html = renderToStaticMarkup(
-      React.createElement(KiloPassUsageCardView, {
-        organizationId: '4d2f6bf9-9a5e-4614-8e5e-39e68d747acd',
-        fullMonthlyCreditsPerPassUsd: 19,
-        canManageSubscription: false,
-        allocations: [],
-      })
-    );
-
-    expect(html).toContain('Kilo Pass Usage');
-    expect(html).not.toContain('Manage Subscription');
-  });
 });

@@ -1,14 +1,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import Link from 'next/link';
 // React must be in scope for the classic JSX runtime used by the jest transform.
 import React from 'react';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
-import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
 import {
   toCurrentAllocations,
   toOrgKiloPassTerms,
@@ -25,7 +23,6 @@ type Props = {
 
 export function KiloPassUsageCard({ organizationId }: Props) {
   const trpc = useTRPC();
-  const currentUserRole = useUserOrganizationRole();
   const usageQuery = useQuery(trpc.organizations.kiloPass.usage.queryOptions({ organizationId }));
 
   if (usageQuery.isPending) {
@@ -54,7 +51,6 @@ export function KiloPassUsageCard({ organizationId }: Props) {
       organizationId={organizationId}
       allocations={toCurrentAllocations(usageQuery.data.currentAllocations)}
       fullMonthlyCreditsPerPassUsd={toOrgKiloPassTerms(usageQuery.data).baseCreditsPerPassUsd}
-      canManageSubscription={canManageOrganizationBilling(currentUserRole)}
     />
   );
 }
@@ -63,12 +59,10 @@ export function KiloPassUsageCardView({
   organizationId,
   allocations,
   fullMonthlyCreditsPerPassUsd,
-  canManageSubscription = true,
 }: {
   organizationId: string;
   allocations: OrgKiloPassAllocation[];
   fullMonthlyCreditsPerPassUsd: number;
-  canManageSubscription?: boolean;
 }) {
   return (
     <Card>
@@ -83,13 +77,11 @@ export function KiloPassUsageCardView({
               Current monthly Credits and bonus progress by organization.
             </CardDescription>
           </div>
-          {canManageSubscription ? (
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/organizations/${organizationId}/subscriptions/kilo-pass`}>
-                Manage Subscription
-              </Link>
-            </Button>
-          ) : null}
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/organizations/${organizationId}/subscriptions/kilo-pass`}>
+              Manage Subscription
+            </Link>
+          </Button>
         </div>
       </CardHeader>
       <CardContent>

@@ -13,10 +13,8 @@ const getSetup = jest.fn<OrganizationKiloPassService['getSetup']>();
 const getDetail = jest.fn<OrganizationKiloPassService['getDetail']>();
 const getUsage = jest.fn<OrganizationKiloPassService['getUsage']>();
 const createCheckout = jest.fn<OrganizationKiloPassService['createCheckout']>();
-const getActivation = jest.fn<OrganizationKiloPassService['getActivation']>();
 const updateAllocation = jest.fn<OrganizationKiloPassService['updateAllocation']>();
 const cancel = jest.fn<OrganizationKiloPassService['cancel']>();
-const getStatus = jest.fn<OrganizationKiloPassService['getStatus']>();
 
 jest.mock('@/lib/kilo-pass-org/stripe-adapter', () => ({
   createOrganizationKiloPassCheckout: jest.fn(),
@@ -31,10 +29,8 @@ jest.mock('@/lib/kilo-pass-org/service', () => ({
     getDetail,
     getUsage,
     createCheckout,
-    getActivation,
     updateAllocation,
     cancel,
-    getStatus,
   },
 }));
 
@@ -98,10 +94,8 @@ describe('organization Kilo Pass router', () => {
       getDetail,
       getUsage,
       createCheckout,
-      getActivation,
       updateAllocation,
       cancel,
-      getStatus,
     ]) {
       mock.mockReset();
     }
@@ -151,7 +145,6 @@ describe('organization Kilo Pass router', () => {
       currentWindow: { startsAt: NOW, endsAt: '2026-08-23T12:00:00.000Z' },
       nextWindowStartsAt: '2026-08-23T12:00:00.000Z',
       latestRun: null,
-      pendingTermTransitions: [],
       currentAllocations: [
         {
           organizationId: parent.id,
@@ -173,22 +166,8 @@ describe('organization Kilo Pass router', () => {
     });
     getUsage.mockResolvedValue(null);
     createCheckout.mockResolvedValue({ kind: 'payment_action', clientSecret: 'pi_secret_1' });
-    getActivation.mockResolvedValue({
-      state: 'activating',
-      commercialState: 'pending_payment',
-      processingCondition: 'ready',
-      agreementId: null,
-      message: 'Waiting',
-    });
     updateAllocation.mockResolvedValue({ planVersion: 2, nextWindowStartsAt: NOW });
     cancel.mockResolvedValue({ state: 'cancel_at_period_end', effectiveAt: NOW });
-    getStatus.mockResolvedValue({
-      state: 'active',
-      commercialState: 'active',
-      processingCondition: 'ready',
-      retryAfterSeconds: null,
-      updatedAt: NOW,
-    });
   });
 
   it('allows an owner and billing manager to read parent agreement data', async () => {
@@ -204,17 +183,15 @@ describe('organization Kilo Pass router', () => {
       agreement: null,
     });
     await expect(
-      billingCaller.organizations.kiloPass.status({ organizationId: parent.id })
-    ).resolves.toEqual({
+      billingCaller.organizations.kiloPass.detail({ organizationId: parent.id })
+    ).resolves.toMatchObject({
       state: 'active',
       commercialState: 'active',
       processingCondition: 'ready',
-      retryAfterSeconds: null,
-      updatedAt: NOW,
     });
   });
 
-  it('allows a member to read current Kilo Pass usage without billing access', async () => {
+  it('allows billing roles to read Kilo Pass usage and denies regular members', async () => {
     const detail = await getDetail({ organizationId: parent.id });
     getUsage.mockResolvedValue({
       tier: detail.tier,
@@ -222,25 +199,15 @@ describe('organization Kilo Pass router', () => {
       currentWindow: detail.currentWindow!,
       currentAllocations: detail.currentAllocations,
     });
-    const caller = await createCallerForUser(member.id);
+    const billingCaller = await createCallerForUser(billingManager.id);
+    const memberCaller = await createCallerForUser(member.id);
 
     await expect(
-      caller.organizations.kiloPass.usage({ organizationId: parent.id })
-    ).resolves.toEqual({
-      tier: 'tier_19',
-      terms: expect.any(Object),
-      currentWindow: { startsAt: NOW, endsAt: '2026-08-23T12:00:00.000Z' },
-      currentAllocations: expect.any(Array),
-    });
-  });
-
-  it('returns no usage when the organization has no live Kilo Pass agreement', async () => {
-    const caller = await createCallerForUser(member.id);
-
+      billingCaller.organizations.kiloPass.usage({ organizationId: parent.id })
+    ).resolves.toMatchObject({ tier: 'tier_19' });
     await expect(
-      caller.organizations.kiloPass.usage({ organizationId: parent.id })
-    ).resolves.toBeNull();
-    expect(getUsage).toHaveBeenCalledTimes(1);
+      memberCaller.organizations.kiloPass.usage({ organizationId: parent.id })
+    ).rejects.toThrow('required organizational role');
   });
 
   it.each([
@@ -287,21 +254,6 @@ describe('organization Kilo Pass router', () => {
       })
     ).rejects.toThrow('Each child organization can appear at most once');
     expect(createCheckout).not.toHaveBeenCalled();
-  });
-
-  it('rejects malformed service DTO timestamps at the router boundary', async () => {
-    getStatus.mockResolvedValueOnce({
-      state: 'active',
-      commercialState: 'active',
-      processingCondition: 'ready',
-      retryAfterSeconds: null,
-      // @ts-expect-error Verifies router rejection of an unnormalized service timestamp.
-      updatedAt: new Date(NOW),
-    });
-    const caller = await createCallerForUser(owner.id);
-    await expect(
-      caller.organizations.kiloPass.status({ organizationId: parent.id })
-    ).rejects.toThrow();
   });
 
   it('maps a stale plan service conflict to tRPC CONFLICT', async () => {

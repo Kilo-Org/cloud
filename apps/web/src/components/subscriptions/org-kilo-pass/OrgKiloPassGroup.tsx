@@ -56,7 +56,10 @@ export function OrgKiloPassGroup({
                 status: commercialState ?? 'pending_payment',
                 tierName: terms.tierName,
                 paidSeatCount: agreement.paidSeatCount,
-                price: `${formatOrgPassMoney(terms.pricePerPassUsd * agreement.paidSeatCount)}/${commercialState === 'active' ? 'month' : 'period'}`,
+                price:
+                  agreement.cadence === 'yearly'
+                    ? `${formatOrgPassMoney(terms.pricePerPassUsd * agreement.paidSeatCount)}/mo equivalent · billed annually`
+                    : `${formatOrgPassMoney(terms.pricePerPassUsd * agreement.paidSeatCount)}/month`,
                 paidThrough: formatDateLabel(agreement.paidThrough, 'Waiting for payment'),
                 billingDateLabel:
                   commercialState === 'cancel_at_period_end' ? 'Ends' : 'Covered through',

@@ -76,13 +76,18 @@ export function OrgKiloPassBillingHistory({ organizationId }: { organizationId: 
           <Skeleton className="h-10 w-3/4" />
         </div>
       ) : (
-        <BillingHistoryTable
-          variant="stripe"
-          entries={billing.entries}
-          hasMore={billing.hasMore}
-          onLoadMore={() => void billing.loadMore()}
-          isLoading={billing.isLoadingMore}
-        />
+        <div className="space-y-3">
+          <p className="type-label text-muted-foreground">
+            Invoice totals include both seat and Kilo Pass charges.
+          </p>
+          <BillingHistoryTable
+            variant="stripe"
+            entries={billing.entries}
+            hasMore={billing.hasMore}
+            onLoadMore={() => void billing.loadMore()}
+            isLoading={billing.isLoadingMore}
+          />
+        </div>
       )}
     </OrgKiloPassBillingHistoryCard>
   );

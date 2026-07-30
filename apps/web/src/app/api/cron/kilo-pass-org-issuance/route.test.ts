@@ -3,13 +3,18 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 jest.mock('@/lib/drizzle', () => ({ db: {} }));
 jest.mock('@/lib/kilo-pass-org/service', () => ({ runOrganizationPassIssuanceCron: jest.fn() }));
+jest.mock('@/lib/kilo-pass-org/notifications', () => ({
+  dispatchOrganizationPassBlockedNotifications: jest.fn(),
+}));
 jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => jest.fn()) }));
 
 import { db } from '@/lib/drizzle';
+import { dispatchOrganizationPassBlockedNotifications } from '@/lib/kilo-pass-org/notifications';
 import { runOrganizationPassIssuanceCron } from '@/lib/kilo-pass-org/service';
 import { GET } from './route';
 
 const mockRunOrganizationPassIssuanceCron = jest.mocked(runOrganizationPassIssuanceCron);
+const mockDispatchNotifications = jest.mocked(dispatchOrganizationPassBlockedNotifications);
 
 function request(authorization?: string) {
   return new Request('http://localhost/api/cron/kilo-pass-org-issuance', {
@@ -34,8 +39,17 @@ describe('GET /api/cron/kilo-pass-org-issuance', () => {
   );
 
   test('runs the issuance processor and returns its summary for valid authorization', async () => {
-    const summary = { examined: 4, processed: 3, issued: 2, blocked: 1 };
+    const summary = {
+      examined: 4,
+      processed: 3,
+      issued: 2,
+      blocked: 1,
+      failed: 0,
+      failures: [],
+    };
+    const notifications = { examined: 1, sent: 1, failed: 0 };
     mockRunOrganizationPassIssuanceCron.mockResolvedValue(summary);
+    mockDispatchNotifications.mockResolvedValue(notifications);
 
     const response = await GET(request('Bearer cron-secret'));
 
@@ -43,6 +57,7 @@ describe('GET /api/cron/kilo-pass-org-issuance', () => {
     await expect(response.json()).resolves.toEqual({
       success: true,
       summary,
+      notifications,
       timestamp: expect.any(String),
     });
     expect(mockRunOrganizationPassIssuanceCron).toHaveBeenCalledTimes(1);

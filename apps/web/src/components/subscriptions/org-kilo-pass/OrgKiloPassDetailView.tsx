@@ -5,7 +5,6 @@ import {
   ArrowRight,
   CalendarDays,
   Check,
-  FileClock,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -34,13 +33,13 @@ import {
 } from '@/components/ui/dialog';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
+import { isPassAssignmentSaveDisabled } from './allocation-dialog-state';
 import { formatOrgPassMoney } from './formatters';
 import type {
   OrgKiloPassAllocation,
   OrgKiloPassCadence,
   OrgKiloPassCommercialState,
   OrgKiloPassCondition,
-  OrgKiloPassPendingTransition,
   OrgKiloPassTerms,
 } from './types';
 import {
@@ -95,7 +94,6 @@ export function OrgKiloPassDetailView({
   nextWindowStarts,
   nextAllocations,
   editingAllocations,
-  pendingTransitions,
   cancellationEffectiveAt,
   restartHref,
   isEditing = false,
@@ -124,7 +122,6 @@ export function OrgKiloPassDetailView({
   nextWindowStarts: string;
   nextAllocations: OrgKiloPassAllocation[];
   editingAllocations?: OrgKiloPassAllocation[];
-  pendingTransitions?: OrgKiloPassPendingTransition[];
   cancellationEffectiveAt?: string;
   restartHref?: string;
   isEditing?: boolean;
@@ -155,7 +152,7 @@ export function OrgKiloPassDetailView({
   const dialogChildTotal = getDirectChildTotal(dialogAllocations);
   const dialogParentPasses = Math.max(0, nextTotalPasses - dialogChildTotal);
   const dialogReductionRequired = Math.max(0, dialogChildTotal - nextTotalPasses);
-  const isDialogOverallocated = dialogReductionRequired > 0 || condition?.kind === 'overallocated';
+  const isDialogOverallocated = dialogReductionRequired > 0;
 
   return (
     <div className="space-y-6">
@@ -205,17 +202,6 @@ export function OrgKiloPassDetailView({
           </AlertDescription>
         </Alert>
       ) : null}
-      {pendingTransitions?.map(transition => (
-        <Alert key={transition.id}>
-          <FileClock />
-          <AlertTitle>Terms change scheduled</AlertTitle>
-          <AlertDescription>
-            New terms ({transition.toVersionKey}) start on {transition.effectiveAt}. Your current
-            Credits and bonus rules stay the same until then.
-          </AlertDescription>
-        </Alert>
-      ))}
-
       <Card>
         <CardContent className="grid gap-6 p-6 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryValue
@@ -490,7 +476,11 @@ function PassAssignmentDialog({
             <Button
               type="button"
               onClick={onSave}
-              disabled={isOverallocated || Boolean(stalePlanMessage) || isBusy}
+              disabled={isPassAssignmentSaveDisabled({
+                reductionRequired,
+                stalePlanMessage,
+                isBusy,
+              })}
             >
               {pendingAction === 'save' ? 'Saving assignments' : 'Save pass assignments'}
             </Button>

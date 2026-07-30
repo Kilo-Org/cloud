@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { CRON_SECRET } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
+import { dispatchOrganizationPassBlockedNotifications } from '@/lib/kilo-pass-org/notifications';
 import { runOrganizationPassIssuanceCron } from '@/lib/kilo-pass-org/service';
 import { sentryLogger } from '@/lib/utils.server';
 
@@ -12,5 +13,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const summary = await runOrganizationPassIssuanceCron(db);
-  return NextResponse.json({ success: true, summary, timestamp: new Date().toISOString() });
+  // Dispatch after issuance so newly created blocked-run deliveries are included.
+  const notifications = await dispatchOrganizationPassBlockedNotifications(db);
+  for (const failure of summary.failures) {
+    sentryLogger('kilo-pass-org-issuance', 'error')('Agreement issuance failed', {
+      agreementId: failure.agreementId,
+      error: failure.message,
+    });
+  }
+  return NextResponse.json({
+    success: true,
+    summary,
+    notifications,
+    timestamp: new Date().toISOString(),
+  });
 }

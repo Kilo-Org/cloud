@@ -48,9 +48,3 @@ export type OrgKiloPassCondition = {
   onAction?: () => void;
   actionBusy?: boolean;
 };
-
-export type OrgKiloPassPendingTransition = {
-  id: string;
-  toVersionKey: string;
-  effectiveAt: string;
-};

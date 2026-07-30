@@ -7,7 +7,9 @@ import {
 } from '@kilocode/db/schema';
 import { KiloPassOrgBonusMode } from '@kilocode/db/schema-types';
 import type { DrizzleTransaction } from '@/lib/drizzle';
-import { and, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+
+const REPAIR_BATCH_SIZE = 250;
 
 export async function repairExpiredOrganizationPassBonuses(
   tx: DrizzleTransaction,
@@ -20,10 +22,13 @@ export async function repairExpiredOrganizationPassBonuses(
       and(
         eq(kilo_pass_org_issuance_snapshots.bonus_mode, KiloPassOrgBonusMode.AfterBase),
         isNull(kilo_pass_org_issuance_snapshots.bonus_unlocked_at),
+        isNull(kilo_pass_org_issuance_snapshots.repair_completed_at),
         lt(kilo_pass_org_issuance_snapshots.window_end, nowIso)
       )
     )
-    .for('update');
+    .orderBy(asc(kilo_pass_org_issuance_snapshots.window_end))
+    .limit(REPAIR_BATCH_SIZE)
+    .for('update', { skipLocked: true });
   let recordedMisses = 0;
 
   for (const snapshot of snapshots) {
@@ -42,24 +47,27 @@ export async function repairExpiredOrganizationPassBonuses(
         )
       );
     const spent = Number(total?.spent ?? 0);
-    if (spent < snapshot.unlock_spend_microdollars) continue;
-
     await tx
       .update(kilo_pass_org_issuance_snapshots)
-      .set({ qualifying_spend_microdollars: spent })
-      .where(eq(kilo_pass_org_issuance_snapshots.id, snapshot.id));
-    const recorded = await tx
-      .insert(kilo_pass_org_audit_records)
-      .values({
-        agreement_id: snapshot.agreement_id,
-        action: 'bonus_missed_after_expiry',
-        reason: 'qualifying_spend_repair',
-        after_json: { issuanceSnapshotId: snapshot.id, qualifyingSpendMicrodollars: spent },
-        idempotency_key: `kpo:expired-bonus-miss:${snapshot.id}`,
+      .set({
+        qualifying_spend_microdollars: spent,
+        repair_completed_at: nowIso,
       })
-      .onConflictDoNothing()
-      .returning({ id: kilo_pass_org_audit_records.id });
-    if (recorded[0]) recordedMisses++;
+      .where(eq(kilo_pass_org_issuance_snapshots.id, snapshot.id));
+    if (spent >= snapshot.unlock_spend_microdollars) {
+      const recorded = await tx
+        .insert(kilo_pass_org_audit_records)
+        .values({
+          agreement_id: snapshot.agreement_id,
+          action: 'bonus_missed_after_expiry',
+          reason: 'qualifying_spend_repair',
+          after_json: { issuanceSnapshotId: snapshot.id, qualifyingSpendMicrodollars: spent },
+          idempotency_key: `kpo:expired-bonus-miss:${snapshot.id}`,
+        })
+        .onConflictDoNothing()
+        .returning({ id: kilo_pass_org_audit_records.id });
+      if (recorded[0]) recordedMisses++;
+    }
   }
   return { examined: snapshots.length, recordedMisses };
 }

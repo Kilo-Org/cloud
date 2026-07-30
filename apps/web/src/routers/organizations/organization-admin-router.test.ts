@@ -1575,6 +1575,25 @@ describe('organization admin router', () => {
         );
       });
 
+      it('allows reparenting after a historical allocation is replaced by zero', async () => {
+        const { child, replacementParent } = await createAllocatedChild({
+          initialCapacity: 1,
+          futureCapacity: 0,
+        });
+        const caller = await createCallerForUser(adminUser.id);
+
+        await caller.organizations.admin.setParent({
+          organizationId: child.id,
+          parentOrganizationId: replacementParent.id,
+        });
+
+        const [updated] = await db
+          .select({ parentOrganizationId: organizations.parent_organization_id })
+          .from(organizations)
+          .where(eq(organizations.id, child.id));
+        expect(updated.parentOrganizationId).toBe(replacementParent.id);
+      });
+
       it('allows reparenting a child with only zero allocations', async () => {
         const { child, replacementParent } = await createAllocatedChild({
           initialCapacity: 0,

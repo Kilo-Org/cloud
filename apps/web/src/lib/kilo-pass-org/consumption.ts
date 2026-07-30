@@ -137,6 +137,10 @@ export async function recordOrganizationConsumption(
 
     if (expired) {
       await tx
+        .update(kilo_pass_org_issuance_snapshots)
+        .set({ repair_completed_at: input.occurredAt })
+        .where(eq(kilo_pass_org_issuance_snapshots.id, updated.id));
+      await tx
         .insert(kilo_pass_org_audit_records)
         .values({
           agreement_id: updated.agreement_id,

@@ -52,6 +52,7 @@ import {
   assertOrganizationHierarchyChangeAllowed,
   KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
 } from '@/lib/kilo-pass-org/hierarchy-guard';
+import { clearAgreementPaymentReview } from '@/lib/kilo-pass-org/service';
 import {
   fetchExpiringTransactionsForOrganization,
   computeNextExpirationAmount,
@@ -154,6 +155,11 @@ const AdminOrganizationDetailsSchema = z.object({
       installation_count: z.number(),
     })
   ),
+});
+
+const ClearKiloPassPaymentReviewInputSchema = z.object({
+  organizationId: z.uuid(),
+  reason: z.string().trim().min(3).max(500),
 });
 
 const AdminOrganizationKiloPassSummarySchema = z.object({
@@ -618,6 +624,21 @@ export const organizationAdminRouter = createTRPCRouter({
           : null,
       };
     }),
+
+  clearKiloPassPaymentReview: adminProcedure
+    .input(ClearKiloPassPaymentReviewInputSchema)
+    .output(
+      z.object({
+        processingCondition: z.enum(['ready', 'overallocated']),
+      })
+    )
+    .mutation(({ input, ctx }) =>
+      clearAgreementPaymentReview({
+        organizationId: input.organizationId,
+        actorUserId: ctx.user.id,
+        reason: input.reason,
+      })
+    ),
 
   getHierarchy: adminProcedure
     .input(OrganizationIdInputSchema)

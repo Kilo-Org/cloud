@@ -9,6 +9,21 @@ import { useEffect } from 'react';
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
+export function useClearOrganizationKiloPassPaymentReview() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.admin.clearKiloPassPaymentReview.mutationOptions({
+      onSuccess: (_data, variables) =>
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getKiloPassSummary.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        }),
+    })
+  );
+}
+
 export function useDeleteOrganization() {
   const queryClient = useQueryClient();
   const trpc = useTRPC();

@@ -1,5 +1,4 @@
 import {
-  toActivationView,
   toCondition,
   toCurrentAllocation,
   toCurrentAllocations,
@@ -137,82 +136,5 @@ describe('organization Kilo Pass mappers', () => {
       { organizationId: 'child-a', organizationName: 'Child A', kind: 'child', passCount: 0 },
       { organizationId: 'child-b', organizationName: 'Child B', kind: 'child', passCount: 0 },
     ]);
-  });
-});
-
-describe('toActivationView', () => {
-  const base = {
-    state: 'pending_payment' as const,
-    commercialState: 'pending_payment' as const,
-    processingCondition: 'ready' as const,
-    message: null,
-  };
-
-  test('treats active and cancel_at_period_end as terminal success states', () => {
-    for (const commercialState of ['active', 'cancel_at_period_end'] as const) {
-      const view = toActivationView({ ...base, state: commercialState, commercialState });
-      expect(view.state).toBe('succeeded');
-      expect(view.shouldPoll).toBe(false);
-      expect(view.actionTarget).toBe('kilo_pass_detail');
-    }
-  });
-
-  test('treats ended as a terminal state without polling', () => {
-    const view = toActivationView({ ...base, state: 'ended', commercialState: 'ended' });
-    expect(view.state).toBe('ended');
-    expect(view.shouldPoll).toBe(false);
-    expect(view.actionTarget).toBe('subscriptions');
-  });
-
-  test('stops polling when payment requires action and points at billing', () => {
-    const view = toActivationView({ ...base, processingCondition: 'suspended_for_review' });
-    expect(view.state).toBe('requires_action');
-    expect(view.shouldPoll).toBe(false);
-    expect(view.actionTarget).toBe('billing_portal');
-  });
-
-  test('stops polling when activation is blocked and points at pass assignments', () => {
-    const view = toActivationView({ ...base, processingCondition: 'blocked' });
-    expect(view.state).toBe('blocked');
-    expect(view.shouldPoll).toBe(false);
-    expect(view.actionTarget).toBe('kilo_pass_detail');
-  });
-
-  test('keeps polling through a failed run because Kilo retries automatically', () => {
-    const view = toActivationView({ ...base, processingCondition: 'failed' });
-    expect(view.state).toBe('failed');
-    expect(view.shouldPoll).toBe(true);
-    expect(view.actionLabel).toBeUndefined();
-  });
-
-  test('keeps polling while payment is pending or activation is in progress', () => {
-    expect(toActivationView(base).state).toBe('awaiting_payment');
-    expect(toActivationView(base).shouldPoll).toBe(true);
-
-    const activating = toActivationView({
-      state: 'activating',
-      commercialState: null,
-      processingCondition: null,
-      message: null,
-    });
-    expect(activating.state).toBe('activating');
-    expect(activating.shouldPoll).toBe(true);
-  });
-
-  test('treats a missing or unavailable agreement as a non-polling dead end', () => {
-    for (const result of [
-      null,
-      { state: 'unavailable', commercialState: null, processingCondition: null, message: null },
-    ] as const) {
-      const view = toActivationView(result);
-      expect(view.state).toBe('blocked');
-      expect(view.shouldPoll).toBe(false);
-      expect(view.actionTarget).toBe('subscriptions');
-    }
-  });
-
-  test('prefers the backend message when one is provided', () => {
-    const view = toActivationView({ ...base, message: 'Custom backend message' });
-    expect(view.description).toBe('Custom backend message');
   });
 });

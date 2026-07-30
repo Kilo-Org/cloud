@@ -1,16 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useAdminOrganizationKiloPassSummary } from '@/app/admin/api/organizations/hooks';
+import {
+  useAdminOrganizationKiloPassSummary,
+  useClearOrganizationKiloPassPaymentReview,
+} from '@/app/admin/api/organizations/hooks';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { formatOrgPassDate } from '@/components/subscriptions/org-kilo-pass/formatters';
 
 export function OrganizationAdminKiloPass({ organizationId }: { organizationId: string }) {
   const summaryQuery = useAdminOrganizationKiloPassSummary(organizationId);
+  const clearPaymentReview = useClearOrganizationKiloPassPaymentReview();
+  const [reviewReason, setReviewReason] = useState('');
 
   if (summaryQuery.isPending) {
     return <Skeleton className="h-44 w-full rounded-xl" />;
@@ -98,6 +107,43 @@ export function OrganizationAdminKiloPass({ organizationId }: { organizationId: 
               <SummaryValue label="Pass capacity" value={String(agreement.purchasedPassCapacity)} />
               <SummaryValue label="Paid through" value={formatOrgPassDate(agreement.paidUntil)} />
             </dl>
+            {agreement.processingCondition === 'suspended_for_review' ? (
+              <form
+                className="space-y-3 rounded-lg border border-status-warning/40 p-3"
+                onSubmit={event => {
+                  event.preventDefault();
+                  clearPaymentReview.mutate(
+                    { organizationId, reason: reviewReason },
+                    {
+                      onSuccess: () => {
+                        setReviewReason('');
+                        toast.success('Payment review cleared');
+                      },
+                      onError: error => toast.error(error.message),
+                    }
+                  );
+                }}
+              >
+                <div className="space-y-1.5">
+                  <Label htmlFor="kilo-pass-review-reason">Resolution reason</Label>
+                  <Input
+                    id="kilo-pass-review-reason"
+                    value={reviewReason}
+                    onChange={event => setReviewReason(event.target.value)}
+                    minLength={3}
+                    maxLength={500}
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={reviewReason.trim().length < 3 || clearPaymentReview.isPending}
+                >
+                  {clearPaymentReview.isPending ? 'Clearing review…' : 'Clear payment review'}
+                </Button>
+              </form>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2 border-t pt-4">
               <Badge
                 variant={

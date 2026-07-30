@@ -61,6 +61,7 @@ export const subjects = {
   securityFindingSlaBreach: 'Kilo Security Agent: SLA breached',
   costInsightSpendAlert: 'Kilo Cost Insights: Spend Alert',
   recommendationsDigest: 'Kilo: Your weekly recommendations',
+  kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -166,6 +167,20 @@ export async function sendOrgSubscriptionEmail(to: string, props: Props): Promis
     to,
     templateName: 'orgSubscription',
     templateVars: { seats, organization_url, invoices_url },
+  });
+}
+
+export async function sendKiloPassOrgBlockedEmail(
+  to: string,
+  props: { organizationId: string; organizationName: string }
+): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'kiloPassOrgBlocked',
+    templateVars: {
+      organization_name: props.organizationName,
+      manage_url: `${NEXTAUTH_URL}/organizations/${props.organizationId}/subscriptions/kilo-pass`,
+    },
   });
 }
 

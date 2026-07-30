@@ -21,7 +21,6 @@ import {
 import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
-  organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 
 const TierSchema = z.enum(['tier_19', 'tier_49', 'tier_199']);
@@ -44,8 +43,6 @@ const BillingHistoryInputSchema = OrganizationIdInputSchema.extend({
 const OrganizationKiloPassStateSchema = z.enum([
   'unavailable',
   'pending_payment',
-  'requires_action',
-  'activating',
   'active',
   'cancel_at_period_end',
   'ended',
@@ -84,6 +81,7 @@ const SummaryOutputSchema = z.object({
   agreement: z
     .object({
       tier: TierSchema,
+      cadence: z.enum(['monthly', 'yearly']),
       paidSeatCount: z.number().int().nonnegative(),
       planVersion: z.number().int().nonnegative(),
       paidThrough: TimestampSchema.nullable(),
@@ -141,9 +139,6 @@ const DetailOutputSchema = z.object({
       attemptCount: z.number().int().nonnegative(),
     })
     .nullable(),
-  pendingTermTransitions: z.array(
-    z.object({ id: z.uuid(), effectiveAt: TimestampSchema, toVersionKey: z.string().min(1) })
-  ),
   currentAllocations: z.array(CurrentAllocationSchema),
   nextAllocations: z.array(
     z.object({
@@ -155,18 +150,10 @@ const DetailOutputSchema = z.object({
   ),
 });
 const CheckoutOutputSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('checkout'), url: z.url() }),
   z.object({ kind: z.literal('payment_action'), clientSecret: z.string().min(1) }),
   z.object({ kind: z.literal('completed') }),
   z.object({ kind: z.literal('pending') }),
 ]);
-const ActivationOutputSchema = z.object({
-  state: OrganizationKiloPassStateSchema,
-  commercialState: CommercialStateSchema.nullable(),
-  processingCondition: ProcessingConditionSchema.nullable(),
-  agreementId: z.uuid().nullable(),
-  message: z.string().min(1).nullable(),
-});
 const UpdateAllocationOutputSchema = z.object({
   planVersion: z.number().int().nonnegative(),
   nextWindowStartsAt: TimestampSchema,
@@ -179,13 +166,6 @@ const ResumeOutputSchema = z.object({ state: z.literal('active') });
 const RetryRunOutputSchema = z.object({
   runId: z.uuid(),
   window: z.object({ startsAt: TimestampSchema, endsAt: TimestampSchema }),
-});
-const StatusOutputSchema = z.object({
-  state: OrganizationKiloPassStateSchema,
-  commercialState: CommercialStateSchema.nullable(),
-  processingCondition: ProcessingConditionSchema.nullable(),
-  retryAfterSeconds: z.number().int().positive().nullable(),
-  updatedAt: TimestampSchema,
 });
 
 /** Billing access applies only to the parent agreement owner, never a child org. */
@@ -221,7 +201,7 @@ function rethrowServiceError(error: unknown): never {
 }
 
 export const organizationKiloPassRouter = createTRPCRouter({
-  usage: organizationMemberProcedure.output(UsageOutputSchema).query(async ({ input }) => {
+  usage: organizationParentBillingProcedure.output(UsageOutputSchema).query(async ({ input }) => {
     return organizationKiloPassService.getUsage(input);
   }),
 
@@ -257,13 +237,6 @@ export const organizationKiloPassRouter = createTRPCRouter({
         createOrganizationKiloPassCheckout
       )
     ),
-
-  activation: organizationParentBillingProcedure
-    .input(
-      OrganizationIdInputSchema.extend({ checkoutSessionId: z.string().min(1).max(512) }).strict()
-    )
-    .output(ActivationOutputSchema)
-    .query(async ({ input }) => organizationKiloPassService.getActivation(input)),
 
   reconcilePayment: organizationParentBillingProcedure
     .output(z.object({ activated: z.boolean() }))
@@ -329,15 +302,26 @@ export const organizationKiloPassRouter = createTRPCRouter({
 
   cancel: organizationParentBillingProcedure
     .output(CancelOutputSchema)
-    .mutation(async ({ input, ctx }) =>
-      organizationKiloPassService.cancel(
-        {
-          organizationId: input.organizationId,
-          actorUserId: ctx.user.id,
-        },
-        scheduleOrganizationKiloPassCancellation
-      )
-    ),
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await organizationKiloPassService.cancel(
+          {
+            organizationId: input.organizationId,
+            actorUserId: ctx.user.id,
+          },
+          scheduleOrganizationKiloPassCancellation
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === 'SCHEDULE_REWRITE_UNSAFE') {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message:
+              'A different subscription change is already scheduled. Cancel it before scheduling Kilo Pass cancellation.',
+          });
+        }
+        throw error;
+      }
+    }),
 
   resume: organizationParentBillingProcedure
     .output(ResumeOutputSchema)
@@ -366,11 +350,5 @@ export const organizationKiloPassRouter = createTRPCRouter({
     .output(RetryRunOutputSchema)
     .mutation(async ({ input, ctx }) =>
       organizationKiloPassService.retryRun({ ...input, actorUserId: ctx.user.id })
-    ),
-
-  status: organizationParentBillingProcedure
-    .output(StatusOutputSchema)
-    .query(async ({ input }) =>
-      organizationKiloPassService.getStatus({ organizationId: input.organizationId })
     ),
 });

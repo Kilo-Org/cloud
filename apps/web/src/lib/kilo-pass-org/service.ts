@@ -4,12 +4,14 @@ import {
   credit_transactions,
   kilo_pass_org_agreements,
   kilo_pass_org_allocation_plan_rows,
+  kilo_pass_org_audit_records,
   kilo_pass_org_allocation_plans,
   kilo_pass_org_issuance_snapshots,
+  kilo_pass_org_notification_deliveries,
   kilo_pass_org_processing_runs,
   kilo_pass_org_supplements,
-  kilo_pass_org_term_transitions,
   kilo_pass_org_term_versions,
+  organization_memberships,
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
@@ -23,7 +25,7 @@ import {
   KiloPassCadence,
   KiloPassTier,
 } from '@kilocode/db/schema-types';
-import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   bridgeRatio,
@@ -37,8 +39,6 @@ import {
 export type OrganizationKiloPassState =
   | 'unavailable'
   | 'pending_payment'
-  | 'requires_action'
-  | 'activating'
   | 'active'
   | 'cancel_at_period_end'
   | 'ended'
@@ -76,6 +76,7 @@ export type OrganizationKiloPassService = {
     processingCondition: OrganizationKiloPassProcessingCondition | null;
     agreement: {
       tier: Tier;
+      cadence: Cadence;
       paidSeatCount: number;
       planVersion: number;
       paidThrough: string | null;
@@ -110,7 +111,6 @@ export type OrganizationKiloPassService = {
       failureCode: string | null;
       attemptCount: number;
     } | null;
-    pendingTermTransitions: { id: string; effectiveAt: string; toVersionKey: string }[];
     currentAllocations: {
       organizationId: string;
       organizationName: string;
@@ -147,18 +147,8 @@ export type OrganizationKiloPassService = {
     },
     createProviderCheckout: OrganizationKiloPassProviderOperations['createCheckout']
   ): Promise<
-    | { kind: 'checkout'; url: string }
-    | { kind: 'payment_action'; clientSecret: string }
-    | { kind: 'completed' }
-    | { kind: 'pending' }
+    { kind: 'payment_action'; clientSecret: string } | { kind: 'completed' } | { kind: 'pending' }
   >;
-  getActivation(input: { organizationId: string; checkoutSessionId: string }): Promise<{
-    state: OrganizationKiloPassState;
-    commercialState: OrganizationKiloPassCommercialState | null;
-    processingCondition: OrganizationKiloPassProcessingCondition | null;
-    agreementId: string | null;
-    message: string | null;
-  }>;
   updateAllocation(input: {
     organizationId: string;
     actorUserId: string;
@@ -183,13 +173,6 @@ export type OrganizationKiloPassService = {
     runId: string;
     window: { startsAt: string; endsAt: string };
   }>;
-  getStatus(input: { organizationId: string }): Promise<{
-    state: OrganizationKiloPassState;
-    commercialState: OrganizationKiloPassCommercialState | null;
-    processingCondition: OrganizationKiloPassProcessingCondition | null;
-    retryAfterSeconds: number | null;
-    updatedAt: string;
-  }>;
 };
 
 /** Stripe-facing operations are supplied by the application boundary. */
@@ -200,10 +183,7 @@ export type OrganizationKiloPassProviderOperations = {
     tier: Tier;
     allocations: { childOrganizationId: string; passCount: number }[];
   }): Promise<
-    | { kind: 'checkout'; url: string }
-    | { kind: 'payment_action'; clientSecret: string }
-    | { kind: 'completed' }
-    | { kind: 'pending' }
+    { kind: 'payment_action'; clientSecret: string } | { kind: 'completed' } | { kind: 'pending' }
   >;
   scheduleCancellation(input: {
     providerSubscriptionId: string;
@@ -342,6 +322,29 @@ async function assertParentAndChildren(
     );
   if (children.length !== allocations.length)
     throw new Error('allocation container must be a direct child organization');
+}
+
+async function recordAudit(
+  tx: DrizzleTransaction,
+  input: {
+    agreementId: string;
+    actorUserId?: string;
+    action: string;
+    reason: string;
+    before?: Record<string, unknown>;
+    after?: Record<string, unknown>;
+    idempotencyKey?: string;
+  }
+) {
+  await tx.insert(kilo_pass_org_audit_records).values({
+    agreement_id: input.agreementId,
+    actor_kilo_user_id: input.actorUserId,
+    action: input.action,
+    reason: input.reason,
+    before_json: input.before,
+    after_json: input.after,
+    idempotency_key: input.idempotencyKey,
+  });
 }
 
 async function insertPlan(
@@ -629,6 +632,29 @@ async function issue(
       .update(kilo_pass_org_agreements)
       .set({ processing_condition: KiloPassOrgProcessingCondition.Overallocated })
       .where(eq(kilo_pass_org_agreements.id, row.agreement.id));
+    const recipients = await tx
+      .select({ userId: organization_memberships.kilo_user_id })
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, row.agreement.parent_organization_id),
+          inArray(organization_memberships.role, ['owner', 'billing_manager'])
+        )
+      );
+    const recipientIds = new Set(recipients.map(recipient => recipient.userId));
+    if (!recipientIds.size) recipientIds.add(input.recipientUserId);
+    if (recipientIds.size) {
+      await tx
+        .insert(kilo_pass_org_notification_deliveries)
+        .values(
+          [...recipientIds].map(userId => ({
+            processing_run_id: run.id,
+            recipient_kilo_user_id: userId,
+            status: 'pending' as const,
+          }))
+        )
+        .onConflictDoNothing();
+    }
     return { issued: false, blocked: true };
   }
   await tx
@@ -715,7 +741,9 @@ async function issue(
     .where(eq(kilo_pass_org_processing_runs.id, run.id));
   await tx
     .update(kilo_pass_org_agreements)
-    .set({ processing_condition: KiloPassOrgProcessingCondition.Ready })
+    .set({
+      processing_condition: conditionAfterRecovery(processingCondition(row.agreement)),
+    })
     .where(eq(kilo_pass_org_agreements.id, row.agreement.id));
   return { issued: true, blocked: false };
 }
@@ -770,13 +798,18 @@ export async function activatePaidAgreement(input: {
       : null;
     const appliesPendingCapacity =
       pendingCapacityEffectiveAt !== null && input.paidFrom >= pendingCapacityEffectiveAt;
-    // Seat increases update the same provider quantity that held any scheduled decrease,
-    // so the confirmed higher quantity supersedes that pending decrease.
-    const replacesPendingCapacity = input.paidSeatCount > existing.purchased_pass_capacity;
+    // A paid provider quantity above the scheduled quantity supersedes that
+    // schedule even when it remains below the pre-decrease capacity.
+    const replacesPendingCapacity =
+      existing.next_purchased_pass_capacity !== null &&
+      input.paidSeatCount > existing.next_purchased_pass_capacity;
     await tx
       .update(kilo_pass_org_agreements)
       .set({
-        state: KiloPassOrgAgreementState.Active,
+        state:
+          existing.state === KiloPassOrgAgreementState.CancelAtPeriodEnd
+            ? KiloPassOrgAgreementState.CancelAtPeriodEnd
+            : KiloPassOrgAgreementState.Active,
         purchased_pass_capacity: input.paidSeatCount,
         next_purchased_pass_capacity:
           appliesPendingCapacity || replacesPendingCapacity
@@ -792,6 +825,12 @@ export async function activatePaidAgreement(input: {
           existing.activation_provider_event_id ?? input.providerEventId,
       })
       .where(eq(kilo_pass_org_agreements.id, input.agreementId));
+    if (
+      processingCondition(existing) === KiloPassOrgProcessingCondition.Manual ||
+      processingCondition(existing) === KiloPassOrgProcessingCondition.SuspendedForReview
+    ) {
+      return { issued: false, blocked: false };
+    }
     const firstWindow = input.isBridge
       ? input.paidBridgeInterval
         ? intersectionWindow(input.firstWindow, input.paidBridgeInterval)
@@ -820,7 +859,7 @@ export async function scheduleOrganizationPassCapacity(input: {
   if (!Number.isSafeInteger(input.paidSeatCount) || input.paidSeatCount < 0) {
     throw new Error('invalid paid seat count');
   }
-  if (!row.agreement.paid_until) throw new Error('active agreement has no paid-through date');
+  if (!row.agreement.paid_until) return { scheduled: false };
   return db.transaction(async tx => {
     const [agreement] = await tx
       .select()
@@ -828,23 +867,42 @@ export async function scheduleOrganizationPassCapacity(input: {
       .where(eq(kilo_pass_org_agreements.id, row.agreement.id))
       .for('update');
     if (!agreement) throw new Error('agreement not found');
-    if (!agreement.paid_until) throw new Error('active agreement has no paid-through date');
+    if (!agreement.paid_until) return { scheduled: false };
     const effectiveAt = asDate(agreement.paid_until);
     const { allocations } = await effectivePlan(tx, agreement.id, effectiveAt);
     const valid = validateAllocation(
       input.paidSeatCount,
       allocations.map(allocation => allocation.passCapacity)
     );
+    const nextCondition = valid.valid
+      ? conditionAfterRecovery(processingCondition(agreement))
+      : processingCondition(agreement) === KiloPassOrgProcessingCondition.Manual ||
+          processingCondition(agreement) === KiloPassOrgProcessingCondition.SuspendedForReview
+        ? processingCondition(agreement)
+        : KiloPassOrgProcessingCondition.Overallocated;
     await tx
       .update(kilo_pass_org_agreements)
       .set({
         next_purchased_pass_capacity: input.paidSeatCount,
         next_capacity_effective_at: agreement.paid_until,
-        processing_condition: valid.valid
-          ? KiloPassOrgProcessingCondition.Ready
-          : KiloPassOrgProcessingCondition.Overallocated,
+        processing_condition: nextCondition,
       })
       .where(eq(kilo_pass_org_agreements.id, agreement.id));
+    await recordAudit(tx, {
+      agreementId: agreement.id,
+      action: 'capacity_change_scheduled',
+      reason: 'paid_seat_decrease',
+      before: {
+        purchasedPassCapacity: agreement.purchased_pass_capacity,
+        nextPurchasedPassCapacity: agreement.next_purchased_pass_capacity,
+        processingCondition: agreement.processing_condition,
+      },
+      after: {
+        nextPurchasedPassCapacity: input.paidSeatCount,
+        effectiveAt: agreement.paid_until,
+        processingCondition: nextCondition,
+      },
+    });
     return { scheduled: true, overallocated: !valid.valid };
   });
 }
@@ -869,14 +927,30 @@ export async function retryOrganizationPassRun(input: { agreementId: string; run
       throw new Error('processing run is not recoverable');
     }
     const [owner] = await tx
-      .select({ userId: organizations.created_by_kilo_user_id })
+      .select({
+        parentOrganizationId: kilo_pass_org_agreements.parent_organization_id,
+        fallbackUserId: organizations.created_by_kilo_user_id,
+        processingCondition: kilo_pass_org_agreements.processing_condition,
+      })
       .from(kilo_pass_org_agreements)
       .innerJoin(
         organizations,
         eq(kilo_pass_org_agreements.parent_organization_id, organizations.id)
       )
       .where(eq(kilo_pass_org_agreements.id, input.agreementId));
-    if (!owner?.userId) throw new Error('agreement owner is unavailable');
+    if (!owner) throw new Error('agreement owner is unavailable');
+    if (
+      owner.processingCondition === KiloPassOrgProcessingCondition.Manual ||
+      owner.processingCondition === KiloPassOrgProcessingCondition.SuspendedForReview
+    ) {
+      throw new Error('agreement processing condition requires explicit review');
+    }
+    const recipientUserId = await agreementRecipientUserId(
+      tx,
+      owner.parentOrganizationId,
+      owner.fallbackUserId
+    );
+    if (!recipientUserId) throw new Error('agreement owner is unavailable');
     await tx
       .update(kilo_pass_org_processing_runs)
       .set({
@@ -887,10 +961,12 @@ export async function retryOrganizationPassRun(input: { agreementId: string; run
       .where(eq(kilo_pass_org_processing_runs.id, run.id));
     await tx
       .update(kilo_pass_org_agreements)
-      .set({ processing_condition: KiloPassOrgProcessingCondition.Ready })
+      .set({
+        processing_condition: conditionAfterRecovery(owner.processingCondition),
+      })
       .where(eq(kilo_pass_org_agreements.id, input.agreementId));
     return {
-      recipientUserId: owner.userId,
+      recipientUserId,
       window: { start: asDate(run.window_start), end: asDate(run.window_end) },
     };
   });
@@ -935,13 +1011,87 @@ export async function bindProviderSeatAddOnItem(input: {
 
 /** Adverse payment events stop future issuance without reversing already granted credits. */
 export async function suspendAgreementForPaymentReview(providerSubscriptionId: string) {
-  await db
-    .update(kilo_pass_org_agreements)
-    .set({
-      processing_condition: KiloPassOrgProcessingCondition.SuspendedForReview,
-      payment_review_required_at: new Date().toISOString(),
-    })
-    .where(eq(kilo_pass_org_agreements.provider_subscription_id, providerSubscriptionId));
+  await db.transaction(async tx => {
+    const [agreement] = await tx
+      .select()
+      .from(kilo_pass_org_agreements)
+      .where(eq(kilo_pass_org_agreements.provider_subscription_id, providerSubscriptionId))
+      .for('update');
+    if (!agreement) return;
+    const suspendedAt = new Date().toISOString();
+    await tx
+      .update(kilo_pass_org_agreements)
+      .set({
+        processing_condition: KiloPassOrgProcessingCondition.SuspendedForReview,
+        payment_review_required_at: suspendedAt,
+      })
+      .where(eq(kilo_pass_org_agreements.id, agreement.id));
+    await recordAudit(tx, {
+      agreementId: agreement.id,
+      action: 'payment_review_suspended',
+      reason: 'provider_adverse_payment_event',
+      before: { processingCondition: agreement.processing_condition },
+      after: {
+        processingCondition: KiloPassOrgProcessingCondition.SuspendedForReview,
+        paymentReviewRequiredAt: suspendedAt,
+      },
+      idempotencyKey: `kpo:payment-review:${agreement.id}:${suspendedAt}`,
+    });
+  });
+}
+
+export async function clearAgreementPaymentReview(input: {
+  organizationId: string;
+  actorUserId: string;
+  reason: string;
+}) {
+  return db.transaction(async tx => {
+    const [agreement] = await tx
+      .select()
+      .from(kilo_pass_org_agreements)
+      .where(
+        and(
+          eq(kilo_pass_org_agreements.parent_organization_id, input.organizationId),
+          ne(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.Ended)
+        )
+      )
+      .for('update');
+    if (!agreement) throw new Error('Kilo Pass organization agreement not found');
+    if (processingCondition(agreement) !== KiloPassOrgProcessingCondition.SuspendedForReview) {
+      throw new Error('agreement is not suspended for payment review');
+    }
+    const capacity = agreement.next_purchased_pass_capacity ?? agreement.purchased_pass_capacity;
+    const { allocations } = await effectivePlan(
+      tx,
+      agreement.id,
+      agreement.next_capacity_effective_at
+        ? asDate(agreement.next_capacity_effective_at)
+        : nextIssuanceBoundary(asDate(agreement.issuance_anchor_at), new Date())
+    );
+    const valid = validateAllocation(
+      capacity,
+      allocations.map(allocation => allocation.passCapacity)
+    );
+    const nextCondition = valid.valid
+      ? KiloPassOrgProcessingCondition.Ready
+      : KiloPassOrgProcessingCondition.Overallocated;
+    await tx
+      .update(kilo_pass_org_agreements)
+      .set({ processing_condition: nextCondition, payment_review_required_at: null })
+      .where(eq(kilo_pass_org_agreements.id, agreement.id));
+    await recordAudit(tx, {
+      agreementId: agreement.id,
+      actorUserId: input.actorUserId,
+      action: 'payment_review_cleared',
+      reason: input.reason,
+      before: {
+        processingCondition: agreement.processing_condition,
+        paymentReviewRequiredAt: agreement.payment_review_required_at,
+      },
+      after: { processingCondition: nextCondition, paymentReviewRequiredAt: null },
+    });
+    return { processingCondition: nextCondition };
+  });
 }
 
 export async function createParentSupplement(input: {
@@ -1111,6 +1261,20 @@ function processingCondition(row: {
   return row.processing_condition as OrganizationKiloPassProcessingCondition;
 }
 
+const recoverableProcessingConditions = new Set<OrganizationKiloPassProcessingCondition>([
+  KiloPassOrgProcessingCondition.Blocked,
+  KiloPassOrgProcessingCondition.Overallocated,
+  KiloPassOrgProcessingCondition.Failed,
+]);
+
+function conditionAfterRecovery(
+  condition: OrganizationKiloPassProcessingCondition
+): OrganizationKiloPassProcessingCondition {
+  return recoverableProcessingConditions.has(condition)
+    ? KiloPassOrgProcessingCondition.Ready
+    : condition;
+}
+
 function processingRunState(row: { state: string }): KiloPassOrgProcessingRunState {
   if (
     Object.values(KiloPassOrgProcessingRunState).includes(
@@ -1151,6 +1315,25 @@ async function latestRunForAgreement(agreementId: string) {
   return latestRun ?? null;
 }
 
+async function agreementRecipientUserId(
+  tx: DrizzleTransaction,
+  parentOrganizationId: string,
+  fallbackUserId: string | null
+): Promise<string | null> {
+  const [manager] = await tx
+    .select({ userId: organization_memberships.kilo_user_id })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, parentOrganizationId),
+        inArray(organization_memberships.role, ['owner', 'billing_manager'])
+      )
+    )
+    .orderBy(asc(organization_memberships.joined_at))
+    .limit(1);
+  return manager?.userId ?? fallbackUserId;
+}
+
 async function latestIssuedCapacity(agreementId: string) {
   const [latestSnapshot] = await db
     .select({ start: kilo_pass_org_issuance_snapshots.window_start })
@@ -1188,6 +1371,7 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
           processingCondition: processingCondition(row.agreement),
           agreement: {
             tier: row.term.tier as Tier,
+            cadence: row.agreement.cadence === KiloPassCadence.Yearly ? 'yearly' : 'monthly',
             paidSeatCount:
               processingCondition(row.agreement) === KiloPassOrgProcessingCondition.Ready
                 ? Math.max(row.agreement.purchased_pass_capacity, issuedCapacity)
@@ -1368,27 +1552,7 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
       });
     }
     const currentWindowEnded = latestSnapshot ? asDate(latestSnapshot.end) <= now : false;
-    const [latestRun, pendingTransitions] = await Promise.all([
-      latestRunForAgreement(row.agreement.id),
-      db
-        .select({
-          id: kilo_pass_org_term_transitions.id,
-          effectiveAt: kilo_pass_org_term_transitions.effective_at,
-          toVersionKey: kilo_pass_org_term_versions.version_key,
-        })
-        .from(kilo_pass_org_term_transitions)
-        .innerJoin(
-          kilo_pass_org_term_versions,
-          eq(kilo_pass_org_term_transitions.to_term_version_id, kilo_pass_org_term_versions.id)
-        )
-        .where(
-          and(
-            eq(kilo_pass_org_term_transitions.agreement_id, row.agreement.id),
-            gte(kilo_pass_org_term_transitions.effective_at, new Date().toISOString())
-          )
-        )
-        .orderBy(asc(kilo_pass_org_term_transitions.effective_at)),
-    ]);
+    const latestRun = await latestRunForAgreement(row.agreement.id);
     return {
       state: commercialState(row.agreement),
       commercialState: commercialState(row.agreement),
@@ -1416,11 +1580,6 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
             attemptCount: latestRun.attempt_count,
           }
         : null,
-      pendingTermTransitions: pendingTransitions.map(transition => ({
-        id: transition.id,
-        effectiveAt: requiredIso(transition.effectiveAt),
-        toVersionKey: transition.toVersionKey,
-      })),
       currentAllocations: [...currentAllocations.values()].map(allocation => ({
         organizationId: allocation.organizationId,
         organizationName: names.get(allocation.organizationId) ?? 'Unknown organization',
@@ -1488,16 +1647,6 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
   },
   async createCheckout(input, createProviderCheckout) {
     return createProviderCheckout(input);
-  },
-  async getActivation({ organizationId }) {
-    const row = await visibleAgreement(organizationId);
-    return {
-      state: row ? commercialState(row.agreement) : 'unavailable',
-      commercialState: row ? commercialState(row.agreement) : null,
-      processingCondition: row ? processingCondition(row.agreement) : null,
-      agreementId: row?.agreement.id ?? null,
-      message: row ? null : 'No Kilo Pass organization agreement exists for this checkout.',
-    };
   },
   async updateAllocation(input) {
     const row = await nonEndedAgreement(input.organizationId);
@@ -1570,10 +1719,24 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
         allocations,
       });
       if (blockedRun) await reclaimBlockedProcessingRun(tx, blockedRun.id);
+      const nextCondition = conditionAfterRecovery(processingCondition(agreement));
       await tx
         .update(kilo_pass_org_agreements)
-        .set({ processing_condition: KiloPassOrgProcessingCondition.Ready })
+        .set({ processing_condition: nextCondition })
         .where(eq(kilo_pass_org_agreements.id, agreement.id));
+      await recordAudit(tx, {
+        agreementId: agreement.id,
+        actorUserId: input.actorUserId,
+        action: 'allocation_plan_updated',
+        reason: blockedRun ? 'blocked_window_reconciliation' : 'future_allocation_update',
+        before: { planVersion: latest.version },
+        after: {
+          planVersion: latest.version + 1,
+          effectiveWindowStart: effectiveWindowStart.toISOString(),
+          allocations,
+          processingCondition: nextCondition,
+        },
+      });
       return { planVersion: latest.version + 1, effectiveWindowStart };
     });
     return {
@@ -1581,7 +1744,7 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
       nextWindowStartsAt: result.effectiveWindowStart.toISOString(),
     };
   },
-  async cancel({ organizationId }, scheduleProviderCancellation) {
+  async cancel({ organizationId, actorUserId }, scheduleProviderCancellation) {
     const row = await nonEndedAgreement(organizationId);
     if (!row) throw new Error('Kilo Pass organization agreement not found');
     const { provider_subscription_id, provider_seat_add_on_item_id } = row.agreement;
@@ -1592,19 +1755,32 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
       providerSubscriptionId: provider_subscription_id,
       providerSeatAddOnItemId: provider_seat_add_on_item_id,
     });
-    await db
-      .update(kilo_pass_org_agreements)
-      .set({
-        state: KiloPassOrgAgreementState.CancelAtPeriodEnd,
-        cancellation_effective_at: row.agreement.paid_until,
-      })
-      .where(eq(kilo_pass_org_agreements.id, row.agreement.id));
+    await db.transaction(async tx => {
+      await tx
+        .update(kilo_pass_org_agreements)
+        .set({
+          state: KiloPassOrgAgreementState.CancelAtPeriodEnd,
+          cancellation_effective_at: row.agreement.paid_until,
+        })
+        .where(eq(kilo_pass_org_agreements.id, row.agreement.id));
+      await recordAudit(tx, {
+        agreementId: row.agreement.id,
+        actorUserId,
+        action: 'cancellation_scheduled',
+        reason: 'self_service',
+        before: { state: row.agreement.state },
+        after: {
+          state: KiloPassOrgAgreementState.CancelAtPeriodEnd,
+          effectiveAt: row.agreement.paid_until,
+        },
+      });
+    });
     return {
       state: 'cancel_at_period_end',
       effectiveAt: iso(row.agreement.paid_until) ?? new Date().toISOString(),
     };
   },
-  async resume({ organizationId }, resumeProviderCancellation) {
+  async resume({ organizationId, actorUserId }, resumeProviderCancellation) {
     const row = await nonEndedAgreement(organizationId);
     if (!row) throw new Error('Kilo Pass organization agreement not found');
     if (row.agreement.state === KiloPassOrgAgreementState.Active) return { state: 'active' };
@@ -1618,13 +1794,23 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
       providerSubscriptionId: row.agreement.provider_subscription_id,
       providerSeatAddOnItemId: row.agreement.provider_seat_add_on_item_id,
     });
-    await db
-      .update(kilo_pass_org_agreements)
-      .set({ state: KiloPassOrgAgreementState.Active, cancellation_effective_at: null })
-      .where(eq(kilo_pass_org_agreements.id, row.agreement.id));
+    await db.transaction(async tx => {
+      await tx
+        .update(kilo_pass_org_agreements)
+        .set({ state: KiloPassOrgAgreementState.Active, cancellation_effective_at: null })
+        .where(eq(kilo_pass_org_agreements.id, row.agreement.id));
+      await recordAudit(tx, {
+        agreementId: row.agreement.id,
+        actorUserId,
+        action: 'cancellation_resumed',
+        reason: 'self_service',
+        before: { state: row.agreement.state },
+        after: { state: KiloPassOrgAgreementState.Active },
+      });
+    });
     return { state: 'active' };
   },
-  async retryRun({ organizationId, runId }) {
+  async retryRun({ organizationId, runId, actorUserId }) {
     const row = await nonEndedAgreement(organizationId);
     if (!row) throw new Error('Kilo Pass organization agreement not found');
     const run = await db
@@ -1642,19 +1828,19 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
       .limit(1);
     if (!run[0]) throw new Error('processing run not found');
     await retryOrganizationPassRun({ agreementId: row.agreement.id, runId });
+    await db.transaction(tx =>
+      recordAudit(tx, {
+        agreementId: row.agreement.id,
+        actorUserId,
+        action: 'processing_run_retried',
+        reason: 'self_service',
+        before: { runId },
+        after: { runId, state: 'retried' },
+      })
+    );
     return {
       runId,
       window: { startsAt: requiredIso(run[0].windowStart), endsAt: requiredIso(run[0].windowEnd) },
-    };
-  },
-  async getStatus({ organizationId }) {
-    const row = await visibleAgreement(organizationId);
-    return {
-      state: row ? commercialState(row.agreement) : 'unavailable',
-      commercialState: row ? commercialState(row.agreement) : null,
-      processingCondition: row ? processingCondition(row.agreement) : null,
-      retryAfterSeconds: null,
-      updatedAt: row ? requiredIso(row.agreement.updated_at) : new Date().toISOString(),
     };
   },
 };
@@ -1683,6 +1869,8 @@ export type OrganizationPassIssuanceCronResult = {
   processed: number;
   issued: number;
   blocked: number;
+  failed: number;
+  failures: { agreementId: string; message: string }[];
 };
 
 /**
@@ -1701,7 +1889,8 @@ export async function runOrganizationPassIssuanceCron(
       paidFrom: kilo_pass_org_agreements.paid_from,
       paidUntil: kilo_pass_org_agreements.paid_until,
       cadence: kilo_pass_org_agreements.cadence,
-      recipientUserId: organizations.created_by_kilo_user_id,
+      parentOrganizationId: organizations.id,
+      fallbackUserId: organizations.created_by_kilo_user_id,
     })
     .from(kilo_pass_org_agreements)
     .innerJoin(organizations, eq(kilo_pass_org_agreements.parent_organization_id, organizations.id))
@@ -1711,7 +1900,8 @@ export async function runOrganizationPassIssuanceCron(
           KiloPassOrgAgreementState.Active,
           KiloPassOrgAgreementState.CancelAtPeriodEnd,
         ]),
-        eq(kilo_pass_org_agreements.processing_condition, KiloPassOrgProcessingCondition.Ready)
+        eq(kilo_pass_org_agreements.processing_condition, KiloPassOrgProcessingCondition.Ready),
+        isNull(organizations.deleted_at)
       )
     )
     .orderBy(asc(kilo_pass_org_agreements.paid_until));
@@ -1719,11 +1909,21 @@ export async function runOrganizationPassIssuanceCron(
   let processed = 0;
   let issued = 0;
   let blocked = 0;
+  const failures: { agreementId: string; message: string }[] = [];
   for (const agreement of agreements) {
-    if (!agreement.paidFrom || !agreement.paidUntil || !agreement.recipientUserId) continue;
+    if (!agreement.paidFrom || !agreement.paidUntil) continue;
     const paidFrom = agreement.paidFrom;
     const paidUntil = agreement.paidUntil;
-    const recipientUserId = agreement.recipientUserId;
+    const recipientUserId = await database.transaction(tx =>
+      agreementRecipientUserId(tx, agreement.parentOrganizationId, agreement.fallbackUserId)
+    );
+    if (!recipientUserId) {
+      failures.push({
+        agreementId: agreement.agreementId,
+        message: 'agreement owner is unavailable',
+      });
+      continue;
+    }
     let result: { didIssue: number; didBlock: number };
     try {
       result = await database.transaction(async tx => {
@@ -1785,13 +1985,24 @@ export async function runOrganizationPassIssuanceCron(
           .set({ processing_condition: KiloPassOrgProcessingCondition.Failed })
           .where(eq(kilo_pass_org_agreements.id, agreement.agreementId));
       });
-      throw error;
+      failures.push({
+        agreementId: agreement.agreementId,
+        message: error instanceof Error ? error.message : 'Unknown issuance failure',
+      });
+      continue;
     }
     processed += 1;
     issued += result.didIssue;
     blocked += result.didBlock;
   }
-  return { examined: agreements.length, processed, issued, blocked };
+  return {
+    examined: agreements.length,
+    processed,
+    issued,
+    blocked,
+    failed: failures.length,
+    failures,
+  };
 }
 
 function monthIndexForDate(anchor: Date, date: Date): number {

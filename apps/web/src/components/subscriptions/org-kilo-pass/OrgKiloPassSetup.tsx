@@ -55,10 +55,6 @@ export function OrgKiloPassSetup({
   const checkout = useMutation(
     trpc.organizations.kiloPass.createCheckout.mutationOptions({
       onSuccess: async result => {
-        if (result.kind === 'checkout') {
-          window.location.assign(result.url);
-          return;
-        }
         if (result.kind === 'payment_action') {
           const stripe = await getStripe();
           if (!stripe) throw new Error('Payment system unavailable. Please try again later.');

@@ -27,6 +27,8 @@ export {
   ORGANIZATION_KILO_PASS_METADATA_TYPE,
 } from './stripe-metadata';
 
+const ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN = 'kilo-pass-org-cancellation';
+
 function intervalToCadence(
   interval: Stripe.Price.Recurring.Interval | undefined
 ): 'monthly' | 'yearly' {
@@ -65,10 +67,7 @@ export async function createOrganizationKiloPassCheckout(input: {
   tier: 'tier_19' | 'tier_49' | 'tier_199';
   allocations: { childOrganizationId: string; passCount: number }[];
 }): Promise<
-  | { kind: 'checkout'; url: string }
-  | { kind: 'payment_action'; clientSecret: string }
-  | { kind: 'completed' }
-  | { kind: 'pending' }
+  { kind: 'payment_action'; clientSecret: string } | { kind: 'completed' } | { kind: 'pending' }
 > {
   const [purchase] = await db
     .select({ subscriptionId: organization_seats_purchases.subscription_stripe_id })
@@ -226,6 +225,9 @@ export async function handleOrganizationKiloPassInvoicePaid(params: {
   );
   const isBridge = isBridgeWindow(firstWindow, paidPeriod);
   const previousSeats = agreement.purchased_pass_capacity;
+  const paidIncreaseSupersedesPendingCapacity =
+    agreement.next_purchased_pass_capacity !== null &&
+    seats > agreement.next_purchased_pass_capacity;
   await activatePaidAgreement({
     agreementId: agreement.id,
     recipientUserId: metadata.kiloUserId,
@@ -236,7 +238,10 @@ export async function handleOrganizationKiloPassInvoicePaid(params: {
     isBridge,
     paidBridgeInterval: isBridge ? paidPeriod : undefined,
   });
-  if (agreement.state === KiloPassOrgAgreementState.Active && seats > previousSeats) {
+  if (
+    agreement.state === KiloPassOrgAgreementState.Active &&
+    (seats > previousSeats || paidIncreaseSupersedesPendingCapacity)
+  ) {
     await createParentSupplement({
       agreementId: agreement.id,
       recipientUserId: metadata.kiloUserId,
@@ -290,13 +295,20 @@ export async function scheduleOrganizationKiloPassCancellation(input: {
     typeof existingSchedule === 'string'
       ? await stripe.subscriptionSchedules.retrieve(existingSchedule)
       : existingSchedule;
-  const hasRemovalScheduled = schedule?.phases.some(phase =>
-    phase.items.every(item => item.price !== passItem.price.id)
-  );
-  if (hasRemovalScheduled) return;
-  const target =
-    schedule ?? (await stripe.subscriptionSchedules.create({ from_subscription: subscription.id }));
+  if (schedule) {
+    const expectedRetainedPrices = new Set(retainedItems.map(item => item.price));
+    const removalPhase = schedule.phases[1];
+    const hasRemovalScheduled =
+      schedule.metadata?.origin === ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN &&
+      schedule.phases.length === 2 &&
+      removalPhase?.items.length === retainedItems.length &&
+      removalPhase.items.every(item => expectedRetainedPrices.has(String(item.price)));
+    if (hasRemovalScheduled) return;
+    throw new Error('SCHEDULE_REWRITE_UNSAFE');
+  }
+  const target = await stripe.subscriptionSchedules.create({ from_subscription: subscription.id });
   await stripe.subscriptionSchedules.update(target.id, {
+    metadata: { origin: ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN },
     end_behavior: 'release',
     phases: [
       {
@@ -326,6 +338,9 @@ export async function resumeOrganizationKiloPassCancellation(input: {
     typeof scheduleReference === 'string'
       ? await stripe.subscriptionSchedules.retrieve(scheduleReference)
       : scheduleReference;
+  if (schedule.metadata?.origin !== ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN) {
+    throw new Error('SCHEDULE_REWRITE_UNSAFE');
+  }
   const expectedCurrentItems = subscription.items.data.map(item => ({
     price: item.price.id,
     quantity: item.quantity ?? 1,

@@ -3029,6 +3029,53 @@ export const kilo_pass_org_processing_runs = pgTable(
   ]
 );
 
+export const kilo_pass_org_notification_deliveries = pgTable(
+  'kilo_pass_org_notification_deliveries',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    processing_run_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_processing_runs.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    recipient_kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    status: text().notNull().default('pending').$type<'pending' | 'sending' | 'sent'>(),
+    attempt_count: integer().notNull().default(0),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_notification_deliveries_run_recipient').on(
+      table.processing_run_id,
+      table.recipient_kilo_user_id
+    ),
+    index('IDX_kilo_pass_org_notification_deliveries_status').on(table.status, table.created_at),
+    check(
+      'kilo_pass_org_notification_deliveries_status_check',
+      sql`${table.status} IN ('pending', 'sending', 'sent')`
+    ),
+    check(
+      'kilo_pass_org_notification_deliveries_attempt_count_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'kilo_pass_org_notification_deliveries_sent_check',
+      sql`(${table.status} = 'sent' AND ${table.sent_at} IS NOT NULL AND ${table.lease_expires_at} IS NULL) OR (${table.status} = 'sending' AND ${table.sent_at} IS NULL AND ${table.lease_expires_at} IS NOT NULL) OR (${table.status} = 'pending' AND ${table.sent_at} IS NULL AND ${table.lease_expires_at} IS NULL)`
+    ),
+  ]
+);
+
 export const kilo_pass_org_issuance_snapshots = pgTable(
   'kilo_pass_org_issuance_snapshots',
   {
@@ -3068,6 +3115,7 @@ export const kilo_pass_org_issuance_snapshots = pgTable(
     qualifying_spend_microdollars: bigint({ mode: 'number' }).notNull().default(0),
     bonus_mode: text().notNull().$type<KiloPassOrgBonusMode>(),
     bonus_unlocked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    repair_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     bonus_credit_transaction_id: uuid().references(() => credit_transactions.id, {
       onDelete: 'restrict',
       onUpdate: 'cascade',

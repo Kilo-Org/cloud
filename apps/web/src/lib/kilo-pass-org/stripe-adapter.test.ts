@@ -440,11 +440,35 @@ describe('organization Kilo Pass Stripe adapter', () => {
     expect(scheduleUpdate).toHaveBeenCalledWith(
       'sub_sched_1',
       expect.objectContaining({
+        metadata: { origin: 'kilo-pass-org-cancellation' },
         phases: expect.arrayContaining([
           expect.objectContaining({ items: [{ price: 'price_seat', quantity: 9 }] }),
         ]),
       })
     );
+  });
+
+  test('fails closed instead of mistaking a billing-cycle schedule for pass removal', async () => {
+    const billingCycleSchedule = {
+      id: 'sched_cycle',
+      status: 'active',
+      metadata: { origin: 'billing-cycle-change' },
+      phases: [
+        { items: [{ price: 'price_pass', quantity: 9 }] },
+        { items: [{ price: 'price_pass_yearly', quantity: 9 }] },
+      ],
+    } as unknown as Stripe.SubscriptionSchedule;
+    retrieve.mockResolvedValue(subscription({ schedule: billingCycleSchedule }));
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await expect(
+      scheduleOrganizationKiloPassCancellation({
+        providerSubscriptionId: 'sub_1',
+        providerSeatAddOnItemId: 'si_pass',
+      })
+    ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
+    expect(scheduleCreate).not.toHaveBeenCalled();
+    expect(scheduleUpdate).not.toHaveBeenCalled();
   });
 
   test('keeps a pending agreement pending until its recognized invoice is paid', async () => {

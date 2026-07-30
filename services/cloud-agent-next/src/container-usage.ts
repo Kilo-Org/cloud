@@ -100,6 +100,17 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     });
   }
 
+  /**
+   * Whether this sandbox's container is currently running.
+   *
+   * Reads Durable Object state only. Calling this over RPC does not boot a sleeping
+   * container, unlike any container fetch, so callers can confirm "nothing is running
+   * in there" without paying for a wake-up.
+   */
+  async isContainerRunning(): Promise<boolean> {
+    return this.ctx.container?.running === true;
+  }
+
   async configureBilling(input: unknown): Promise<void> {
     const parsed = parseSandboxBillingInput(input);
     assertSandboxBillingAllocation(this.sandboxClassName, parsed);

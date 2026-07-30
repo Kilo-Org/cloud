@@ -74,6 +74,7 @@ import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgro
 import {
   buildSandboxBillingInput,
   configureSandboxBillingInput,
+  isSandboxContainerRunning,
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 
@@ -751,16 +752,38 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     reason: WrapperStopReason;
   }): Promise<StopWrappersResult> {
     const sandbox = await this.getSandbox();
+    const stopInspectionLogger = logger.withTags({
+      logTag: 'wrapper_stop_inspection',
+      sessionId: this.metadata.identity.sessionId,
+      sandboxId: await this.resolveSandboxId(),
+    });
+
+    // Inspecting is a container fetch, so it boots a sleeping container. A wrapper is a
+    // process, and a process cannot outlive its container (activity expiry SIGTERMs the
+    // whole container), so a stopped container cannot be hiding a leaked wrapper.
+    //
+    // Scoped to idle-timeout: that sweep already established via DO state that no wrapper
+    // runtime or pending work remains, and it is the path that was waking cold containers
+    // for nothing. Every other stop reason keeps inspecting, which preserves the leaked
+    // wrapper recovery those paths were built for.
+    if (request.reason === 'idle-timeout') {
+      const containerRunning = await isSandboxContainerRunning(sandbox);
+      if (containerRunning === false) {
+        stopInspectionLogger
+          .withFields({
+            reason: request.reason,
+            attemptId: request.attemptId,
+            target: request.target.kind,
+            observation: 'absent-no-container',
+            observedWrapperCount: 0,
+          })
+          .info('Wrapper stop inspection completed');
+        return { status: 'absent' };
+      }
+    }
+
     const initial = await this.observeTarget(request.target);
-    // Inspection is a container fetch, so it wakes a sleeping container. An `absent`
-    // result therefore means we booted a container only to learn nothing was running
-    // in it — the signal for how much idle container time this path is creating.
-    logger
-      .withTags({
-        logTag: 'wrapper_stop_inspection',
-        sessionId: this.metadata.identity.sessionId,
-        sandboxId: await this.resolveSandboxId(),
-      })
+    stopInspectionLogger
       .withFields({
         reason: request.reason,
         attemptId: request.attemptId,

@@ -7,7 +7,7 @@ HERE=$(dirname "$0")
   exit 1
 }
 
-resource=${1:?usage: $0 stack [targets...] | ios [udid] | android <avd> [--gpu ...] | command <cmd> [args...]}
+resource=${1:?usage: $0 stack [targets...] | ios [udid] | android <avd> [--gpu ...] [--wait] | bundle <avd> [--gpu ...] | command <cmd> [args...]}
 shift
 # Run repo wrappers from this script's own repository, never the caller's
 # CWD — invoked by absolute path from a sibling worktree, pnpm would
@@ -42,7 +42,42 @@ NODE
     esac
     ;;
   ios) exec pnpm dev:mobile:simulator claim "$@" ;;
-  android) exec pnpm dev:mobile:android emulator-start "$@" ;;
+  android) exec pnpm dev:mobile:android emulator-start --wait "$@" ;;
+  bundle)
+    # Whole E2E bundle at once: stack ∥ iOS chain ∥ Android chain, one log per
+    # chain. The slowest chain sets the wall time, not the sum of the three.
+    AVD=${1:?usage: $0 bundle <avd> [--gpu ...]}
+    shift
+    LOGD=$(mktemp -d "${TMPDIR:-/tmp}/kilo-bundle.XXXXXX")
+    echo "bundle setup logs: $LOGD"
+    (
+      "$HERE/e2e-start-resource.sh" stack mobile cloud-agent-next kiloclaw event-service
+    ) >"$LOGD/stack.log" 2>&1 &
+    P_STACK=$!
+    (
+      CLAIM=$("$HERE/e2e-start-resource.sh" ios | tail -1) &&
+        UDID=$(printf '%s' "$CLAIM" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).device.id)') &&
+        pnpm dev:mobile:ios build "$UDID"
+    ) >"$LOGD/ios.log" 2>&1 &
+    P_IOS=$!
+    (
+      RECORD=$("$HERE/e2e-start-resource.sh" android "$AVD" "$@") &&
+        SERIAL=$(printf '%s' "$RECORD" | grep -o '"serial": *"[^"]*"' | cut -d'"' -f4) &&
+        [ -n "$SERIAL" ] &&
+        pnpm -s dev:mobile:android claim "$SERIAL" >/dev/null &&
+        pnpm dev:mobile:android build "$SERIAL"
+    ) >"$LOGD/android.log" 2>&1 &
+    P_ANDROID=$!
+    FAILED=0
+    for p in $P_STACK $P_IOS $P_ANDROID; do
+      wait "$p" || FAILED=1
+    done
+    [ "$FAILED" -eq 0 ] || {
+      echo "bundle setup failed — inspect $LOGD" >&2
+      exit 1
+    }
+    echo "bundle ready (logs kept at $LOGD)"
+    ;;
   command)
     [ "$#" -gt 0 ] || { echo "command requires a command to run" >&2; exit 1; }
     exec "$@"

@@ -33,7 +33,7 @@ function elementIdOf(el) {
 }
 
 function make(driver, platform) {
-  async function findAll(pattern, { ci = false } = {}) {
+  async function findAll(pattern, { ci = false, sort = false } = {}) {
     const source = regexSource(pattern);
     const flags = regexFlags(pattern, ci);
     const anchored = flags.includes('i') ? `(?i)(?:${source})` : `(?:${source})`;
@@ -69,7 +69,10 @@ function make(driver, platform) {
         }
       }
     }
-    if (elements.length <= 1) return elements;
+    // Sorting costs one HTTP round trip per match; callers that only probe
+    // (visible/when/waitVisible) skip it. tapOn and scrollUntilVisible keep
+    // topmost-first order — index: 0 is load-bearing there.
+    if (!sort || elements.length <= 1) return elements;
     const withRect = await Promise.all(
       elements.map(async el => ({ el, rect: await driver.getElementRect(elementIdOf(el)) }))
     );
@@ -102,7 +105,7 @@ function make(driver, platform) {
   }
 
   async function tapOn(pattern, { index = 0, ci = false } = {}) {
-    const els = await findAll(pattern, { ci });
+    const els = await findAll(pattern, { ci, sort: true });
     if (els.length === 0) throw new Error(`no element matching ${describe(pattern)}`);
     if (index >= els.length) {
       throw new Error(`index ${index} out of range (${els.length} matches) for ${describe(pattern)}`);
@@ -170,7 +173,7 @@ function make(driver, platform) {
 
   async function scrollUntilVisible(pattern, { direction = 'DOWN', maxScrolls = 10 } = {}) {
     for (let i = 0; i < maxScrolls; i++) {
-      const els = await findAll(pattern).catch(() => []);
+      const els = await findAll(pattern, { sort: true }).catch(() => []);
       if (els.length > 0) return els[0];
       await swipeUp(direction === 'UP' ? -1 : 1);
     }

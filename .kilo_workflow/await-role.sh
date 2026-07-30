@@ -110,5 +110,5 @@ while :; do
     echo "RUNNING — no verdict after ${TIMEOUT}s; invoke again to keep waiting"
     exit 4
   fi
-  sleep 15
+  sleep 5
 done

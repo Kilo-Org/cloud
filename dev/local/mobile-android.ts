@@ -435,11 +435,12 @@ function getAndroidSerials(env: AndroidEnvironment): string[] {
     .map(([serial]) => serial);
 }
 
-function parseEmulatorStartArgs(args: string[]): { avd: string; gpu: string } {
+function parseEmulatorStartArgs(args: string[]): { avd: string; gpu: string; wait: boolean } {
   const avd = args[0];
   const gpuIndex = args.indexOf('--gpu');
   const gpu = gpuIndex === -1 ? 'host' : args[gpuIndex + 1];
-  const expectedArgs = gpuIndex === -1 ? 1 : 3;
+  const wait = args.includes('--wait');
+  const expectedArgs = (gpuIndex === -1 ? 1 : 3) + (wait ? 1 : 0);
   if (
     !avd ||
     avd.startsWith('-') ||
@@ -448,10 +449,37 @@ function parseEmulatorStartArgs(args: string[]): { avd: string; gpu: string } {
     args.length !== expectedArgs
   ) {
     throw new Error(
-      'Usage: pnpm dev:mobile:android emulator-start <avd-name> [--gpu host|swiftshader_indirect]'
+      'Usage: pnpm dev:mobile:android emulator-start <avd-name> [--gpu host|swiftshader_indirect] [--wait]'
     );
   }
-  return { avd, gpu };
+  return { avd, gpu, wait };
+}
+
+// Poll until the emulator is fully booted: process alive, serial visible as
+// `device`, and sys.boot_completed=1. Console-port bind alone does not mean
+// the guest is ready for installs or taps.
+async function waitForAndroidBoot(env: AndroidEnvironment, record: EmulatorRecord): Promise<void> {
+  const deadline = Date.now() + 8 * 60_000;
+  for (;;) {
+    if (!processIsAlive(record.pid))
+      throw new Error(`${record.session} died while booting; see ${record.log}`);
+    try {
+      const ready =
+        getAndroidSerials(env).includes(record.serial) &&
+        execFileSync(env.adb, ['-s', record.serial, 'shell', 'getprop', 'sys.boot_completed'], {
+          encoding: 'utf8',
+          env: { ...process.env, PATH: env.path },
+        }).trim() === '1';
+      if (ready) return;
+    } catch (error) {
+      // adb errors mid-boot are transient; a dead emulator is not.
+      if (error instanceof Error && !processIsAlive(record.pid))
+        throw new Error(`${record.session} died while booting; see ${record.log}`);
+    }
+    if (Date.now() > deadline)
+      throw new Error(`${record.serial} did not reach sys.boot_completed=1 within 8 minutes; see ${record.log}`);
+    await delay(15_000);
+  }
 }
 
 // Identity of the running emulator instance, stable for its whole life and
@@ -647,8 +675,10 @@ async function main(): Promise<void> {
     return;
   }
   if (command === 'emulator-start') {
-    const { avd, gpu } = parseEmulatorStartArgs(args);
-    console.log(JSON.stringify(await startAndroidEmulator(env, worktreeRoot, avd, gpu), null, 2));
+    const { avd, gpu, wait } = parseEmulatorStartArgs(args);
+    const record = await startAndroidEmulator(env, worktreeRoot, avd, gpu);
+    if (wait) await waitForAndroidBoot(env, record);
+    console.log(JSON.stringify(record, null, 2));
     return;
   }
   if (command === 'emulator-stop') {

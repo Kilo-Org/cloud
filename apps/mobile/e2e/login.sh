@@ -30,6 +30,7 @@ case "$DEVICE" in
   emulator-*) PLATFORM=android ;;
   *) PLATFORM=ios ;;
 esac
+export KILO_E2E_PLATFORM="$PLATFORM"
 EMAIL="${2:-e2e-mobile-${WORKTREE_SLUG}-${PLATFORM}@example.com}"
 
 if [ "${KILO_APPIUM_LOCKED:-}" != "1" ]; then

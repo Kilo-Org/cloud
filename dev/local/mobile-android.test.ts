@@ -89,6 +89,12 @@ test('rejects emulator-start when the flag appears where the AVD name belongs', 
   assert.deepEqual(parseEmulatorStartArgs(['Pixel_9', '--gpu', 'host']), {
     avd: 'Pixel_9',
     gpu: 'host',
+    wait: false,
+  });
+  assert.deepEqual(parseEmulatorStartArgs(['Pixel_9', '--gpu', 'host', '--wait']), {
+    avd: 'Pixel_9',
+    gpu: 'host',
+    wait: true,
   });
 });
 

@@ -51,6 +51,12 @@ after taking its slot:
 
 The script also refreshes the session-ingest Secrets Store binding, applies migrations, and fails fast when a requested service or the kiloclaw docker bridge never comes up.
 
+To bring the whole bundle up at once (stack, iOS claim+build, Android start+claim+build — three chains in parallel, the slowest sets the wall time instead of the sum):
+
+```bash
+.kilo_workflow/e2e-start-resource.sh bundle <avd-name> [--gpu host]
+```
+
 Rules:
 
 - Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale shell values select the wrong bundle endpoints. Secondary worktrees get an isolated port offset automatically, and startup injects this worktree's LAN URLs before Metro starts. When the automatic offset lands on occupied ports (AirPlay on 5000/7000, another worktree's stack), `dev:start` probes for a free offset itself and persists it before services launch; later `dev:restart`/`dev:env` reuse the persisted value, so no manual prefix is needed. A per-command `KILO_PORT_OFFSET=<n>` prefix still overrides everything when you must pin one — never `export` it.
@@ -242,10 +248,12 @@ pnpm dev:mobile:android doctor
 ```
 
 The bundle owner uses the wrappers for emulator lifecycle and the Expo/Gradle
-build before dispatch: take slot → `emulator-start` → claim its exact serial at
-first ADB visibility → bounded boot wait → `build`. The verifier starts with
-`login.sh`. Never use unbounded `adb wait-for-device`, manual `adb reverse`, or
-dev-client `am start`; `login.sh` preflight handles the last two.
+build before dispatch. `e2e-start-resource.sh android` starts the emulator and
+waits for `sys.boot_completed=1` (process-liveness checked, 8-minute envelope)
+— device visibility is not readiness, and there is no manual boot polling.
+The verifier starts with `login.sh`. Never use unbounded `adb wait-for-device`,
+manual `adb reverse`, or dev-client `am start`; `login.sh` preflight handles
+the last two.
 
 ### Launch and GPU policy
 
@@ -260,25 +268,16 @@ EMULATOR_LOG=$(jq -r .log <<<"$EMULATOR")
 
 Record `SERIAL`, `EMULATOR_PID`, and `EMULATOR_LOG` in the round handoff. Never drive or kill a device claimed by another worktree, and never delete a foreign claim file.
 
-### Bounded boot wait
-
-From the moment of launch, poll about every 15 s until the envelope expires. Cold boot on an idle host ≈ 1–3 minutes; under parallel-workflow load allow up to 8 minutes before declaring the attempt failed (relaunch-rule bounds, not SLAs). Each poll, check in order:
-
-1. **Liveness** — `kill -0 "$EMULATOR_PID"` succeeds. If not, the attempt died.
-2. **Visibility** — `$SERIAL` appears with state `device` in `pnpm dev:mobile:android adb devices -l`. Claim it immediately: `pnpm dev:mobile:android claim "$SERIAL"`.
-3. **Readiness** — once visible, `pnpm dev:mobile:android adb -s "$SERIAL" shell getprop sys.boot_completed` prints `1`.
-
-Device visibility is not readiness. Never gate on `adb devices` output alone, and never wait on any one stage without the liveness check.
-
 ### Failed attempt → stop exactly yours → relaunch once
 
 On failure run `.kilo_workflow/e2e-stop-resource.sh android`; it uses the recorded session and verifies the recorded PID before sending a signal, so it cannot kill a sibling's same-AVD emulator. Relaunch once per the GPU policy with the same envelope. If the second attempt also fails, stop and return a test-environment blocker with `tail -200 "$EMULATOR_LOG"`; never a third launch.
 
 ### Build and login
 
-The claim already happened at adb visibility (claim is idempotent — re-running it is harmless):
+Claim the serial (idempotent), then build:
 
 ```bash
+pnpm dev:mobile:android claim <serial>
 pnpm dev:mobile:android build <serial>   # validated cached APK only
 apps/mobile/e2e/login.sh <serial>
 ```

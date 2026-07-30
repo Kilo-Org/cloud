@@ -82,8 +82,7 @@ thread_info() {
 }
 
 do_reply() {
-  local thread=$1 body=$2 info repo pr comment
-  info=$(thread_info "$thread")
+  local thread=$1 body=$2 info=$3 repo pr comment
   repo=$(jq -r '.repo' <<<"$info")
   [ "$repo" = "$REPO" ] || { echo "pr-threads: thread $thread belongs to $repo, not $REPO" >&2; exit 1; }
   pr=$(jq -r '.pr' <<<"$info")
@@ -96,8 +95,7 @@ do_reply() {
 }
 
 do_resolve() {
-  local thread=$1 info repo resolved
-  info=$(thread_info "$thread")
+  local thread=$1 info=$2 repo resolved
   repo=$(jq -r '.repo' <<<"$info")
   [ "$repo" = "$REPO" ] || { echo "pr-threads: thread $thread belongs to $repo, not $REPO" >&2; exit 1; }
   resolved=$(gh api graphql \
@@ -117,8 +115,11 @@ case $CMD in
     ;;
   close)
     BODY=$(read_body "${4:?body or -}")
-    do_reply "${3:?thread id}" "$BODY"
-    do_resolve "$3"
+    # One thread fetch feeds both the reply idempotency check and the
+    # repository assertion — thread_info is a GraphQL round trip.
+    INFO=$(thread_info "${3:?thread id}")
+    do_reply "$3" "$BODY" "$INFO"
+    do_resolve "$3" "$INFO"
     ;;
   *) echo "usage: pr-threads.sh list|unresolved|close ..." >&2; exit 1 ;;
 esac

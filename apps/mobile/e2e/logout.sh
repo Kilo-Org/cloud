@@ -10,6 +10,9 @@ set -euo pipefail
 
 DEVICE="${1:?usage: logout.sh <device-udid>}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+case "$DEVICE" in
+  emulator-*) export KILO_E2E_PLATFORM=android ;;
+esac
 
 if [ "${KILO_APPIUM_LOCKED:-}" != "1" ]; then
   exec "$SCRIPT_DIR/appium.sh" "$DEVICE" --exec "$0" "$@"

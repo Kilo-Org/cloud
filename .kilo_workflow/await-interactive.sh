@@ -65,5 +65,5 @@ while :; do
     echo "RUNNING"
     exit 4
   fi
-  sleep 30
+  sleep 10
 done

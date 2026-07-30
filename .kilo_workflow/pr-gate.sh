@@ -54,7 +54,7 @@ while :; do
       | "\(.user.login) @ \(.updated_at): \(.body | gsub("\\s+"; " ") | .[0:200])"] | .[]' <<<"$COMMENTS")
   [ -n "$BOTCOMMENTS" ] && break
   [ "$(date +%s)" -ge "$DEADLINE" ] && break
-  sleep 120
+  sleep 30
 done
 
 echo "head=$HEAD_OID ($HEAD_TIME)"

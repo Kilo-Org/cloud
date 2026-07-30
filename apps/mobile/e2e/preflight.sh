@@ -32,8 +32,10 @@ if [ "$SESSION_STATUS" != "401" ] || ! grep -Fq 'Invalid or expired token' "$SES
   exit 1
 fi
 
-PLATFORM="ios"
-if (cd "$REPO_ROOT" && pnpm -s dev:mobile:android adb devices | awk -v device="$DEVICE" '$1 == device && $2 == "device" { found=1 } END { exit !found }'); then
+# login.sh/logout.sh pass the platform they already derived; the adb probe is
+# the fallback for direct invocations.
+PLATFORM="${KILO_E2E_PLATFORM:-ios}"
+if [ -z "${KILO_E2E_PLATFORM:-}" ] && (cd "$REPO_ROOT" && pnpm -s dev:mobile:android adb devices | awk -v device="$DEVICE" '$1 == device && $2 == "device" { found=1 } END { exit !found }'); then
   PLATFORM="android"
   CLAIM="$(cd "$REPO_ROOT" && pnpm -s dev:mobile:android claim "$DEVICE")"
 else

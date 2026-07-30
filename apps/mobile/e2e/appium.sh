@@ -129,18 +129,17 @@ case "$cmd" in
   test)
     shift
     ENV_ARGS=()
-    FLOW=""
+    FLOWS=()
     while [ $# -gt 0 ]; do
       case "$1" in
         -e) ENV_ARGS+=("$2"); shift 2 ;;
-        *) [ -z "$FLOW" ] || { echo "appium.sh: one flow per test invocation (got '$FLOW' and '$1')" >&2; exit 1; }
-           FLOW="$1"; shift ;;
+        *) FLOWS+=("$1"); shift ;;
       esac
     done
-    [ -n "$FLOW" ] || { echo "usage: appium.sh <device> test [-e K=V]... <flow.js>" >&2; exit 1; }
+    [ "${#FLOWS[@]}" -gt 0 ] || { echo "usage: appium.sh <device> test [-e K=V]... <flow.js> [more-flows.js]" >&2; exit 1; }
     ensure_server
     env DEVICE="$DEVICE" APPIUM_PORT="$APPIUM_PORT" "${ENV_ARGS[@]}" \
-      node "$SCRIPT_DIR/wdio/run-flow.js" "$FLOW"
+      node "$SCRIPT_DIR/wdio/run-flow.js" "${FLOWS[@]}"
     ;;
   hierarchy)
     ensure_server

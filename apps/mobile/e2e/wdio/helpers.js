@@ -25,6 +25,13 @@ function javaEscape(s) {
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+// driver.findElements returns raw protocol references
+// ({ 'element-6066-11e4-a52e-4f735466cecf': <id> }), not WDIO Element
+// objects; normalize the id for element commands.
+function elementIdOf(el) {
+  return el.elementId ?? el['element-6066-11e4-a52e-4f735466cecf'] ?? el.ELEMENT;
+}
+
 function make(driver, platform) {
   async function findAll(pattern, { ci = false } = {}) {
     const source = regexSource(pattern);
@@ -52,15 +59,16 @@ function make(driver, platform) {
       const seen = new Set();
       elements = [];
       for (const el of [...byText, ...byDesc]) {
-        if (!seen.has(el.elementId)) {
-          seen.add(el.elementId);
+        const id = elementIdOf(el);
+        if (!seen.has(id)) {
+          seen.add(id);
           elements.push(el);
         }
       }
     }
     if (elements.length <= 1) return elements;
     const withRect = await Promise.all(
-      elements.map(async el => ({ el, rect: await driver.getElementRect(el.elementId) }))
+      elements.map(async el => ({ el, rect: await driver.getElementRect(elementIdOf(el)) }))
     );
     withRect.sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
     return withRect.map(({ el }) => el);
@@ -96,7 +104,7 @@ function make(driver, platform) {
     if (index >= els.length) {
       throw new Error(`index ${index} out of range (${els.length} matches) for ${describe(pattern)}`);
     }
-    await driver.elementClick(els[index].elementId);
+    await driver.elementClick(elementIdOf(els[index]));
   }
 
   async function assertVisible(pattern, opts) {

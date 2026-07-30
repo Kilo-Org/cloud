@@ -47,7 +47,10 @@ async function connect(device) {
     hostname: '127.0.0.1',
     port: ports.server,
     logLevel: 'warn',
-    connectionRetryTimeout: 15000,
+    // The first XCUITest session on a device builds WebDriverAgent (minutes);
+    // later sessions reuse the cached build. Never time this out at 15s.
+    connectionRetryTimeout: 300000,
+    connectionRetryCount: 3,
     capabilities,
   });
 }

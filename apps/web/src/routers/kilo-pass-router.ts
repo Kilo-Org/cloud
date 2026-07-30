@@ -167,6 +167,7 @@ const KiloPassSubscriptionStateSchema = KiloPassSubscriptionStateBaseSchema.exte
   currentPeriodHostingCostUsd: z.number(),
   currentPeriodBonusCreditsUsd: z.number().nullable(),
   isBonusUnlocked: z.boolean(),
+  isBonusAvailableToUnlock: z.boolean(),
   refillAt: z.string().nullable(),
 });
 
@@ -460,6 +461,15 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
   return Boolean(unlockedItem);
 }
 
+async function getHasKiloPassThreshold(kiloUserId: string): Promise<boolean> {
+  const user = await db.query.kilocode_users.findFirst({
+    columns: { kilo_pass_threshold: true },
+    where: eq(kilocode_users.id, kiloUserId),
+  });
+
+  return user?.kilo_pass_threshold != null;
+}
+
 /**
  * Get the credit transaction for the most recent base issuance of a subscription.
  *
@@ -737,17 +747,25 @@ async function buildActiveKiloPassSubscriptionState(params: {
   nowUtc: ReturnType<typeof dayjs>;
 }): Promise<KiloPassSubscriptionStateResponse> {
   const baseAmountUsd = getMonthlyPriceUsd(params.subscription.tier);
-  const isFirstTimeSubscriberEver = await getIsFirstTimeSubscriberEver({
-    kiloUserId: params.kiloUserId,
-    subscriptionId: params.subscription.subscriptionId,
-  });
-  const [isBonusUnlocked, latestBaseCredits, initialWelcomePromoContext] = await Promise.all([
+  const [
+    isFirstTimeSubscriberEver,
+    isBonusUnlocked,
+    hasKiloPassThreshold,
+    latestBaseCredits,
+    initialWelcomePromoContext,
+  ] = await Promise.all([
+    getIsFirstTimeSubscriberEver({
+      kiloUserId: params.kiloUserId,
+      subscriptionId: params.subscription.subscriptionId,
+    }),
     getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
+    getHasKiloPassThreshold(params.kiloUserId),
     getLatestBaseCreditsForSubscription(params.subscription.subscriptionId),
     getInitialWelcomePromoContextForSubscription(db, {
       subscriptionId: params.subscription.subscriptionId,
     }),
   ]);
+  const isBonusAvailableToUnlock = hasKiloPassThreshold && !isBonusUnlocked;
   const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
     paymentProvider: params.subscription.paymentProvider,
     initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
@@ -779,13 +797,17 @@ async function buildActiveKiloPassSubscriptionState(params: {
     currentPeriodBaseCreditsUsd: baseAmountUsd,
     currentPeriodUsageUsd,
     currentPeriodHostingCostUsd,
-    currentPeriodBonusCreditsUsd: getCurrentKiloPassBonusCreditsUsd({
-      subscription: params.subscription,
-      isFirstTimeSubscriberEver,
-      welcomePromoPolicy,
-      welcomePromoEligibilityReason,
-    }),
+    currentPeriodBonusCreditsUsd:
+      isBonusUnlocked || isBonusAvailableToUnlock
+        ? getCurrentKiloPassBonusCreditsUsd({
+            subscription: params.subscription,
+            isFirstTimeSubscriberEver,
+            welcomePromoPolicy,
+            welcomePromoEligibilityReason,
+          })
+        : null,
     isBonusUnlocked,
+    isBonusAvailableToUnlock,
     refillAt:
       params.subscription.cadence === KiloPassCadence.Yearly
         ? (params.subscription.nextYearlyIssueAt ?? params.nextBillingAt)
@@ -815,6 +837,7 @@ async function buildEndedKiloPassSubscriptionState(params: {
     currentPeriodHostingCostUsd: 0,
     currentPeriodBonusCreditsUsd: null,
     isBonusUnlocked: false,
+    isBonusAvailableToUnlock: false,
     refillAt: null,
   };
 }

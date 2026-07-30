@@ -50,6 +50,12 @@ import {
   maybeMapStripeScheduleStatusToDb,
 } from '@/lib/kilo-pass/scheduled-change-release';
 import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
+import { invoiceLooksLikeOrganizationKiloPass } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
+import {
+  handleOrganizationKiloPassPaymentAdverseForInvoice,
+  handleOrganizationKiloPassInvoicePaid,
+  handleOrganizationKiloPassSubscriptionEvent,
+} from '@/lib/kilo-pass-org/stripe-adapter';
 import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import {
   handleKiloClawSubscriptionCreated,
@@ -130,6 +136,23 @@ async function getAffiliateDisputeChargeContext(
     invoiceId: invoice.id,
     saleKind,
   };
+}
+
+async function suspendOrganizationKiloPassForAdverseCharge(
+  chargeId: string,
+  preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
+) {
+  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } = preFetchedCharge
+    ? preFetchedCharge
+    : await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  const invoiceReference = charge.invoice;
+  const invoice =
+    typeof invoiceReference === 'string'
+      ? await client.invoices.retrieve(invoiceReference)
+      : invoiceReference;
+  if (invoice && invoiceLooksLikeOrganizationKiloPass(invoice)) {
+    await handleOrganizationKiloPassPaymentAdverseForInvoice(invoice);
+  }
 }
 
 function stripeReferenceId(reference: StripeReference): string | undefined {
@@ -815,10 +838,16 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
       // Kilo Pass invoice.paid events should be routed to the Kilo Pass handler first.
       // If it is a Kilo Pass invoice, no other invoice.paid handler should run.
+      const isOrganizationKiloPass = invoiceLooksLikeOrganizationKiloPass(invoice);
       const isKiloPassByPriceId = invoiceLooksLikeKiloPassByPriceId(invoice);
       const isKiloPassByInvoiceMetadata =
         getKiloPassMetadataFromStripeMetadata(invoice.parent?.subscription_details?.metadata) !==
         null;
+
+      if (isOrganizationKiloPass) {
+        await handleOrganizationKiloPassInvoicePaid({ invoice });
+        break;
+      }
 
       if (isKiloPassByPriceId || isKiloPassByInvoiceMetadata) {
         await handleKiloPassInvoicePaid({ eventId: event.id, invoice, stripe: client });
@@ -979,6 +1008,8 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
+      await suspendOrganizationKiloPassForAdverseCharge(chargeId, disputeCharge ?? undefined);
+
       const affiliateDisputeCharge = await getAffiliateDisputeChargeContext(
         chargeId,
         disputeCharge ?? undefined
@@ -1041,6 +1072,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
+      await suspendOrganizationKiloPassForAdverseCharge(charge.id);
       const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
       if (!referralAdverseCharge) {
         break;
@@ -1073,6 +1105,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
+      await suspendOrganizationKiloPassForAdverseCharge(charge.id);
       const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
       if (!referralAdverseCharge) {
         break;
@@ -1099,6 +1132,15 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
     // invoice.payment_succeeded is for subscriptions
     case 'customer.subscription.created': {
       const createdSubType = event.data.object.metadata?.type;
+      if (createdSubType === 'kilo-pass-org') {
+        await handleOrganizationKiloPassSubscriptionEvent(event.data.object);
+        await handleSubscriptionEvent(
+          event.data.object,
+          event.request?.idempotency_key ?? event.id,
+          true
+        );
+        break;
+      }
       if (createdSubType === 'kilo-pass') {
         await handleKiloPassSubscriptionEvent({
           eventId: event.id,
@@ -1137,6 +1179,14 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted': {
       const updatedSubType = event.data.object.metadata?.type;
+      if (updatedSubType === 'kilo-pass-org') {
+        await handleOrganizationKiloPassSubscriptionEvent(event.data.object);
+        await handleSubscriptionEvent(
+          event.data.object,
+          event.request?.idempotency_key ?? event.id
+        );
+        break;
+      }
       if (updatedSubType === 'kilo-pass') {
         await handleKiloPassSubscriptionEvent({
           eventId: event.id,
@@ -1766,6 +1816,10 @@ export async function handleUpdateSeatCount(
       );
     }
     const paidSeatQuantity = rawPaidQuantity;
+    const organizationPassItem =
+      subscription.metadata?.type === 'kilo-pass-org'
+        ? subscription.items.data.find(item => !isSeatLineItem(item))
+        : undefined;
 
     try {
       const updatedSubscription = await client.subscriptions.update(
@@ -1779,6 +1833,9 @@ export async function handleUpdateSeatCount(
               id: paidSeatItem.id,
               quantity: paidSeatQuantity,
             },
+            ...(organizationPassItem
+              ? [{ id: organizationPassItem.id, quantity: paidSeatQuantity }]
+              : []),
           ],
           expand: ['latest_invoice'],
         },
@@ -1806,6 +1863,7 @@ export async function handleUpdateSeatCount(
           const paidInvoice = (await client.invoices.pay(invoiceObj.id, {
             expand: ['payment_intent'],
           })) as Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string | null };
+          invoiceObj = paidInvoice;
 
           if (typeof paidInvoice.payment_intent === 'object' && paidInvoice.payment_intent) {
             paymentIntent = paidInvoice.payment_intent;
@@ -1890,6 +1948,19 @@ export async function handleUpdateSeatCount(
       ) {
         // Payment failed for another reason
         throw new Error('Payment failed. Please update your payment method and try again.');
+      }
+
+      if (isIncreasingSeats && organizationPassItem && invoiceObj?.status === 'paid') {
+        const reconciled = await handleOrganizationKiloPassInvoicePaid({
+          invoice: invoiceObj,
+          paidSeatCount: paidSeatQuantity,
+        });
+        if (!reconciled) {
+          warnExceptInTest('Could not eagerly reconcile organization Kilo Pass seat increase', {
+            subscriptionStripeId,
+            invoiceId: invoiceObj.id,
+          });
+        }
       }
 
       // immediately update our seats purchases - it will usually be updated again by the webhook

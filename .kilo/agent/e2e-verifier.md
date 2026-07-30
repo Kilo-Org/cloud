@@ -1,8 +1,9 @@
 ---
 description: Verifies end to end that an implemented plan meets its goals; in repro mode, reproduces a reported defect on the unmodified baseline
 mode: all
-model: kilo/moonshotai/kimi-k3
+model: kilo/x-ai/grok-4.5
 variant: high
+steps: 100
 permission:
   edit: allow
   external_directory: allow

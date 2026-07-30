@@ -36,4 +36,4 @@ Handling notes: the crash log's `params` can include the OAuth **refresh JWT** â
 workflow's `kilo run` to free a lock. Three consecutive void rounds with this signature is an
 infrastructure blocker to report, not something to keep redispatching through.
 
-Distinct from the mid-run provider stream stall (exit 0 after real work, reported VOID by `await-role.sh`) and from `kilo-provider-model-not-found-transient.md` (gateway catalog blip, also exit 1).
+Distinct from the mid-run provider stream stall (exit 0 after real work, reported VOID by `await-role.sh`).

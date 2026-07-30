@@ -6,7 +6,7 @@ A multi-agent delivery workflow for this repository (and siblings like `~/Projec
 
 1. Open an interactive session on a strong model — either harness works:
    - Claude Code: just ask, e.g. *"Run the kilo workflow on \<work\>."*
-   - kilo CLI: `kilo run --agent starter --interactive --model <model>`
+   - kilo CLI: `kilo run --agent starter --interactive` (pass `--model` and `--variant` only to override the pinned default)
 2. Answer the one process question: **hands on** (it asks you questions, you approve the plan) or **hands off** (it decides everything from repository evidence and never waits for you).
 3. Walk away. Everything runs in tmux windows named after the section (`<name>-<hex>`, e.g. `billing-a7f3-planner`); attach to watch or, in hands-on mode, to answer a question.
 
@@ -68,4 +68,4 @@ A section can still take hours of unattended machine time when builds or live E2
 
 A standing rule from the spec: **anything that can be automated away, should be automated away.** Agents' tokens go to the work, not to battling the workflow or the environment — when a run stumbles on something a script or a document could have prevented, the run fixes the script or the document in the same PR, and learnings that graduate into automation get deleted.
 
-Role definitions live in the repository root `.kilo/agent/` (the kilo CLI only discovers agents there). 
+Role definitions live in the repository root `.kilo/agent/` (the kilo CLI only discovers agents there).

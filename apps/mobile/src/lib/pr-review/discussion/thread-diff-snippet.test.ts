@@ -130,7 +130,7 @@ describe('selectThreadDiffSnippet', () => {
     expect(snippet?.language).toBeNull();
   });
 
-  it(`caps lines at ${THREAD_SNIPPET_MAX_LINES} and keeps totalLineCount full`, () => {
+  it(`caps lines at ${THREAD_SNIPPET_MAX_LINES} keeping the tail (anchored line)`, () => {
     const bodyLines: string[] = [];
     // 40 context lines after the header — well over the cap.
     for (let i = 0; i < 40; i += 1) {
@@ -141,10 +141,9 @@ describe('selectThreadDiffSnippet', () => {
     expect(snippet).not.toBeNull();
     expect(snippet?.totalLineCount).toBe(40);
     expect(snippet?.lines).toHaveLength(THREAD_SNIPPET_MAX_LINES);
-    expect(snippet?.lines[0]?.text).toBe('line 0');
-    expect(snippet?.lines[THREAD_SNIPPET_MAX_LINES - 1]?.text).toBe(
-      `line ${THREAD_SNIPPET_MAX_LINES - 1}`
-    );
+    // Head dropped; last 30 kept so the anchored (final) line survives.
+    expect(snippet?.lines[0]?.text).toBe('line 10');
+    expect(snippet?.lines[THREAD_SNIPPET_MAX_LINES - 1]?.text).toBe('line 39');
   });
 
   it('parses a bare @@ fragment without a diff --git header', () => {

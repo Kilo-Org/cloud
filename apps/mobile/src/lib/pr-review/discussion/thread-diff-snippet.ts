@@ -6,8 +6,10 @@
 // helper parses that string with the same `parsePatch` the Files tab
 // uses, flattens hunk body lines (no `@@` header — the thread header
 // already names file + lines), and caps the rendered set so multi-line
-// anchors don't blow card height. Outdated threads need no special
-// casing: their `diffHunk` IS the original hunk.
+// anchors don't blow card height. The cap keeps the TAIL of the hunk
+// (GitHub's diffHunk ends at the anchored line, so the comment's line
+// always renders). Outdated threads need no special casing: their
+// `diffHunk` IS the original hunk.
 
 import { languageForPath } from '@/lib/pr-review/diff/highlight';
 import { type ParsedDiffLine, parsePatch } from '@/lib/pr-review/diff/parse-patch';
@@ -51,7 +53,7 @@ export function selectThreadDiffSnippet(thread: ThreadDiffSnippetInput): ThreadD
   }
 
   return {
-    lines: allLines.slice(0, THREAD_SNIPPET_MAX_LINES),
+    lines: allLines.slice(-THREAD_SNIPPET_MAX_LINES),
     totalLineCount: allLines.length,
     language: languageForPath(thread.path),
   };

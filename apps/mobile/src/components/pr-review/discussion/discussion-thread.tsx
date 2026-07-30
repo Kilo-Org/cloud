@@ -24,6 +24,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { Check, CheckCheck, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
@@ -74,7 +75,13 @@ export function DiscussionThread({
 
   const anchorLabel = selectThreadAnchorLabel(thread);
   const badges = selectThreadBadges(thread);
-  const diffSnippet = selectThreadDiffSnippet(thread);
+  // Parse only when expanded; memoize so DiffLine's memo comparator sees a
+  // stable `lines` identity across parent re-renders (e.g. reaction toggles).
+  const { diffHunk, subjectType, path } = thread;
+  const diffSnippet = useMemo(
+    () => (expanded ? selectThreadDiffSnippet({ diffHunk, subjectType, path }) : null),
+    [expanded, diffHunk, subjectType, path]
+  );
   const firstComment = thread.comments[0];
   const isResolving = resolve.isPending || unresolve.isPending;
   const isReacting = addReaction.isPending || removeReaction.isPending;

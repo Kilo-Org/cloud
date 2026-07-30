@@ -156,10 +156,14 @@ export function useRemoteSpawnDispatch({
   const mode = modeArg ?? inheritance.mode;
   const model = modelArg ?? inheritance.model;
   const variant = variantArg ?? inheritance.variant;
+  // Route param is frozen at navigation: missing param means personal, not
+  // "inherit live context". `?? null` so undefined does not fall through to
+  // `useOrganization()` after a later org switch (share-gate keeps zero-arg
+  // inherit by calling `useRemoteInstanceSpawn()` with no arg).
   const remoteSpawn: {
     status: RemoteInstanceSpawnStatus;
     spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
-  } = useRemoteInstanceSpawn(organizationId);
+  } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
 
   // kilocode_change - `onStart`'s async tail (spawn + refetch + classify)

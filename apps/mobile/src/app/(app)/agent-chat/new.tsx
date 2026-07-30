@@ -37,11 +37,28 @@ import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-subm
  * `useNewSessionShareRemote` → `useRemoteSpawnDispatch` (in the inner
  * body) reads mode/model/variant as a true descendant. Provider wrapping
  * only the returned JSX left the hook outside the tree with `{}`.
+ *
+ * Auto-select also lives here: `setModel`/`setVariant` belong to this
+ * component, so the render-phase apply is a same-component update (legal).
+ * Doing it in the body after the M1 split was a cross-component setState.
  */
 export default function NewSessionScreen() {
   const [mode, setMode] = useState<AgentMode>('code');
   const [model, setModel] = useState('');
   const [variant, setVariant] = useState('');
+  const { organizationId } = useLocalSearchParams<{
+    organizationId?: string;
+  }>();
+  // Same query key as the body — React Query dedupes; used only so
+  // auto-select can run in the state owner without a cross-component update.
+  const { models } = useAvailableModels(organizationId);
+  const autoSelected = useAutoSelectModel(models, organizationId);
+  const hasAppliedAutoSelection = useRef(false);
+  if (!hasAppliedAutoSelection.current && autoSelected.model && !model) {
+    hasAppliedAutoSelection.current = true;
+    setModel(autoSelected.model);
+    setVariant(autoSelected.variant);
+  }
 
   return (
     <RemoteSpawnInheritanceProvider mode={mode} model={model} variant={variant}>
@@ -108,16 +125,7 @@ function NewSessionScreenBody({
   } = useAvailableModels(organizationId);
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { saveModel } = usePersistedAgentModel();
-  const autoSelected = useAutoSelectModel(models, organizationId);
   const attachments = useAgentAttachmentUpload({ organizationId });
-
-  // Apply auto-selected model when the user hasn't picked one yet.
-  const hasAppliedAutoSelection = useRef(false);
-  if (!hasAppliedAutoSelection.current && autoSelected.model && !model) {
-    hasAppliedAutoSelection.current = true;
-    setModel(autoSelected.model);
-    setVariant(autoSelected.variant);
-  }
 
   // ── Repositories ─────────────────────────────────────────────────
   const trpc = useTRPC();

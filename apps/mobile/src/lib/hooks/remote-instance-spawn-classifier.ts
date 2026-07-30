@@ -168,6 +168,22 @@ export function buildCreateRemoteSessionInput(fields: {
 }
 
 /**
+ * Resolve the spawn hook's org arg against live organization context.
+ *
+ *   - `explicit === undefined` (zero-arg / omitted) → inherit `context`
+ *   - `explicit === null` → personal; do not inherit context
+ *   - `explicit` string → that org
+ *
+ * Pure so the tri-state is unit-testable without a React renderer.
+ */
+export function resolveSpawnOrganizationId(
+  explicit: string | null | undefined,
+  context: string | null | undefined
+): string | null | undefined {
+  return explicit !== undefined ? explicit : context;
+}
+
+/**
  * Merge an optional explicit org id (hook arg) into spawn opts when the
  * caller did not already set `orgId`. Pure so hook defaulting is unit-testable
  * without a React renderer.

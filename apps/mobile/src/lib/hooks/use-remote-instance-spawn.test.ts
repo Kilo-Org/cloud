@@ -20,6 +20,7 @@ import {
   createSessionSpawner,
   type CreateSessionSpawner,
   mergeSpawnOrganizationId,
+  resolveSpawnOrganizationId,
   SESSION_OWNER_NOT_FOUND_LITERAL,
 } from './remote-instance-spawn-classifier';
 
@@ -172,6 +173,21 @@ describe('buildCreateRemoteSessionInput', () => {
 
   it('omits model when only variant is set', () => {
     expect(buildCreateRemoteSessionInput({ variant: 'high' })).toBeUndefined();
+  });
+});
+
+describe('resolveSpawnOrganizationId', () => {
+  it('inherits context when explicit arg is omitted (zero-arg callers)', () => {
+    expect(resolveSpawnOrganizationId(undefined, 'context-org')).toBe('context-org');
+    expect(resolveSpawnOrganizationId(undefined, null)).toBeNull();
+  });
+
+  it('null means personal and wins over a live context org', () => {
+    expect(resolveSpawnOrganizationId(null, 'context-org')).toBeNull();
+  });
+
+  it('string means that org and wins over context', () => {
+    expect(resolveSpawnOrganizationId('route-org', 'context-org')).toBe('route-org');
   });
 });
 

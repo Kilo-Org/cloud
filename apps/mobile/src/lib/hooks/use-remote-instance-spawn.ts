@@ -17,6 +17,7 @@ import {
   type CreateSessionOutcome,
   createSessionSpawner,
   mergeSpawnOrganizationId,
+  resolveSpawnOrganizationId,
 } from './remote-instance-spawn-classifier';
 
 export type { CreateRemoteSessionInput, CreateSessionOutcome };
@@ -38,9 +39,14 @@ export type RemoteInstanceSpawnStatus =
  * underlying SDK call is one-shot per `spawn()` call — no in-hook retry
  * loop, no toast, no debouncing; the caller drives those.
  *
- * Optional `organizationId` defaults to `useOrganization()` so any caller
- * in org context attributes the create without a call-site edit. Explicit
- * `opts.orgId` still wins when the caller sets it.
+ * `organizationId` tri-state:
+ *   - omitted (`undefined`) — inherit live `useOrganization()` (share-gate
+ *     and other zero-arg callers that intentionally follow global context)
+ *   - `null` — explicitly personal; never attribute to context org (wins
+ *     over a later context switch after the route froze personal)
+ *   - `string` — that org id
+ *
+ * Explicit `opts.orgId` on `spawn()` still wins when the caller sets it.
  */
 export function useRemoteInstanceSpawn(organizationId?: string | null): {
   status: RemoteInstanceSpawnStatus;
@@ -48,8 +54,7 @@ export function useRemoteInstanceSpawn(organizationId?: string | null): {
 } {
   const connection = useUserWebConnection();
   const { organizationId: contextOrganizationId } = useOrganization();
-  const resolvedOrganizationId =
-    organizationId !== undefined ? organizationId : contextOrganizationId;
+  const resolvedOrganizationId = resolveSpawnOrganizationId(organizationId, contextOrganizationId);
   const [status, setStatus] = useState<RemoteInstanceSpawnStatus>({ status: 'idle' });
 
   // Re-create the spawner only when the connection reference changes

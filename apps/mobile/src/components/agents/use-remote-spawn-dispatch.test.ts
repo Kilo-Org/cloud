@@ -19,6 +19,13 @@ const spawnMock = vi.hoisted(() =>
   })
 );
 
+const useRemoteInstanceSpawnMock = vi.hoisted(() =>
+  vi.fn((_organizationId?: string | null) => ({
+    status: { status: 'idle' as const },
+    spawn: spawnMock,
+  }))
+);
+
 const routerReplace = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
@@ -32,10 +39,8 @@ vi.mock('sonner-native', () => ({
 // Keep the real input builder; only stub the RN-touching spawn hook.
 vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
   buildCreateRemoteSessionInput,
-  useRemoteInstanceSpawn: () => ({
-    status: { status: 'idle' as const },
-    spawn: spawnMock,
-  }),
+  useRemoteInstanceSpawn: (organizationId?: string | null) =>
+    useRemoteInstanceSpawnMock(organizationId),
 }));
 
 type ReactInternals = {
@@ -167,6 +172,7 @@ function runHookWithProvider(args: {
 describe('useRemoteSpawnDispatch spawn input chain', () => {
   beforeEach(() => {
     spawnMock.mockClear();
+    useRemoteInstanceSpawnMock.mockClear();
     routerReplace.mockClear();
   });
 
@@ -235,6 +241,39 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         variant: 'high',
       })
     );
+  });
+
+  it('org route passes the route org into useRemoteInstanceSpawn (not inherit)', () => {
+    runHookWithProvider({ organizationId: 'org-route-1', withProvider: false });
+    expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith('org-route-1');
+  });
+
+  it('personal route (no param) passes null so context org cannot win after a switch', () => {
+    // undefined route param must become null — not omitted — or the spawn
+    // hook would inherit live useOrganization() and mis-attribute personal
+    // spawns after the user switches org in the global switcher.
+    runHookWithProvider({ organizationId: undefined, withProvider: false });
+    expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith(null);
+  });
+
+  it('personal-route onStart omits orgId even when only mode/model are set', async () => {
+    const { onStart } = runHookWithProvider({
+      organizationId: undefined,
+      withProvider: false,
+      mode: 'code',
+      model: 'kilo-auto/efficient',
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalled();
+    });
+
+    // Exact args — no orgId key (personal route must not inherit context org).
+    expect(spawnMock).toHaveBeenCalledWith('conn-abc', {
+      agent: 'code',
+      model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+    });
   });
 });
 

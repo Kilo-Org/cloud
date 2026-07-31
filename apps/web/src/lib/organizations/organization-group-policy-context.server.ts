@@ -50,9 +50,46 @@ function parsePolicies(
   return parsed.data;
 }
 
+/**
+ * Resolve the organization the policy is evaluated against.
+ *
+ * Callers that already loaded and authorized the row pass it in, so the policy
+ * reflects the same organization the request authorized instead of a second read
+ * that could disagree with it.
+ */
+async function resolveOrganization(
+  client: typeof db | DrizzleTransaction,
+  params: { organizationId: string; organization?: Organization }
+): Promise<Organization> {
+  if (params.organization) {
+    if (params.organization.id !== params.organizationId) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Organization group policy context received a mismatched organization',
+      });
+    }
+    // Soft-deleted organizations must fail closed here too.
+    if (params.organization.deleted_at) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
+    return params.organization;
+  }
+  const [organization] = await client
+    .select()
+    .from(organizations)
+    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  return organization;
+}
+
 export async function getOrganizationGroupPolicyContext(params: {
   organizationId: string;
   subject: OrganizationPolicySubject;
+  /** Organization row the caller already loaded; avoids re-reading it. */
+  organization?: Organization;
   tx?: DrizzleTransaction;
 }): Promise<OrganizationGroupPolicyContext> {
   if (!params.tx) {
@@ -62,14 +99,7 @@ export async function getOrganizationGroupPolicyContext(params: {
     );
   }
   const client = params.tx ?? db;
-  const [organization] = await client
-    .select()
-    .from(organizations)
-    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
-    .limit(1);
-  if (!organization) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
+  const organization = await resolveOrganization(client, params);
 
   if (params.subject.type === 'member') {
     const [membership] = await client

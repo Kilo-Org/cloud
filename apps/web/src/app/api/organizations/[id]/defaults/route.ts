@@ -39,6 +39,10 @@ export async function GET(
     await getOrganizationGroupPolicyContext({
       organizationId,
       subject: { type: 'member', kiloUserId: user.id },
+      // Evaluate against the organization this request already authorized, so the
+      // deny list and provider allow-list driving these defaults are the ones the
+      // endpoint resolved rather than a second read of the same row.
+      organization,
     })
   );
   const isAllowed = async (modelId: string) =>

@@ -552,15 +552,27 @@ PY
     return 0
   fi
 
-  # Read the runtime's own count for this session key. Take the LAST matching
-  # pre-prompt line so a retry cannot leave an earlier zero-count line winning.
-  prompt_images=$(docker logs "$cid" 2>&1 \
-    | grep -F "sessionKey=$session_key" \
-    | grep -oE 'promptImages=[0-9]+' \
-    | tail -1 | cut -d= -f2 || true)
+  # POLL, do not read once. `chat.send` acknowledges with status=started and
+  # returns before the run reaches pre-prompt, so a single read right after it
+  # returns races the agent and finds nothing — which reports "no pre-prompt
+  # diag" (looks like a broken/missing session) instead of the true
+  # "promptImages=0". That is the misleading-diagnosis failure mode this
+  # assertion is supposed to eliminate, so it must not create one itself.
+  #
+  # Take the LAST matching pre-prompt line so a retried run cannot leave an
+  # earlier zero-count line winning.
+  local _attempt
+  for _attempt in $(seq 1 60); do
+    prompt_images=$(docker logs "$cid" 2>&1 \
+      | grep -F "sessionKey=$session_key" \
+      | grep -oE 'promptImages=[0-9]+' \
+      | tail -1 | cut -d= -f2 || true)
+    [ -n "$prompt_images" ] && break
+    sleep 1
+  done
 
   if [ -z "$prompt_images" ]; then
-    check "image round trip (promptImages >= 1)" "image-received" "no pre-prompt diag for session"
+    check "image round trip (promptImages >= 1)" "image-received" "no pre-prompt diag after 60s"
   elif [ "$prompt_images" -ge 1 ]; then
     check "image round trip (promptImages >= 1)" "image-received" "image-received"
   else

@@ -6,6 +6,7 @@ import {
   closeChildSessionSheet,
   getChildSessionSheetState,
   openChildSessionSheet,
+  releaseChildSessionSheet,
 } from './child-session-sheet-state';
 
 const emptyMount: ChildSessionSheetMountState = { sheet: null, visible: false };
@@ -59,5 +60,29 @@ describe('openChildSessionSheet / closeChildSessionSheet', () => {
       sheet: null,
       visible: false,
     });
+  });
+});
+
+describe('releaseChildSessionSheet', () => {
+  it('releases sheet identity after close', () => {
+    const open = openChildSessionSheet(emptyMount, childA);
+    const closed = closeChildSessionSheet(open);
+    expect(releaseChildSessionSheet(closed)).toEqual({
+      sheet: null,
+      visible: false,
+    });
+  });
+
+  it('is a no-op when sheet is already null', () => {
+    expect(releaseChildSessionSheet(emptyMount)).toEqual({
+      sheet: null,
+      visible: false,
+    });
+  });
+
+  it('never releases a visible sheet — a reopen before the scheduled release wins', () => {
+    const closed = closeChildSessionSheet(openChildSessionSheet(emptyMount, childA));
+    const reopened = openChildSessionSheet(closed, childB);
+    expect(releaseChildSessionSheet(reopened)).toBe(reopened);
   });
 });

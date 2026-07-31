@@ -45,3 +45,18 @@ export function closeChildSessionSheet(
 ): ChildSessionSheetMountState {
   return { sheet: current.sheet, visible: false };
 }
+
+/**
+ * Release the sheet identity after the native dismiss animation finishes.
+ * Callers are responsible for scheduling this from the close callback.
+ * A visible sheet is never released: if a reopen landed before the scheduled
+ * release runs, the reopen wins and the release is a no-op.
+ */
+export function releaseChildSessionSheet(
+  current: ChildSessionSheetMountState
+): ChildSessionSheetMountState {
+  if (!current.sheet || current.visible) {
+    return current;
+  }
+  return { sheet: null, visible: false };
+}

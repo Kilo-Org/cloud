@@ -4,7 +4,7 @@ import {
   type KiloSessionId,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -68,6 +68,7 @@ import {
   type ChildSessionSheetMountState,
   closeChildSessionSheet,
   openChildSessionSheet,
+  releaseChildSessionSheet,
 } from '@/components/agents/child-session-sheet-state';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
@@ -127,6 +128,14 @@ export function SessionDetailContent({
     sheet: null,
     visible: false,
   });
+  const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearChildSheetReleaseTimeout = useCallback(() => {
+    if (childSheetReleaseTimeoutRef.current !== null) {
+      clearTimeout(childSheetReleaseTimeoutRef.current);
+      childSheetReleaseTimeoutRef.current = null;
+    }
+  }, []);
 
   const messages = useAtomValue(manager.atoms.messagesList);
   const isLoading = useAtomValue(manager.atoms.isLoading);
@@ -290,6 +299,13 @@ export function SessionDetailContent({
     captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
   }, [fetchedData, sessionId, analyticsSurface, openedVia]);
 
+  useEffect(
+    () => () => {
+      clearChildSheetReleaseTimeout();
+    },
+    [clearChildSheetReleaseTimeout]
+  );
+
   useEffect(() => {
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
@@ -345,17 +361,26 @@ export function SessionDetailContent({
 
   const handleOpenChildSession = useCallback(
     (childSessionId: KiloSessionId, childTitle: string) => {
+      clearChildSheetReleaseTimeout();
       setChildSessionSheet(current =>
         openChildSessionSheet(current, { sessionId: childSessionId, title: childTitle })
       );
       void manager.hydrateChildSession(childSessionId);
     },
-    [manager]
+    [manager, clearChildSheetReleaseTimeout]
   );
 
+  const CHILD_SHEET_RELEASE_DELAY_MS = 350;
+
   const handleCloseChildSession = useCallback(() => {
+    clearChildSheetReleaseTimeout();
     setChildSessionSheet(closeChildSessionSheet);
-  }, []);
+    childSheetReleaseTimeoutRef.current = setTimeout(() => {
+      childSheetReleaseTimeoutRef.current = null;
+      setChildSessionSheet(current => releaseChildSessionSheet(current));
+      // covers the native dismiss animation; the white flash is iOS-specific
+    }, CHILD_SHEET_RELEASE_DELAY_MS);
+  }, [clearChildSheetReleaseTimeout]);
 
   const transcript = useMemo(
     () => mergeSessionTranscript(messages, preparationAttempts),
@@ -683,7 +708,10 @@ export function SessionDetailContent({
     [manager, router]
   );
 
-  const keepScreenAwake = isStreaming || pendingMessages.size > 0;
+  const isFocused = useIsFocused();
+  // Focus bounds the awake window to the visible working UI; a backgrounded
+  // or covered screen must not hold the OS idle timer.
+  const keepScreenAwake = isFocused && (isStreaming || pendingMessages.size > 0);
 
   return (
     <View className="flex-1 bg-background">
@@ -697,7 +725,7 @@ export function SessionDetailContent({
             }
           : {})}
       />
-      {keepScreenAwake ? <ActiveSessionKeepAwake /> : null}
+      {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
       {!isConnected && <ConnectivityBanner />}
 
@@ -941,8 +969,10 @@ export function SessionDetailContent({
   }
 }
 
-function ActiveSessionKeepAwake() {
-  useKeepAwake();
+function ActiveSessionKeepAwake({ sessionId }: Readonly<{ sessionId: KiloSessionId }>) {
+  // Scoped tag keeps stacked session screens independent so deactivating one
+  // does not release the wake lock another visible session still needs.
+  useKeepAwake(`session-${sessionId}`);
   return null;
 }
 

@@ -727,3 +727,756 @@ esac
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+function makePnpmStub(bin: string, commandLog: string): void {
+  executable(
+    path.join(bin, 'pnpm'),
+    '#!/bin/sh\n' +
+      `main="\$1"\n` +
+      `sub="\$2"\n` +
+      `if [ "\$main" = "-s" ]; then\n` +
+      `  main="\$2"\n` +
+      `  sub="\$3"\n` +
+      `fi\n` +
+      `printf '%s: %s\\n' "\$PWD" "\$*" >> "${commandLog.replace(/"/g, '\\"')}"\n` +
+      `case "\$main" in\n` +
+      `  dev:env|dev:start|drizzle) ;;\n` +
+      `  dev:status)\n` +
+      `    printf '%s\\n' '{"services":[{"name":"mobile","status":"up"},{"name":"nextjs","status":"up"},{"name":"cloudflare-session-ingest","status":"up"},{"name":"cloud-agent-next","status":"up"},{"name":"kiloclaw","status":"up"},{"name":"event-service","status":"up"}]}'\n` +
+      `    ;;\n` +
+      `  dev:mobile:simulator)\n` +
+      `    printf '{"device":{"id":"UDID-123"},"worktreeRoot":"%s"}\\n' "\$PWD"\n` +
+      `    ;;\n` +
+      `  dev:mobile:ios)\n` +
+      `    if [ -n "\$IOS_BUILD_FAIL" ]; then exit 1; fi\n` +
+      `    ;;\n` +
+      `  dev:mobile:android)\n` +
+      `    case "\$sub" in\n` +
+      `      emulator-start)\n` +
+      `        mkdir -p "\$TMPDIR/kilo-mobile-android-emulators"\n` +
+      `        printf '{\\n  "serial": "emulator-5554",\\n  "pid": 123,\\n  "log": "/tmp/log",\\n  "worktreeRoot": "%s"\\n}\\n' "\$PWD" > "\$TMPDIR/kilo-mobile-android-emulators/$(basename "\$PWD").json"\n` +
+      `        ;;\n` +
+      `      adb)\n` +
+      `        [ "\$BOOT_COMPLETED" = "1" ] && echo 1 || echo 0\n` +
+      `        ;;\n` +
+      `      claim) ;;\n` +
+      `      build)\n` +
+      `        if [ -n "\$ANDROID_BUILD_FAIL" ]; then exit 1; fi\n` +
+      `        ;;\n` +
+      `    esac\n` +
+      `    ;;\n` +
+      `esac\n`
+  );
+}
+
+function makeNpxStub(bin: string, commandLog: string): void {
+  executable(
+    path.join(bin, 'npx'),
+    '#!/bin/sh\n' +
+      `printf '%s: %s\\n' "\$PWD" "\$*" >> "${commandLog.replace(/"/g, '\\"')}"\n` +
+      `if [ "\$1" = "expo" ] && [ "\$2" = "prebuild" ]; then\n` +
+      `  platform="\$4"\n` +
+      `  if [ "\$platform" = "ios" ]; then\n` +
+      `    mkdir -p ios/Kilo.xcworkspace\n` +
+      `  elif [ "\$platform" = "android" ]; then\n` +
+      `    mkdir -p android\n` +
+      `    touch android/build.gradle\n` +
+      `  fi\n` +
+      `  if [ -n "\$DIRTY_PREBUILD" ]; then\n` +
+      `    touch dirty-prebuild.txt\n` +
+      `  fi\n` +
+      `fi\n`
+  );
+}
+
+test('E2E status enumerates iOS booted devices and Android emulators', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-device-enum-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'live-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), path.join(root, 'covered-abcd'));
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\n' +
+      'if [ "$1" = has-session ]; then exit 0; fi\n' +
+      'if [ "$1" = list-sessions ]; then printf "kilo-dev-covered-abcd\n"; exit 0; fi\n' +
+      'exit 1\n'
+  );
+  fs.writeFileSync(
+    path.join(bin, 'xcrun'),
+    '#!/bin/sh\n' +
+      'if [ "$1" = "simctl" ] && [ "$2" = "list" ] && [ "$3" = "devices" ] && [ "$4" = "booted" ]; then\n' +
+      '  printf "iPhone 17 (BOOTED-UDID) (Booted)\\n"\n' +
+      '  printf "iPhone Claimed (CLAIMED-UDID) (Booted)\\n"\n' +
+      'fi\n'
+  );
+  fs.writeFileSync(
+    path.join(bin, 'adb'),
+    '#!/bin/sh\n' +
+      'printf "List of devices attached\\nemulator-5554\\tdevice\\nphysical-123\\tdevice\\n"\n'
+  );
+  for (const command of ['tmux', 'xcrun', 'adb']) fs.chmodSync(path.join(bin, command), 0o755);
+  try {
+    const result = spawnSync(path.join(repoRoot, '.kilo_workflow/e2e-slot-status.sh'), [], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /UNACCOUNTED booted device: BOOTED-UDID/);
+    assert.match(result.stdout, /UNACCOUNTED booted emulator: emulator-5554/);
+    assert.doesNotMatch(result.stdout, /UNACCOUNTED booted emulator: physical-123/);
+    // Claimed iOS device is covered by the existing claim check, not device enum.
+    fs.mkdirSync(path.join(root, 'tmp', 'kilo-mobile-simulator-claims'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'tmp', 'kilo-mobile-simulator-claims', 'CLAIMED-UDID.json'),
+      JSON.stringify({ worktreeRoot: path.join(root, 'covered-abcd') })
+    );
+    const claimed = spawnSync(path.join(repoRoot, '.kilo_workflow/e2e-slot-status.sh'), [], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+      },
+    });
+    assert.equal(claimed.status, 0, claimed.stderr);
+    assert.match(claimed.stdout, /UNACCOUNTED booted device: BOOTED-UDID/);
+    assert.doesNotMatch(claimed.stdout, /UNACCOUNTED booted device: CLAIMED-UDID/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E status reports claimed-but-dead devices and suppresses footer on findings', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-dead-device-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  const covered = path.join(root, 'covered-abcd');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'live-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), covered);
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\n' +
+      'if [ "$1" = has-session ]; then exit 0; fi\n' +
+      'if [ "$1" = list-sessions ]; then printf "kilo-dev-covered-abcd\n"; exit 0; fi\n' +
+      'exit 1\n'
+  );
+  fs.writeFileSync(
+    path.join(bin, 'xcrun'),
+    '#!/bin/sh\n' +
+      'if [ "$1" = "simctl" ] && [ "$2" = "list" ] && [ "$3" = "devices" ] && [ "$4" = "booted" ]; then\n' +
+      '  printf "iPhone 17 (ALIVE-UDID) (Booted)\\n"\n' +
+      'fi\n'
+  );
+  fs.writeFileSync(path.join(bin, 'adb'), '#!/bin/sh\nexit 0\n');
+  for (const command of ['tmux', 'xcrun', 'adb']) fs.chmodSync(path.join(bin, command), 0o755);
+  fs.mkdirSync(path.join(root, 'tmp', 'kilo-mobile-simulator-claims'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'tmp', 'kilo-mobile-simulator-claims', 'DEAD-UDID.json'),
+    JSON.stringify({ worktreeRoot: covered })
+  );
+  try {
+    const result = spawnSync(path.join(repoRoot, '.kilo_workflow/e2e-slot-status.sh'), [], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /DEAD device: DEAD-UDID claimed by .*covered-abcd.* \(slot held\)/);
+    assert.doesNotMatch(result.stdout, /no unaccounted known resources/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E status prints all-clear footer only when there are zero findings', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-clear-footer-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'live-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), path.join(root, 'covered-abcd'));
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\n' +
+      'if [ "$1" = has-session ]; then exit 0; fi\n' +
+      'if [ "$1" = list-sessions ]; then printf "kilo-dev-covered-abcd\n"; exit 0; fi\n' +
+      'exit 1\n'
+  );
+  fs.writeFileSync(path.join(bin, 'xcrun'), '#!/bin/sh\nexit 0\n');
+  fs.writeFileSync(path.join(bin, 'adb'), '#!/bin/sh\nexit 0\n');
+  for (const command of ['tmux', 'xcrun', 'adb']) fs.chmodSync(path.join(bin, command), 0o755);
+  try {
+    const result = spawnSync(path.join(repoRoot, '.kilo_workflow/e2e-slot-status.sh'), [], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /no unaccounted known resources/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E status reports Android DEAD once when adb sees no devices', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-android-dead-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  const covered = path.join(root, 'covered-abcd');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'live-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), covered);
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\n' +
+      'if [ "$1" = has-session ]; then exit 0; fi\n' +
+      'if [ "$1" = list-sessions ]; then printf "kilo-dev-covered-abcd\n"; exit 0; fi\n' +
+      'exit 1\n'
+  );
+  fs.writeFileSync(path.join(bin, 'adb'), '#!/bin/sh\nprintf "List of devices attached\\n"\n');
+  for (const command of ['tmux', 'adb']) fs.chmodSync(path.join(bin, command), 0o755);
+  fs.mkdirSync(path.join(root, 'tmp', 'kilo-mobile-android-claims'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'tmp', 'kilo-mobile-android-claims', 'emulator-5554.json'),
+    JSON.stringify({ serial: 'emulator-5554', worktreeRoot: covered })
+  );
+  fs.mkdirSync(path.join(root, 'tmp', 'kilo-mobile-android-emulators'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'tmp', 'kilo-mobile-android-emulators', 'covered-abcd.json'),
+    JSON.stringify({ serial: 'emulator-5554', worktreeRoot: covered })
+  );
+  try {
+    const result = spawnSync(path.join(repoRoot, '.kilo_workflow/e2e-slot-status.sh'), [], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const deadMatches = result.stdout.match(/DEAD device: emulator-5554/g);
+    assert.equal(deadMatches?.length, 1, `expected one DEAD line, got: ${result.stdout}`);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E acquire wait announces holders before the first retry', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-acquire-wait-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const state = path.join(home, '.cache/kilo-e2e-slots');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(state, { recursive: true });
+  for (let i = 1; i <= 3; i++) {
+    const slot = path.join(state, `slot-${i}`);
+    fs.mkdirSync(slot);
+    fs.writeFileSync(path.join(slot, 'owner'), 'other-owner');
+    fs.writeFileSync(path.join(slot, 'worktree'), `/worktree-${i}`);
+    fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  }
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\n' +
+      'if [ "$1" = display-message ]; then echo test-owner; exit 0; fi\n' +
+      'if [ "$1" = has-session ]; then exit 0; fi\n' +
+      'exit 1\n'
+  );
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/bin/sh\nexit 0\n');
+  for (const command of ['tmux', 'sleep']) fs.chmodSync(path.join(bin, command), 0o755);
+  try {
+    const child = spawnSync(path.join(repoRoot, '.kilo_workflow/.e2e-slot-state.sh'), ['acquire'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMUX_PANE: '%1',
+      },
+      timeout: 5000,
+    });
+    const waitIndex = child.stderr.indexOf('waiting for an E2E slot; holders:');
+    const retryIndex = child.stderr.indexOf('retrying in');
+    assert.ok(waitIndex >= 0, child.stderr);
+    assert.ok(retryIndex < 0 || waitIndex < retryIndex, `wait not before retry: ${child.stderr}`);
+    assert.match(child.stderr, /slot-1 other-owner \[\/worktree-1\]/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E start-resource iOS prebuilds, builds, and emits one compact claim JSON', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-ios-start-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const commandLog = path.join(root, 'commands.log');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(home);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'test-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), root);
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\nif [ "$1" = display-message ]; then echo test-owner; exit 0; fi\nexit 1\n'
+  );
+  fs.chmodSync(path.join(bin, 'tmux'), 0o755);
+  makePnpmStub(bin, commandLog);
+  makeNpxStub(bin, commandLog);
+  const wt = path.join(root, 'wt');
+  fs.mkdirSync(path.join(wt, '.kilo_workflow'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'apps/mobile'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/.e2e-slot-state.sh'),
+    path.join(wt, '.kilo_workflow/.e2e-slot-state.sh')
+  );
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/e2e-start-resource.sh'),
+    path.join(wt, '.kilo_workflow/e2e-start-resource.sh')
+  );
+  fs.chmodSync(path.join(wt, '.kilo_workflow/.e2e-slot-state.sh'), 0o755);
+  fs.chmodSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), 0o755);
+  execFileSync('git', ['init', '-q'], { cwd: wt });
+  execFileSync('git', ['-C', wt, 'config', 'user.email', 'test@example.com']);
+  execFileSync('git', ['-C', wt, 'config', 'user.name', 'Test']);
+  fs.writeFileSync(
+    path.join(wt, '.gitignore'),
+    '.env.local\napps/mobile/ios\napps/mobile/android\n'
+  );
+  execFileSync('git', ['-C', wt, 'add', '.']);
+  execFileSync('git', ['-C', wt, 'commit', '-qm', 'base']);
+  try {
+    const held = spawnSync(path.join(wt, '.kilo_workflow/.e2e-slot-state.sh'), ['_held'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMUX_PANE: '%1',
+      },
+    });
+    assert.equal(
+      held.status,
+      0,
+      `held failed: ${held.stderr} slot=${slot} owner=${fs.readFileSync(path.join(slot, 'owner'), 'utf8')}`
+    );
+    const result = spawnSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), ['ios'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+        TMUX_PANE: '%1',
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const lines = result.stdout.split('\n').filter(Boolean);
+    assert.equal(lines.length, 1, `expected single stdout line, got: ${result.stdout}`);
+    const parsed = JSON.parse(lines[0]);
+    assert.equal(parsed.device.id, 'UDID-123');
+    assert.doesNotMatch(result.stdout, /\n.*build/);
+    assert.match(fs.readFileSync(commandLog, 'utf8'), /expo prebuild --platform ios/);
+    assert.match(fs.readFileSync(commandLog, 'utf8'), /dev:mobile:ios build UDID-123/);
+    // Second invocation reuses the existing prebuild, so npx is not invoked again.
+    fs.writeFileSync(commandLog, '');
+    const reuse = spawnSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), ['ios'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+        TMUX_PANE: '%1',
+      },
+    });
+    assert.equal(reuse.status, 0, reuse.stderr);
+    assert.doesNotMatch(fs.readFileSync(commandLog, 'utf8'), /expo prebuild/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E start-resource android starts, claims, builds, and emits one compact record JSON', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-android-start-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const commandLog = path.join(root, 'commands.log');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(home);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'test-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), root);
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\nif [ "$1" = display-message ]; then echo test-owner; exit 0; fi\nexit 1\n'
+  );
+  fs.chmodSync(path.join(bin, 'tmux'), 0o755);
+  makePnpmStub(bin, commandLog);
+  makeNpxStub(bin, commandLog);
+  const wt = path.join(root, 'wt');
+  fs.mkdirSync(path.join(wt, '.kilo_workflow'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'apps/mobile'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/.e2e-slot-state.sh'),
+    path.join(wt, '.kilo_workflow/.e2e-slot-state.sh')
+  );
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/e2e-start-resource.sh'),
+    path.join(wt, '.kilo_workflow/e2e-start-resource.sh')
+  );
+  fs.chmodSync(path.join(wt, '.kilo_workflow/.e2e-slot-state.sh'), 0o755);
+  fs.chmodSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), 0o755);
+  execFileSync('git', ['init', '-q'], { cwd: wt });
+  execFileSync('git', ['-C', wt, 'config', 'user.email', 'test@example.com']);
+  execFileSync('git', ['-C', wt, 'config', 'user.name', 'Test']);
+  fs.writeFileSync(
+    path.join(wt, '.gitignore'),
+    '.env.local\napps/mobile/ios\napps/mobile/android\n'
+  );
+  execFileSync('git', ['-C', wt, 'add', '.']);
+  execFileSync('git', ['-C', wt, 'commit', '-qm', 'base']);
+  try {
+    const result = spawnSync(
+      path.join(wt, '.kilo_workflow/e2e-start-resource.sh'),
+      ['android', 'Pixel_8'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          HOME: home,
+          PATH: `${bin}:${process.env.PATH}`,
+          TMPDIR: path.join(root, 'tmp'),
+          TMUX_PANE: '%1',
+        },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const lines = result.stdout.split('\n').filter(Boolean);
+    assert.equal(lines.length, 1, `expected single stdout line, got: ${result.stdout}`);
+    const parsed = JSON.parse(lines[0]);
+    assert.equal(parsed.serial, 'emulator-5554');
+    assert.match(fs.readFileSync(commandLog, 'utf8'), /expo prebuild --platform android/);
+    assert.match(fs.readFileSync(commandLog, 'utf8'), /dev:mobile:android emulator-start/);
+    assert.match(fs.readFileSync(commandLog, 'utf8'), /dev:mobile:android claim emulator-5554/);
+    assert.match(fs.readFileSync(commandLog, 'utf8'), /dev:mobile:android build emulator-5554/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E start-resource android reuse skips emulator-start but still claims and builds', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-android-reuse-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const commandLog = path.join(root, 'commands.log');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(home);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'test-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), root);
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\nif [ "$1" = display-message ]; then echo test-owner; exit 0; fi\nexit 1\n'
+  );
+  fs.chmodSync(path.join(bin, 'tmux'), 0o755);
+  makePnpmStub(bin, commandLog);
+  makeNpxStub(bin, commandLog);
+  const wt = path.join(root, 'wt');
+  fs.mkdirSync(path.join(wt, '.kilo_workflow'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'apps/mobile'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/.e2e-slot-state.sh'),
+    path.join(wt, '.kilo_workflow/.e2e-slot-state.sh')
+  );
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/e2e-start-resource.sh'),
+    path.join(wt, '.kilo_workflow/e2e-start-resource.sh')
+  );
+  fs.chmodSync(path.join(wt, '.kilo_workflow/.e2e-slot-state.sh'), 0o755);
+  fs.chmodSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), 0o755);
+  execFileSync('git', ['init', '-q'], { cwd: wt });
+  execFileSync('git', ['-C', wt, 'config', 'user.email', 'test@example.com']);
+  execFileSync('git', ['-C', wt, 'config', 'user.name', 'Test']);
+  fs.writeFileSync(
+    path.join(wt, '.gitignore'),
+    '.env.local\napps/mobile/ios\napps/mobile/android\n'
+  );
+  execFileSync('git', ['-C', wt, 'add', '.']);
+  execFileSync('git', ['-C', wt, 'commit', '-qm', 'base']);
+  const recordDir = path.join(root, 'tmp', 'kilo-mobile-android-emulators');
+  fs.mkdirSync(recordDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(recordDir, `${path.basename(wt)}.json`),
+    JSON.stringify(
+      { serial: 'emulator-5554', pid: 123, log: '/tmp/log', worktreeRoot: wt },
+      null,
+      2
+    )
+  );
+  try {
+    const result = spawnSync(
+      path.join(wt, '.kilo_workflow/e2e-start-resource.sh'),
+      ['android', 'Pixel_8'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          HOME: home,
+          PATH: `${bin}:${process.env.PATH}`,
+          TMPDIR: path.join(root, 'tmp'),
+          TMUX_PANE: '%1',
+          BOOT_COMPLETED: '1',
+        },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const lines = result.stdout.split('\n').filter(Boolean);
+    assert.equal(lines.length, 1);
+    const parsed = JSON.parse(lines[0]);
+    assert.equal(parsed.serial, 'emulator-5554');
+    assert.doesNotMatch(fs.readFileSync(commandLog, 'utf8'), /dev:mobile:android emulator-start/);
+    assert.match(fs.readFileSync(commandLog, 'utf8'), /dev:mobile:android claim emulator-5554/);
+    assert.match(fs.readFileSync(commandLog, 'utf8'), /dev:mobile:android build emulator-5554/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E start-resource rejects a prebuild that creates tracked changes', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-prebuild-dirty-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const commandLog = path.join(root, 'commands.log');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(home);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'test-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), root);
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\nif [ "$1" = display-message ]; then echo test-owner; exit 0; fi\nexit 1\n'
+  );
+  fs.chmodSync(path.join(bin, 'tmux'), 0o755);
+  makePnpmStub(bin, commandLog);
+  makeNpxStub(bin, commandLog);
+  const wt = path.join(root, 'wt');
+  fs.mkdirSync(path.join(wt, '.kilo_workflow'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'apps/mobile'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/.e2e-slot-state.sh'),
+    path.join(wt, '.kilo_workflow/.e2e-slot-state.sh')
+  );
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/e2e-start-resource.sh'),
+    path.join(wt, '.kilo_workflow/e2e-start-resource.sh')
+  );
+  fs.chmodSync(path.join(wt, '.kilo_workflow/.e2e-slot-state.sh'), 0o755);
+  fs.chmodSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), 0o755);
+  execFileSync('git', ['init', '-q'], { cwd: wt });
+  execFileSync('git', ['-C', wt, 'config', 'user.email', 'test@example.com']);
+  execFileSync('git', ['-C', wt, 'config', 'user.name', 'Test']);
+  // apps/mobile/ios is NOT ignored, so creating it counts as a tracked change.
+  fs.writeFileSync(path.join(wt, '.gitignore'), '.env.local\napps/mobile/android\n');
+  execFileSync('git', ['-C', wt, 'add', '.']);
+  execFileSync('git', ['-C', wt, 'commit', '-qm', 'base']);
+  try {
+    const result = spawnSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), ['ios'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+        TMUX_PANE: '%1',
+        DIRTY_PREBUILD: '1',
+      },
+    });
+    assert.notEqual(result.status, 0, `expected failure, got: ${result.stderr}`);
+    assert.match(result.stderr, /prebuild for ios produced new tracked changes/);
+    assert.equal(result.stdout.trim(), '');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E start-resource bundle --ios-only emits only ios summary lines', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-bundle-ios-only-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const commandLog = path.join(root, 'commands.log');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(home);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'test-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), root);
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\nif [ "$1" = display-message ]; then echo test-owner; exit 0; fi\nexit 1\n'
+  );
+  fs.chmodSync(path.join(bin, 'tmux'), 0o755);
+  makePnpmStub(bin, commandLog);
+  makeNpxStub(bin, commandLog);
+  fs.writeFileSync(
+    path.join(bin, 'curl'),
+    '#!/bin/sh\n' +
+      'if [ "$1" = "-sf" ] && [ "$4" = "http://127.0.0.1:23750/v1.44/_ping" ]; then exit 0; fi\n' +
+      'exit 1\n'
+  );
+  fs.chmodSync(path.join(bin, 'curl'), 0o755);
+  const wt = path.join(root, 'wt');
+  fs.mkdirSync(path.join(wt, '.kilo_workflow'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'apps/mobile'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/.e2e-slot-state.sh'),
+    path.join(wt, '.kilo_workflow/.e2e-slot-state.sh')
+  );
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/e2e-start-resource.sh'),
+    path.join(wt, '.kilo_workflow/e2e-start-resource.sh')
+  );
+  fs.chmodSync(path.join(wt, '.kilo_workflow/.e2e-slot-state.sh'), 0o755);
+  fs.chmodSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), 0o755);
+  execFileSync('git', ['init', '-q'], { cwd: wt });
+  execFileSync('git', ['-C', wt, 'config', 'user.email', 'test@example.com']);
+  execFileSync('git', ['-C', wt, 'config', 'user.name', 'Test']);
+  fs.writeFileSync(
+    path.join(wt, '.gitignore'),
+    '.env.local\napps/mobile/ios\napps/mobile/android\n'
+  );
+  execFileSync('git', ['-C', wt, 'add', '.']);
+  execFileSync('git', ['-C', wt, 'commit', '-qm', 'base']);
+  try {
+    const result = spawnSync(
+      path.join(wt, '.kilo_workflow/e2e-start-resource.sh'),
+      ['bundle', '--ios-only'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          HOME: home,
+          PATH: `${bin}:${process.env.PATH}`,
+          TMPDIR: path.join(root, 'tmp'),
+          TMUX_PANE: '%1',
+        },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const stdoutLines = result.stdout.split('\n').filter(Boolean);
+    assert.equal(stdoutLines.length, 1);
+    assert.match(stdoutLines[0], /^ios claim: /);
+    const json = stdoutLines[0].replace(/^ios claim: /, '');
+    assert.equal(JSON.parse(json).device.id, 'UDID-123');
+    assert.doesNotMatch(result.stdout, /android record:/);
+    assert.doesNotMatch(fs.readFileSync(commandLog, 'utf8'), /dev:mobile:android emulator-start/);
+    assert.match(result.stderr, /bundle ready/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('E2E start-resource build failure exits non-zero with no stdout JSON', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-e2e-build-fail-test-'));
+  const bin = path.join(root, 'bin');
+  const home = path.join(root, 'home');
+  const commandLog = path.join(root, 'commands.log');
+  const slot = path.join(home, '.cache/kilo-e2e-slots/slot-1');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(home);
+  fs.mkdirSync(slot, { recursive: true });
+  fs.writeFileSync(path.join(slot, 'owner'), 'test-owner');
+  fs.writeFileSync(path.join(slot, 'worktree'), root);
+  fs.writeFileSync(path.join(slot, 'since'), '2026-01-01T00:00:00Z\n');
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    '#!/bin/sh\nif [ "$1" = display-message ]; then echo test-owner; exit 0; fi\nexit 1\n'
+  );
+  fs.chmodSync(path.join(bin, 'tmux'), 0o755);
+  makePnpmStub(bin, commandLog);
+  makeNpxStub(bin, commandLog);
+  const wt = path.join(root, 'wt');
+  fs.mkdirSync(path.join(wt, '.kilo_workflow'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'apps/mobile'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/.e2e-slot-state.sh'),
+    path.join(wt, '.kilo_workflow/.e2e-slot-state.sh')
+  );
+  fs.copyFileSync(
+    path.join(repoRoot, '.kilo_workflow/e2e-start-resource.sh'),
+    path.join(wt, '.kilo_workflow/e2e-start-resource.sh')
+  );
+  fs.chmodSync(path.join(wt, '.kilo_workflow/.e2e-slot-state.sh'), 0o755);
+  fs.chmodSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), 0o755);
+  execFileSync('git', ['init', '-q'], { cwd: wt });
+  execFileSync('git', ['-C', wt, 'config', 'user.email', 'test@example.com']);
+  execFileSync('git', ['-C', wt, 'config', 'user.name', 'Test']);
+  fs.writeFileSync(
+    path.join(wt, '.gitignore'),
+    '.env.local\napps/mobile/ios\napps/mobile/android\n'
+  );
+  execFileSync('git', ['-C', wt, 'add', '.']);
+  execFileSync('git', ['-C', wt, 'commit', '-qm', 'base']);
+  try {
+    const result = spawnSync(path.join(wt, '.kilo_workflow/e2e-start-resource.sh'), ['ios'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: path.join(root, 'tmp'),
+        TMUX_PANE: '%1',
+        IOS_BUILD_FAIL: '1',
+      },
+    });
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout.trim(), '');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

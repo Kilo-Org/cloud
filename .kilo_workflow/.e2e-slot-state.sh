@@ -5,7 +5,7 @@ set -uo pipefail
 DIR="$HOME/.cache/kilo-e2e-slots"
 TOTAL=3
 POLL=10
-ACQUIRE_DEADLINE=2700
+ACQUIRE_DEADLINE=480
 mkdir -p "$DIR" || { echo "cannot create slot state dir $DIR" >&2; exit 1; }
 [ -w "$DIR" ] || { echo "slot state dir $DIR is not writable" >&2; exit 1; }
 command -v tmux >/dev/null || { echo "tmux is required" >&2; exit 1; }
@@ -78,6 +78,7 @@ case "${1:?internal usage: $0 acquire|release|status|_held}" in
     done
 
     deadline=$(($(date +%s) + ACQUIRE_DEADLINE))
+    wait_announced=0
     while :; do
       reap
       for number in $(seq 1 "$TOTAL"); do
@@ -104,7 +105,21 @@ case "${1:?internal usage: $0 acquire|release|status|_held}" in
         "$0" status >&2 || true
         exit 1
       fi
-      echo "all $TOTAL E2E slots busy; retrying in ${POLL}s" >&2
+      if [ "$wait_announced" -eq 0 ]; then
+        holders=""
+        for slot in "$DIR"/slot-*; do
+          [ -d "$slot" ] || continue
+          name=$(basename "$slot")
+          slot_owner=$(cat "$slot/owner" 2>/dev/null || echo '<acquiring>')
+          worktree=$(cat "$slot/worktree" 2>/dev/null || echo '<unknown>')
+          if [ -n "$holders" ]; then holders="${holders}, "; fi
+          holders="${holders}${name} ${slot_owner} [${worktree}]"
+        done
+        echo "waiting for an E2E slot; holders: ${holders}" >&2
+        wait_announced=1
+      else
+        echo "all $TOTAL E2E slots busy; retrying in ${POLL}s" >&2
+      fi
       sleep "$POLL"
     done
     ;;

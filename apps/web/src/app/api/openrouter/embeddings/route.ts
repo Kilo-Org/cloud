@@ -18,6 +18,7 @@ import {
   extractHeaderAndLimitLength,
   invalidRequestResponse,
   modelDoesNotExistResponse,
+  modelNotAllowedResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -40,6 +41,7 @@ import {
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 export const maxDuration = 300;
 
@@ -211,7 +213,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
     if (modelRestrictionError) return modelRestrictionError;
 
-    if (providerConfig) {
+    if (organizationId) {
+      const { decision } = await resolveOrganizationMemberModelDecision({
+        organizationId,
+        kiloUserId: user.id,
+        modelId: requestedModelLowerCased,
+      });
+      if (!decision.allowed) return modelNotAllowedResponse();
+      if (decision.eligibleProviderRoutes) {
+        const currentOnly = providerConfig?.only;
+        const only = currentOnly
+          ? currentOnly.filter(route => decision.eligibleProviderRoutes?.has(route))
+          : [...decision.eligibleProviderRoutes];
+        if (only.length === 0) return modelNotAllowedResponse();
+        requestBodyParsed.provider = { ...providerConfig, only };
+      } else if (providerConfig) {
+        requestBodyParsed.provider = providerConfig;
+      }
+    } else if (providerConfig) {
       requestBodyParsed.provider = providerConfig;
     }
   }

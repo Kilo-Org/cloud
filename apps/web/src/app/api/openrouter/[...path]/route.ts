@@ -107,6 +107,11 @@ import {
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { logExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
+import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
+import {
+  evaluateEffectiveModelAccessPolicy,
+  getEffectiveModelDecision,
+} from '@/lib/organizations/effective-model-access.server';
 
 export const maxDuration = 800;
 
@@ -456,6 +461,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user = maybeUser;
   }
 
+  // Enterprise group model-access policy is enforced on the hottest request
+  // path, so start its DB read now — concurrently with provider resolution,
+  // abuse checks, and the balance await below — rather than sequentially just
+  // before routing. The evaluated policy and per-model decision are then
+  // in-memory (the provider index is cached), so awaiting this promise later
+  // adds no extra round-trip. Only authenticated org requests need it.
+  const organizationGroupPolicyPromise =
+    organizationId && !isAnonymousContext(user)
+      ? getOrganizationGroupPolicyContext({
+          organizationId,
+          subject: { type: 'member', kiloUserId: user.id },
+        }).then(evaluateEffectiveModelAccessPolicy)
+      : null;
+
   // Fraud/project headers are pure header parsing; resolve them here so the
   // classifier-overhead billing below can be scheduled before any downstream
   // rejection path runs.
@@ -792,6 +811,26 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
     if (modelRestrictionError) return modelRestrictionError;
 
+    let effectiveProviderConfig = providerConfig;
+    if (organizationGroupPolicyPromise) {
+      // Started right after auth so the DB read overlapped the work above; the
+      // decision itself is in-memory against the cached provider index.
+      const groupPolicy = await organizationGroupPolicyPromise;
+      const groupDecision = await getEffectiveModelDecision(
+        groupPolicy,
+        effectiveModelIdLowerCased
+      );
+      if (!groupDecision.allowed) return modelNotAllowedResponse();
+      if (groupDecision.eligibleProviderRoutes) {
+        const currentOnly = providerConfig?.only;
+        const only = currentOnly
+          ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
+          : [...groupDecision.eligibleProviderRoutes];
+        if (only.length === 0) return modelNotAllowedResponse();
+        effectiveProviderConfig = { ...providerConfig, only };
+      }
+    }
+
     // Experiment traffic captures prompts to R2 for partner evaluation, which
     // is a form of data collection that the gateway-pinned `data_collection`
     // setting cannot enforce on a direct partner upstream. If the org has
@@ -812,8 +851,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // Direct experiment upstreams must not have a Vercel/OpenRouter
     // provider config pinned onto them — the partner endpoint is selected
     // by the variant version.
-    if (providerConfig && !effectiveProviderContext.experiment) {
-      requestBodyParsed.body.provider = providerConfig;
+    if (effectiveProviderConfig && !effectiveProviderContext.experiment) {
+      requestBodyParsed.body.provider = effectiveProviderConfig;
     }
   }
 

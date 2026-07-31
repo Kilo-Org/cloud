@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChartLine,
+  UsersRound,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -291,6 +292,15 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
+    ...(currentOrg?.plan === 'enterprise'
+      ? [
+          {
+            title: 'Groups',
+            icon: UsersRound,
+            url: `/organizations/${organizationId}/groups`,
+          },
+        ]
+      : []),
     ...(hasOwnerLevelAccess
       ? [
           {

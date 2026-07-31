@@ -252,8 +252,21 @@ export async function applyVercelSettings(
       throw new Error('Invalid state: userByok should be null or not empty');
     }
     const byokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    // Only honor the caller's own `provider.ignore` here. The organization /
+    // group `provider.only` allow-list must NOT constrain BYOK selection:
+    // direct BYOK uses the user's own credentials and is intentionally exempt
+    // from organization model/provider restrictions (see ai-gateway AGENTS.md).
+    // Filtering by it also silently drops providers whose OpenRouter slug has
+    // no Vercel BYOK equivalent, turning previously working requests into hard
+    // failures.
+    const ignoredProviders = new Set(
+      (requestToMutate.body.provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId)
+    );
     for (const provider of userByok) {
       const [key, list] = getVercelInferenceProviderConfigForUserByok(provider);
+      if (ignoredProviders.has(key)) {
+        continue;
+      }
       byokProviders[key] = [...(byokProviders[key] ?? []), ...list];
     }
 

@@ -36,6 +36,7 @@ import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { failureResult, successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -320,7 +321,12 @@ export async function addUserToOrganization(
   role: OrganizationRole,
   txn?: DrizzleTransaction
 ): Promise<boolean> {
-  const result = await (txn || db)
+  if (!txn) {
+    return await db.transaction(async tx =>
+      addUserToOrganization(organizationId, userId, role, tx)
+    );
+  }
+  const result = await txn
     .insert(organization_memberships)
     .values({
       organization_id: organizationId,
@@ -330,7 +336,12 @@ export async function addUserToOrganization(
     .onConflictDoNothing();
 
   const added = (result.rowCount ?? 0) > 0;
+  // Only a real membership change affects group-policy evaluation. Bumping the
+  // revision (and taking the org-wide policy advisory lock) on a no-op insert
+  // would serialize every SSO re-login on one row. Skip both when nothing was
+  // inserted.
   if (added) {
+    await bumpOrganizationGroupPolicyRevision(txn, organizationId, userId);
     void reportEvents({
       events: [
         {
@@ -396,6 +407,7 @@ export async function removeUserFromOrganization(
 ): Promise<{ rowCount: number | null }> {
   const result = await db.transaction(async tx => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
+    await bumpOrganizationGroupPolicyRevision(tx, organizationId, removedBy ?? userId);
     // Look up the user's current role before deleting
     const [membership] = await tx
       .select({ role: organization_memberships.role })

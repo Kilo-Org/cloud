@@ -36,6 +36,13 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
 jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@/lib/organizations/organization-group-policy-context.server', () => ({
+  getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
+}));
+jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+  evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
+  getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
+}));
 jest.mock('@/lib/ai-gateway/abuse-service', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/abuse-service');
   return {

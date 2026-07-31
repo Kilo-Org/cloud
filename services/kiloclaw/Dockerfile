@@ -3,10 +3,20 @@ ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 # Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
 # pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
-# Last bumped 2026-07-02 to refresh chromium, gh, 1password-cli, and base apt
-# security updates (CVE hardening). Note: much of the chromium CVE volume has no
-# fixed version available, so it is not fully clearable by a version bump.
-ARG APT_CACHE_BUST=2026-07-02
+# Last bumped 2026-07-31 to refresh chromium, gh, 1password-cli, and base apt
+# security updates (CVE hardening). Measured against the 2026-07-02 layer, this
+# picks up chromium/chromium-common 150.0.7871.124 -> 150.0.7871.181 (17
+# Critical/High each) and libexpat1 2.7.1-2 -> 2.8.2-1~deb13u1 (4).
+#
+# Note: much of the chromium CVE volume has no fixed version available, so it is
+# not fully clearable by a version bump — 117 Critical/High per chromium package
+# currently have no upstream fix. Chromium cannot simply be dropped either: it
+# backs OpenClaw's browser tool (see controller/src/config-writer.ts).
+#
+# 1password-cli is NOT improved by this bump: 2.35.0 -> 2.38.1 is still built
+# with go1.25.7, so its 28 Go-stdlib Critical/High findings persist until
+# 1Password ships a build on go1.25.10+. Do not re-investigate that each cycle.
+ARG APT_CACHE_BUST=2026-07-31
 
 FROM debian:trixie-slim AS runtime
 
@@ -152,8 +162,13 @@ RUN ARCH="$(dpkg --print-architecture)" \
 #   so user-installed tools persist across restarts and are included in snapshots.
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
+# gogcli ships PREBUILT binaries, so its Go stdlib is whatever upstream built it
+# with — unlike the `go install` tools below, which this image compiles with
+# GO_VERSION above. v0.31.1 was built with go1.26.2 and carried 17 Critical/High
+# stdlib findings; v0.34.1 is built with go1.26.5, which clears them. When
+# bumping GO_VERSION for CVE hygiene, check this pin too: it does not follow.
 RUN ARCH="$(dpkg --print-architecture)" \
-    && curl -fsSL "https://github.com/openclaw/gogcli/releases/download/v0.31.1/gogcli_0.31.1_linux_${ARCH}.tar.gz" \
+    && curl -fsSL "https://github.com/openclaw/gogcli/releases/download/v0.34.1/gogcli_0.34.1_linux_${ARCH}.tar.gz" \
        | tar xz -C /usr/local/bin gog \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
     && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.4.3 \

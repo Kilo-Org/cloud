@@ -1,7 +1,18 @@
-import { useState } from 'react';
+/* eslint-disable import/max-dependencies */
+import { storage } from '#imports';
+import { useCallback, useEffect, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
+import { normalizeOrganizationId } from '@/src/shared/organization-normalization';
+import {
+  loadSidePanelMode,
+  saveSidePanelMode,
+} from '@/src/shared/side-panel-mode';
+import type { SidePanelMode } from '@/src/shared/side-panel-mode';
 import { AgentChatPanel } from './agent-chat-panel';
+import { AgentsMode } from './agents-mode';
+import { AgentsModeSwitch } from './agents-mode-switch';
+import { ExtensionAgentsProvider } from './agents-provider';
 import { Shell } from './auth-shell';
 import { useOrganizationCreditAccount } from './organization-credit-account';
 import { PendingMemorySaveCard } from './pending-memory-save-card';
@@ -130,8 +141,24 @@ export const SignedInView = ({
   onSignOut: () => void;
 }): JSX.Element => {
   const [headerBeforeSettings, setHeaderBeforeSettings] = useState<ReactNode>();
+  const [mode, setMode] = useState<SidePanelMode>('browser');
   const { organizationOptions, selectOrganization, selectedOrganizationId } =
     useOrganizationCreditAccount(auth.token);
+
+  // Hydrate persisted panel mode on mount (async WXT storage).
+  useEffect(() => {
+    (async () => {
+      const persisted = await loadSidePanelMode(storage);
+      setMode(persisted);
+    })();
+  }, []);
+
+  const handleModeChange = useCallback((nextMode: SidePanelMode) => {
+    setMode(nextMode);
+    void saveSidePanelMode(storage, nextMode);
+  }, []);
+
+  const agentsOrgId = normalizeOrganizationId(selectedOrganizationId);
 
   return (
     <Shell
@@ -142,12 +169,25 @@ export const SignedInView = ({
       organizationOptions={organizationOptions}
       selectedOrganizationId={selectedOrganizationId}
     >
-      <PendingMemorySaveCard />
-      <AgentChatPanel
-        auth={auth}
-        onHeaderBeforeSettingsChange={setHeaderBeforeSettings}
-        organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
-      />
+      <AgentsModeSwitch mode={mode} onModeChange={handleModeChange} />
+      {mode === 'browser' ? (
+        <>
+          <PendingMemorySaveCard />
+          <AgentChatPanel
+            auth={auth}
+            onHeaderBeforeSettingsChange={setHeaderBeforeSettings}
+            organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
+          />
+        </>
+      ) : (
+        <ExtensionAgentsProvider
+          auth={auth}
+          key={`${auth.token}:${selectedOrganizationId}`}
+          organizationId={agentsOrgId}
+        >
+          <AgentsMode />
+        </ExtensionAgentsProvider>
+      )}
     </Shell>
   );
 };

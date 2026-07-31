@@ -295,15 +295,22 @@ With `--wait`, JSON is printed only **after** boot succeeds. On failure the comm
 
 | Error text | Cause | Attempt 2 GPU |
 |---|---|---|
-| `… died while booting; see <log>` | recorded PID died mid-boot | `--gpu swiftshader_indirect` |
 | `… did not reach sys.boot_completed=1 within 8 minutes; see <log>` | process still live, boot envelope missed | `--gpu host` (retry Mac GPU) |
+| `… died while booting; see <log>` | recorded PID died mid-boot | `--gpu swiftshader_indirect` |
+| `… exited during launch; see <log>` | process died before console bind | `--gpu swiftshader_indirect` |
+| `… did not bind console port … within 30s; see <log>` | launch hung before bind | `--gpu swiftshader_indirect` |
+| `… does not own console port …` | foreign process on the port | `--gpu swiftshader_indirect` |
+| `… did not record its PID` | launch failed before pid file | `--gpu swiftshader_indirect` |
+| any other `emulator-start` failure | treat as died / unusable host GPU path | `--gpu swiftshader_indirect` |
+
+Only the boot-envelope timeout retries the Mac GPU. Every pre-boot launch failure and mid-boot death switches to software rendering.
 
 Log path for `tail -200` (not `$EMULATOR_LOG`):
 
 - `$TMPDIR/kilo-e2e-android-<worktree-slug>.log` (slug = basename with non `[A-Za-z0-9_-]` → `_`), or
-- the path after `see ` in the error text.
+- the path after `see ` in the error text (when present).
 
-Optionally read `$TMPDIR/kilo-mobile-android-emulators/<worktree-slug>.json` before stopping if you need the recorded PID/session. Then run `pnpm dev:mobile:android emulator-stop` and `pnpm dev:mobile:android release-all` — stop kills the PID and deletes the session record, so it cannot be used to re-derive the GPU policy afterward. Relaunch once with the GPU chosen above. If the second attempt also fails, stop and return a test-environment blocker with the log tail; never a third launch.
+The session record at `$TMPDIR/kilo-mobile-android-emulators/<worktree-slug>.json` only exists after a successful launch bind. Pre-boot launch failures delete it before rethrowing, so there is nothing to read — `emulator-stop` still reaps a stray tmux session. Boot-wait failures leave the record in place; read it before stopping only if you need the recorded PID/session for the handoff. Then run `pnpm dev:mobile:android emulator-stop` and `pnpm dev:mobile:android release-all` — stop kills any remaining PID and deletes the session record, so it cannot be used to re-derive the GPU policy afterward. Relaunch once with the GPU chosen above. If the second attempt also fails, stop and return a test-environment blocker with the log tail; never a third launch.
 
 ### Build and login
 

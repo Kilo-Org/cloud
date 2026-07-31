@@ -37,6 +37,7 @@ function formatTableSummary(columnCount: number, rowCount: number): string {
 // messages) and fights the swipe-to-reply pan gesture. Instead we render a
 // compact "View table" chip inline and show the full table in a modal, where
 // it can scroll both ways with the whole screen available.
+
 export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableProps>) {
   const [open, setOpen] = useState(false);
   const colors = useThemeColors();
@@ -92,8 +93,9 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
                 setOpen(false);
               }}
               className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
-              accessibilityRole="button"
               accessibilityLabel="Close table"
+              accessibilityRole="button"
+              hitSlop={8}
             >
               <X size={20} color={colors.foreground} />
             </Pressable>

@@ -297,6 +297,23 @@ export async function createOrganization(
   return organization;
 }
 
+/**
+ * When a user joins an organization through SSO or an invitation we should not
+ * ask them how they heard about Kilo. Mark the customer-source survey as
+ * dismissed by setting `customer_source` to an empty string, but only when they
+ * have not already answered or dismissed it (`customer_source IS NULL`) so an
+ * existing answer is never overwritten.
+ */
+export async function skipCustomerSourceSurveyForOrgJoin(
+  userId: User['id'],
+  txn?: DrizzleTransaction
+): Promise<void> {
+  await (txn || db)
+    .update(kilocode_users)
+    .set({ customer_source: '' })
+    .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.customer_source)));
+}
+
 export async function addUserToOrganization(
   organizationId: Organization['id'],
   userId: User['id'],
@@ -825,6 +842,10 @@ export async function acceptOrganizationInvite(
         role: invitation.role,
         invited_by: invitation.invited_by,
       });
+
+      // Users who join through an invitation should not be asked how they
+      // heard about Kilo.
+      await skipCustomerSourceSurveyForOrgJoin(userId, tx);
 
       // If the invitation predates the account, the account was created after
       // (i.e. because of) a pending invite: this is a brand-new user joining an

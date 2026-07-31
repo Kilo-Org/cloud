@@ -1,4 +1,4 @@
-import { createDrizzleClient } from '@kilocode/db/client';
+import { createDrizzleClient, type DrizzleClient } from '@kilocode/db/client';
 import { sql } from 'drizzle-orm';
 
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -122,18 +122,24 @@ export function classifyReplicaRow(row: ReplicaProbeRow): ReplicaHealthStatus {
  * which is itself the signal that the replica is down.
  */
 export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth> {
-  const client = createDrizzleClient({
-    connectionString: target.url,
-    poolConfig: {
-      max: 1,
-      application_name: 'kilocode-web-replication-health',
-      connectionTimeoutMillis: PROBE_TIMEOUT_MS,
-      statement_timeout: PROBE_TIMEOUT_MS,
-      query_timeout: PROBE_TIMEOUT_MS,
-    },
-  });
+  // createDrizzleClient must stay inside the try: getDatabaseClientConfig runs
+  // `new URL(connectionString)`, which throws synchronously on a malformed
+  // POSTGRES_REPLICA_* value. Keeping it here preserves the "never throws"
+  // contract and maps such failures to `status: 'unreachable'`.
+  let client: DrizzleClient | undefined;
 
   try {
+    client = createDrizzleClient({
+      connectionString: target.url,
+      poolConfig: {
+        max: 1,
+        application_name: 'kilocode-web-replication-health',
+        connectionTimeoutMillis: PROBE_TIMEOUT_MS,
+        statement_timeout: PROBE_TIMEOUT_MS,
+        query_timeout: PROBE_TIMEOUT_MS,
+      },
+    });
+
     const { rows } = await client.db.execute<ReplicaProbeRow>(sql`
       SELECT
         pg_is_in_recovery() AS in_recovery,
@@ -176,7 +182,7 @@ export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth
       error: errorMessage(error),
     };
   } finally {
-    await client.pool.end().catch(() => {});
+    await client?.pool.end().catch(() => {});
   }
 }
 
@@ -230,7 +236,24 @@ export async function collectReplicationHealth(options?: {
   const errors: string[] = [];
 
   const [replicas, walSenders, slots] = await Promise.all([
-    Promise.all(targets.map(target => probe(target))),
+    // Isolate each probe: `probeReplica` is contracted not to throw, but a
+    // custom/injected probe or an unexpected error must not reject the whole
+    // report and blank the walsender and slot data below.
+    Promise.all(
+      targets.map(target =>
+        probe(target).catch(
+          (error): ReplicaHealth => ({
+            name: target.name,
+            status: 'unreachable',
+            in_recovery: null,
+            replay_lsn: null,
+            last_xact_replay_timestamp: null,
+            replay_delay_seconds: null,
+            error: errorMessage(error),
+          })
+        )
+      )
+    ),
     getWalSenders().catch(error => {
       errors.push(`pg_stat_replication: ${errorMessage(error)}`);
       return [] as WalSender[];

@@ -9,6 +9,7 @@ jest.mock('@/lib/drizzle', () => ({
 import {
   classifyReplicaRow,
   collectReplicationHealth,
+  probeReplica,
   REPLICA_LAG_ALERT_SECONDS,
   type ReplicaHealth,
 } from './replication-health';
@@ -61,6 +62,15 @@ function mockPrimary(walSenders: Record<string, unknown>[], slots: Record<string
     .mockResolvedValueOnce(queryResult(walSenders))
     .mockResolvedValueOnce(queryResult(slots));
 }
+
+describe('probeReplica', () => {
+  it('maps a malformed connection string to unreachable instead of throwing', async () => {
+    const health = await probeReplica({ name: 'us-west', url: 'not-a-url' });
+
+    expect(health).toMatchObject({ name: 'us-west', status: 'unreachable' });
+    expect(health.error).toBeTruthy();
+  });
+});
 
 describe('classifyReplicaRow', () => {
   it('flags a replica that is not in recovery', () => {
@@ -157,6 +167,24 @@ describe('collectReplicationHealth', () => {
     expect(report.healthy).toBe(false);
     const lost = report.slots.find(s => s.slot_name === 'snowflake_connector_gfqyzuertw');
     expect(lost?.at_risk).toBe(true);
+  });
+
+  it('isolates a throwing probe as an unreachable replica without blanking primary data', async () => {
+    mockPrimary([walSenderRow()], [slotRow()]);
+
+    const report = await collectReplicationHealth({
+      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      probe: async () => {
+        throw new Error('boom');
+      },
+    });
+
+    expect(report.replicas).toEqual([
+      expect.objectContaining({ name: 'us-west', status: 'unreachable', error: 'boom' }),
+    ]);
+    expect(report.walSenders).toHaveLength(1);
+    expect(report.slots).toHaveLength(1);
+    expect(report.healthy).toBe(false);
   });
 
   it('captures primary query failures without blanking the report', async () => {

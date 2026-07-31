@@ -22,7 +22,7 @@ import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persi
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
-import { setTag, startInactiveSpan } from '@sentry/nextjs';
+import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { isDeadFreeModel, isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
@@ -66,6 +66,7 @@ import {
   consumeFreeModelRateLimitByUser,
   consumePromotionLimit,
 } from '@/lib/free-model-rate-limiter';
+import { logFreeModelUsage } from '@/lib/free-model-usage';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import {
   classifyAbuse,
@@ -544,6 +545,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
   ) {
     return storeAndPreviousResponseIdIsNotSupported();
+  }
+
+  if (isRateLimitedFreeModelRequest) {
+    after(async () => {
+      try {
+        await logFreeModelUsage(
+          ipAddress,
+          effectiveModelIdLowerCased,
+          isAnonymousContext(user) ? undefined : user.id
+        );
+      } catch (error) {
+        captureException(error, { tags: { source: 'free_model_usage' } });
+      }
+    });
   }
 
   // Resolve the initial provider before abuse enforcement because abuse needs

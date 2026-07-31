@@ -4,11 +4,16 @@ import type * as FreeModelRateLimiter from './free-model-rate-limiter';
 type MockRedisEval = (script: string, keys: string[], args: unknown[]) => Promise<unknown>;
 
 const mockRedisEval = jest.fn<MockRedisEval>();
+const mockCaptureException = jest.fn();
 
 jest.mock('@/lib/redis', () => ({
   redisClient: {
     eval: mockRedisEval,
   },
+}));
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: mockCaptureException,
 }));
 
 let rateLimiter: typeof FreeModelRateLimiter;
@@ -20,6 +25,7 @@ describe('free model rate limiter', () => {
 
   beforeEach(() => {
     mockRedisEval.mockReset();
+    mockCaptureException.mockReset();
   });
 
   it('atomically consumes an IP request from the rolling window', async () => {
@@ -70,6 +76,9 @@ describe('free model rate limiter', () => {
     await expect(rateLimiter.consumeFreeModelRateLimit('192.0.2.1')).resolves.toEqual({
       allowed: true,
       requestCount: 0,
+    });
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'free_model_rate_limiter' },
     });
   });
 

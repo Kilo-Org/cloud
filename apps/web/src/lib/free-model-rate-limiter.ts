@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { captureException } from '@sentry/nextjs';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
@@ -94,7 +95,8 @@ async function consumeRateLimit(
       allowed: allowed === 1,
       requestCount,
     };
-  } catch {
+  } catch (error) {
+    captureException(error, { tags: { source: 'free_model_rate_limiter' } });
     // Redis is an availability optimization; do not block inference when it is unavailable.
     return { allowed: true, requestCount: 0 };
   }

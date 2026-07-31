@@ -3,12 +3,7 @@ import { type NextRequest } from 'next/server';
 import { stripRequiredPrefix, toMicrodollars } from '@/lib/utils';
 import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
-import {
-  validateFeatureHeader,
-  FEATURE_HEADER,
-  isUserRateLimitedFeature,
-  type FeatureValue,
-} from '@/lib/feature-detection';
+import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
@@ -22,7 +17,7 @@ import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persi
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { isDeadFreeModel, isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
@@ -61,15 +56,8 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
-import {
-  checkPromotionLimit,
-  consumeAnonymousFreeModelRateLimits,
-  consumeFreeModelRateLimit,
-  consumeFreeModelRateLimitByUser,
-  type RateLimitResult,
-} from '@/lib/free-model-rate-limiter';
-import { logFreeModelUsage } from '@/lib/free-model-usage';
-import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
+import { enforceFreeModelRateLimits } from '@/lib/ai-gateway/free-model-rate-limit-enforcement';
+import { scheduleFreeModelUsageLog } from '@/lib/free-model-usage';
 import {
   classifyAbuse,
   awaitClassifyAbuse,
@@ -88,7 +76,6 @@ import {
 } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
-import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
   KILO_AUTO_FREE_MODEL,
@@ -114,7 +101,6 @@ export const maxDuration = 1800;
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
-const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 
 function validatePath(
   url: URL
@@ -135,36 +121,6 @@ function validatePath(
     return { path: pathSuffix };
   }
   return { errorResponse: invalidPathResponse() };
-}
-
-async function resolveRateLimit(
-  feature: FeatureValue | null,
-  ipAddress: string,
-  authPromise: Promise<{ user: { id: string } | null }>
-): Promise<
-  | NextResponseType<unknown>
-  | { result: { allowed: boolean; requestCount: number }; subject: string }
-> {
-  if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
-    const { user } = await authPromise;
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: 'Authentication required for this feature',
-          error_type: ProxyErrorType.authentication_required,
-        },
-        { status: 401 }
-      );
-    }
-    return {
-      result: await consumeFreeModelRateLimitByUser(user.id),
-      subject: `user: ${user.id}`,
-    };
-  }
-  return {
-    result: await consumeFreeModelRateLimit(ipAddress),
-    subject: `ip address: ${ipAddress}`,
-  };
 }
 
 export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
@@ -503,76 +459,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return storeAndPreviousResponseIdIsNotSupported();
   }
 
-  let freeModelRateLimit: { result: RateLimitResult; subject: string } | null = null;
-  let promotionLimit: RateLimitResult | null = null;
-
-  if (
-    isRateLimitedFreeModelRequest &&
-    (!isAnonymousContext(user) || (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)))
-  ) {
-    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
-    if (rateLimit instanceof NextResponse) return rateLimit;
-    freeModelRateLimit = rateLimit;
-  } else if (isAnonymousContext(user)) {
-    if (isRateLimitedFreeModelRequest) {
-      const anonymousLimits = await consumeAnonymousFreeModelRateLimits(ipAddress);
-      freeModelRateLimit = {
-        result: anonymousLimits.freeModel,
-        subject: `ip address: ${ipAddress}`,
-      };
-      promotionLimit = anonymousLimits.promotion;
-    } else {
-      promotionLimit = await checkPromotionLimit(ipAddress);
-    }
-  }
-
-  if (freeModelRateLimit && !freeModelRateLimit.result.allowed) {
-    console.warn(
-      `Free model rate limit exceeded, ${freeModelRateLimit.subject}, model: ${effectiveModelIdLowerCased}, request count: ${freeModelRateLimit.result.requestCount}`
-    );
-    return NextResponse.json(
-      {
-        error: 'Rate limit exceeded',
-        error_type: ProxyErrorType.rate_limit_exceeded,
-        message:
-          'Free model usage limit reached. Please try again later or upgrade to a paid model.',
-      },
-      { status: 429 }
-    );
-  }
-
-  if (promotionLimit && !promotionLimit.allowed) {
-    console.warn(
-      `Promotion model limit exceeded, ip: ${ipAddress}, ` +
-        `model: ${effectiveModelIdLowerCased}, ` +
-        `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
-        `in ${PROMOTION_WINDOW_HOURS}h window`
-    );
-
-    return NextResponse.json(
-      {
-        error: {
-          code: PROMOTION_MODEL_LIMIT_REACHED,
-          message:
-            'Sign up for free to continue and explore 500 other models. ' +
-            'Takes 2 minutes, no credit card required. Or come back later.',
-        },
-        error_type: ProxyErrorType.promotion_limit_reached,
-      },
-      { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
-    );
-  }
+  const freeModelRateLimitResponse = await enforceFreeModelRateLimits({
+    feature,
+    ipAddress,
+    isRateLimitedFreeModel: isRateLimitedFreeModelRequest,
+    model: effectiveModelIdLowerCased,
+    user,
+  });
+  if (freeModelRateLimitResponse) return freeModelRateLimitResponse;
 
   if (isRateLimitedFreeModelRequest) {
-    const loggedModelId = effectiveModelIdLowerCased;
-    const loggedKiloUserId = isAnonymousContext(user) ? undefined : user.id;
-    after(async () => {
-      try {
-        await logFreeModelUsage(ipAddress, loggedModelId, loggedKiloUserId);
-      } catch (error) {
-        captureException(error, { tags: { source: 'free_model_usage' } });
-      }
-    });
+    scheduleFreeModelUsageLog(
+      ipAddress,
+      effectiveModelIdLowerCased,
+      isAnonymousContext(user) ? undefined : user.id
+    );
   }
 
   // Resolve the initial provider before abuse enforcement because abuse needs

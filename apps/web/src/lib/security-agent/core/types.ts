@@ -46,6 +46,7 @@ export type SecurityFindingAnalysisStatus =
   (typeof SecurityFindingAnalysisStatus)[keyof typeof SecurityFindingAnalysisStatus];
 
 export type AnalysisMode = 'auto' | 'shallow' | 'deep';
+export type DependabotAlertsAvailability = 'enabled' | 'disabled' | 'unknown';
 
 export type AutoAnalysisMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type AutoRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';

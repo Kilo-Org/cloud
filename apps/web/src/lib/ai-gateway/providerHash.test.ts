@@ -1,5 +1,11 @@
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import type {
+  GatewayMessagesRequest,
+  GatewayRequest,
+  GatewayResponsesRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import {
+  applyTrackingIds,
   generateOpenRouterDownstreamSafetyIdentifier,
   generateProviderSpecificHash,
   generateVercelDownstreamSafetyIdentifier,
@@ -50,5 +56,76 @@ describe('downstream safety identifiers', () => {
     expect(generateOpenRouterDownstreamSafetyIdentifier(testUserId)).not.toBe(
       generateVercelDownstreamSafetyIdentifier(testUserId)
     );
+  });
+});
+
+describe('applyTrackingIds', () => {
+  const userId = 'user-123';
+  const taskId = 'task-456';
+  const taskHash = generateProviderSpecificHash(`${userId}-${taskId}`, PROVIDERS.OPENROUTER);
+
+  function responsesRequest(body: Partial<GatewayResponsesRequest> = {}) {
+    const fullBody: GatewayResponsesRequest = {
+      model: 'openai/gpt-5.4',
+      input: 'hi',
+      ...body,
+    };
+    const request: GatewayRequest = { kind: 'responses', body: fullBody };
+    return { request, body: fullBody };
+  }
+
+  function messagesRequest(body: Partial<GatewayMessagesRequest> = {}) {
+    const fullBody: GatewayMessagesRequest = {
+      model: 'anthropic/claude-sonnet-4.5',
+      max_tokens: 1024,
+      messages: [],
+      ...body,
+    };
+    const request: GatewayRequest = { kind: 'messages', body: fullBody };
+    return { request, body: fullBody };
+  }
+
+  it('sets prompt_cache_key to the task hash when the client did not set one', () => {
+    const { request, body } = responsesRequest();
+    applyTrackingIds(request, PROVIDERS.OPENROUTER, userId, taskId);
+    expect(body.prompt_cache_key).toBe(taskHash);
+  });
+
+  it('does not overwrite a client-supplied prompt_cache_key', () => {
+    const clientKey = '019fb418-bf88-70cc-bb8c-f595c82173b3';
+    const { request, body } = responsesRequest({ prompt_cache_key: clientKey });
+    applyTrackingIds(request, PROVIDERS.OPENROUTER, userId, taskId);
+    expect(body.prompt_cache_key).toBe(clientKey);
+  });
+
+  it('does not overwrite a client-supplied prompt_cache_key on chat completions', () => {
+    const clientKey = 'client-cache-key';
+    const body = {
+      model: 'openai/gpt-5.4',
+      messages: [],
+      prompt_cache_key: clientKey,
+    };
+    const request: GatewayRequest = { kind: 'chat_completions', body };
+    applyTrackingIds(request, PROVIDERS.OPENROUTER, userId, taskId);
+    expect(body.prompt_cache_key).toBe(clientKey);
+  });
+
+  it('leaves prompt_cache_key unset when there is no task id', () => {
+    const { request, body } = responsesRequest();
+    applyTrackingIds(request, PROVIDERS.OPENROUTER, userId, null);
+    expect(body.prompt_cache_key).toBeUndefined();
+  });
+
+  it('sets session_id to the task hash when the client did not set one', () => {
+    const { request, body } = messagesRequest();
+    applyTrackingIds(request, PROVIDERS.OPENROUTER, userId, taskId);
+    expect(body.session_id).toBe(taskHash);
+  });
+
+  it('does not overwrite a client-supplied session_id', () => {
+    const clientSessionId = 'client-session-id';
+    const { request, body } = messagesRequest({ session_id: clientSessionId });
+    applyTrackingIds(request, PROVIDERS.OPENROUTER, userId, taskId);
+    expect(body.session_id).toBe(clientSessionId);
   });
 });

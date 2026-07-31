@@ -60,12 +60,14 @@ export function applyTrackingIds(
     if (provider.id === 'openrouter') {
       request.body.user = userHash;
       if (taskHash) {
-        request.body.session_id = taskHash;
+        // Keep a client-supplied session id (e.g. from non-KiloCode clients).
+        request.body.session_id ??= taskHash;
       }
     }
   } else {
     if (taskHash) {
-      request.body.prompt_cache_key = taskHash;
+      // Keep a client-supplied cache key (e.g. Codex sends its session UUID).
+      request.body.prompt_cache_key ??= taskHash;
     }
     request.body.safety_identifier = userHash;
     request.body.user = userHash; // deprecated, but this is what OpenRouter uses

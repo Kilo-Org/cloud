@@ -181,7 +181,6 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
 }
 
 const COMMAND_POLL_INTERVAL_MS = 3000;
-const REPOSITORY_AVAILABILITY_STALE_TIME_MS = 30 * 60_000;
 const EMPTY_REPOSITORIES: SecurityAgentContextValue['allRepositories'] = [];
 const EMPTY_REPOSITORY_IDS: number[] = [];
 const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositories'] = [];
@@ -631,13 +630,8 @@ function useSecurityAgentProviderValue(
   // Repositories query
   const { data: reposData } = useQuery(
     isOrg
-      ? trpc.organizations.securityAgent.getRepositories.queryOptions(
-          { organizationId },
-          { staleTime: REPOSITORY_AVAILABILITY_STALE_TIME_MS }
-        )
-      : trpc.securityAgent.getRepositories.queryOptions(undefined, {
-          staleTime: REPOSITORY_AVAILABILITY_STALE_TIME_MS,
-        })
+      ? trpc.organizations.securityAgent.getRepositories.queryOptions({ organizationId })
+      : trpc.securityAgent.getRepositories.queryOptions()
   );
 
   // Orphaned repositories query

@@ -143,6 +143,7 @@ const DEPENDABOT_DISABLED_HINTS = [
 const ACCESS_BLOCKED_HINTS = ['repository access blocked'] as const;
 
 const DEPENDABOT_AVAILABILITY_CACHE_TTL_MS = 30 * 60_000;
+const DEPENDABOT_AVAILABILITY_CACHE_MAX_ENTRIES = 10_000;
 const dependabotAvailabilityCache = new Map<
   string,
   { status: DependabotAlertsAvailability; expiresAtMs: number }
@@ -203,15 +204,13 @@ export async function checkDependabotAlertsAvailability(
   if (repositories.length === 0) return [];
 
   const now = Date.now();
+  sweepDependabotAvailabilityCache(now);
   const cachedResults = new Map<number, DependabotAlertsAvailability>();
   const repositoriesToCheck = repositories.filter(repository => {
     const cacheKey = dependabotAvailabilityCacheKey(installationId, appType, repository.fullName);
+    if (!cacheKey) return true;
     const cached = dependabotAvailabilityCache.get(cacheKey);
     if (!cached) return true;
-    if (cached.expiresAtMs <= now) {
-      dependabotAvailabilityCache.delete(cacheKey);
-      return true;
-    }
     cachedResults.set(repository.id, cached.status);
     return false;
   });
@@ -239,13 +238,17 @@ export async function checkDependabotAlertsAvailability(
   const checkedResults = await Promise.all(
     repositoriesToCheck.map(repository =>
       limit(async (): Promise<RepositoryDependabotAlertsAvailability> => {
-        const status = await checkRepositoryDependabotAlertsAvailability({
-          installationId,
-          appType,
-          repositoryFullName: repository.fullName,
-          octokit,
-        });
-        return { id: repository.id, status };
+        try {
+          const status = await checkRepositoryDependabotAlertsAvailability({
+            installationId,
+            appType,
+            repositoryFullName: repository.fullName,
+            octokit,
+          });
+          return { id: repository.id, status };
+        } catch {
+          return { id: repository.id, status: 'unknown' };
+        }
       })
     )
   );
@@ -276,6 +279,7 @@ async function checkRepositoryDependabotAlertsAvailability(input: {
     input.appType,
     input.repositoryFullName
   );
+  if (!cacheKey) return 'unknown';
   const inFlight = dependabotAvailabilityInFlight.get(cacheKey);
   if (inFlight) return await inFlight;
 
@@ -292,6 +296,7 @@ async function checkRepositoryDependabotAlertsAvailability(input: {
         status,
         expiresAtMs: Date.now() + DEPENDABOT_AVAILABILITY_CACHE_TTL_MS,
       });
+      sweepDependabotAvailabilityCache(Date.now());
     }
     return status;
   } finally {
@@ -326,13 +331,28 @@ async function fetchRepositoryDependabotAlertsAvailability(
 function dependabotAvailabilityCacheKey(
   installationId: string,
   appType: GitHubAppType,
-  repositoryFullName: string
-): string {
+  repositoryFullName: unknown
+): string | null {
+  if (typeof repositoryFullName !== 'string') return null;
+  const normalizedRepositoryFullName = repositoryFullName.trim().toLowerCase();
+  if (!normalizedRepositoryFullName) return null;
   return JSON.stringify([
     installationId.trim().toLowerCase(),
     appType,
-    repositoryFullName.trim().toLowerCase(),
+    normalizedRepositoryFullName,
   ]);
+}
+
+function sweepDependabotAvailabilityCache(now: number): void {
+  for (const [key, cached] of dependabotAvailabilityCache) {
+    if (cached.expiresAtMs <= now) dependabotAvailabilityCache.delete(key);
+  }
+
+  while (dependabotAvailabilityCache.size > DEPENDABOT_AVAILABILITY_CACHE_MAX_ENTRIES) {
+    const oldestKey = dependabotAvailabilityCache.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    dependabotAvailabilityCache.delete(oldestKey);
+  }
 }
 
 /**

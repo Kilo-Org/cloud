@@ -125,4 +125,19 @@ describe('dependabot-api', () => {
 
     expect(mockListAlertsForRepo).not.toHaveBeenCalled();
   });
+
+  it('isolates malformed repository names instead of failing the whole check', async () => {
+    const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
+    mockListAlertsForRepo.mockResolvedValueOnce({ data: [] });
+
+    await expect(
+      checkDependabotAlertsAvailability('malformed-installation', 'standard', [
+        { id: 1, fullName: undefined as never },
+        { id: 2, fullName: 'acme/valid' },
+      ])
+    ).resolves.toEqual([
+      { id: 1, status: 'unknown' },
+      { id: 2, status: 'enabled' },
+    ]);
+  });
 });

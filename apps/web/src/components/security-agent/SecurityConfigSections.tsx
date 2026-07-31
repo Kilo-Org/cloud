@@ -347,6 +347,9 @@ export function RepositorySection({
     state.repositorySelectionMode === 'all'
       ? disabledRepositories
       : disabledRepositories.filter(repository => selectedRepositoryIds.has(repository.id));
+  const displayedDisabledRepositories = selectedDisabledRepositories.slice(0, 5);
+  const additionalDisabledRepositoryCount =
+    selectedDisabledRepositories.length - displayedDisabledRepositories.length;
 
   return (
     <Card>
@@ -399,9 +402,12 @@ export function RepositorySection({
                 <AlertDescription>
                   <p>
                     Security Agent cannot import findings from{' '}
-                    {selectedDisabledRepositories.length === 1
-                      ? selectedDisabledRepositories[0]?.fullName
-                      : 'these repositories'}{' '}
+                    {displayedDisabledRepositories
+                      .map(repository => repository.fullName)
+                      .join(', ')}
+                    {additionalDisabledRepositoryCount > 0
+                      ? `, and ${additionalDisabledRepositoryCount} more`
+                      : ''}{' '}
                     until Dependabot alerts are enabled in GitHub repository settings.
                   </p>
                 </AlertDescription>

@@ -143,7 +143,13 @@ export function NewSessionRepositorySection({
               </Text>
             </View>
             <View className="flex-row gap-2">
-              <Button variant="outline" size="icon" onPress={onRefreshRepos} disabled={isRetrying}>
+              <Button
+                variant="outline"
+                size="icon"
+                onPress={onRefreshRepos}
+                disabled={isRetrying}
+                accessibilityLabel="Refresh repositories"
+              >
                 {isRetrying ? (
                   <ActivityIndicator size="small" color={colors.foreground} />
                 ) : (

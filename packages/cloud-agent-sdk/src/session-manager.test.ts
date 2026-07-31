@@ -412,6 +412,7 @@ describe('createSessionManager', () => {
     mockSession.state.getCloudStatus.mockReturnValue(null);
     mockSession.state.getSetupLog.mockReturnValue([]);
     mockSession.state.getPendingMessages.mockReturnValue(new Map());
+    mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
     mockSession.storage = latestStorage;
     latestStorage = null;
     mockSessionCallbacks.onQuestionAsked = undefined;
@@ -2867,6 +2868,172 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
       // isReadOnly follows normal session-type semantics: cloud-agent is never read-only.
       expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+    });
+
+    it('suppresses Aborted onError from the interrupted session so errorAtom stays clear', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Interrupt fires, service emits "Aborted" onError synchronously
+      // (mock implementation fires it during the interrupt await).
+      mockSession.interrupt.mockImplementation(async () => {
+        mockSessionCallbacks.onError?.('Aborted');
+      });
+      await mgr.interrupt();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      const indicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(indicator).toEqual(
+        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+      );
+    });
+
+    it('still surfaces a non-Aborted onError from the interrupted session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockImplementation(async () => {
+        mockSessionCallbacks.onError?.('Connection to agent lost');
+      });
+      await mgr.interrupt();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Connection to agent lost'
+      );
+    });
+
+    it('does not suppress Aborted onError when no interrupt is pending', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Direct onError call without a preceding interrupt — should land in errorAtom.
+      mockSessionCallbacks.onError?.('Aborted');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+    });
+
+    it('does not suppress Aborted from a stale session after switchSession', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Capture the first session's onError callback before switching.
+      const firstSessionOnError = mockSessionCallbacks.onError;
+      expect(firstSessionOnError).toBeDefined();
+
+      // Initiate interrupt on session A — guard is set for session A.
+      mockSession.interrupt.mockImplementation(async () => {
+        // Don't fire anything here — we'll fire Aborted later from the stale session.
+      });
+      const interruptPromise = mgr.interrupt();
+
+      // Switch to session B — clearAllAtoms resets the guard.
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // Session A's onError fires "Aborted" after switch — must NOT be suppressed
+      // because the guard was cleared.
+      firstSessionOnError?.('Aborted');
+
+      // The error should land on the current store (session B's context).
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+
+      await interruptPromise;
+    });
+
+    it('clears the abort guard on destroy so late Aborted is not suppressed', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const firstSessionOnError = mockSessionCallbacks.onError;
+      expect(firstSessionOnError).toBeDefined();
+
+      mockSession.interrupt.mockImplementation(async () => {
+        // Don't fire Aborted — we'll fire it after destroy.
+      });
+      const interruptPromise = mgr.interrupt();
+
+      mgr.destroy();
+
+      // Late Aborted from destroyed session's transport still surfaces.
+      firstSessionOnError?.('Aborted');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+
+      await interruptPromise;
+    });
+
+    it('suppresses Aborted emitted after interrupt settles so errorAtom stays clear', async () => {
+      // The real timing gap: interrupt RPC settles, finally clears the guard,
+      // THEN the WebSocket delivers onError('Aborted'). The one-shot guard
+      // must persist past the finally so the late Aborted is still suppressed.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Late Aborted after the interrupt Promise has already settled.
+      mockSessionCallbacks.onError?.('Aborted');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      const indicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(indicator).toEqual(
+        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+      );
+    });
+
+    it('surfaces non-Aborted error emitted after interrupt settles', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Late non-Aborted error after interrupt settles — must still surface.
+      mockSessionCallbacks.onError?.('Connection to agent lost');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Connection to agent lost'
+      );
+    });
+
+    it('state recovery to busy clears the guard so a subsequent Aborted surfaces', async () => {
+      // After the session recovers (activity → busy), the one-shot guard
+      // must clear. A new Aborted arriving later must not be suppressed.
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Simulate state recovery: session becomes busy (new user message).
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
+      notifyStateChange?.();
+
+      // A late Aborted after recovery must surface.
+      mockSessionCallbacks.onError?.('Aborted');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
     });
   });
 

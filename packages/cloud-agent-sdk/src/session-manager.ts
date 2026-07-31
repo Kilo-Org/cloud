@@ -614,6 +614,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // history; false once live events are flowing. See clearOverrideIfDiverged.
   let remoteHistoryReplaying = true;
   /**
+   * Session captured at the start of an interrupt call. While non-null, an
+   * `onError("Aborted")` from this session is suppressed — it was produced by
+   * the manager's own `interrupt()`. A real transport error or an Aborted from
+   * a different/late session still sets errorAtom normally.
+   */
+  let pendingInterruptSession: CloudAgentSession | null = null;
+  /**
    * Message ids already in local storage when a reconnect replay starts while
    * `/clear` is active. Those are live post-clear turns for this visit and
    * must survive purge; everything else in the replayed snapshot is dropped.
@@ -715,6 +722,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     lastPromptMode = null;
     olderMessagesTerminal = false;
     currentCapabilities = undefined;
+    pendingInterruptSession = null;
   }
 
   function setChildSessionHydrationState(
@@ -979,6 +987,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
       if (act.type !== prevAct) {
         if (act.type === 'busy') {
+          pendingInterruptSession = null;
           setIndicator(null);
         } else if (act.type === 'retrying') {
           setIndicator({
@@ -1337,7 +1346,20 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         config.onBranchChanged?.(branch);
       },
-      onError: message => store.set(errorAtom, message),
+      onError: message => {
+        // Suppress the one-shot "Aborted" produced by this manager's own
+        // interrupt() call. The service emits this after a user-initiated
+        // Stop, and the interrupt path already handles composer unlock +
+        // indicator. Letting it through to errorAtom would disable the
+        // composer despite canSend being correctly restored by
+        // restoreAfterInterrupt. The guard is consumed on match (one-shot) so
+        // unrelated or subsequent Aborted events still surface.
+        if (message === 'Aborted' && pendingInterruptSession === session) {
+          pendingInterruptSession = null;
+          return;
+        }
+        store.set(errorAtom, message);
+      },
       onMessageFailed: (_messageId, deliveryState) => {
         if (deliveryState.reason !== 'exhausted') return;
         setIndicator({
@@ -1589,6 +1611,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     postInterruptUnlock = false;
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
+    // Mark this session as the expected source of any "Aborted" error so
+    // onError can suppress it without hiding real transport failures.
+    pendingInterruptSession = session;
     try {
       if (session.canInterrupt) {
         await session.interrupt();

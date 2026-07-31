@@ -253,6 +253,46 @@ action_patch=$(docker run --rm "$IMAGE" sh -c \
    if [ "$new" -ge 1 ] && [ "$old" -eq 0 ]; then echo ok; else echo "patched=$new unpatched=$old"; fi' 2>/dev/null || echo failed)
 check "actionRequiresTarget patch applied (whole dist, by content)" "ok" "$action_patch"
 
+# The check above proves the patched TEXT is present. It does not prove the
+# patched CODE behaves correctly — a future bundle could carry the string while
+# the surrounding logic changed, and the whole point of this patch is a runtime
+# behaviour. So import the shipped module and call the real function.
+#
+# The bug: an action id absent from MESSAGE_ACTION_TARGET_MODE yields `undefined`,
+# and `undefined !== "none"` is true, so every plugin-declared action id outside
+# the core map was reported as needing a delivery target and the runner threw
+# `Action <id> requires a target.` The patch defaults the lookup to "none".
+#
+# Assert BOTH directions, because a patch that simply made the function always
+# return false would satisfy the synthetic case while breaking real delivery:
+#   - a synthetic (unmapped) id must NOT require a target
+#   - core mapped ids must still require one, and an explicit "none" must not
+#
+# The module is located by CONTENT (not filename) and its export is resolved from
+# the export list, so this survives both bundle re-hashing and minified-name churn.
+action_behaviour=$(docker run --rm "$IMAGE" sh -c '
+  set -e
+  OC=/usr/local/lib/node_modules/openclaw/dist
+  F=$(grep -rl "MESSAGE_ACTION_TARGET_MODE\[action\] ?? \"none\"" "$OC" --include="*.js" | head -1)
+  [ -n "$F" ] || { echo "module-not-found"; exit 0; }
+  # Resolve the minified export alias for actionRequiresTarget from `export{...}`.
+  ALIAS=$(grep -oE "[A-Za-z_$][A-Za-z0-9_$]* as [A-Za-z_$][A-Za-z0-9_$]*" "$F" \
+          | grep "^actionRequiresTarget as " | head -1 | sed "s/.* as //")
+  [ -n "$ALIAS" ] || { echo "export-not-found"; exit 0; }
+  cat > /tmp/action-target-probe.mjs <<EOF
+import { $ALIAS as actionRequiresTarget } from "$F";
+const unmapped = actionRequiresTarget("kiloclaw-smoke-unmapped-action");
+const mapped   = actionRequiresTarget("send");
+const none     = actionRequiresTarget("typing");
+if (unmapped !== false) { console.log("unmapped-requires-target"); }
+else if (mapped !== true) { console.log("mapped-lost-target"); }
+else if (none !== false) { console.log("none-mode-broken"); }
+else { console.log("ok"); }
+EOF
+  node /tmp/action-target-probe.mjs
+' 2>/dev/null || echo failed)
+check "actionRequiresTarget behaviour (unmapped id needs no target)" "ok" "$action_behaviour"
+
 # ── Externalized kilocode provider pin alignment ─────────────────────────────
 # The kilocode provider was externalized from openclaw core (openclaw #93470) and
 # is installed as a separate pin (@openclaw/kilocode-provider@<ver>). It is kept

@@ -644,6 +644,58 @@ else:
   done
 
   check "kilocode native vision capability (post-#4054-revert)" "image-capable" "$result"
+
+  # The assertion above answers "did discovery repopulate vision metadata at all"
+  # and correctly fails on the 1-model static fallback. Two things it does not
+  # cover, both of which have bitten us:
+  #
+  #   1. Catalog SIZE. A fallback catalog can still satisfy an `any()` check if
+  #      the one entry happens to advertise image input. Discovery in a fresh
+  #      container also lags boot by well over two minutes, so a small count read
+  #      too early looks exactly like a broken catalog. Require a plausible count.
+  #
+  #   2. The CONFIGURED model. `any()` over every kilocode model says nothing
+  #      about the model the instance will actually use — the catalog can be full
+  #      of image-capable models while the configured route is text-only, in which
+  #      case attachments are silently dropped (openclaw #49518).
+  local detail
+  detail=$(python3 -c '
+import json, sys
+
+raw = sys.stdin.read().strip()
+try:
+    data = json.loads(raw) if raw else []
+except Exception:
+    print("no-catalog"); raise SystemExit(0)
+models = data.get("models", data) if isinstance(data, dict) else data
+if not isinstance(models, list):
+    print("no-catalog"); raise SystemExit(0)
+
+def has_image(m):
+    inp = m.get("input")
+    return "image" in inp if isinstance(inp, (str, list, tuple)) else False
+
+configured = sys.argv[1]
+# `openclaw models list` keys are provider-qualified ("kilocode/kilo-auto/balanced")
+# while the configured value may omit the provider prefix; match on either.
+wanted = configured.split("/", 1)[1] if configured.startswith("kilocode/") else configured
+match = next(
+    (m for m in models
+     if isinstance(m, dict)
+     and str(m.get("key", "")).split("/", 1)[-1].endswith(wanted.split("/")[-1])
+     and wanted.split("/")[-1] in str(m.get("key", ""))),
+    None,
+)
+if len(models) < 50:
+    print(f"catalog-too-small({len(models)})")
+elif match is None:
+    print(f"configured-model-absent({configured})")
+elif not has_image(match):
+    print(f"configured-model-text-only({configured})")
+else:
+    print("ok")
+' "$KILOCODE_SMOKE_MODEL" <<< "$output")
+  check "configured model is image-capable in a full catalog" "ok" "$detail"
 }
 
 # Verifies the agent can still use GitHub after bootstrap even though OpenClaw
@@ -762,8 +814,15 @@ run_phase() {
     wait_for_gateway_serving "$label post-self-heal"
   fi
   assert_exec_approvals_seeded "$CID"
+  assert_exec_approvals_policy "$CID"
   assert_github_gh_auth
   if [ "$live_turn" = "1" ]; then
+    # Candidate legs only (they are the ones that mutate config and run a turn).
+    # An image model must be configured for image input to be usable at all, and
+    # the round trip proves an image actually reaches the agent runtime — neither
+    # of which any catalog-level assertion can establish.
+    assert_image_model_configured "$CID"
+    assert_image_round_trip "$CID"
     echo
     echo "--- live agent turn ($KILOCODE_SMOKE_MODEL) ---"
     # Both warm-up gates must have passed before this: the gateway serving, and

@@ -9,6 +9,8 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 
+import { formatCost } from './context-usage-display';
+
 type SessionCostBreakdownTotals = {
   input: number;
   output: number;
@@ -198,7 +200,10 @@ export function getVisibleSessionCostModels(
  * residual, which is computed on the live-message basis alone.
  *
  * Returns a row-ready amount: 0 when total is null/non-finite, when the
- * delta is within ±epsilon, or when live already covers the page total.
+ * delta is within ±epsilon, when live already covers the page total, or when
+ * the residual rounds to $0.0000 in the sheet's 4-decimal display. Sub-display
+ * residuals are absorbed as display rounding; reconciliation fixtures must use
+ * residuals above the display threshold.
  */
 export function getOlderActivityCostUsd(
   totalCostMicrodollars: number | null,
@@ -208,7 +213,10 @@ export function getOlderActivityCostUsd(
     return 0;
   }
   const residualUsd = totalCostMicrodollars / 1e6 - liveCostUsd;
-  return residualUsd > COST_RECONCILIATION_EPSILON_USD ? residualUsd : 0;
+  if (residualUsd <= COST_RECONCILIATION_EPSILON_USD) {
+    return 0;
+  }
+  return formatCost(residualUsd) === '$0.0000' ? 0 : residualUsd;
 }
 
 /**

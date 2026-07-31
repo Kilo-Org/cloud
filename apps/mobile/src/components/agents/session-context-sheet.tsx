@@ -313,7 +313,7 @@ function OlderActivityRow({ costUsd }: Readonly<{ costUsd: number }>) {
       <View className="gap-0.5">
         <Text className="text-sm font-medium text-foreground">Older activity</Text>
         <Text className="text-xs text-muted-foreground">
-          Cost from activity before the loaded history
+          Cost not attributed to the loaded history
         </Text>
       </View>
       <Text className="text-sm font-medium text-foreground tabular-nums">

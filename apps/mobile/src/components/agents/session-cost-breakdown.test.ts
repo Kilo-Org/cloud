@@ -324,6 +324,18 @@ describe('getOlderActivityCostUsd', () => {
     expect(getOlderActivityCostUsd(Number.POSITIVE_INFINITY, 0.01)).toBe(0);
   });
 
+  it('returns 0 when residual rounds to $0.0000 at the display boundary', () => {
+    // 49 µ$ rounds to $0.0000 with toFixed(4) and should be absorbed.
+    expect(getOlderActivityCostUsd(50_000 + 49, 0.05)).toBe(0);
+  });
+
+  it('returns exact residual when it renders a non-zero display amount', () => {
+    // 200 µ$ renders $0.0002 — safely above the 4-decimal rounding boundary.
+    // (The gate is display-aligned: whatever formatCost shows decides; a ~50 µ$
+    // subtraction residual lands below 0.00005 in floating point and suppresses.)
+    expect(getOlderActivityCostUsd(50_000 + 200, 0.05)).toBeCloseTo(200e-6, 9);
+  });
+
   it('returns 0 when residual is zero or within epsilon', () => {
     expect(getOlderActivityCostUsd(50_000, 0.05)).toBe(0);
     // +0.5µ$ and +0.9µ$ are both below COST_RECONCILIATION_EPSILON_USD (1e-6)

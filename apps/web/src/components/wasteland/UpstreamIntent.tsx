@@ -343,15 +343,11 @@ function CardShell({
         <div
           className={[
             'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border',
-            selected
-              ? 'border-white/40 bg-white/10'
-              : 'border-white/20 bg-transparent',
+            selected ? 'border-white/40 bg-white/10' : 'border-white/20 bg-transparent',
           ].join(' ')}
           aria-hidden
         >
-          {selected && (
-            <span className="size-2 rounded-full bg-white/80" />
-          )}
+          {selected && <span className="size-2 rounded-full bg-white/80" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

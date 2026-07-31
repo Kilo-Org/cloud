@@ -251,11 +251,7 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
             <Button variant="secondary" type="button" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              variant="default"
-              type="submit"
-              disabled={!canSubmit}
-            >
+            <Button variant="default" type="submit" disabled={!canSubmit}>
               {createRig.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>

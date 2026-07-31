@@ -268,7 +268,10 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
             <Button
               variant="outline"
               size="sm"
-              className={statusFilter === undefined ? 'bg-surface-selected' : ''}
+              className={
+                statusFilter === undefined ? 'bg-surface-selected hover:bg-surface-selected' : ''
+              }
+              aria-pressed={statusFilter === undefined}
               onClick={() => {
                 setStatusFilter(undefined);
                 setCurrentPage(1);
@@ -281,7 +284,10 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
                 key={status}
                 variant="outline"
                 size="sm"
-                className={statusFilter === status ? 'bg-surface-selected' : ''}
+                className={
+                  statusFilter === status ? 'bg-surface-selected hover:bg-surface-selected' : ''
+                }
+                aria-pressed={statusFilter === status}
                 onClick={() => {
                   setStatusFilter(status as FixStatus);
                   setCurrentPage(1);
@@ -299,7 +305,12 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
             <Button
               variant="outline"
               size="sm"
-              className={classificationFilter === undefined ? 'bg-surface-selected' : ''}
+              className={
+                classificationFilter === undefined
+                  ? 'bg-surface-selected hover:bg-surface-selected'
+                  : ''
+              }
+              aria-pressed={classificationFilter === undefined}
               onClick={() => {
                 setClassificationFilter(undefined);
                 setCurrentPage(1);
@@ -312,7 +323,12 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
                 key={classification}
                 variant="outline"
                 size="sm"
-                className={classificationFilter === classification ? 'bg-surface-selected' : ''}
+                className={
+                  classificationFilter === classification
+                    ? 'bg-surface-selected hover:bg-surface-selected'
+                    : ''
+                }
+                aria-pressed={classificationFilter === classification}
                 onClick={() => {
                   setClassificationFilter(classification as FixClassification);
                   setCurrentPage(1);

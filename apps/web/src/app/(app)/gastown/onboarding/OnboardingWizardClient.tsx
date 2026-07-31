@@ -234,11 +234,7 @@ function WizardContent() {
           {isLastStep ? (
             <FinalStepNav />
           ) : (
-            <Button
-              onClick={goNext}
-              variant="default"
-              className="gap-1.5"
-            >
+            <Button onClick={goNext} variant="default" className="gap-1.5">
               Next
               <ChevronRight className="size-4" />
             </Button>

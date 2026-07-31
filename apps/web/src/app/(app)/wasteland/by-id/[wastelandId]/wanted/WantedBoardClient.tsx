@@ -644,12 +644,7 @@ export function WantedBoardClient({
                 {pageLimit >= WANTED_BOARD_MAX_LIMIT ? ' Refine search to narrow results.' : ''}
               </span>
               {pageLimit < WANTED_BOARD_MAX_LIMIT && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLoadMore}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={handleLoadMore}>
                   Load more
                 </Button>
               )}
@@ -1003,11 +998,7 @@ export function AcceptDialog({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="default"
-              disabled={acceptMutation.isPending}
-            >
+            <Button type="submit" variant="default" disabled={acceptMutation.isPending}>
               {acceptMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
               Accept
             </Button>
@@ -1343,7 +1334,8 @@ function FilterChip({
       variant="ghost"
       size="sm"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium capitalize ${active ? 'bg-surface-selected text-white/70' : 'text-white/30'}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium capitalize ${active ? 'bg-surface-selected hover:bg-surface-selected text-white/70' : 'text-white/30'}`}
+      aria-pressed={active}
     >
       {dotColor && <span className={`size-1.5 rounded-full ${dotColor}`} />}
       {label}

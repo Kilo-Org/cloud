@@ -68,11 +68,7 @@ export function CreateTownDialog({ isOpen, onClose }: CreateTownDialogProps) {
             <Button variant="secondary" type="button" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              variant="default"
-              type="submit"
-              disabled={!name.trim() || createTown.isPending}
-            >
+            <Button variant="default" type="submit" disabled={!name.trim() || createTown.isPending}>
               {createTown.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>

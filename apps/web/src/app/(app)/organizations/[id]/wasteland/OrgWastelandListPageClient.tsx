@@ -60,11 +60,7 @@ export function OrgWastelandListPageClient({ organizationId }: OrgWastelandListP
               </p>
             </div>
 
-            <Button
-              variant="default"
-              onClick={() => router.push(newUrl)}
-              className="gap-2"
-            >
+            <Button variant="default" onClick={() => router.push(newUrl)} className="gap-2">
               <Plus className="size-5" />
               New Wasteland
             </Button>
@@ -106,11 +102,7 @@ export function OrgWastelandListPageClient({ organizationId }: OrgWastelandListP
               Create a wasteland to set up a hosted bounty board for your organization. Connect it
               to DoltHub to track wanted items, claims, and completions.
             </p>
-            <Button
-              variant="default"
-              onClick={() => router.push(newUrl)}
-              className="mt-5 gap-2"
-            >
+            <Button variant="default" onClick={() => router.push(newUrl)} className="mt-5 gap-2">
               <Plus className="size-5" />
               Create your first wasteland
             </Button>

@@ -104,9 +104,7 @@ function BeadCard({
         onKeyDown={handleKeyDown}
         className={cn(
           'w-full text-left',
-          onSelect
-            ? 'focus-visible:ring-2 focus-visible:ring-white/25'
-            : '',
+          onSelect ? 'focus-visible:ring-2 focus-visible:ring-white/25' : '',
           'focus-visible:ring-offset-0 focus-visible:outline-none'
         )}
       >

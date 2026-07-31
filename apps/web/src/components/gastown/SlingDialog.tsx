@@ -122,11 +122,7 @@ export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
             <Button variant="secondary" type="button" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              variant="default"
-              type="submit"
-              disabled={!title.trim() || sling.isPending}
-            >
+            <Button variant="default" type="submit" disabled={!title.trim() || sling.isPending}>
               {sling.isPending ? 'Slinging...' : 'Sling'}
             </Button>
           </DialogFooter>

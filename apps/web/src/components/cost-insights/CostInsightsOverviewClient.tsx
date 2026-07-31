@@ -159,7 +159,11 @@ export function CostInsightsOverviewClient({
           : alert.type === 'threshold_7d'
             ? 'spend-threshold-7d'
             : 'spend-threshold-24h';
-      router.push(`${basePath}/config#${thresholdAnchor}`);
+      router.push(
+        dashboard?.enabled
+          ? `${basePath}/config#${thresholdAnchor}`
+          : `${basePath}/config#spend-alert-options-hidden`
+      );
       return;
     }
 

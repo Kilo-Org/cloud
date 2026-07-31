@@ -71,6 +71,7 @@ const DISMISS_KEYBOARD_ACTIVE_OFFSET_Y = 24;
 const DISMISS_KEYBOARD_FAIL_OFFSET_X = 16;
 
 type AndroidDismissKeyboardGesture = {
+  identifier: string;
   startPageX: number;
   startPageY: number;
   dismissed: boolean;
@@ -310,12 +311,21 @@ export function ChatComposer({
   // once dy crosses the same threshold as the pan. iOS keeps the RNGH path only.
   const androidDismissGestureRef = useRef<AndroidDismissKeyboardGesture | null>(null);
 
-  const resetAndroidDismissGesture = useCallback(() => {
+  const resetAndroidDismissGesture = useCallback((event: GestureResponderEvent) => {
+    const gesture = androidDismissGestureRef.current;
+    if (gesture && gesture.identifier !== event.nativeEvent.identifier) {
+      return;
+    }
     androidDismissGestureRef.current = null;
   }, []);
 
   const handleAndroidDismissTouchStart = useCallback((event: GestureResponderEvent) => {
+    const gesture = androidDismissGestureRef.current;
+    if (gesture && gesture.identifier !== event.nativeEvent.identifier) {
+      return;
+    }
     androidDismissGestureRef.current = {
+      identifier: event.nativeEvent.identifier,
       startPageX: event.nativeEvent.pageX,
       startPageY: event.nativeEvent.pageY,
       dismissed: false,
@@ -326,7 +336,13 @@ export function ChatComposer({
   const tryAndroidDismissKeyboardFromTouchMove = useCallback(
     (event: GestureResponderEvent): boolean => {
       const gesture = androidDismissGestureRef.current;
-      if (!gesture || gesture.dismissed || gesture.failed || inputScrollable) {
+      if (
+        !gesture ||
+        gesture.identifier !== event.nativeEvent.identifier ||
+        gesture.dismissed ||
+        gesture.failed ||
+        inputScrollable
+      ) {
         return false;
       }
       const dx = event.nativeEvent.pageX - gesture.startPageX;

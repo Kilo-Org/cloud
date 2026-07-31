@@ -34,7 +34,7 @@ Each section works in its own worktree under `~/Projects/.worktrees/` — never 
 The workflow minimizes wall time while preserving independent review and live verification:
 
 - **Expensive models only where judgment concentrates** (planning); high-volume implementation and review runs on cheaper models that follow an explicit plan.
-- **Independent work runs in parallel.** Slices, reviewers, checks, and iOS/Android E2E shards overlap when their files and resources do not conflict; synchronization gates only the points that need a complete diff.
+- **Independent work runs in parallel.** Slices, reviewers, checks, and E2E shards (iOS-only by default; dual-platform only with a recorded rationale) overlap when their files and resources do not conflict; synchronization gates only the points that need a complete diff.
 - **Nothing ships on one opinion.** Every artifact — plan, slice, cumulative diff, runtime behavior, PR — is checked by a *fresh* session with no memory of earlier rounds, so conclusions can't anchor. Loops repeat until a fresh reviewer finds nothing.
 - **Verification is empirical.** Bugs must be reproduced before they're fixed; features must pass a live E2E round against real services before the gate opens.
 - **Doomed E2E rounds stop early.** A verifier stops at the first confirmed product failure; after the fix, it runs that case first, every same-area regression case, and every unproven case. Only proven cases with a concrete disjoint-impact reason carry forward.

@@ -38,6 +38,8 @@ node --version   # must be v24; activate the root .nvmrc first if needed
 pnpm dev:worktree:prepare
 ```
 
+Missing local env values: the human bootstrap is `pnpm dev:setup-env`. Test users, credits, and API tokens: `pnpm dev:seed` (no args lists topics).
+
 Record pre-existing state so you later clean up only resources you own:
 
 ```bash

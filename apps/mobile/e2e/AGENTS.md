@@ -31,9 +31,9 @@ xcrun simctl list devices booted
 
 Reuse an existing stack only when it belongs to the current live slot bundle.
 An unaccounted stack whose `kilo-dev-<slug>` slug matches this worktree's
-basename is yours: stop it through `e2e-stop-resource.sh stack`, then take a
-slot and start fresh. An unaccounted stack from another worktree is not yours —
-leave it alone and never stop an unrelated `kilo-dev-*` session.
+basename is yours: stop it with `pnpm dev:stop`, then start fresh. An unaccounted
+stack from another worktree is not yours — leave it alone and never stop an
+unrelated `kilo-dev-*` session.
 
 If this worktree has no stack, the bundle owner starts the complete mobile flow
 after taking its slot:
@@ -225,7 +225,7 @@ xcrun simctl io <udid> screenshot <path>      # iOS still
 pnpm dev:mobile:android adb -s <serial> exec-out screencap -p > <path>  # Android still
 ```
 
-`stop` is idempotent. The bundle owner runs `record.sh <device> stop` for every bundle device before `e2e-stop-resource.sh ios|android` (also reaps a recorder orphaned by a crashed verifier).
+`stop` is idempotent. The bundle owner runs `record.sh <device> stop` for every bundle device before `pnpm dev:mobile:simulator release-all` / `pnpm dev:mobile:android emulator-stop` (also reaps a recorder orphaned by a crashed verifier).
 
 ## Remote CLI Session Flows
 
@@ -288,16 +288,16 @@ pnpm -s dev:mobile:android claim "$SERIAL" >/dev/null
 pnpm dev:mobile:android build "$SERIAL"
 ```
 
-Record `SERIAL`, `EMULATOR_PID`, and `EMULATOR_LOG` in the round handoff. Never drive or kill a device claimed by another worktree, and never delete a foreign claim file.
+On success, record `SERIAL`, `EMULATOR_PID`, and `EMULATOR_LOG` in the round handoff. Never drive or kill a device claimed by another worktree, and never delete a foreign claim file.
 
 ### Failed attempt → stop exactly yours → relaunch once
 
-On failure run `pnpm dev:mobile:android emulator-stop` then
-`pnpm dev:mobile:android release-all`; the stop path uses the recorded session
-and verifies the recorded PID before sending a signal, so it cannot kill a
-sibling's same-AVD emulator. Relaunch once per the GPU policy with the same
-envelope. If the second attempt also fails, stop and return a test-environment
-blocker with `tail -200 "$EMULATOR_LOG"`; never a third launch.
+With `--wait`, JSON is printed only **after** boot succeeds. On failure the command throws and stdout is empty — `$EMULATOR` / `$EMULATOR_LOG` are unset. The log path is still:
+
+- `$TMPDIR/kilo-e2e-android-<worktree-slug>.log` (slug = basename with non `[A-Za-z0-9_-]` → `_`), or
+- the path after `see ` in the error text (`… died while booting; see <log>` / `… did not reach sys.boot_completed=1 …; see <log>`).
+
+Use that path for `tail -200`, not `$EMULATOR_LOG`. Then run `pnpm dev:mobile:android emulator-stop` and `pnpm dev:mobile:android release-all`; the stop path uses the on-disk session record and verifies the recorded PID before signalling, so it cannot kill a sibling's same-AVD emulator. Relaunch once per the GPU policy (software GPU only when the process is gone — there is no JSON PID on a failed wait). If the second attempt also fails, stop and return a test-environment blocker with the log tail; never a third launch.
 
 ### Build and login
 

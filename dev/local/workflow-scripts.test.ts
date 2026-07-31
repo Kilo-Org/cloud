@@ -152,11 +152,16 @@ test('role dispatches allocate distinct artifacts and verifier scratch', () => {
       .match(/^scratch=(.*)$/m)?.[1];
     assert.ok(verifierScratch?.startsWith(`${scratch}/e2e-r1-`));
     assert.ok(fs.existsSync(verifierScratch));
+    // Section-level artifacts dir is a sibling of the unique role scratch.
+    const artifactsDir = path.join(scratch, 'e2e-artifacts');
+    assert.ok(fs.existsSync(artifactsDir), 'e2e-artifacts must be created under the section scratch');
+    assert.ok(!verifierScratch?.includes('/e2e-artifacts'), 'role scratch must stay unique per round');
     fs.writeFileSync(path.join(home, '.cache/kilo-launch-gate/last'), '0\n');
     dispatch('implementer', ['--file', 'handoff.md']);
     const tmuxCommands = fs.readFileSync(tmuxLog, 'utf8');
     assert.ok(tmuxCommands.includes(`--file ${path.join(fs.realpathSync(root), 'handoff.md')}`));
     assert.match(tmuxCommands, /--auto/);
+    assert.match(tmuxCommands, new RegExp(`E2E_ARTIFACTS=${artifactsDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -73,9 +73,16 @@ rm "$TOKEN"
 NAME="$SECTION-$ROLE-$LABEL-$DISPATCH_ID"
 LOG="$SCRATCH/$ROLE-$LABEL-$DISPATCH_ID.log"
 ROLE_SCRATCH=$SCRATCH
+E2E_ARTIFACTS_ENV=""
 if [ "$ROLE" = "e2e-verifier" ]; then
   ROLE_SCRATCH="$SCRATCH/e2e-$LABEL-$DISPATCH_ID"
   mkdir "$ROLE_SCRATCH"
+  # Section-level artifacts directory (not the unique per-round ROLE_SCRATCH):
+  # reusable flow scripts/assertions survive across verifier rounds. mkdir -p
+  # is race-safe for parallel iOS+Android shard dispatches.
+  E2E_ARTIFACTS_DIR="$SCRATCH/e2e-artifacts"
+  mkdir -p "$E2E_ARTIFACTS_DIR"
+  E2E_ARTIFACTS_ENV=" E2E_ARTIFACTS=$(printf '%q' "$E2E_ARTIFACTS_DIR")"
 fi
 # The strip list must be computed INSIDE the new pane, not here: tmux panes
 # inherit the tmux SERVER environment, so vars absent from this dispatcher's
@@ -87,7 +94,7 @@ STRIP='$(env | grep -oE "^(KILO|OPENCODE)[A-Za-z0-9_]*" | sed "s/^/-u /" | tr "\
 # Redirection below means an attached pane shows nothing at all. Say so in the
 # pane itself — a blank window reads as a dead agent otherwise. This prints to
 # the terminal only, never into the log, so the EXITCODE contract is untouched.
-CMD="echo $(printf '%q' "$NAME: output goes to $LOG — this pane stays blank by design; watch with: tail -f $LOG") && cd $(printf '%q' "$WT") && env $STRIP SCRATCH=$(printf '%q' "$ROLE_SCRATCH") kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME") --auto"
+CMD="echo $(printf '%q' "$NAME: output goes to $LOG — this pane stays blank by design; watch with: tail -f $LOG") && cd $(printf '%q' "$WT") && env $STRIP SCRATCH=$(printf '%q' "$ROLE_SCRATCH")$E2E_ARTIFACTS_ENV kilo run $(printf '%q' "$MSG") --agent $(printf '%q' "$ROLE") --title $(printf '%q' "$NAME") --auto"
 for arg in "${FILES[@]+"${FILES[@]}"}"; do CMD+=" $(printf '%q' "$arg")"; done
 # The wrapper-owned exit file is what proves the run ENDED: the in-log
 # EXITCODE marker is convenient for humans but shares the stream with agent

@@ -227,15 +227,25 @@ Setup is automatic: the repository install provides Appium and the webdriverio c
 CLI usage — always through `e2e/appium.sh`, which serializes per device (two concurrent sessions against one UDID interleave taps and fail flows in ways that read as product defects):
 
 ```bash
-apps/mobile/e2e/appium.sh <udid|emulator-5554> test -e KEY=VALUE <flow.js>
+apps/mobile/e2e/appium.sh <udid|emulator-5554> test -e KEY=VALUE <flow.js> [more-flows.js]
 apps/mobile/e2e/appium.sh <udid> hierarchy > /tmp/hierarchy.xml
-xcrun simctl io <udid> screenshot <path>      # iOS
-pnpm dev:mobile:android adb -s <serial> exec-out screencap -p > <path>  # Android
 ```
 
-The Appium server per device starts on demand and keeps running for the bundle's lifetime; stop it during bundle cleanup with `apps/mobile/e2e/appium.sh <udid> server stop`.
+One `appium.sh <device> test` invocation accepts multiple flow files and runs them on **one** WebDriver session. Session startup is the dominant per-command cost, so a verifier plans its route and batches flows into as few invocations as possible. Batching applies to verifier-written flows; `login.sh` / `logout.sh` keep their per-call sessions. The Appium server per device already persists across invocations for the bundle's lifetime; stop it during bundle cleanup with `apps/mobile/e2e/appium.sh <udid> server stop`.
 
-Attach a screenshot of a changed flow to the PR when it helps review. For transitions, prefer a short screenshot loop over `simctl io recordVideo`, which can produce one-frame recordings.
+### Video-first evidence
+
+Record each flow segment (not the whole route) with `record.sh`. Extract frames at the timestamps the flow hit — simctl videos are variable-frame-rate, so a static screen legitimately yields few frames. Android `screenrecord` caps at ~3 minutes (`--time-limit 170`); segment recordings, never one whole-route video. Keep screenshots for ad-hoc stills.
+
+```bash
+apps/mobile/e2e/record.sh <udid|serial> start <video-path>
+apps/mobile/e2e/record.sh <udid|serial> stop
+apps/mobile/e2e/record.sh frame <video-path> <hh:mm:ss> <out.png>
+xcrun simctl io <udid> screenshot <path>      # iOS still
+pnpm dev:mobile:android adb -s <serial> exec-out screencap -p > <path>  # Android still
+```
+
+`stop` is idempotent. The bundle owner runs `record.sh <device> stop` for every bundle device before `e2e-stop-resource.sh ios|android` (also reaps a recorder orphaned by a crashed verifier).
 
 ## Remote CLI Session Flows
 
@@ -379,6 +389,8 @@ Android stop line is skipped by the same skip-any-never-started rule:
 ```bash
 apps/mobile/e2e/remote-cli.sh stop                                                 # only after remote-cli.sh start
 tmux kill-session -t "kilo-e2e-github-stub-$(basename "$PWD")" 2>/dev/null || true  # only after the GitHub stub
+apps/mobile/e2e/record.sh <udid> stop                                              # every bundle device; idempotent
+apps/mobile/e2e/record.sh <serial> stop                                            # only if android was started
 .kilo_workflow/e2e-stop-resource.sh android                                        # only if android was started
 .kilo_workflow/e2e-stop-resource.sh ios
 .kilo_workflow/e2e-stop-resource.sh stack
@@ -390,7 +402,7 @@ The wrappers release only this worktree's claims and power off only devices
 they started. Never call `xcrun simctl shutdown` or kill an emulator session
 yourself.
 
-Also stop recorders and log followers you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, or use `pnpm dev:stop --force` while sibling worktrees are active.
+Also stop log followers you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, or use `pnpm dev:stop --force` while sibling worktrees are active.
 
 Verify cleanup, and confirm no generated E2E fixtures remain tracked or untracked:
 

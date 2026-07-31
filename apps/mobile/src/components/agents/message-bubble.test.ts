@@ -98,30 +98,33 @@ describe('MessageBubble regressions', () => {
 });
 
 describe('MessageBubble user text join', () => {
-  it(String.raw`joins text parts with \n\n so synthesized attachment notices get a blank line`, async () => {
-    const { isTextPart } = await import('./part-types');
-    vi.mocked(isTextPart).mockReturnValue(true);
+  it(
+    String.raw`joins text parts with \n\n so synthesized attachment notices get a blank line`,
+    async () => {
+      const { isTextPart } = await import('./part-types');
+      vi.mocked(isTextPart).mockReturnValue(true);
 
-    const { ChatMarkdownText: MockChatMarkdownText } = await import('./chat-markdown-text');
+      const { ChatMarkdownText: MockChatMarkdownText } = await import('./chat-markdown-text');
 
-    const message = userMessage('m8');
-    message.parts = [
-      { id: 'm8-prompt', sessionID: 'ses_1', messageID: 'm8', type: 'text', text: 'prompt' },
-      {
-        id: 'm8-attachment',
-        sessionID: 'ses_1',
-        messageID: 'm8',
-        type: 'text',
-        text: 'attachment saved: file.pdf',
-      },
-    ] as typeof message.parts;
+      const message = userMessage('m8');
+      message.parts = [
+        { id: 'm8-prompt', sessionID: 'ses_1', messageID: 'm8', type: 'text', text: 'prompt' },
+        {
+          id: 'm8-attachment',
+          sessionID: 'ses_1',
+          messageID: 'm8',
+          type: 'text',
+          text: 'attachment saved: file.pdf',
+        },
+      ] as typeof message.parts;
 
-    const tree = await renderBubble(message);
+      const tree = await renderBubble(message);
 
-    const element = findElementByTypeFn(tree, MockChatMarkdownText);
-    expect(element).not.toBeNull();
-    expect(element?.props.value as string).toContain('\n\n');
-  });
+      const element = findElementByTypeFn(tree, MockChatMarkdownText);
+      expect(element).not.toBeNull();
+      expect(element?.props.value as string).toContain('\n\n');
+    }
+  );
 });
 
 describe('MessageBubble in-bubble text selection context', () => {

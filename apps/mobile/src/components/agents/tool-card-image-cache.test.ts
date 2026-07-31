@@ -207,14 +207,11 @@ describe('cacheToolCardImage', () => {
 
 describe('cacheToolAttachment', () => {
   it('writes base64 payload for a pdf attachment with a filename using getSafeCacheFilename', () => {
-    cacheToolAttachment(
-      'part-send',
-      {
-        mime: 'application/pdf',
-        dataUrl: 'data:application/pdf;base64,QUJD',
-        filename: 'report.pdf',
-      }
-    );
+    cacheToolAttachment('part-send', {
+      mime: 'application/pdf',
+      dataUrl: 'data:application/pdf;base64,QUJD',
+      filename: 'report.pdf',
+    });
 
     expect(expoFileSystemMock.Directory).toHaveBeenCalledWith('file:///cache', 'tool-card-images');
     expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledWith({
@@ -240,8 +237,16 @@ describe('cacheToolAttachment', () => {
   });
 
   it('deduplicates same part id across cacheToolAttachment calls', () => {
-    cacheToolAttachment('part-dup', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA', filename: 'img.png' });
-    cacheToolAttachment('part-dup', { mime: 'image/png', dataUrl: 'data:image/png;base64,BBB', filename: 'other.png' });
+    cacheToolAttachment('part-dup', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,AAA',
+      filename: 'img.png',
+    });
+    cacheToolAttachment('part-dup', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,BBB',
+      filename: 'other.png',
+    });
 
     expect(fileInstances).toHaveLength(1);
     expect(fileInstances[0]?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
@@ -250,7 +255,11 @@ describe('cacheToolAttachment', () => {
 
   it('shares the dedupe set with cacheToolCardImage', () => {
     cacheToolCardImage('part-shared', 'image/png', 'data:image/png;base64,AAA');
-    cacheToolAttachment('part-shared', { mime: 'image/png', dataUrl: 'data:image/png;base64,BBB', filename: 'name.png' });
+    cacheToolAttachment('part-shared', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,BBB',
+      filename: 'name.png',
+    });
 
     expect(fileInstances).toHaveLength(1);
     expect(fileInstances[0]?.filename).toBe('part-shared.png');

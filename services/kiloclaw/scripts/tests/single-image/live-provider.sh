@@ -694,7 +694,9 @@ elif not has_image(match):
     print(f"configured-model-text-only({configured})")
 else:
     print("ok")
-' "$KILOCODE_SMOKE_MODEL" <<< "$output")
+' "$KILOCODE_SMOKE_MODEL" <<< "$output" || echo "probe-error")
+  # `|| echo` (not bare): under `set -euo pipefail` an unexpected exception here
+  # would abort the entire smoke instead of recording one failure.
   check "configured model is image-capable in a full catalog" "ok" "$detail"
 }
 

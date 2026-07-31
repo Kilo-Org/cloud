@@ -513,11 +513,19 @@ assert_image_round_trip() {
   echo
   echo "--- image round trip (chat.send attachments -> promptImages) ---"
 
-  if ! docker exec "$cid" sh -c '
+  # NOTE on `|| true` below: this file runs under `set -euo pipefail`. Every
+  # command here must be guarded, because a non-zero exit would abort the WHOLE
+  # smoke rather than record one failure — losing every later assertion and the
+  # remaining legs. That is not hypothetical: the unguarded `grep` this replaced
+  # took the run down when it found no match, which is precisely the case this
+  # assertion exists to report.
+  local send_out
+  if ! send_out=$(docker exec "$cid" sh -c '
     set -e
     SK="'"$session_key"'"
     IMG=/usr/local/lib/node_modules/openclaw/dist/control-ui/favicon-32.png
     [ -f "$IMG" ] || IMG=$(find /usr/local/lib/node_modules/openclaw/dist -name "*.png" | head -1)
+    [ -n "$IMG" ] || { echo "no png in image" >&2; exit 1; }
     B64=$(base64 -w0 "$IMG" 2>/dev/null || base64 "$IMG" | tr -d "\n")
     python3 - "$B64" "$SK" > /tmp/kc-img-params.json <<PY
 import json, sys
@@ -537,10 +545,11 @@ print(json.dumps({
 }))
 PY
     openclaw gateway call chat.send --params "$(cat /tmp/kc-img-params.json)" \
-      --expect-final --timeout 240000 --json >/dev/null 2>&1
-  '; then
+      --expect-final --timeout 240000 --json 2>&1
+  ' 2>&1); then
     check "image round trip (promptImages >= 1)" "image-received" "chat.send failed"
-    return
+    echo "  details: $(printf '%s' "$send_out" | tail -3)"
+    return 0
   fi
 
   # Read the runtime's own count for this session key. Take the LAST matching
@@ -548,7 +557,7 @@ PY
   prompt_images=$(docker logs "$cid" 2>&1 \
     | grep -F "sessionKey=$session_key" \
     | grep -oE 'promptImages=[0-9]+' \
-    | tail -1 | cut -d= -f2)
+    | tail -1 | cut -d= -f2 || true)
 
   if [ -z "$prompt_images" ]; then
     check "image round trip (promptImages >= 1)" "image-received" "no pre-prompt diag for session"

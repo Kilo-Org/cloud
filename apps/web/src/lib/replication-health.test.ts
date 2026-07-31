@@ -9,6 +9,7 @@ jest.mock('@/lib/drizzle', () => ({
 import {
   classifyReplicaRow,
   collectReplicationHealth,
+  PROBE_POOL_CONFIG,
   probeReplica,
   REPLICA_LAG_ALERT_SECONDS,
   type ReplicaHealth,
@@ -69,6 +70,14 @@ describe('probeReplica', () => {
 
     expect(health).toMatchObject({ name: 'us-west', status: 'unreachable' });
     expect(health.error).toBeTruthy();
+  });
+
+  it('does not send statement_timeout, which Supabase Supavisor rejects at startup', () => {
+    // Regression guard: statement_timeout travels in the Postgres startup packet
+    // and the pooler refuses connections carrying it, so every probe failed.
+    expect(PROBE_POOL_CONFIG).not.toHaveProperty('statement_timeout');
+    expect(PROBE_POOL_CONFIG.query_timeout).toBe(5_000);
+    expect(PROBE_POOL_CONFIG.connectionTimeoutMillis).toBe(5_000);
   });
 });
 
@@ -234,6 +243,25 @@ describe('collectReplicationHealth', () => {
     expect(report.walSenders).toHaveLength(1);
     expect(report.slots).toHaveLength(1);
     expect(report.healthy).toBe(false);
+  });
+
+  it('surfaces the underlying driver cause when a probe error wraps one', async () => {
+    mockPrimary([walSenderRow()], [slotRow()]);
+
+    const report = await collectReplicationHealth({
+      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      probe: async () => {
+        // Shape of a drizzle failure: generic wrapper message + real driver cause.
+        throw Object.assign(new Error('Failed query: SELECT ...'), {
+          cause: new Error('db error: connection terminated'),
+        });
+      },
+    });
+
+    expect(report.replicas[0]).toMatchObject({
+      status: 'unreachable',
+      error: 'db error: connection terminated',
+    });
   });
 
   it('captures primary query failures without blanking the report', async () => {

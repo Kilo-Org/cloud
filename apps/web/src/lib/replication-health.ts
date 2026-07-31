@@ -140,6 +140,12 @@ export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth
       },
     });
 
+    // A pg.Pool emits 'error' when an idle/checked-out client's connection drops
+    // unexpectedly (likely here, since we probe replicas that may already be in a
+    // bad state). Without a listener Node treats it as unhandled and crashes the
+    // process, so attach a no-op like the long-lived pools in lib/drizzle.ts do.
+    client.pool.on('error', () => {});
+
     const { rows } = await client.db.execute<ReplicaProbeRow>(sql`
       SELECT
         pg_is_in_recovery() AS in_recovery,

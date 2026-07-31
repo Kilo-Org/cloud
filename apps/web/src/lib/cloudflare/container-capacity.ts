@@ -1,6 +1,11 @@
 const MEBIBYTE_BYTES = 1024 ** 2;
 const MEGABYTE_BYTES = 1_000_000;
 
+// Production Cloud Agent values mirror the top-level services/cloud-agent-next/wrangler.jsonc
+// entries and SANDBOX_CAPACITIES in services/cloud-agent-next/src/container-usage-context.ts.
+// Development intentionally uses different named instance types and does not query Analytics.
+// Keep container-capacity-parity.test.ts aligned when adding a container class.
+
 export type ContainerCapacity = {
   vcpu: number;
   memoryBytes: number;

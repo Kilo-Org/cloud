@@ -86,6 +86,7 @@ export function SessionContainerTelemetryContent({
     interval.capacity ? [interval.capacity.memoryBytes] : []
   );
   const memoryCapacities = new Set(knownMemoryCapacities);
+  // A global limit is only valid when every plotted interval has the same known capacity.
   const memoryCapacity =
     knownMemoryCapacities.length === info.intervals.length && memoryCapacities.size === 1
       ? knownMemoryCapacities[0]
@@ -97,32 +98,44 @@ export function SessionContainerTelemetryContent({
     'var(--chart-4)',
     'var(--chart-5)',
   ];
-  const series = [...new Set(rows.map(row => `${row.windowKey}\0${row.placementId}`))].map(
-    (key, index) => {
-      const [, placementId] = key.split('\0');
+  const placementsByWindow = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const placements = placementsByWindow.get(row.windowKey) ?? new Set<string>();
+    placements.add(row.placementId);
+    placementsByWindow.set(row.windowKey, placements);
+  }
+  let nextSeriesIndex = 0;
+  const series = [...placementsByWindow].flatMap(([windowKey, placements]) =>
+    [...placements].map(placementId => {
+      const seriesIndex = nextSeriesIndex;
+      nextSeriesIndex += 1;
       return {
-        key,
-        placementId: placementId ?? 'unknown',
+        windowKey,
+        placementId,
         label:
           placementId && placementId.length > 12
             ? `${placementId.slice(0, 8)}...`
             : (placementId ?? 'unknown'),
-        color: seriesColors[index % seriesColors.length],
-        memoryMaxKey: `memoryMax${index}`,
-        memoryP95Key: `memoryP95${index}`,
-        cpuAverageKey: `cpuAverage${index}`,
-        cpuP95Key: `cpuP95${index}`,
+        color: seriesColors[seriesIndex % seriesColors.length],
+        memoryMaxKey: `memoryMax${seriesIndex}`,
+        memoryP95Key: `memoryP95${seriesIndex}`,
+        cpuAverageKey: `cpuAverage${seriesIndex}`,
+        cpuP95Key: `cpuP95${seriesIndex}`,
       };
-    }
+    })
   );
-  const seriesByKey = new Map(series.map(item => [item.key, item]));
+  const seriesByWindow = new Map<string, Map<string, (typeof series)[number]>>();
+  for (const item of series) {
+    const placements = seriesByWindow.get(item.windowKey) ?? new Map();
+    placements.set(item.placementId, item);
+    seriesByWindow.set(item.windowKey, placements);
+  }
   const chartPoints = new Map<string, Record<string, string | number | null>>();
   for (const row of rows) {
     const point = chartPoints.get(row.timestamp) ?? {
       timestamp: row.timestamp,
-      label: formatTime(row.timestamp),
     };
-    const item = seriesByKey.get(`${row.windowKey}\0${row.placementId}`);
+    const item = seriesByWindow.get(row.windowKey)?.get(row.placementId);
     if (item) {
       point[item.memoryMaxKey] = row.max.memory === null ? null : row.max.memory / 1024 ** 3;
       point[item.memoryP95Key] =
@@ -134,8 +147,8 @@ export function SessionContainerTelemetryContent({
     }
     chartPoints.set(row.timestamp, point);
   }
-  const chartData = [...chartPoints.values()].sort((left, right) =>
-    String(left.timestamp).localeCompare(String(right.timestamp))
+  const chartData = [...chartPoints.values()].sort(
+    (left, right) => Date.parse(String(left.timestamp)) - Date.parse(String(right.timestamp))
   );
   const peakMemory = rows.reduce<number | null>(
     (peak, row) => (row.max.memory === null ? peak : Math.max(peak ?? 0, row.max.memory)),
@@ -236,13 +249,22 @@ export function SessionContainerTelemetryContent({
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <div className="space-y-2">
+              <figure
+                className="space-y-2"
+                role="img"
+                aria-label="Container memory usage over time"
+              >
                 <h3 className="text-sm font-medium">Memory</h3>
                 <div className="h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={24} />
+                      <XAxis
+                        dataKey="timestamp"
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={value => formatTime(String(value))}
+                        minTickGap={24}
+                      />
                       <YAxis
                         tick={{ fontSize: 10 }}
                         tickFormatter={value => `${Number(value).toFixed(1)} GiB`}
@@ -253,7 +275,7 @@ export function SessionContainerTelemetryContent({
                           `${Number(value).toFixed(2)} GiB`,
                           String(name),
                         ]}
-                        labelFormatter={label => `Time ${String(label)}`}
+                        labelFormatter={label => new Date(String(label)).toLocaleString()}
                       />
                       <Legend />
                       {memoryCapacity && (
@@ -292,15 +314,24 @@ export function SessionContainerTelemetryContent({
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              </div>
+              </figure>
 
-              <div className="space-y-2">
+              <figure
+                className="space-y-2"
+                role="img"
+                aria-label="Container CPU utilization over time"
+              >
                 <h3 className="text-sm font-medium">CPU Utilization</h3>
                 <div className="h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={24} />
+                      <XAxis
+                        dataKey="timestamp"
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={value => formatTime(String(value))}
+                        minTickGap={24}
+                      />
                       <YAxis
                         tick={{ fontSize: 10 }}
                         tickFormatter={value => `${Number(value).toFixed(0)}%`}
@@ -308,7 +339,7 @@ export function SessionContainerTelemetryContent({
                       />
                       <Tooltip
                         formatter={(value, name) => [`${Number(value).toFixed(1)}%`, String(name)]}
-                        labelFormatter={label => `Time ${String(label)}`}
+                        labelFormatter={label => new Date(String(label)).toLocaleString()}
                       />
                       <Legend />
                       {series.flatMap(item => [
@@ -339,13 +370,11 @@ export function SessionContainerTelemetryContent({
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              </div>
+              </figure>
             </div>
 
             <details>
-              <summary className="cursor-pointer text-sm font-medium">
-                Metric samples ({rows.length})
-              </summary>
+              <summary className="text-sm font-medium">Metric samples ({rows.length})</summary>
               <div className="mt-3 overflow-x-auto">
                 <Table>
                   <caption className="sr-only">

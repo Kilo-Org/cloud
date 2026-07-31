@@ -161,4 +161,54 @@ describe('queryContainerMetricsAnalytics', () => {
     ).rejects.toMatchObject({ code: 'fields_unavailable' });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects malformed provider timestamps as an invalid response shape', async () => {
+    let requestCount = 0;
+    const fetch = jest.fn(async () => {
+      requestCount += 1;
+      if (requestCount === 1) return response(settingsBody());
+      return response({
+        data: {
+          viewer: {
+            accounts: [
+              {
+                m0: [
+                  {
+                    dimensions: {
+                      datetimeMinute: 'not-a-datetime',
+                      applicationId: 'application-id',
+                      instanceId: 'durable-object-id',
+                      placementId: 'placement-id',
+                      location: 'ord02',
+                      region: 'WNAM',
+                    },
+                    avg: {
+                      cpuUtilization: 0.72,
+                      memory: 4_000,
+                      rxBandwidthBps: 10,
+                      txBandwidthBps: 20,
+                      containerUptime: 300,
+                    },
+                    max: { memory: 5_000, diskUsage: 6_000, diskUsagePercentage: 12 },
+                    quantiles: { cpuUtilizationP95: 0.9, memoryP95: 4_800 },
+                    sum: { cpuTimeSec: 30, rxBytes: 100, txBytes: 200 },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        errors: null,
+      });
+    }) as typeof globalThis.fetch;
+
+    await expect(
+      queryContainerMetricsAnalytics(input, {
+        fetch,
+        accountId: 'account-id',
+        apiToken: 'analytics-token',
+        now: () => new Date('2026-08-01T00:00:00.000Z'),
+      })
+    ).rejects.toMatchObject({ code: 'invalid_response_shape' });
+  });
 });

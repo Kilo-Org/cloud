@@ -21,6 +21,9 @@ export const SANDBOX_USAGE_SKUS = {
 
 export type SandboxClassName = keyof typeof SANDBOX_USAGE_SKUS;
 
+// Production values mirror this service's top-level wrangler.jsonc entries and
+// apps/web/src/lib/cloudflare/container-capacity.ts. The parity test reads all three sources.
+// Development intentionally uses different named instance types and does not query Analytics.
 export const SANDBOX_CAPACITIES: Record<
   SandboxClassName,
   { vcpu: number; memoryMiB: number; diskMB: number }

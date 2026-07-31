@@ -117,7 +117,7 @@ const SettingsResponseSchema = z.object({
 const NullableNumber = z.number().nullable();
 const MetricsGroupSchema = z.object({
   dimensions: z.object({
-    datetimeMinute: z.string(),
+    datetimeMinute: z.string().datetime(),
     applicationId: z.string(),
     instanceId: z.string(),
     placementId: z.string(),

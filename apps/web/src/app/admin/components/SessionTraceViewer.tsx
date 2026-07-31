@@ -443,7 +443,7 @@ export function SessionTraceViewer() {
         {cloudAgentSessionIdentity && containerInfoQuery.isError && (
           <Alert variant="destructive">
             <AlertDescription>
-              {containerInfoQuery.error.message || 'Container information failed to load.'}
+              {containerInfoQuery.error?.message || 'Container information failed to load.'}
             </AlertDescription>
           </Alert>
         )}

@@ -52,6 +52,8 @@ type NewSessionCloudFormProps = {
   selectedRepo: string;
   isStartDisabled: boolean;
   onStartSession: () => void;
+  /** Optional initial prompt text seeded into the prompt input once on mount. */
+  initialPrompt?: string;
 };
 
 /**
@@ -94,6 +96,7 @@ export function NewSessionCloudForm({
   selectedRepo,
   isStartDisabled,
   onStartSession,
+  initialPrompt,
 }: Readonly<NewSessionCloudFormProps>) {
   const colors = useThemeColors();
 
@@ -124,6 +127,7 @@ export function NewSessionCloudForm({
         onPrefillAttachments={onPrefillAttachments}
         shareId={shareId}
         voiceInputSettlerRef={voiceInputSettlerRef}
+        initialPrompt={initialPrompt}
       />
 
       {showRunOnSelector ? (
@@ -136,12 +140,12 @@ export function NewSessionCloudForm({
             onChange={onChangeRunOnInstance}
             disabled={isCreating}
           />
-          {showInstanceDisconnectedNote ? (
-            <Text className="mt-2 text-sm text-muted-foreground">
-              {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
-            </Text>
-          ) : null}
         </View>
+      ) : null}
+      {showInstanceDisconnectedNote ? (
+        <Text className="mt-2 text-sm text-muted-foreground">
+          {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
+        </Text>
       ) : null}
 
       <NewSessionRepositorySection

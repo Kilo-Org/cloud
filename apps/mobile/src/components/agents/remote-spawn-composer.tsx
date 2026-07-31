@@ -14,6 +14,8 @@ type RemoteSpawnComposerProps = {
   isSpawningRemote: boolean;
   isStartDisabled: boolean;
   onStart: () => void;
+  /** When false, hides the Run-on selector and shows a muted target-context line instead. */
+  showRunOnSelector?: boolean;
 };
 
 /**
@@ -24,12 +26,10 @@ type RemoteSpawnComposerProps = {
  * back to Cloud Agent or pick a different instance) and a single
  * "Start session" CTA drives the spawn.
  *
- * kilocode_change - the inline "disconnected" note lives in the FULL
- * (Cloud Agent) composer in `new.tsx`, not here: a retryable spawn
- * failure resets the selection to `null` in the SAME state update that
- * sets the note, which immediately swaps the screen away from this
- * component (`isRemoteTargetSelected` becomes `false`) — a note prop on
- * this component could never actually render.
+ * When `showRunOnSelector` is false (step 2 of the steps flow), the
+ * selector is hidden and replaced by a muted target-context line. The
+ * only affordance is the Start CTA — back to step 1 is the "switch
+ * target" path.
  */
 export function RemoteSpawnComposer({
   runOnInstance,
@@ -39,8 +39,36 @@ export function RemoteSpawnComposer({
   isSpawningRemote,
   isStartDisabled,
   onStart,
+  showRunOnSelector = true,
 }: Readonly<RemoteSpawnComposerProps>) {
   const colors = useThemeColors();
+  const targetLabel = runOnInstance ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
+
+  function renderRunTarget() {
+    if (showRunOnSelector) {
+      return (
+        <View className="mt-2">
+          <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
+          <InstanceSelector
+            value={runOnInstance}
+            instances={instanceList}
+            isLoading={isLoadingInstances}
+            onChange={onChangeRunOnInstance}
+            disabled={isSpawningRemote}
+          />
+        </View>
+      );
+    }
+    if (targetLabel) {
+      return (
+        <View className="mt-2">
+          <Text className="text-sm text-muted-foreground">Run on: {targetLabel}</Text>
+        </View>
+      );
+    }
+    return null;
+  }
+
   return (
     <ScrollView
       className="flex-1"
@@ -48,17 +76,7 @@ export function RemoteSpawnComposer({
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
     >
-      <View className="mt-2">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
-        <InstanceSelector
-          value={runOnInstance}
-          instances={instanceList}
-          isLoading={isLoadingInstances}
-          onChange={onChangeRunOnInstance}
-          disabled={isSpawningRemote}
-        />
-      </View>
-
+      {renderRunTarget()}
       <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStart}>
         {isSpawningRemote ? (
           <ActivityIndicator size="small" color={colors.primaryForeground} />

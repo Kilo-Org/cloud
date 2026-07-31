@@ -55,5 +55,5 @@ export function useNewSessionShareRemote({
     onChangeRunOnInstance: remoteSpawn.onChangeRunOnInstance,
   });
 
-  return { remoteSpawn, handleRunOnInstanceChange };
+  return { remoteSpawn, handleRunOnInstanceChange, isShareStaged };
 }

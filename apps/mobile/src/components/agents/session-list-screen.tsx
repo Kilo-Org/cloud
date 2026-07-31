@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Plus } from 'lucide-react-native';
 
 import { ActiveNowSection } from '@/components/agents/active-now-section';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
-import { AgentSessionListContent } from '@/components/agents/session-list-content';
+import {
+  AgentSessionListContent,
+  FAB_MARGIN,
+} from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
@@ -21,6 +26,10 @@ import {
   selectPinnedActiveSessions,
   type SessionSection,
 } from '@/components/agents/session-list-helpers';
+import {
+  selectEffectiveSearchQuery,
+  selectShowSearchBusy,
+} from '@/components/agents/session-list-search-busy';
 import { ScreenHeader } from '@/components/screen-header';
 import {
   useAgentSessions,
@@ -29,11 +38,26 @@ import {
 } from '@/lib/hooks/use-agent-sessions';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { useOrganization } from '@/lib/organization-context';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 
 export function AgentSessionListScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+
+  const tabBarHeight = useMemo(
+    () =>
+      getEffectiveTabBarHeight({
+        bottomInset: bottom,
+        platform: Platform.OS,
+        fontScale,
+      }),
+    [bottom, fontScale]
+  );
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -51,6 +75,7 @@ export function AgentSessionListScreen() {
     searchQuery,
     searchInputRef,
     hasText,
+    awaitingCommit,
     handleSearchInputChange,
     handleClearSearchInput,
     clearSearchInput,
@@ -95,6 +120,11 @@ export function AgentSessionListScreen() {
     enabled: ready && isSearching,
     sortBy,
   });
+  const showSearchBusy = selectShowSearchBusy({
+    awaitingCommit,
+    isSearching,
+    isFetching: search.isFetching,
+  });
   const { data: recentRepositories } = useRecentAgentRepositories({
     organizationId,
     enabled: ready,
@@ -109,7 +139,7 @@ export function AgentSessionListScreen() {
   // an active-only failure during search additionally retries the active poll
   // so the inline staleness line clears.
   const contentIsError = isSearching ? search.isError : storedIsError;
-  const isSearchPending = isSearching && search.isPending;
+
   const searchRefetch = search.refetch;
   const handleRetry = useCallback(() => {
     if (!isSearching) {
@@ -141,8 +171,14 @@ export function AgentSessionListScreen() {
     refetchRef.current = refetch;
   }, [refetch]);
 
+  // Navigation guard: prevent double-push on rapid row taps. One lock covers
+  // history + tray presses (both funnel through `navigateToSession`). Re-arms
+  // on next focus so returning from the detail screen always releases the guard.
+  const rowNavLockRef = useRef(false);
+
   useFocusEffect(
     useCallback(() => {
+      rowNavLockRef.current = false;
       void refetchRef.current();
     }, [])
   );
@@ -173,8 +209,12 @@ export function AgentSessionListScreen() {
   // While the first fetch for this search text is still in flight (no
   // keepPreviousData to fall back on yet), render as if no search were
   // applied instead of blanking to an empty/mismatched list —
-  // `isSearchPending` drives a lightweight inline indicator instead.
-  const effectiveSearchQuery = isSearchPending ? '' : searchQuery;
+  // `showSearchBusy` drives a lightweight inline indicator instead.
+  const effectiveSearchQuery = selectEffectiveSearchQuery({
+    isSearching,
+    isPending: search.isPending,
+    searchQuery,
+  });
 
   // Pinned "Active now" tray. The committed effective search query narrows
   // the tray together with the history data source (blank while the first
@@ -213,10 +253,18 @@ export function AgentSessionListScreen() {
 
   const navigateToSession = useCallback(
     (sessionId: string, sessionOrgId?: string | null) => {
-      const path = sessionOrgId
-        ? `/(app)/agent-chat/${sessionId}?organizationId=${sessionOrgId}`
-        : `/(app)/agent-chat/${sessionId}`;
-      router.push(path as Href);
+      if (rowNavLockRef.current) return;
+      rowNavLockRef.current = true;
+      try {
+        const path = sessionOrgId
+          ? `/(app)/agent-chat/${sessionId}?organizationId=${sessionOrgId}`
+          : `/(app)/agent-chat/${sessionId}`;
+        router.push(path as Href);
+      } catch {
+        // If push throws synchronously (e.g. duplicate route), release the
+        // lock so the row stays tappable.
+        rowNavLockRef.current = false;
+      }
     },
     [router]
   );
@@ -291,7 +339,7 @@ export function AgentSessionListScreen() {
         <SessionListSearchHeader
           inputRef={searchInputRef}
           hasText={hasText}
-          isSearchPending={isSearchPending}
+          showSearchBusy={showSearchBusy}
           showInlineError={showInlineError}
           onChangeText={handleSearchInputChange}
           onClearSearch={handleClearSearchInput}
@@ -340,6 +388,25 @@ export function AgentSessionListScreen() {
             setFilters(filters);
           }}
         />
+      )}
+      {/* FAB visible when there are sessions — empty state already owns
+          the creation CTA. Header "+" stays unchanged. */}
+      {hasAnySessions && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New session"
+          testID="agents-new-session-fab"
+          onPress={() => {
+            router.push(getNewAgentSessionPath(organizationId) as Href);
+          }}
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80"
+          style={{
+            bottom: tabBarHeight + FAB_MARGIN,
+            right: 20,
+          }}
+        >
+          <Plus size={24} color={colors.primaryForeground} />
+        </Pressable>
       )}
     </View>
   );

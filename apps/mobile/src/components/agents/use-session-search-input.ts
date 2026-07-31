@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type TextInput } from 'react-native';
 
+import { selectAwaitingCommit } from '@/components/agents/session-list-search-busy';
 import {
   createDefaultSearchTimer,
   createSessionSearchController,
@@ -14,6 +15,8 @@ type UseSessionSearchInputResult = {
   searchInputRef: React.RefObject<TextInput | null>;
   /** Whether the search TextInput currently has non-empty text. */
   hasText: boolean;
+  /** True while typed text is ahead of the committed (debounced) query. */
+  awaitingCommit: boolean;
   /** Call on every `onChangeText` from the search TextInput. */
   handleSearchInputChange: (text: string) => void;
   /** In-field X: imperatively clear the typed text, blur, and drop the query. */
@@ -32,6 +35,7 @@ type UseSessionSearchInputResult = {
  */
 export function useSessionSearchInput(): UseSessionSearchInputResult {
   const [searchQuery, setSearchQuery] = useState('');
+  const [lastTyped, setLastTyped] = useState('');
 
   // Search debounce + clear semantics live in a pure controller so the
   // 300ms timing and the two clear paths (search-only vs. broad) can be
@@ -56,6 +60,7 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   // filters — the broad empty-state clear still owns that.
   const handleClearSearchOnly = useCallback(() => {
     searchController.clearSearchOnly();
+    setLastTyped('');
   }, [searchController]);
 
   // The search TextInput lives above the pinned "Active now" tray (so it's
@@ -66,6 +71,7 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   const handleSearchInputChange = useCallback(
     (text: string) => {
       setHasText(text.length > 0);
+      setLastTyped(text);
       handleSearchChange(text);
     },
     [handleSearchChange]
@@ -78,6 +84,7 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
     searchInputRef.current?.clear();
     searchInputRef.current?.blur();
     setHasText(false);
+    setLastTyped('');
     handleClearSearchOnly();
   }, [handleClearSearchOnly]);
 
@@ -87,7 +94,10 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   const clearSearchInput = useCallback(() => {
     searchInputRef.current?.clear();
     setHasText(false);
+    setLastTyped('');
   }, []);
+
+  const awaitingCommit = selectAwaitingCommit({ hasText, lastTyped, searchQuery });
 
   useEffect(
     () => () => {
@@ -100,6 +110,7 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
     searchQuery,
     searchInputRef,
     hasText,
+    awaitingCommit,
     handleSearchInputChange,
     handleClearSearchInput,
     clearSearchInput,

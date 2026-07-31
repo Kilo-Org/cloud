@@ -4,7 +4,6 @@ import { createHash } from 'node:crypto';
 import { addDays } from 'date-fns';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
-import * as z from 'zod';
 
 import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -38,11 +37,6 @@ const logError = sentryLogger('coding-plans', 'error');
 // large inventory uploads finish within the request budget without overwhelming
 // the upstream provider with one unbounded burst of requests.
 const INVENTORY_VALIDATION_CONCURRENCY = 10;
-const EncryptedApiKeySchema = z.object({
-  iv: z.string().min(1),
-  data: z.string().min(1),
-  authTag: z.string().min(1),
-});
 
 type CancellationReason =
   | 'user_canceled'
@@ -72,20 +66,19 @@ export async function getAssignedCodingPlanApiKey(input: {
     .from(coding_plan_key_inventory)
     .where(eq(coding_plan_key_inventory.id, input.inventoryId))
     .limit(1);
-  const encrypted = EncryptedApiKeySchema.safeParse(assignment?.encryptedApiKey);
   if (
     !assignment ||
     assignment.status !== 'assigned' ||
     assignment.assignedToUserId !== input.userId ||
     assignment.planId !== input.planId ||
     assignment.providerId !== input.providerId ||
-    !encrypted.success
+    !assignment.encryptedApiKey
   ) {
     return null;
   }
 
   try {
-    return decryptApiKey(encrypted.data, BYOK_ENCRYPTION_KEY);
+    return decryptApiKey(assignment.encryptedApiKey, BYOK_ENCRYPTION_KEY);
   } catch {
     return null;
   }

@@ -83,7 +83,19 @@ describe('shareLocalFile', () => {
 
   it('presents the native share sheet when sharing is available', async () => {
     await shareLocalFile('file:///tmp/a.pdf');
-    expect(expoSharingMock.shareAsync).toHaveBeenCalledWith('file:///tmp/a.pdf');
+    expect(expoSharingMock.shareAsync).toHaveBeenCalledWith('file:///tmp/a.pdf', undefined);
+  });
+
+  it('passes mimeType to shareAsync when provided', async () => {
+    await shareLocalFile('file:///tmp/a.pdf', { mimeType: 'application/pdf' });
+    expect(expoSharingMock.shareAsync).toHaveBeenCalledWith('file:///tmp/a.pdf', {
+      mimeType: 'application/pdf',
+    });
+  });
+
+  it('does not pass mimeType when omitted', async () => {
+    await shareLocalFile('file:///tmp/b.png');
+    expect(expoSharingMock.shareAsync).toHaveBeenCalledWith('file:///tmp/b.png', undefined);
   });
 });
 
@@ -180,7 +192,7 @@ describe('shareRemoteFile', () => {
 
     expect(expoFileSystemMock.Directory).toHaveBeenCalledWith('file:///cache', 'org-invoices');
     expect(expoFileSystemMock.File.downloadFileAsync).toHaveBeenCalled();
-    expect(expoSharingMock.shareAsync).toHaveBeenCalledWith(downloaded.uri);
+    expect(expoSharingMock.shareAsync).toHaveBeenCalledWith(downloaded.uri, undefined);
     expect(downloaded.delete).toHaveBeenCalled();
   });
 });

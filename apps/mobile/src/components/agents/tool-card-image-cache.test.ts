@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __resetToolCardImageCacheForTests,
+  cacheToolAttachment,
   cacheToolCardImage,
   extensionForImageMime,
+  extensionForMime,
   getToolCardImageUri,
   stripDataUrlBase64Prefix,
   useToolCardImageUri,
@@ -51,6 +53,11 @@ vi.mock('expo-file-system', () => ({
   Paths: expoFileSystemMock.Paths,
 }));
 
+vi.mock('@/lib/share-remote-file', () => ({
+  getSafeCacheFilename: ({ id, filename }: { id: string; filename: string }) =>
+    `${id}-${filename.replaceAll(/[^a-zA-Z0-9._-]/g, '_')}`,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   fileInstances.length = 0;
@@ -62,6 +69,28 @@ describe('extensionForImageMime', () => {
     expect(extensionForImageMime('image/png')).toBe('png');
     expect(extensionForImageMime('image/jpeg')).toBe('jpg');
     expect(extensionForImageMime('image/webp')).toBe('webp');
+  });
+});
+
+describe('extensionForMime', () => {
+  it('maps image mimes identically to extensionForImageMime', () => {
+    expect(extensionForMime('image/png')).toBe('png');
+    expect(extensionForMime('image/jpeg')).toBe('jpg');
+    expect(extensionForMime('image/webp')).toBe('webp');
+  });
+
+  it('extracts the subtype for non-image mimes', () => {
+    expect(extensionForMime('application/pdf')).toBe('pdf');
+    expect(extensionForMime('text/plain')).toBe('plain');
+    expect(
+      extensionForMime('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    ).toBe('vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  });
+
+  it('falls back to bin for malformed or empty mimes', () => {
+    expect(extensionForMime('')).toBe('bin');
+    expect(extensionForMime('invalid')).toBe('bin');
+    expect(extensionForMime('text/')).toBe('bin');
   });
 });
 
@@ -173,6 +202,59 @@ describe('cacheToolCardImage', () => {
     }).not.toThrow();
     expect(fileInstances).toHaveLength(0);
     expect(getToolCardImageUri('part-x')).toBeUndefined();
+  });
+});
+
+describe('cacheToolAttachment', () => {
+  it('writes base64 payload for a pdf attachment with a filename using getSafeCacheFilename', () => {
+    cacheToolAttachment(
+      'part-send',
+      'application/pdf',
+      'data:application/pdf;base64,QUJD',
+      'report.pdf'
+    );
+
+    expect(expoFileSystemMock.Directory).toHaveBeenCalledWith('file:///cache', 'tool-card-images');
+    expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledWith({
+      idempotent: true,
+      intermediates: true,
+    });
+    const file = fileInstances[0];
+    // getSafeCacheFilename({ id: 'part-send', filename: 'report.pdf' })
+    //  → 'part-send-report.pdf' (after sanitization)
+    expect(file?.filename).toBe('part-send-report.pdf');
+    expect(file?.write).toHaveBeenCalledWith('QUJD', { encoding: 'base64' });
+    expect(getToolCardImageUri('part-send')).toBe(
+      'file:///cache/tool-card-images/part-send-report.pdf'
+    );
+  });
+
+  it('uses extension-based naming when no filename is provided (image fallback)', () => {
+    cacheToolAttachment('part-img', 'image/png', 'data:image/png;base64,AAA');
+
+    const file = fileInstances[0];
+    expect(file?.filename).toBe('part-img.png');
+    expect(file?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+  });
+
+  it('deduplicates same part id across cacheToolAttachment calls', () => {
+    cacheToolAttachment('part-dup', 'image/png', 'data:image/png;base64,AAA', 'img.png');
+    cacheToolAttachment('part-dup', 'image/png', 'data:image/png;base64,BBB', 'other.png');
+
+    expect(fileInstances).toHaveLength(1);
+    expect(fileInstances[0]?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+    expect(getToolCardImageUri('part-dup')).toBe('file:///cache/tool-card-images/part-dup-img.png');
+  });
+
+  it('shares the dedupe set with cacheToolCardImage', () => {
+    cacheToolCardImage('part-shared', 'image/png', 'data:image/png;base64,AAA');
+    cacheToolAttachment('part-shared', 'image/png', 'data:image/png;base64,BBB', 'name.png');
+
+    expect(fileInstances).toHaveLength(1);
+    expect(fileInstances[0]?.filename).toBe('part-shared.png');
+    expect(getToolCardImageUri('part-shared')).toBe(
+      'file:///cache/tool-card-images/part-shared.png'
+    );
   });
 });
 

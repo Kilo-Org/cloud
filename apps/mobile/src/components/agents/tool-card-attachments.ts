@@ -21,6 +21,20 @@ export function getToolImageAttachments(part: ToolPart): FilePart[] {
 }
 
 /**
+ * Non-image file attachments on a completed `send_file` tool part.
+ *
+ * Only returns attachments from `send_file` tool parts — matching the
+ * processor gate. Blank-`url` entries are kept; renderability is decided
+ * by the file-system cache lookup.
+ */
+export function getToolFileAttachments(part: ToolPart): FilePart[] {
+  if (part.tool !== 'send_file' || part.state.status !== 'completed') {
+    return [];
+  }
+  return (part.state.attachments ?? []).filter(item => !item.mime.startsWith('image/'));
+}
+
+/**
  * Clamp an image's intrinsic ratio so a tall screenshot still gets a usable
  * preview height in a tool card. `contentFit="contain"` letterboxes the rest.
  */

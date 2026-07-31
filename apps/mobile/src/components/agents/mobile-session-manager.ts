@@ -23,7 +23,7 @@ import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
-import { cacheToolCardImage } from '@/components/agents/tool-card-image-cache';
+import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
 type SessionWithRuntimeState =
@@ -143,7 +143,8 @@ export function createMobileAgentSessionManager({
     websocketHeaders: { Origin: WEB_BASE_URL },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
-    onImageAttachment: cacheToolCardImage,
+    onToolAttachment: (partId, { mime, filename, dataUrl }) =>
+      cacheToolAttachment(partId, mime, dataUrl, filename),
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
       // Read-only is only ever returned once we have successful evidence the
       // session isn't cloud-agent or remote. A failed query here must

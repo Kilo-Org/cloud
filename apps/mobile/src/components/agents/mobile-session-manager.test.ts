@@ -36,6 +36,7 @@ vi.mock('@/lib/user-web-connection-lifecycle', () => ({
   createNativeUserWebConnectionLifecycleHooks: vi.fn(() => ({})),
 }));
 vi.mock('@/components/agents/tool-card-image-cache', () => ({
+  cacheToolAttachment: vi.fn(),
   cacheToolCardImage: vi.fn(),
 }));
 

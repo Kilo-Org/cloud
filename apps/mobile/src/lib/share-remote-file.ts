@@ -60,13 +60,19 @@ async function materializeRemoteFile({
   }
 }
 
-export async function shareLocalFile(localUri: string): Promise<void> {
+export async function shareLocalFile(
+  localUri: string,
+  options?: { mimeType?: string }
+): Promise<void> {
   const available = await Sharing.isAvailableAsync();
   if (!available) {
     throw new ShareRemoteFileError('sharing-unavailable');
   }
 
-  await Sharing.shareAsync(localUri);
+  await Sharing.shareAsync(
+    localUri,
+    options?.mimeType ? { mimeType: options.mimeType } : undefined
+  );
 }
 
 export async function shareMaterializedRemoteFile(

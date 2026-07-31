@@ -56,17 +56,34 @@ describe('free model rate limiter', () => {
     );
   });
 
-  it('uses a separate 24-hour window for anonymous promotion requests', async () => {
-    mockRedisEval.mockResolvedValueOnce([1, 42]);
+  it('atomically consumes both anonymous rate limits', async () => {
+    mockRedisEval.mockResolvedValueOnce([2, 1, 42]);
 
-    await expect(rateLimiter.consumePromotionLimit('192.0.2.1')).resolves.toEqual({
-      allowed: true,
-      requestCount: 42,
+    await expect(rateLimiter.consumeAnonymousFreeModelRateLimits('192.0.2.1')).resolves.toEqual({
+      freeModel: { allowed: true, requestCount: 1 },
+      promotion: { allowed: true, requestCount: 42 },
     });
     expect(mockRedisEval).toHaveBeenCalledWith(
       expect.any(String),
+      [
+        'ai-gateway.free-model-rate-limit:ip:192.0.2.1',
+        'ai-gateway.promotion-rate-limit:ip:192.0.2.1',
+      ],
+      [3_600_000, 200, 3_600, 86_400_000, 10_000, 86_400, expect.any(String)]
+    );
+  });
+
+  it('checks the promotion limit without consuming it', async () => {
+    mockRedisEval.mockResolvedValueOnce(10_000);
+
+    await expect(rateLimiter.checkPromotionLimit('192.0.2.1')).resolves.toEqual({
+      allowed: false,
+      requestCount: 10_000,
+    });
+    expect(mockRedisEval).toHaveBeenCalledWith(
+      expect.not.stringContaining("redis.call('ZADD'"),
       ['ai-gateway.promotion-rate-limit:ip:192.0.2.1'],
-      [86_400_000, 10_000, 86_400, expect.any(String)]
+      [86_400_000]
     );
   });
 

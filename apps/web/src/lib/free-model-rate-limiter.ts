@@ -34,6 +34,35 @@ redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
 return { 1, request_count + 1 }
 `;
 
+const CONSUME_ANONYMOUS_RATE_LIMITS_SCRIPT = `
+local time = redis.call('TIME')
+local now = time[1] * 1000 + math.floor(time[2] / 1000)
+
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now - tonumber(ARGV[1]))
+redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now - tonumber(ARGV[4]))
+
+local free_model_count = redis.call('ZCARD', KEYS[1])
+local promotion_count = redis.call('ZCARD', KEYS[2])
+
+if free_model_count >= tonumber(ARGV[2]) then
+  redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
+  redis.call('EXPIRE', KEYS[2], tonumber(ARGV[6]))
+  return { 0, free_model_count, promotion_count }
+end
+
+if promotion_count >= tonumber(ARGV[5]) then
+  redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
+  redis.call('EXPIRE', KEYS[2], tonumber(ARGV[6]))
+  return { 1, free_model_count, promotion_count }
+end
+
+redis.call('ZADD', KEYS[1], now, ARGV[7])
+redis.call('ZADD', KEYS[2], now, ARGV[7])
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
+redis.call('EXPIRE', KEYS[2], tonumber(ARGV[6]))
+return { 2, free_model_count + 1, promotion_count + 1 }
+`;
+
 const GET_RATE_LIMIT_USAGE_SCRIPT = `
 local time = redis.call('TIME')
 local now = time[1] * 1000 + math.floor(time[2] / 1000)
@@ -66,6 +95,11 @@ return { requests_to_add, request_count + requests_to_add }
 export type RateLimitResult = {
   allowed: boolean;
   requestCount: number;
+};
+
+export type AnonymousFreeModelRateLimits = {
+  freeModel: RateLimitResult;
+  promotion: RateLimitResult;
 };
 
 type FillRateLimitResult = {
@@ -153,15 +187,64 @@ export function consumeFreeModelRateLimitByUser(kiloUserId: string): Promise<Rat
 }
 
 /**
- * Consume one request from an IP address's anonymous promotion limit.
- * Applies to free model requests without authentication.
+ * Atomically consume the hourly IP and daily promotion limits for an anonymous
+ * Kilo free-model request. Neither limit is consumed when either is exhausted.
  */
-export function consumePromotionLimit(ipAddress: string): Promise<RateLimitResult> {
-  return consumeRateLimit(
-    promotionRateLimitIpRedisKey(ipAddress),
-    PROMOTION_WINDOW_HOURS,
-    PROMOTION_MAX_REQUESTS
-  );
+export async function consumeAnonymousFreeModelRateLimits(
+  ipAddress: string
+): Promise<AnonymousFreeModelRateLimits> {
+  try {
+    const [outcome, freeModelCount, promotionCount] = await redisClient.eval<
+      [number, number, number, number, number, number, string],
+      [number, number, number]
+    >(
+      CONSUME_ANONYMOUS_RATE_LIMITS_SCRIPT,
+      [freeModelRateLimitIpRedisKey(ipAddress), promotionRateLimitIpRedisKey(ipAddress)],
+      [
+        FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * MILLISECONDS_PER_HOUR,
+        FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
+        FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60,
+        PROMOTION_WINDOW_HOURS * MILLISECONDS_PER_HOUR,
+        PROMOTION_MAX_REQUESTS,
+        PROMOTION_WINDOW_HOURS * 60 * 60,
+        randomUUID(),
+      ]
+    );
+
+    return {
+      freeModel: {
+        allowed: outcome !== 0,
+        requestCount: freeModelCount,
+      },
+      promotion: {
+        allowed: outcome === 2 || (outcome === 0 && promotionCount < PROMOTION_MAX_REQUESTS),
+        requestCount: promotionCount,
+      },
+    };
+  } catch (error) {
+    captureException(error, { tags: { source: 'free_model_rate_limiter' } });
+    return {
+      freeModel: { allowed: true, requestCount: 0 },
+      promotion: { allowed: true, requestCount: 0 },
+    };
+  }
+}
+
+/**
+ * Check the anonymous promotion limit without consuming it. Third-party free
+ * models historically shared the cap but did not add to its request count.
+ */
+export async function checkPromotionLimit(ipAddress: string): Promise<RateLimitResult> {
+  try {
+    const requestCount = await getRateLimitUsage(
+      promotionRateLimitIpRedisKey(ipAddress),
+      PROMOTION_WINDOW_HOURS
+    );
+    return { allowed: requestCount < PROMOTION_MAX_REQUESTS, requestCount };
+  } catch (error) {
+    captureException(error, { tags: { source: 'free_model_rate_limiter' } });
+    return { allowed: true, requestCount: 0 };
+  }
 }
 
 export function getFreeModelRateLimitUsage(ipAddress: string): Promise<number> {

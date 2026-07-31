@@ -62,9 +62,11 @@ import {
   type AnonymousUserContext,
 } from '@/lib/anonymous';
 import {
+  checkPromotionLimit,
+  consumeAnonymousFreeModelRateLimits,
   consumeFreeModelRateLimit,
   consumeFreeModelRateLimitByUser,
-  consumePromotionLimit,
+  type RateLimitResult,
 } from '@/lib/free-model-rate-limiter';
 import { logFreeModelUsage } from '@/lib/free-model-usage';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
@@ -361,35 +363,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // For FREE models: check rate limit, log at start.
-  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
-  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
-  // All other products rate-limit per IP (fast pre-auth path).
+  // Server-side products (cloud-agent, code-review, app-builder) rate-limit per
+  // user when the request comes from Cloudflare IPs. All other products use IPs.
   const isRateLimitedFreeModelRequest =
     isKiloExclusiveFreeModel(effectiveModelIdLowerCased) ||
     autoModel === KILO_AUTO_FREE_MODEL.id ||
     routingTarget === KILO_AUTO_FREE_MODEL.id ||
     (await isPublicIdExperimented(effectiveModelIdLowerCased));
-  if (isRateLimitedFreeModelRequest) {
-    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
-    if (rateLimit instanceof NextResponse) return rateLimit;
-
-    if (!rateLimit.result.allowed) {
-      console.warn(
-        `Free model rate limit exceeded, ${rateLimit.subject}, model: ${effectiveModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
-      );
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          error_type: ProxyErrorType.rate_limit_exceeded,
-          message:
-            'Free model usage limit reached. Please try again later or upgrade to a paid model.',
-        },
-        { status: 429 }
-      );
-    }
-  }
-
   // Now check auth
   const authSpan = startInactiveSpan({ name: 'auth-check' });
   const {
@@ -422,31 +402,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       );
     }
 
-    const promotionLimit = await consumePromotionLimit(ipAddress);
-
-    if (!promotionLimit.allowed) {
-      console.warn(
-        `Promotion model limit exceeded, ip: ${ipAddress}, ` +
-          `model: ${effectiveModelIdLowerCased}, ` +
-          `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
-          `in ${PROMOTION_WINDOW_HOURS}h window`
-      );
-
-      return NextResponse.json(
-        {
-          error: {
-            code: PROMOTION_MODEL_LIMIT_REACHED,
-            message:
-              'Sign up for free to continue and explore 500 other models. ' +
-              'Takes 2 minutes, no credit card required. Or come back later.',
-          },
-          error_type: ProxyErrorType.promotion_limit_reached,
-        },
-        { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
-      );
-    }
-
-    // Anonymous access for free model (already rate-limited above)
+    // Anonymous access for free models is rate-limited after request validation.
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;
@@ -547,14 +503,72 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return storeAndPreviousResponseIdIsNotSupported();
   }
 
+  let freeModelRateLimit: { result: RateLimitResult; subject: string } | null = null;
+  let promotionLimit: RateLimitResult | null = null;
+
+  if (
+    isRateLimitedFreeModelRequest &&
+    (!isAnonymousContext(user) || (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)))
+  ) {
+    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
+    if (rateLimit instanceof NextResponse) return rateLimit;
+    freeModelRateLimit = rateLimit;
+  } else if (isAnonymousContext(user)) {
+    if (isRateLimitedFreeModelRequest) {
+      const anonymousLimits = await consumeAnonymousFreeModelRateLimits(ipAddress);
+      freeModelRateLimit = {
+        result: anonymousLimits.freeModel,
+        subject: `ip address: ${ipAddress}`,
+      };
+      promotionLimit = anonymousLimits.promotion;
+    } else {
+      promotionLimit = await checkPromotionLimit(ipAddress);
+    }
+  }
+
+  if (freeModelRateLimit && !freeModelRateLimit.result.allowed) {
+    console.warn(
+      `Free model rate limit exceeded, ${freeModelRateLimit.subject}, model: ${effectiveModelIdLowerCased}, request count: ${freeModelRateLimit.result.requestCount}`
+    );
+    return NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        error_type: ProxyErrorType.rate_limit_exceeded,
+        message:
+          'Free model usage limit reached. Please try again later or upgrade to a paid model.',
+      },
+      { status: 429 }
+    );
+  }
+
+  if (promotionLimit && !promotionLimit.allowed) {
+    console.warn(
+      `Promotion model limit exceeded, ip: ${ipAddress}, ` +
+        `model: ${effectiveModelIdLowerCased}, ` +
+        `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
+        `in ${PROMOTION_WINDOW_HOURS}h window`
+    );
+
+    return NextResponse.json(
+      {
+        error: {
+          code: PROMOTION_MODEL_LIMIT_REACHED,
+          message:
+            'Sign up for free to continue and explore 500 other models. ' +
+            'Takes 2 minutes, no credit card required. Or come back later.',
+        },
+        error_type: ProxyErrorType.promotion_limit_reached,
+      },
+      { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
+    );
+  }
+
   if (isRateLimitedFreeModelRequest) {
+    const loggedModelId = effectiveModelIdLowerCased;
+    const loggedKiloUserId = isAnonymousContext(user) ? undefined : user.id;
     after(async () => {
       try {
-        await logFreeModelUsage(
-          ipAddress,
-          effectiveModelIdLowerCased,
-          isAnonymousContext(user) ? undefined : user.id
-        );
+        await logFreeModelUsage(ipAddress, loggedModelId, loggedKiloUserId);
       } catch (error) {
         captureException(error, { tags: { source: 'free_model_usage' } });
       }

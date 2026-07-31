@@ -193,6 +193,24 @@ describe('startRun — profile purpose', () => {
       /non-empty entries/
     );
   });
+
+  it('rejects and marks run failed when markProfilesRunningForRun rejects', async () => {
+    const entries = [{ model: 'vendor/m', variant: 'xhigh' }];
+    vi.mocked(markProfilesRunningForRun).mockRejectedValueOnce(new Error('claim failed'));
+
+    await expect(
+      startRun(env, 'decider', { purpose: 'profile', entries })
+    ).rejects.toThrow('claim failed');
+
+    // Run was marked failed via failRunAndDrain
+    expect(markRunFailed).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.stringMatching(/^profile-/),
+      'claim failed'
+    );
+    // No queue work enqueued
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
 });
 
 describe('profile completion transitions', () => {

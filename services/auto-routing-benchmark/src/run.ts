@@ -553,13 +553,15 @@ export async function startRun(
         repetitions,
       });
     } catch (error) {
-      console.warn(
+      console.error(
         JSON.stringify({
           event: 'benchmark_profile_running_transition_error',
           runId,
           ...formatError(error),
         })
       );
+      await failRunAndDrain(env, runId, formatError(error).error);
+      throw error;
     }
   }
 

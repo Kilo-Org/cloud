@@ -319,6 +319,42 @@ if (args[0] === 'simctl' && args[1] === 'io' && args[3] === 'recordVideo') {
   }
 });
 
+
+test('record.sh start recovers from corrupt prior state', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-record-corrupt-start-'));
+  const bin = path.join(root, 'bin');
+  const tmp = path.join(root, 'tmp');
+  const signalLog = path.join(root, 'signals.log');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(tmp);
+  makeXcrunStub(bin, signalLog, 'h264data');
+  fs.mkdirSync(path.join(tmp, 'kilo-e2e-record', 'UDID-C'), { recursive: true });
+  fs.writeFileSync(path.join(tmp, 'kilo-e2e-record', 'UDID-C', 'state'), 'platform=not-valid-base64!!!\n');
+  const video = path.join(tmp, 'video.mp4');
+  const env = {
+    ...process.env,
+    PATH: `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`,
+    TMPDIR: tmp,
+    SIGNAL_LOG: signalLog,
+    VIDEO_DATA: 'h264data',
+  };
+  try {
+    const start = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['UDID-C', 'start', video], {
+      encoding: 'utf8',
+      env,
+    });
+    assert.equal(start.status, 0, start.stderr);
+    const stop = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['UDID-C', 'stop'], {
+      encoding: 'utf8',
+      env,
+    });
+    assert.equal(stop.status, 0, stop.stderr);
+    assert.equal(fs.readFileSync(video, 'utf8'), 'h264data');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('record.sh frame invokes ffmpeg input-first and extracts a frame', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-record-frame-test-'));
   const bin = path.join(root, 'bin');

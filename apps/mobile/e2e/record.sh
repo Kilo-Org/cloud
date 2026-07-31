@@ -221,8 +221,12 @@ cmd="${1:-}"
 case "$cmd" in
   start)
     VIDEO="${2:?usage: record.sh <device> start <video-path>}"
-    read_state
-    if [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
+    # Corrupt/unreadable prior state must not permanently block the device:
+    # self-clear and start fresh (plan: stale state files self-clear on next start).
+    if ! read_state; then
+      echo "record.sh: clearing unreadable prior state for $DEVICE" >&2
+      clear_state
+    elif [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
       if recorder_pid_live "$pid" "recordVideo" || recorder_pid_live "$pid" "screenrecord"; then
         echo "record.sh: already recording on $DEVICE (pid $pid)" >&2
         exit 1
@@ -277,11 +281,14 @@ case "$cmd" in
 
   stop)
     if ! read_state; then
-      echo "record.sh: corrupt state for $DEVICE; not clearing so a human can inspect $STATE_FILE" >&2
-      exit 1
+      # Blind cleanup must stay idempotent: clear corrupt state and exit 0.
+      echo "record.sh: clearing unreadable state for $DEVICE" >&2
+      clear_state
+      exit 0
     fi
     if [ -z "${pid:-}" ]; then
       echo "record.sh: no active recording for $DEVICE" >&2
+      clear_state
       exit 0
     fi
     case "${platform:-}" in

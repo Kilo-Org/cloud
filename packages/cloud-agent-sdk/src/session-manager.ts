@@ -621,6 +621,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * snapshotted (should not purge blindly).
    */
   let postClearSurvivorIds: ReadonlySet<string> | null = null;
+  /**
+   * After Stop ACK we force the composer unlocked. Remote `session.canSend`
+   * can stay false while `ownerConnectionId` is briefly null; state.subscribe
+   * would then re-lock via updateCapabilityAtoms. Hold the unlock until the
+   * live gate recovers (or the session switches).
+   */
+  let postInterruptUnlock = false;
   let stateUnsub: (() => void) | null = null;
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
   let childSessionHydrationGeneration = 0;
@@ -669,6 +676,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     observedModelSource = null;
     remoteHistoryReplaying = true;
     postClearSurvivorIds = null;
+    postInterruptUnlock = false;
     store.set(remoteModelOverrideAtom, null);
     store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
@@ -785,7 +793,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function updateCapabilityAtoms(session: CloudAgentSession): void {
     const cloudStatus = store.get(cloudStatusAtom);
     const cloudReady = cloudStatus === null || cloudStatus.type === 'ready';
-    store.set(canSendAtom, session.canSend && cloudReady);
+    const liveCanSend = session.canSend && cloudReady;
+    if (postInterruptUnlock) {
+      if (liveCanSend) {
+        postInterruptUnlock = false;
+        store.set(canSendAtom, true);
+      } else {
+        // Keep composer editable while the remote owner reconverges.
+        // Latch is never armed for read-only sessions.
+        store.set(canSendAtom, cloudReady);
+      }
+    } else {
+      store.set(canSendAtom, liveCanSend);
+    }
     store.set(canInterruptAtom, session.canInterrupt);
   }
 
@@ -935,10 +955,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // During the 'connecting' phase the transport is null so canSend is
       // always false, which would briefly flash a "read-only" banner.
       if (act.type !== 'connecting') {
-        store.set(
-          isReadOnlyAtom,
-          activeSessionType === null ? !session.canSend : activeSessionType === 'read-only'
-        );
+        if (postInterruptUnlock && activeSessionType !== 'read-only') {
+          store.set(isReadOnlyAtom, false);
+        } else {
+          store.set(
+            isReadOnlyAtom,
+            activeSessionType === null ? !session.canSend : activeSessionType === 'read-only'
+          );
+        }
       }
       updateCapabilityAtoms(session);
 
@@ -1541,10 +1565,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const cs = store.get(cloudStatusAtom);
     const cloudReady = cs === null || cs.type === 'ready';
     const readOnly = activeSessionType === 'read-only';
+    postInterruptUnlock = !readOnly;
     store.set(isStreamingAtom, false);
     store.set(isReadOnlyAtom, readOnly);
     store.set(canSendAtom, !readOnly && cloudReady);
     store.set(canInterruptAtom, session.canInterrupt);
+    // Drop the latch immediately when the live gate is already healthy.
+    if (postInterruptUnlock && session.canSend && cloudReady) {
+      postInterruptUnlock = false;
+    }
   }
 
   async function interrupt(): Promise<void> {
@@ -1555,6 +1584,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // message while the async interrupt HTTP call is in flight. We do NOT
     // call disconnect() — interrupt stops the agent but keeps the transport
     // alive so the user can continue the session.
+    postInterruptUnlock = false;
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     try {
@@ -1567,9 +1597,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
     } catch {
       if (currentSession === session) {
-        // Failure path still uses the live transport gate (may re-lock if the
-        // owner truly dropped). Prefer unlock over a stuck composer when the
-        // session is still writable.
+        // Prefer unlock over a stuck composer when the session is still writable.
         restoreAfterInterrupt(session);
         // Never poison errorAtom — that disables the composer. Use the
         // transient indicator instead (Item 14 / Decision 2).

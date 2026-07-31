@@ -2680,6 +2680,43 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
     });
 
+    it('holds canSend unlocked when a post-interrupt state tick still reports canSend false', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(true);
+
+      mockSession.canSend = false;
+      mockSession.interrupt.mockImplementation(async () => {
+        // State tick during/after ACK with canSend still false must not re-lock.
+        mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+        notifyStateChange?.();
+      });
+      await mgr.interrupt();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+
+      // Another false tick after unlock still held.
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Live gate recovery clears the latch.
+      mockSession.canSend = true;
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+    });
+
     it('is a no-op without active session', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

@@ -9,6 +9,7 @@ type UseCurrentUserIdOptions = {
 export function useCurrentUserId(options: UseCurrentUserIdOptions = {}): {
   userId: string | undefined;
   email: string | undefined;
+  displayName: string | null | undefined;
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
@@ -22,6 +23,7 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}): {
   return {
     userId: data?.id,
     email: data?.email,
+    displayName: data?.displayName,
     isLoading,
     isError,
     refetch: () => {

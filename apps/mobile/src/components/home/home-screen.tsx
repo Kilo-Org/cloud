@@ -24,6 +24,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type ClawInstance, useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
@@ -106,7 +107,8 @@ export function HomeScreen() {
   // stored + any active), so a CLI-only account shows the first-use promo
   // instead of an empty section + orphaned "New coding task" button.
   const hasAnySession = hasDisplayableAgentSessions(storedSessions, activeSessions);
-  const headerTitle = buildTimedGreeting();
+  const { displayName } = useCurrentUserId();
+  const headerTitle = buildTimedGreeting(displayName);
 
   const handleRefresh = useCallback(() => {
     void (async () => {

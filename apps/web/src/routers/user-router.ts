@@ -1,4 +1,5 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { resolveDisplayName } from '@/lib/user/display-name';
 import { getUserAuthProviders, unlinkAuthProviderFromUser } from '@/lib/user';
 import {
   sendAccountDeletionConfirmationEmail,
@@ -334,7 +335,9 @@ async function enrichDeductionsWithInstanceNames(
 export const userRouter = createTRPCRouter({
   // Account linking routes
   getMe: baseProcedure.query(async ({ ctx }) => {
-    return successResult({ id: ctx.user.id, email: ctx.user.google_user_email });
+    const providers = await getUserAuthProviders(ctx.user.id);
+    const displayName = resolveDisplayName(providers, ctx.user.google_user_name);
+    return successResult({ id: ctx.user.id, email: ctx.user.google_user_email, displayName });
   }),
 
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {

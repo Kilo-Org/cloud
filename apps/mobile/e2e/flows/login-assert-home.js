@@ -2,5 +2,5 @@
 module.exports = async function assertHome(ctx) {
   const { h } = ctx;
   await h.tapOn('HOME|Home, tab, 1 of 4');
-  await h.assertVisible(/Good (morning|afternoon|evening)/);
+  await h.assertVisible(/Good (morning|afternoon|evening)(, .+)?/);
 };

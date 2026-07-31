@@ -29,14 +29,13 @@ tmux ls
 xcrun simctl list devices booted
 ```
 
-Reuse an existing stack only when it belongs to the current live slot bundle.
-An unaccounted stack whose `kilo-dev-<slug>` slug matches this worktree's
-basename is yours: stop it with `pnpm dev:stop`, then start fresh. An unaccounted
-stack from another worktree is not yours — leave it alone and never stop an
-unrelated `kilo-dev-*` session.
+Reuse an existing stack only when it belongs to this worktree (same
+`kilo-dev-<slug>` session). An unaccounted stack whose slug matches this
+worktree's basename is yours: stop it with `pnpm dev:stop`, then start fresh. An
+unaccounted stack from another worktree is not yours — leave it alone and never
+stop an unrelated `kilo-dev-*` session.
 
-If this worktree has no stack, the bundle owner starts the complete mobile flow
-after taking its slot:
+If this worktree has no stack, the bundle owner starts the complete mobile flow:
 
 ```bash
 pnpm dev:env -y cloudflare-session-ingest
@@ -292,12 +291,19 @@ On success, record `SERIAL`, `EMULATOR_PID`, and `EMULATOR_LOG` in the round han
 
 ### Failed attempt → stop exactly yours → relaunch once
 
-With `--wait`, JSON is printed only **after** boot succeeds. On failure the command throws and stdout is empty — `$EMULATOR` / `$EMULATOR_LOG` are unset. The log path is still:
+With `--wait`, JSON is printed only **after** boot succeeds. On failure the command throws and stdout is empty — `$EMULATOR` / `$EMULATOR_LOG` / `$EMULATOR_PID` are unset. Before any teardown, decide attempt 2's GPU from the **error text** (not from whether a process is still alive after stop):
+
+| Error text | Cause | Attempt 2 GPU |
+|---|---|---|
+| `… died while booting; see <log>` | recorded PID died mid-boot | `--gpu swiftshader_indirect` |
+| `… did not reach sys.boot_completed=1 within 8 minutes; see <log>` | process still live, boot envelope missed | `--gpu host` (retry Mac GPU) |
+
+Log path for `tail -200` (not `$EMULATOR_LOG`):
 
 - `$TMPDIR/kilo-e2e-android-<worktree-slug>.log` (slug = basename with non `[A-Za-z0-9_-]` → `_`), or
-- the path after `see ` in the error text (`… died while booting; see <log>` / `… did not reach sys.boot_completed=1 …; see <log>`).
+- the path after `see ` in the error text.
 
-Use that path for `tail -200`, not `$EMULATOR_LOG`. Then run `pnpm dev:mobile:android emulator-stop` and `pnpm dev:mobile:android release-all`; the stop path uses the on-disk session record and verifies the recorded PID before signalling, so it cannot kill a sibling's same-AVD emulator. Relaunch once per the GPU policy (software GPU only when the process is gone — there is no JSON PID on a failed wait). If the second attempt also fails, stop and return a test-environment blocker with the log tail; never a third launch.
+Optionally read `$TMPDIR/kilo-mobile-android-emulators/<worktree-slug>.json` before stopping if you need the recorded PID/session. Then run `pnpm dev:mobile:android emulator-stop` and `pnpm dev:mobile:android release-all` — stop kills the PID and deletes the session record, so it cannot be used to re-derive the GPU policy afterward. Relaunch once with the GPU chosen above. If the second attempt also fails, stop and return a test-environment blocker with the log tail; never a third launch.
 
 ### Build and login
 
@@ -365,9 +371,9 @@ rm -f "$LOGIN_LOG"
 ```
 
 After all verifiers return, the bundle owner stops everything it started —
-conditional resources first (skip any never started), then the bundle — and
-frees the slot. An iOS-only round has no Android resources to stop, so the
-Android stop line is skipped by the same skip-any-never-started rule:
+conditional resources first (skip any never started), then the stack. An
+iOS-only round has no Android resources to stop, so the Android stop line is
+skipped by the same skip-any-never-started rule:
 
 ```bash
 apps/mobile/e2e/remote-cli.sh stop                                                 # only after remote-cli.sh start

@@ -13,8 +13,12 @@ import {
   BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_SMALL_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
+import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
+import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 
 const baseParams = {
@@ -383,6 +387,44 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     );
 
     expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+  });
+});
+
+describe('resolveAutoModel — kilo-auto/small branch', () => {
+  const smallParams = {
+    ...baseParams,
+    model: KILO_AUTO_SMALL_MODEL.id,
+    apiKind: 'chat_completions' as const,
+  };
+
+  it('resolves to the paid Gemma model when the user has balance', async () => {
+    const result = await resolveAutoModel(smallParams, nullUserPromise, Promise.resolve(100));
+
+    expect(result).toEqual({ kind: 'ok', resolved: { model: GEMMA_4_26B_A4B_IT_ID } });
+  });
+
+  it('falls back to the kilo-auto/free rotation when the user has no balance', async () => {
+    const params = { ...smallParams, sessionId: 'session-1' };
+    const smallResult = await resolveAutoModel(params, nullUserPromise, zeroBalancePromise);
+    const freeResult = await resolveAutoModel(
+      { ...params, model: KILO_AUTO_FREE_MODEL.id },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(smallResult).toEqual(freeResult);
+    expect(smallResult.kind).toBe('ok');
+  });
+
+  it('resolves to a free candidate when the user has no balance', async () => {
+    // The Redis mock returns no OpenRouter models, so the only candidate is
+    // the public Kilo-exclusive free model.
+    const result = await resolveAutoModel(smallParams, nullUserPromise, zeroBalancePromise);
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: stepfun_37_flash_free_model.public_id },
+    });
   });
 });
 

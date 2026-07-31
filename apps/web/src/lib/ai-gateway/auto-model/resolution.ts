@@ -1,8 +1,5 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import {
-  gemma_4_26b_a4b_it_free_model,
-  GEMMA_4_26B_A4B_IT_ID,
-} from '@/lib/ai-gateway/providers/google';
+import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
@@ -141,6 +138,27 @@ export type ResolveAutoModelResult =
   | { kind: 'ok'; resolved: ResolvedAutoModel; routingTarget?: string }
   | { kind: 'no_free_models_available' }
   | { kind: 'organization_auto_configuration_error'; message: string };
+
+/**
+ * Picks a model from the kilo-auto/free candidate rotation, deterministically
+ * randomized per session (falling back to user id, then client IP).
+ */
+async function resolveFreeRotation(
+  apiKind: GatewayRequest['kind'] | null,
+  sessionId: string | null,
+  clientIp: string | null,
+  userPromise: Promise<User | null>
+): Promise<ResolveAutoModelResult> {
+  const candidates = await getAutoFreeCandidates(apiKind);
+  if (candidates.length === 0) {
+    return { kind: 'no_free_models_available' };
+  }
+  const randomNumber = getRandomNumber(
+    'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp),
+    candidates.length
+  );
+  return { kind: 'ok', resolved: { model: candidates[randomNumber] } };
+}
 
 async function resolveOrganizationAutoModel(
   params: ResolveAutoModelParams,
@@ -282,26 +300,15 @@ export async function resolveAutoModel(
     return await resolveOrganizationAutoModel(params, userPromise, balancePromise);
   }
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    const candidates = await getAutoFreeCandidates(apiKind);
-    if (candidates.length === 0) {
-      return { kind: 'no_free_models_available' };
-    }
-    const randomNumber = getRandomNumber(
-      'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp),
-      candidates.length
-    );
-    return { kind: 'ok', resolved: { model: candidates[randomNumber] } };
+    return resolveFreeRotation(apiKind, sessionId, clientIp, userPromise);
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
-    return {
-      kind: 'ok',
-      resolved: {
-        model:
-          (await balancePromise) > 0
-            ? GEMMA_4_26B_A4B_IT_ID
-            : gemma_4_26b_a4b_it_free_model.public_id,
-      },
-    };
+    if ((await balancePromise) > 0) {
+      return { kind: 'ok', resolved: { model: GEMMA_4_26B_A4B_IT_ID } };
+    }
+    // Without balance, kilo-auto/small falls back to the same free model
+    // rotation as kilo-auto/free.
+    return resolveFreeRotation(apiKind, sessionId, clientIp, userPromise);
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id) {
     const decision = params.efficientDecision ? await params.efficientDecision() : null;

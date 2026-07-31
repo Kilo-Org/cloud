@@ -8,6 +8,7 @@ import {
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 
@@ -815,10 +816,10 @@ describe('rewriteModelResponse', () => {
   test('continues stripping cost for free models outside the Kilo organization', async () => {
     const result = await rewriteModelResponse(
       jsonResponse({
-        model: 'google/gemma-4-26b-a4b-it:free',
+        model: stepfun_37_flash_free_model.public_id,
         usage: { cost: 0, is_byok: false },
       }),
-      'google/gemma-4-26b-a4b-it:free',
+      stepfun_37_flash_free_model.public_id,
       'openrouter',
       'chat_completions',
       makeLogging()
@@ -826,7 +827,7 @@ describe('rewriteModelResponse', () => {
 
     expect(result).not.toBeNull();
     expect(await result?.json()).toEqual({
-      model: 'google/gemma-4-26b-a4b-it:free',
+      model: stepfun_37_flash_free_model.public_id,
       usage: {},
     });
   });

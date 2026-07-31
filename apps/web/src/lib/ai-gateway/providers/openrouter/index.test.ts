@@ -8,7 +8,6 @@ import {
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import {
   findKiloExclusiveModel,
   isDeadFreeModel,
@@ -39,6 +38,15 @@ const disabledFreeModel = {
   internal_id: 'vendor/disabled-free-model-internal',
   display_name: 'Disabled Free Kilo Model',
   status: 'disabled',
+  pricing: null,
+} satisfies KiloExclusiveModel;
+
+const hiddenFreeModel = {
+  ...qwen36_plus_stealth_model,
+  public_id: 'vendor/hidden-free-model',
+  internal_id: 'vendor/hidden-free-model-internal',
+  display_name: 'Hidden Free Kilo Model',
+  status: 'hidden',
   pricing: null,
 } satisfies KiloExclusiveModel;
 
@@ -192,8 +200,8 @@ describe('shouldSuppressOpenRouterModel', () => {
   });
 
   it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {
-    expect(gemma_4_26b_a4b_it_free_model.status).toBe('hidden');
-    expect(shouldSuppressOpenRouterModel(gemma_4_26b_a4b_it_free_model)).toBe(true);
+    expect(hiddenFreeModel.status).toBe('hidden');
+    expect(shouldSuppressOpenRouterModel(hiddenFreeModel)).toBe(true);
   });
 });
 

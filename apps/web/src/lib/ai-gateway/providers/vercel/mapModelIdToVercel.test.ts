@@ -104,11 +104,9 @@ describe('mapModelIdToVercel', () => {
 
   describe('kilo-exclusive models', () => {
     it('maps an exclusive flagged with vercel-routing to its internal id', () => {
-      // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
-      // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.
-      expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).toBe(
-        'google/gemma-4-26b-a4b-it'
-      );
+      // stepfun/step-3.7-flash:free is registered in kiloExclusiveModels
+      // with the 'vercel-routing' flag and internal_id 'stepfun/step-3.7-flash'.
+      expect(mapModelIdToVercel('stepfun/step-3.7-flash:free')).toBe('stepfun/step-3.7-flash');
     });
 
     it('does not use internal_id for exclusives that are not vercel-routed', () => {

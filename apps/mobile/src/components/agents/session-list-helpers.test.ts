@@ -6,6 +6,8 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
   activeSessionMetaTimestamp,
+  composeActiveSessionSpokenMeta,
+  composeActiveSessionVisibleMeta,
   excludeActiveFromGroups,
   expandPlatformFilter,
   formatMeta,
@@ -15,6 +17,7 @@ import {
   remoteSessionEyebrowLabel,
   repoNameFromGitUrl,
   selectPinnedActiveSessions,
+  selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
@@ -621,5 +624,100 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
         createdOnPlatform: 'cli',
       })
     ).toBe('MY-REPO');
+  });
+});
+
+describe('composeActiveSessionVisibleMeta', () => {
+  it('both cost and time → "$cost · timeMeta"', () => {
+    expect(composeActiveSessionVisibleMeta('$0.12', '5M AGO')).toBe('$0.12 · 5M AGO');
+  });
+
+  it('cost only → cost', () => {
+    expect(composeActiveSessionVisibleMeta('$3.50', undefined)).toBe('$3.50');
+  });
+
+  it('time only → timeMeta', () => {
+    expect(composeActiveSessionVisibleMeta(null, '1H AGO')).toBe('1H AGO');
+  });
+
+  it('neither → undefined', () => {
+    expect(composeActiveSessionVisibleMeta(null, undefined)).toBeUndefined();
+  });
+
+  it('null cost with empty time → undefined', () => {
+    expect(composeActiveSessionVisibleMeta(null, '')).toBeUndefined();
+  });
+});
+
+describe('composeActiveSessionSpokenMeta', () => {
+  it('both cost and time → "cost <cost>, <time>"', () => {
+    expect(composeActiveSessionSpokenMeta('12 cents', '5 minutes ago')).toBe(
+      'cost 12 cents, 5 minutes ago'
+    );
+  });
+
+  it('cost only → "cost <cost>"', () => {
+    expect(composeActiveSessionSpokenMeta('3 dollars', null)).toBe('cost 3 dollars');
+  });
+
+  it('time only → timeSpoken', () => {
+    expect(composeActiveSessionSpokenMeta(null, '1 hour ago')).toBe('1 hour ago');
+  });
+
+  it('neither → null', () => {
+    expect(composeActiveSessionSpokenMeta(null, null)).toBeNull();
+  });
+});
+
+describe('selectRemoteRowSpokenMeta', () => {
+  const costSpoken = '12 cents';
+  const timeSpoken = '5 minutes ago';
+
+  it('needsInput + cost + time → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken })
+    ).toBeNull();
+  });
+
+  it('needsInput + cost only → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken: null })
+    ).toBeNull();
+  });
+
+  it('needsInput + time only → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken })
+    ).toBeNull();
+  });
+
+  it('needsInput + neither → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken: null })
+    ).toBeNull();
+  });
+
+  it('cost + time → combined spoken form', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken })
+    ).toBe('cost 12 cents, 5 minutes ago');
+  });
+
+  it('cost only → spoken cost alone', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken: null })
+    ).toBe('cost 12 cents');
+  });
+
+  it('time only → spoken time alone', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken })
+    ).toBe('5 minutes ago');
+  });
+
+  it('neither → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken: null })
+    ).toBeNull();
   });
 });

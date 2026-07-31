@@ -125,6 +125,26 @@ describe('mergeSnapshotForActiveSessions', () => {
     expect(found?.createdAt).toBe('2024-01-01T00:00:00Z');
     expect(found?.updatedAt).toBe('2024-01-02T00:00:00Z');
   });
+
+  it('preserves a numeric totalCostMicrodollars through snapshot merge', () => {
+    const current: CachedActiveSession[] = [
+      makeCached({ id: 'a', totalCostMicrodollars: 12_000_000 }),
+    ];
+    const snapshot = [
+      { id: 'a', status: 'running', title: 'A', connectionId: 'c1' },
+    ];
+    const result = mergeSnapshotForActiveSessions(current, snapshot);
+    expect(result[0]?.totalCostMicrodollars).toBe(12_000_000);
+  });
+
+  it('leaves totalCostMicrodollars absent for a never-enriched snapshot row', () => {
+    const current: CachedActiveSession[] = [];
+    const snapshot = [
+      { id: 'new', status: 'running', title: 'New', connectionId: 'c1' },
+    ];
+    const result = mergeSnapshotForActiveSessions(current, snapshot);
+    expect(result[0]?.totalCostMicrodollars).toBeUndefined();
+  });
 });
 
 // ── Heartbeat merge ──────────────────────────────────────────────────
@@ -234,6 +254,28 @@ describe('mergeHeartbeatForActiveSessions', () => {
     };
     const result = mergeHeartbeatForActiveSessions(current, payload);
     expect(result.map(r => r.id)).toEqual(['a']);
+  });
+
+  it('preserves a numeric totalCostMicrodollars through heartbeat merge', () => {
+    const current: CachedActiveSession[] = [
+      makeCached({ id: 'a', connectionId: 'c1', totalCostMicrodollars: 5_000_000 }),
+    ];
+    const payload = {
+      connectionId: 'c1',
+      sessions: [{ id: 'a', status: 'running', title: 'A' }],
+    };
+    const result = mergeHeartbeatForActiveSessions(current, payload);
+    expect(result[0]?.totalCostMicrodollars).toBe(5_000_000);
+  });
+
+  it('leaves totalCostMicrodollars absent for a new heartbeat-only row', () => {
+    const current: CachedActiveSession[] = [];
+    const payload = {
+      connectionId: 'c1',
+      sessions: [{ id: 'new', status: 'running', title: 'New' }],
+    };
+    const result = mergeHeartbeatForActiveSessions(current, payload);
+    expect(result[0]?.totalCostMicrodollars).toBeUndefined();
   });
 });
 

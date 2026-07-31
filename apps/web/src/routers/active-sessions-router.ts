@@ -34,6 +34,14 @@ export const activeSessionSchema = z.object({
   // Optional: legacy CLIs (predating the `kilo remote` spawner) never
   // report a platform. Only present in the response when the CLI supplied it.
   platform: z.string().optional(),
+  /**
+   * Optional total session cost from `cli_sessions_v2.total_cost_microdollars`
+   * (microdollars, bigint). Only present when the DB row carries a non-null
+   * value — null never goes on the wire. Unenriched heartbeat rows (no
+   * `cli_sessions_v2` join) omit the key. The wire may legitimately carry
+   * zero; display still omits it via `formatSessionTotalCost`.
+   */
+  totalCostMicrodollars: z.number().optional(),
 });
 
 const activeSessionsResponseSchema = z.object({
@@ -116,6 +124,7 @@ type EnrichmentRow = {
   title: string | null;
   organization_id: string | null;
   last_activity_at: string | null;
+  total_cost_microdollars: number | null;
 };
 
 type CloudCandidateRow = EnrichmentRow & {
@@ -170,6 +179,9 @@ function mapEnrichedHeartbeatSession(
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
   }
+  if (row.total_cost_microdollars != null) {
+    mapped.totalCostMicrodollars = row.total_cost_microdollars;
+  }
   return mapped;
 }
 
@@ -192,6 +204,9 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
   };
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
+  }
+  if (row.total_cost_microdollars != null) {
+    mapped.totalCostMicrodollars = row.total_cost_microdollars;
   }
   return mapped;
 }
@@ -276,6 +291,7 @@ export const activeSessionsRouter = createTRPCRouter({
             title: cli_sessions_v2.title,
             organization_id: cli_sessions_v2.organization_id,
             last_activity_at: cli_sessions_v2.last_activity_at,
+            total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
           })
           .from(cli_sessions_v2)
           .where(
@@ -361,6 +377,7 @@ export const activeSessionsRouter = createTRPCRouter({
             git_url: cli_sessions_v2.git_url,
             git_branch: cli_sessions_v2.git_branch,
             last_activity_at: cli_sessions_v2.last_activity_at,
+            total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
             cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
           })
           .from(cli_sessions_v2)

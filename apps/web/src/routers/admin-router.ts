@@ -41,6 +41,11 @@ import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
+import {
+  getSessionContainerInfo,
+  getSessionContainerMetrics,
+} from '@/routers/admin/session-container-telemetry';
+import { ContainerMetricsAnalyticsError } from '@/lib/cloudflare/container-metrics-analytics';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
@@ -2203,6 +2208,32 @@ export const adminRouter = createTRPCRouter({
               }
             : null,
         };
+      }),
+
+    getContainerInfo: sessionViewerProcedure
+      .input(z.object({ session_id: sessionIdSchema }))
+      .query(({ input }) => getSessionContainerInfo(input.session_id)),
+
+    getContainerMetrics: sessionViewerProcedure
+      .input(z.object({ session_id: sessionIdSchema }))
+      .query(async ({ input }) => {
+        try {
+          return await getSessionContainerMetrics(input.session_id);
+        } catch (error) {
+          if (error instanceof ContainerMetricsAnalyticsError) {
+            const preconditionCodes = new Set([
+              'missing_config',
+              'dataset_unavailable',
+              'fields_unavailable',
+              'request_limit_exceeded',
+            ]);
+            throw new TRPCError({
+              code: preconditionCodes.has(error.code) ? 'PRECONDITION_FAILED' : 'BAD_GATEWAY',
+              message: error.message,
+            });
+          }
+          throw error;
+        }
       }),
 
     getMessages: sessionViewerProcedure

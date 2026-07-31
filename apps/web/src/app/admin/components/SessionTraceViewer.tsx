@@ -16,14 +16,26 @@ import { MessageErrorBoundary as V2MessageErrorBoundary } from '@/components/clo
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import {
   useAdminSessionTrace,
+  useAdminSessionContainerInfo,
   useAdminSessionMessages,
   useAdminApiConversationHistory,
   useAdminResolveCloudAgentSession,
 } from '@/app/admin/api/session-traces/hooks';
-import { Search, User, Calendar, Globe, GitBranch, Loader2, Download } from 'lucide-react';
+import {
+  Search,
+  User,
+  Calendar,
+  Globe,
+  GitBranch,
+  Loader2,
+  Download,
+  Server,
+  Tag,
+} from 'lucide-react';
 import type { CloudMessage, Message } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
+import { SessionContainerTelemetry } from './SessionContainerTelemetry';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SES_PREFIX = 'ses_';
@@ -120,6 +132,16 @@ export function SessionTraceViewer() {
   }, [sessionIdFromUrl]);
 
   const sessionQuery = useAdminSessionTrace(searchedSessionId, canViewSessions);
+  const cloudAgentSessionIdentity = sessionQuery.data
+    ? (sessionQuery.data.cloud_agent_session_id ??
+      ('cloud_agent_session_scope_id' in sessionQuery.data
+        ? sessionQuery.data.cloud_agent_session_scope_id
+        : null))
+    : null;
+  const containerInfoQuery = useAdminSessionContainerInfo(
+    searchedSessionId,
+    canViewSessions && !!cloudAgentSessionIdentity
+  );
   const messagesQuery = useAdminSessionMessages(searchedSessionId, canViewSessions);
   const apiHistoryQuery = useAdminApiConversationHistory(searchedSessionId, canViewSessions);
 
@@ -214,6 +236,7 @@ export function SessionTraceViewer() {
 
     return null;
   }, [v2Messages]);
+  const latestContainerInterval = containerInfoQuery.data?.intervals.at(-1);
 
   const breadcrumbs = (
     <BreadcrumbItem>
@@ -380,8 +403,49 @@ export function SessionTraceViewer() {
                   </span>
                 </div>
               )}
+              {latestContainerInterval?.cloudflareInstanceId && (
+                <div className="flex min-w-0 items-center gap-2">
+                  <Server className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <span className="text-sm font-medium">Container:</span>
+                  <span
+                    className="truncate font-mono text-sm"
+                    title={latestContainerInterval.cloudflareInstanceId}
+                  >
+                    {latestContainerInterval.cloudflareInstanceId}
+                  </span>
+                </div>
+              )}
+              {latestContainerInterval && (
+                <div className="flex min-w-0 items-center gap-2">
+                  <Tag className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <span className="text-sm font-medium">SKU:</span>
+                  <span className="truncate text-sm" title={latestContainerInterval.sku.id}>
+                    {latestContainerInterval.sku.name}{' '}
+                    <span className="text-muted-foreground font-mono">
+                      ({latestContainerInterval.sku.id})
+                    </span>
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
+        )}
+
+        {searchedSessionId &&
+          containerInfoQuery.data &&
+          containerInfoQuery.data.intervals.length > 0 && (
+            <SessionContainerTelemetry
+              sessionId={searchedSessionId}
+              info={containerInfoQuery.data}
+            />
+          )}
+
+        {cloudAgentSessionIdentity && containerInfoQuery.isError && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              {containerInfoQuery.error.message || 'Container information failed to load.'}
+            </AlertDescription>
+          </Alert>
         )}
 
         {sessionQuery.data && (

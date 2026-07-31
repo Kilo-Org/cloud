@@ -56,7 +56,7 @@ describe('fetchGeneration', () => {
       },
       expect.objectContaining({
         baseDelayMs: 5_000,
-        maxDelayMs: 60 * 1_000,
+        maxDelayMs: 75 * 1_000,
       })
     );
 

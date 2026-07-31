@@ -71,7 +71,7 @@ export const ModelPicker = ({
   };
 
   return (
-    <div className="relative min-w-0 flex-1">
+    <div className="relative flex min-w-0 flex-1">
       <button
         aria-label="Model"
         className={triggerClassName}

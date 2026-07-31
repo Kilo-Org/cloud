@@ -3,8 +3,6 @@ import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
-import * as WebBrowser from 'expo-web-browser';
-import { toast } from 'sonner-native';
 
 import { NewSessionCloudForm } from '@/components/agents/new-session-cloud-form';
 import { RemoteSpawnComposer } from '@/components/agents/remote-spawn-composer';
@@ -13,13 +11,9 @@ import { RemoteSpawnInheritanceProvider } from '@/components/agents/use-remote-s
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ScreenHeader } from '@/components/screen-header';
-import {
-  getGitHubIntegrationUrl,
-  shouldShowGitHubIntegrationPrompt,
-} from '@/lib/agent-github-integration';
+import { resolveRepositorySectionView } from '@/components/agents/new-session-repository-state';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -29,6 +23,7 @@ import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
+import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
@@ -134,7 +129,6 @@ function NewSessionScreenBody({
     isLoading: isLoadingRepos,
     isError: isReposError,
     isRefetching: isRefetchingRepos,
-    refetch: refetchRepos,
   } = useQuery(
     organizationId
       ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
@@ -146,11 +140,21 @@ function NewSessionScreenBody({
         })
   );
 
-  const showGitHubIntegrationPrompt = shouldShowGitHubIntegrationPrompt({
-    isLoadingRepos,
+  const { openGitHubIntegration, refreshReposForceFresh, isRefreshingRepos, connectCheckFailed } =
+    useGitHubReposRefresh({
+      organizationId,
+      integrationInstalled: repoData?.integrationInstalled,
+    });
+
+  const view = resolveRepositorySectionView({
+    isLoading: isLoadingRepos,
+    isError: isReposError,
     integrationInstalled: repoData?.integrationInstalled,
-    repositoryCount: repoData?.repositories.length,
+    repositoryCount: repoData?.repositories.length ?? 0,
+    connectCheckFailed,
   });
+
+  const isRetrying = isRefetchingRepos || isRefreshingRepos;
 
   const repositories = useMemo(() => {
     if (!repoData?.repositories) {
@@ -216,15 +220,6 @@ function NewSessionScreenBody({
     },
     [organizationId, saveModel, persistServerLastSelected, setModel, setVariant]
   );
-
-  const handleOpenGitHubIntegration = useCallback(async () => {
-    try {
-      await WebBrowser.openAuthSessionAsync(getGitHubIntegrationUrl(WEB_BASE_URL, organizationId));
-      await refetchRepos();
-    } catch {
-      toast.error('Could not open GitHub setup. Please try again.');
-    }
-  }, [organizationId, refetchRepos]);
 
   function handlePromptChange(text: string) {
     promptRef.current = text;
@@ -328,18 +323,16 @@ function NewSessionScreenBody({
           isLoadingInstances={isLoadingInstances}
           onChangeRunOnInstance={handleRunOnInstanceChange}
           showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
-          isReposError={isReposError}
-          isLoadingRepos={isLoadingRepos}
-          isRefetchingRepos={isRefetchingRepos}
+          view={view}
+          isRetrying={isRetrying}
           onChangeRepo={setSelectedRepo}
           onOpenGitHubIntegration={() => {
-            void handleOpenGitHubIntegration();
+            openGitHubIntegration();
           }}
-          onRefetchRepos={() => {
-            void refetchRepos();
+          onRefreshRepos={() => {
+            void refreshReposForceFresh();
           }}
           repositories={repositories}
-          showGitHubIntegrationPrompt={showGitHubIntegrationPrompt}
           selectedRepo={selectedRepo}
           isStartDisabled={isStartDisabled}
           onStartSession={handleStartSession}

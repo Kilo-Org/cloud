@@ -4,6 +4,7 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { InstanceSelector } from '@/components/agents/instance-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
+import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -42,14 +43,12 @@ type NewSessionCloudFormProps = {
   isLoadingInstances: boolean;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
-  isReposError: boolean;
-  isLoadingRepos: boolean;
-  isRefetchingRepos: boolean;
+  view: RepositorySectionView;
+  isRetrying: boolean;
   onChangeRepo: (fullName: string) => void;
   onOpenGitHubIntegration: () => void;
-  onRefetchRepos: () => void;
+  onRefreshRepos: () => void;
   repositories: { fullName: string; isPrivate: boolean }[];
-  showGitHubIntegrationPrompt: boolean;
   selectedRepo: string;
   isStartDisabled: boolean;
   onStartSession: () => void;
@@ -86,14 +85,12 @@ export function NewSessionCloudForm({
   isLoadingInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
-  isReposError,
-  isLoadingRepos,
-  isRefetchingRepos,
+  view,
+  isRetrying,
   onChangeRepo,
   onOpenGitHubIntegration,
-  onRefetchRepos,
+  onRefreshRepos,
   repositories,
-  showGitHubIntegrationPrompt,
   selectedRepo,
   isStartDisabled,
   onStartSession,
@@ -149,14 +146,12 @@ export function NewSessionCloudForm({
 
       <NewSessionRepositorySection
         disabled={isCreating}
-        isError={isReposError}
-        isLoading={isLoadingRepos}
-        isRefetching={isRefetchingRepos}
+        view={view}
+        isRetrying={isRetrying}
         onChange={onChangeRepo}
         onOpenGitHubIntegration={onOpenGitHubIntegration}
-        onRefetch={onRefetchRepos}
+        onRefreshRepos={onRefreshRepos}
         repositories={repositories}
-        showGitHubIntegrationPrompt={showGitHubIntegrationPrompt}
         value={selectedRepo}
       />
 

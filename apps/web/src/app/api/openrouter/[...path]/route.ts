@@ -62,10 +62,9 @@ import {
   type AnonymousUserContext,
 } from '@/lib/anonymous';
 import {
-  checkFreeModelRateLimit,
-  checkFreeModelRateLimitByUser,
-  logFreeModelRequest,
-  checkPromotionLimit,
+  consumeFreeModelRateLimit,
+  consumeFreeModelRateLimitByUser,
+  consumePromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import {
@@ -155,12 +154,12 @@ async function resolveRateLimit(
       );
     }
     return {
-      result: await checkFreeModelRateLimitByUser(user.id),
+      result: await consumeFreeModelRateLimitByUser(user.id),
       subject: `user: ${user.id}`,
     };
   }
   return {
-    result: await checkFreeModelRateLimit(ipAddress),
+    result: await consumeFreeModelRateLimit(ipAddress),
     subject: `ip address: ${ipAddress}`,
   };
 }
@@ -422,7 +421,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       );
     }
 
-    const promotionLimit = await checkPromotionLimit(ipAddress);
+    const promotionLimit = await consumePromotionLimit(ipAddress);
 
     if (!promotionLimit.allowed) {
       console.warn(
@@ -545,15 +544,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
   ) {
     return storeAndPreviousResponseIdIsNotSupported();
-  }
-
-  // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRateLimitedFreeModelRequest) {
-    await logFreeModelRequest(
-      ipAddress,
-      effectiveModelIdLowerCased,
-      isAnonymousContext(user) ? undefined : user.id
-    );
   }
 
   // Resolve the initial provider before abuse enforcement because abuse needs

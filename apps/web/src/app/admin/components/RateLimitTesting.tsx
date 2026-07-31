@@ -22,7 +22,7 @@ export function RateLimitTesting() {
           });
         } else {
           toast.success(
-            `Inserted ${data.rowsInserted} rows for IP ${data.ipAddress}. New total: ${data.newTotal}.`
+            `Added ${data.requestsAdded} requests for IP ${data.ipAddress}. New total: ${data.newTotal}.`
           );
         }
         void queryClient.invalidateQueries({
@@ -42,7 +42,7 @@ export function RateLimitTesting() {
       <CardHeader>
         <CardTitle>Rate Limit Testing</CardTitle>
         <CardDescription>
-          Insert enough requests to trigger the free model rate limit for your current IP address.
+          Add enough requests to trigger the free model rate limit for your current IP address.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -85,10 +85,10 @@ export function RateLimitTesting() {
               variant={data.isRateLimited ? 'outline' : 'default'}
             >
               {rateLimitMutation.isPending
-                ? 'Inserting rows...'
+                ? 'Adding requests...'
                 : data.isRateLimited
                   ? 'Already Rate Limited'
-                  : `Rate Limit My IP (insert ${data.limit - data.currentUsage} rows)`}
+                  : `Rate Limit My IP (add ${data.limit - data.currentUsage} requests)`}
             </Button>
           </>
         )}

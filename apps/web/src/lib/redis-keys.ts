@@ -59,6 +59,15 @@ export const REQUEST_LOGGING_OPT_INS_REDIS_KEY = redisKey('ai-gateway:request-lo
 export const abuseRulesClassificationRedisKey = (identityKey: string) =>
   redisKey(`ai-gateway.abuse-rules:last-classification:${identityKey}`);
 
+export const freeModelRateLimitIpRedisKey = (ipAddress: string) =>
+  redisKey(`ai-gateway.free-model-rate-limit:ip:${ipAddress}`);
+
+export const freeModelRateLimitUserRedisKey = (kiloUserId: string) =>
+  redisKey(`ai-gateway.free-model-rate-limit:user:${kiloUserId}`);
+
+export const promotionRateLimitIpRedisKey = (ipAddress: string) =>
+  redisKey(`ai-gateway.promotion-rate-limit:ip:${ipAddress}`);
+
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 

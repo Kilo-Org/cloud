@@ -110,9 +110,7 @@ function recordUri(partId: string, uri: string): void {
  */
 export function cacheToolAttachment(
   partId: string,
-  mime: string,
-  dataUrl: string,
-  filename?: string
+  { mime, dataUrl, filename }: Readonly<{ mime: string; dataUrl: string; filename?: string }>
 ): void {
   try {
     if (inFlightOrDone.has(partId)) {
@@ -149,10 +147,9 @@ export function cacheToolAttachment(
  * filename, using the legacy extension-based naming. Kept for existing
  * consumers that don't pass a filename (call sites that only handle images).
  *
- * @deprecated Prefer {@link cacheToolAttachment}.
  */
 export function cacheToolCardImage(partId: string, mime: string, dataUrl: string): void {
-  cacheToolAttachment(partId, mime, dataUrl);
+  cacheToolAttachment(partId, { mime, dataUrl });
 }
 
 /** Synchronous lookup used by the hook and by tests. */

@@ -98,7 +98,7 @@ describe('MessageBubble regressions', () => {
 });
 
 describe('MessageBubble user text join', () => {
-  it('joins text parts with \\n\\n so synthesized attachment notices get a blank line', async () => {
+  it(String.raw`joins text parts with \n\n so synthesized attachment notices get a blank line`, async () => {
     const { isTextPart } = await import('./part-types');
     vi.mocked(isTextPart).mockReturnValue(true);
 
@@ -118,8 +118,7 @@ describe('MessageBubble user text join', () => {
 
     const tree = await renderBubble(message);
 
-    const mockFn = vi.mocked(MockChatMarkdownText as (...args: never[]) => null);
-    const element = findElementByTypeFn(tree, mockFn);
+    const element = findElementByTypeFn(tree, MockChatMarkdownText);
     expect(element).not.toBeNull();
     expect(element?.props.value as string).toContain('\n\n');
   });
@@ -147,7 +146,7 @@ describe('MessageBubble in-bubble text selection context', () => {
 
 function findElementByTypeFn(
   node: unknown,
-  typeFn: (...args: never[]) => null
+  typeFn: unknown
 ): { type: unknown; props: Record<string, unknown> } | null {
   if (node == null || typeof node !== 'object') {
     return null;

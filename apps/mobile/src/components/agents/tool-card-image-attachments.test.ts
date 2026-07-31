@@ -12,7 +12,7 @@ function resolveImageAttachmentLabel(
   inputFilePath: unknown
 ): string {
   const filePath = typeof inputFilePath === 'string' ? inputFilePath : '';
-  return attachmentFilename || getFilename(filePath) || tool;
+  return attachmentFilename ?? getFilename(filePath === '' ? tool : filePath);
 }
 
 describe('resolveImageAttachmentLabel', () => {

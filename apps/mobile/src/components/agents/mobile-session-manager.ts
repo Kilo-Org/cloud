@@ -143,8 +143,9 @@ export function createMobileAgentSessionManager({
     websocketHeaders: { Origin: WEB_BASE_URL },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
-    onToolAttachment: (partId, { mime, filename, dataUrl }) =>
-      cacheToolAttachment(partId, mime, dataUrl, filename),
+    onToolAttachment: (partId, attachment) => {
+      cacheToolAttachment(partId, attachment);
+    },
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
       // Read-only is only ever returned once we have successful evidence the
       // session isn't cloud-agent or remote. A failed query here must

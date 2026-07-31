@@ -38,8 +38,10 @@ function FileChip({
 
   const fileUri = uri;
 
-  function handleShare() {
-    shareLocalFile(fileUri, { mimeType: mime }).catch(error => {
+  async function handleShare() {
+    try {
+      await shareLocalFile(fileUri, { mimeType: mime });
+    } catch (error: unknown) {
       const reason = getShareRemoteFileReason(error);
       if (reason === 'sharing-unavailable') {
         toast.error('File sharing is not available on this device.');
@@ -50,7 +52,7 @@ function FileChip({
         return;
       }
       toast.error('Share failed');
-    });
+    }
   }
 
   return (
@@ -64,7 +66,9 @@ function FileChip({
       </View>
       <Pressable
         className="rounded p-1 active:opacity-60"
-        onPress={handleShare}
+        onPress={() => {
+          void handleShare();
+        }}
         accessibilityRole="button"
         accessibilityLabel={`Share ${label}`}
       >

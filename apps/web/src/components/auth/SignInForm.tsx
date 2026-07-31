@@ -335,14 +335,14 @@ export function SignInForm({
             <div className="border-border mt-8 flex flex-col items-center gap-3 border-t pt-6">
               <Link
                 href="/users/sign_in?sso=true"
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 <SquareUserRound className="size-4" />
                 Enterprise SSO
               </Link>
               <Link
                 href="/get-started"
-                className="text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
+                className="w-full mt-4 justify-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
               >
                 Install Kilo Code
               </Link>

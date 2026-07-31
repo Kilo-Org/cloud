@@ -42,4 +42,6 @@ Do not praise or summarize the plan before findings. Put residual risks after th
 - `No findings.` when there is nothing actionable
 - `STOPPED EARLY.` after an early stop (preceded by: reviewed scope, remaining scope, evidence inspected, and the safest next action)
 
+Zero findings is always spelled exactly `No findings.` — never `FINDINGS: 0`.
+
 Your dispatcher treats a log whose last report line is not one of these as a void round — a crashed run, never a pass.

@@ -51,8 +51,8 @@ A section can still take hours of unattended machine time when builds or live E2
 | [`await-role.sh`](await-role.sh) | Waits on a dispatched agent's log and reports the round's outcome: DONE with its verdict, VOID, STALLED, or RUNNING |
 | [`launch-interactive.sh`](launch-interactive.sh) | Launches an interactive session (planner, orchestrator) in tmux with a clean environment and a live TTY |
 | [`launch-gate.sh`](launch-gate.sh) | Spaces Kilo CLI startups through a recoverable machine-global lock |
-| [`await-interactive.sh`](await-interactive.sh) | Watches an interactive session for the monitor: COMPLETED, BLOCKED, DEAD, QUIET, or RUNNING |
-| [`steer.sh`](steer.sh) | Delivers a message to a running interactive session (starter, planner, orchestrator) and confirms it was submitted |
+| [`await-interactive.sh`](await-interactive.sh) | Watches an interactive session for the monitor: COMPLETED, BLOCKED, LAUNCHED, DEAD, QUIET, or RUNNING |
+| [`steer.sh`](steer.sh) | Delivers a message to a running interactive session (starter, planner, orchestrator) and confirms it was submitted; `--interrupt` cancels the in-flight turn first |
 | [`e2e-take-slot.sh`](e2e-take-slot.sh) | Takes one of three machine-global E2E bundle slots for the current round (default: iOS-only scope) |
 | [`e2e-start-resource.sh`](e2e-start-resource.sh) | Starts a stack, iOS simulator, Android emulator, or explicit custom resource after proving the caller holds a slot; also prebuilds/builds/claims the device as needed. Default bundle form is `--ios-only`; use `bundle <avd>` for dual-platform |
 | [`e2e-stop-resource.sh`](e2e-stop-resource.sh) | Stops the matching resource through its repository wrapper |

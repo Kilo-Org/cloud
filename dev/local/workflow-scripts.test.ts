@@ -154,14 +154,23 @@ test('role dispatches allocate distinct artifacts and verifier scratch', () => {
     assert.ok(fs.existsSync(verifierScratch));
     // Section-level artifacts dir is a sibling of the unique role scratch.
     const artifactsDir = path.join(scratch, 'e2e-artifacts');
-    assert.ok(fs.existsSync(artifactsDir), 'e2e-artifacts must be created under the section scratch');
-    assert.ok(!verifierScratch?.includes('/e2e-artifacts'), 'role scratch must stay unique per round');
+    assert.ok(
+      fs.existsSync(artifactsDir),
+      'e2e-artifacts must be created under the section scratch'
+    );
+    assert.ok(
+      !verifierScratch?.includes('/e2e-artifacts'),
+      'role scratch must stay unique per round'
+    );
     fs.writeFileSync(path.join(home, '.cache/kilo-launch-gate/last'), '0\n');
     dispatch('implementer', ['--file', 'handoff.md']);
     const tmuxCommands = fs.readFileSync(tmuxLog, 'utf8');
     assert.ok(tmuxCommands.includes(`--file ${path.join(fs.realpathSync(root), 'handoff.md')}`));
     assert.match(tmuxCommands, /--auto/);
-    assert.match(tmuxCommands, new RegExp(`E2E_ARTIFACTS=${artifactsDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    assert.match(
+      tmuxCommands,
+      new RegExp(`E2E_ARTIFACTS=${artifactsDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -223,7 +232,7 @@ test('await-role accepts only a completed role-specific verdict', () => {
     fs.writeFileSync(log, options.log);
     if (options.exit !== false) fs.writeFileSync(`${log}.exit`, '0\n');
     if (options.meta !== undefined) fs.writeFileSync(`${log}.meta`, options.meta);
-    return spawnSync(script, [log, '--timeout', '0', '--stall', '999'], {
+    return spawnSync(script, [log], {
       encoding: 'utf8',
       env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
     });
@@ -236,6 +245,16 @@ test('await-role accepts only a completed role-specific verdict', () => {
     assert.equal(done.status, 0);
     assert.equal(done.stdout.trim(), 'DONE No findings.');
 
+    for (const variant of ['FINDINGS: 0', 'FINDINGS:0', 'FINDINGS: 0.', 'No findings']) {
+      const name = `zero-findings-${variant.replace(/[^a-z0-9]/gi, '-')}`;
+      const normalized = run(name, {
+        log: `${variant}\nEXITCODE=0\n`,
+        meta: 'role=impl-reviewer\nmode=verify\ntmux=@1\n',
+      });
+      assert.equal(normalized.status, 0, variant);
+      assert.equal(normalized.stdout.trim(), 'DONE No findings.', variant);
+    }
+
     const invalid = [
       run('implementer-wrong-sentinel', {
         log: 'No findings.\nEXITCODE=0\n',
@@ -245,9 +264,13 @@ test('await-role accepts only a completed role-specific verdict', () => {
         log: 'VERIFICATION PASSED.\nEXITCODE=0\n',
         meta: 'role=e2e-verifier\nmode=repro\ntmux=@3\n',
       }),
-      run('zero-findings', {
-        log: 'FINDINGS: 0\nEXITCODE=0\n',
+      run('zero-findings-malformed-double-zero', {
+        log: 'FINDINGS: 00\nEXITCODE=0\n',
         meta: 'role=impl-reviewer\nmode=verify\ntmux=@4\n',
+      }),
+      run('zero-findings-malformed-bang', {
+        log: 'FINDINGS: 0!\nEXITCODE=0\n',
+        meta: 'role=impl-reviewer\nmode=verify\ntmux=@7\n',
       }),
       run('corrupt-meta', {
         log: 'No findings.\nEXITCODE=0\n',
@@ -1481,6 +1504,292 @@ test('E2E start-resource build failure exits non-zero with no stdout JSON', () =
     });
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout.trim(), '');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('await-interactive --until-launched reports LAUNCHED when a window or session exists', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-await-interactive-launched-test-'));
+  const bin = path.join(root, 'bin');
+  const windows = path.join(root, 'windows');
+  const sessions = path.join(root, 'sessions');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    `#!/bin/sh\n` +
+      `case "$1" in\n` +
+      `  list-windows) cat "${windows.replace(/"/g, '\\"')}" 2>/dev/null || true ;;\n` +
+      `  list-sessions) cat "${sessions.replace(/"/g, '\\"')}" 2>/dev/null || true ;;\n` +
+      `  list-panes) exit 1 ;;\n` +
+      `esac\n`
+  );
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/bin/sh\nexit 0\n');
+  for (const command of ['tmux', 'sleep']) fs.chmodSync(path.join(bin, command), 0o755);
+  const scratch = path.join(root, 'scratch');
+  fs.mkdirSync(scratch);
+  const run = () =>
+    spawnSync(
+      path.join(repoRoot, '.kilo_workflow/await-interactive.sh'),
+      ['@1', scratch, '--until-launched', 'section-orchestrator'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      }
+    );
+  try {
+    // Window branch: name appears only in list-windows.
+    fs.writeFileSync(windows, 'section-orchestrator\n');
+    fs.writeFileSync(sessions, 'unrelated-session\n');
+    const windowMatch = run();
+    assert.equal(windowMatch.status, 6, windowMatch.stderr);
+    assert.equal(windowMatch.stdout.trim(), 'LAUNCHED section-orchestrator');
+
+    // Session branch: list-windows does not list the name; list-sessions does.
+    fs.writeFileSync(windows, 'other-window\n');
+    fs.writeFileSync(sessions, 'section-orchestrator\n');
+    const sessionMatch = run();
+    assert.equal(sessionMatch.status, 6, sessionMatch.stderr);
+    assert.equal(sessionMatch.stdout.trim(), 'LAUNCHED section-orchestrator');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('await-interactive terminal states win over LAUNCHED', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-await-interactive-terminal-test-'));
+  const bin = path.join(root, 'bin');
+  const names = path.join(root, 'names');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(
+    path.join(bin, 'tmux'),
+    `#!/bin/sh\n` +
+      `names=$(cat "${names.replace(/"/g, '\\"')}" 2>/dev/null || true)\n` +
+      `case "$1" in\n` +
+      `  list-windows) printf '%s\\n' "$names" | tr ' ' '\\n' ;;\n` +
+      `  list-sessions) printf '%s\\n' "$names" | tr ' ' '\\n' ;;\n` +
+      `  list-panes) exit 1 ;;\n` +
+      `esac\n`
+  );
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/bin/sh\nexit 0\n');
+  for (const command of ['tmux', 'sleep']) fs.chmodSync(path.join(bin, command), 0o755);
+  const scratch = path.join(root, 'scratch');
+  fs.mkdirSync(scratch);
+  fs.writeFileSync(names, 'section-orchestrator');
+  const run = () =>
+    spawnSync(
+      path.join(repoRoot, '.kilo_workflow/await-interactive.sh'),
+      ['@1', scratch, '--until-launched', 'section-orchestrator'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      }
+    );
+  try {
+    fs.rmSync(scratch, { recursive: true, force: true });
+    const completed = run();
+    assert.equal(completed.status, 0, completed.stderr);
+    assert.equal(completed.stdout.trim(), 'COMPLETED');
+
+    fs.mkdirSync(scratch);
+    fs.writeFileSync(path.join(scratch, 'final-report.md'), 'blocked\n');
+    const blocked = run();
+    assert.equal(blocked.status, 5, blocked.stderr);
+    assert.equal(blocked.stdout.trim(), `BLOCKED ${scratch}/final-report.md`);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('await-interactive --until-launched reports DEAD when the name is absent and target is gone', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-await-interactive-dead-test-'));
+  const bin = path.join(root, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'tmux'), '#!/bin/sh\nexit 1\n');
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/bin/sh\nexit 0\n');
+  for (const command of ['tmux', 'sleep']) fs.chmodSync(path.join(bin, command), 0o755);
+  const scratch = path.join(root, 'scratch');
+  fs.mkdirSync(scratch);
+  const result = spawnSync(
+    path.join(repoRoot, '.kilo_workflow/await-interactive.sh'),
+    ['@1', scratch, '--until-launched', 'section-orchestrator'],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    }
+  );
+  try {
+    assert.equal(result.status, 2, result.stderr);
+    assert.equal(result.stdout.trim(), 'DEAD');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function makeSteerTmuxStub(
+  bin: string,
+  state: string,
+  escapes: string,
+  submitted: string,
+  needle: string
+): void {
+  executable(
+    path.join(bin, 'tmux'),
+    `#!/bin/sh\n` +
+      `case "$1" in\n` +
+      `  display-message) echo node ;;\n` +
+      `  capture-pane)\n` +
+      `    st=$(cat "${state.replace(/"/g, '\\"')}")\n` +
+      `    case "$st" in\n` +
+      `      busy) echo "esc interrupt" ;;\n` +
+      `      armed) echo "esc again to interrupt" ;;\n` +
+      `      interrupting) echo "interrupting" ;;\n` +
+      `      submitted) echo "› ${needle.replace(/"/g, '\\"')}" ;;\n` +
+      `      *) echo "idle" ;;\n` +
+      `    esac\n` +
+      `    ;;\n` +
+      `  send-keys)\n` +
+      `    for arg; do last=$arg; done\n` +
+      `    if [ "$last" = "Escape" ]; then\n` +
+      `      printf 'E' >> "${escapes.replace(/"/g, '\\"')}"\n` +
+      `      st=$(cat "${state.replace(/"/g, '\\"')}")\n` +
+      `      case "$st" in\n` +
+      `        busy) echo armed > "${state.replace(/"/g, '\\"')}" ;;\n` +
+      `        armed) echo interrupting > "${state.replace(/"/g, '\\"')}" ;;\n` +
+      `      esac\n` +
+      `    fi\n` +
+      `    if [ "$last" = "Enter" ]; then\n` +
+      `      echo ${submitted} > "${state.replace(/"/g, '\\"')}"\n` +
+      `    fi\n` +
+      `    ;;\n` +
+      `  load-buffer|paste-buffer) ;;\n` +
+      `esac\n`
+  );
+}
+
+test('steer --interrupt cancels a busy turn via Escape then delivers the message', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-steer-interrupt-busy-test-'));
+  const bin = path.join(root, 'bin');
+  const state = path.join(root, 'state');
+  const escapes = path.join(root, 'escapes');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(state, 'busy');
+  fs.writeFileSync(escapes, '');
+  makeSteerTmuxStub(bin, state, escapes, 'submitted', 'go');
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/bin/sh\nexit 0\n');
+  fs.chmodSync(path.join(bin, 'sleep'), 0o755);
+  try {
+    const result = spawnSync(
+      path.join(repoRoot, '.kilo_workflow/steer.sh'),
+      ['@1', '--interrupt', 'go'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), 'running');
+    assert.equal(fs.readFileSync(escapes, 'utf8'), 'EE', 'two Escape presses before submission');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('steer --interrupt on an already-armed pane sends one Escape', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-steer-interrupt-armed-test-'));
+  const bin = path.join(root, 'bin');
+  const state = path.join(root, 'state');
+  const escapes = path.join(root, 'escapes');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(state, 'armed');
+  fs.writeFileSync(escapes, '');
+  makeSteerTmuxStub(bin, state, escapes, 'submitted', 'go');
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/bin/sh\nexit 0\n');
+  fs.chmodSync(path.join(bin, 'sleep'), 0o755);
+  try {
+    const result = spawnSync(
+      path.join(repoRoot, '.kilo_workflow/steer.sh'),
+      ['@1', '--interrupt', 'go'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), 'running');
+    assert.equal(fs.readFileSync(escapes, 'utf8'), 'E', 'only one Escape when already armed');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('steer --interrupt exits when the armed confirmation never appears', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-steer-interrupt-timeout-test-'));
+  const bin = path.join(root, 'bin');
+  const state = path.join(root, 'state');
+  const escapes = path.join(root, 'escapes');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(state, 'busy');
+  fs.writeFileSync(escapes, '');
+  // Stub never arms the interrupt, so the first Escape is never confirmed.
+  executable(
+    path.join(bin, 'tmux'),
+    `#!/bin/sh\n` +
+      `case "$1" in\n` +
+      `  display-message) echo node ;;\n` +
+      `  capture-pane) echo "esc interrupt" ;;\n` +
+      `  send-keys)\n` +
+      `    for arg; do last=$arg; done\n` +
+      `    if [ "$last" = "Escape" ]; then printf 'E' >> "${escapes.replace(/"/g, '\\"')}"; fi\n` +
+      `    ;;\n` +
+      `  load-buffer|paste-buffer) ;;\n` +
+      `esac\n`
+  );
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/bin/sh\nexit 0\n');
+  fs.chmodSync(path.join(bin, 'sleep'), 0o755);
+  try {
+    const result = spawnSync(
+      path.join(repoRoot, '.kilo_workflow/steer.sh'),
+      ['@1', '--interrupt', 'go'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      }
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(
+      fs.readFileSync(escapes, 'utf8'),
+      'E',
+      'only one Escape sent; no second without confirmation'
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('steer --interrupt on a non-busy pane delivers normally with no Escape', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-steer-interrupt-idle-test-'));
+  const bin = path.join(root, 'bin');
+  const state = path.join(root, 'state');
+  const escapes = path.join(root, 'escapes');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(state, 'notbusy');
+  fs.writeFileSync(escapes, '');
+  makeSteerTmuxStub(bin, state, escapes, 'submitted', 'go');
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/bin/sh\nexit 0\n');
+  fs.chmodSync(path.join(bin, 'sleep'), 0o755);
+  try {
+    const result = spawnSync(
+      path.join(repoRoot, '.kilo_workflow/steer.sh'),
+      ['@1', '--interrupt', 'go'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), 'running');
+    assert.equal(fs.readFileSync(escapes, 'utf8'), '', 'no Escape sent when pane is not busy');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -92,13 +92,14 @@ Worker roles are steered by re-dispatching them (see Escalation). The interactiv
 ```bash
 .kilo_workflow/steer.sh <section>-orchestrator "Scope change: drop slice 4; commit what holds and open the PR."
 printf '%s' "$AMENDMENT" | .kilo_workflow/steer.sh <section>-orchestrator -   # long or multi-line text via stdin
+.kilo_workflow/steer.sh <section>-orchestrator --interrupt "Drop the speculative refactor; fix the reported bug only."   # cancel the in-flight turn
 ```
 
 It prints `running` when the session took the message immediately and `queued` when the message is waiting behind the active turn; either way it is delivered. A non-zero exit means it is **not** delivered — inspect the target rather than sending a second copy. Delivery mechanics (Enter as its own keystroke, bracketed paste, non-kilo-pane refusal, pane-confirmed delivery) are enforced by the script — see its header.
 
 **`N queued` in the footer is delivery working, not a wedge.** Queued messages land one at a time at turn boundaries, in order, and a session that chains tool calls for tens of minutes holds the whole queue that entire time. Never kill, relaunch, or escalate on a queue count; a wedge needs its own evidence (frozen build timer, stream or api error, dead process — see Monitor Mode). `Escape` does not flush the queue.
 
-Because delivery is ordered and turn-paced, a correction cannot overtake what it corrects: send ONE consolidated, self-contained message per change, never a drip of add-then-retract. When a change must take effect before the current turn ends, kill the session and relaunch it fresh with an updated handoff — faster than waiting on the queue, and it cannot half-apply. Everything a session needs at launch belongs in its launch message and handoff; steering a live one is the exception, not the channel.
+Because delivery is ordered and turn-paced, a correction cannot overtake what it corrects: send ONE consolidated, self-contained message per change, never a drip of add-then-retract. When a change must take effect before the current turn ends, use `steer.sh --interrupt` first; it cancels the in-flight turn so the correction lands now. `--interrupt` does NOT flush the already-queued backlog, so if the queued state is untrustworthy, kill-and-relaunch is still the tool. `steer.sh --interrupt` fails loudly (exit 1) when it cannot confirm the abort; in that case, relaunch the session fresh with an updated handoff rather than retrying blindly.
 
 ### Escalation
 
@@ -153,7 +154,7 @@ Its job is to turn a raw request into approved, sectioned work:
   --interactive --title '<section> planner' --file "$SCRATCH/brief.md"
 ```
 
-One planner per section; each section flows through its own planner, orchestrator, and PR. A single-section run launches a single planner. If the starter's own session already fits the planner role (right model, user agrees), it may become the single planner itself instead of launching one — only when the starter already runs inside tmux on the default server: the repro gate's slot scripts refuse to run outside tmux, and a starter-turned-planner has no separate monitor to relaunch it. After launch, the starter follows Monitor Mode below for its planners until every section reaches a terminal state.
+One planner per section; each section flows through its own planner, orchestrator, and PR. A single-section run launches a single planner. If the starter's own session already fits the planner role (right model, user agrees), it may become the single planner itself instead of launching one — only when the starter already runs inside tmux on the default server: the repro gate's slot scripts refuse to run outside tmux, and a starter-turned-planner has no separate monitor to relaunch it. After launch, the starter monitors each planner only until that planner's orchestrator window exists: for each planner, run `.kilo_workflow/await-interactive.sh <planner-target> "$SCRATCH" --log "$SCRATCH/planner.log" --until-launched <section>-orchestrator`. Before declaring a planner dispatched, confirm from the planner's pane or log that `launch-interactive.sh` printed the orchestrator's tmux target — a same-named leftover window alone is not dispatch. A planner crash before dispatch is the starter's to relaunch. Once every planner's orchestrator is `LAUNCHED`, print the final launch manifest (sections, tmux targets, worktrees, and any PR links that already exist) and stop. The starter never kills its own window; the starter-turned-planner exception keeps full monitor-to-terminal duty.
 
 ### Interaction Modes
 
@@ -195,14 +196,15 @@ The `orchestrator` agent definition pins the model and permissions, so the launc
 
 ### Monitor Mode
 
-After the handoff the planner stops all hands-on work. It has exactly one job — relaunch or unstick the orchestrator when infrastructure fails (a crashed kilo CLI, a dead tmux window, a hung service). Product, logic, design, and review problems are the orchestrator's, handled by its escalation ladder. (The starter monitors its planners under these same rules.) Watch with [`await-interactive.sh`](await-interactive.sh) — it reads the scratch-directory state machine and reports one line per invocation:
+After the handoff the planner stops all hands-on work. It has exactly one job — relaunch or unstick the orchestrator when infrastructure fails (a crashed kilo CLI, a dead tmux window, a hung service). Product, logic, design, and review problems are the orchestrator's, handled by its escalation ladder. The starter monitors its planners only until dispatch, then prints the manifest and stops without closing its own window; the planner monitors the orchestrator to terminal state. Watch with [`await-interactive.sh`](await-interactive.sh) — it reads the scratch-directory state machine and reports one line per invocation:
 
 ```bash
-.kilo_workflow/await-interactive.sh <tmux-target> "$SCRATCH" --log "$SCRATCH/orchestrator.log"   # blocks up to 25 min
+.kilo_workflow/await-interactive.sh <tmux-target> "$SCRATCH" --log "$SCRATCH/orchestrator.log"   # blocks up to 10 min
 ```
 
-- `COMPLETED` — scratch gone; confirm the PR is in gate state (below) and close yourself.
-- `BLOCKED <report>` — relay the report to the user, leave the scratch directory alone, close yourself.
+- `LAUNCHED <name>` — returned only when `--until-launched <name>` is passed; the named tmux window/session exists. Confirm the dispatch from the pane or log, then move on (starter) or continue monitoring (starter-turned-planner).
+- `COMPLETED` — scratch gone; confirm the PR is in gate state (below) and close yourself. The starter is the exception: it prints the manifest and stops without closing its own window.
+- `BLOCKED <report>` — relay the report to the user, leave the scratch directory alone, close yourself. The starter is the exception: it relays the report and stops without closing its own window.
 - `DEAD` — a crash; relaunch fresh with a continuation handoff (below).
 - `QUIET <sec>s` — the transcript stopped moving. Not a verdict: read the pane first (below) — a hands-on user question and queued steers look exactly like this.
 - `RUNNING` — invoke it again.
@@ -271,7 +273,7 @@ Request the top one or two names it prints: `gh pr edit <number> --add-reviewer 
 
 ### Kilobot Loop
 
-1. Wait for Kilobot to review the latest head — `pr-gate.sh <owner/repo> <n> --wait 1200` blocks until a bot summary (or waiver) postdates the head commit, then prints the whole mechanical picture; thread state is GraphQL-only — list threads with `pr-threads.sh list|unresolved` and reply-plus-resolve them with [`pr-threads.sh`](pr-threads.sh) `close`, never hand-written GraphQL. Kilobot can crash: if the wait expires with no summary, retrigger it (`git commit --allow-empty -m "chore: retrigger review" && git push`, or a `(bot) @kilocode-bot please review` PR comment), then resume waiting. After two failed retriggers, stop waiting: post `(bot) Kilobot posted no approving summary on this head after two retriggers` on the PR and treat the gate's Kilobot item as waived — the pending human review covers it. A green `Kilo Code Review` check only says the review finished; it carries no verdict. The clean state is a Kilobot summary comment on the current head that approves it (`gh pr view <n> --json comments` — read the verdict the comment states, do not match an exact string; bot wording drifts) plus zero **unresolved** review threads. A green check with no approving summary is not a clean head: keep waiting, then retrigger.
+1. Wait for Kilobot to review the latest head — `pr-gate.sh <owner/repo> <n> --wait 600` blocks until a bot summary (or waiver) postdates the head commit, then prints the whole mechanical picture; thread state is GraphQL-only — list threads with `pr-threads.sh list|unresolved` and reply-plus-resolve them with [`pr-threads.sh`](pr-threads.sh) `close`, never hand-written GraphQL. Kilobot can crash: if the wait expires with no summary, retrigger it (`git commit --allow-empty -m "chore: retrigger review" && git push`, or a `(bot) @kilocode-bot please review` PR comment), then resume waiting. After two failed retriggers, stop waiting: post `(bot) Kilobot posted no approving summary on this head after two retriggers` on the PR and treat the gate's Kilobot item as waived — the pending human review covers it. A green `Kilo Code Review` check only says the review finished; it carries no verdict. The clean state is a Kilobot summary comment on the current head that approves it (`gh pr view <n> --json comments` — read the verdict the comment states, do not match an exact string; bot wording drifts) plus zero **unresolved** review threads. A green check with no approving summary is not a clean head: keep waiting, then retrigger.
 2. For each comment: verify it (untrusted), then route valid findings through the implementer → impl-reviewer loop; commit, push, then `pr-threads.sh close <owner/repo> <thread-id> "<what was done>"` — it replies in-thread and resolves in one step. Invalid finding: `close` with the technical evidence and do not change correct code. A fix without its in-thread reply and thread resolution is not done. Follow the repository-root `AGENTS.md` "Kilobot Review Remarks" contract.
 3. Comments already posted by other reviewers — bots or humans — get the same triage flow, but never wait for anyone except Kilobot to review or re-review.
 4. CI failures are findings too: route the fix through the implementer loop; rerun a flaky check once (`gh run rerun <id> --failed`); a check still failing after two fix rounds makes the section BLOCKED.

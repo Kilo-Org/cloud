@@ -46,4 +46,6 @@ Do not praise the implementation or summarize before findings. Put residual test
 - `No findings.` when there is nothing actionable
 - `STOPPED EARLY.` after an early stop (preceded by: completed review scope, remaining scope, failures, files inspected, checks run or deferred, and the safest next action)
 
+Zero findings is always spelled exactly `No findings.` — never `FINDINGS: 0`.
+
 Your dispatcher treats a log whose last report line is not one of these as a void round — a crashed run, never a pass.

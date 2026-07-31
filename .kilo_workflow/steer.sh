@@ -2,7 +2,12 @@
 # Deliver a message to a running interactive kilo session (starter, planner,
 # orchestrator) and prove it landed.
 #
-#   steer.sh <tmux-target> <message>     # message text, or - to read stdin
+#   steer.sh <tmux-target> <message>                # message text, or - to read stdin
+#   steer.sh <tmux-target> --interrupt <message>   # cancel the in-flight turn first
+#
+# `--interrupt` is only special as the first argument after the target and
+# requires a message argument. A positional message that literally starts with
+# `--interrupt` goes through stdin: `printf '%s' "--interrupt ..." | steer.sh <t> -`.
 #
 # Traps this exists for (reproduced against kilo 7.4.16):
 #
@@ -13,6 +18,11 @@
 #      keystroke, after the text.
 #   2. A delivered message only reaches the model at the next turn boundary. The
 #      footer shows `N queued` until then, which is delivery working, not a wedge.
+#   3. `--interrupt` cancels the in-flight turn. Escape is a two-press abort:
+#      the first press while busy shows `esc again to interrupt`, the second
+#      fires it and posts `interrupting`. The footer joins to `esc interrupt`
+#      under `capture-pane -pJ`. We only act on the joined last-5 lines, never
+#      the whole scrollback, and fail loudly if confirmation is missing.
 #
 # Exit 0 once the message is submitted; prints `queued` (waiting for the current
 # turn to end) or `running` (the session picked it up immediately). Exit 1 with
@@ -21,7 +31,18 @@
 set -euo pipefail
 
 TARGET=${1:?tmux target — session, window or pane}
-MSG=${2:?message text, or - for stdin}
+shift
+INTERRUPT=0
+if [ "${1:-}" = "--interrupt" ]; then
+  INTERRUPT=1
+  shift
+fi
+MSG=${1:?message text, or - for stdin}
+shift
+if [ $# -gt 0 ]; then
+  echo "steer: unexpected argument after message: $1" >&2
+  exit 1
+fi
 [ "$MSG" = "-" ] && MSG=$(cat)
 [ -n "${MSG//[[:space:]]/}" ] || { echo "steer: empty message" >&2; exit 1; }
 
@@ -54,6 +75,61 @@ submitted() { pane | grep -cF -- "› $needle" || true; }
 # Per-invocation buffer: the tmux server's buffers are shared, so a fixed name
 # lets two sections steering at once paste each other's message.
 BUF=kilo-steer-$$
+
+# Busy footer strings we match exactly in the joined pane's last 5 lines.
+BUSY_FOOTER='esc interrupt'
+ARMED_FOOTER='esc again to interrupt'
+INTERRUPT_NOTICE='interrupting'
+ABORTED_ASSISTANT='assistant interrupted'
+ABORTED_REASONING='reasoning interrupted'
+
+busy() { pane | tail -5 | grep -qF -e "$BUSY_FOOTER" -e "$ARMED_FOOTER"; }
+armed() { pane | tail -5 | grep -qF "$ARMED_FOOTER"; }
+abort_confirmed() {
+  local tail
+  tail=$(pane | tail -5)
+  # Busy footer gone: neither busy nor armed string present.
+  if ! printf '%s\n' "$tail" | grep -qF -e "$BUSY_FOOTER" -e "$ARMED_FOOTER"; then return 0; fi
+  if printf '%s\n' "$tail" | grep -qF "$INTERRUPT_NOTICE"; then return 0; fi
+  if printf '%s\n' "$tail" | grep -qF "$ABORTED_ASSISTANT"; then return 0; fi
+  if printf '%s\n' "$tail" | grep -qF "$ABORTED_REASONING"; then return 0; fi
+  return 1
+}
+
+wait_until() {
+  local deadline cond
+  deadline=$(( $(date +%s) + $1 ))
+  cond=$2
+  while [ $(date +%s) -lt "$deadline" ]; do
+    if $cond; then return 0; fi
+    sleep 0.2
+  done
+  return 1
+}
+
+if [ "$INTERRUPT" -eq 1 ]; then
+  if busy; then
+    if armed; then
+      # Already armed: one Escape fires the abort.
+      tmux send-keys -t "$TARGET" Escape
+    else
+      # First Escape arms the abort; wait for confirmation before the second.
+      tmux send-keys -t "$TARGET" Escape
+      if ! wait_until 3 armed; then
+        echo "steer: interrupt not armed after first Escape — abort unconfirmed" >&2
+        pane | grep -vE '^ *$' | tail -15 >&2
+        exit 1
+      fi
+      tmux send-keys -t "$TARGET" Escape
+    fi
+    if ! wait_until 10 abort_confirmed; then
+      echo "steer: interrupt abort not confirmed within 10s" >&2
+      pane | grep -vE '^ *$' | tail -15 >&2
+      exit 1
+    fi
+  fi
+  # Not busy: deliver normally, nothing to interrupt.
+fi
 
 before=$(queued); before=${before:-0}
 sub_before=$(submitted)

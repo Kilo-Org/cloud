@@ -48,8 +48,9 @@ if [ -f "$LOG.meta" ]; then
   TMUX_TARGET=$(sed -n 's/^tmux=//p' "$LOG.meta" | head -1)
 fi
 
-# FINDINGS requires a count of at least 1 — `FINDINGS: 0` contradicts itself
-# (zero findings is spelled `No findings.`) and signals a broken report.
+# Zero-findings variants are normalized at the verdict layer because the
+# strictness cost rerun rounds; the anchored exact match stays because it
+# catches crashed runs.
 case "$ROLE/$MODE" in
   plan-reviewer/* | impl-reviewer/*) SENTINELS='^(No findings\.|FINDINGS: [1-9][0-9]*|STOPPED EARLY\.)$' ;;
   implementer/*) SENTINELS='^(SLICE COMPLETE\.|STOPPED EARLY\.)$' ;;
@@ -60,6 +61,19 @@ case "$ROLE/$MODE" in
     exit 2
     ;;
 esac
+
+normalize_reviewer_sentinel() {
+  case "$ROLE/$MODE" in
+    plan-reviewer/* | impl-reviewer/*)
+      case "$1" in
+        "FINDINGS: 0" | "FINDINGS:0" | "FINDINGS: 0.") echo "No findings." ;;
+        "No findings") echo "No findings." ;;
+        *) echo "$1" ;;
+      esac
+      ;;
+    *) echo "$1" ;;
+  esac
+}
 
 mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 target_dead() {
@@ -79,6 +93,7 @@ while :; do
     if [ -z "$SENTINEL" ]; then
       SENTINEL=$({ tail -2 "$LOG" 2>/dev/null || true; } | head -1 | sed 's/[[:space:]]*$//')
     fi
+    SENTINEL=$(normalize_reviewer_sentinel "$SENTINEL")
     if [[ "$SENTINEL" =~ $SENTINELS ]]; then
       echo "DONE $SENTINEL"
       exit 0

@@ -160,7 +160,6 @@ type ResponseReadError = {
   errorType: 'timeout' | 'upstream_disconnect';
   /** Already carries the request id suffix when one is available. */
   message: string;
-  vercelRequestId?: string;
 };
 
 const STREAM_PROGRESS_LOG_INTERVAL_MS = 30_000;
@@ -212,7 +211,6 @@ function getResponseReadError(
         'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.',
         vercelRequestId
       ),
-      vercelRequestId: vercelRequestId ?? undefined,
     };
   }
 
@@ -223,7 +221,6 @@ function getResponseReadError(
         'The upstream provider timed out while sending the response.',
         vercelRequestId
       ),
-      vercelRequestId: vercelRequestId ?? undefined,
     };
   }
 
@@ -254,9 +251,6 @@ async function readResponseText(
           error: responseReadError.message,
           error_type: responseReadError.errorType,
           message: responseReadError.message,
-          ...(responseReadError.vercelRequestId && {
-            vercel_request_id: responseReadError.vercelRequestId,
-          }),
         },
         { status: 503, headers }
       ),
@@ -482,9 +476,6 @@ export async function rewriteModelResponse_ChatCompletions(
               code: 503,
               message: responseReadError.message,
               type: responseReadError.errorType,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',
@@ -665,9 +656,6 @@ export async function rewriteModelResponse_Messages(
               type: 'api_error',
               message: responseReadError.message,
               error_type: responseReadError.errorType,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',
@@ -819,9 +807,6 @@ export async function rewriteModelResponse_Responses(
               type: responseReadError.errorType,
               code: responseReadError.errorType === 'timeout' ? '504' : '503',
               message: responseReadError.message,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',

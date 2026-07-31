@@ -13,12 +13,11 @@ import {
   terminateCodingPlanImmediately,
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
-import { CodingPlanQuotaWindowsSchema } from '@/lib/coding-plans/usage-contract';
 import {
+  CodingPlanQuotaWindowsSchema,
   CodingPlanUsageError,
-  getCodingPlanUsage,
-  hasCodingPlanUsageAdapter,
-} from '@/lib/coding-plans/usage';
+} from '@/lib/coding-plans/usage-contract';
+import { getCodingPlanUsage, hasCodingPlanUsageAdapter } from '@/lib/coding-plans/usage';
 import {
   listManualCredentialRevocations,
   markCredentialManuallyRevoked,
@@ -32,6 +31,7 @@ import {
   getCodingPlanPrice,
 } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
+import { sentryLogger } from '@/lib/utils.server';
 import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
 import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
@@ -42,6 +42,9 @@ import {
   credit_transactions,
   kilocode_users,
 } from '@kilocode/db/schema';
+
+const logUsageWarning = sentryLogger('coding-plans', 'warning');
+const logUsageError = sentryLogger('coding-plans', 'error');
 
 const CodingPlanIdSchema = z.enum(CODING_PLAN_IDS);
 const CodingPlanProviderIdSchema = UserByokProviderIdSchema;
@@ -95,19 +98,6 @@ function toIsoTimestamp(value: string): string {
 
 function toNullableIsoTimestamp(value: string | null): string | null {
   return value ? toIsoTimestamp(value) : null;
-}
-
-function hasCurrentUsageAccess(subscription: CodingPlanSubscriptionRow): boolean {
-  if (subscription.cancelAtPeriodEnd) {
-    return Date.parse(subscription.currentPeriodEnd) > Date.now();
-  }
-  if (subscription.status === 'past_due') {
-    return (
-      subscription.paymentGraceExpiresAt !== null &&
-      Date.parse(subscription.paymentGraceExpiresAt) > Date.now()
-    );
-  }
-  return true;
 }
 
 function toAvailabilityStatus(isAvailable: boolean): 'available' | 'sold_out' {
@@ -235,9 +225,10 @@ export const codingPlansRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const subscription = await getOwnedSubscription(ctx.user.id, input.subscriptionId);
       const plan = getCodingPlanPrice(subscription.planId);
+      // Lifecycle sweeps own termination; usage stays visible while the
+      // subscription status is non-terminal, even just past a period deadline.
       if (
         !['active', 'past_due'].includes(subscription.status) ||
-        !hasCurrentUsageAccess(subscription) ||
         !plan ||
         subscription.providerId !== plan.providerId ||
         !hasCodingPlanUsageAdapter(plan.providerId)
@@ -261,6 +252,9 @@ export const codingPlansRouter = createTRPCRouter({
         providerId: subscription.providerId,
       });
       if (!apiKey) {
+        logUsageError('Coding Plan usage credential lookup failed', {
+          subscriptionId: subscription.id,
+        });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Coding Plan usage is unavailable.',
@@ -269,6 +263,11 @@ export const codingPlansRouter = createTRPCRouter({
 
       const usage = await getCodingPlanUsage(plan.providerId, apiKey).catch(error => {
         if (error instanceof CodingPlanUsageError) {
+          logUsageWarning('Coding Plan usage fetch failed', {
+            subscriptionId: subscription.id,
+            providerId: plan.providerId,
+            code: error.code,
+          });
           throw new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
         }
         throw new TRPCError({

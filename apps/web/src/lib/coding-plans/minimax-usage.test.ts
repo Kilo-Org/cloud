@@ -1,4 +1,5 @@
-import { getMiniMaxUsage, MiniMaxUsageError } from '@/lib/coding-plans/minimax-usage';
+import { getMiniMaxUsage } from '@/lib/coding-plans/minimax-usage';
+import { CodingPlanUsageError } from '@/lib/coding-plans/usage-contract';
 
 const API_KEY = 'sk-cp-managed-secret';
 
@@ -160,38 +161,9 @@ describe('MiniMax managed usage transport', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(body));
 
     await expect(getMiniMaxUsage(API_KEY)).rejects.toMatchObject({
-      code: 'invalid_schema',
-      message: 'MiniMax usage is temporarily unavailable.',
+      code: 'invalid_response',
+      message: 'Coding Plan usage is temporarily unavailable.',
     });
-  });
-
-  it('rejects declared and streamed oversized responses', async () => {
-    const declaredCancel = jest.fn();
-    const streamedCancel = jest.fn();
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(new ReadableStream({ cancel: declaredCancel }), {
-          status: 200,
-          headers: { 'content-length': String(64 * 1024 + 1) },
-        })
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          new ReadableStream({
-            start(controller) {
-              controller.enqueue(new Uint8Array(64 * 1024 + 1));
-            },
-            cancel: streamedCancel,
-          }),
-          { status: 200 }
-        )
-      );
-
-    await expect(getMiniMaxUsage(API_KEY)).rejects.toMatchObject({ code: 'too_large' });
-    await expect(getMiniMaxUsage(API_KEY)).rejects.toMatchObject({ code: 'too_large' });
-    expect(declaredCancel).toHaveBeenCalledTimes(1);
-    expect(streamedCancel).toHaveBeenCalledTimes(1);
   });
 
   it('cancels unsuccessful HTTP response bodies before returning', async () => {
@@ -208,8 +180,8 @@ describe('MiniMax managed usage transport', () => {
 
   it.each([
     ['http', new Response('raw upstream body', { status: 429 })],
-    ['invalid_json', new Response('raw invalid json', { status: 200 })],
-    ['invalid_schema', jsonResponse({ base_resp: { status_code: 0 }, model_remains: 'wrong' })],
+    ['invalid_response', new Response('raw invalid json', { status: 200 })],
+    ['invalid_response', jsonResponse({ base_resp: { status_code: 0 }, model_remains: 'wrong' })],
     ['application', jsonResponse({ base_resp: { status_code: 1004, status_msg: 'secret' } })],
   ] as const)('maps %s failures without exposing provider data', async (code, response) => {
     jest.spyOn(global, 'fetch').mockResolvedValue(response);
@@ -217,7 +189,7 @@ describe('MiniMax managed usage transport', () => {
     await expect(getMiniMaxUsage(API_KEY)).rejects.toEqual(
       expect.objectContaining({
         code,
-        message: 'MiniMax usage is temporarily unavailable.',
+        message: 'Coding Plan usage is temporarily unavailable.',
       })
     );
   });
@@ -226,10 +198,10 @@ describe('MiniMax managed usage transport', () => {
     jest.spyOn(global, 'fetch').mockRejectedValue(new Error(`network body ${API_KEY}`));
 
     const error = await getMiniMaxUsage(API_KEY).catch(value => value);
-    expect(error).toBeInstanceOf(MiniMaxUsageError);
+    expect(error).toBeInstanceOf(CodingPlanUsageError);
     expect(error).toMatchObject({
       code: 'network',
-      message: 'MiniMax usage is temporarily unavailable.',
+      message: 'Coding Plan usage is temporarily unavailable.',
     });
     expect(JSON.stringify(error)).not.toContain(API_KEY);
   });

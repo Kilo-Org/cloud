@@ -36,3 +36,17 @@ export const CodingPlanQuotaWindowsSchema = z
   });
 
 export type CodingPlanQuotaWindow = z.infer<typeof CodingPlanQuotaWindowSchema>;
+
+export type CodingPlanUsageErrorCode = 'network' | 'http' | 'invalid_response' | 'application';
+
+// Thrown by provider usage adapters. The message is a safe generic user-facing
+// string; `code` is a non-secret failure category for logging.
+export class CodingPlanUsageError extends Error {
+  readonly code: CodingPlanUsageErrorCode;
+
+  constructor(code: CodingPlanUsageErrorCode) {
+    super('Coding Plan usage is temporarily unavailable.');
+    this.name = 'CodingPlanUsageError';
+    this.code = code;
+  }
+}

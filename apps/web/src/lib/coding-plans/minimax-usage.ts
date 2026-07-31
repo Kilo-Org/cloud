@@ -4,110 +4,41 @@ import * as z from 'zod';
 
 import {
   CodingPlanQuotaWindowsSchema,
+  CodingPlanUsageError,
   type CodingPlanQuotaWindow,
 } from '@/lib/coding-plans/usage-contract';
 
 const MINIMAX_USAGE_URL = 'https://api.minimax.io/v1/token_plan/remains';
 const MINIMAX_USAGE_TIMEOUT_MS = 5_000;
-const MINIMAX_USAGE_MAX_BYTES = 64 * 1024;
 
 const NativePercentSchema = z.number().finite().min(0).max(100);
 const NativeIntegerSchema = z.number().int().safe();
 
 const MiniMaxModelRemainsSchema = z.object({
   model_name: z.string().min(1).max(128),
-  current_interval_total_count: NativeIntegerSchema.nonnegative().optional(),
-  current_interval_usage_count: NativeIntegerSchema.nonnegative().optional(),
   start_time: NativeIntegerSchema.nonnegative().optional(),
   end_time: NativeIntegerSchema.nonnegative().optional(),
-  interval_boost_permill: NativeIntegerSchema.nonnegative().optional(),
   interval_boost_permille: NativeIntegerSchema.nonnegative().optional(),
   current_interval_remaining_percent: NativePercentSchema.optional(),
   current_interval_status: NativeIntegerSchema.optional(),
-  current_weekly_total_count: NativeIntegerSchema.nonnegative().optional(),
-  current_weekly_usage_count: NativeIntegerSchema.nonnegative().optional(),
   weekly_start_time: NativeIntegerSchema.nonnegative().optional(),
   weekly_end_time: NativeIntegerSchema.nonnegative().optional(),
-  weekly_boost_permill: NativeIntegerSchema.nonnegative().optional(),
   weekly_boost_permille: NativeIntegerSchema.nonnegative().optional(),
   current_weekly_remaining_percent: NativePercentSchema.optional(),
   current_weekly_status: NativeIntegerSchema.optional(),
 });
 
-const MiniMaxBaseResponseSchema = z.object({
+// `model_remains` is optional so a non-zero application status without quota
+// rows still parses and maps to an `application` failure instead of
+// `invalid_response`.
+const MiniMaxUsageResponseSchema = z.object({
   base_resp: z.object({
     status_code: NativeIntegerSchema,
   }),
+  model_remains: z.array(MiniMaxModelRemainsSchema).max(64).optional(),
 });
 
-const MiniMaxUsageNativeSchema = MiniMaxBaseResponseSchema.extend({
-  model_remains: z.array(MiniMaxModelRemainsSchema).max(64),
-});
-
-type MiniMaxUsageNative = z.infer<typeof MiniMaxUsageNativeSchema>;
-
-type MiniMaxUsageErrorCode =
-  | 'network'
-  | 'http'
-  | 'too_large'
-  | 'invalid_json'
-  | 'invalid_schema'
-  | 'application';
-
-export class MiniMaxUsageError extends Error {
-  readonly code: MiniMaxUsageErrorCode;
-
-  constructor(code: MiniMaxUsageErrorCode) {
-    super('MiniMax usage is temporarily unavailable.');
-    this.name = 'MiniMaxUsageError';
-    this.code = code;
-  }
-}
-
-async function readBoundedText(response: Response): Promise<string> {
-  const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > MINIMAX_USAGE_MAX_BYTES) {
-    await response.body?.cancel().catch(() => undefined);
-    throw new MiniMaxUsageError('too_large');
-  }
-
-  if (!response.body) {
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > MINIMAX_USAGE_MAX_BYTES) {
-      throw new MiniMaxUsageError('too_large');
-    }
-    return new TextDecoder().decode(buffer);
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      if (!chunk.value) continue;
-
-      size += chunk.value.byteLength;
-      if (size > MINIMAX_USAGE_MAX_BYTES) {
-        await reader.cancel().catch(() => undefined);
-        throw new MiniMaxUsageError('too_large');
-      }
-      chunks.push(chunk.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(body);
-}
+type MiniMaxModelRemains = z.infer<typeof MiniMaxModelRemainsSchema>;
 
 function isoTimestamp(value: number | undefined): string | undefined {
   if (value === undefined || value <= 0) return undefined;
@@ -130,8 +61,6 @@ function quotaWindow(input: {
 
   const boost =
     input.boostPermille !== undefined && input.boostPermille > 0 ? input.boostPermille / 1000 : 1;
-  if (!Number.isFinite(boost) || boost < 0) return null;
-
   const startsAt = isoTimestamp(input.start);
   return {
     id: input.id,
@@ -142,10 +71,10 @@ function quotaWindow(input: {
   };
 }
 
-function normalizeUsage(native: MiniMaxUsageNative): CodingPlanQuotaWindow[] {
-  const aggregateRows = native.model_remains.filter(row => row.model_name === 'general');
+function normalizeUsage(rows: MiniMaxModelRemains[]): CodingPlanQuotaWindow[] {
+  const aggregateRows = rows.filter(row => row.model_name === 'general');
   if (aggregateRows.length !== 1) {
-    throw new MiniMaxUsageError('invalid_schema');
+    throw new CodingPlanUsageError('invalid_response');
   }
   const aggregate = aggregateRows[0];
   const windows = [
@@ -155,7 +84,7 @@ function normalizeUsage(native: MiniMaxUsageNative): CodingPlanQuotaWindow[] {
       status: aggregate.current_interval_status,
       start: aggregate.start_time,
       end: aggregate.end_time,
-      boostPermille: aggregate.interval_boost_permille ?? aggregate.interval_boost_permill,
+      boostPermille: aggregate.interval_boost_permille,
       period: { unit: 'hour', value: 5 },
     }),
     quotaWindow({
@@ -164,13 +93,13 @@ function normalizeUsage(native: MiniMaxUsageNative): CodingPlanQuotaWindow[] {
       status: aggregate.current_weekly_status,
       start: aggregate.weekly_start_time,
       end: aggregate.weekly_end_time,
-      boostPermille: aggregate.weekly_boost_permille ?? aggregate.weekly_boost_permill,
+      boostPermille: aggregate.weekly_boost_permille,
       period: { unit: 'week', value: 1 },
     }),
   ].filter((window): window is CodingPlanQuotaWindow => window !== null);
   const result = CodingPlanQuotaWindowsSchema.safeParse(windows);
   if (!result.success) {
-    throw new MiniMaxUsageError('invalid_schema');
+    throw new CodingPlanUsageError('invalid_response');
   }
   return result.data;
 }
@@ -186,39 +115,26 @@ export async function getMiniMaxUsage(apiKey: string) {
     redirect: 'error',
     signal: AbortSignal.timeout(MINIMAX_USAGE_TIMEOUT_MS),
   }).catch(() => {
-    throw new MiniMaxUsageError('network');
+    throw new CodingPlanUsageError('network');
   });
 
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
-    throw new MiniMaxUsageError('http');
+    throw new CodingPlanUsageError('http');
   }
 
-  const text = await readBoundedText(response).catch(error => {
-    if (error instanceof MiniMaxUsageError) throw error;
-    throw new MiniMaxUsageError('network');
+  const json: unknown = await response.json().catch(() => {
+    throw new CodingPlanUsageError('invalid_response');
   });
-  const json = (() => {
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new MiniMaxUsageError('invalid_json');
-    }
-  })();
-  const baseResponse = MiniMaxBaseResponseSchema.safeParse(json);
-  if (!baseResponse.success) {
-    throw new MiniMaxUsageError('invalid_schema');
-  }
-  if (baseResponse.data.base_resp.status_code !== 0) {
-    throw new MiniMaxUsageError('application');
-  }
-  const result = MiniMaxUsageNativeSchema.safeParse(json);
+  const result = MiniMaxUsageResponseSchema.safeParse(json);
   if (!result.success) {
-    throw new MiniMaxUsageError('invalid_schema');
+    throw new CodingPlanUsageError('invalid_response');
   }
-  const fetchedAt = new Date().toISOString();
+  if (result.data.base_resp.status_code !== 0) {
+    throw new CodingPlanUsageError('application');
+  }
   return {
-    fetchedAt,
-    windows: normalizeUsage(result.data),
+    fetchedAt: new Date().toISOString(),
+    windows: normalizeUsage(result.data.model_remains ?? []),
   };
 }

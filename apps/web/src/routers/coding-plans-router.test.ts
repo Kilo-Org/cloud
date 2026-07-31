@@ -378,7 +378,7 @@ describe('coding plans router', () => {
     }
   });
 
-  it('limits usage to the paid period or payment grace window', async () => {
+  it('serves usage for non-terminal subscriptions and rejects terminal ones', async () => {
     const owner = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,
       microdollars_used: 0,
@@ -397,12 +397,13 @@ describe('coding plans router', () => {
       idempotencyKey: 'usage-states',
     });
     jest.spyOn(global, 'fetch').mockImplementation(async () => usageResponse());
-    const future = new Date(Date.now() + 60_000).toISOString();
     const past = new Date(Date.now() - 60_000).toISOString();
 
+    // A period deadline that already passed does not end usage early; the
+    // billing lifecycle sweep owns termination.
     await db
       .update(coding_plan_subscriptions)
-      .set({ status: 'active', cancel_at_period_end: true, current_period_end: future })
+      .set({ status: 'active', cancel_at_period_end: true, current_period_end: past })
       .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
     await expect(
       caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
@@ -410,39 +411,11 @@ describe('coding plans router', () => {
 
     await db
       .update(coding_plan_subscriptions)
-      .set({ current_period_end: past })
-      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
-    await expect(
-      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
-
-    await db
-      .update(coding_plan_subscriptions)
-      .set({
-        status: 'past_due',
-        cancel_at_period_end: false,
-        payment_grace_expires_at: future,
-      })
+      .set({ status: 'past_due', cancel_at_period_end: false, payment_grace_expires_at: past })
       .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
     await expect(
       caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
     ).resolves.toMatchObject({ subscription: { id: activation.subscriptionId } });
-
-    await db
-      .update(coding_plan_subscriptions)
-      .set({ payment_grace_expires_at: null })
-      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
-    await expect(
-      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
-
-    await db
-      .update(coding_plan_subscriptions)
-      .set({ payment_grace_expires_at: past })
-      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
-    await expect(
-      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
 
     await db
       .update(coding_plan_subscriptions)

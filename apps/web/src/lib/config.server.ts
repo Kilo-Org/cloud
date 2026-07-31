@@ -176,6 +176,11 @@ export const APP_BUILDER_DB_PROXY_AUTH_TOKEN = getEnvVariable('APP_BUILDER_DB_PR
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
+// Posts notifications from server-side Admin UI code to a fixed Slack channel.
+// Expected to be a Slack Incoming Webhook URL. Keep this server-only.
+export const SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL = getEnvVariable(
+  'SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL'
+);
 
 // Linear (bot integration)
 // @chat-adapter/linear 4.27 does not (yet) support encryption-at-rest via

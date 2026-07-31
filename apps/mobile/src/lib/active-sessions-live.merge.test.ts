@@ -130,18 +130,14 @@ describe('mergeSnapshotForActiveSessions', () => {
     const current: CachedActiveSession[] = [
       makeCached({ id: 'a', totalCostMicrodollars: 12_000_000 }),
     ];
-    const snapshot = [
-      { id: 'a', status: 'running', title: 'A', connectionId: 'c1' },
-    ];
+    const snapshot = [{ id: 'a', status: 'running', title: 'A', connectionId: 'c1' }];
     const result = mergeSnapshotForActiveSessions(current, snapshot);
     expect(result[0]?.totalCostMicrodollars).toBe(12_000_000);
   });
 
   it('leaves totalCostMicrodollars absent for a never-enriched snapshot row', () => {
     const current: CachedActiveSession[] = [];
-    const snapshot = [
-      { id: 'new', status: 'running', title: 'New', connectionId: 'c1' },
-    ];
+    const snapshot = [{ id: 'new', status: 'running', title: 'New', connectionId: 'c1' }];
     const result = mergeSnapshotForActiveSessions(current, snapshot);
     expect(result[0]?.totalCostMicrodollars).toBeUndefined();
   });

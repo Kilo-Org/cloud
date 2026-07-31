@@ -7,10 +7,7 @@ import { Plus } from 'lucide-react-native';
 import { ActiveNowSection } from '@/components/agents/active-now-section';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
-import {
-  AgentSessionListContent,
-  FAB_MARGIN,
-} from '@/components/agents/session-list-content';
+import { AgentSessionListContent, FAB_MARGIN } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';

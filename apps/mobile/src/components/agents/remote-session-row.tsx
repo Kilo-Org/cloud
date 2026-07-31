@@ -135,7 +135,10 @@ export function RemoteSessionRow({
           agentLabel={agentLabel}
           title={title}
           subtitle={session.gitBranch ?? null}
-          meta={composeActiveSessionVisibleMeta(formatSessionTotalCost(session.totalCostMicrodollars), remoteMeta(session))}
+          meta={composeActiveSessionVisibleMeta(
+            formatSessionTotalCost(session.totalCostMicrodollars),
+            remoteMeta(session)
+          )}
           live
           needsInput={needsInput}
           metaWhileLive

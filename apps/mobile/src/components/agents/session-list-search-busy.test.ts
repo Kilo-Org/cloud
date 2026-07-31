@@ -8,15 +8,13 @@ import {
 
 describe('selectAwaitingCommit', () => {
   it('returns true when hasText and lastTyped trimmed differs from committed query', () => {
-    expect(
-      selectAwaitingCommit({ hasText: true, lastTyped: 'hello', searchQuery: '' })
-    ).toBe(true);
+    expect(selectAwaitingCommit({ hasText: true, lastTyped: 'hello', searchQuery: '' })).toBe(true);
   });
 
   it('returns false when hasText is false (empty input)', () => {
-    expect(
-      selectAwaitingCommit({ hasText: false, lastTyped: '', searchQuery: 'committed' })
-    ).toBe(false);
+    expect(selectAwaitingCommit({ hasText: false, lastTyped: '', searchQuery: 'committed' })).toBe(
+      false
+    );
   });
 
   it('returns false when lastTyped trimmed equals committed query (query committed)', () => {
@@ -27,21 +25,15 @@ describe('selectAwaitingCommit', () => {
 
   it('returns false when lastTyped is only trailing whitespace (committed trimmed value)', () => {
     // trim mirrors the controller's text.trim() — trailing spaces do not stick
-    expect(
-      selectAwaitingCommit({ hasText: true, lastTyped: '  ', searchQuery: '' })
-    ).toBe(false);
+    expect(selectAwaitingCommit({ hasText: true, lastTyped: '  ', searchQuery: '' })).toBe(false);
   });
 
   it('returns true when lastTyped has content but no committed query', () => {
-    expect(
-      selectAwaitingCommit({ hasText: true, lastTyped: 'a', searchQuery: '' })
-    ).toBe(true);
+    expect(selectAwaitingCommit({ hasText: true, lastTyped: 'a', searchQuery: '' })).toBe(true);
   });
 
   it('returns false when both lastTyped and searchQuery are empty', () => {
-    expect(
-      selectAwaitingCommit({ hasText: false, lastTyped: '', searchQuery: '' })
-    ).toBe(false);
+    expect(selectAwaitingCommit({ hasText: false, lastTyped: '', searchQuery: '' })).toBe(false);
   });
 });
 

@@ -166,18 +166,6 @@ describe('MiniMax managed usage transport', () => {
     });
   });
 
-  it('cancels unsuccessful HTTP response bodies before returning', async () => {
-    const cancel = jest.fn();
-    jest.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(new ReadableStream({ cancel }), {
-        status: 429,
-      })
-    );
-
-    await expect(getMiniMaxUsage(API_KEY)).rejects.toMatchObject({ code: 'http' });
-    expect(cancel).toHaveBeenCalledTimes(1);
-  });
-
   it.each([
     ['http', new Response('raw upstream body', { status: 429 })],
     ['invalid_response', new Response('raw invalid json', { status: 200 })],

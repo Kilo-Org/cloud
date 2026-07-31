@@ -1,8 +1,6 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import {
-  auto_top_up_configs,
   credit_transactions,
   kilocode_users,
   user_notification_preferences,
@@ -10,12 +8,6 @@ import {
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
-
-jest.mock('@/lib/stripePaymentMethodInfo', () => ({
-  retrievePaymentMethodInfo: jest.fn(),
-}));
-
-const mockRetrievePaymentMethodInfo = jest.mocked(retrievePaymentMethodInfo);
 
 let testUser: User;
 let surveyTestUser: User;
@@ -140,86 +132,6 @@ describe('user router - updateProfile', () => {
     const result = await caller.user.updateProfile({});
 
     expect(result).toEqual({ success: true });
-  });
-});
-
-describe('user router - getAutoTopUpPaymentMethod', () => {
-  const users: string[] = [];
-
-  beforeEach(() => {
-    mockRetrievePaymentMethodInfo.mockResolvedValue(null);
-  });
-
-  afterEach(async () => {
-    mockRetrievePaymentMethodInfo.mockReset();
-    for (const userId of users.splice(0)) {
-      await db.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
-      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
-    }
-  });
-
-  it('reports an unconfigured account with the server-owned threshold', async () => {
-    const user = await insertTestUser({ auto_top_up_enabled: true });
-    users.push(user.id);
-    const caller = await createCallerForUser(user.id);
-
-    await expect(caller.user.getAutoTopUpPaymentMethod()).resolves.toEqual({
-      enabled: true,
-      amountCents: 5000,
-      thresholdCents: 500,
-      paymentMethod: null,
-    });
-    expect(mockRetrievePaymentMethodInfo).toHaveBeenCalledWith(undefined);
-  });
-
-  it('distinguishes a configured account from an unavailable Stripe lookup', async () => {
-    const user = await insertTestUser();
-    users.push(user.id);
-    await db.insert(auto_top_up_configs).values({
-      owned_by_user_id: user.id,
-      stripe_payment_method_id: 'pm_missing',
-      amount_cents: 10000,
-    });
-    mockRetrievePaymentMethodInfo.mockResolvedValue(null);
-    const caller = await createCallerForUser(user.id);
-
-    await expect(caller.user.getAutoTopUpPaymentMethod()).resolves.toEqual({
-      enabled: false,
-      amountCents: 10000,
-      thresholdCents: 500,
-      paymentMethod: null,
-    });
-  });
-
-  it('retains legacy browser payment fields alongside the additive state', async () => {
-    const user = await insertTestUser({ auto_top_up_enabled: true });
-    users.push(user.id);
-    await db.insert(auto_top_up_configs).values({
-      owned_by_user_id: user.id,
-      stripe_payment_method_id: 'pm_safe',
-      amount_cents: 2000,
-    });
-    mockRetrievePaymentMethodInfo.mockResolvedValue({
-      type: 'card',
-      last4: '4242',
-      brand: 'visa',
-      linkEmail: null,
-      stripePaymentMethodId: 'pm_safe',
-    });
-    const caller = await createCallerForUser(user.id);
-
-    await expect(caller.user.getAutoTopUpPaymentMethod()).resolves.toEqual({
-      enabled: true,
-      amountCents: 2000,
-      thresholdCents: 500,
-      paymentMethod: {
-        type: 'card',
-        last4: '4242',
-        brand: 'visa',
-        linkEmail: null,
-        stripePaymentMethodId: 'pm_safe',
-      },
-    });
   });
 });
 

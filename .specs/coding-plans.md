@@ -120,8 +120,6 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 5.10. The initial pilot **MAY** leave an unchanged Kilo-installed BYOK configuration routable between its paid-period or grace deadline and the next scheduled billing lifecycle sweep. Once that sweep processes termination, local Kilo-installed access **MUST** be deleted regardless of whether manual upstream revocation is complete.
 
-5.11. An active or `past_due` Coding Plan, including one pending cancellation at period end, **MUST** remain eligible for current quota presentation until billing lifecycle processing moves the subscription to a terminal status. Quota eligibility **MUST** follow subscription status alone; Kilo **MUST NOT** end quota presentation ahead of the lifecycle sweep that processes a passed paid-period or payment-grace deadline. Quota lookup **MUST** use the subscription's retained assigned Managed Plan Credential and **MUST NOT** require its Installed BYOK Configuration to remain linked.
-
 ## 6. Traffic routing
 
 6.1. Initial MiniMax Coding Plan setup **MUST** route through the Kilo Gateway using the existing ordinary personal MiniMax BYOK provider identity. The initial release **MUST NOT** expose saved raw credential values through Kilo UI or API responses.

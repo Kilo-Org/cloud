@@ -1,4 +1,4 @@
-import { createDrizzleClient, type DrizzleClient } from '@kilocode/db/client';
+import { createDrizzleClient, type DrizzleClient, type pg } from '@kilocode/db/client';
 import { sql } from 'drizzle-orm';
 
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -64,6 +64,24 @@ const AT_RISK_WAL_STATUSES = new Set(['unreserved', 'lost']);
 
 const PROBE_TIMEOUT_MS = 5_000;
 
+/**
+ * Connection config for a single probe.
+ *
+ * IMPORTANT: do not set `statement_timeout` here. node-postgres transmits
+ * `statement_timeout` in the Postgres startup packet (pg `getStartupConf`), and
+ * Supabase's Supavisor pooler — which the POSTGRES_REPLICA_* URLs connect
+ * through — rejects connections that carry it, so the probe would never
+ * establish a session (it silently failed on every EU replica this way). Bound
+ * the probe with the client-side `query_timeout` and `connectionTimeoutMillis`
+ * instead, matching the app's own replica pool in lib/drizzle.ts.
+ */
+export const PROBE_POOL_CONFIG = {
+  max: 1,
+  application_name: 'kilocode-web-replication-health',
+  connectionTimeoutMillis: PROBE_TIMEOUT_MS,
+  query_timeout: PROBE_TIMEOUT_MS,
+} satisfies Partial<pg.PoolConfig>;
+
 export type ReplicaHealthStatus = 'ok' | 'lagging' | 'not_in_recovery' | 'unreachable';
 
 export type ReplicaHealth = {
@@ -112,7 +130,13 @@ export type ReplicationHealthReport = {
 };
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (!(error instanceof Error)) return String(error);
+  // drizzle wraps DB failures as `Error('Failed query: <sql>')` and attaches the
+  // real driver error (e.g. the connection/pooler rejection) as `cause`. Prefer
+  // that cause so alerts show why a probe failed instead of the SQL text.
+  const cause = error.cause;
+  if (cause instanceof Error && cause.message) return cause.message;
+  return error.message;
 }
 
 /** Pure status derivation, split out so it can be unit-tested without a database. */
@@ -139,13 +163,7 @@ export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth
   try {
     client = createDrizzleClient({
       connectionString: target.url,
-      poolConfig: {
-        max: 1,
-        application_name: 'kilocode-web-replication-health',
-        connectionTimeoutMillis: PROBE_TIMEOUT_MS,
-        statement_timeout: PROBE_TIMEOUT_MS,
-        query_timeout: PROBE_TIMEOUT_MS,
-      },
+      poolConfig: PROBE_POOL_CONFIG,
     });
 
     // A pg.Pool emits 'error' when an idle/checked-out client's connection drops

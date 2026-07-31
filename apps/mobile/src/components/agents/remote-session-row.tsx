@@ -18,11 +18,11 @@ import {
 import {
   activeSessionMetaTimestamp,
   composeActiveSessionVisibleMeta,
+  formatSessionTotalCost,
   remoteMeta,
   remoteSessionEyebrowLabel,
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
-import { formatSessionTotalCost } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { type RowVariant } from './session-row';
 import { copySessionId, showRenamePrompt, showSessionActionMenu } from './session-row-actions';

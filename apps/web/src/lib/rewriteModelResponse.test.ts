@@ -137,7 +137,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     });
   });
 
-  test('includes the vercel request id in the JSON read error', async () => {
+  test('includes the vercel request id only in the JSON read error message', async () => {
     const result = await rewrite(
       failingResponse('application/json', 'ResponseAborted'),
       true,
@@ -152,11 +152,10 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       error_type: 'upstream_disconnect',
       message:
         'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
-      vercel_request_id: 'iad1::iad1::request-id',
     });
   });
 
-  test('includes the vercel request id in the emitted stream error event', async () => {
+  test('includes the vercel request id only in the stream error message', async () => {
     const result = await rewrite(
       failingResponse('text/event-stream', 'ResponseAborted'),
       true,
@@ -164,14 +163,14 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       'iad1::iad1::request-id'
     );
     const events = dataObjects(await readOutputStream(result)) as {
-      error: { message: string; vercel_request_id?: string };
+      error: { message: string };
     }[];
 
     expect(events).toHaveLength(1);
     expect(events[0].error.message).toBe(
       'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)'
     );
-    expect(events[0].error.vercel_request_id).toBe('iad1::iad1::request-id');
+    expect(events[0].error).not.toHaveProperty('vercel_request_id');
   });
 
   test('omits the request id suffix when no vercel request id is available', async () => {
@@ -182,13 +181,12 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       null
     );
     const events = dataObjects(await readOutputStream(result)) as {
-      error: { message: string; vercel_request_id?: string };
+      error: { message: string };
     }[];
 
     expect(events[0].error.message).toBe(
       'The upstream provider disconnected while sending the response.'
     );
-    expect(events[0].error.vercel_request_id).toBeUndefined();
   });
 });
 

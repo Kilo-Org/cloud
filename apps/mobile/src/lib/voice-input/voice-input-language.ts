@@ -24,7 +24,7 @@ export function resolveVoiceInputLanguageTag(locales: readonly { languageTag?: s
 }
 
 function normalizeLocale(tag: string): string {
-  return tag.toLowerCase().replace(/_/g, '-');
+  return tag.toLowerCase().replaceAll('_', '-');
 }
 
 /**
@@ -53,28 +53,38 @@ export function pickSupportedVoiceInputLanguageTag(
   const normalized = supportedTags.map(tag => [normalizeLocale(tag), tag] as const);
 
   for (const rawDeviceTag of deviceTags) {
-    if (!rawDeviceTag) continue;
-    const deviceTag = normalizeLocale(rawDeviceTag);
+    if (rawDeviceTag) {
+      const deviceTag = normalizeLocale(rawDeviceTag);
 
-    // (a) Exact normalized match
-    const exact = normalized.find(([n]) => n === deviceTag);
-    if (exact) return exact[1];
+      // (a) Exact normalized match
+      const exact = normalized.find(([n]) => n === deviceTag);
+      if (exact) {
+        return exact[1];
+      }
 
-    // (b) Same-language fallback
-    const deviceLang = deviceTag.split('-')[0]!;
-    const sameLang = normalized.filter(([n]) => n.split('-')[0] === deviceLang);
-    if (sameLang.length === 0) continue;
+      // (b) Same-language fallback
+      const [deviceLang] = deviceTag.split('-');
+      const sameLang = normalized.filter(([n]) => n.split('-')[0] === deviceLang);
+      if (sameLang.length > 0) {
+        // i. Eponymous region: <lang>-<LANG>
+        const eponymous = sameLang.find(([n]) => n === `${deviceLang}-${deviceLang}`.toLowerCase());
+        if (eponymous) {
+          return eponymous[1];
+        }
 
-    // i. Eponymous region: <lang>-<LANG>
-    const eponymous = sameLang.find(([n]) => n === `${deviceLang}-${deviceLang}`.toLowerCase());
-    if (eponymous) return eponymous[1];
+        // ii. <lang>-US
+        const usVariant = sameLang.find(([n]) => n === `${deviceLang}-us`);
+        if (usVariant) {
+          return usVariant[1];
+        }
 
-    // ii. <lang>-US
-    const usVariant = sameLang.find(([n]) => n === `${deviceLang}-us`);
-    if (usVariant) return usVariant[1];
-
-    // iii. First candidate in supportedTags order
-    return sameLang[0]![1];
+        // iii. First candidate in supportedTags order
+        const first = sameLang[0];
+        if (first) {
+          return first[1];
+        }
+      }
+    }
   }
 
   return null;
@@ -83,7 +93,9 @@ export function pickSupportedVoiceInputLanguageTag(
 let cachedSupportedTags: readonly string[] | null = null;
 
 async function fetchSupportedLanguageTags(): Promise<readonly string[] | null> {
-  if (cachedSupportedTags) return cachedSupportedTags;
+  if (cachedSupportedTags) {
+    return cachedSupportedTags;
+  }
   try {
     const result = await ExpoSpeechRecognitionModule.getSupportedLocales({});
     cachedSupportedTags = result.locales;

@@ -15,7 +15,11 @@ import {
 export const mcpServerAccessPolicyClientDefinition = {
   type: 'mcp_server_access',
   label: 'MCP server access',
-  description: 'Grant all, none, or selected organization MCP servers to members.',
+  // The picker is where an owner decides to add this policy, so the
+  // not-yet-enforced caveat has to be visible here rather than only in the
+  // editor. See `mcp-server-access.server.ts` for the enforcement gap.
+  description:
+    'Choose all, none, or selected organization MCP servers. Not enforced at the gateway yet.',
   // Matches the "MCP Gateway" navigation icon.
   Icon: Cable,
   summarize: summarizeMcpServerAccessPolicy,

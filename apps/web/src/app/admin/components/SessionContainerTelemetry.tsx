@@ -14,7 +14,6 @@ import {
   YAxis,
 } from 'recharts';
 
-import { useAdminSessionContainerMetrics } from '@/app/admin/api/session-traces/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,10 +29,9 @@ import {
 import type { RootRouter } from '@/routers/root-router';
 
 type RouterOutputs = inferRouterOutputs<RootRouter>;
-export type SessionContainerInfo = NonNullable<
-  RouterOutputs['admin']['sessionTraces']['getContainerInfo']
->;
-type SessionContainerMetrics = RouterOutputs['admin']['sessionTraces']['getContainerMetrics'];
+type SessionContainerTelemetryResult = RouterOutputs['admin']['sessionTraces']['getContainerMetrics'];
+export type SessionContainerInfo = NonNullable<SessionContainerTelemetryResult['info']>;
+type SessionContainerMetrics = SessionContainerTelemetryResult['metrics'];
 type MetricsQueryState = {
   isLoading: boolean;
   isError: boolean;
@@ -61,15 +59,10 @@ function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function SessionContainerTelemetry({
-  sessionId,
-  info,
-}: {
-  sessionId: string;
-  info: SessionContainerInfo;
-}) {
-  const metricsQuery = useAdminSessionContainerMetrics(sessionId);
-  return <SessionContainerTelemetryContent info={info} metricsQuery={metricsQuery} />;
+export function containerMetricSeriesLabel(windowKey: string, placementId: string): string {
+  const placement = placementId.length > 12 ? `${placementId.slice(0, 8)}...` : placementId;
+  const window = windowKey.length > 12 ? `${windowKey.slice(0, 8)}...` : windowKey;
+  return `${placement} · ${window}`;
 }
 
 export function SessionContainerTelemetryContent({
@@ -112,10 +105,7 @@ export function SessionContainerTelemetryContent({
       return {
         windowKey,
         placementId,
-        label:
-          placementId && placementId.length > 12
-            ? `${placementId.slice(0, 8)}...`
-            : (placementId ?? 'unknown'),
+        label: containerMetricSeriesLabel(windowKey, placementId),
         color: seriesColors[seriesIndex % seriesColors.length],
         memoryMaxKey: `memoryMax${seriesIndex}`,
         memoryP95Key: `memoryP95${seriesIndex}`,
@@ -174,7 +164,11 @@ export function SessionContainerTelemetryContent({
             </CardDescription>
           </div>
           <Badge variant="outline">
-            {info.scope === 'isolated' ? 'Isolated container' : 'Shared container'}
+            {info.scope === 'isolated'
+              ? 'Isolated container'
+              : info.scope === 'shared'
+                ? 'Shared container'
+                : 'Unknown container scope'}
           </Badge>
         </div>
       </CardHeader>
@@ -206,7 +200,9 @@ export function SessionContainerTelemetryContent({
           <p className="text-muted-foreground text-sm">
             {metrics?.reason === 'no_provider_identity'
               ? 'No Cloudflare instance identity was recorded for these container intervals.'
-              : metrics?.reason === 'ambiguous_application'
+              : metrics?.reason === 'no_overlapping_intervals'
+                ? 'No container intervals overlap the recorded session activity window.'
+                : metrics?.reason === 'ambiguous_application'
                 ? 'Cloudflare returned more than one container application for this instance ID.'
                 : metrics?.reason === 'no_container_intervals'
                   ? 'No metered container intervals were recorded for this session.'
@@ -249,13 +245,13 @@ export function SessionContainerTelemetryContent({
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <figure
-                className="space-y-2"
-                role="img"
-                aria-label="Container memory usage over time"
-              >
+              <figure className="space-y-2">
                 <h3 className="text-sm font-medium">Memory</h3>
-                <div className="h-64 w-full">
+                <div
+                  className="h-64 w-full"
+                  role="img"
+                  aria-label="Container memory usage over time"
+                >
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -316,13 +312,13 @@ export function SessionContainerTelemetryContent({
                 </div>
               </figure>
 
-              <figure
-                className="space-y-2"
-                role="img"
-                aria-label="Container CPU utilization over time"
-              >
+              <figure className="space-y-2">
                 <h3 className="text-sm font-medium">CPU Utilization</h3>
-                <div className="h-64 w-full">
+                <div
+                  className="h-64 w-full"
+                  role="img"
+                  aria-label="Container CPU utilization over time"
+                >
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />

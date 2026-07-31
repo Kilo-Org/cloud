@@ -147,6 +147,31 @@ describe('queryContainerMetricsAnalytics', () => {
     expect(JSON.stringify(result)).not.toContain('analytics-token');
   });
 
+  it('reports single-window unscoped GraphQL errors as partial results', async () => {
+    let requestCount = 0;
+    const fetch = jest.fn(async () => {
+      requestCount += 1;
+      if (requestCount === 1) return response(settingsBody());
+      return response({
+        data: { viewer: { accounts: [{ m0: [] }] } },
+        errors: [{ message: 'Account data is incomplete', path: ['viewer', 'accounts'] }],
+      });
+    }) as typeof globalThis.fetch;
+
+    await expect(
+      queryContainerMetricsAnalytics(input, {
+        fetch,
+        accountId: 'account-id',
+        apiToken: 'analytics-token',
+        now: () => new Date('2026-08-01T00:00:00.000Z'),
+      })
+    ).resolves.toEqual({
+      rows: [],
+      partial: true,
+      issues: ['Account data is incomplete'],
+    });
+  });
+
   it('fails before the workload query when required fields are unavailable', async () => {
     const fetch = jest.fn(async () =>
       response(settingsBody(REQUIRED_FIELDS.slice(1)))

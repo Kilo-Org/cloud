@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, jest } from '@jest/globals';
 
 import {
+  containerMetricSeriesLabel,
   SessionContainerTelemetryContent,
   type SessionContainerInfo,
 } from './SessionContainerTelemetry';
@@ -76,6 +77,28 @@ describe('SessionContainerTelemetry', () => {
     expect(html).toContain('Peak memory');
     expect(html).toContain('5.0 GiB / 6.0 GiB');
     expect(html).toContain('90.0%');
+    expect(containerMetricSeriesLabel('interval-1', 'placement-1')).toBe(
+      'placement-1 · interval-1'
+    );
+    expect(html).toContain('<figure class="space-y-2"><h3');
+    expect(html).toContain('class="h-64 w-full" role="img"');
     expect(html).not.toContain('CPU capacity');
+  });
+
+  it('does not report an unknown sandbox identity as shared', () => {
+    const metricsQuery = {
+      isLoading: false,
+      isError: false,
+      data: { available: false as const, reason: 'no_container_intervals' as const },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(SessionContainerTelemetryContent, {
+        info: { ...info, sandboxId: null, scope: 'unknown' },
+        metricsQuery,
+      })
+    );
+
+    expect(html).toContain('Unknown container scope');
+    expect(html).not.toContain('This container is shared');
   });
 });

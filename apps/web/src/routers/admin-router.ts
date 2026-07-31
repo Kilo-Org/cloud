@@ -43,7 +43,7 @@ import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
 import {
   getSessionContainerInfo,
-  getSessionContainerMetrics,
+  getSessionContainerMetricsForInfo,
 } from '@/routers/admin/session-container-telemetry';
 import { ContainerMetricsAnalyticsError } from '@/lib/cloudflare/container-metrics-analytics';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
@@ -2218,7 +2218,11 @@ export const adminRouter = createTRPCRouter({
       .input(z.object({ session_id: sessionIdSchema }))
       .query(async ({ input }) => {
         try {
-          return await getSessionContainerMetrics(input.session_id);
+          const info = await getSessionContainerInfo(input.session_id);
+          const metrics = info
+            ? await getSessionContainerMetricsForInfo(info)
+            : { available: false as const, reason: 'not_cloud_agent_session' as const };
+          return { info, metrics };
         } catch (error) {
           if (error instanceof ContainerMetricsAnalyticsError) {
             const preconditionCodes = new Set([

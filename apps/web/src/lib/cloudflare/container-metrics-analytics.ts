@@ -463,7 +463,10 @@ export async function queryContainerMetricsAnalytics(
     for (const [index, plan] of batch.entries()) {
       const alias = `m${index}`;
       const aliasErrors = errors.filter(
-        error => error.path?.includes(alias) || error.path === undefined
+        error =>
+          error.path?.includes(alias) ||
+          error.path === undefined ||
+          (batch.length === 1 && unscopedErrors.includes(error))
       );
       const groups = account[alias];
       if (!groups) {

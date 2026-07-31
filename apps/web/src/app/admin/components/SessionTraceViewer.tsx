@@ -16,7 +16,7 @@ import { MessageErrorBoundary as V2MessageErrorBoundary } from '@/components/clo
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import {
   useAdminSessionTrace,
-  useAdminSessionContainerInfo,
+  useAdminSessionContainerTelemetry,
   useAdminSessionMessages,
   useAdminApiConversationHistory,
   useAdminResolveCloudAgentSession,
@@ -35,7 +35,7 @@ import {
 import type { CloudMessage, Message } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
-import { SessionContainerTelemetry } from './SessionContainerTelemetry';
+import { SessionContainerTelemetryContent } from './SessionContainerTelemetry';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SES_PREFIX = 'ses_';
@@ -138,7 +138,7 @@ export function SessionTraceViewer() {
         ? sessionQuery.data.cloud_agent_session_scope_id
         : null))
     : null;
-  const containerInfoQuery = useAdminSessionContainerInfo(
+  const containerTelemetryQuery = useAdminSessionContainerTelemetry(
     searchedSessionId,
     canViewSessions && !!cloudAgentSessionIdentity
   );
@@ -236,7 +236,7 @@ export function SessionTraceViewer() {
 
     return null;
   }, [v2Messages]);
-  const latestContainerInterval = containerInfoQuery.data?.intervals.at(-1);
+  const latestContainerInterval = containerTelemetryQuery.data?.info?.intervals.at(-1);
 
   const breadcrumbs = (
     <BreadcrumbItem>
@@ -431,19 +431,22 @@ export function SessionTraceViewer() {
           </Card>
         )}
 
-        {searchedSessionId &&
-          containerInfoQuery.data &&
-          containerInfoQuery.data.intervals.length > 0 && (
-            <SessionContainerTelemetry
-              sessionId={searchedSessionId}
-              info={containerInfoQuery.data}
+        {containerTelemetryQuery.data?.info &&
+          containerTelemetryQuery.data.info.intervals.length > 0 && (
+            <SessionContainerTelemetryContent
+              info={containerTelemetryQuery.data.info}
+              metricsQuery={{
+                isLoading: false,
+                isError: false,
+                data: containerTelemetryQuery.data.metrics,
+              }}
             />
           )}
 
-        {cloudAgentSessionIdentity && containerInfoQuery.isError && (
+        {cloudAgentSessionIdentity && containerTelemetryQuery.isError && (
           <Alert variant="destructive">
             <AlertDescription>
-              {containerInfoQuery.error?.message || 'Container information failed to load.'}
+              {containerTelemetryQuery.error?.message || 'Container telemetry failed to load.'}
             </AlertDescription>
           </Alert>
         )}

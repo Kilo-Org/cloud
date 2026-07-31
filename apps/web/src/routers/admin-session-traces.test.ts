@@ -11,7 +11,10 @@ jest.mock('@/lib/session-ingest-client', () => ({
 
 import { db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
-import { getSessionContainerMetrics } from '@/routers/admin/session-container-telemetry';
+import {
+  getSessionContainerMetrics,
+  getSessionContainerMetricsForInfo,
+} from '@/routers/admin/session-container-telemetry';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   cliSessions,
@@ -271,6 +274,17 @@ describe('admin.sessionTraces authorization', () => {
         end: '2026-07-31T09:05:07.000Z',
       },
     ]);
+
+    const info = await caller.admin.sessionTraces.getContainerInfo({ session_id: sessionId });
+    expect(info).not.toBeNull();
+    if (!info) throw new Error('Expected container info');
+    await expect(
+      getSessionContainerMetricsForInfo({
+        ...info,
+        windowStartAt: '2026-07-31T10:00:00.000Z',
+        windowEndAt: '2026-07-31T10:10:00.000Z',
+      })
+    ).resolves.toEqual({ available: false, reason: 'no_overlapping_intervals' });
 
     const childSessionId = `ses_${crypto.randomUUID()}`;
     await db.insert(cli_sessions_v2).values({

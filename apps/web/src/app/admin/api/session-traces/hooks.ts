@@ -11,17 +11,7 @@ export function useAdminSessionTrace(sessionId: string | null, enabled = true) {
   });
 }
 
-export function useAdminSessionContainerInfo(sessionId: string | null, enabled = true) {
-  const trpc = useTRPC();
-  return useQuery({
-    ...trpc.admin.sessionTraces.getContainerInfo.queryOptions({ session_id: sessionId ?? '' }),
-    enabled: enabled && !!sessionId,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-}
-
-export function useAdminSessionContainerMetrics(sessionId: string | null, enabled = true) {
+export function useAdminSessionContainerTelemetry(sessionId: string | null, enabled = true) {
   const trpc = useTRPC();
   return useQuery({
     ...trpc.admin.sessionTraces.getContainerMetrics.queryOptions({ session_id: sessionId ?? '' }),

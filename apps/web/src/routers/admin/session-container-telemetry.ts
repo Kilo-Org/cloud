@@ -35,6 +35,8 @@ const capacityMetadataSchema = z
 
 type SessionReference = {
   cloudAgentSessionId: string;
+  subjectType: 'user' | 'org';
+  subjectId: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -63,7 +65,7 @@ export type SessionContainerInterval = {
 export type SessionContainerInfo = {
   cloudAgentSessionId: string;
   sandboxId: string | null;
-  scope: 'isolated' | 'shared';
+  scope: 'isolated' | 'shared' | 'unknown';
   windowStartAt: string;
   windowEndAt: string;
   intervals: SessionContainerInterval[];
@@ -87,6 +89,8 @@ async function resolveSessionReference(sessionId: string): Promise<SessionRefere
       .select({
         cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
         cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+        kiloUserId: cli_sessions_v2.kilo_user_id,
+        organizationId: cli_sessions_v2.organization_id,
         createdAt: cli_sessions_v2.created_at,
         updatedAt: cli_sessions_v2.updated_at,
       })
@@ -97,6 +101,8 @@ async function resolveSessionReference(sessionId: string): Promise<SessionRefere
     if (!session || !cloudAgentSessionId) return null;
     return {
       cloudAgentSessionId,
+      subjectType: session.organizationId ? 'org' : 'user',
+      subjectId: session.organizationId ?? session.kiloUserId,
       createdAt: new Date(session.createdAt).toISOString(),
       updatedAt: new Date(session.updatedAt).toISOString(),
     };
@@ -105,6 +111,8 @@ async function resolveSessionReference(sessionId: string): Promise<SessionRefere
   const [session] = await db
     .select({
       cloudAgentSessionId: cliSessions.cloud_agent_session_id,
+      kiloUserId: cliSessions.kilo_user_id,
+      organizationId: cliSessions.organization_id,
       createdAt: cliSessions.created_at,
       updatedAt: cliSessions.updated_at,
     })
@@ -114,6 +122,8 @@ async function resolveSessionReference(sessionId: string): Promise<SessionRefere
   if (!session?.cloudAgentSessionId) return null;
   return {
     cloudAgentSessionId: session.cloudAgentSessionId,
+    subjectType: session.organizationId ? 'org' : 'user',
+    subjectId: session.organizationId ?? session.kiloUserId,
     createdAt: new Date(session.createdAt).toISOString(),
     updatedAt: new Date(session.updatedAt).toISOString(),
   };
@@ -177,14 +187,14 @@ export async function getSessionContainerInfo(
     Math.max(Date.parse(reference.updatedAt), ...observedTimes) + SESSION_METRICS_PADDING_MS;
   const windowStartAt = new Date(windowStartMs).toISOString();
   const windowEndAt = new Date(windowEndMs).toISOString();
+  const overlapsSessionWindow = and(
+    lt(container_usage_interval.started_at, windowEndAt),
+    gt(container_usage_interval.last_seen_at, windowStartAt)
+  );
   const intervalIdentityCondition = sandboxId
     ? or(
         eq(container_usage_interval.session_id, reference.cloudAgentSessionId),
-        and(
-          eq(container_usage_interval.instance_id, sandboxId),
-          lt(container_usage_interval.started_at, windowEndAt),
-          gt(container_usage_interval.last_seen_at, windowStartAt)
-        )
+        eq(container_usage_interval.instance_id, sandboxId)
       )
     : eq(container_usage_interval.session_id, reference.cloudAgentSessionId);
 
@@ -210,7 +220,13 @@ export async function getSessionContainerInfo(
       eq(container_usage_interval.cloud_billing_sku_id, cloud_billing_sku.id)
     )
     .where(
-      and(like(container_usage_interval.service, 'cloud-agent-next%'), intervalIdentityCondition)
+      and(
+        eq(container_usage_interval.subject_type, reference.subjectType),
+        eq(container_usage_interval.subject_id, reference.subjectId),
+        like(container_usage_interval.service, 'cloud-agent-next%'),
+        overlapsSessionWindow,
+        intervalIdentityCondition
+      )
     )
     .orderBy(asc(container_usage_interval.started_at), asc(container_usage_interval.id));
 
@@ -244,10 +260,11 @@ export async function getSessionContainerInfo(
   return {
     cloudAgentSessionId: reference.cloudAgentSessionId,
     sandboxId,
-    scope:
-      sandboxId?.startsWith('ses-') ||
-      sandboxId?.startsWith('crv-') ||
-      sandboxId?.startsWith('dind-')
+    scope: !sandboxId
+      ? 'unknown'
+      : sandboxId.startsWith('ses-') ||
+          sandboxId.startsWith('crv-') ||
+          sandboxId.startsWith('dind-')
         ? 'isolated'
         : 'shared',
     windowStartAt,
@@ -271,19 +288,23 @@ export type SessionContainerMetrics =
         | 'not_cloud_agent_session'
         | 'no_container_intervals'
         | 'no_provider_identity'
+        | 'no_overlapping_intervals'
         | 'ambiguous_application';
     }
   | ({ available: true } & ContainerMetricsResult);
 
-export async function getSessionContainerMetrics(
-  sessionId: string,
+export async function getSessionContainerMetricsForInfo(
+  info: SessionContainerInfo,
   queryMetrics: typeof queryContainerMetricsAnalytics = queryContainerMetricsAnalytics
 ): Promise<SessionContainerMetrics> {
-  const info = await getSessionContainerInfo(sessionId);
-  if (!info) return { available: false, reason: 'not_cloud_agent_session' };
   if (info.intervals.length === 0) return { available: false, reason: 'no_container_intervals' };
-  const windows = info.intervals.flatMap(interval => {
-    if (!interval.cloudflareInstanceId) return [];
+  const intervalsWithProviderIdentity = info.intervals.filter(
+    interval => interval.cloudflareInstanceId !== null
+  );
+  if (intervalsWithProviderIdentity.length === 0) {
+    return { available: false, reason: 'no_provider_identity' };
+  }
+  const windows = intervalsWithProviderIdentity.flatMap(interval => {
     const start = new Date(
       Math.max(Date.parse(interval.startedAt), Date.parse(info.windowStartAt))
     ).toISOString();
@@ -300,11 +321,21 @@ export async function getSessionContainerMetrics(
       },
     ];
   });
-  if (windows.length === 0) return { available: false, reason: 'no_provider_identity' };
+  if (windows.length === 0) return { available: false, reason: 'no_overlapping_intervals' };
   const metrics = await queryMetrics({ windows });
   const applicationIds = new Set(metrics.rows.map(row => row.applicationId));
   if (applicationIds.size > 1) {
     return { available: false, reason: 'ambiguous_application' };
   }
   return { available: true, ...metrics };
+}
+
+export async function getSessionContainerMetrics(
+  sessionId: string,
+  queryMetrics: typeof queryContainerMetricsAnalytics = queryContainerMetricsAnalytics
+): Promise<SessionContainerMetrics> {
+  const info = await getSessionContainerInfo(sessionId);
+  return info
+    ? getSessionContainerMetricsForInfo(info, queryMetrics)
+    : { available: false, reason: 'not_cloud_agent_session' };
 }

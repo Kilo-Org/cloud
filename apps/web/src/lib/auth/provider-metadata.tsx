@@ -1,4 +1,5 @@
 import { AppleLogo } from '@/components/auth/AppleLogo';
+import { AnacondaLogo } from '@/components/auth/AnacondaLogo';
 import { DiscordLogo } from '@/components/auth/DiscordLogo';
 import { GitHubLogo } from '@/components/auth/GitHubLogo';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
@@ -21,6 +22,7 @@ const AllAuthProviders = [
   { id: 'email', name: 'Email', icon: <Mail /> },
   { id: 'apple', name: 'Apple', icon: <AppleLogo /> },
   { id: 'google', name: 'Google', icon: <GoogleLogo /> },
+  { id: 'anaconda', name: 'Anaconda', icon: <AnacondaLogo /> },
   { id: 'github', name: 'GitHub', icon: <GitHubLogo /> },
   { id: 'gitlab', name: 'GitLab', icon: <GitLabLogo className="size-5" /> },
   { id: 'linkedin', name: 'LinkedIn', icon: <LinkedInLogo /> },

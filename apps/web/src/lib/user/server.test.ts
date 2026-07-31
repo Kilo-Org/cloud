@@ -10,6 +10,8 @@ import {
   isEmailBlacklistedByDomain,
   isBlockedTLD,
   parseLinkedInProfileName,
+  parseAnacondaProfile,
+  authOptions,
   getUserUUID,
   uuidSchema,
   parseSignInRedirectContext,
@@ -213,6 +215,62 @@ describe('parseLinkedInProfileName', () => {
       expect(typeof result).toBe('string');
       expect(result).not.toBe(true);
       expect(result).not.toBe(false);
+    });
+  });
+});
+
+describe('Anaconda OAuth provider', () => {
+  test('maps a valid profile and uses sub as the stable account id', () => {
+    expect(
+      parseAnacondaProfile({
+        sub: 'anaconda-user-123',
+        email: 'user@example.com',
+        email_verified: true,
+        name: 'Anaconda User',
+        picture: 'https://example.com/avatar.png',
+      })
+    ).toEqual({
+      id: 'anaconda-user-123',
+      email: 'user@example.com',
+      name: 'Anaconda User',
+      image: 'https://example.com/avatar.png',
+    });
+  });
+
+  test('uses the email local part when the profile omits a name', () => {
+    expect(
+      parseAnacondaProfile({
+        sub: 'anaconda-user-123',
+        email: 'local-part@example.com',
+      })
+    ).toMatchObject({ name: 'local-part' });
+  });
+
+  test.each([
+    [{ email: 'user@example.com' }, 'missing subject'],
+    [{ sub: 'anaconda-user-123' }, 'missing email'],
+    [{ sub: '', email: 'user@example.com' }, 'empty subject'],
+    [{ sub: 'anaconda-user-123', email: 'not-an-email' }, 'invalid email'],
+  ])('rejects a profile with %s (%s)', (profile, _reason) => {
+    expect(() => parseAnacondaProfile(profile)).toThrow();
+  });
+
+  test('rejects an explicitly unverified email', () => {
+    expect(() =>
+      parseAnacondaProfile({
+        sub: 'anaconda-user-123',
+        email: 'user@example.com',
+        email_verified: false,
+      })
+    ).toThrow('Anaconda email must be verified');
+  });
+
+  test('registers discovery, scopes, PKCE, state, and client secret POST authentication', () => {
+    expect(authOptions.providers.find(provider => provider.id === 'anaconda')).toMatchObject({
+      wellKnown: 'https://anaconda.com/.well-known/openid-configuration',
+      authorization: { params: { scope: 'openid profile email' } },
+      checks: ['pkce', 'state'],
+      client: { token_endpoint_auth_method: 'client_secret_post' },
     });
   });
 });

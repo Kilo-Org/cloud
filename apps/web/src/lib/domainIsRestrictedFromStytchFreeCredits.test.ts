@@ -24,6 +24,16 @@ describe('domainIsRestrictedFromStytchFreeCredits', () => {
     expect(result).toBe(false);
   });
 
+  test('should return false for Anaconda (@@anaconda@@)', async () => {
+    const user = await insertTestUser({
+      google_user_email: `test-${Math.random()}@example.com`,
+      hosted_domain: hosted_domain_specials.anaconda,
+    });
+
+    const result = await domainIsRestrictedFromStytchFreeCredits(user);
+    expect(result).toBe(false);
+  });
+
   test('should return false when domain has 5 or fewer users', async () => {
     const domain = `smallcompany-${Math.random()}.co.uk`; //might as well check nested TLDs
 

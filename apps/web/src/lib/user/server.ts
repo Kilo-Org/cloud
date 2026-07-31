@@ -65,6 +65,8 @@ import {
   GITHUB_CLIENT_SECRET,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
+  ANACONDA_CLIENT_ID,
+  ANACONDA_CLIENT_SECRET,
   LINKEDIN_CLIENT_ID,
   LINKEDIN_CLIENT_SECRET,
   WORKOS_API_KEY,
@@ -134,6 +136,28 @@ function generateAppleClientSecret(): string {
   );
 }
 
+const anacondaProfileSchema = z.object({
+  sub: z.string().trim().min(1),
+  email: z.string().email(),
+  email_verified: z.boolean().optional(),
+  name: z.string().nullish(),
+  picture: z.string().url().nullish(),
+});
+
+export function parseAnacondaProfile(profile: unknown) {
+  const parsedProfile = anacondaProfileSchema.parse(profile);
+  if (parsedProfile.email_verified === false) {
+    throw new Error('Anaconda email must be verified');
+  }
+
+  return {
+    id: parsedProfile.sub,
+    email: parsedProfile.email,
+    name: parsedProfile.name?.trim() || parsedProfile.email.split('@')[0],
+    image: parsedProfile.picture ?? null,
+  };
+}
+
 function createGoogleAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -153,6 +177,24 @@ function createGoogleAccountInfo(
     provider: account.provider,
     provider_account_id: account.providerAccountId,
     display_name: null, // Google OAuth does not provide a public profile URL
+  };
+}
+
+function createAnacondaAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'anaconda') return null;
+  assert(user.email, 'User email is required for Anaconda auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    hosted_domain: hosted_domain_specials.anaconda,
+    provider: account.provider,
+    provider_account_id: account.providerAccountId,
+    display_name: null,
   };
 }
 
@@ -346,6 +388,7 @@ function createAccountInfo(
 ): CreateOrUpdateUserArgs {
   const accountInfo =
     createGoogleAccountInfo(account, user, profile) ??
+    createAnacondaAccountInfo(account, user) ??
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
@@ -526,6 +569,22 @@ export const authOptions: NextAuthOptions = {
       clientId: GOOGLE_CLIENT_ID,
       clientSecret: GOOGLE_CLIENT_SECRET,
     }),
+    {
+      id: 'anaconda',
+      name: 'Anaconda',
+      type: 'oauth',
+      wellKnown: 'https://anaconda.com/.well-known/openid-configuration',
+      authorization: {
+        params: { scope: 'openid profile email' },
+      },
+      checks: ['pkce', 'state'],
+      client: {
+        token_endpoint_auth_method: 'client_secret_post',
+      },
+      clientId: ANACONDA_CLIENT_ID,
+      clientSecret: ANACONDA_CLIENT_SECRET,
+      profile: parseAnacondaProfile,
+    },
     AppleProvider({
       clientId: APPLE_CLIENT_ID ?? '',
       clientSecret: generateAppleClientSecret(),

@@ -1044,6 +1044,7 @@ export type AuthProviderId =
   | 'apple'
   | 'email'
   | 'google'
+  | 'anaconda'
   | 'github'
   | 'gitlab'
   | 'linkedin'

@@ -11,6 +11,8 @@ export const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY');
 export const WORKOS_CLIENT_ID = getEnvVariable('WORKOS_CLIENT_ID');
 export const GOOGLE_CLIENT_ID = getEnvVariable('GOOGLE_CLIENT_ID');
 export const GOOGLE_CLIENT_SECRET = getEnvVariable('GOOGLE_CLIENT_SECRET');
+export const ANACONDA_CLIENT_ID = getEnvVariable('ANACONDA_CLIENT_ID');
+export const ANACONDA_CLIENT_SECRET = getEnvVariable('ANACONDA_CLIENT_SECRET');
 export const GOOGLE_WORKSPACE_OAUTH_CLIENT_ID = getEnvVariable('GOOGLE_WORKSPACE_OAUTH_CLIENT_ID');
 export const GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET = getEnvVariable(
   'GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET'

@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
   type LayoutChangeEvent,
@@ -127,6 +127,25 @@ export function ChatComposer({
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  // Remount the input row after Stop. iOS leaves the multiline TextInput
+  // non-interactive after the Stop↔Send swap until the screen is left and
+  // re-entered (Item 14 E2E gate). A fresh mount matches that recovery without
+  // navigating away. Draft text is restored after remount.
+  const [inputEpoch, setInputEpoch] = useState(0);
+  const pendingDraftRestoreRef = useRef<string | null>(null);
+  useEffect(() => {
+    const draft = pendingDraftRestoreRef.current;
+    if (draft === null) return;
+    pendingDraftRestoreRef.current = null;
+    if (!draft) return;
+    inputRef.current?.setNativeProps({
+      text: draft,
+      selection: { start: draft.length, end: draft.length },
+    });
+    setHasText(draft.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(draft));
+    measure.setText(draft);
+  }, [inputEpoch, measure]);
 
   // Single send-admission authority. `settleVoiceInputBeforeSubmit` owns
   // this lock for the full voice-settle + asynchronous send sequence, and
@@ -332,6 +351,10 @@ export function ChatComposer({
 
   function handleStop() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    pendingDraftRestoreRef.current = textRef.current;
+    Keyboard.dismiss();
+    setIsFocused(false);
+    setInputEpoch(epoch => epoch + 1);
     void onStop?.();
   }
 
@@ -399,6 +422,7 @@ export function ChatComposer({
       </View>
 
       <ChatComposerInputRow
+        key={inputEpoch}
         attachmentsEnabled={attachmentsEnabled}
         canSend={control.canSend}
         disabled={disabled}

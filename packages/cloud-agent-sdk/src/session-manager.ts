@@ -1508,7 +1508,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
       // User continued after `/clear`: drop the marker so a later reconnect
       // replays full history (pre-clear may reappear — accepted tradeoff).
-      if (store.get(transcriptClearedAtom)) {
+      // Gate on the pre-await session id — a mid-flight switchSession + /clear
+      // on B must not have A's resolving send clear B's marker.
+      if (activeSessionId === kiloSessionId && store.get(transcriptClearedAtom)) {
         store.set(transcriptClearedAtom, false);
       }
 

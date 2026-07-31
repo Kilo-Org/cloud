@@ -68,7 +68,7 @@ export function AgentCard({ agent, isSelected, onSelect, onDelete }: AgentCardPr
         'cursor-pointer border transition-[border-color,background-color]',
         'hover:bg-white/[0.05]',
         isSelected
-          ? 'border-[color:oklch(95%_0.15_108_/_0.45)] bg-[color:oklch(95%_0.15_108_/_0.06)]'
+          ? 'border-border bg-surface-selected'
           : 'border-white/10 bg-white/[0.03]'
       )}
       onClick={onSelect}

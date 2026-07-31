@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { PageContainer } from '@/components/layouts/PageContainer';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
@@ -61,10 +61,9 @@ export function OrgWastelandListPageClient({ organizationId }: OrgWastelandListP
             </div>
 
             <Button
-              variant="primary"
-              size="md"
+              variant="default"
               onClick={() => router.push(newUrl)}
-              className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              className="gap-2"
             >
               <Plus className="size-5" />
               New Wasteland
@@ -108,10 +107,9 @@ export function OrgWastelandListPageClient({ organizationId }: OrgWastelandListP
               to DoltHub to track wanted items, claims, and completions.
             </p>
             <Button
-              variant="primary"
-              size="md"
+              variant="default"
               onClick={() => router.push(newUrl)}
-              className="mt-5 gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              className="mt-5 gap-2"
             >
               <Plus className="size-5" />
               Create your first wasteland

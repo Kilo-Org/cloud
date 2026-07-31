@@ -76,7 +76,8 @@ export default function LearnPage() {
           </CardHeader>
           <CardFooter>
             <Button
-              className="bg-brand-primary hover:text-brand-primary hover:ring-brand-primary w-full text-black hover:bg-black hover:ring-2"
+              variant="secondary"
+              className="w-full"
               asChild
             >
               <Link href="https://kilo.ai/docs" target="_blank" rel="noopener noreferrer">
@@ -99,7 +100,8 @@ export default function LearnPage() {
           </CardHeader>
           <CardFooter>
             <Button
-              className="bg-brand-primary hover:text-brand-primary hover:ring-brand-primary w-full text-black hover:bg-black hover:ring-2"
+              variant="secondary"
+              className="w-full"
               asChild
             >
               <Link href="/code-reviews/review-md">Read guide</Link>
@@ -121,7 +123,8 @@ export default function LearnPage() {
           </CardHeader>
           <CardFooter>
             <Button
-              className="bg-brand-primary hover:text-brand-primary hover:ring-brand-primary w-full text-black hover:bg-black hover:ring-2"
+              variant="secondary"
+              className="w-full"
               asChild
             >
               <Link

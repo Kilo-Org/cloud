@@ -236,7 +236,8 @@ function WizardContent() {
           ) : (
             <Button
               onClick={goNext}
-              className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              variant="default"
+              className="gap-1.5"
             >
               Next
               <ChevronRight className="size-4" />
@@ -262,7 +263,8 @@ function FinalStepNav() {
     <Button
       onClick={handlers.submit}
       disabled={!handlers.canSubmit}
-      className="h-10 gap-1.5 px-6 text-sm font-medium bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
+      variant="default"
+      className="h-10 gap-1.5 px-6 text-sm font-medium"
     >
       Create Town & Start
       <ChevronRight className="size-4" />

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { X, Radio } from 'lucide-react';
 
 type AgentStreamProps = {

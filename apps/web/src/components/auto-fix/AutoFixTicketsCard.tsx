@@ -266,8 +266,9 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-sm">Status:</span>
             <Button
-              variant={statusFilter === undefined ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
+              className={statusFilter === undefined ? 'bg-surface-selected' : ''}
               onClick={() => {
                 setStatusFilter(undefined);
                 setCurrentPage(1);
@@ -278,8 +279,9 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
             {Object.entries(statusConfig).map(([status, config]) => (
               <Button
                 key={status}
-                variant={statusFilter === status ? 'default' : 'outline'}
+                variant="outline"
                 size="sm"
+                className={statusFilter === status ? 'bg-surface-selected' : ''}
                 onClick={() => {
                   setStatusFilter(status as FixStatus);
                   setCurrentPage(1);
@@ -295,8 +297,9 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-sm">Classification:</span>
             <Button
-              variant={classificationFilter === undefined ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
+              className={classificationFilter === undefined ? 'bg-surface-selected' : ''}
               onClick={() => {
                 setClassificationFilter(undefined);
                 setCurrentPage(1);
@@ -307,8 +310,9 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
             {Object.entries(classificationConfig).map(([classification, config]) => (
               <Button
                 key={classification}
-                variant={classificationFilter === classification ? 'default' : 'outline'}
+                variant="outline"
                 size="sm"
+                className={classificationFilter === classification ? 'bg-surface-selected' : ''}
                 onClick={() => {
                   setClassificationFilter(classification as FixClassification);
                   setCurrentPage(1);

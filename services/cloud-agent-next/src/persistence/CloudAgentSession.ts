@@ -2686,10 +2686,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     // Server has been idle too long and no wrapper/pending work remains, stop it
     logger
+      .withTags({ logTag: 'idle_kilo_server_stopped' })
       .withFields({
         sessionId: this.sessionId,
         idleMs,
         idleTimeoutMs,
+        // How late this sweep ran against its own deadline; aggregate to spot a
+        // sweeper that is firing well past idleTimeoutMs.
+        overdueMs: Math.max(0, idleMs - idleTimeoutMs),
       })
       .info('Stopping idle kilo server');
 

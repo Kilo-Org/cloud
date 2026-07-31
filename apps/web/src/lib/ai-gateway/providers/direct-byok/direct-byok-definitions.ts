@@ -8,6 +8,7 @@ import kimiCoding from './kimi-coding';
 import martian from './martian';
 import morph from './morph';
 import neuralwatt from './neurowatt';
+import nvidiaByok from './nvidia-byok';
 import ollamaCloud from './ollama-cloud';
 import openCodeGo from './opencode-go';
 import orcarouter from './orcarouter';
@@ -26,6 +27,7 @@ export default [
   martian,
   morph,
   neuralwatt,
+  nvidiaByok,
   ollamaCloud,
   openCodeGo,
   orcarouter,

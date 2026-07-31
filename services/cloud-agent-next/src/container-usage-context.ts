@@ -25,6 +25,7 @@ export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 
 };
 export type MeteredSandboxInstance = SandboxInstance & {
   configureBilling(input: unknown): Promise<void>;
+  isContainerRunning(): Promise<boolean>;
 };
 
 const sandboxBillingInputEnvelopeSchema = z
@@ -166,6 +167,31 @@ export async function configureSandboxBilling(
   sandboxId: SandboxId
 ): Promise<void> {
   await configureSandboxBillingInput(sandbox, buildSandboxBillingInput(metadata, sandboxId));
+}
+
+/**
+ * Whether the sandbox's container is currently running, read over Durable Object RPC.
+ *
+ * This deliberately avoids any container fetch (`exec`, `listProcesses`, …), because
+ * those boot a sleeping container. Callers use it to answer "is there anything running
+ * in there?" without paying for a wake-up.
+ *
+ * Returns `undefined` when the sandbox does not expose the method, so callers can fall
+ * back to their existing behaviour rather than treating an unknown state as "stopped".
+ */
+export async function isSandboxContainerRunning(
+  sandbox: SandboxInstance
+): Promise<boolean | undefined> {
+  const isContainerRunning = (sandbox as Partial<MeteredSandboxInstance>).isContainerRunning;
+  if (typeof isContainerRunning !== 'function') return undefined;
+  try {
+    return await (sandbox as MeteredSandboxInstance).isContainerRunning();
+  } catch (error) {
+    logger
+      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .warn('Container running probe failed');
+    return undefined;
+  }
 }
 
 export async function configureSandboxBillingInput(

@@ -5,6 +5,7 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
+  activeSessionMetaTimestamp,
   excludeActiveFromGroups,
   expandPlatformFilter,
   formatMeta,
@@ -352,6 +353,27 @@ describe('remoteAgentLabel', () => {
   });
 });
 
+describe('activeSessionMetaTimestamp', () => {
+  it('prefers lastActivityAt over updatedAt', () => {
+    expect(
+      activeSessionMetaTimestamp({
+        lastActivityAt: '2024-06-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      })
+    ).toBe('2024-06-01T00:00:00.000Z');
+  });
+
+  it('falls back to updatedAt when lastActivityAt is absent', () => {
+    expect(activeSessionMetaTimestamp({ updatedAt: '2024-01-01T00:00:00.000Z' })).toBe(
+      '2024-01-01T00:00:00.000Z'
+    );
+  });
+
+  it('returns undefined when neither timestamp is present', () => {
+    expect(activeSessionMetaTimestamp({})).toBeUndefined();
+  });
+});
+
 describe('remoteMeta', () => {
   it('returns the same relative-time string as formatMeta when updatedAt is present', () => {
     const updatedAt = '2024-01-01T00:00:00.000Z';
@@ -359,16 +381,33 @@ describe('remoteMeta', () => {
     expect(remoteMeta({ updatedAt })).toBe(timeAgo(parseTimestamp(updatedAt)).toUpperCase());
   });
 
-  it('returns undefined when updatedAt is absent (never idle/busy/retry status words)', () => {
+  it('prefers lastActivityAt over updatedAt', () => {
+    const lastActivityAt = '2024-06-01T00:00:00.000Z';
+    const updatedAt = '2024-01-01T00:00:00.000Z';
+    expect(remoteMeta({ lastActivityAt, updatedAt })).toBe(formatMeta(lastActivityAt));
+  });
+
+  it('falls back to updatedAt when lastActivityAt is absent', () => {
+    const updatedAt = '2024-01-01T00:00:00.000Z';
+    expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
+  });
+
+  it('returns undefined when neither timestamp is present (never idle/busy/retry status words)', () => {
     // Former fallback uppercased session.status into the timestamp slot
     // (BUSY/IDLE/RETRY). Status is no longer a parameter; assert undefined
     // for each status that used to leak, plus a row with no status field.
     // Extra `status` fields stay on the object so a regression that re-reads
     // `.status` would still see them — remoteMeta must ignore them.
-    const idleRow: { updatedAt?: string; status?: string } = { status: 'idle' };
-    const busyRow: { updatedAt?: string; status?: string } = { status: 'busy' };
-    const retryRow: { updatedAt?: string; status?: string } = { status: 'retry' };
-    const noStatusRow: { updatedAt?: string } = {};
+    const idleRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'idle',
+    };
+    const busyRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'busy',
+    };
+    const retryRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'retry',
+    };
+    const noStatusRow: { updatedAt?: string; lastActivityAt?: string } = {};
     expect(remoteMeta(idleRow)).toBeUndefined();
     expect(remoteMeta(busyRow)).toBeUndefined();
     expect(remoteMeta(retryRow)).toBeUndefined();

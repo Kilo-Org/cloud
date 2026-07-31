@@ -377,6 +377,9 @@ importers:
       expo-dev-client:
         specifier: ~57.0.9
         version: 57.0.9(expo@57.0.8)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))
+      expo-device:
+        specifier: ~57.0.1
+        version: 57.0.1(expo@57.0.8)
       expo-document-picker:
         specifier: ~57.0.1
         version: 57.0.1(expo@57.0.8)
@@ -466,7 +469,7 @@ importers:
         version: 5.0.0-preview.4(react-native-css@3.0.7(@expo/metro-config@57.0.7(bufferutil@4.1.0)(expo@57.0.8)(typescript@6.0.3)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(tailwindcss@4.3.3)
       posthog-react-native:
         specifier: 4.59.0
-        version: 4.59.0(expo-application@57.0.2(expo@57.0.8))(expo-file-system@57.0.1(expo@57.0.8)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)))(expo-localization@57.0.1(expo@57.0.8)(react@19.2.3))(react-native-safe-area-context@5.7.0(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native-svg@15.15.4(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))
+        version: 4.59.0(expo-application@57.0.2(expo@57.0.8))(expo-device@57.0.1(expo@57.0.8))(expo-file-system@57.0.1(expo@57.0.8)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)))(expo-localization@57.0.1(expo@57.0.8)(react@19.2.3))(react-native-safe-area-context@5.7.0(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native-svg@15.15.4(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1271,7 +1274,7 @@ importers:
         version: 7.0.0-dev.20260514.1
       jest:
         specifier: 30.3.0
-        version: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
+        version: 30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1921,7 +1924,7 @@ importers:
         version: 0.3.7
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@kilocode/sdk':
         specifier: 7.3.54
         version: 7.3.54
@@ -2069,7 +2072,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/jest':
         specifier: 30.0.0
         version: 30.0.0
@@ -2231,7 +2234,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2406,7 +2409,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
@@ -2513,7 +2516,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/content-disposition':
         specifier: 0.5.9
         version: 0.5.9
@@ -2870,7 +2873,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2907,7 +2910,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3137,7 +3140,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -4604,11 +4607,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild/aix-ppc64@0.27.4':
     resolution: {integrity: sha512-cQPwL2mp2nSmHHJlCyoXgHGhbEPMrEEU5xhkcy3Hs/O7nGZqEpZ2sUtLaL9MORLtDfRvVl2/3PAuEkYZH0Ty8Q==}
@@ -12767,6 +12770,11 @@ packages:
       expo: '*'
       react-native: '*'
 
+  expo-device@57.0.1:
+    resolution: {integrity: sha512-jyEMDUticH+dhcL3GHa2aiifOvGXJsmb3oVT2R2q4i8bN7Bddy61+NkpMmuS2VAZrvoLQwf0TJJ/1vi1ukvutA==}
+    peerDependencies:
+      expo: '*'
+
   expo-document-picker@57.0.1:
     resolution: {integrity: sha512-qBwM5oxDZ3I9kwFD3pUE1oK/WNv9artoEKO6UpqhQgNRr0XA1ALRVWYjkF4+ge9lUNDRehjTm/jenINkzqg84g==}
     peerDependencies:
@@ -18272,6 +18280,10 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  ua-parser-js@0.7.41:
+    resolution: {integrity: sha512-O3oYyCMPYgNNHuO7Jjk3uacJWZF8loBgwrfd/5LE/HyZ3lUIOdniQ7DNXJcIgZbwioZxk0fLfI4EVnetdiX5jg==}
+    hasBin: true
+
   uc.micro@2.1.0:
     resolution: {integrity: sha512-ARDJmphmdvUk6Glw7y9DQ2bFkKBHwQHLi2lsaH6PPmz/Ka9sFOBsBluozhDltWmnv9u/cF6Rt87znRTPV+yp/A==}
 
@@ -20941,6 +20953,21 @@ snapshots:
       esbuild: 0.27.4
       miniflare: 4.20260603.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      wrangler: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@cloudflare/workers-types'
+      - bufferutil
+      - utf-8-validate
+
+  '@cloudflare/vitest-pool-workers@0.16.13(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)':
+    dependencies:
+      '@vitest/runner': 4.1.6
+      '@vitest/snapshot': 4.1.6
+      cjs-module-lexer: 1.2.3
+      esbuild: 0.27.4
+      miniflare: 4.20260603.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -27725,7 +27752,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.0.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -27803,7 +27830,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -30547,6 +30574,11 @@ snapshots:
       expo: 57.0.8(@babel/core@7.29.0)(@expo/metro-runtime@57.0.7)(bufferutil@4.1.0)(expo-router@57.0.8)(react-dom@19.2.6(react@19.2.3))(react-native-worklets@0.10.0(@babel/core@7.29.0)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3)(utf-8-validate@6.0.6)
       expo-dev-menu-interface: 57.0.0(expo@57.0.8)
       react-native: 0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
+
+  expo-device@57.0.1(expo@57.0.8):
+    dependencies:
+      expo: 57.0.8(@babel/core@7.29.0)(@expo/metro-runtime@57.0.7)(bufferutil@4.1.0)(expo-router@57.0.8)(react-dom@19.2.6(react@19.2.3))(react-native-worklets@0.10.0(@babel/core@7.29.0)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3)(utf-8-validate@6.0.6)
+      ua-parser-js: 0.7.41
 
   expo-document-picker@57.0.1(expo@57.0.8):
     dependencies:
@@ -35356,12 +35388,13 @@ snapshots:
     dependencies:
       '@posthog/core': 1.4.0
 
-  posthog-react-native@4.59.0(expo-application@57.0.2(expo@57.0.8))(expo-file-system@57.0.1(expo@57.0.8)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)))(expo-localization@57.0.1(expo@57.0.8)(react@19.2.3))(react-native-safe-area-context@5.7.0(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native-svg@15.15.4(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)):
+  posthog-react-native@4.59.0(expo-application@57.0.2(expo@57.0.8))(expo-device@57.0.1(expo@57.0.8))(expo-file-system@57.0.1(expo@57.0.8)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)))(expo-localization@57.0.1(expo@57.0.8)(react@19.2.3))(react-native-safe-area-context@5.7.0(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native-svg@15.15.4(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)):
     dependencies:
       '@posthog/core': 1.45.0
       '@posthog/types': 1.398.0
     optionalDependencies:
       expo-application: 57.0.2(expo@57.0.8)
+      expo-device: 57.0.1(expo@57.0.8)
       expo-file-system: 57.0.1(expo@57.0.8)(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))
       expo-localization: 57.0.1(expo@57.0.8)(react@19.2.3)
       react-native-safe-area-context: 5.7.0(react-native@0.86.0(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -37628,6 +37661,8 @@ snapshots:
   typescript@5.9.3: {}
 
   typescript@6.0.3: {}
+
+  ua-parser-js@0.7.41: {}
 
   uc.micro@2.1.0: {}
 

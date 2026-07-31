@@ -12,8 +12,9 @@ set -uo pipefail
 #
 #   Phase 2  credentialed live smoke — builds the before/after images, performs
 #            the persisted-root upgrade (boots baseline, then candidate on the
-#            same /root), and runs every assertion incl. a real Auto Free gateway
-#            turn. Needs a dedicated free-model Kilo API key.
+#            same /root), then asserts the candidate BOTH as an upgraded instance
+#            and on a fresh root, each with a real gateway turn on a paid route.
+#            Needs a Kilo API key on an account with credits.
 #
 # OpenClaw is never built or run in CI (it is a security-sensitive upstream), so
 # this is the gate a human runs locally before marking the bump PR ready.
@@ -150,8 +151,12 @@ elif [ "$IS_BUMP" -eq 1 ]; then
   echo "  • Phase 2 — credentialed live smoke: WILL BE SKIPPED (no Kilo API key is set)"
   echo
   echo "Phase 2 (the live smoke) is half the coverage and needs a Kilo API key."
-  echo "For the full validation, set a dedicated free-model key and re-run:"
+  echo "For the full validation, set a key on an account WITH CREDITS and re-run:"
   echo "    export KILOCODE_API_KEY=<key>   # from https://app.kilo.ai/profile (bottom)"
+  echo "    export KILOCODE_ORGANIZATION_ID=<org id>   # REQUIRED to spend ORG credits;"
+  echo "                                               # a personal token alone spends only"
+  echo "                                               # personal credits and the live turn"
+  echo "                                               # then fails with a misleading error"
   echo "    bash $0"
   ask_continue_keyless_or_stop
 

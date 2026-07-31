@@ -569,6 +569,122 @@ describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction f
       { content: 'HEART', count: 1, viewerHasReacted: false },
     ]);
   });
+
+  it('listReviewThreads maps first-comment diffHunk onto the thread DTO', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    buildOctokit('t1').request.mockImplementation(
+      async (_path: string, body: { query: string }) => {
+        if (body.query.includes('PrReviewConversationComments')) {
+          return {
+            data: {
+              data: {
+                repository: {
+                  pullRequest: {
+                    comments: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                  },
+                },
+              },
+            },
+          };
+        }
+        return {
+          data: {
+            data: {
+              repository: {
+                pullRequest: {
+                  reviewThreads: {
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    nodes: [
+                      {
+                        id: 'PRRT_with_hunk',
+                        isResolved: false,
+                        isOutdated: false,
+                        subjectType: 'LINE',
+                        path: 'src/foo.ts',
+                        line: 4,
+                        startLine: null,
+                        originalLine: 4,
+                        originalStartLine: null,
+                        diffSide: 'RIGHT',
+                        comments: {
+                          pageInfo: { hasNextPage: false, endCursor: null },
+                          nodes: [
+                            {
+                              databaseId: 21,
+                              id: 'PRRC_21',
+                              body: 'nit',
+                              diffHunk: '@@ -1,2 +1,3 @@\n+added',
+                              createdAt: '2024-01-01T00:00:00Z',
+                              author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
+                              reactionGroups: [],
+                            },
+                          ],
+                        },
+                      },
+                      {
+                        id: 'PRRT_no_comments',
+                        isResolved: false,
+                        isOutdated: false,
+                        subjectType: 'LINE',
+                        path: 'src/bar.ts',
+                        line: 1,
+                        startLine: null,
+                        originalLine: 1,
+                        originalStartLine: null,
+                        diffSide: 'RIGHT',
+                        comments: {
+                          pageInfo: { hasNextPage: false, endCursor: null },
+                          nodes: [],
+                        },
+                      },
+                      {
+                        id: 'PRRT_no_hunk',
+                        isResolved: false,
+                        isOutdated: false,
+                        subjectType: 'LINE',
+                        path: 'src/baz.ts',
+                        line: 2,
+                        startLine: null,
+                        originalLine: 2,
+                        originalStartLine: null,
+                        diffSide: 'RIGHT',
+                        comments: {
+                          pageInfo: { hasNextPage: false, endCursor: null },
+                          nodes: [
+                            {
+                              databaseId: 22,
+                              id: 'PRRC_22',
+                              body: 'no hunk',
+                              createdAt: '2024-01-01T00:00:00Z',
+                              author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
+                              reactionGroups: [],
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        };
+      }
+    );
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      direction: 'forward',
+    });
+
+    expect(result.threads).toHaveLength(3);
+    expect(result.threads[0]?.diffHunk).toBe('@@ -1,2 +1,3 @@\n+added');
+    expect(result.threads[1]?.diffHunk).toBeNull();
+    expect(result.threads[2]?.diffHunk).toBeNull();
+  });
 });
 
 describe('githubPrReviewRouter.listReviewThreads conversation comments', () => {

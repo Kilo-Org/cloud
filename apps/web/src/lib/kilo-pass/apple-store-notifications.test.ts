@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import {
   DeliveryStatus,
   NotificationTypeV2,
@@ -27,10 +27,30 @@ import {
   KiloPassPaymentProvider,
   KiloPassTier,
 } from './enums';
-import { processAppStoreKiloPassNotification } from './apple-store-notifications';
+import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import { toMicrodollars } from '@/lib/utils';
+
+// SWC + static ESM imports do not see jest.mock replacements on the same module id.
+// Dynamic-import the SUT after the mock (same pattern as stripe-handlers-invoice-paid.test.ts).
+jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
+  runAfterResponse: async (work: () => Promise<void>) => {
+    await work();
+  },
+  trackKiloPassPurchaseCompleted: jest.fn(),
+}));
+
+type PosthogTrackingMock = {
+  trackKiloPassPurchaseCompleted: jest.Mock;
+  runAfterResponse: (work: () => Promise<void>) => Promise<void>;
+};
+
+function getPosthogTrackingMock(): PosthogTrackingMock {
+  return jest.requireMock('@/lib/kilo-pass/posthog-tracking') as PosthogTrackingMock;
+}
+
+let processAppStoreKiloPassNotification: typeof AppleStoreNotifications.processAppStoreKiloPassNotification;
 
 const APP_STORE_NOTIFICATION_TEST_NOW_MS = Date.parse('2026-05-15T00:00:00.000Z');
 
@@ -99,12 +119,218 @@ async function insertProviderScopedSubscriptionRows(providerSubscriptionId: stri
 describe('processAppStoreKiloPassNotification', () => {
   let dateNowSpy: jest.SpiedFunction<typeof Date.now>;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(APP_STORE_NOTIFICATION_TEST_NOW_MS);
+    ({ processAppStoreKiloPassNotification } = await import('./apple-store-notifications'));
   });
 
   afterAll(() => {
     dateNowSpy.mockRestore();
+  });
+
+  beforeEach(() => {
+    getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockClear();
+  });
+
+  describe('kilo_pass_purchase_completed tracking', () => {
+    it('does not track when the notification UUID was already processed', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const user = await insertTestUser();
+      const decodedNotification = notification();
+      const decodedTransaction = transaction({
+        appAccountToken: user.app_store_account_token,
+      });
+      const params = {
+        signedPayload: 'payload',
+        decodeNotification: async () => decodedNotification,
+        decodeTransaction: async () => decodedTransaction,
+      };
+
+      await processAppStoreKiloPassNotification(params);
+      trackingMock.trackKiloPassPurchaseCompleted.mockClear();
+
+      const replay = await processAppStoreKiloPassNotification(params);
+      expect(replay).toEqual({ processed: true, status: 'already_processed' });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).not.toHaveBeenCalled();
+    });
+
+    it('does not track when the provider transaction was already recorded by the app', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const user = await insertTestUser();
+      const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+      const providerTransactionId = `tx-${crypto.randomUUID()}`;
+      const decodedTransaction = transaction({
+        originalTransactionId: providerSubscriptionId,
+        transactionId: providerTransactionId,
+        appAccountToken: user.app_store_account_token,
+      });
+
+      // App path records the purchase first (same provider transaction id).
+      await processAppStoreKiloPassNotification({
+        signedPayload: 'app-first-initial',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.SUBSCRIBED,
+            subtype: Subtype.INITIAL_BUY,
+          }),
+        decodeTransaction: async () => decodedTransaction,
+      });
+      trackingMock.trackKiloPassPurchaseCompleted.mockClear();
+
+      const result = await processAppStoreKiloPassNotification({
+        signedPayload: 'assn-same-tx',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.DID_RENEW,
+          }),
+        decodeTransaction: async () => decodedTransaction,
+      });
+
+      expect(result).toEqual({ processed: true });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).not.toHaveBeenCalled();
+    });
+
+    it('tracks DID_RENEW with a new transaction as renewal', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const user = await insertTestUser();
+      const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+
+      await processAppStoreKiloPassNotification({
+        signedPayload: 'renewal-initial',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.SUBSCRIBED,
+            subtype: Subtype.INITIAL_BUY,
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            originalTransactionId: providerSubscriptionId,
+            appAccountToken: user.app_store_account_token,
+          }),
+      });
+      trackingMock.trackKiloPassPurchaseCompleted.mockClear();
+
+      const renewalTransaction = transaction({
+        originalTransactionId: providerSubscriptionId,
+        transactionId: `tx-${crypto.randomUUID()}`,
+        appAccountToken: user.app_store_account_token,
+      });
+      const result = await processAppStoreKiloPassNotification({
+        signedPayload: 'renewal',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.DID_RENEW,
+          }),
+        decodeTransaction: async () => renewalTransaction,
+      });
+
+      expect(result).toEqual({ processed: true });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'app_store',
+          distinctId: user.google_user_email,
+          userId: user.id,
+          purchaseKind: 'renewal',
+          providerTransactionId: renewalTransaction.transactionId,
+          productId: renewalTransaction.productId,
+          environment: renewalTransaction.environment,
+        })
+      );
+    });
+
+    it('tracks SUBSCRIBED with a resolved user and new transaction as initial', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const user = await insertTestUser();
+      const decodedTransaction = transaction({
+        appAccountToken: user.app_store_account_token,
+      });
+
+      const result = await processAppStoreKiloPassNotification({
+        signedPayload: 'subscribed-initial',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.SUBSCRIBED,
+            subtype: Subtype.INITIAL_BUY,
+          }),
+        decodeTransaction: async () => decodedTransaction,
+      });
+
+      expect(result).toEqual({ processed: true });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'app_store',
+          distinctId: user.google_user_email,
+          userId: user.id,
+          purchaseKind: 'initial',
+          providerTransactionId: decodedTransaction.transactionId,
+          productId: decodedTransaction.productId,
+          environment: decodedTransaction.environment,
+        })
+      );
+    });
+
+    it('forwards purchaseKind from completion on DID_CHANGE_RENEWAL_PREF UPGRADE', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const user = await insertTestUser();
+      const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+
+      await processAppStoreKiloPassNotification({
+        signedPayload: 'upgrade-initial',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.SUBSCRIBED,
+            subtype: Subtype.INITIAL_BUY,
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            originalTransactionId: providerSubscriptionId,
+            appAccountToken: user.app_store_account_token,
+          }),
+      });
+      trackingMock.trackKiloPassPurchaseCompleted.mockClear();
+
+      const upgradeTransaction = transaction({
+        originalTransactionId: providerSubscriptionId,
+        transactionId: `tx-${crypto.randomUUID()}`,
+        productId: 'kilopass.tier49.monthly.v1',
+        appAccountToken: user.app_store_account_token,
+      });
+      const result = await processAppStoreKiloPassNotification({
+        signedPayload: 'upgrade-pref',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.DID_CHANGE_RENEWAL_PREF,
+            subtype: Subtype.UPGRADE,
+          }),
+        decodeTransaction: async () => upgradeTransaction,
+      });
+
+      expect(result).toEqual({ processed: true });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      // tier19 → tier49 within the previous purchase's period classifies as a
+      // same-period upgrade in completeStoreKiloPassPurchase (pinned in slice 1);
+      // this asserts the kind is forwarded through the ASSN path.
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'app_store',
+          distinctId: user.google_user_email,
+          userId: user.id,
+          purchaseKind: 'upgrade',
+          providerTransactionId: upgradeTransaction.transactionId,
+          productId: upgradeTransaction.productId,
+          environment: upgradeTransaction.environment,
+        })
+      );
+    });
   });
 
   it('records a renewal notification and completes the subscription once', async () => {

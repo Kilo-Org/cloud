@@ -1,4 +1,5 @@
 import * as Application from 'expo-application';
+import * as Device from 'expo-device';
 import PostHog from 'posthog-react-native';
 import { useCallback, useSyncExternalStore } from 'react';
 
@@ -10,7 +11,23 @@ import { POSTHOG_API_KEY } from '@/lib/config';
  * the web convention (see apps/web PostHogProvider) — otherwise the same
  * person double-counts across platforms.
  *
- * Payload rules (hard): stable enum strings only — no free text, no PII.
+ * Payload rules (hard): stable enum strings only — no free text, no PII. This
+ * binds OUR `captureEvent` / `customAppProperties` payloads. The SDK's stock
+ * auto-captured device fields (`$device_name`, `$device_manufacturer`, etc.)
+ * are an intentional exception — still no PII beyond stock device metadata.
+ *
+ * Auto-captured on every event (posthog-react-native 4.59.0 `native-deps.js`):
+ * - Once `expo-device` is installed: `$device_manufacturer`, `$device_name`,
+ *   `$os_name`, `$os_version`, `$is_emulator`
+ * - Always: `$device_type` (always the string `'Mobile'` — no form-factor
+ *   granularity), `$app_name`/`$app_version`/`$app_build`/`$app_namespace`,
+ *   `$locale`/`$timezone`, `$screen_width`/`$screen_height`
+ *
+ * Brand (`Device.brand`) is skipped — near-duplicate of manufacturer, no extra
+ * segmentation value. Form factor is the real gap: we add `device_form_factor`
+ * via the `customAppProperties` constructor option (merges into `_appProperties`,
+ * lands on every event including the first, survives `client.reset()` — unlike
+ * `register()`). We do not override the reserved `$device_type`.
  */
 
 export const SESSION_VIEWED_EVENT = 'session_viewed';
@@ -57,6 +74,26 @@ function appVersionProperties(): Record<string, string> {
   return props;
 }
 
+// Total mapping of expo-device DeviceType (+ null) → stable enum strings.
+// Always present on every event via customAppProperties; never conditional.
+function deviceFormFactor(): 'phone' | 'tablet' | 'desktop' | 'tv' | 'unknown' {
+  // Total mapping: null / UNKNOWN / unexpected → 'unknown'. if-chain (not
+  // switch) so exhaustiveness over DeviceType | null stays lint-clean.
+  if (Device.deviceType === Device.DeviceType.PHONE) {
+    return 'phone';
+  }
+  if (Device.deviceType === Device.DeviceType.TABLET) {
+    return 'tablet';
+  }
+  if (Device.deviceType === Device.DeviceType.DESKTOP) {
+    return 'desktop';
+  }
+  if (Device.deviceType === Device.DeviceType.TV) {
+    return 'tv';
+  }
+  return 'unknown';
+}
+
 export function initPostHog(): void {
   if (client) {
     return;
@@ -65,6 +102,10 @@ export function initPostHog(): void {
     host: 'https://us.i.posthog.com',
     // No events are sent from dev builds.
     disabled: __DEV__,
+    customAppProperties: properties => ({
+      ...properties,
+      device_form_factor: deviceFormFactor(),
+    }),
   });
   // Super property on every event so dashboards can filter mobile vs web
   // without relying on $lib.

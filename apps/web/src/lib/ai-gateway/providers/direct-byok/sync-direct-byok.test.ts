@@ -227,4 +227,60 @@ describe('parseModelsDevProviderModels', () => {
     expect(models.map(model => model.id)).toEqual(['available']);
     expect(models[0].context_length).toBe(128_000);
   });
+
+  test('excludes explicit capability mismatches while accepting missing metadata', () => {
+    const model = (id: string, overrides: Record<string, unknown> = {}) => ({
+      id,
+      name: id,
+      tool_call: true,
+      modalities: { input: ['text'], output: ['text'] },
+      ...overrides,
+    });
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          chat: model('nvidia/chat', {
+            reasoning: true,
+            reasoning_options: [{ type: 'effort', values: ['none', 'high', 'max'] }],
+            limit: { context: 128000 },
+          }),
+          vision: model('nvidia/vision', {
+            modalities: { input: ['text', 'image'], output: ['text'] },
+          }),
+          unknownCapabilities: { id: 'nvidia/unknown' },
+          unavailable: model('nvidia/unavailable'),
+          noTools: model('nvidia/no-tools', { tool_call: false }),
+          noTextInput: model('nvidia/no-text-input', {
+            modalities: { input: ['image'], output: ['text'] },
+          }),
+        },
+      },
+      'nvidia-byok',
+      new Set([
+        'nvidia/chat',
+        'nvidia/vision',
+        'nvidia/unknown',
+        'nvidia/no-tools',
+        'nvidia/no-text-input',
+      ])
+    );
+
+    expect(models).toEqual([
+      expect.objectContaining({
+        id: 'nvidia/chat',
+        context_length: 128000,
+        flags: ['reasoning'],
+        variants: {
+          none: { reasoning: { enabled: false, effort: 'none' } },
+          high: { reasoning: { enabled: true, effort: 'high' } },
+          max: { reasoning: { enabled: true, effort: 'max' } },
+        },
+      }),
+      expect.objectContaining({
+        id: 'nvidia/vision',
+        input_modalities: ['text', 'image'],
+      }),
+      expect.objectContaining({ id: 'nvidia/unknown' }),
+    ]);
+  });
 });

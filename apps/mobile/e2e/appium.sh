@@ -4,7 +4,7 @@
 # assertion — no report files to inspect). `--exec` holds the same device
 # lock around a multi-command helper.
 #
-#   appium.sh <device> test [-e KEY=VALUE]... <flow.js>
+#   appium.sh <device> test [-e KEY=VALUE]... <flow.js> [more-flows.js]
 #   appium.sh <device> hierarchy
 #   appium.sh <device> server start|stop|status
 #   appium.sh <device> --exec <command...>

@@ -150,13 +150,28 @@ export function remoteAgentLabel(createdOnPlatform: string | undefined): string 
 }
 
 /**
- * Pinned-tray meta line for an active session. Returns the relative timestamp
- * when `updatedAt` is present; otherwise `undefined` so `SessionRow` renders
- * the live dot alone. Never the CLI status — status words in the timestamp
- * slot were a defect (BUSY/IDLE/RETRY).
+ * Timestamp for an active-row meta line: prefer last agent activity, fall back
+ * to row `updatedAt`. Absent both → `undefined` (live dot alone).
  */
-export function remoteMeta(session: { updatedAt?: string }): string | undefined {
-  return session.updatedAt ? formatMeta(session.updatedAt) : undefined;
+export function activeSessionMetaTimestamp(session: {
+  updatedAt?: string;
+  lastActivityAt?: string;
+}): string | undefined {
+  return session.lastActivityAt ?? session.updatedAt;
+}
+
+/**
+ * Pinned-tray meta line for an active session. Prefers `lastActivityAt`, falls
+ * back to `updatedAt`; otherwise `undefined` so `SessionRow` renders the live
+ * dot alone. Never the CLI status — status words in the timestamp slot were a
+ * defect (BUSY/IDLE/RETRY).
+ */
+export function remoteMeta(session: {
+  updatedAt?: string;
+  lastActivityAt?: string;
+}): string | undefined {
+  const ts = activeSessionMetaTimestamp(session);
+  return ts ? formatMeta(ts) : undefined;
 }
 
 /**

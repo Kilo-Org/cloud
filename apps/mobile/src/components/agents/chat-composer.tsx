@@ -38,6 +38,10 @@ import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-se
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
+import {
+  nextStopRemountPhase,
+  type StopRemountPhase,
+} from '@/components/agents/chat-composer-stop-remount';
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { VoiceInputStatus } from '@/components/voice-input-control';
@@ -148,6 +152,17 @@ export function ChatComposer({
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  // Remount the input row after Stop. iOS leaves the multiline TextInput
+  // non-interactive after the editable=false→true flip that happens when
+  // the SDK unlocks the composer post-interrupt (Item 14 E2E gate). Defer
+  // the remount until disabled transitions to false so the new TextInput
+  // mounts with editable=true from the start. Draft text is restored after
+  // remount.
+  const [inputEpoch, setInputEpoch] = useState(0);
+  const pendingDraftRestoreRef = useRef<string | null>(null);
+  const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
+  const [stopCompleted, setStopCompleted] = useState(false);
+  const stopGenerationRef = useRef(0);
   // Live gates for the AppState focus-restore timeout: read at fire time so a
   // disabled/isSending flip cannot re-run the subscription effect and cancel a
   // pending restore after the restore flag was already consumed.
@@ -189,6 +204,43 @@ export function ChatComposer({
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
+  // useTextHeight() returns a new object every render.  Hold the latest
+  // measure in a ref so the draft-restore effect only runs after an
+  // inputEpoch bump (remount), never on a stray measure identity change.
+  const measureRef = useRef(measure);
+  measureRef.current = measure;
+
+  useEffect(() => {
+    const draft = pendingDraftRestoreRef.current;
+    if (draft === null) {
+      return;
+    }
+    pendingDraftRestoreRef.current = null;
+    if (!draft) {
+      return;
+    }
+    inputRef.current?.setNativeProps({
+      text: draft,
+      selection: { start: draft.length, end: draft.length },
+    });
+    setHasText(draft.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(draft));
+    measureRef.current.setText(draft);
+  }, [inputEpoch]);
+
+  // After Stop, remount the input row once the SDK has restored the composer
+  // (Item 14 E2E gate).  The state machine is armed in handleStop and
+  // progresses when onStop's promise settles (stopCompleted) and the parent's
+  // disabled prop clears.  Tracking stop completion directly avoids the race
+  // where React batches the SDK's false→true→false atom writes into a single
+  // render that never commits disabled=true.
+  useEffect(() => {
+    const transition = nextStopRemountPhase(stopRemountPhaseRef.current, disabled, stopCompleted);
+    stopRemountPhaseRef.current = transition.phase;
+    if (transition.shouldRemount) {
+      setInputEpoch(epoch => epoch + 1);
+    }
+  }, [disabled, stopCompleted]);
 
   // Compute base composer disabled before the voice hook so voice can react to it.
   // `isStreaming` is intentionally NOT a composer gate (see
@@ -497,7 +549,31 @@ export function ChatComposer({
 
   function handleStop() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    void onStop?.();
+    pendingDraftRestoreRef.current = textRef.current;
+    Keyboard.dismiss();
+    setIsFocused(false);
+    // Arm the state machine and clear the completion flag.  The effect
+    // watching [disabled, stopCompleted] transitions armed→settled→idle
+    // after the interrupt round-trip finishes and the parent clears the
+    // disabled lock.  A generation counter prevents a stale completion
+    // from a superseded stop call from triggering a premature remount.
+    stopRemountPhaseRef.current = 'armed';
+    setStopCompleted(false);
+    stopGenerationRef.current += 1;
+    const gen = stopGenerationRef.current;
+    const complete = async () => {
+      try {
+        await onStop?.();
+      } catch {
+        // onStop failures are deliberately swallowed — finally already
+        // signalled stopCompleted with the generation guard.
+      } finally {
+        if (stopGenerationRef.current === gen) {
+          setStopCompleted(true);
+        }
+      }
+    };
+    void complete();
   }
 
   function handleInputLayout(event: LayoutChangeEvent) {
@@ -566,6 +642,7 @@ export function ChatComposer({
       <GestureDetector gesture={dismissKeyboardPan}>
         <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
           <ChatComposerInputRow
+            key={inputEpoch}
             attachmentsEnabled={attachmentsEnabled}
             canSend={control.canSend}
             disabled={disabled}

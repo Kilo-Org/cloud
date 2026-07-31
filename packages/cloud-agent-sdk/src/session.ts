@@ -24,6 +24,7 @@ import type { UserWebConnection } from './user-web-connection';
 import type {
   CloudAgentApi,
   CloudAgentStreamTicketResult,
+  CreateRemoteSessionInput,
   RemoteAttachmentPart,
   TransportFactory,
   TransportSink,
@@ -187,7 +188,7 @@ type CloudAgentSession = {
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
-  createRemoteSession: () => Promise<KiloSessionId>;
+  createRemoteSession: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitRemoteSession: () => Promise<void>;
 
   // Capability checks
@@ -478,11 +479,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     retryRemoteCommands() {
       transport?.retryRemoteCommands?.();
     },
-    createRemoteSession: async () => {
+    createRemoteSession: async (input?: CreateRemoteSessionInput) => {
       if (!transport?.createSession) {
         throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
       }
-      return transport.createSession();
+      return transport.createSession(input);
     },
     exitRemoteSession: async () => {
       if (!transport?.exitSession) {

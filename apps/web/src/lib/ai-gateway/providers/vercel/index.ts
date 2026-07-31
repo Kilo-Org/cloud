@@ -96,7 +96,7 @@ export async function shouldRouteToVercel(
   randomSeed: string
 ) {
   // BYOK in the Vercel AI Gateway was not working for Laguna models.
-  if (requestedModel.startsWith('poolside/laguna-')) {
+  if (requestedModel.includes('laguna')) {
     return false;
   }
 

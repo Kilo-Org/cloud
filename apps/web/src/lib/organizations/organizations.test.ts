@@ -507,6 +507,36 @@ describe('Organizations', () => {
       expect(added).toBe(false);
       expect(await getUserOrganizationsWithSeats(member.id)).toHaveLength(0);
     });
+
+    test('disables the personal account for a brand-new user provisioned via SSO', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('SSO Org', owner.id);
+
+      const added = await addSsoUserToOrganization(organization.id, member.id, {
+        isNewUser: true,
+      });
+
+      expect(added).toBe(true);
+      const updatedMember = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, member.id),
+      });
+      expect(updatedMember?.personal_account_disabled).toBe(true);
+    });
+
+    test('leaves the personal account untouched for an existing user authenticating via SSO', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('SSO Org', owner.id);
+
+      const added = await addSsoUserToOrganization(organization.id, member.id);
+
+      expect(added).toBe(true);
+      const updatedMember = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, member.id),
+      });
+      expect(updatedMember?.personal_account_disabled).toBe(false);
+    });
   });
 
   describe('updateUserRoleInOrganization', () => {

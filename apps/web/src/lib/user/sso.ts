@@ -81,7 +81,9 @@ async function processSSOInternal(
 
   const savedUser = res.user;
   // add user to organization since its been fully created
-  const added = await addSsoUserToOrganization(kiloOrg.id, savedUser.id);
+  const added = await addSsoUserToOrganization(kiloOrg.id, savedUser.id, {
+    isNewUser: res.isNew,
+  });
   if (added) {
     // get all owners for org
     const members = await getOrganizationMembers(kiloOrg.id);

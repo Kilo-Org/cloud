@@ -1,0 +1,1 @@
+ALTER TABLE "cli_sessions_v2" ADD COLUMN "last_activity_at" timestamp with time zone;

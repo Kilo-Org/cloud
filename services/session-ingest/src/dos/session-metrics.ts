@@ -322,3 +322,78 @@ export function computeSessionMetrics(
     organizationId: acc.organizationId,
   };
 }
+
+/**
+ * Sum assistant-message `cost` (USD) from inline message rows for live cost persist.
+ * Malformed rows and non-assistant messages are skipped; R2-offloaded rows store '{}' → 0.
+ * Convert to microdollars at the call site with Math.max(0, Math.round(usd * 1_000_000)).
+ */
+export function computeRunningAssistantCostUsd(rows: Array<{ item_data: string }>): number {
+  let total = 0;
+  for (const row of rows) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(row.item_data);
+    } catch {
+      continue;
+    }
+    const parsed = AssistantMessageSchema.safeParse(raw);
+    if (!parsed.success) continue;
+    total += parsed.data.cost;
+  }
+  return nonNegative(total);
+}
+
+const ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
+export const COST_PERSIST_THROTTLE_MS = 30_000;
+
+export type DecideLivePersistArgs = {
+  nowMs: number;
+  wroteActivityItem: boolean;
+  wroteAssistantMessageItem: boolean;
+  idleTransition: boolean;
+  /** Candidate activity value (request ingestedAt ?? Date.now()). */
+  lastActivityValueMs: number;
+  lastActivityPersistedAtMs: number | null;
+  lastActivityPersistedValueMs: number | null;
+  /** null = not computed this batch (no message upsert, no idle). */
+  currentCostMicrodollars: number | null;
+  lastCostPersistedAtMs: number | null;
+  lastCostPersistedMicrodollars: number | null;
+};
+
+/**
+ * Pure throttle / monotonic guards for live activity + cost Postgres persists.
+ * idleTransition forces a cost persist regardless of the 30s window and message flag.
+ */
+export function decideLivePersist(args: DecideLivePersistArgs): {
+  persistActivity: boolean;
+  persistCost: boolean;
+} {
+  const activityNewer =
+    args.lastActivityPersistedValueMs === null ||
+    args.lastActivityValueMs > args.lastActivityPersistedValueMs;
+  const activityThrottleOk =
+    args.lastActivityPersistedAtMs === null ||
+    args.nowMs - args.lastActivityPersistedAtMs >= ACTIVITY_PERSIST_THROTTLE_MS;
+  const persistActivity = args.wroteActivityItem && activityNewer && activityThrottleOk;
+
+  // Monotonic: only open the gate when cost strictly increased (matches SQL CASE).
+  // null last → treat as -1 so any cost ≥ 0 (including 0) can persist once.
+  let persistCost = false;
+  if (
+    args.currentCostMicrodollars !== null &&
+    args.currentCostMicrodollars > (args.lastCostPersistedMicrodollars ?? -1)
+  ) {
+    if (args.idleTransition) {
+      persistCost = true;
+    } else if (args.wroteAssistantMessageItem) {
+      const costThrottleOk =
+        args.lastCostPersistedAtMs === null ||
+        args.nowMs - args.lastCostPersistedAtMs >= COST_PERSIST_THROTTLE_MS;
+      persistCost = costThrottleOk;
+    }
+  }
+
+  return { persistActivity, persistCost };
+}

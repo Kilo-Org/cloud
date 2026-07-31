@@ -62,6 +62,35 @@ describe('activeSessionSchema capabilities', () => {
     }
   });
 
+  it('accepts optional lastActivityAt as a raw DB timestamp string', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+      lastActivityAt: '2026-07-20 08:00:00+00',
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.lastActivityAt).toBe('2026-07-20 08:00:00+00');
+    }
+  });
+
+  it('accepts a session row without lastActivityAt', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.lastActivityAt).toBeUndefined();
+    }
+  });
+
   it('rejects a non-boolean capabilities.attachments value', () => {
     const row = {
       id: 's1',

@@ -32,6 +32,13 @@ const LAST_START_EPOCH_STORAGE_KEY = 'container-usage:last-start-epoch:v1';
 type SandboxDurableObjectState = DurableObjectState<{}>;
 type ContainerStopParams = { reason: 'exit' | 'runtime_signal'; exitCode?: number };
 
+/**
+ * Why a billing generation — and therefore a physical container run — began.
+ * `container-start` is the SDK dispatching onStart; the other two adopt a container
+ * that was already running when attribution or a replacement generation arrived.
+ */
+type ContainerStartTrigger = 'container-start' | 'attribution-adoption' | 'replacement-generation';
+
 const pendingStopReasonSchema = z
   .object({
     generation: z.uuid(),
@@ -91,6 +98,17 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     return createContainerUsageClient(env.CONTAINER_USAGE_METER, {
       service: usageServiceForSandboxClass(this.sandboxClassName),
     });
+  }
+
+  /**
+   * Whether this sandbox's container is currently running.
+   *
+   * Reads Durable Object state only. Calling this over RPC does not boot a sleeping
+   * container, unlike any container fetch, so callers can confirm "nothing is running
+   * in there" without paying for a wake-up.
+   */
+  async isContainerRunning(): Promise<boolean> {
+    return this.ctx.container?.running === true;
   }
 
   async configureBilling(input: unknown): Promise<void> {
@@ -166,7 +184,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
 
       // Adopt containers that were already running when shadow metering rolled out.
       if (this.ctx.container?.running === true) {
-        await this.startBillingGeneration(parsed);
+        await this.startBillingGeneration(parsed, 'attribution-adoption');
       }
     });
   }
@@ -207,7 +225,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
         return;
       }
 
-      await this.startBillingGeneration(input);
+      await this.startBillingGeneration(input, 'container-start');
     });
   }
 
@@ -222,6 +240,20 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       const requestedReason = activityExpiryRequested
         ? 'activity_expired'
         : await this.getPendingStopReason(context.generation);
+      // Pairs with `container_started`: reason plus lifetime makes idle-expiry patterns
+      // queryable in logs instead of only in the usage tables.
+      logger
+        .withTags({ logTag: 'container_stopped', sandboxId: context.instanceId })
+        .withFields({
+          sandboxClass: this.sandboxClassName,
+          generation: context.generation,
+          startEpochMs: context.startEpochMs,
+          reason: requestedReason ?? params?.reason ?? 'runtime_signal',
+          exitCode: params?.exitCode,
+          lifetimeMs: stoppedAtMs - context.startEpochMs,
+          sessionId: context.sessionId,
+        })
+        .info('Container stopped');
       const pending = await this.billingHeartbeat.persistStop(
         {
           reason: requestedReason ?? params?.reason ?? 'runtime_signal',
@@ -275,7 +307,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       if (this.ctx.container?.running !== true) return;
       if (await getBillingContext(this.ctx.storage)) return;
       const input = await this.getPendingAttribution();
-      if (input) await this.startBillingGeneration(input);
+      if (input) await this.startBillingGeneration(input, 'replacement-generation');
     });
   }
 
@@ -340,7 +372,10 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     }
   }
 
-  private async startBillingGeneration(input: SandboxBillingInput): Promise<void> {
+  private async startBillingGeneration(
+    input: SandboxBillingInput,
+    trigger: ContainerStartTrigger
+  ): Promise<void> {
     const previousStartEpochMs =
       (await this.ctx.storage.get<number>(LAST_START_EPOCH_STORAGE_KEY)) ?? -1;
     const startEpochMs = Math.max(Date.now(), previousStartEpochMs + 1);
@@ -361,6 +396,19 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       startEpochMs,
     } satisfies UsageContext & { startEpochMs: number });
     await this.ctx.storage.delete(PENDING_STOP_REASON_STORAGE_KEY);
+    // The only worker-side record that a container run began. `service:sandboxId:startEpochMs`
+    // is the usage `intervalId`, so these fields join a log line to its usage row.
+    logger
+      .withTags({ logTag: 'container_started', sandboxId: input.sandboxId })
+      .withFields({
+        sandboxClass: this.sandboxClassName,
+        generation: context.generation,
+        startEpochMs,
+        trigger,
+        sessionId: input.sessionId,
+        durableObjectId: this.ctx.id.toString(),
+      })
+      .info('Container started');
     await this.admitAndScheduleBestEffort(context);
   }
 }

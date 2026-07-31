@@ -70,11 +70,7 @@ export function PrReviewDiscussionList({
           return (
             <View className="px-4 pb-3">
               <View className="gap-2.5 rounded-xl border border-border bg-card p-3.5">
-                <CommentRow
-                  comment={item.comment}
-                  reactionsDisabled
-                  onToggleReaction={noopReactionToggle}
-                />
+                <CommentRow comment={item.comment} readOnly onToggleReaction={noopReactionToggle} />
               </View>
             </View>
           );

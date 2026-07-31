@@ -1088,7 +1088,39 @@ export class WrapperClient {
   async ensureSessionReady(
     request: WrapperSessionReadyRequest
   ): Promise<WrapperSessionReadySuccessResponse> {
-    return this.request<WrapperSessionReadySuccessResponse>('POST', '/session/ready', request);
+    const response = await this.request<WrapperSessionReadySuccessResponse>(
+      'POST',
+      '/session/ready',
+      request
+    );
+    // Single choke point for both callers (execution orchestrator and the sandbox
+    // ready path), so a given `ensureSessionReady` call logs its outcome exactly
+    // once. This does NOT mean once per session lifetime: `ensureSessionReady` is
+    // called on every dispatch to a sandbox that isn't already `session-ready`,
+    // including ordinary warm follow-up turns. Skip logging those to keep the
+    // "bootstrap" metric scoped to calls that actually did bootstrap work (a cold
+    // clone, or a backup restore even when the marker makes the workspace look
+    // warm). Only the wrapper's `telemetry` object is logged: `workspaceReady`
+    // carries `gitToken`. Older wrappers omit `telemetry` entirely, hence the guard.
+    const telemetry = response.telemetry;
+    if (telemetry && (!telemetry.workspaceWasWarm || telemetry.restoredFromBackup)) {
+      logger.info('Cloud agent workspace bootstrap', {
+        metric: 'cloud_agent_workspace_bootstrap',
+        count: 1,
+        sessionId: request.agentSessionId,
+        // Attaches the platform to a session-scoped event. The read-only command
+        // guard log carries `createdOnPlatform` but no session id, which makes
+        // code-review sessions impossible to isolate without trace-row guesswork.
+        platform: request.materialized.env.KILO_PLATFORM ?? '(none)',
+        workspaceWasWarm: telemetry.workspaceWasWarm,
+        restoredFromBackup: telemetry.restoredFromBackup,
+        // Nested rather than spread: `clone` comes from the wrapper's response
+        // body, which is parsed without runtime schema validation, so an
+        // unexpected key must not be able to overwrite the trusted fields above.
+        clone: telemetry.clone,
+      });
+    }
+    return response;
   }
 
   async updateRuntimeEnvironment(env: Record<string, string>): Promise<void> {

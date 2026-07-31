@@ -1,49 +1,32 @@
 // Reactions row for a single review comment.
 //
-// GitHub's review-comment reactions are a fixed set of 8 emoji
-// (`THUMBS_UP, THUMBS_DOWN, LAUGH, HOORAY, CONFUSED, HEART,
-// ROCKET, EYES`). Each one is rendered as a small pill that shows
-// the current count when > 0 and a darker fill when the viewer
-// has already reacted.
+// Renders non-zero known reaction buckets as pills, plus one
+// smiley-plus "Add reaction" control that opens a picker sheet of
+// all 8 GitHub review reactions. Tapping a pill or picking from the
+// sheet toggles via `onToggle`; the optimistic cache reducer flips
+// count + fill in the same frame.
 //
-// Tapping a pill toggles: if the viewer has reacted, fire
-// `removeReaction`; otherwise `addReaction`. The optimistic cache
-// reducer (`applyReactionToggle`) updates the row instantly, so the
-// count + fill flip in the same frame as the tap.
-//
-// Disabled state is exposed for callers that want to lock the row
-// during the mutation's pending phase (rare — the optimistic update
-// makes the row look responsive; the hook will still rollback on
-// error).
+// `disabled` locks presses during a pending mutation but keeps the
+// add icon mounted (no flicker). `readOnly` (conversation comments)
+// makes pills non-pressable and hides the add icon entirely; a
+// zero-pill read-only row renders null.
 
 import * as Haptics from 'expo-haptics';
+import { SmilePlus } from 'lucide-react-native';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { ReactionPickerSheet } from '@/components/pr-review/discussion/reaction-picker-sheet';
 import { Text } from '@/components/ui/text';
-import {
-  REVIEW_REACTION_CONTENTS,
-  type ReviewReactionContent,
-} from '@/lib/pr-review/discussion/review-discussion-types';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { REACTION_EMOJI, selectReactionPills } from '@/lib/pr-review/discussion/reaction-pills';
+import { type ReviewReactionContent } from '@/lib/pr-review/discussion/review-discussion-types';
 import { cn } from '@/lib/utils';
-
-// Map each GitHub reaction content to the emoji that GitHub itself
-// renders in its UI. Kept inline (not in a shared emoji module) so
-// the discussion tab stays a self-contained slice.
-const REACTION_EMOJI: Record<ReviewReactionContent, string> = {
-  THUMBS_UP: '👍',
-  THUMBS_DOWN: '👎',
-  LAUGH: '😄',
-  HOORAY: '🎉',
-  CONFUSED: '😕',
-  HEART: '❤️',
-  ROCKET: '🚀',
-  EYES: '👀',
-};
 
 type ReactionsRowProps = {
   // Raw reactions from the DTO — `content` is a plain string (GitHub can
-  // return content outside the 8 emoji). We index by string and only render
-  // + toggle the fixed 8 known reactions.
+  // return content outside the 8 emoji). We only render known contents
+  // with count > 0.
   readonly reactions: readonly {
     readonly content: string;
     readonly count: number;
@@ -51,43 +34,75 @@ type ReactionsRowProps = {
   }[];
   readonly onToggle: (content: ReviewReactionContent) => void;
   readonly disabled?: boolean;
+  readonly readOnly?: boolean;
 };
 
-export function ReactionsRow({ reactions, onToggle, disabled }: Readonly<ReactionsRowProps>) {
-  // Index existing reactions by content for O(1) lookup. Missing
-  // reactions render as an empty pill (no count) so the user can
-  // discover the full set.
-  const byContent = new Map<string, { count: number; viewerHasReacted: boolean }>();
-  for (const r of reactions) {
-    byContent.set(r.content, { count: r.count, viewerHasReacted: r.viewerHasReacted });
+export function ReactionsRow({
+  reactions,
+  onToggle,
+  disabled,
+  readOnly,
+}: Readonly<ReactionsRowProps>) {
+  const colors = useThemeColors();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pills = selectReactionPills(reactions);
+  const isDisabled = Boolean(disabled);
+  const isReadOnly = Boolean(readOnly);
+  const pillDisabled = isDisabled || isReadOnly;
+
+  if (pills.length === 0 && isReadOnly) {
+    return null;
   }
+
   return (
-    <View className="flex-row flex-wrap gap-1.5">
-      {REVIEW_REACTION_CONTENTS.map(content => {
-        const existing = byContent.get(content);
-        const count = existing?.count ?? 0;
-        const reacted = existing?.viewerHasReacted ?? false;
-        return (
-          <ReactionPill
-            key={content}
-            content={content}
-            emoji={REACTION_EMOJI[content]}
-            count={count}
-            viewerHasReacted={reacted}
-            disabled={Boolean(disabled)}
-            onPress={() => {
-              void Haptics.selectionAsync();
-              onToggle(content);
-            }}
-          />
-        );
-      })}
+    <View className="flex-row flex-wrap items-center gap-1.5">
+      {pills.map(pill => (
+        <ReactionPill
+          key={pill.content}
+          emoji={REACTION_EMOJI[pill.content]}
+          count={pill.count}
+          viewerHasReacted={pill.viewerHasReacted}
+          disabled={pillDisabled}
+          onPress={() => {
+            void Haptics.selectionAsync();
+            onToggle(pill.content);
+          }}
+        />
+      ))}
+      {isReadOnly ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add reaction"
+          disabled={isDisabled}
+          onPress={() => {
+            void Haptics.selectionAsync();
+            setPickerOpen(true);
+          }}
+          className={cn(
+            'rounded-full border border-border bg-card p-1.5',
+            isDisabled && 'opacity-50'
+          )}
+        >
+          <SmilePlus size={16} color={colors.mutedForeground} />
+        </Pressable>
+      )}
+      <ReactionPickerSheet
+        visible={pickerOpen}
+        reactions={reactions}
+        onClose={() => {
+          setPickerOpen(false);
+        }}
+        onPick={content => {
+          void Haptics.selectionAsync();
+          onToggle(content);
+          setPickerOpen(false);
+        }}
+      />
     </View>
   );
 }
 
 type ReactionPillProps = {
-  readonly content: ReviewReactionContent;
   readonly emoji: string;
   readonly count: number;
   readonly viewerHasReacted: boolean;
@@ -118,16 +133,14 @@ function ReactionPill({
       )}
     >
       <Text className="text-base leading-none">{emoji}</Text>
-      {count > 0 ? (
-        <Text
-          className={cn(
-            'text-xs font-medium tabular-nums',
-            viewerHasReacted ? 'text-accent-soft-foreground' : 'text-muted-foreground'
-          )}
-        >
-          {count}
-        </Text>
-      ) : null}
+      <Text
+        className={cn(
+          'text-xs font-medium tabular-nums',
+          viewerHasReacted ? 'text-accent-soft-foreground' : 'text-muted-foreground'
+        )}
+      >
+        {count}
+      </Text>
     </Pressable>
   );
 }

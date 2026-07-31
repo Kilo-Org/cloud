@@ -14,6 +14,7 @@ import {
 type SessionContextMetricsProps = {
   info: SessionContextInfo | undefined;
   totalCostMicrodollars: number | null;
+  /** When false (empty session), the pill stays hidden — an empty session has no usage or cost to show. */
   hasMessages: boolean;
   onPress?: () => void;
   /**
@@ -45,9 +46,14 @@ export function SessionContextMetrics({
   loading = false,
 }: Readonly<SessionContextMetricsProps>) {
   const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages });
+  // A session with no messages has neither context usage nor cost to show. Keep
+  // the pill's layout box reserved (same mechanism as `loading`) so the header
+  // does not shift when the first message lands, but keep it invisible and out
+  // of the accessibility tree.
+  const hidden = loading || !hasMessages;
   // Single source for element kind and a11y affordance wording so a future
   // caller with interactive content but no onPress cannot advertise a tap.
-  const pressable = !loading && content.interactive && onPress != null;
+  const pressable = !hidden && content.interactive && onPress != null;
   const accessibilityLabel = getMetricsAccessibilityLabel({
     info,
     totalCostMicrodollars,
@@ -105,10 +111,10 @@ export function SessionContextMetrics({
   return (
     <View
       accessibilityLabel={accessibilityLabel || undefined}
-      {...(loading
+      {...(hidden
         ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
         : {})}
-      className={cn(pillClassName, loading && 'opacity-0')}
+      className={cn(pillClassName, hidden && 'opacity-0')}
       testID="session-context-metrics"
     >
       {body}

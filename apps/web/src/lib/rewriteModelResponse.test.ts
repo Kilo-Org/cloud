@@ -148,10 +148,10 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({
       error:
-        'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)',
       error_type: 'upstream_disconnect',
       message:
-        'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)',
       vercel_request_id: 'iad1::iad1::request-id',
     });
   });
@@ -169,7 +169,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
 
     expect(events).toHaveLength(1);
     expect(events[0].error.message).toBe(
-      'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)'
+      'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)'
     );
     expect(events[0].error.vercel_request_id).toBe('iad1::iad1::request-id');
   });
@@ -186,7 +186,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     }[];
 
     expect(events[0].error.message).toBe(
-      'The upstream provider disconnected while sending the response.'
+      'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.'
     );
     expect(events[0].error.vercel_request_id).toBeUndefined();
   });

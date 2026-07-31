@@ -208,7 +208,7 @@ function getResponseReadError(
     return {
       errorType: 'upstream_disconnect',
       message: withRequestId(
-        'The upstream provider disconnected while sending the response.',
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.',
         vercelRequestId
       ),
     };

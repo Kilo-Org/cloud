@@ -29,6 +29,8 @@ type ChildSessionSheetProps = {
   onOpenChildSession: OpenChildSession;
   onRetry: () => void;
   onClose: () => void;
+  /** Fires on iOS after the native pageSheet dismiss animation completes. */
+  onDismiss?: () => void;
 };
 
 // eslint-disable-next-line no-empty-function -- child sessions are hydrated one-shot, no pagination
@@ -45,6 +47,7 @@ export function ChildSessionSheet({
   onOpenChildSession,
   onRetry,
   onClose,
+  onDismiss,
 }: Readonly<ChildSessionSheetProps>) {
   const messages = getChildMessages(sessionId);
   const state = getChildSessionSheetState(hydrationState, messages.length);
@@ -118,6 +121,7 @@ export function ChildSessionSheet({
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <View className="flex-1 bg-background">
         <SheetHeader title={title} onDone={onClose} />

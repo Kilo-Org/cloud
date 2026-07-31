@@ -372,14 +372,21 @@ export function SessionDetailContent({
 
   const CHILD_SHEET_RELEASE_DELAY_MS = 350;
 
+  /** Releases the sheet identity via the native onDismiss path (iOS) or the fallback timer. */
+  const handleChildSheetDismiss = useCallback(() => {
+    clearChildSheetReleaseTimeout();
+    setChildSessionSheet(current => releaseChildSessionSheet(current));
+  }, [clearChildSheetReleaseTimeout]);
+
   const handleCloseChildSession = useCallback(() => {
     clearChildSheetReleaseTimeout();
     setChildSessionSheet(closeChildSessionSheet);
-    childSheetReleaseTimeoutRef.current = setTimeout(() => {
-      childSheetReleaseTimeoutRef.current = null;
-      setChildSessionSheet(current => releaseChildSessionSheet(current));
-      // covers the native dismiss animation; the white flash is iOS-specific
-    }, CHILD_SHEET_RELEASE_DELAY_MS);
+    if (Platform.OS !== 'ios') {
+      childSheetReleaseTimeoutRef.current = setTimeout(() => {
+        childSheetReleaseTimeoutRef.current = null;
+        setChildSessionSheet(current => releaseChildSessionSheet(current));
+      }, CHILD_SHEET_RELEASE_DELAY_MS);
+    }
   }, [clearChildSheetReleaseTimeout]);
 
   const transcript = useMemo(
@@ -790,6 +797,7 @@ export function SessionDetailContent({
             void manager.hydrateChildSession(openSheet.sessionId);
           }}
           onClose={handleCloseChildSession}
+          onDismiss={handleChildSheetDismiss}
         />
       ) : null}
 

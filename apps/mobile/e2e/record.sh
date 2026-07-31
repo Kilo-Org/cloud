@@ -79,9 +79,13 @@ read_state() {
 
 write_state() {
   # usage: write_state key value ...
+  # Capture encode first so a failed b64_encode is fatal (command-sub status
+  # alone is not enough under set -e for the printf pipeline).
+  local encoded
   : >"$STATE_FILE"
   while [ $# -ge 2 ]; do
-    printf '%s=%s\n' "$1" "$(b64_encode "$2")" >>"$STATE_FILE" || return 1
+    encoded=$(b64_encode "$2") || return 1
+    printf '%s=%s\n' "$1" "$encoded" >>"$STATE_FILE" || return 1
     shift 2
   done
 }

@@ -14,10 +14,20 @@ Slots". Before dispatching verifiers, the owner runs:
 ```
 
 The owner starts every bundle resource through `e2e-start-resource.sh`, passes
-the ready services and device identifiers in each verifier handoff, then stops
-every resource through `e2e-stop-resource.sh` before freeing the slot. Taking
-is idempotent per session. Parallel iOS and Android verifiers share this bundle
-and never take another slot.
+its platform scope, start command, and the ready services and device identifiers
+in each verifier handoff, then stops every resource it started through
+`e2e-stop-resource.sh` before freeing the slot. Taking is idempotent per session.
+One iOS verifier is the default for this bundle; parallel iOS and Android shards
+run only when the handoff records a platform rationale (platform-specific paths
+touched or a prior platform-specific defect). Parallel platform shards share the
+same slot bundle and never take another slot. The slot owner is responsible for
+the whole round lifecycle; do not hold a slot through planning, review, or CI
+waits.
+
+Slot ownership is round-scoped and the platform scope is recorded in every
+device/stack handoff. The default is iOS-only; dual-platform requires a
+recorded rationale. See `.kilo_workflow/WORKFLOW.md` "E2E Slots" and "E2E Loop"
+for the scope table and lifecycle.
 
 ## Fresh Worktree Quickstart
 
@@ -51,11 +61,23 @@ after taking its slot:
 
 The script also refreshes the session-ingest Secrets Store binding, applies migrations, and fails fast when a requested service or the kiloclaw docker bridge never comes up.
 
-To bring the whole bundle up at once (stack, iOS claim+build, Android start+claim+build — three chains in parallel, the slowest sets the wall time instead of the sum):
+To bring the whole bundle up at once (stack, iOS claim+build, and optionally
+Android start+claim+build — selected chains run in parallel, the slowest sets
+the wall time instead of the sum):
+
+```bash
+.kilo_workflow/e2e-start-resource.sh bundle --ios-only
+```
+
+For dual-platform rounds (recorded rationale required):
 
 ```bash
 .kilo_workflow/e2e-start-resource.sh bundle <avd-name> [--gpu host]
 ```
+
+The start wrapper prebuilds the generated `apps/mobile/{ios,android}` projects
+when needed and emits compact JSON / summary lines on stdout for the devices it
+claims. The generated trees are gitignored.
 
 Rules:
 
@@ -107,21 +129,25 @@ Pinned surface only: REST pull/repo/check-runs/statuses/`pulls/{n}/files` (pagin
 
 ## iOS Simulator
 
-The bundle owner claims and builds before dispatch. Never share a simulator
-with another worktree; the claim command prefers an unclaimed shutdown iPhone
-and boots it:
+The bundle owner claims and builds before dispatch. The start wrapper does both
+in one command; never share a simulator with another worktree. The claim command
+prefers an unclaimed shutdown iPhone and boots it:
 
 ```bash
-.kilo_workflow/e2e-start-resource.sh ios [udid]  # idempotent per worktree
+.kilo_workflow/e2e-start-resource.sh ios [udid]  # claim + build, idempotent per worktree
 .kilo_workflow/e2e-stop-resource.sh ios          # this worktree's claims
 ```
 
 The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted. A claim killed mid-boot boots the Shutdown device again on reclaim automatically; give claims a >=10-minute timeout under parallel-workflow load (booting is slow).
 
-Install a validated cached native build. A compatible fingerprint skips rebuilding; a cache miss serializes through the host-wide native compiler semaphore. Never install an arbitrary DerivedData app or run a separate Expo native build:
+Install a validated cached native build. `e2e-start-resource.sh ios` already
+runs this for the claimed device; use the standalone build command only for
+rebuilds. A compatible fingerprint skips rebuilding; a cache miss serializes
+through the host-wide native compiler semaphore. Never install an arbitrary
+DerivedData app or run a separate Expo native build:
 
 ```bash
-pnpm dev:mobile:ios build <udid>
+pnpm dev:mobile:ios build <udid>   # rebuild only; the start wrapper already builds
 ```
 
 Connect the app to the Metro URL shown by this worktree's `mobile` pane:
@@ -278,17 +304,26 @@ On failure run `.kilo_workflow/e2e-stop-resource.sh android`; it uses the record
 
 ### Build and login
 
-Claim the serial (idempotent), then build:
+`e2e-start-resource.sh android <avd-name>` already prebuilds (when
+`apps/mobile/android/` is missing), starts the emulator, claims the serial, and
+builds it. On the primary path, run login next:
 
 ```bash
-pnpm dev:mobile:android claim <serial>
-pnpm dev:mobile:android build <serial>   # validated cached APK only
-apps/mobile/e2e/login.sh <serial>
+EMULATOR=$(.kilo_workflow/e2e-start-resource.sh android <avd-name> --gpu host)
+SERIAL=$(jq -r .serial <<<"$EMULATOR")
+apps/mobile/e2e/login.sh "$SERIAL"
 ```
 
-`build` installs a validated cached APK when the Android native fingerprint and toolchain match. Never install an APK from another output path or invoke Gradle directly. Reinstall via `build <serial>` only when the native fingerprint changed, never to reset app state.
+`build` installs a validated cached APK when the Android native fingerprint and toolchain match. Never install an APK from another output path or invoke Gradle directly. Reinstall via `build <serial>` only when the native fingerprint changed, never to reset app state. For rebuilds only, the manual claim and build commands are:
 
-`build` reads the generated Android project, and `apps/mobile/android/` is git-ignored — a fresh worktree has none. Run `npx expo prebuild --platform android` in `apps/mobile` once before the first `build`; it is codegen only, needs no wrapper, and a missing project is the one failure `build` cannot fix itself.
+```bash
+pnpm dev:mobile:android claim <serial>   # idempotent
+pnpm dev:mobile:android build <serial>   # validated cached APK only
+```
+
+`apps/mobile/android/` is git-ignored and a fresh worktree has none. The
+wrapper runs `npx expo prebuild --platform android` when needed; that step is
+codegen only, needs no wrapper, and the generated tree is gitignored.
 
 `login.sh` and `logout.sh` accept an iOS simulator UDID or an Android ADB serial. On Android, `login.sh`'s shared preflight verifies the claim, applies both `adb reverse` mappings (the `nextjs` service's API port and the `mobile` service's Metro port, both from `pnpm dev:status --json` — there is no service named `metro`), and opens the dev-client deep link itself. On the primary path no manual reverse or `am start` is needed.
 
@@ -338,12 +373,13 @@ rm -f "$LOGIN_LOG"
 
 After all verifiers return, the bundle owner stops everything it started —
 conditional resources first (skip any never started), then the bundle — and
-frees the slot:
+frees the slot. An iOS-only round has no Android resources to stop, so the
+Android stop line is skipped by the same skip-any-never-started rule:
 
 ```bash
 apps/mobile/e2e/remote-cli.sh stop                                                 # only after remote-cli.sh start
 tmux kill-session -t "kilo-e2e-github-stub-$(basename "$PWD")" 2>/dev/null || true  # only after the GitHub stub
-.kilo_workflow/e2e-stop-resource.sh android
+.kilo_workflow/e2e-stop-resource.sh android                                        # only if android was started
 .kilo_workflow/e2e-stop-resource.sh ios
 .kilo_workflow/e2e-stop-resource.sh stack
 .kilo_workflow/e2e-free-slot.sh   # refuses while any resource above is still live

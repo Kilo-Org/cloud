@@ -53,11 +53,11 @@ A section can still take hours of unattended machine time when builds or live E2
 | [`launch-gate.sh`](launch-gate.sh) | Spaces Kilo CLI startups through a recoverable machine-global lock |
 | [`await-interactive.sh`](await-interactive.sh) | Watches an interactive session for the monitor: COMPLETED, BLOCKED, DEAD, QUIET, or RUNNING |
 | [`steer.sh`](steer.sh) | Delivers a message to a running interactive session (starter, planner, orchestrator) and confirms it was submitted |
-| [`e2e-take-slot.sh`](e2e-take-slot.sh) | Takes one of three machine-global E2E bundle slots (stack + iOS + Android + other resources) |
-| [`e2e-start-resource.sh`](e2e-start-resource.sh) | Starts a stack, iOS simulator, Android emulator, or explicit custom resource after proving the caller holds a slot |
+| [`e2e-take-slot.sh`](e2e-take-slot.sh) | Takes one of three machine-global E2E bundle slots for the current round (default: iOS-only scope) |
+| [`e2e-start-resource.sh`](e2e-start-resource.sh) | Starts a stack, iOS simulator, Android emulator, or explicit custom resource after proving the caller holds a slot; also prebuilds/builds/claims the device as needed. Default bundle form is `--ios-only`; use `bundle <avd>` for dual-platform |
 | [`e2e-stop-resource.sh`](e2e-stop-resource.sh) | Stops the matching resource through its repository wrapper |
 | [`e2e-free-slot.sh`](e2e-free-slot.sh) | Frees the caller's slot after its resources are stopped |
-| [`e2e-slot-status.sh`](e2e-slot-status.sh) | Reclaims dead owners and reports live slots plus known resources with no slot |
+| [`e2e-slot-status.sh`](e2e-slot-status.sh) | Reclaims dead owners and reports live slots plus known resources with no slot; also enumerates booted devices with no claim record and claimed devices that are no longer booted. The all-clear footer prints only when zero findings |
 | [`slice-diff.sh`](slice-diff.sh) | Emits one slice's diff for review plus a snapshot fingerprint; `--check` judges the round for violations |
 | [`baseline.sh`](baseline.sh) | Records a worktree's exact git state and later proves the E2E verifier's byte-identical restore |
 | [`pr-gate.sh`](pr-gate.sh) | Checks the completion gate's mechanical items against one head SHA (CI, threads, assignee, bot summary) |

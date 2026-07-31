@@ -108,7 +108,7 @@ export function CostInsightsSettingsView({
               </div>
             </section>
 
-            {data.enabled && (
+            {data.enabled ? (
               <div className="border-border ml-6 divide-y border-l sm:ml-10">
                 <section
                   className="grid gap-5 px-6 py-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]"
@@ -172,6 +172,14 @@ export function CostInsightsSettingsView({
                   onChange={threshold30DayUsd => onChange?.({ threshold30DayUsd })}
                 />
               </div>
+            ) : (
+              <p
+                id="spend-alert-options-hidden"
+                className="type-label text-muted-foreground px-6 pb-6"
+                role="status"
+              >
+                Turn on Spend Alerts to manage anomaly and threshold settings.
+              </p>
             )}
           </div>
         </CardContent>

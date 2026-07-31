@@ -36,7 +36,8 @@ export function SpendEvidenceCard({
   const totals = evidence.map(point => point.variableUsd + point.scheduledUsd);
   const axisMax = niceCeil(Math.max(0, ...totals));
   const hasSpend = axisMax > 0;
-  const hasIncompleteEvidence = hasSpend && evidence.some(point => point.coverage !== 'complete');
+  const hasIncompleteEvidence = evidence.some(point => point.coverage !== 'complete');
+  const shouldRenderChart = hasSpend || hasIncompleteEvidence;
   const rangeLabel = {
     '1h': 'This hour',
     '24h': 'Last 24 hours',
@@ -45,7 +46,7 @@ export function SpendEvidenceCard({
     '90d': 'Last 90 days',
   }[range];
   const highest = evidence
-    .filter(point => point.variableUsd + point.scheduledUsd > 0)
+    .filter(point => point.coverage !== 'unavailable' && point.variableUsd + point.scheduledUsd > 0)
     .reduce<(typeof evidence)[number] | undefined>((currentHighest, point) => {
       if (!currentHighest) return point;
       const currentTotal = currentHighest.variableUsd + currentHighest.scheduledUsd;
@@ -111,7 +112,7 @@ export function SpendEvidenceCard({
             Use Left and Right Arrow keys to inspect each period. Use Home and End to jump to the
             first or last period.
           </p>
-          {hasSpend ? (
+          {shouldRenderChart ? (
             <div className="border-border bg-surface-inset rounded-lg border p-4">
               <fieldset
                 aria-describedby={chartInstructionsId}
@@ -133,11 +134,13 @@ export function SpendEvidenceCard({
                   const scheduledShare = percentOf(point.scheduledUsd, pointTotal);
                   const showTick = index % tickStride === 0 || index === evidence.length - 1;
                   const accessibilityLabel =
-                    pointTotal === 0
-                      ? `${point.label}: no spend`
-                      : point.coverage === 'unavailable'
-                        ? `${point.label}: spend data unavailable, ${point.coveredHours} of ${point.totalHours} hours covered`
-                        : `${point.label}: ${point.coverage === 'partial' ? 'at least ' : ''}${money(pointTotal)} total, ${money(point.variableUsd)} usage-based, ${money(point.scheduledUsd)} scheduled${point.coverage === 'partial' ? `, ${point.coveredHours} of ${point.totalHours} hours covered` : ''}`;
+                    point.coverage === 'unavailable'
+                      ? `${point.label}: spend data unavailable, ${point.coveredHours} of ${point.totalHours} hours covered`
+                      : point.coverage === 'partial'
+                        ? `${point.label}: at least ${money(pointTotal)} total, ${money(point.variableUsd)} usage-based, ${money(point.scheduledUsd)} scheduled, ${point.coveredHours} of ${point.totalHours} hours covered`
+                        : pointTotal === 0
+                          ? `${point.label}: no spend`
+                          : `${point.label}: ${money(pointTotal)} total, ${money(point.variableUsd)} usage-based, ${money(point.scheduledUsd)} scheduled`;
                   return (
                     <Tooltip key={point.periodStart}>
                       <TooltipTrigger asChild>
@@ -193,9 +196,14 @@ export function SpendEvidenceCard({
                       </TooltipTrigger>
                       <TooltipContent side="top" sideOffset={8} className="min-w-44 p-3">
                         <div className="type-label font-medium">{point.label}</div>
-                        {pointTotal === 0 ? (
+                        {point.coverage === 'unavailable' ? (
+                          <p className="type-label text-muted-foreground mt-2">
+                            Spend data unavailable. Covered {point.coveredHours} of{' '}
+                            {point.totalHours} hours.
+                          </p>
+                        ) : point.coverage === 'complete' && pointTotal === 0 ? (
                           <p className="type-label text-muted-foreground mt-2">No spend.</p>
-                        ) : point.coverage !== 'unavailable' ? (
+                        ) : (
                           <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 type-label">
                             <dt className="text-muted-foreground">
                               {point.coverage === 'partial' ? 'Known spend' : 'Total'}
@@ -223,11 +231,6 @@ export function SpendEvidenceCard({
                               </dt>
                             )}
                           </dl>
-                        ) : (
-                          <p className="type-label text-muted-foreground mt-2">
-                            Spend data unavailable. Covered {point.coveredHours} of{' '}
-                            {point.totalHours} hours.
-                          </p>
                         )}
                       </TooltipContent>
                     </Tooltip>

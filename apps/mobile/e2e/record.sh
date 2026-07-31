@@ -291,9 +291,14 @@ case "$cmd" in
           fi
           ;;
         *)
-          pgrep -f "simctl io $DEVICE recordVideo" 2>/dev/null | while read -r orphan; do
-            kill -INT "$orphan" 2>/dev/null || true
-          done
+          # pgrep exits 1 when nothing matches; keep stop idempotent under set -e.
+          orphans=$(pgrep -f "simctl io $DEVICE recordVideo" 2>/dev/null || true)
+          if [ -n "$orphans" ]; then
+            printf '%s\n' "$orphans" | while read -r orphan; do
+              [ -n "$orphan" ] || continue
+              kill -INT "$orphan" 2>/dev/null || true
+            done
+          fi
           ;;
       esac
       clear_state

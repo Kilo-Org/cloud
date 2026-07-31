@@ -10,7 +10,11 @@ import {
   generateGitHubInstallationToken,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
-import type { DependabotAlertRaw, DependabotAlertState } from '../core/types';
+import type {
+  DependabotAlertRaw,
+  DependabotAlertsAvailability,
+  DependabotAlertState,
+} from '../core/types';
 import { errorExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
 
 const log = sentryLogger('security-agent:dependabot-api', 'info');
@@ -121,8 +125,6 @@ type FetchAlertsSkipStatus =
   | 'access_blocked'
   | 'auth_invalid';
 
-export type DependabotAlertsAvailability = 'enabled' | 'disabled' | 'unknown';
-
 export type RepositoryDependabotAlertsAvailability = {
   id: number;
   status: DependabotAlertsAvailability;
@@ -139,6 +141,13 @@ const DEPENDABOT_DISABLED_HINTS = [
 // The repo exists but our app can't read it — should block freshness
 // advancement so the owner doesn't look fully synced.
 const ACCESS_BLOCKED_HINTS = ['repository access blocked'] as const;
+
+const DEPENDABOT_AVAILABILITY_CACHE_TTL_MS = 30 * 60_000;
+const dependabotAvailabilityCache = new Map<
+  string,
+  { status: DependabotAlertsAvailability; expiresAtMs: number }
+>();
+const dependabotAvailabilityInFlight = new Map<string, Promise<DependabotAlertsAvailability>>();
 
 function normalizeErrorMessage(message?: string): string {
   return (message ?? '').toLowerCase();
@@ -193,45 +202,58 @@ export async function checkDependabotAlertsAvailability(
 ): Promise<RepositoryDependabotAlertsAvailability[]> {
   if (repositories.length === 0) return [];
 
+  const now = Date.now();
+  const cachedResults = new Map<number, DependabotAlertsAvailability>();
+  const repositoriesToCheck = repositories.filter(repository => {
+    const cacheKey = dependabotAvailabilityCacheKey(installationId, appType, repository.fullName);
+    const cached = dependabotAvailabilityCache.get(cacheKey);
+    if (!cached) return true;
+    if (cached.expiresAtMs <= now) {
+      dependabotAvailabilityCache.delete(cacheKey);
+      return true;
+    }
+    cachedResults.set(repository.id, cached.status);
+    return false;
+  });
+
+  if (repositoriesToCheck.length === 0) {
+    return repositories.map(repository => ({
+      id: repository.id,
+      status: cachedResults.get(repository.id) ?? 'unknown',
+    }));
+  }
+
   let token: string;
   try {
     token = (await generateGitHubInstallationToken(installationId, appType)).token;
   } catch {
     warnExceptInTest('Unable to authenticate while checking Dependabot alerts availability');
-    return repositories.map(repository => ({ id: repository.id, status: 'unknown' }));
+    return repositories.map(repository => ({
+      id: repository.id,
+      status: cachedResults.get(repository.id) ?? 'unknown',
+    }));
   }
 
   const octokit = new Octokit({ auth: token });
   const limit = pLimit(5);
-
-  const results = await Promise.all(
-    repositories.map(repository =>
+  const checkedResults = await Promise.all(
+    repositoriesToCheck.map(repository =>
       limit(async (): Promise<RepositoryDependabotAlertsAvailability> => {
-        const [owner, repo, ...extraParts] = repository.fullName.split('/');
-        if (!owner || !repo || extraParts.length > 0) {
-          return { id: repository.id, status: 'unknown' };
-        }
-
-        try {
-          await octokit.rest.dependabot.listAlertsForRepo({
-            owner,
-            repo,
-            state: 'open',
-            per_page: 1,
-          });
-          return { id: repository.id, status: 'enabled' };
-        } catch (error) {
-          const httpStatus = (error as { status?: number }).status;
-          const message = (error as { message?: string }).message;
-          if (classifyFetchAlertsError(httpStatus, message) === 'alerts_disabled') {
-            return { id: repository.id, status: 'disabled' };
-          }
-
-          return { id: repository.id, status: 'unknown' };
-        }
+        const status = await checkRepositoryDependabotAlertsAvailability({
+          installationId,
+          appType,
+          repositoryFullName: repository.fullName,
+          octokit,
+        });
+        return { id: repository.id, status };
       })
     )
   );
+  const checkedResultsById = new Map(checkedResults.map(result => [result.id, result.status]));
+  const results = repositories.map(repository => ({
+    id: repository.id,
+    status: cachedResults.get(repository.id) ?? checkedResultsById.get(repository.id) ?? 'unknown',
+  }));
 
   const unknownCount = results.filter(result => result.status === 'unknown').length;
   if (unknownCount > 0) {
@@ -241,6 +263,76 @@ export async function checkDependabotAlertsAvailability(
   }
 
   return results;
+}
+
+async function checkRepositoryDependabotAlertsAvailability(input: {
+  installationId: string;
+  appType: GitHubAppType;
+  repositoryFullName: string;
+  octokit: Octokit;
+}): Promise<DependabotAlertsAvailability> {
+  const cacheKey = dependabotAvailabilityCacheKey(
+    input.installationId,
+    input.appType,
+    input.repositoryFullName
+  );
+  const inFlight = dependabotAvailabilityInFlight.get(cacheKey);
+  if (inFlight) return await inFlight;
+
+  const promise = fetchRepositoryDependabotAlertsAvailability(
+    input.repositoryFullName,
+    input.octokit
+  );
+  dependabotAvailabilityInFlight.set(cacheKey, promise);
+
+  try {
+    const status = await promise;
+    if (status !== 'unknown') {
+      dependabotAvailabilityCache.set(cacheKey, {
+        status,
+        expiresAtMs: Date.now() + DEPENDABOT_AVAILABILITY_CACHE_TTL_MS,
+      });
+    }
+    return status;
+  } finally {
+    dependabotAvailabilityInFlight.delete(cacheKey);
+  }
+}
+
+async function fetchRepositoryDependabotAlertsAvailability(
+  repositoryFullName: string,
+  octokit: Octokit
+): Promise<DependabotAlertsAvailability> {
+  const [owner, repo, ...extraParts] = repositoryFullName.split('/');
+  if (!owner || !repo || extraParts.length > 0) return 'unknown';
+
+  try {
+    await octokit.rest.dependabot.listAlertsForRepo({
+      owner,
+      repo,
+      state: 'open',
+      per_page: 1,
+    });
+    return 'enabled';
+  } catch (error) {
+    const httpStatus = (error as { status?: number }).status;
+    const message = (error as { message?: string }).message;
+    return classifyFetchAlertsError(httpStatus, message) === 'alerts_disabled'
+      ? 'disabled'
+      : 'unknown';
+  }
+}
+
+function dependabotAvailabilityCacheKey(
+  installationId: string,
+  appType: GitHubAppType,
+  repositoryFullName: string
+): string {
+  return JSON.stringify([
+    installationId.trim().toLowerCase(),
+    appType,
+    repositoryFullName.trim().toLowerCase(),
+  ]);
 }
 
 /**

@@ -14,6 +14,7 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityRemediationAdmissionRejectionReason } from '@kilocode/worker-utils/security-remediation-policy';
 import { getSecurityCommandFailureMessage } from '@kilocode/app-shared/security-agent';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
+import type { DependabotAlertsAvailability } from '@/lib/security-agent/core/types';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
 import { getRemediationUnavailableCopy } from './remediation-unavailable-copy';
@@ -81,14 +82,14 @@ type SecurityAgentContextValue = {
     fullName: string;
     name: string;
     private: boolean;
-    dependabotAlerts: 'enabled' | 'disabled' | 'unknown';
+    dependabotAlerts: DependabotAlertsAvailability;
   }>;
   filteredRepositories: Array<{
     id: number;
     fullName: string;
     name: string;
     private: boolean;
-    dependabotAlerts: 'enabled' | 'disabled' | 'unknown';
+    dependabotAlerts: DependabotAlertsAvailability;
   }>;
 
   // Mutation handlers
@@ -180,6 +181,7 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
 }
 
 const COMMAND_POLL_INTERVAL_MS = 3000;
+const REPOSITORY_AVAILABILITY_STALE_TIME_MS = 30 * 60_000;
 const EMPTY_REPOSITORIES: SecurityAgentContextValue['allRepositories'] = [];
 const EMPTY_REPOSITORY_IDS: number[] = [];
 const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositories'] = [];
@@ -629,8 +631,13 @@ function useSecurityAgentProviderValue(
   // Repositories query
   const { data: reposData } = useQuery(
     isOrg
-      ? trpc.organizations.securityAgent.getRepositories.queryOptions({ organizationId })
-      : trpc.securityAgent.getRepositories.queryOptions()
+      ? trpc.organizations.securityAgent.getRepositories.queryOptions(
+          { organizationId },
+          { staleTime: REPOSITORY_AVAILABILITY_STALE_TIME_MS }
+        )
+      : trpc.securityAgent.getRepositories.queryOptions(undefined, {
+          staleTime: REPOSITORY_AVAILABILITY_STALE_TIME_MS,
+        })
   );
 
   // Orphaned repositories query

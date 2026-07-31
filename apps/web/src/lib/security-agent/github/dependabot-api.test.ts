@@ -97,12 +97,30 @@ describe('dependabot-api', () => {
     });
   });
 
+  it('reuses a recent repository result without another GitHub request', async () => {
+    const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
+    mockListAlertsForRepo.mockResolvedValue({ data: [] });
+    const repositories = [{ id: 1, fullName: 'cache-test/widgets' }];
+
+    await expect(
+      checkDependabotAlertsAvailability('cache-installation', 'standard', repositories)
+    ).resolves.toEqual([{ id: 1, status: 'enabled' }]);
+    await expect(
+      checkDependabotAlertsAvailability('cache-installation', 'standard', repositories)
+    ).resolves.toEqual([{ id: 1, status: 'enabled' }]);
+
+    expect(mockGenerateGitHubInstallationToken).toHaveBeenCalledTimes(1);
+    expect(mockListAlertsForRepo).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps every repository unknown when GitHub authentication fails', async () => {
     const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
     mockGenerateGitHubInstallationToken.mockRejectedValueOnce(new Error('auth unavailable'));
 
     await expect(
-      checkDependabotAlertsAvailability('inst-1', 'standard', [{ id: 1, fullName: 'acme/widgets' }])
+      checkDependabotAlertsAvailability('auth-failure-installation', 'standard', [
+        { id: 1, fullName: 'auth-failure/widgets' },
+      ])
     ).resolves.toEqual([{ id: 1, status: 'unknown' }]);
 
     expect(mockListAlertsForRepo).not.toHaveBeenCalled();

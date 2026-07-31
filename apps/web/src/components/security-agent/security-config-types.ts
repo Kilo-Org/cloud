@@ -1,4 +1,5 @@
 import type { Repository } from '@/components/code-reviews/RepositoryMultiSelect';
+import type { DependabotAlertsAvailability } from '@/lib/security-agent/core/types';
 
 export type SlaConfig = {
   critical: number;
@@ -13,8 +14,6 @@ export type AutoAnalysisMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type AutoRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type NotificationMinSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type RepositorySelectionMode = 'all' | 'selected';
-
-export type DependabotAlertsAvailability = 'enabled' | 'disabled' | 'unknown';
 
 export type SecurityRepository = {
   id: number;

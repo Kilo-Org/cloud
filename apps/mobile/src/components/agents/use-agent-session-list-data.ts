@@ -8,6 +8,7 @@ import {
   type SessionSection,
 } from '@/components/agents/session-list-helpers';
 import { selectEffectiveSearchQuery } from '@/components/agents/session-list-search-busy';
+import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import {
   useAgentSessions,
   useAgentSessionSearch,
@@ -18,7 +19,7 @@ export function useAgentSessionListData(options: {
   organizationId: string | null;
   platformFilter: string[];
   projectFilter: string[];
-  sortBy: string;
+  sortBy: AgentSessionSortBy;
   ready: boolean;
   searchQuery: string;
 }) {

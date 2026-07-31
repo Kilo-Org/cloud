@@ -7,7 +7,11 @@ import { Plus } from 'lucide-react-native';
 import { ActiveNowSection } from '@/components/agents/active-now-section';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
-import { AgentSessionListContent, FAB_MARGIN } from '@/components/agents/session-list-content';
+import {
+  AgentSessionListContent,
+  FAB_MARGIN,
+  FAB_SIZE,
+} from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
@@ -159,7 +163,12 @@ export function AgentSessionListScreen() {
   }, [clearSearchInput, searchController, setFilters]);
 
   const fabStyle = useMemo(
-    () => ({ bottom: tabBarHeight + FAB_MARGIN, right: 20 }),
+    () => ({
+      bottom: tabBarHeight + FAB_MARGIN,
+      right: 20,
+      width: FAB_SIZE,
+      height: FAB_SIZE,
+    }),
     [tabBarHeight]
   );
 
@@ -259,7 +268,7 @@ export function AgentSessionListScreen() {
           onPress={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}
-          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80"
+          className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80"
           style={fabStyle}
         >
           <Plus size={24} color={colors.primaryForeground} />

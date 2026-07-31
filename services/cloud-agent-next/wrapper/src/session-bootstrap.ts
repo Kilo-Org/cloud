@@ -1027,7 +1027,9 @@ async function downloadBounded(
 
   if (overflowed) {
     await safeUnlink(filePath);
-    throw new Error(`Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`);
+    throw new Error(
+      `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
+    );
   }
 
   return { bytesWritten };

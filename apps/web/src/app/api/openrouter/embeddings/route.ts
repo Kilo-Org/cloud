@@ -104,7 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Extract IP for all requests (needed for free model rate limiting)
+  // Extract IP for anonymous request context and provider processing.
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (!ipAddress) {
     return NextResponse.json(

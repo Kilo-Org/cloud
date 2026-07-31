@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { isUserRateLimitedFeature, validateFeatureHeader } from './feature-detection';
+import { validateFeatureHeader } from './feature-detection';
 
 describe('validateFeatureHeader', () => {
   test('returns null for null input', () => {
@@ -30,25 +30,5 @@ describe('validateFeatureHeader', () => {
     'scheduled',
   ])('accepts emitted feature %s', feature => {
     expect(validateFeatureHeader(feature)).toBe(feature);
-  });
-});
-
-describe('isUserRateLimitedFeature', () => {
-  test('returns true for server-side products', () => {
-    expect(isUserRateLimitedFeature('cloud-agent')).toBe(true);
-    expect(isUserRateLimitedFeature('code-review')).toBe(true);
-    expect(isUserRateLimitedFeature('app-builder')).toBe(true);
-    expect(isUserRateLimitedFeature('gastown')).toBe(true);
-  });
-
-  test('returns false for client-side products', () => {
-    expect(isUserRateLimitedFeature('vscode-extension')).toBe(false);
-    expect(isUserRateLimitedFeature('jetbrains-extension')).toBe(false);
-    expect(isUserRateLimitedFeature('cli')).toBe(false);
-    expect(isUserRateLimitedFeature('direct-gateway')).toBe(false);
-  });
-
-  test('returns false for null', () => {
-    expect(isUserRateLimitedFeature(null)).toBe(false);
   });
 });

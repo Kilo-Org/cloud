@@ -286,6 +286,20 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('allows unauthenticated free-model requests when abuse rules do not block', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('stepfun/step-3.7-flash:free')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
   it('adds latency and rewrites quarantine-3 non-BYOK requests to a free model', async () => {
     jest.useFakeTimers();
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));

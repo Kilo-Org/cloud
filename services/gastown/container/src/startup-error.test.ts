@@ -7,7 +7,7 @@ describe('classifyStartupError', () => {
       {
         status: 429,
         body: {
-          error: 'Free model rate limit exceeded',
+          error: 'Gateway rate limit exceeded',
           error_type: 'rate_limit_exceeded',
         },
       },
@@ -15,7 +15,7 @@ describe('classifyStartupError', () => {
     );
 
     expect(payload).toEqual({
-      error: 'Free model rate limit exceeded',
+      error: 'Gateway rate limit exceeded',
       phase: 'initial_prompt',
       status: 429,
       error_type: 'rate_limit_exceeded',

@@ -21,6 +21,8 @@ import {
 import { and, asc, eq, gt, like, lt, or } from 'drizzle-orm';
 import * as z from 'zod';
 
+const SESSION_METRICS_PADDING_MS = 10 * 60 * 1_000;
+
 const capacityMetadataSchema = z
   .object({
     durable_object_id: z.string().min(1),
@@ -169,8 +171,10 @@ export async function getSessionContainerInfo(
       value => (value ? [Date.parse(value)] : [])
     )
   );
-  const windowStartMs = Math.min(Date.parse(reference.createdAt), ...observedTimes);
-  const windowEndMs = Math.max(Date.parse(reference.updatedAt), ...observedTimes);
+  const windowStartMs =
+    Math.min(Date.parse(reference.createdAt), ...observedTimes) - SESSION_METRICS_PADDING_MS;
+  const windowEndMs =
+    Math.max(Date.parse(reference.updatedAt), ...observedTimes) + SESSION_METRICS_PADDING_MS;
   const windowStartAt = new Date(windowStartMs).toISOString();
   const windowEndAt = new Date(windowEndMs).toISOString();
   const intervalIdentityCondition = sandboxId

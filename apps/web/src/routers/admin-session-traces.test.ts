@@ -227,8 +227,8 @@ describe('admin.sessionTraces authorization', () => {
       actor_type: 'user',
       actor_id: owner.id,
       session_id: cloudAgentSessionId,
-      started_at: '2026-07-31T08:40:00.000Z',
-      last_seen_at: '2026-07-31T09:00:00.000Z',
+      started_at: '2026-07-31T08:20:00.000Z',
+      last_seen_at: '2026-07-31T09:30:00.000Z',
       metadata: {
         durable_object_id: 'durable-object-id',
         container_class: 'SandboxSmallContainment',
@@ -267,8 +267,8 @@ describe('admin.sessionTraces authorization', () => {
       {
         key: `cloud-agent-next-sandbox-small-containment:${sandboxId}:1`,
         instanceId: 'durable-object-id',
-        start: '2026-07-31T08:43:36.040Z',
-        end: '2026-07-31T08:55:07.000Z',
+        start: '2026-07-31T08:33:36.040Z',
+        end: '2026-07-31T09:05:07.000Z',
       },
     ]);
 

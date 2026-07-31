@@ -97,24 +97,24 @@ describe('classifyAttachment', () => {
     }
   });
 
-  it('rejects a file over the 5 MB cap', () => {
-    expect(classifyAttachment({ name: 'big.pdf', size: 6 * 1024 * 1024 })).toEqual({
+  it('rejects a file over the 20 MB cap', () => {
+    expect(classifyAttachment({ name: 'big.pdf', size: 21 * 1024 * 1024 })).toEqual({
       ok: false,
       reason: 'too-large',
     });
   });
 
-  it('accepts a file exactly at the 5 MB cap', () => {
-    expect(classifyAttachment({ name: 'edge.pdf', size: 5 * 1024 * 1024 })).toEqual({
+  it('accepts a file exactly at the 20 MB cap', () => {
+    expect(classifyAttachment({ name: 'edge.pdf', size: 20 * 1024 * 1024 })).toEqual({
       ok: true,
       kind: 'document',
       extension: 'pdf',
-      size: 5 * 1024 * 1024,
+      size: 20 * 1024 * 1024,
     });
   });
 
-  it('checks the deny list before the size cap (a 5 MB .exe is denied, not too-large)', () => {
-    expect(classifyAttachment({ name: 'big.exe', size: 5 * 1024 * 1024 + 1 })).toEqual({
+  it('checks the deny list before the size cap (a 20 MB .exe is denied, not too-large)', () => {
+    expect(classifyAttachment({ name: 'big.exe', size: 20 * 1024 * 1024 + 1 })).toEqual({
       ok: false,
       reason: 'denied',
     });
@@ -146,7 +146,7 @@ describe('describeClassificationFailure', () => {
   it('returns the locked copy for each reason', () => {
     expect(describeClassificationFailure('denied')).toMatch(/can't be attached/i);
     expect(describeClassificationFailure('empty')).toMatch(/empty/i);
-    expect(describeClassificationFailure('too-large')).toMatch(/5 MB/);
+    expect(describeClassificationFailure('too-large')).toMatch(/20 MB/);
     expect(describeClassificationFailure('unreadable')).toBe("Couldn't read this file");
   });
 });

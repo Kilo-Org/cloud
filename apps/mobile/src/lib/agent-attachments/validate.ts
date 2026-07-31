@@ -105,7 +105,7 @@ export function canAddAttachments(
 const CLASSIFICATION_FAILURE_MESSAGES = {
   denied: "Executable files can't be attached",
   empty: 'File is empty',
-  'too-large': 'Files must be 5 MB or smaller',
+  'too-large': 'Files must be 20 MB or smaller',
   unreadable: "Couldn't read this file",
 } as const satisfies Record<'denied' | 'empty' | 'too-large' | 'unreadable', string>;
 

@@ -1,5 +1,5 @@
 export const AGENT_ATTACHMENT_MAX_FILES = 5;
-export const AGENT_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+export const AGENT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 
 /**
  * Extensions that are NEVER allowed regardless of the picker's reported MIME

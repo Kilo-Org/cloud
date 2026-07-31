@@ -81,6 +81,8 @@ if command -v xcrun >/dev/null 2>&1; then
         unaccounted=1
       fi
     done <<<"$ios_list"
+  else
+    echo "note: xcrun simctl list devices booted failed; skipping iOS device checks" >&2
   fi
 fi
 
@@ -116,6 +118,8 @@ if [ -n "$adb" ]; then
         unaccounted=1
       fi
     done <<<"$android_list"
+  else
+    echo "note: adb devices failed; skipping Android emulator checks" >&2
   fi
 fi
 

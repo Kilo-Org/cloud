@@ -244,9 +244,11 @@ test('record.sh stop is a no-op when state is stale and video is missing', () =>
   const tmp = path.join(root, 'tmp');
   fs.mkdirSync(path.join(tmp, 'kilo-e2e-record', 'UDID-STALE'), { recursive: true });
   // Guaranteed-dead PID on Linux and macOS (pid 1 is init and kill -0 succeeds).
+  // State values are base64-encoded (see record.sh write_state).
+  const b64 = (s: string) => Buffer.from(s).toString('base64');
   fs.writeFileSync(
     path.join(tmp, 'kilo-e2e-record', 'UDID-STALE', 'state'),
-    'platform=ios\npid=999999\npath=' + path.join(tmp, 'missing.mp4') + '\n'
+    `platform=${b64('ios')}\npid=${b64('999999')}\npath=${b64(path.join(tmp, 'missing.mp4'))}\n`
   );
   try {
     const stop = spawnSync(

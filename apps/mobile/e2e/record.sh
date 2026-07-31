@@ -23,8 +23,11 @@ resolve_adb() {
   return 1
 }
 
-# State is KEY=VALUE lines with values escaped via printf %q so paths with
-# spaces or shell metacharacters round-trip safely (never source the file).
+# State is KEY=VALUE lines. Values are base64-encoded so paths with spaces or
+# shell metacharacters round-trip without eval/source.
+b64_encode() { printf '%s' "$1" | base64 | tr -d '\n'; }
+b64_decode() { printf '%s' "$1" | base64 -d 2>/dev/null || true; }
+
 read_state() {
   platform='' pid='' path='' remote=''
   [ -f "$STATE_FILE" ] || return 0
@@ -34,7 +37,10 @@ read_state() {
     key=${line%%=*}
     value=${line#*=}
     case "$key" in
-      platform | pid | path | remote) eval "$key=$value" ;;
+      platform) platform=$(b64_decode "$value") ;;
+      pid) pid=$(b64_decode "$value") ;;
+      path) path=$(b64_decode "$value") ;;
+      remote) remote=$(b64_decode "$value") ;;
     esac
   done <"$STATE_FILE"
 }
@@ -43,7 +49,7 @@ write_state() {
   # usage: write_state key value ...
   : >"$STATE_FILE"
   while [ $# -ge 2 ]; do
-    printf '%s=%q\n' "$1" "$2" >>"$STATE_FILE"
+    printf '%s=%s\n' "$1" "$(b64_encode "$2")" >>"$STATE_FILE"
     shift 2
   done
 }
@@ -59,11 +65,12 @@ require_dir() {
 }
 
 # True when $1 is live and its command line looks like our recorder (not a
-# recycled PID of an unrelated process).
+# recycled PID of an unrelated process). Use -ww so BSD ps does not truncate
+# the command column to the terminal width (no-tty default is ~79 cols).
 recorder_pid_live() {
   local pid=$1 expect=$2 cmd
   kill -0 "$pid" 2>/dev/null || return 1
-  cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
+  cmd=$(ps -ww -p "$pid" -o command= 2>/dev/null || ps -p "$pid" -o args= 2>/dev/null || true)
   [ -n "$cmd" ] || return 1
   case "$cmd" in
     *"$expect"*) return 0 ;;
@@ -221,6 +228,10 @@ case "$cmd" in
     read_state
     rec_pid=${pid:-}
     if [ -z "$rec_pid" ] || ! recorder_pid_live "$rec_pid" "$expect"; then
+      # If the probe is wrong but the pid is still live, SIGINT it before drop.
+      if [ -n "$rec_pid" ] && kill -0 "$rec_pid" 2>/dev/null; then
+        kill -INT "$rec_pid" 2>/dev/null || true
+      fi
       clear_state
       echo "record.sh: recorder failed to stay up on $DEVICE" >&2
       exit 1

@@ -2,9 +2,11 @@ import {
   kilo_pass_org_agreements,
   kilo_pass_org_allocation_plan_rows,
   kilo_pass_org_allocation_plans,
+  kilo_pass_org_issuance_snapshots,
+  kilo_pass_org_processing_runs,
   organizations,
 } from '@kilocode/db/schema';
-import { and, desc, eq, gt, ne } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, ne } from 'drizzle-orm';
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
 
@@ -36,30 +38,77 @@ export async function assertOrganizationHierarchyChangeAllowed(
     return;
   }
 
-  const [latestPlan] = await tx
-    .select({ id: kilo_pass_org_allocation_plans.id })
+  const [agreement] = await tx
+    .select({ id: kilo_pass_org_agreements.id })
     .from(kilo_pass_org_agreements)
-    .innerJoin(
-      kilo_pass_org_allocation_plans,
-      eq(kilo_pass_org_allocation_plans.agreement_id, kilo_pass_org_agreements.id)
-    )
     .where(
       and(
         eq(kilo_pass_org_agreements.parent_organization_id, organization.parentOrganizationId),
         ne(kilo_pass_org_agreements.state, 'ended')
       )
     )
-    .orderBy(desc(kilo_pass_org_allocation_plans.version))
     .limit(1)
     .for('update');
+  if (!agreement) return;
 
-  if (!latestPlan) return;
+  const plans = await tx
+    .select({
+      id: kilo_pass_org_allocation_plans.id,
+      effectiveAt: kilo_pass_org_allocation_plans.effective_window_start,
+      version: kilo_pass_org_allocation_plans.version,
+    })
+    .from(kilo_pass_org_allocation_plans)
+    .where(eq(kilo_pass_org_allocation_plans.agreement_id, agreement.id))
+    .orderBy(
+      asc(kilo_pass_org_allocation_plans.effective_window_start),
+      asc(kilo_pass_org_allocation_plans.version)
+    )
+    .for('update');
+  if (!plans.length) return;
+
+  const unresolvedRuns = await tx
+    .select({ windowStart: kilo_pass_org_processing_runs.window_start })
+    .from(kilo_pass_org_processing_runs)
+    .leftJoin(
+      kilo_pass_org_issuance_snapshots,
+      and(
+        eq(kilo_pass_org_issuance_snapshots.agreement_id, agreement.id),
+        eq(
+          kilo_pass_org_issuance_snapshots.window_start,
+          kilo_pass_org_processing_runs.window_start
+        )
+      )
+    )
+    .where(
+      and(
+        eq(kilo_pass_org_processing_runs.agreement_id, agreement.id),
+        inArray(kilo_pass_org_processing_runs.state, ['pending', 'running', 'blocked', 'failed']),
+        isNull(kilo_pass_org_issuance_snapshots.id)
+      )
+    );
+
+  const now = Date.now();
+  const relevantPlanIds = new Set(
+    plans.filter(plan => new Date(plan.effectiveAt).getTime() > now).map(plan => plan.id)
+  );
+  const planAt = (timestamp: string | Date) => {
+    const at = new Date(timestamp).getTime();
+    return plans.findLast(plan => new Date(plan.effectiveAt).getTime() <= at);
+  };
+  const currentPlan = planAt(new Date(now));
+  if (currentPlan) relevantPlanIds.add(currentPlan.id);
+  for (const run of unresolvedRuns) {
+    const plan = planAt(run.windowStart);
+    if (plan) relevantPlanIds.add(plan.id);
+  }
+  if (!relevantPlanIds.size) return;
+
   const [allocation] = await tx
     .select({ id: kilo_pass_org_allocation_plan_rows.id })
     .from(kilo_pass_org_allocation_plan_rows)
     .where(
       and(
-        eq(kilo_pass_org_allocation_plan_rows.allocation_plan_id, latestPlan.id),
+        inArray(kilo_pass_org_allocation_plan_rows.allocation_plan_id, [...relevantPlanIds]),
         eq(kilo_pass_org_allocation_plan_rows.allocation_container_organization_id, organizationId),
         gt(kilo_pass_org_allocation_plan_rows.pass_capacity, 0)
       )

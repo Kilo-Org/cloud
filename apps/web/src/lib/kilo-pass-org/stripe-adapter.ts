@@ -336,7 +336,7 @@ export async function scheduleOrganizationKiloPassCancellation(input: {
       removalPhase !== undefined &&
       scheduleItemsMatch(removalPhase.items, currentItems);
     const isOrphanedCreate =
-      !schedule.metadata?.origin &&
+      Object.keys(schedule.metadata ?? {}).length === 0 &&
       schedule.phases.length === 1 &&
       currentPhase !== undefined &&
       scheduleItemsMatch(currentPhase.items, currentItems);
@@ -345,14 +345,18 @@ export async function scheduleOrganizationKiloPassCancellation(input: {
     target = await stripe.subscriptionSchedules.create({ from_subscription: subscription.id });
   }
   if (!target) throw new Error('SCHEDULE_REWRITE_UNSAFE');
+  const resumedPhase =
+    schedule?.metadata?.origin === ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN
+      ? schedule.phases.at(-1)
+      : undefined;
   await stripe.subscriptionSchedules.update(target.id, {
     metadata: { origin: ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN },
     end_behavior: 'release',
     phases: [
       {
         items: currentItems,
-        start_date: Math.floor(period.start.getTime() / 1000),
-        end_date: Math.floor(period.end.getTime() / 1000),
+        start_date: resumedPhase?.start_date ?? Math.floor(period.start.getTime() / 1000),
+        end_date: resumedPhase?.end_date ?? Math.floor(period.end.getTime() / 1000),
       },
       { items: retainedItems },
     ],

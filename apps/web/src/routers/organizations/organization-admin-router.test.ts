@@ -1442,6 +1442,7 @@ describe('organization admin router', () => {
         initialCapacity: number;
         futureCapacity?: number;
         issuedCreditsOnly?: boolean;
+        futureIsEffective?: boolean;
       }) {
         const prefix = `Kilo Pass hierarchy ${crypto.randomUUID()}`;
         const parent = await createOrganization(`${prefix} parent`, adminUser.id);
@@ -1485,14 +1486,14 @@ describe('organization admin router', () => {
 
         const capacities = [params.initialCapacity];
         if (params.futureCapacity !== undefined) capacities.push(params.futureCapacity);
+        const planIntervalMs = 31 * 24 * 60 * 60 * 1000;
+        const planBaseTime = Date.now() - (params.futureIsEffective ? planIntervalMs : 1_000);
         for (const [index, capacity] of capacities.entries()) {
           const [plan] = await db
             .insert(kilo_pass_org_allocation_plans)
             .values({
               agreement_id: agreement.id,
-              effective_window_start: new Date(
-                Date.now() + index * 31 * 24 * 60 * 60 * 1000
-              ).toISOString(),
+              effective_window_start: new Date(planBaseTime + index * planIntervalMs).toISOString(),
               version: index + 1,
               created_by_kilo_user_id: adminUser.id,
             })
@@ -1575,10 +1576,11 @@ describe('organization admin router', () => {
         );
       });
 
-      it('allows reparenting after a historical allocation is replaced by zero', async () => {
+      it('allows reparenting after a historical allocation is replaced by an effective zero plan', async () => {
         const { child, replacementParent } = await createAllocatedChild({
           initialCapacity: 1,
           futureCapacity: 0,
+          futureIsEffective: true,
         });
         const caller = await createCallerForUser(adminUser.id);
 
@@ -1592,6 +1594,23 @@ describe('organization admin router', () => {
           .from(organizations)
           .where(eq(organizations.id, child.id));
         expect(updated.parentOrganizationId).toBe(replacementParent.id);
+      });
+
+      it('blocks reparenting while a zero allocation is only scheduled for the future', async () => {
+        const { child, replacementParent } = await createAllocatedChild({
+          initialCapacity: 1,
+          futureCapacity: 0,
+        });
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: child.id,
+            parentOrganizationId: replacementParent.id,
+          })
+        ).rejects.toThrow(
+          'Cannot change organization hierarchy while it has Kilo Pass allocations'
+        );
       });
 
       it('allows reparenting a child with only zero allocations', async () => {

@@ -521,6 +521,48 @@ describe('organization Kilo Pass Stripe adapter', () => {
     );
   });
 
+  test('preserves the active resumed phase boundary when cancelling after renewal', async () => {
+    const resumedSchedule = {
+      id: 'sched_after_renewal',
+      status: 'active',
+      metadata: { origin: 'kilo-pass-org-cancellation' },
+      phases: [
+        {
+          start_date: 1_767_225_600,
+          end_date: 1_769_904_000,
+          items: [
+            { price: 'price_seat', quantity: 9 },
+            { price: 'price_pass', quantity: 9 },
+          ],
+        },
+        {
+          start_date: 1_769_904_000,
+          end_date: 1_772_582_400,
+          items: [
+            { price: 'price_seat', quantity: 9 },
+            { price: 'price_pass', quantity: 9 },
+          ],
+        },
+      ],
+    } as unknown as Stripe.SubscriptionSchedule;
+    retrieve.mockResolvedValue(subscription({ schedule: resumedSchedule }));
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await scheduleOrganizationKiloPassCancellation({
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+    });
+
+    expect(scheduleUpdate).toHaveBeenCalledWith(
+      'sched_after_renewal',
+      expect.objectContaining({
+        phases: expect.arrayContaining([
+          expect.objectContaining({ start_date: 1_769_904_000, end_date: 1_772_582_400 }),
+        ]),
+      })
+    );
+  });
+
   test('adopts a safe orphaned from-subscription schedule after an update failure', async () => {
     const orphanedSchedule = {
       id: 'sched_orphaned',
@@ -550,6 +592,31 @@ describe('organization Kilo Pass Stripe adapter', () => {
       'sched_orphaned',
       expect.objectContaining({ metadata: { origin: 'kilo-pass-org-cancellation' } })
     );
+  });
+
+  test('does not adopt a matching single-phase schedule with foreign metadata', async () => {
+    const foreignSchedule = {
+      id: 'sched_foreign',
+      status: 'active',
+      metadata: { supportTicket: 'SUP-1' },
+      phases: [
+        {
+          items: [
+            { price: 'price_seat', quantity: 9 },
+            { price: 'price_pass', quantity: 9 },
+          ],
+        },
+      ],
+    } as unknown as Stripe.SubscriptionSchedule;
+    retrieve.mockResolvedValue(subscription({ schedule: foreignSchedule }));
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await expect(
+      scheduleOrganizationKiloPassCancellation({
+        providerSubscriptionId: 'sub_1',
+        providerSeatAddOnItemId: 'si_pass',
+      })
+    ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
   });
 
   test('fails closed instead of mistaking a billing-cycle schedule for pass removal', async () => {

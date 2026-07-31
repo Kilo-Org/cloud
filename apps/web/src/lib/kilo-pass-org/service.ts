@@ -1041,7 +1041,7 @@ export async function suspendAgreementForPaymentReview(providerSubscriptionId: s
         processingCondition: KiloPassOrgProcessingCondition.SuspendedForReview,
         paymentReviewRequiredAt: suspendedAt,
       },
-      idempotencyKey: `kpo:payment-review:${agreement.id}`,
+      idempotencyKey: `kpo:payment-review:${agreement.id}:${suspendedAt}`,
     });
   });
 }

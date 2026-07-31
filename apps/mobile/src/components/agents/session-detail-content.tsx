@@ -144,6 +144,7 @@ export function SessionDetailContent({
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
+  const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
@@ -718,7 +719,8 @@ export function SessionDetailContent({
   const isFocused = useIsFocused();
   // Focus bounds the awake window to the visible working UI; a backgrounded
   // or covered screen must not hold the OS idle timer.
-  const keepScreenAwake = isFocused && (isStreaming || pendingMessages.size > 0);
+  const keepScreenAwake =
+    isFocused && agentStatus.type !== 'disconnected' && (isStreaming || pendingMessages.size > 0);
 
   return (
     <View className="flex-1 bg-background">

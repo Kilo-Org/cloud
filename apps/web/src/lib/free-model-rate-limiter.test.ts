@@ -7,7 +7,9 @@ import {
   getFreeModelRateLimitUsage,
 } from './free-model-rate-limiter';
 
-const mockRedisEval = jest.fn();
+type MockRedisEval = (script: string, keys: string[], args: unknown[]) => Promise<unknown>;
+
+const mockRedisEval = jest.fn<MockRedisEval>();
 
 jest.mock('@/lib/redis', () => ({
   redisClient: {

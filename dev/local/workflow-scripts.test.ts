@@ -808,7 +808,7 @@ function makeNpxStub(bin: string, commandLog: string): void {
       `    mkdir -p ios/Kilo.xcworkspace\n` +
       `  elif [ "\$platform" = "android" ]; then\n` +
       `    mkdir -p android\n` +
-      `    touch android/build.gradle\n` +
+      `    touch android/build.gradle android/gradlew\n` +
       `  fi\n` +
       `  if [ -n "\$DIRTY_PREBUILD" ]; then\n` +
       `    touch dirty-prebuild.txt\n` +

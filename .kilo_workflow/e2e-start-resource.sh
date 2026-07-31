@@ -21,7 +21,8 @@ prebuild_clean() {
   if [ "$platform" = "ios" ]; then
     [ -d "apps/mobile/ios/Kilo.xcworkspace" ] && return 0
   elif [ "$platform" = "android" ]; then
-    [ -d "apps/mobile/android" ] && return 0
+    # Require a concrete final artifact, not a partial tree left by a failed prebuild.
+    [ -f "apps/mobile/android/gradlew" ] && return 0
   fi
   snapshot_before=$(git status --porcelain)
   (cd apps/mobile && CI=1 npx expo prebuild --platform "$platform") >&2

@@ -23,12 +23,29 @@ resolve_adb() {
   return 1
 }
 
+# State is KEY=VALUE lines with values escaped via printf %q so paths with
+# spaces or shell metacharacters round-trip safely (never source the file).
 read_state() {
   platform='' pid='' path='' remote=''
-  if [ -f "$STATE_FILE" ]; then
-    # shellcheck disable=SC1090
-    source "$STATE_FILE"
-  fi
+  [ -f "$STATE_FILE" ] || return 0
+  local line key value
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
+    key=${line%%=*}
+    value=${line#*=}
+    case "$key" in
+      platform | pid | path | remote) eval "$key=$value" ;;
+    esac
+  done <"$STATE_FILE"
+}
+
+write_state() {
+  # usage: write_state key value ...
+  : >"$STATE_FILE"
+  while [ $# -ge 2 ]; do
+    printf '%s=%q\n' "$1" "$2" >>"$STATE_FILE"
+    shift 2
+  done
 }
 
 clear_state() {
@@ -41,11 +58,24 @@ require_dir() {
   [ -d "$dir" ] || mkdir -p "$dir"
 }
 
+# True when $1 is live and its command line looks like our recorder (not a
+# recycled PID of an unrelated process).
+recorder_pid_live() {
+  local pid=$1 expect=$2 cmd
+  kill -0 "$pid" 2>/dev/null || return 1
+  cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
+  [ -n "$cmd" ] || return 1
+  case "$cmd" in
+    *"$expect"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 stop_ios() {
   local pid path waited was_live=0
   pid=$1
   path=$2
-  if kill -0 "$pid" 2>/dev/null; then
+  if recorder_pid_live "$pid" "recordVideo"; then
     was_live=1
     kill -INT "$pid" 2>/dev/null || true
     waited=0
@@ -54,18 +84,15 @@ stop_ios() {
       waited=$((waited + 1))
     done
     if kill -0 "$pid" 2>/dev/null; then
-      # Keep state so a later stop can re-signal; do not orphan tracking.
       echo "record.sh: iOS recorder on $DEVICE did not exit after SIGINT" >&2
       return 2
     fi
   fi
   if [ ! -s "$path" ]; then
     if [ "$was_live" -eq 1 ]; then
-      # Active stop that failed to finalize — keep state, fail so callers fall back.
       echo "record.sh: no finalized video at $path" >&2
       return 1
     fi
-    # Stale state, no live recorder: cleanup no-op.
     echo "record.sh: no active recording for $DEVICE" >&2
     return 0
   fi
@@ -81,7 +108,7 @@ stop_android() {
   path=$2
   remote=${3:-}
   adb=$(resolve_adb) || { echo "record.sh: adb not found" >&2; return 1; }
-  if kill -0 "$pid" 2>/dev/null; then
+  if recorder_pid_live "$pid" "screenrecord"; then
     was_live=1
   fi
   remaining=$("$adb" -s "$DEVICE" shell pidof screenrecord 2>/dev/null | tr -d '[:space:]') || remaining=''
@@ -108,6 +135,8 @@ stop_android() {
   fi
   if [ -n "$remote" ]; then
     "$adb" -s "$DEVICE" pull "$remote" "$path" >/dev/null 2>&1 || true
+    # Drop the remote so a later failed segment cannot pull a prior video.
+    "$adb" -s "$DEVICE" shell rm -f "$remote" >/dev/null 2>&1 || true
   fi
   if [ ! -s "$path" ]; then
     if [ "$was_live" -eq 1 ]; then
@@ -151,8 +180,11 @@ case "$cmd" in
     VIDEO="${2:?usage: record.sh <device> start <video-path>}"
     read_state
     if [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
-      echo "record.sh: already recording on $DEVICE (pid $pid)" >&2
-      exit 1
+      if recorder_pid_live "$pid" "recordVideo" || recorder_pid_live "$pid" "screenrecord"; then
+        echo "record.sh: already recording on $DEVICE (pid $pid)" >&2
+        exit 1
+      fi
+      # Stale pid recycled by an unrelated process — clear and start fresh.
     fi
     clear_state
     mkdir -p "$STATE_DIR"
@@ -164,27 +196,35 @@ case "$cmd" in
       emulator-*)
         ADB=$(resolve_adb) || { echo "record.sh: adb not found" >&2; exit 1; }
         REMOTE="/sdcard/kilo-e2e-record.mp4"
+        # Clear any prior segment so a failed new recording cannot pull stale video.
+        "$ADB" -s "$DEVICE" shell rm -f "$REMOTE" >/dev/null 2>&1 || true
         (
           trap '' HUP
           exec "$ADB" -s "$DEVICE" shell screenrecord --time-limit 170 --size 1280x720 "$REMOTE"
         ) >/dev/null 2>&1 &
-        echo "platform=android" > "$STATE_FILE"
-        echo "pid=$!" >> "$STATE_FILE"
-        echo "path=$VIDEO" >> "$STATE_FILE"
-        echo "remote=$REMOTE" >> "$STATE_FILE"
+        write_state platform android pid "$!" path "$VIDEO" remote "$REMOTE"
+        expect=screenrecord
         ;;
       *)
+        command -v xcrun >/dev/null 2>&1 || { echo "record.sh: xcrun not found" >&2; exit 1; }
         (
           trap '' HUP
           exec xcrun simctl io "$DEVICE" recordVideo --codec h264 --force "$VIDEO"
         ) >/dev/null 2>&1 &
-        echo "platform=ios" > "$STATE_FILE"
-        echo "pid=$!" >> "$STATE_FILE"
-        echo "path=$VIDEO" >> "$STATE_FILE"
+        write_state platform ios pid "$!" path "$VIDEO"
+        expect=recordVideo
         ;;
     esac
-    # Give the recorder a beat to install signal handlers before stop can race.
+    # Give the recorder a beat to install signal handlers, then require liveness.
     sleep 0.2
+    rec_pid=
+    read_state
+    rec_pid=${pid:-}
+    if [ -z "$rec_pid" ] || ! recorder_pid_live "$rec_pid" "$expect"; then
+      clear_state
+      echo "record.sh: recorder failed to stay up on $DEVICE" >&2
+      exit 1
+    fi
     echo "record.sh: started $DEVICE recorder -> $VIDEO" >&2
     ;;
 
@@ -197,7 +237,6 @@ case "$cmd" in
     case "${platform:-}" in
       ios)
         if ! stop_ios "$pid" "${path:-}"; then
-          # rc 1 = empty finalize after live stop; rc 2 = still live — keep state
           exit 1
         fi
         ;;

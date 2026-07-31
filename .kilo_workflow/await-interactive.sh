@@ -46,8 +46,8 @@ mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; 
 
 launched() {
   [ -n "$UNTIL_LAUNCHED" ] || return 1
-  tmux list-windows -a -F '#{window_name}' 2>/dev/null | grep -qx "$UNTIL_LAUNCHED" && return 0
-  tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -qx "$UNTIL_LAUNCHED" && return 0
+  tmux list-windows -a -F '#{window_name}' 2>/dev/null | grep -qxF -- "$UNTIL_LAUNCHED" && return 0
+  tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -qxF -- "$UNTIL_LAUNCHED" && return 0
   return 1
 }
 

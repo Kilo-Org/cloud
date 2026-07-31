@@ -68,16 +68,20 @@ dead_printed=$(mktemp)
 trap 'rm -f "$covered" "$ios_booted" "$android_booted" "$dead_printed"' EXIT
 
 if command -v xcrun >/dev/null 2>&1; then
-  ios_enum=1
-  while IFS= read -r line; do
-    udid=$(printf '%s' "$line" | sed -nE 's/.*\(([^)]+)\)[[:space:]]*\(Booted\).*/\1/p')
-    [ -n "$udid" ] || continue
-    printf '%s\n' "$udid" >> "$ios_booted"
-    if [ ! -f "${TMPDIR:-/tmp}/kilo-mobile-simulator-claims/${udid}.json" ]; then
-      echo "UNACCOUNTED booted device: $udid (no claim record) — if this is not a manual device, stop it: xcrun simctl shutdown $udid"
-      unaccounted=1
-    fi
-  done < <(xcrun simctl list devices booted 2>/dev/null || true)
+  # Only mark enum success when simctl exits 0; a transient failure must not
+  # report every claimed device as DEAD.
+  if ios_list=$(xcrun simctl list devices booted 2>/dev/null); then
+    ios_enum=1
+    while IFS= read -r line; do
+      udid=$(printf '%s' "$line" | sed -nE 's/.*\(([^)]+)\)[[:space:]]*\(Booted\).*/\1/p')
+      [ -n "$udid" ] || continue
+      printf '%s\n' "$udid" >> "$ios_booted"
+      if [ ! -f "${TMPDIR:-/tmp}/kilo-mobile-simulator-claims/${udid}.json" ]; then
+        echo "UNACCOUNTED booted device: $udid (no claim record) — if this is not a manual device, stop it: xcrun simctl shutdown $udid"
+        unaccounted=1
+      fi
+    done <<<"$ios_list"
+  fi
 fi
 
 adb=$(command -v adb 2>/dev/null || true)
@@ -89,28 +93,30 @@ if [ -z "$adb" ] && [ -x "$HOME/Library/Android/sdk/platform-tools/adb" ]; then
 fi
 
 if [ -n "$adb" ]; then
-  android_enum=1
-  while IFS= read -r line; do
-    serial=$(printf '%s' "$line" | awk '/^emulator-/{print $1}')
-    state_field=$(printf '%s' "$line" | awk '/^emulator-/{print $2}')
-    [ -n "$serial" ] || continue
-    [ "$state_field" = "device" ] || continue
-    printf '%s\n' "$serial" >> "$android_booted"
-    accounted=0
-    for root in "${TMPDIR:-/tmp}/kilo-mobile-android-emulators" \
-                "${TMPDIR:-/tmp}/kilo-mobile-android-claims"; do
-      [ -d "$root" ] || continue
-      for record in "$root"/*.json; do
-        [ -f "$record" ] || continue
-        rec_serial=$(sed -nE 's/.*"serial"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$record" | head -1)
-        [ "$rec_serial" = "$serial" ] && accounted=1
+  if android_list=$("$adb" devices 2>/dev/null); then
+    android_enum=1
+    while IFS= read -r line; do
+      serial=$(printf '%s' "$line" | awk '/^emulator-/{print $1}')
+      state_field=$(printf '%s' "$line" | awk '/^emulator-/{print $2}')
+      [ -n "$serial" ] || continue
+      [ "$state_field" = "device" ] || continue
+      printf '%s\n' "$serial" >> "$android_booted"
+      accounted=0
+      for root in "${TMPDIR:-/tmp}/kilo-mobile-android-emulators" \
+                  "${TMPDIR:-/tmp}/kilo-mobile-android-claims"; do
+        [ -d "$root" ] || continue
+        for record in "$root"/*.json; do
+          [ -f "$record" ] || continue
+          rec_serial=$(sed -nE 's/.*"serial"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$record" | head -1)
+          [ "$rec_serial" = "$serial" ] && accounted=1
+        done
       done
-    done
-    if [ "$accounted" -eq 0 ]; then
-      echo "UNACCOUNTED booted emulator: $serial (no claim/emulator record) — verify ownership before stopping: adb -s $serial emu kill"
-      unaccounted=1
-    fi
-  done < <("$adb" devices 2>/dev/null || true)
+      if [ "$accounted" -eq 0 ]; then
+        echo "UNACCOUNTED booted emulator: $serial (no claim/emulator record) — verify ownership before stopping: adb -s $serial emu kill"
+        unaccounted=1
+      fi
+    done <<<"$android_list"
+  fi
 fi
 
 # Claimed-but-dead detection: records tied to a live slot whose device is gone.

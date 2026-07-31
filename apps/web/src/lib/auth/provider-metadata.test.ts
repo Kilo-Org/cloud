@@ -15,9 +15,9 @@ describe('Anaconda provider metadata', () => {
       id: 'anaconda',
       name: 'Anaconda',
     });
-    expect(LinkableAuthProviders.map(provider => provider.id)).toContain('anaconda');
-    expect(OAuthProviderIds).toContain('anaconda');
-    expect(ProdNonSSOAuthProviders).toContain('anaconda');
+    expect(LinkableAuthProviders[0]?.id).toBe('anaconda');
+    expect(OAuthProviderIds[0]).toBe('anaconda');
+    expect(ProdNonSSOAuthProviders[0]).toBe('anaconda');
     expect(AllAuthMethodIds).toContain('anaconda');
   });
 });

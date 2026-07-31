@@ -19,10 +19,10 @@ const fakeLoginIcon = (
 
 // Single source of truth: array of all authentication providers with full metadata.
 const AllAuthProviders = [
+  { id: 'anaconda', name: 'Anaconda', icon: <AnacondaLogo /> },
   { id: 'email', name: 'Email', icon: <Mail /> },
   { id: 'apple', name: 'Apple', icon: <AppleLogo /> },
   { id: 'google', name: 'Google', icon: <GoogleLogo /> },
-  { id: 'anaconda', name: 'Anaconda', icon: <AnacondaLogo /> },
   { id: 'github', name: 'GitHub', icon: <GitHubLogo /> },
   { id: 'gitlab', name: 'GitLab', icon: <GitLabLogo className="size-5" /> },
   { id: 'linkedin', name: 'LinkedIn', icon: <LinkedInLogo /> },

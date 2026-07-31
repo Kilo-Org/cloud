@@ -65,7 +65,7 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
   moonshotai: 'Moonshot AI',
   novita: 'Novita',
   perplexity: 'Perplexity',
-  xai: 'xAI',
+  xai: 'SpaceXAI',
   xiaomi: 'Xiaomi (pay as you go)',
   zai: 'Z.ai (pay as you go)',
 } satisfies Record<VercelUserByokInferenceProviderId, string>;

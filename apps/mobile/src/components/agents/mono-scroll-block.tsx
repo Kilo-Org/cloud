@@ -5,6 +5,7 @@ import { ScrollView } from 'react-native-gesture-handler';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
+import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import {
   MONO_SCROLL_VIEW_PROPS,
   type MonoScrollHeightPin,
@@ -48,6 +49,7 @@ export function MonoScrollBlock({
   textClassName,
   containerClassName,
 }: Readonly<MonoScrollBlockProps>) {
+  const textSelectable = useTranscriptTextSelectable();
   const { displayText, isTruncated } = prepareMonoScrollContent(content, maxLength);
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   const contentHeight = resolveMonoScrollPinnedHeight(heightPin, displayText);
@@ -69,7 +71,7 @@ export function MonoScrollBlock({
         style={contentHeight === undefined ? undefined : { height: contentHeight }}
       >
         <Text
-          selectable
+          selectable={textSelectable}
           onLayout={handleContentLayout}
           className={cn('shrink-0 self-start font-mono text-xs leading-4', textClassName)}
         >

@@ -1,12 +1,16 @@
-import { MirrorPayloadSchema, taxonomyRouteKey } from '@kilocode/auto-routing-contracts';
-import type {
-  AutoRoutingDecision,
-  AutoRoutingDecisionResponse,
-  MirrorPayload,
-  NormalizedClassifierInput,
-  RoutingConstraints,
+import {
+  MirrorPayloadSchema,
+  poolEntryKey,
+  taxonomyRouteKey,
+  type AutoRoutingDecision,
+  type AutoRoutingDecisionResponse,
+  type EfficientModelPool,
+  type MirrorPayload,
+  type NormalizedClassifierInput,
+  type RoutingConstraints,
+  type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
-import { formatError } from '@kilocode/worker-utils';
+import { formatError, ttlCached } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import type { ClassifierAnalyticsStatus } from './classifier-analytics';
@@ -26,15 +30,76 @@ import {
   putStickyDecision,
 } from './decision-cache';
 import type { StickyDecision } from './decision-cache';
-import { computeDecision, modelSatisfiesConstraints } from './decision-engine';
+import {
+  computeDecision,
+  modelSatisfiesConstraints,
+  type DecisionIncumbent,
+} from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
+import { fetchCustomRoutingTable } from './benchmark-origin';
 import { getRoutingTable } from './routing-table';
-import { getAutoRoutingMode } from './routing-mode';
+import { getEffectiveAutoRoutingSettings } from './routing-mode';
 import type { HonoEnv } from './hono-env';
 import { codingPlanDefaultDecision, getCodingPlanPreference } from './coding-plan-preference';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilitiesMap } from './model-capabilities';
+
+const CUSTOM_ROUTING_TABLE_CACHE_TTL_MS = 60_000;
+
+/** Ordered canonical key for an Efficient model pool (sort by poolEntryKey). */
+export function orderedPoolCacheKey(pool: EfficientModelPool): string {
+  return [...pool]
+    .map(entry => poolEntryKey(entry))
+    .sort()
+    .join('\n');
+}
+
+// Per-pool-key isolate caches that close over the pool entries (~60s TTL).
+const customTableLoaders = new Map<
+  string,
+  ReturnType<typeof ttlCached<Env, RoutingTable | null>>
+>();
+
+export function clearCustomRoutingTableCache(): void {
+  for (const cache of customTableLoaders.values()) {
+    cache.clear();
+  }
+  customTableLoaders.clear();
+}
+
+async function loadCustomRoutingTable(
+  env: Env,
+  pool: EfficientModelPool
+): Promise<RoutingTable | null> {
+  const key = orderedPoolCacheKey(pool);
+  let cache = customTableLoaders.get(key);
+  if (!cache) {
+    const poolSnapshot = pool;
+    cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, async (e: Env) => {
+      return fetchCustomRoutingTable(e, poolSnapshot);
+    });
+    customTableLoaders.set(key, cache);
+  }
+  return cache.get(env).catch((error: unknown) => {
+    console.warn(
+      JSON.stringify({ event: 'auto_routing_custom_table_read_failed', ...formatError(error) })
+    );
+    return null;
+  });
+}
+
+function stickyToIncumbent(sticky: StickyDecision | null): DecisionIncumbent | null {
+  if (!sticky) return null;
+  return { model: sticky.model, variant: sticky.variant ?? null };
+}
+
+function decisionVariant(decision: AutoRoutingDecision): string | null {
+  if (decision.source !== 'benchmark') return null;
+  if (decision.variant !== undefined && decision.variant !== null) return decision.variant;
+  // Legacy effort-only decisions: sticky stores null variant (model-only).
+  return null;
+}
 
 // Isolate-scoped request counter, used to correlate latency with isolate
 // warm-up in logs.
@@ -228,8 +293,13 @@ function recordDecision(
   });
 
   const incumbentModel = incumbent?.model ?? null;
+  const decidedVariant =
+    decision !== null && decision.source === 'benchmark' ? (decision.variant ?? null) : null;
   const switched =
-    decision !== null && incumbentModel !== null && decision.model !== incumbentModel;
+    decision !== null &&
+    incumbentModel !== null &&
+    (decision.model !== incumbentModel ||
+      (incumbent?.variant != null && decidedVariant !== incumbent.variant));
   const routeKey = summary.classification ? taxonomyRouteKey(summary.classification) : null;
   // Null when there is no incumbent route to compare against (no incumbent,
   // a pre-routeKey cache entry, or no classification this request).
@@ -275,6 +345,7 @@ function recordDecision(
       autoRoutingMode,
       uaPrefix: ctx.payload.userAgent?.slice(0, 40) ?? null,
       decidedModel: decision?.model ?? null,
+      decidedVariant,
       decidedTaskType: decision?.taskType ?? null,
       decidedSubtaskType: decision?.subtaskType ?? null,
       decisionSource: decision?.source ?? null,
@@ -319,27 +390,51 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const hasConstraints = payload.constraints !== undefined;
   const constraints: RoutingConstraints | undefined = payload.constraints;
 
-  // Capability-aware path: when the gateway attached a `constraints` field,
-  // we must consult capability data before either (a) taking the coding-
-  // plan short-circuit or (b) making a benchmark decision. The lookup has
-  // its own 500ms sub-budget; on failure we treat it as "no capability
-  // data" and the decision-engine fails closed on required modalities.
-  //
-  // When `constraints` is absent we MUST stay byte-identical to today: no
-  // capability fetch, no routing-table fetch, no benchmark hop on the
-  // coding-plan path.
+  // Constraints-absent coding-plan short-circuit stays byte-identical: no
+  // settings hop, capability fetch, routing-table fetch, or benchmark hop.
+  if (codingPlanActive && !hasConstraints) {
+    const decision = codingPlanDefaultDecision(codingPlanPreference);
+    writeClassifierMetricsDataPoint(c.env, {
+      status: 'coding_plan_default',
+      classifierModel: 'coding_plan_default',
+      requestedModel: payload.input.requestedModel,
+      classifierDurationMs: performance.now() - startedAt,
+      classifierCostCredits: 0,
+      cacheHit: false,
+    });
+    return c.json({ cost: 0, decision, classifierResult: null });
+  }
+
+  // Resolve settings before the (single) capability load so custom-pool
+  // model ids are included when a pool is configured. Settings do not
+  // depend on capabilities. Null pool keeps platform-table semantics and
+  // does not add a custom benchmark hop beyond the table loader below.
+  const effectiveSettings = await getEffectiveAutoRoutingSettings(c.env, {
+    userId: payload.userId,
+    organizationId: payload.organizationId,
+  });
+  const configuredPool = effectiveSettings.pool;
+  const routingMode = effectiveSettings.mode;
+  const failClosedOnInactive = configuredPool !== null;
+
+  // One capability load on the decide path. Include pool model ids whenever
+  // a pool is configured so constrained + custom-pool traffic does not pay
+  // two sequential 500ms capability budgets.
   let capabilities: ModelCapabilitiesMap = new Map();
-  if (hasConstraints && constraints) {
+  if (hasConstraints || configuredPool !== null) {
     capabilities = await getModelCapabilities(c.env, {
       codingPlanModelId: codingPlanActive ? codingPlanPreference.modelId : null,
+      ...(configuredPool !== null
+        ? { additionalModelIds: configuredPool.map(entry => entry.model) }
+        : {}),
     });
   }
 
-  if (codingPlanActive) {
-    const canTakeShortCircuit =
-      hasConstraints && constraints
-        ? modelSatisfiesConstraints(capabilities.get(codingPlanPreference.modelId), constraints)
-        : true;
+  if (codingPlanActive && hasConstraints && constraints) {
+    const canTakeShortCircuit = modelSatisfiesConstraints(
+      capabilities.get(codingPlanPreference.modelId),
+      constraints
+    );
     if (canTakeShortCircuit) {
       const decision = codingPlanDefaultDecision(codingPlanPreference);
       writeClassifierMetricsDataPoint(c.env, {
@@ -357,18 +452,19 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     // from subscription-billed to credit-billed benchmark routing.
   }
 
-  const [hashes, userIdHash, classifierModel, successSampleRate, routingTable, routingMode] =
-    await Promise.all([
-      computeContentHashes(payload.input),
-      hashIdentifierForTelemetry(payload.userId),
-      getClassifierModel(c.env),
-      getDecisionLogSampleRate(c.env),
-      getRoutingTable(c.env),
-      getAutoRoutingMode(c.env, {
-        userId: payload.userId,
-        organizationId: payload.organizationId,
-      }),
-    ]);
+  // Null pool uses the platform cached table (no custom benchmark hop).
+  // Configured pool loads the sparse custom table for exactly those entries;
+  // on lookup failure the table is null → null decision → gateway balanced fallback.
+  const [hashes, userIdHash, classifierModel, successSampleRate, routingTable] = await Promise.all([
+    computeContentHashes(payload.input),
+    hashIdentifierForTelemetry(payload.userId),
+    getClassifierModel(c.env),
+    getDecisionLogSampleRate(c.env),
+    configuredPool === null
+      ? getRoutingTable(c.env)
+      : loadCustomRoutingTable(c.env, configuredPool),
+  ]);
+
   const ctx: DecisionContext = {
     payload,
     hashes,
@@ -384,21 +480,30 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     getCachedClassification(c.env, ctx.conversationKey, hashes.exact, classifierModel),
     getStickyDecision(c.env, ctx.conversationKey),
   ]);
+  const incumbent = stickyToIncumbent(sticky);
+  const decisionOptions = {
+    constraints: payload.constraints,
+    capabilityMap: hasConstraints || configuredPool !== null ? capabilities : undefined,
+    failClosedOnInactive,
+  };
   if (cached) {
     const decision = computeDecision(
       cached,
       routingTable,
-      sticky?.model ?? null,
+      incumbent,
       deniedModelIds,
       routingMode,
-      {
-        constraints: payload.constraints,
-        capabilityMap: hasConstraints ? capabilities : undefined,
-      }
+      decisionOptions
     );
     if (decision) {
       c.executionCtx.waitUntil(
-        putStickyDecision(c.env, ctx.conversationKey, decision.model, taxonomyRouteKey(cached))
+        putStickyDecision(
+          c.env,
+          ctx.conversationKey,
+          decision.model,
+          decisionVariant(decision),
+          taxonomyRouteKey(cached)
+        )
       );
     }
     recordDecision(
@@ -431,13 +536,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const decision = computeDecision(
       classifier.classification,
       routingTable,
-      sticky?.model ?? null,
+      incumbent,
       deniedModelIds,
       routingMode,
-      {
-        constraints: payload.constraints,
-        capabilityMap: hasConstraints ? capabilities : undefined,
-      }
+      decisionOptions
     );
     // Like the classification cache, sticky state only trusts real classifier
     // output: a heuristic fallback must not re-anchor the session's model.
@@ -447,6 +549,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           c.env,
           ctx.conversationKey,
           decision.model,
+          decisionVariant(decision),
           taxonomyRouteKey(classifier.classification)
         )
       );

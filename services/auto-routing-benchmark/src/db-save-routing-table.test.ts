@@ -1,27 +1,30 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
 
-const mockState = vi.hoisted(() => ({
-  batchCalls: [] as Array<Array<{ kind: string; values?: unknown }>>,
-}));
+const mocks = vi.hoisted(() => {
+  const batch = vi.fn(async (_stmts: unknown[]) => []);
+  const where = vi.fn(() => ({ kind: 'delete' }));
+  const deleteFrom = vi.fn(() => ({ where }));
+  const onConflictDoUpdate = vi.fn((args: unknown) => ({ kind: 'upsert', args }));
+  const insertValues = vi.fn((values: unknown) => ({
+    kind: 'insert',
+    values,
+    onConflictDoUpdate,
+  }));
+  const insertInto = vi.fn(() => ({ values: insertValues }));
+
+  return { batch, deleteFrom, insertInto, insertValues, onConflictDoUpdate, where };
+});
 
 vi.mock('drizzle-orm/d1', () => ({
   drizzle: vi.fn(() => ({
-    delete: vi.fn(() => ({
-      where: vi.fn(() => ({ kind: 'delete' })),
-    })),
-    insert: vi.fn(() => ({
-      values: vi.fn((values: unknown) => ({
-        kind: 'insert',
-        values,
-        onConflictDoUpdate: vi.fn(() => ({ kind: 'upsert', values })),
-      })),
-    })),
-    batch: vi.fn(async (stmts: Array<{ kind: string; values?: unknown }>) => {
-      mockState.batchCalls.push(stmts);
-    }),
+    batch: mocks.batch,
+    delete: mocks.deleteFrom,
+    insert: mocks.insertInto,
   })),
 }));
+
+import { saveRoutingTable } from './db';
 
 const candidate = (model: string): RankedCandidate => ({
   model,
@@ -32,9 +35,16 @@ const candidate = (model: string): RankedCandidate => ({
 });
 
 describe('saveRoutingTable', () => {
-  it('chunks routing candidate inserts to stay under D1 variable limits', async () => {
-    const { saveRoutingTable } = await import('./db');
+  beforeEach(() => {
+    mocks.batch.mockClear();
+    mocks.deleteFrom.mockClear();
+    mocks.insertInto.mockClear();
+    mocks.insertValues.mockClear();
+    mocks.onConflictDoUpdate.mockClear();
+    mocks.where.mockClear();
+  });
 
+  it('chunks routing candidate inserts to stay under D1 variable limits', async () => {
     const table: RoutingTable = {
       version: 'run-large-routing-table',
       generatedAt: '2026-06-16T18:00:00.000Z',
@@ -53,7 +63,8 @@ describe('saveRoutingTable', () => {
 
     await saveRoutingTable({} as D1Database, table, '2026-06-16T18:01:00.000Z');
 
-    const [batch] = mockState.batchCalls;
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
+    const batch = mocks.batch.mock.calls[0]?.[0] as Array<{ kind: string; values?: unknown }>;
     expect(batch).toBeDefined();
     const candidateInsertSizes = batch
       .filter(stmt => stmt.kind === 'insert')

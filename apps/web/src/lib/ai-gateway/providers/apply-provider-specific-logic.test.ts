@@ -6,7 +6,6 @@ import {
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import { OPENROUTER_GPT56_PROMO_MODEL_IDS } from '@/lib/ai-gateway/providers/openai';
 
 function makeRequest(model: string, models?: string[]): GatewayRequest {
   return {
@@ -60,12 +59,24 @@ describe('applyGatewayModelsFallback', () => {
 });
 
 describe('applyPreferredProvider', () => {
-  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('prefers OpenAI for promo model %s', model => {
+  it.each(['openai/gpt-5.6-terra', 'openai/o3', 'gpt-5.5'])(
+    'prefers OpenAI for OpenAI model %s',
+    model => {
+      const request = makeRequest(model);
+
+      applyPreferredProvider(model, request.body);
+
+      expect(request.body.provider).toEqual({ order: ['openai'] });
+    }
+  );
+
+  it('does not set a provider order for GPT-OSS', () => {
+    const model = 'openai/gpt-oss-120b';
     const request = makeRequest(model);
 
     applyPreferredProvider(model, request.body);
 
-    expect(request.body.provider).toEqual({ order: ['openai'] });
+    expect(request.body.provider).toBeUndefined();
   });
 
   it('does not set a provider order for Fable', () => {

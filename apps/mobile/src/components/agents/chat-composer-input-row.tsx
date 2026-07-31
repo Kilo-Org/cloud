@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -78,6 +79,7 @@ export function ChatComposerInputRow({
   voiceInputStatus,
 }: Readonly<ChatComposerInputRowProps>) {
   const colors = useThemeColors();
+  const inputScrollable = shouldEnableComposerInputScroll(measureHeight, maxInputHeight);
 
   return (
     <View className="flex-row items-center p-2.5 px-3">
@@ -115,7 +117,7 @@ export function ChatComposerInputRow({
           onFocus={onInputFocus}
           onBlur={onInputBlur}
           style={textInputStyle}
-          scrollEnabled={measureHeight >= maxInputHeight}
+          scrollEnabled={inputScrollable}
           editable={inputEditable}
           accessibilityState={{ disabled: inputAccessibilityDisabled }}
           returnKeyType="default"

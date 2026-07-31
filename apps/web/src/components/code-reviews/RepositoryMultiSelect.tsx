@@ -20,12 +20,14 @@ export type RepositoryMultiSelectProps<TId extends RepositoryId = number> = {
   repositories: Repository<TId>[];
   selectedIds: TId[];
   onSelectionChange: (selectedIds: TId[]) => void;
+  renderRepositoryAccessory?: (repository: Repository<TId>) => React.ReactNode;
 };
 
 export function RepositoryMultiSelect<TId extends RepositoryId = number>({
   repositories,
   selectedIds,
   onSelectionChange,
+  renderRepositoryAccessory,
 }: RepositoryMultiSelectProps<TId>) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -116,7 +118,7 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
                   />
                   <label
                     htmlFor={`repo-${repo.id}`}
-                    className="flex flex-1 cursor-pointer items-center gap-2 text-sm"
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm"
                   >
                     {repo.private ? (
                       <Lock className="text-primary h-3.5 w-3.5 shrink-0" />
@@ -124,6 +126,7 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
                       <Unlock className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                     )}
                     <span className="truncate font-mono">{repo.full_name}</span>
+                    {renderRepositoryAccessory?.(repo)}
                   </label>
                 </div>
               );

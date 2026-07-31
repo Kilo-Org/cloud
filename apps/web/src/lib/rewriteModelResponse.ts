@@ -11,6 +11,7 @@ import { db } from '@/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
+import { sanitizeJsonbValue } from '@/lib/sanitize-jsonb';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
@@ -109,9 +110,9 @@ async function createRequestLogCapture(
           status_code: status,
           model,
           provider,
-          request: request.body,
+          request: sanitizeJsonbValue(request.body),
           response: responseText,
-          error,
+          error: sanitizeJsonbValue(error),
         })
         .returning({ id: api_request_log.id });
       logExceptInTest(
@@ -159,7 +160,6 @@ type ResponseReadError = {
   errorType: 'timeout' | 'upstream_disconnect';
   /** Already carries the request id suffix when one is available. */
   message: string;
-  vercelRequestId?: string;
 };
 
 const STREAM_PROGRESS_LOG_INTERVAL_MS = 30_000;
@@ -208,10 +208,9 @@ function getResponseReadError(
     return {
       errorType: 'upstream_disconnect',
       message: withRequestId(
-        'The upstream provider disconnected while sending the response.',
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.',
         vercelRequestId
       ),
-      vercelRequestId: vercelRequestId ?? undefined,
     };
   }
 
@@ -222,7 +221,6 @@ function getResponseReadError(
         'The upstream provider timed out while sending the response.',
         vercelRequestId
       ),
-      vercelRequestId: vercelRequestId ?? undefined,
     };
   }
 
@@ -253,9 +251,6 @@ async function readResponseText(
           error: responseReadError.message,
           error_type: responseReadError.errorType,
           message: responseReadError.message,
-          ...(responseReadError.vercelRequestId && {
-            vercel_request_id: responseReadError.vercelRequestId,
-          }),
         },
         { status: 503, headers }
       ),
@@ -481,9 +476,6 @@ export async function rewriteModelResponse_ChatCompletions(
               code: 503,
               message: responseReadError.message,
               type: responseReadError.errorType,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',
@@ -664,9 +656,6 @@ export async function rewriteModelResponse_Messages(
               type: 'api_error',
               message: responseReadError.message,
               error_type: responseReadError.errorType,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',
@@ -818,9 +807,6 @@ export async function rewriteModelResponse_Responses(
               type: responseReadError.errorType,
               code: responseReadError.errorType === 'timeout' ? '504' : '503',
               message: responseReadError.message,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',

@@ -96,3 +96,48 @@ describe('MessageBubble regressions', () => {
     expect(findText(dequeuedTree, t => t === 'Queued')).toBe(false);
   });
 });
+
+describe('MessageBubble in-bubble text selection context', () => {
+  it('wraps the assistant parts view in InMessageBubbleContext.Provider with value true', async () => {
+    const { InMessageBubbleContext } = await import('./bubble-text-selection-context');
+    const tree = await renderBubble(assistantMessage('m6'));
+
+    const provider = findProvider(tree, InMessageBubbleContext.Provider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.value).toBe(true);
+  });
+
+  it('wraps the user bubble content in InMessageBubbleContext.Provider with value true', async () => {
+    const { InMessageBubbleContext } = await import('./bubble-text-selection-context');
+    const tree = await renderBubble(userMessage('m7'));
+
+    const provider = findProvider(tree, InMessageBubbleContext.Provider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.value).toBe(true);
+  });
+});
+
+function findProvider(
+  node: unknown,
+  providerType: unknown
+): { type: unknown; props: { value?: unknown; children?: unknown } } | null {
+  if (node == null || typeof node !== 'object') {
+    return null;
+  }
+  const element = node as { type?: unknown; props?: { value?: unknown; children?: unknown } };
+  if (element.type === providerType) {
+    return element as { type: unknown; props: { value?: unknown; children?: unknown } };
+  }
+  const children = element.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const hit = findProvider(child, providerType);
+      if (hit) {
+        return hit;
+      }
+    }
+  } else if (children && typeof children === 'object') {
+    return findProvider(children, providerType);
+  }
+  return null;
+}

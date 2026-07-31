@@ -9,12 +9,16 @@ import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
+  type GestureResponderEvent,
   Keyboard,
   type LayoutChangeEvent,
+  Platform,
   type TextInput,
   type TextStyle,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -29,6 +33,7 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -48,6 +53,7 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
@@ -63,6 +69,18 @@ const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDI
 const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_FONT_SIZE = 16;
+const COMPOSER_FOCUS_RESTORE_DELAY_MS = 100;
+/** Match RNGH pan activeOffsetY / failOffsetX so Android JS path and iOS pan agree. */
+const DISMISS_KEYBOARD_ACTIVE_OFFSET_Y = 24;
+const DISMISS_KEYBOARD_FAIL_OFFSET_X = 16;
+
+type AndroidDismissKeyboardGesture = {
+  identifier: string;
+  startPageX: number;
+  startPageY: number;
+  dismissed: boolean;
+  failed: boolean;
+};
 
 type ChatComposerProps = {
   onSend: (
@@ -126,6 +144,9 @@ export function ChatComposer({
   const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
+  const inputFocusedRef = useRef(false);
+  const restoreFocusOnActiveRef = useRef(false);
+  const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasText, setHasText] = useState(false);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
   const [inputWidth, setInputWidth] = useState(0);
@@ -142,6 +163,13 @@ export function ChatComposer({
   const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
   const [stopCompleted, setStopCompleted] = useState(false);
   const stopGenerationRef = useRef(0);
+  // Live gates for the AppState focus-restore timeout: read at fire time so a
+  // disabled/isSending flip cannot re-run the subscription effect and cancel a
+  // pending restore after the restore flag was already consumed.
+  const disabledRef = useRef(disabled);
+  const isSendingRef = useRef(isSending);
+  disabledRef.current = disabled;
+  isSendingRef.current = isSending;
 
   // Single send-admission authority. `settleVoiceInputBeforeSubmit` owns
   // this lock for the full voice-settle + asynchronous send sequence, and
@@ -270,6 +298,143 @@ export function ChatComposer({
 
   // The strip must show share-prefilled files before the session resolves.
   const showAttachments = attachmentsEnabled || upload.attachments.length > 0;
+
+  useEffect(() => {
+    const clearRestoreFocusTimeout = () => {
+      if (restoreFocusTimeoutRef.current !== null) {
+        clearTimeout(restoreFocusTimeoutRef.current);
+        restoreFocusTimeoutRef.current = null;
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      const transition = resolveMessageInputAppStateTransition({
+        nextAppState,
+        restoreFocusOnActive: restoreFocusOnActiveRef.current,
+        wasFocused: inputFocusedRef.current,
+      });
+      restoreFocusOnActiveRef.current = transition.restoreFocusOnActive;
+
+      if (transition.shouldBlur) {
+        clearRestoreFocusTimeout();
+        inputRef.current?.blur();
+      }
+
+      // Schedule unconditionally when the transition asks for focus; gate at
+      // fire time via refs so disabled/isSending flips never cancel a pending
+      // restore after the flag was consumed.
+      if (transition.shouldFocus) {
+        clearRestoreFocusTimeout();
+        restoreFocusTimeoutRef.current = setTimeout(() => {
+          restoreFocusTimeoutRef.current = null;
+          if (disabledRef.current || isSendingRef.current) {
+            return;
+          }
+          inputRef.current?.focus();
+        }, COMPOSER_FOCUS_RESTORE_DELAY_MS);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      clearRestoreFocusTimeout();
+    };
+  }, []);
+
+  const inputScrollable = shouldEnableComposerInputScroll(measure.height, TEXT_INPUT_MAX_HEIGHT);
+  const dismissKeyboardPan = useMemo(
+    () =>
+      // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
+      Gesture.Pan()
+        .runOnJS(true)
+        .activeOffsetY(DISMISS_KEYBOARD_ACTIVE_OFFSET_Y)
+        .failOffsetX([-DISMISS_KEYBOARD_FAIL_OFFSET_X, DISMISS_KEYBOARD_FAIL_OFFSET_X])
+        .enabled(!inputScrollable)
+        .onStart(() => {
+          Keyboard.dismiss();
+        }),
+    [inputScrollable]
+  );
+
+  // Android: ReactEditText.requestDisallowInterceptTouchEvent(true) on ACTION_DOWN
+  // (ReactEditText.kt) blocks RNGH Pan from seeing the stream start when the drag
+  // begins on the focused EditText. JS onTouch* still bubbles to this host View
+  // (BaseViewConfig.android.js topTouchStart/Move), so track pageY here and dismiss
+  // once dy crosses the same threshold as the pan. iOS keeps the RNGH path only.
+  const androidDismissGestureRef = useRef<AndroidDismissKeyboardGesture | null>(null);
+
+  const resetAndroidDismissGesture = useCallback((event: GestureResponderEvent) => {
+    const gesture = androidDismissGestureRef.current;
+    if (gesture && gesture.identifier !== event.nativeEvent.identifier) {
+      return;
+    }
+    androidDismissGestureRef.current = null;
+  }, []);
+
+  const handleAndroidDismissTouchStart = useCallback((event: GestureResponderEvent) => {
+    const gesture = androidDismissGestureRef.current;
+    if (gesture && gesture.identifier !== event.nativeEvent.identifier) {
+      return;
+    }
+    androidDismissGestureRef.current = {
+      identifier: event.nativeEvent.identifier,
+      startPageX: event.nativeEvent.pageX,
+      startPageY: event.nativeEvent.pageY,
+      dismissed: false,
+      failed: false,
+    };
+  }, []);
+
+  const tryAndroidDismissKeyboardFromTouchMove = useCallback(
+    (event: GestureResponderEvent): boolean => {
+      const gesture = androidDismissGestureRef.current;
+      if (
+        !gesture ||
+        gesture.identifier !== event.nativeEvent.identifier ||
+        gesture.dismissed ||
+        gesture.failed ||
+        inputScrollable
+      ) {
+        return false;
+      }
+      const dx = event.nativeEvent.pageX - gesture.startPageX;
+      const dy = event.nativeEvent.pageY - gesture.startPageY;
+      if (Math.abs(dx) > DISMISS_KEYBOARD_FAIL_OFFSET_X) {
+        gesture.failed = true;
+        return false;
+      }
+      if (dy < DISMISS_KEYBOARD_ACTIVE_OFFSET_Y) {
+        return false;
+      }
+      gesture.dismissed = true;
+      Keyboard.dismiss();
+      return true;
+    },
+    [inputScrollable]
+  );
+
+  const handleAndroidDismissTouchMove = useCallback(
+    (event: GestureResponderEvent) => {
+      tryAndroidDismissKeyboardFromTouchMove(event);
+    },
+    [tryAndroidDismissKeyboardFromTouchMove]
+  );
+
+  const shouldCaptureAndroidDismissMove = useCallback(
+    (event: GestureResponderEvent) => tryAndroidDismissKeyboardFromTouchMove(event),
+    [tryAndroidDismissKeyboardFromTouchMove]
+  );
+
+  const androidDismissKeyboardTouchProps =
+    Platform.OS === 'android'
+      ? {
+          onTouchStart: handleAndroidDismissTouchStart,
+          onTouchMove: handleAndroidDismissTouchMove,
+          onTouchEnd: resetAndroidDismissGesture,
+          onTouchCancel: resetAndroidDismissGesture,
+          onMoveShouldSetResponderCapture: shouldCaptureAndroidDismissMove,
+        }
+      : undefined;
 
   function clearDraft() {
     textRef.current = '';
@@ -474,43 +639,49 @@ export function ChatComposer({
         <VoiceInputStatus status={voiceInput.status} />
       </View>
 
-      <ChatComposerInputRow
-        key={inputEpoch}
-        attachmentsEnabled={attachmentsEnabled}
-        canSend={control.canSend}
-        disabled={disabled}
-        inputAccessibilityDisabled={control.inputAccessibilityDisabled}
-        inputEditable={control.inputEditable}
-        inputRef={inputRef}
-        isSending={isSending}
-        isStreaming={isStreaming}
-        maxInputHeight={TEXT_INPUT_MAX_HEIGHT}
-        measureHeight={measure.height}
-        onAddAttachment={() => {
-          void handleAddAttachment();
-        }}
-        onChangeText={handleChangeText}
-        onInputBlur={() => {
-          setIsFocused(false);
-        }}
-        onInputFocus={() => {
-          setIsFocused(true);
-        }}
-        onInputLayout={handleInputLayout}
-        onStop={handleStop}
-        onSubmit={() => {
-          void submit();
-        }}
-        onToggleVoice={() => {
-          void voiceInput.toggle();
-        }}
-        paperclipDisabled={control.paperclipDisabled}
-        placeholder={placeholder}
-        textInputStyle={textInputStyle}
-        voiceDisabled={control.voiceDisabled}
-        voiceInputAvailable={voiceInput.available}
-        voiceInputStatus={voiceInput.status}
-      />
+      <GestureDetector gesture={dismissKeyboardPan}>
+        <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
+          <ChatComposerInputRow
+            key={inputEpoch}
+            attachmentsEnabled={attachmentsEnabled}
+            canSend={control.canSend}
+            disabled={disabled}
+            inputAccessibilityDisabled={control.inputAccessibilityDisabled}
+            inputEditable={control.inputEditable}
+            inputRef={inputRef}
+            isSending={isSending}
+            isStreaming={isStreaming}
+            maxInputHeight={TEXT_INPUT_MAX_HEIGHT}
+            measureHeight={measure.height}
+            onAddAttachment={() => {
+              void handleAddAttachment();
+            }}
+            onChangeText={handleChangeText}
+            onInputBlur={() => {
+              inputFocusedRef.current = false;
+              setIsFocused(false);
+            }}
+            onInputFocus={() => {
+              inputFocusedRef.current = true;
+              setIsFocused(true);
+            }}
+            onInputLayout={handleInputLayout}
+            onStop={handleStop}
+            onSubmit={() => {
+              void submit();
+            }}
+            onToggleVoice={() => {
+              void voiceInput.toggle();
+            }}
+            paperclipDisabled={control.paperclipDisabled}
+            placeholder={placeholder}
+            textInputStyle={textInputStyle}
+            voiceDisabled={control.voiceDisabled}
+            voiceInputAvailable={voiceInput.available}
+            voiceInputStatus={voiceInput.status}
+          />
+        </View>
+      </GestureDetector>
     </BlurBar>
   );
 }

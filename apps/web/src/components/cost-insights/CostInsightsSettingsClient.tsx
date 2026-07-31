@@ -235,9 +235,11 @@ function CostInsightsSettingsForm({
     threshold7DayUsd: validateThresholdUsd(form.threshold7DayUsd),
     threshold30DayUsd: validateThresholdUsd(form.threshold30DayUsd),
   };
-  const hasValidationError = Boolean(
-    validations.thresholdUsd || validations.threshold7DayUsd || validations.threshold30DayUsd
-  );
+  const hasValidationError =
+    form.enabled &&
+    Boolean(
+      validations.thresholdUsd || validations.threshold7DayUsd || validations.threshold30DayUsd
+    );
   const dirty =
     form.enabled !== settings.enabled ||
     form.anomalyAlertsEnabled !== settings.anomalyAlertsEnabled ||
@@ -266,15 +268,18 @@ function CostInsightsSettingsForm({
 
   const handleSave = () => {
     if (!dirty || hasValidationError || settings.readOnly) return;
+    const thresholdUsd = form.enabled ? form.thresholdUsd : settings.thresholdUsd;
+    const threshold7DayUsd = form.enabled
+      ? form.threshold7DayUsd
+      : (settings.threshold7DayUsd ?? '');
+    const threshold30DayUsd = form.enabled ? form.threshold30DayUsd : settings.threshold30DayUsd;
     onSave({
       spendAlertsEnabled: form.enabled,
       anomalyAlertsEnabled: form.anomalyAlertsEnabled,
       costSuggestionsEnabled: form.suggestionsEnabled,
-      spendThresholdUsd: form.thresholdUsd.trim() === '' ? null : form.thresholdUsd.trim(),
-      spend7DayThresholdUsd:
-        form.threshold7DayUsd.trim() === '' ? null : form.threshold7DayUsd.trim(),
-      spend30DayThresholdUsd:
-        form.threshold30DayUsd.trim() === '' ? null : form.threshold30DayUsd.trim(),
+      spendThresholdUsd: thresholdUsd.trim() === '' ? null : thresholdUsd.trim(),
+      spend7DayThresholdUsd: threshold7DayUsd.trim() === '' ? null : threshold7DayUsd.trim(),
+      spend30DayThresholdUsd: threshold30DayUsd.trim() === '' ? null : threshold30DayUsd.trim(),
     });
   };
 

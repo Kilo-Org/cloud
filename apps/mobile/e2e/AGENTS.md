@@ -4,30 +4,11 @@ Interactive verification against a local backend. Run commands from the reposito
 
 ## E2E Bundle: Required First Step
 
-E2E device/stack work runs only inside a slot bundle. Bundle contents,
-ownership, blocked-take, and release rules: `.kilo_workflow/WORKFLOW.md` "E2E
-Slots". Before dispatching verifiers, the owner runs:
-
-```bash
-.kilo_workflow/e2e-take-slot.sh      # run from your own tmux session; blocks until a slot frees
-.kilo_workflow/e2e-slot-status.sh    # live holders; stale slots and unaccounted resources
-```
-
-The owner starts every bundle resource through `e2e-start-resource.sh`, passes
-its platform scope, start command, and the ready services and device identifiers
-in each verifier handoff, then stops every resource it started through
-`e2e-stop-resource.sh` before freeing the slot. Taking is idempotent per session.
-One iOS verifier is the default for this bundle; parallel iOS and Android shards
-run only when the handoff records a platform rationale (platform-specific paths
-touched or a prior platform-specific defect). Parallel platform shards share the
-same slot bundle and never take another slot. The slot owner is responsible for
-the whole round lifecycle; do not hold a slot through planning, review, or CI
-waits.
-
-Slot ownership is round-scoped and the platform scope is recorded in every
-device/stack handoff. The default is iOS-only; dual-platform requires a
-recorded rationale. See `.kilo_workflow/WORKFLOW.md` "E2E Slots" and "E2E Loop"
-for the scope table and lifecycle.
+E2E device/stack work is owned by one process per round. That owner starts every
+resource, records the platform scope and ready device identifiers, then stops
+everything it started before leaving. Default platform scope is **iOS-only**;
+run Android only when the change touches platform-specific paths or a prior
+platform-specific defect exists, and record that rationale.
 
 ## Fresh Worktree Quickstart
 
@@ -58,28 +39,25 @@ If this worktree has no stack, the bundle owner starts the complete mobile flow
 after taking its slot:
 
 ```bash
-.kilo_workflow/e2e-start-resource.sh stack mobile cloud-agent-next kiloclaw event-service
+pnpm dev:env -y cloudflare-session-ingest
+pnpm dev:start --no-attach --reuse-running mobile cloud-agent-next kiloclaw event-service
+pnpm drizzle migrate
 ```
 
-The script also refreshes the session-ingest Secrets Store binding, applies migrations, and fails fast when a requested service or the kiloclaw docker bridge never comes up.
+Confirm services are up with `pnpm dev:status --json`. Refresh the session-ingest
+Secrets Store binding before start when the worktree is fresh.
 
-To bring the whole bundle up at once (stack, iOS claim+build, and optionally
-Android start+claim+build — selected chains run in parallel, the slowest sets
-the wall time instead of the sum):
+iOS claim+build (idempotent per worktree):
 
 ```bash
-.kilo_workflow/e2e-start-resource.sh bundle --ios-only
+CLAIM=$(pnpm -s dev:mobile:simulator claim)
+UDID=$(printf '%s' "$CLAIM" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).device.id)')
+pnpm dev:mobile:ios build "$UDID"
 ```
 
-For dual-platform rounds (recorded rationale required):
-
-```bash
-.kilo_workflow/e2e-start-resource.sh bundle <avd-name> [--gpu host]
-```
-
-The start wrapper prebuilds the generated `apps/mobile/{ios,android}` projects
-when needed and emits compact JSON / summary lines on stdout for the devices it
-claims. The generated trees are gitignored.
+Android (only with a recorded dual-platform rationale): start, claim, build via
+`pnpm dev:mobile:android` (see Android section). Generated `apps/mobile/{ios,android}`
+trees are gitignored; prebuild runs when missing.
 
 Rules:
 
@@ -136,20 +114,20 @@ in one command; never share a simulator with another worktree. The claim command
 prefers an unclaimed shutdown iPhone and boots it:
 
 ```bash
-.kilo_workflow/e2e-start-resource.sh ios [udid]  # claim + build, idempotent per worktree
-.kilo_workflow/e2e-stop-resource.sh ios          # this worktree's claims
+pnpm dev:mobile:simulator claim [udid]   # claim (+ boot); then build
+pnpm dev:mobile:ios build <udid>
+pnpm dev:mobile:simulator release-all    # this worktree's claims; powers off what it booted
 ```
 
 The wrapper renames the claimed device to `Kilo E2E - <sanitized-worktree-basename>` and restores the original name on release. Never call `xcrun simctl rename` yourself. The claim also records whether it was the thing that booted the device, which is what lets release power off only the devices it started — so never boot or shut down an E2E simulator with `xcrun simctl` behind the wrapper's back. A claim is stale — and silently reclaimable — once its owning worktree is deleted. A claim killed mid-boot boots the Shutdown device again on reclaim automatically; give claims a >=10-minute timeout under parallel-workflow load (booting is slow).
 
-Install a validated cached native build. `e2e-start-resource.sh ios` already
-runs this for the claimed device; use the standalone build command only for
-rebuilds. A compatible fingerprint skips rebuilding; a cache miss serializes
-through the host-wide native compiler semaphore. Never install an arbitrary
-DerivedData app or run a separate Expo native build:
+Install a validated cached native build. A compatible fingerprint skips
+rebuilding; a cache miss serializes through the host-wide native compiler
+semaphore. Never install an arbitrary DerivedData app or run a separate Expo
+native build:
 
 ```bash
-pnpm dev:mobile:ios build <udid>   # rebuild only; the start wrapper already builds
+pnpm dev:mobile:ios build <udid>
 ```
 
 Connect the app to the Metro URL shown by this worktree's `mobile` pane:
@@ -289,40 +267,43 @@ Do not conclude Android is unavailable from `command -v adb` or the inherited `P
 pnpm dev:mobile:android doctor
 ```
 
-The bundle owner uses the wrappers for emulator lifecycle and the Expo/Gradle
-build before dispatch. `e2e-start-resource.sh android` starts the emulator and
-waits for `sys.boot_completed=1` (process-liveness checked, 8-minute envelope)
-— device visibility is not readiness, and there is no manual boot polling.
-The verifier starts with `login.sh`. Never use unbounded `adb wait-for-device`,
-manual `adb reverse`, or dev-client `am start`; `login.sh` preflight handles
-the last two.
+The bundle owner uses the repository Android wrappers for emulator lifecycle
+and the Expo/Gradle build before dispatch. `pnpm dev:mobile:android emulator-start`
+starts the emulator and waits for `sys.boot_completed=1` (process-liveness
+checked, 8-minute envelope) — device visibility is not readiness, and there is
+no manual boot polling. The verifier starts with `login.sh`. Never use unbounded
+`adb wait-for-device`, manual `adb reverse`, or dev-client `am start`; `login.sh`
+preflight handles the last two.
 
 ### Launch and GPU policy
 
 Two launch attempts total, then a test-environment blocker with the recorded log tail. Attempt 1 uses the Mac GPU. Attempt 2 switches to software rendering only when the recorded PID died; a live process that missed the boot envelope retries the Mac GPU. `emulator-start` atomically allocates the console port, creates the worktree session, and records its exact PID/session; never launch with raw `tmux`, `emulator`, or a hand-picked port.
 
 ```bash
-EMULATOR=$(.kilo_workflow/e2e-start-resource.sh android <avd-name> --gpu host)
+EMULATOR=$(pnpm -s dev:mobile:android emulator-start <avd-name> --gpu host --wait)
 SERIAL=$(jq -r .serial <<<"$EMULATOR")
 EMULATOR_PID=$(jq -r .pid <<<"$EMULATOR")
 EMULATOR_LOG=$(jq -r .log <<<"$EMULATOR")
+pnpm -s dev:mobile:android claim "$SERIAL" >/dev/null
+pnpm dev:mobile:android build "$SERIAL"
 ```
 
 Record `SERIAL`, `EMULATOR_PID`, and `EMULATOR_LOG` in the round handoff. Never drive or kill a device claimed by another worktree, and never delete a foreign claim file.
 
 ### Failed attempt → stop exactly yours → relaunch once
 
-On failure run `.kilo_workflow/e2e-stop-resource.sh android`; it uses the recorded session and verifies the recorded PID before sending a signal, so it cannot kill a sibling's same-AVD emulator. Relaunch once per the GPU policy with the same envelope. If the second attempt also fails, stop and return a test-environment blocker with `tail -200 "$EMULATOR_LOG"`; never a third launch.
+On failure run `pnpm dev:mobile:android emulator-stop` then
+`pnpm dev:mobile:android release-all`; the stop path uses the recorded session
+and verifies the recorded PID before sending a signal, so it cannot kill a
+sibling's same-AVD emulator. Relaunch once per the GPU policy with the same
+envelope. If the second attempt also fails, stop and return a test-environment
+blocker with `tail -200 "$EMULATOR_LOG"`; never a third launch.
 
 ### Build and login
 
-`e2e-start-resource.sh android <avd-name>` already prebuilds (when
-`apps/mobile/android/` is missing), starts the emulator, claims the serial, and
-builds it. On the primary path, run login next:
+After emulator-start + claim + build (above), run login next:
 
 ```bash
-EMULATOR=$(.kilo_workflow/e2e-start-resource.sh android <avd-name> --gpu host)
-SERIAL=$(jq -r .serial <<<"$EMULATOR")
 apps/mobile/e2e/login.sh "$SERIAL"
 ```
 
@@ -393,10 +374,10 @@ apps/mobile/e2e/remote-cli.sh stop                                              
 tmux kill-session -t "kilo-e2e-github-stub-$(basename "$PWD")" 2>/dev/null || true  # only after the GitHub stub
 apps/mobile/e2e/record.sh <udid> stop                                              # every bundle device; idempotent
 apps/mobile/e2e/record.sh <serial> stop                                            # only if android was started
-.kilo_workflow/e2e-stop-resource.sh android                                        # only if android was started
-.kilo_workflow/e2e-stop-resource.sh ios
-.kilo_workflow/e2e-stop-resource.sh stack
-.kilo_workflow/e2e-free-slot.sh   # refuses while any resource above is still live
+pnpm dev:mobile:android emulator-stop || true                                      # only if android was started
+pnpm dev:mobile:android release-all || true                                        # only if android was started
+pnpm dev:mobile:simulator release-all
+pnpm dev:stop
 rm -f "$EMULATOR_LOG"
 ```
 

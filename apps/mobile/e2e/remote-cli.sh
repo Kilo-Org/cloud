@@ -69,7 +69,7 @@ prepare_env() {
 
   if [ -z "$nextjs_port" ] || [ -z "$ingest_port" ]; then
     echo "Required services are not up for $REPO_ROOT." >&2
-    echo "If you hold no E2E slot: take one, then .kilo_workflow/e2e-start-resource.sh stack mobile cloud-agent-next kiloclaw event-service" >&2
+    echo "Start the stack: pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw event-service" >&2
     echo "If a bundle owner already runs this stack, use it — never start a second one." >&2
     exit 1
   fi

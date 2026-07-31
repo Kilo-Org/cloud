@@ -34,7 +34,7 @@ export type ShutdownFn = (deviceId: string) => void;
 // and silently reclaimable — when its worktree no longer exists on
 // disk. Concurrency is handled by atomic `wx` creation plus a short
 // per-device mutation lock; device-phase parallelism is capped by the
-// machine-global slot semaphore (.kilo_workflow/e2e-take-slot.sh), so no
+// machine-global slot semaphore (external multi-agent tooling), so no
 // heavier ownership protocol is needed here.
 type ClaimRecord = {
   deviceId?: string;
@@ -469,7 +469,7 @@ function releaseSimulator(args: {
 
 // Release every simulator this worktree still holds, powering off the ones
 // its claims booted. Callers that only know the worktree — teardown paths like
-// `.kilo_workflow/e2e-stop-resource.sh ios`, which stops a resource without
+// external stop-resource wrappers, which stop a resource without
 // ever seeing a UDID — need this so a forgotten `release <udid>` cannot leak a
 // device.
 // Returns the released device ids. Foreign claims are ignored, never touched.

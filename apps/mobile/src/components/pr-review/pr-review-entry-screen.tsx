@@ -186,7 +186,11 @@ export function PrReviewEntryScreen() {
           </View>
           <View className="gap-3">
             <View className="flex-row items-center gap-2">
-              <View className="min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card">
+              <View
+                className="min-h-13 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
+                testID="pr-link-input-row"
+                collapsable={false}
+              >
                 <TextInput
                   ref={inputRef}
                   defaultValue=""

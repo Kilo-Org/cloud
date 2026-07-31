@@ -141,16 +141,27 @@ describe('applyVercelSettings BYOK pinning', () => {
     };
   }
 
-  it('drops a BYOK provider the caller ignored when another key remains', async () => {
+  // `userByok` is built from the providers that actually serve the requested
+  // model, so the realistic partial-ignore case is two endpoints for the same
+  // model: Anthropic direct and Bedrock both serve Claude.
+  const bedrockCredentials = JSON.stringify({
+    accessKeyId: 'AKIAEXAMPLE',
+    secretAccessKey: 'secret',
+    region: 'us-east-1',
+  });
+
+  it('drops a BYOK provider the caller ignored when another serving provider remains', async () => {
     const request = byokRequest(['anthropic']);
 
     await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
       { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-      { decryptedAPIKey: 'sk-openai', providerId: 'openai' },
+      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
     ]);
 
-    expect(Object.keys(request.body.providerOptions?.gateway?.byok ?? {})).toEqual(['openai']);
-    expect(request.body.providerOptions?.gateway?.only).toEqual(['openai']);
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
+    });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
   });
 
   // Regression: an empty BYOK map sends `only: []` with no credential, so the

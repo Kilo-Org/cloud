@@ -8,7 +8,7 @@ export const tencent_hy3_free_model: KiloExclusiveModel = {
   context_length: 262_144,
   max_completion_tokens: 128_000,
   status: 'public',
-  flags: ['reasoning', 'vercel-routing'],
+  flags: ['reasoning'],
   gateway: 'openrouter',
   internal_id: 'tencent/hy3',
   pricing: null,

@@ -41,8 +41,8 @@ export function OrganizationWelcomeHeader({
               Welcome to {organizationName}!
             </h3>
             <p className="mb-4 text-blue-200">
-              You&apos;ve been added to the <strong>{organizationName}</strong>{' '}organization. Click
-              &apos;Open in vscode&apos; to get started with Kilo Code.
+              You&apos;ve been added to the <strong>{organizationName}</strong>
+              {' organization'}. Click &apos;Open in vscode&apos; to get started with Kilo Code.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <span className="bg-background">

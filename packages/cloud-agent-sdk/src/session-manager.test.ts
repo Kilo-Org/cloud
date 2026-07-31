@@ -4558,6 +4558,16 @@ describe('formatError', () => {
     );
   });
 
+  it('handles TRPCClientError with numeric shape.code (JSON-RPC code from tRPC v11)', () => {
+    const err = Object.assign(new Error('Insufficient credits'), {
+      data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+      shape: { message: 'Insufficient credits', code: -32000, data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 } },
+    });
+    expect(formatError(err)).toBe(
+      'Insufficient credits. Please add at least $1 to continue using Cloud Agent.'
+    );
+  });
+
   it('handles unknown object errors with data property', () => {
     expect(formatError({ data: { code: 'SOME_UNKNOWN_CODE' } })).toBe(
       'Something went wrong. Please retry in a moment.'

@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   assistantMessage,
+  findElementByType,
   findText,
-  hasAnimatedBadge,
   renderBubble,
   userMessage,
 } from './message-bubble-test-utils';
@@ -12,11 +12,6 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'android' },
-}));
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
-  FadeOut: { duration: vi.fn() },
 }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('expo-haptics', () => ({
@@ -56,44 +51,118 @@ vi.mock('./use-message-copy', () => ({
   useMessageCopy: () => ({ copyMessage: vi.fn() }),
 }));
 
+const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
+
 describe('MessageBubble queued badge', () => {
-  it('renders the Queued badge when deliveryState is queued on a user message', async () => {
+  it('renders the Queued badge visible when deliveryState is queued', async () => {
     const tree = await renderBubble(userMessage('m1'), { status: 'queued' });
     expect(findText(tree, t => t === 'Queued')).toBe(true);
-    expect(hasAnimatedBadge(tree)).toBe(true);
+    const badge = findElementByType(
+      tree,
+      'View',
+      p => typeof p.className === 'string' && p.className.includes(BADGE_CLASS)
+    );
+    expect(badge).not.toBeNull();
+    expect(badge!.props.accessible).toBe(true);
+    expect(badge!.props.accessibilityRole).toBe('text');
+    expect(badge!.props.accessibilityLabel).toBe('Message queued');
+    expect(badge!.props.accessibilityElementsHidden).toBeUndefined();
+    expect(badge!.props.importantForAccessibility).toBeUndefined();
+    expect(badge!.props.pointerEvents).toBe('auto');
+    expect(typeof badge!.props.className).toBe('string');
+    expect(badge!.props.className).toContain('opacity-100');
   });
 
-  it('does not render the Queued badge for a failed delivery state on a user message', async () => {
-    const tree = await renderBubble(userMessage('m2'), {
+  it('renders a held badge slot when holdQueuedSlot is set but deliveryState is absent', async () => {
+    const tree = await renderBubble(userMessage('m2'), undefined, true);
+    expect(findText(tree, t => t === 'Queued')).toBe(true);
+    const badge = findElementByType(
+      tree,
+      'View',
+      p => typeof p.className === 'string' && p.className.includes(BADGE_CLASS)
+    );
+    expect(badge).not.toBeNull();
+    expect(badge!.props.accessible).toBe(false);
+    expect(badge!.props.accessibilityRole).toBeUndefined();
+    expect(badge!.props.accessibilityLabel).toBeUndefined();
+    expect(badge!.props.accessibilityElementsHidden).toBe(true);
+    expect(badge!.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(badge!.props.pointerEvents).toBe('none');
+    expect(typeof badge!.props.className).toBe('string');
+    expect(badge!.props.className).toContain('opacity-0');
+  });
+
+  it('does not render the badge when neither deliveryState nor holdQueuedSlot is set', async () => {
+    const tree = await renderBubble(userMessage('m3'));
+    expect(findText(tree, t => t === 'Queued')).toBe(false);
+  });
+
+  it('badge row is structurally identical between queued and held-only states', async () => {
+    const queuedTree = await renderBubble(userMessage('m4'), { status: 'queued' });
+    const heldTree = await renderBubble(userMessage('m4'), undefined, true);
+    const queuedBadge = findElementByType(
+      queuedTree,
+      'View',
+      p => typeof p.className === 'string' && p.className.includes(BADGE_CLASS)
+    );
+    const heldBadge = findElementByType(
+      heldTree,
+      'View',
+      p => typeof p.className === 'string' && p.className.includes(BADGE_CLASS)
+    );
+    expect(queuedBadge).not.toBeNull();
+    expect(heldBadge).not.toBeNull();
+    // Both render as plain Views with the same structural Tailwind classes
+    // (only opacity differs).
+    const baseClass = 'flex-row items-center gap-1 self-end pr-1';
+    expect(typeof queuedBadge!.props.className).toBe('string');
+    expect((queuedBadge!.props.className as string).replace(/ opacity-[^\s]+/, '')).toBe(baseClass);
+    expect(typeof heldBadge!.props.className).toBe('string');
+    expect((heldBadge!.props.className as string).replace(/ opacity-[^\s]+/, '')).toBe(baseClass);
+    // Both contain the Queued text child
+    expect(findText(heldBadge, t => t === 'Queued')).toBe(true);
+  });
+
+  it('does not render the badge for assistant messages when delivery state is queued', async () => {
+    const tree = await renderBubble(assistantMessage('m5'), { status: 'queued' });
+    expect(findText(tree, t => t === 'Queued')).toBe(false);
+  });
+});
+
+describe('MessageBubble failed delivery state', () => {
+  it('does not render the badge for a failed delivery state on a user message', async () => {
+    const tree = await renderBubble(userMessage('m6'), {
       status: 'failed',
       error: 'nope',
       reason: 'exhausted',
     });
     expect(findText(tree, t => t === 'Queued')).toBe(false);
   });
-
-  it('does not render the Queued badge when no delivery state is provided', async () => {
-    const tree = await renderBubble(userMessage('m3'));
-    expect(findText(tree, t => t === 'Queued')).toBe(false);
-  });
-
-  it('does not render the Queued badge for assistant messages even when delivery state is queued', async () => {
-    const tree = await renderBubble(assistantMessage('m4'), { status: 'queued' });
-    expect(findText(tree, t => t === 'Queued')).toBe(false);
-  });
 });
 
 describe('MessageBubble regressions', () => {
-  it('renders without error when deliveryState transitions from queued to undefined (badge unmounts on dequeue)', async () => {
-    const message = userMessage('m5');
+  it('holds badge slot when queued and holdQueuedSlot is set after dequeue', async () => {
+    const message = userMessage('m7');
+    // Queued: badge visible with Queued text
     const queuedTree = await renderBubble(message, { status: 'queued' });
     expect(findText(queuedTree, t => t === 'Queued')).toBe(true);
+    // Dequeued with holdQueuedSlot: badge stays mounted but invisible
+    const heldTree = await renderBubble(message, undefined, true);
+    expect(findText(heldTree, t => t === 'Queued')).toBe(true);
+    const badge = findElementByType(
+      heldTree,
+      'View',
+      p => typeof p.className === 'string' && p.className.includes(BADGE_CLASS)
+    );
+    expect(badge).not.toBeNull();
+    expect(badge!.props.accessible).toBe(false);
+    expect(badge!.props.pointerEvents).toBe('none');
+  });
 
-    // Same message, no more delivery state (as when `pendingMessages` drops
-    // the entry once the CLI/cloud-agent starts processing it) — the badge
-    // must be absent, not stuck from a prior render.
-    const dequeuedTree = await renderBubble(message);
-    expect(findText(dequeuedTree, t => t === 'Queued')).toBe(false);
+  it('does not render badge when holdQueuedSlot is not set after dequeue', async () => {
+    const message = userMessage('m8');
+    const heldTree = await renderBubble(message);
+    expect(findText(heldTree, t => t === 'Queued')).toBe(false);
   });
 });
 

@@ -281,8 +281,21 @@ case "$cmd" in
 
   stop)
     if ! read_state; then
-      # Blind cleanup must stay idempotent: clear corrupt state and exit 0.
+      # Blind cleanup must stay idempotent. Best-effort reap without a readable
+      # pid: android device-wide pkill; iOS match simctl recordVideo for this UDID.
       echo "record.sh: clearing unreadable state for $DEVICE" >&2
+      case "$DEVICE" in
+        emulator-*)
+          if adb=$(resolve_adb 2>/dev/null); then
+            "$adb" -s "$DEVICE" shell pkill -INT screenrecord >/dev/null 2>&1 || true
+          fi
+          ;;
+        *)
+          pgrep -f "simctl io $DEVICE recordVideo" 2>/dev/null | while read -r orphan; do
+            kill -INT "$orphan" 2>/dev/null || true
+          done
+          ;;
+      esac
       clear_state
       exit 0
     fi

@@ -17,7 +17,7 @@ export const GPT_MINI_CURRENT_MODEL_ID = 'openai/gpt-5.4-mini';
 
 export const GPT_MINI_CURRENT_VERCEL_MODEL_ID = GPT_MINI_CURRENT_MODEL_ID;
 
-// When enabled, OpenRouter BYOK is disabled for these models so requests use the discounted endpoint.
+// OpenAI BYOK must be disabled on the OpenRouter website before enabling this flag.
 export const ENABLE_OPENROUTER_GPT56_PROMO = false;
 
 export const OPENROUTER_GPT56_PROMO_MODEL_IDS = [

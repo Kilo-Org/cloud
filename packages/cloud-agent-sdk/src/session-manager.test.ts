@@ -2946,6 +2946,60 @@ describe('createSessionManager', () => {
       await interruptPromise;
     });
 
+    it('stale Aborted from distinct old session does not consume the current interrupt guard', async () => {
+      // The shared mock factory returns the same object for every session,
+      // so `pendingInterruptSession === session` always matches. This test
+      // overrides the first factory call with a distinct identity via
+      // Object.create so the guard can distinguish A from B. After
+      // switching to B and arming its guard, session A's stale Aborted
+      // must NOT consume B's guard.
+      type SF = (cfg: Parameters<typeof createCloudAgentSession>[0]) => MockSession;
+      const defaultFactory = (createCloudAgentSession as jest.Mock).getMockImplementation() as
+        | SF
+        | undefined;
+      expect(defaultFactory).toBeDefined();
+
+      (createCloudAgentSession as jest.Mock).mockImplementationOnce((cfg: Parameters<SF>[0]) => {
+        // Return a distinct-wrapper that delegates to mockSession.
+        // The onError closure in switchSession captures this wrapper,
+        // so pendingInterruptSession === session correctly distinguishes
+        // session A from session B (the raw mockSession).
+        const session = defaultFactory!(cfg);
+        return Object.create(session) as MockSession;
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Capture session A's onError before switching away.
+      const sessionAOnError = mockSessionCallbacks.onError;
+      expect(sessionAOnError).toBeDefined();
+
+      // Arm the guard for session A (distinct wrapper).
+      mockSession.interrupt.mockImplementation(async () => {
+        // No Aborted fired here — we'll fire it later from the stale callback.
+      });
+      await mgr.interrupt();
+
+      // Switch to session B — clearAllAtoms clears pendingInterruptSession.
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // Arm the guard for session B (raw mockSession).
+      mockSession.canInterrupt = true;
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Fire A's stale Aborted — must NOT match B's guard.
+      sessionAOnError?.('Aborted');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+
+      // B's guard must still be intact — B's own Aborted should be suppressed.
+      mgr.clearError();
+      mockSessionCallbacks.onError?.('Aborted');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
     it('clears the abort guard on destroy so late Aborted is not suppressed', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

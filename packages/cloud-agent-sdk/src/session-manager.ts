@@ -1611,11 +1611,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     postInterruptUnlock = false;
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
-    // Mark this session as the expected source of any "Aborted" error so
-    // onError can suppress it without hiding real transport failures.
-    pendingInterruptSession = session;
     try {
       if (session.canInterrupt) {
+        // Mark this session as the expected source of any "Aborted" error
+        // so onError can suppress it without hiding real transport failures.
+        pendingInterruptSession = session;
         await session.interrupt();
       }
       if (currentSession === session) {

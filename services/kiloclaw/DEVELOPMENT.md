@@ -580,17 +580,17 @@ docker buildx build --build-context workspace=../.. --load --progress=plain -t k
 
 Then run one of:
 
-- `bash scripts/tests/smoke-controller.sh`
+- `bash scripts/tests/single-image/controller.sh`
   - Fresh container (onboard path). Tests auth, env patch, version endpoints.
   - Use this when iterating on controller auth/proxy behavior.
-- `bash scripts/tests/smoke-entrypoint.sh`
+- `bash scripts/tests/single-image/entrypoint.sh`
   - Volume-mounted container with pre-seeded config (doctor path).
   - Use this when changing bootstrap, env patching, or Docker wiring.
-- `bash scripts/tests/smoke-proxy-auth.sh`
+- `bash scripts/tests/single-image/proxy-auth.sh`
   - Validates proxy enforcement semantics end-to-end:
     no token -> `401`, correct proxy token -> pass-through.
   - Use this when changing proxy token logic or route/auth ordering.
-- `bash scripts/tests/smoke-live-provider.sh`
+- `bash scripts/tests/single-image/live-provider.sh`
   - Runs the packaged image against the real Kilo Gateway with a paid route (`kilocode/kilo-auto/balanced` by default; free routes are rejected), verifying `openclaw config validate --json`, Control UI proxying, packaged Kilo Chat loading, and one live agent turn per leg. In `--upgrade` mode the candidate is asserted both on the baseline's persisted root and on a fresh root.
   - Reads `KILOCODE_API_KEY` from the environment, or falls back locally to the active `kilocodeToken` and matching organization scope in `~/.kilocode/cli/config.json`. The credential is passed to the temporary container as an environment variable; the script does not print it or dump potentially sensitive controller logs on startup failure.
   - Publishes the temporary controller only on loopback and generates a random controller/proxy token unless `TOKEN` is explicitly set.
@@ -599,7 +599,7 @@ Then run one of:
   - This is an opt-in/manual live validation; it is not a deterministic CI smoke or an image-promotion gate.
 - `bash scripts/tests/openclaw-upgrade-validate.sh`
   - Entry point for validating an OpenClaw bump locally. Runs a preflight (Docker, bump branch, clean tree, grype, credential), then Phase 1 (keyless image checks: version, bundle patches, plugin pins, config-shape validation, and the grype CVE scan) and Phase 2 (the live smoke below). Prints a summary with per-phase pass/fail counts and the grype totals. Set `KILOCODE_API_KEY` for Phase 2. Use this for an OpenClaw bump; run the two scripts below directly only when you specifically need one phase alone.
-- `bash scripts/tests/openclaw-upgrade-smoke.sh`
+- `bash scripts/tests/upgrade/smoke.sh`
   - The Phase 2 live smoke that `openclaw-upgrade-validate.sh` runs. Refreshes and builds the baseline image from `origin/main`, builds the candidate image from a detached worktree at `HEAD`, then runs the persisted-root live smoke with installed-version assertions, `openclaw doctor` on candidate startup, and explicit config validation in both phases.
   - The wrapper fails if the checked-in Dockerfile pin has not changed or the current checkout has uncommitted files. Use `ALLOW_SAME_OPENCLAW_VERSION=true` or `ALLOW_DIRTY_CHECKOUT=true` only to test wrapper mechanics locally; candidate image contents still come from committed `HEAD`.
   - Set `BASE_REF` when the upgrade baseline is not `origin/main`; set `IMAGE_BEFORE` and `IMAGE_AFTER` to choose local image tags. Built images remain in Docker for inspection or build-cache reuse until explicitly removed.

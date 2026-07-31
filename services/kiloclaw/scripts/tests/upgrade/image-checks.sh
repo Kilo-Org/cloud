@@ -19,7 +19,7 @@ set -euo pipefail
 # not — this is the check that catches a controller/runtime plugin-path skew),
 # and runs a full grype CVE scan of the image (base OS + Go + npm, unfiltered).
 #
-# Run the credentialed live smoke (openclaw-upgrade-smoke.sh) next; this script
+# Run the credentialed live smoke (upgrade/smoke.sh) next; this script
 # prints exactly what that still covers.
 #
 # Env:
@@ -27,7 +27,7 @@ set -euo pipefail
 #   BUILD   build the candidate image first (default true; set false to reuse IMAGE)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 REPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
 IMAGE="${IMAGE:-kiloclaw:openclaw-upgrade-candidate}"
 BUILD="${BUILD:-true}"
@@ -445,7 +445,7 @@ freshly released OpenClaw, which is why nothing here runs in CI):
 
   export KILOCODE_API_KEY=<key on an account with credits>   # not your personal key
   export KILOCODE_ORGANIZATION_ID=<org id>             # required to spend ORG credits
-  bash services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
+  bash services/kiloclaw/scripts/tests/upgrade/smoke.sh
 
 That covers what CI cannot without a credential:
   - persisted-root upgrade boot (baseline -> candidate on the same /root)

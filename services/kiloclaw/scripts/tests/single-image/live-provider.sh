@@ -31,12 +31,12 @@ EXPECTED_VERSION_BEFORE="${EXPECTED_VERSION_BEFORE:-}"
 EXPECTED_VERSION_AFTER="${EXPECTED_VERSION_AFTER:-}"
 MODE="fresh"
 
-source "$SCRIPT_DIR/smoke-helpers.sh"
-source "$SCRIPT_DIR/provider-creds.sh"
+source "$SCRIPT_DIR/../lib/helpers.sh"
+source "$SCRIPT_DIR/../lib/provider-creds.sh"
 
 usage() {
   cat <<'EOF'
-Usage: bash scripts/tests/smoke-live-provider.sh [--upgrade]
+Usage: bash scripts/tests/single-image/live-provider.sh [--upgrade]
 
 Runs a packaged KiloClaw image against the real Kilo Gateway using a PAID auto
 route by default (kilocode/kilo-auto/balanced, what production instances use).

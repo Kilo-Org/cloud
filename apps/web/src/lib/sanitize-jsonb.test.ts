@@ -2,13 +2,15 @@ import { describe, expect, test } from '@jest/globals';
 import { sanitizeJsonbValue } from './sanitize-jsonb';
 
 describe('sanitizeJsonbValue', () => {
-  test('replaces lone surrogates in nested values and object keys', () => {
+  test('replaces JSONB-incompatible characters in nested values and object keys', () => {
     const value = {
       [`bad\ud800key`]: ['before\udc00after', { text: 'still\ud800broken' }],
+      [`nul\0key`]: 'nul\0value',
     };
 
     expect(sanitizeJsonbValue(value)).toEqual({
       ['bad\ufffdkey']: ['before\ufffdafter', { text: 'still\ufffdbroken' }],
+      ['nul\ufffdkey']: 'nul\ufffdvalue',
     });
   });
 

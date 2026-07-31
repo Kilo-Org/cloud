@@ -951,6 +951,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(sessionInfoAtom, session.state.getSessionInfo());
       store.set(pendingMessagesAtom, new Map(session.state.getPendingMessages()));
 
+      // Disconnect clears the interrupt unlock latch so normal
+      // (!session.canSend) semantics take over for unresolved/null sessions.
+      if (st.type === 'disconnected') {
+        postInterruptUnlock = false;
+      }
+
       // Only update read-only state after the transport has been resolved.
       // During the 'connecting' phase the transport is null so canSend is
       // always false, which would briefly flash a "read-only" banner.
@@ -1570,10 +1576,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isReadOnlyAtom, readOnly);
     store.set(canSendAtom, !readOnly && cloudReady);
     store.set(canInterruptAtom, session.canInterrupt);
-    // Drop the latch immediately when the live gate is already healthy.
-    if (postInterruptUnlock && session.canSend && cloudReady) {
-      postInterruptUnlock = false;
-    }
   }
 
   async function interrupt(): Promise<void> {

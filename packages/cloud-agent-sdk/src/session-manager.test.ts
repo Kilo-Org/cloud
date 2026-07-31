@@ -2783,6 +2783,91 @@ describe('createSessionManager', () => {
       ).resolves.not.toThrow();
       expect(mockSession.send).toHaveBeenCalledTimes(1);
     });
+
+    it('holds canSend after ACK when session.canSend is true at ACK then flips false', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // canSend is true at interrupt ACK time — the old synchronous clear path
+      // (restoreAfterInterrupt mirroring session.canSend) would have wrongly
+      // dropped the latch here because canSend was still true. The mock
+      // interrupt resolves without changing canSend, so the pre-ACK state
+      // is identical to the post-ACK state, exposing any code that
+      // gate-checks canSend inside restoreAfterInterrupt.
+      mockSession.canSend = true;
+      mockSession.interrupt.mockImplementation(async () => {
+        // State tick occurs after ACK, before restoreAfterInterrupt returns.
+        mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      });
+      await mgr.interrupt();
+
+      // Latch armed — restoreAfterInterrupt set postInterruptUnlock.
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(false);
+
+      // Now flip canSend false AFTER the latch is armed. This is the "owner
+      // disconnected between ACK and next heartbeat" race that the latch
+      // exists to protect against.
+      mockSession.canSend = false;
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Live gate recovers — latch clears via updateCapabilityAtoms.
+      mockSession.canSend = true;
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Normal false tick after latch cleared — canSend follows session.canSend.
+      mockSession.canSend = false;
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+    });
+
+    it('disconnect clears interrupt unlock latch and uses normal canSend semantics', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Arm the latch: interrupt with canSend=false (forces latch but doesn't clear).
+      mockSession.canSend = false;
+      mockSession.interrupt.mockResolvedValueOnce({});
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
+      await mgr.interrupt();
+
+      // Latch armed: canSend is true despite session.canSend=false.
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Now disconnect: latch must clear, canSend follows session.canSend=false.
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      mockSession.state.getStatus.mockReturnValue({ type: 'disconnected' });
+      notifyStateChange?.();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+      // isReadOnly follows normal session-type semantics: cloud-agent is never read-only.
+      expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------

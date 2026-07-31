@@ -268,6 +268,7 @@ describe('Anaconda OAuth provider', () => {
 
   test('registers discovery, ID tokens, OIDC checks, and client secret POST authentication', () => {
     expect(authOptions.providers.find(provider => provider.id === 'anaconda')).toMatchObject({
+      issuer: 'https://auth.anaconda.com/api/auth',
       wellKnown: 'https://anaconda.com/.well-known/openid-configuration',
       authorization: { params: { scope: 'openid profile email' } },
       idToken: true,

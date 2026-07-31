@@ -575,6 +575,7 @@ export const authOptions: NextAuthOptions = {
       id: 'anaconda',
       name: 'Anaconda',
       type: 'oauth',
+      issuer: 'https://auth.anaconda.com/api/auth',
       wellKnown: 'https://anaconda.com/.well-known/openid-configuration',
       authorization: {
         params: { scope: 'openid profile email' },

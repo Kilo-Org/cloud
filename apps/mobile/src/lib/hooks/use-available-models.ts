@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { API_BASE_URL } from '@/lib/config';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 
-// ── Types ────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────
 
 export type ModelOption = {
   id: string;
@@ -16,9 +16,10 @@ export type ModelOption = {
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
   context_length?: number | null;
+  pricing?: { prompt?: string; completion?: string };
 };
 
-type ModelResponse = {
+export type ModelResponse = {
   data: {
     id: string;
     name: string;
@@ -27,15 +28,14 @@ type ModelResponse = {
     hasUserByokAvailable?: boolean;
     context_length?: number | null;
     preferredIndex?: number;
+    pricing?: { prompt?: string; completion?: string };
     opencode?: {
       variants?: Record<string, unknown>;
     };
   }[];
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
-const MODEL_REQUEST_TIMEOUT_MS = 15_000;
+// ── Pure model-option helpers ─────────────────────────────────────────
 
 function formatShortModelName(name: string): string {
   if (!name) {
@@ -45,12 +45,62 @@ function formatShortModelName(name: string): string {
   return colonIndex === -1 ? name : name.slice(colonIndex + 2);
 }
 
+export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
+  if (!data?.data) {
+    return [];
+  }
+
+  const items = data.data.map(model => ({
+    id: model.id,
+    name: formatShortModelName(model.name),
+    isFree: model.isFree,
+    mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+    hasUserByokAvailable: model.hasUserByokAvailable,
+    pricing: model.pricing,
+    variants: Object.keys(model.opencode?.variants ?? {}),
+    preferredIndex: model.preferredIndex,
+    context_length: model.context_length ?? null,
+  }));
+
+  items.sort((a, b) => {
+    const aHas = a.preferredIndex !== undefined;
+    const bHas = b.preferredIndex !== undefined;
+
+    if (aHas && bHas) {
+      return (a.preferredIndex ?? 0) - (b.preferredIndex ?? 0);
+    }
+    if (aHas) {
+      return -1;
+    }
+    if (bHas) {
+      return 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return items.map(item => ({
+    id: item.id,
+    name: item.name,
+    variants: item.variants,
+    isPreferred: item.preferredIndex !== undefined,
+    isFree: item.isFree,
+    mayTrainOnYourPrompts: item.mayTrainOnYourPrompts,
+    hasUserByokAvailable: item.hasUserByokAvailable,
+    pricing: item.pricing,
+    context_length: item.context_length,
+  }));
+}
+
 export function thinkingEffortLabel(variant: string): string {
   if (variant === 'xhigh') {
     return 'Extra High';
   }
   return variant.charAt(0).toUpperCase() + variant.slice(1);
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+const MODEL_REQUEST_TIMEOUT_MS = 15_000;
 
 async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
   const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -128,49 +178,7 @@ export function useAvailableModels(organizationId: string | undefined) {
     staleTime: 60_000,
   });
 
-  const models = useMemo<ModelOption[]>(() => {
-    if (!data?.data) {
-      return [];
-    }
-
-    const items = data.data.map(model => ({
-      id: model.id,
-      name: formatShortModelName(model.name),
-      isFree: model.isFree,
-      mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
-      hasUserByokAvailable: model.hasUserByokAvailable,
-      variants: Object.keys(model.opencode?.variants ?? {}),
-      preferredIndex: model.preferredIndex,
-      context_length: model.context_length ?? null,
-    }));
-
-    items.sort((a, b) => {
-      const aHas = a.preferredIndex !== undefined;
-      const bHas = b.preferredIndex !== undefined;
-
-      if (aHas && bHas) {
-        return (a.preferredIndex ?? 0) - (b.preferredIndex ?? 0);
-      }
-      if (aHas) {
-        return -1;
-      }
-      if (bHas) {
-        return 1;
-      }
-      return a.name.localeCompare(b.name);
-    });
-
-    return items.map(item => ({
-      id: item.id,
-      name: item.name,
-      variants: item.variants,
-      isPreferred: item.preferredIndex !== undefined,
-      isFree: item.isFree,
-      mayTrainOnYourPrompts: item.mayTrainOnYourPrompts,
-      hasUserByokAvailable: item.hasUserByokAvailable,
-      context_length: item.context_length,
-    }));
-  }, [data]);
+  const models = useMemo(() => toModelOptions(data), [data]);
 
   return { models, isLoading, isError, error, refetch };
 }

@@ -29,7 +29,8 @@ import {
 import type { RootRouter } from '@/routers/root-router';
 
 type RouterOutputs = inferRouterOutputs<RootRouter>;
-type SessionContainerTelemetryResult = RouterOutputs['admin']['sessionTraces']['getContainerMetrics'];
+type SessionContainerTelemetryResult =
+  RouterOutputs['admin']['sessionTraces']['getContainerMetrics'];
 export type SessionContainerInfo = NonNullable<SessionContainerTelemetryResult['info']>;
 type SessionContainerMetrics = SessionContainerTelemetryResult['metrics'];
 type MetricsQueryState = {
@@ -203,10 +204,10 @@ export function SessionContainerTelemetryContent({
               : metrics?.reason === 'no_overlapping_intervals'
                 ? 'No container intervals overlap the recorded session activity window.'
                 : metrics?.reason === 'ambiguous_application'
-                ? 'Cloudflare returned more than one container application for this instance ID.'
-                : metrics?.reason === 'no_container_intervals'
-                  ? 'No metered container intervals were recorded for this session.'
-                  : 'Container metrics are not available for this session.'}
+                  ? 'Cloudflare returned more than one container application for this instance ID.'
+                  : metrics?.reason === 'no_container_intervals'
+                    ? 'No metered container intervals were recorded for this session.'
+                    : 'Container metrics are not available for this session.'}
           </p>
         ) : rows.length === 0 ? (
           <p className="text-muted-foreground text-sm">

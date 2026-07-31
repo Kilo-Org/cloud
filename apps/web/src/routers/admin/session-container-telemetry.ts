@@ -299,7 +299,11 @@ export async function getSessionContainerMetricsForInfo(
 ): Promise<SessionContainerMetrics> {
   if (info.intervals.length === 0) return { available: false, reason: 'no_container_intervals' };
   const intervalsWithProviderIdentity = info.intervals.filter(
-    interval => interval.cloudflareInstanceId !== null
+    (
+      interval
+    ): interval is SessionContainerInterval & {
+      cloudflareInstanceId: string;
+    } => interval.cloudflareInstanceId !== null
   );
   if (intervalsWithProviderIdentity.length === 0) {
     return { available: false, reason: 'no_provider_identity' };

@@ -139,21 +139,23 @@ function generateAppleClientSecret(): string {
 const anacondaProfileSchema = z.object({
   sub: z.string().trim().min(1),
   email: z.string().email(),
-  email_verified: z.boolean().optional(),
+  email_verified: z.literal(true),
   name: z.string().nullish(),
+  given_name: z.string().nullish(),
+  family_name: z.string().nullish(),
   picture: z.string().url().nullish(),
 });
 
 export function parseAnacondaProfile(profile: unknown) {
   const parsedProfile = anacondaProfileSchema.parse(profile);
-  if (parsedProfile.email_verified === false) {
-    throw new Error('Anaconda email must be verified');
-  }
+  const fullName = [parsedProfile.given_name?.trim(), parsedProfile.family_name?.trim()]
+    .filter(Boolean)
+    .join(' ');
 
   return {
     id: parsedProfile.sub,
     email: parsedProfile.email,
-    name: parsedProfile.name?.trim() || parsedProfile.email.split('@')[0],
+    name: parsedProfile.name?.trim() || fullName || parsedProfile.email.split('@')[0],
     image: parsedProfile.picture ?? null,
   };
 }
@@ -577,7 +579,8 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: { scope: 'openid profile email' },
       },
-      checks: ['pkce', 'state'],
+      idToken: true,
+      checks: ['pkce', 'state', 'nonce'],
       client: {
         token_endpoint_auth_method: 'client_secret_post',
       },

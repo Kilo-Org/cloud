@@ -1,11 +1,5 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import {
-  consumeFreeModelRateLimit,
-  consumeFreeModelRateLimitByUser,
-  consumePromotionLimit,
-  fillFreeModelRateLimit,
-  getFreeModelRateLimitUsage,
-} from './free-model-rate-limiter';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type * as FreeModelRateLimiter from './free-model-rate-limiter';
 
 type MockRedisEval = (script: string, keys: string[], args: unknown[]) => Promise<unknown>;
 
@@ -17,7 +11,13 @@ jest.mock('@/lib/redis', () => ({
   },
 }));
 
+let rateLimiter: typeof FreeModelRateLimiter;
+
 describe('free model rate limiter', () => {
+  beforeAll(async () => {
+    rateLimiter = await import('./free-model-rate-limiter');
+  });
+
   beforeEach(() => {
     mockRedisEval.mockReset();
   });
@@ -25,7 +25,7 @@ describe('free model rate limiter', () => {
   it('atomically consumes an IP request from the rolling window', async () => {
     mockRedisEval.mockResolvedValueOnce([1, 1]);
 
-    await expect(consumeFreeModelRateLimit('192.0.2.1')).resolves.toEqual({
+    await expect(rateLimiter.consumeFreeModelRateLimit('192.0.2.1')).resolves.toEqual({
       allowed: true,
       requestCount: 1,
     });
@@ -39,7 +39,7 @@ describe('free model rate limiter', () => {
   it('returns the current count when a user has reached the limit', async () => {
     mockRedisEval.mockResolvedValueOnce([0, 200]);
 
-    await expect(consumeFreeModelRateLimitByUser('user-123')).resolves.toEqual({
+    await expect(rateLimiter.consumeFreeModelRateLimitByUser('user-123')).resolves.toEqual({
       allowed: false,
       requestCount: 200,
     });
@@ -53,7 +53,7 @@ describe('free model rate limiter', () => {
   it('uses a separate 24-hour window for anonymous promotion requests', async () => {
     mockRedisEval.mockResolvedValueOnce([1, 42]);
 
-    await expect(consumePromotionLimit('192.0.2.1')).resolves.toEqual({
+    await expect(rateLimiter.consumePromotionLimit('192.0.2.1')).resolves.toEqual({
       allowed: true,
       requestCount: 42,
     });
@@ -67,7 +67,7 @@ describe('free model rate limiter', () => {
   it('fails open when Redis is unavailable', async () => {
     mockRedisEval.mockRejectedValueOnce(new Error('Redis unavailable'));
 
-    await expect(consumeFreeModelRateLimit('192.0.2.1')).resolves.toEqual({
+    await expect(rateLimiter.consumeFreeModelRateLimit('192.0.2.1')).resolves.toEqual({
       allowed: true,
       requestCount: 0,
     });
@@ -76,8 +76,8 @@ describe('free model rate limiter', () => {
   it('reads and fills the same IP limit for the admin controls', async () => {
     mockRedisEval.mockResolvedValueOnce(12).mockResolvedValueOnce([188, 200]);
 
-    await expect(getFreeModelRateLimitUsage('192.0.2.1')).resolves.toBe(12);
-    await expect(fillFreeModelRateLimit('192.0.2.1')).resolves.toEqual({
+    await expect(rateLimiter.getFreeModelRateLimitUsage('192.0.2.1')).resolves.toBe(12);
+    await expect(rateLimiter.fillFreeModelRateLimit('192.0.2.1')).resolves.toEqual({
       requestsAdded: 188,
       requestCount: 200,
     });

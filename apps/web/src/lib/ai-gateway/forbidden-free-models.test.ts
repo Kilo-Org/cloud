@@ -7,6 +7,7 @@ import {
 describe('forbidden free models', () => {
   test('keeps exact matching for request rejection', () => {
     expect(isForbiddenFreeModel('openai/gpt-oss-20b:free')).toBe(true);
+    expect(isForbiddenFreeModel('tencent/hy3:free')).toBe(true);
     expect(isForbiddenFreeModel('openai/gpt-oss-20b')).toBe(false);
   });
 

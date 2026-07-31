@@ -24,23 +24,55 @@ resolve_adb() {
 }
 
 # State is KEY=VALUE lines. Values are base64-encoded so paths with spaces or
-# shell metacharacters round-trip without eval/source.
-b64_encode() { printf '%s' "$1" | base64 | tr -d '\n'; }
-b64_decode() { printf '%s' "$1" | base64 -d 2>/dev/null || true; }
+# shell metacharacters round-trip without eval/source. Encode/decode failures
+# are fatal — never silently empty a pid (that would turn stop into a no-op
+# while the recorder keeps running).
+b64_encode() {
+  local out
+  out=$(printf '%s' "$1" | base64 | tr -d '\n') || {
+    echo "record.sh: base64 encode failed" >&2
+    return 1
+  }
+  [ -n "$out" ] || {
+    echo "record.sh: base64 encode produced empty output" >&2
+    return 1
+  }
+  printf '%s' "$out"
+}
+
+b64_decode() {
+  local out
+  out=$(printf '%s' "$1" | base64 -d 2>/dev/null) || {
+    echo "record.sh: base64 decode failed for state value" >&2
+    return 1
+  }
+  printf '%s' "$out"
+}
 
 read_state() {
   platform='' pid='' path='' remote=''
   [ -f "$STATE_FILE" ] || return 0
-  local line key value
+  local line key value decoded
   while IFS= read -r line || [ -n "$line" ]; do
     [ -n "$line" ] || continue
     key=${line%%=*}
     value=${line#*=}
     case "$key" in
-      platform) platform=$(b64_decode "$value") ;;
-      pid) pid=$(b64_decode "$value") ;;
-      path) path=$(b64_decode "$value") ;;
-      remote) remote=$(b64_decode "$value") ;;
+      platform | pid | path | remote)
+        decoded=$(b64_decode "$value") || return 1
+        case "$key" in
+          platform) platform=$decoded ;;
+          pid)
+            [ -n "$decoded" ] || {
+              echo "record.sh: empty pid in state file" >&2
+              return 1
+            }
+            pid=$decoded
+            ;;
+          path) path=$decoded ;;
+          remote) remote=$decoded ;;
+        esac
+        ;;
     esac
   done <"$STATE_FILE"
 }
@@ -49,7 +81,7 @@ write_state() {
   # usage: write_state key value ...
   : >"$STATE_FILE"
   while [ $# -ge 2 ]; do
-    printf '%s=%s\n' "$1" "$(b64_encode "$2")" >>"$STATE_FILE"
+    printf '%s=%s\n' "$1" "$(b64_encode "$2")" >>"$STATE_FILE" || return 1
     shift 2
   done
 }
@@ -240,7 +272,10 @@ case "$cmd" in
     ;;
 
   stop)
-    read_state
+    if ! read_state; then
+      echo "record.sh: corrupt state for $DEVICE; not clearing so a human can inspect $STATE_FILE" >&2
+      exit 1
+    fi
     if [ -z "${pid:-}" ]; then
       echo "record.sh: no active recording for $DEVICE" >&2
       exit 0

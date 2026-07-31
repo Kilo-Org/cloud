@@ -36,7 +36,7 @@ describe('fetchGeneration', () => {
     jest.useRealTimers();
   });
 
-  it('uses a longer, slower retry window', async () => {
+  it('limits generation polling to about one minute', async () => {
     mockFetchWithBackoff.mockResolvedValue(
       new Response(JSON.stringify({ id: 'generation-id' }), {
         status: 200,
@@ -56,7 +56,7 @@ describe('fetchGeneration', () => {
       },
       expect.objectContaining({
         baseDelayMs: 5_000,
-        maxDelayMs: 5 * 60 * 1_000,
+        maxDelayMs: 60 * 1_000,
       })
     );
 

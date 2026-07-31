@@ -25,7 +25,7 @@ type UpstreamFetchFailureFamily =
 
 // Longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout.
 const TIMEOUT_MS = 15 * 60 * 1000;
-const GENERATION_FETCH_MAX_DELAY_MS = 5 * 60 * 1000;
+const GENERATION_FETCH_MAX_DELAY_MS = 60 * 1000;
 
 function getProviderTargetHost(apiUrl: string): string {
   try {

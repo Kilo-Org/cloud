@@ -2664,6 +2664,22 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
     });
 
+    it('re-enables canSend after interrupt even when session.canSend is briefly false', async () => {
+      // Remote ownerConnectionId can clear during the interrupt round-trip;
+      // the composer must not stay locked until the next heartbeat.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.canSend = false;
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+    });
+
     it('is a no-op without active session', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

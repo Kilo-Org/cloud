@@ -1529,10 +1529,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
-  function restoreCapabilityAtoms(session: CloudAgentSession): void {
+  /**
+   * After Stop ACK, unlock the composer immediately. Remote `session.canSend`
+   * keys on `ownerConnectionId`, which can briefly clear during the interrupt
+   * round-trip (SESSION_OWNER_CHANGED / heartbeat race). Waiting on the next
+   * heartbeat leaves the multiline TextInput non-editable (parent NotEnabled)
+   * even though the CLI cancel already settled — Item 14 E2E gate. Sends while
+   * the CLI is still winding down are queued CLI-side.
+   */
+  function restoreAfterInterrupt(session: CloudAgentSession): void {
     const cs = store.get(cloudStatusAtom);
     const cloudReady = cs === null || cs.type === 'ready';
-    store.set(canSendAtom, session.canSend && cloudReady);
+    const readOnly = activeSessionType === 'read-only';
+    store.set(isStreamingAtom, false);
+    store.set(isReadOnlyAtom, readOnly);
+    store.set(canSendAtom, !readOnly && cloudReady);
     store.set(canInterruptAtom, session.canInterrupt);
   }
 
@@ -1551,15 +1562,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         await session.interrupt();
       }
       if (currentSession === session) {
-        // Restore immediately after ACK — do not wait for external state events
-        // (heartbeat status is deduped and may never re-enable). Sends while
-        // the CLI is still busy are queued CLI-side.
-        restoreCapabilityAtoms(session);
+        restoreAfterInterrupt(session);
         setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
       }
     } catch {
       if (currentSession === session) {
-        restoreCapabilityAtoms(session);
+        // Failure path still uses the live transport gate (may re-lock if the
+        // owner truly dropped). Prefer unlock over a stuck composer when the
+        // session is still writable.
+        restoreAfterInterrupt(session);
         // Never poison errorAtom — that disables the composer. Use the
         // transient indicator instead (Item 14 / Decision 2).
         setIndicator({

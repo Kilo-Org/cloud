@@ -58,23 +58,23 @@ test('record.sh passes bash -n syntax check', () => {
 function makeXcrunStub(bin: string, signalLog: string, videoData: string): void {
   const escapedData = videoData.replace(/'/g, "\\'");
   const script =
-    "#!/usr/bin/env node\n" +
+    '#!/usr/bin/env node\n' +
     "const fs = require('fs');\n" +
     "const path = require('path');\n" +
-    "const args = process.argv.slice(2);\n" +
+    'const args = process.argv.slice(2);\n' +
     "const log = process.env.SIGNAL_LOG || '/dev/null';\n" +
     "const videoData = process.env.VIDEO_DATA || '" +
     escapedData +
     "';\n" +
     "if (args[0] === 'simctl' && args[1] === 'io' && args[3] === 'recordVideo') {\n" +
-    "  const videoPath = args[args.length - 1];\n" +
-    "  fs.mkdirSync(path.dirname(videoPath), { recursive: true });\n" +
+    '  const videoPath = args[args.length - 1];\n' +
+    '  fs.mkdirSync(path.dirname(videoPath), { recursive: true });\n' +
     "  process.on('SIGINT', () => { fs.appendFileSync(log, 'INT\\n'); fs.writeFileSync(videoPath, videoData); process.exit(0); });\n" +
     "  process.on('SIGTERM', () => { fs.appendFileSync(log, 'TERM\\n'); process.exit(0); });\n" +
-    "  setInterval(() => {}, 1000);\n" +
-    "} else {\n" +
-    "  process.exit(0);\n" +
-    "}\n";
+    '  setInterval(() => {}, 1000);\n' +
+    '} else {\n' +
+    '  process.exit(0);\n' +
+    '}\n';
   executable(path.join(bin, 'xcrun'), script);
 }
 
@@ -99,7 +99,7 @@ process.exit(0);
 function makeAdbStub(bin: string, remoteDir: string): void {
   const escapedDir = remoteDir.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const script =
-    "#!/usr/bin/env node\n" +
+    '#!/usr/bin/env node\n' +
     "const fs = require('fs');\n" +
     "const path = require('path');\n" +
     "const stateDir = process.env.RECORD_ADB_STATE || '" +
@@ -109,31 +109,31 @@ function makeAdbStub(bin: string, remoteDir: string): void {
     "const remoteFile = path.join(stateDir, 'remote.mp4');\n" +
     "const signalLog = process.env.SIGNAL_LOG || '/dev/null';\n" +
     "const videoData = process.env.VIDEO_DATA || 'androiddata';\n" +
-    "fs.mkdirSync(stateDir, { recursive: true });\n" +
-    "const args = process.argv.slice(2);\n" +
+    'fs.mkdirSync(stateDir, { recursive: true });\n' +
+    'const args = process.argv.slice(2);\n' +
     "const cmd = args.join(' ');\n" +
     "if (cmd.includes('shell screenrecord')) {\n" +
-    "  fs.writeFileSync(pidFile, String(process.pid));\n" +
+    '  fs.writeFileSync(pidFile, String(process.pid));\n' +
     "  process.on('SIGINT', () => { fs.writeFileSync(remoteFile, videoData); fs.rmSync(pidFile, { force: true }); process.exit(0); });\n" +
-    "  setInterval(() => {}, 1000);\n" +
+    '  setInterval(() => {}, 1000);\n' +
     "} else if (cmd.includes('pkill -INT screenrecord')) {\n" +
-    "  if (fs.existsSync(pidFile)) {\n" +
+    '  if (fs.existsSync(pidFile)) {\n' +
     "    try { process.kill(Number(fs.readFileSync(pidFile, 'utf8')), 'SIGINT'); fs.appendFileSync(signalLog, 'INT(device)\\n'); } catch {}\n" +
-    "  }\n" +
-    "  process.exit(0);\n" +
+    '  }\n' +
+    '  process.exit(0);\n' +
     "} else if (cmd.includes('pidof screenrecord')) {\n" +
-    "  if (fs.existsSync(pidFile)) {\n" +
+    '  if (fs.existsSync(pidFile)) {\n' +
     "    try { process.kill(Number(fs.readFileSync(pidFile, 'utf8')), 0); } catch { fs.rmSync(pidFile, { force: true }); }\n" +
-    "  }\n" +
+    '  }\n' +
     "  if (fs.existsSync(pidFile)) console.log(fs.readFileSync(pidFile, 'utf8'));\n" +
-    "  process.exit(0);\n" +
+    '  process.exit(0);\n' +
     "} else if (cmd.includes('pull')) {\n" +
-    "  const hostPath = args[args.length - 1];\n" +
-    "  if (fs.existsSync(remoteFile)) fs.copyFileSync(remoteFile, hostPath);\n" +
-    "  process.exit(0);\n" +
-    "} else {\n" +
-    "  process.exit(0);\n" +
-    "}\n";
+    '  const hostPath = args[args.length - 1];\n' +
+    '  if (fs.existsSync(remoteFile)) fs.copyFileSync(remoteFile, hostPath);\n' +
+    '  process.exit(0);\n' +
+    '} else {\n' +
+    '  process.exit(0);\n' +
+    '}\n';
   executable(path.join(bin, 'adb'), script);
 }
 
@@ -155,16 +155,24 @@ test('record.sh iOS start/stop finalizes a non-empty video and cleans state', ()
     VIDEO_DATA: 'h264data',
   };
   try {
-    const start = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['UDID-123', 'start', video], {
-      encoding: 'utf8',
-      env,
-    });
+    const start = spawnSync(
+      path.join(repoRoot, 'apps/mobile/e2e/record.sh'),
+      ['UDID-123', 'start', video],
+      {
+        encoding: 'utf8',
+        env,
+      }
+    );
     assert.equal(start.status, 0, start.stderr);
     assert.ok(fs.existsSync(path.join(tmp, 'kilo-e2e-record', 'UDID-123', 'state')));
-    const second = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['UDID-123', 'start', video], {
-      encoding: 'utf8',
-      env,
-    });
+    const second = spawnSync(
+      path.join(repoRoot, 'apps/mobile/e2e/record.sh'),
+      ['UDID-123', 'start', video],
+      {
+        encoding: 'utf8',
+        env,
+      }
+    );
     assert.notEqual(second.status, 0);
     assert.match(second.stderr, /already recording/);
 
@@ -204,16 +212,24 @@ test('record.sh Android start/stop finalizes a non-empty video and cleans state'
     VIDEO_DATA: 'androiddata',
   };
   try {
-    const start = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['emulator-5554', 'start', video], {
-      encoding: 'utf8',
-      env,
-    });
+    const start = spawnSync(
+      path.join(repoRoot, 'apps/mobile/e2e/record.sh'),
+      ['emulator-5554', 'start', video],
+      {
+        encoding: 'utf8',
+        env,
+      }
+    );
     assert.equal(start.status, 0, start.stderr);
     assert.ok(fs.existsSync(path.join(tmp, 'kilo-e2e-record', 'emulator-5554', 'state')));
-    const stop = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['emulator-5554', 'stop'], {
-      encoding: 'utf8',
-      env,
-    });
+    const stop = spawnSync(
+      path.join(repoRoot, 'apps/mobile/e2e/record.sh'),
+      ['emulator-5554', 'stop'],
+      {
+        encoding: 'utf8',
+        env,
+      }
+    );
     assert.equal(stop.status, 0, stop.stderr);
     assert.equal(stop.stdout.trim(), `${video} 11`);
     assert.equal(fs.readFileSync(video, 'utf8'), 'androiddata');
@@ -233,10 +249,14 @@ test('record.sh stop is a no-op when state is stale and video is missing', () =>
     'platform=ios\npid=999999\npath=' + path.join(tmp, 'missing.mp4') + '\n'
   );
   try {
-    const stop = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['UDID-STALE', 'stop'], {
-      encoding: 'utf8',
-      env: { ...process.env, TMPDIR: tmp },
-    });
+    const stop = spawnSync(
+      path.join(repoRoot, 'apps/mobile/e2e/record.sh'),
+      ['UDID-STALE', 'stop'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, TMPDIR: tmp },
+      }
+    );
     assert.equal(stop.status, 0, stop.stderr);
     assert.ok(!fs.existsSync(path.join(tmp, 'kilo-e2e-record', 'UDID-STALE')));
   } finally {
@@ -275,10 +295,14 @@ if (args[0] === 'simctl' && args[1] === 'io' && args[3] === 'recordVideo') {
     TMPDIR: tmp,
   };
   try {
-    const start = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['UDID-E', 'start', video], {
-      encoding: 'utf8',
-      env,
-    });
+    const start = spawnSync(
+      path.join(repoRoot, 'apps/mobile/e2e/record.sh'),
+      ['UDID-E', 'start', video],
+      {
+        encoding: 'utf8',
+        env,
+      }
+    );
     assert.equal(start.status, 0, start.stderr);
     const stop = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['UDID-E', 'stop'], {
       encoding: 'utf8',
@@ -304,10 +328,14 @@ test('record.sh frame invokes ffmpeg input-first and extracts a frame', () => {
   const minimalPath = `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`;
   const env = { ...process.env, PATH: minimalPath };
   try {
-    const result = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['frame', video, '00:01:23', out], {
-      encoding: 'utf8',
-      env,
-    });
+    const result = spawnSync(
+      path.join(repoRoot, 'apps/mobile/e2e/record.sh'),
+      ['frame', video, '00:01:23', out],
+      {
+        encoding: 'utf8',
+        env,
+      }
+    );
     assert.equal(result.status, 0, result.stderr);
     assert.equal(fs.readFileSync(out, 'utf8'), `frame:${video}:00:01:23`);
   } finally {
@@ -325,10 +353,14 @@ test('record.sh frame fails loudly when ffmpeg is missing', () => {
   const minimalPath = `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`;
   const env = { ...process.env, PATH: minimalPath };
   try {
-    const result = spawnSync(path.join(repoRoot, 'apps/mobile/e2e/record.sh'), ['frame', video, '00:00:01', out], {
-      encoding: 'utf8',
-      env,
-    });
+    const result = spawnSync(
+      path.join(repoRoot, 'apps/mobile/e2e/record.sh'),
+      ['frame', video, '00:00:01', out],
+      {
+        encoding: 'utf8',
+        env,
+      }
+    );
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /ffmpeg not found/);
   } finally {

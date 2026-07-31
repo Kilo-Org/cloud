@@ -11,6 +11,7 @@ import { db } from '@/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
+import { sanitizeJsonbValue } from '@/lib/sanitize-jsonb';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
@@ -109,9 +110,9 @@ async function createRequestLogCapture(
           status_code: status,
           model,
           provider,
-          request: request.body,
+          request: sanitizeJsonbValue(request.body),
           response: responseText,
-          error,
+          error: sanitizeJsonbValue(error),
         })
         .returning({ id: api_request_log.id });
       logExceptInTest(

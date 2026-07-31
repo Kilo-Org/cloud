@@ -5,9 +5,27 @@ import {
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
   passesVercelRoutingPercentage,
+  shouldRouteToVercel,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+
+describe('shouldRouteToVercel', () => {
+  it.each(['poolside/laguna-s-2.1', 'poolside/laguna-s-2.1:free'])(
+    'does not randomly route %s to Vercel',
+    async model => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: {
+          model,
+          messages: [{ role: 'user', content: 'hello' }],
+        },
+      };
+
+      await expect(shouldRouteToVercel(model, request, 'seed')).resolves.toBe(false);
+    }
+  );
+});
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {

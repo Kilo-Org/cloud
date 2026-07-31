@@ -3063,9 +3063,10 @@ describe('createSessionManager', () => {
       );
     });
 
-    it('state recovery to busy clears the guard so a subsequent Aborted surfaces', async () => {
+    it('state recovery to busy preserves the expected abort guard', async () => {
       // After the session recovers (activity → busy), the one-shot guard
-      // must clear. A new Aborted arriving later must not be suppressed.
+      // must survive — a delayed Aborted from the prior interrupt
+      // must still be suppressed to avoid re-bricking the composer.
       let notifyStateChange: (() => void) | undefined;
       mockSession.state.subscribe.mockImplementation(callback => {
         notifyStateChange = callback;
@@ -3084,10 +3085,16 @@ describe('createSessionManager', () => {
       mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
       notifyStateChange?.();
 
-      // A late Aborted after recovery must surface.
+      // A late Aborted after recovery must still be suppressed —
+      // the guard survives the busy transition.
       mockSessionCallbacks.onError?.('Aborted');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
 
-      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+      // A non-Aborted real error still surfaces.
+      mockSessionCallbacks.onError?.('Connection to agent lost');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Connection to agent lost'
+      );
     });
   });
 

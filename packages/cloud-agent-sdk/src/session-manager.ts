@@ -987,7 +987,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
       if (act.type !== prevAct) {
         if (act.type === 'busy') {
-          pendingInterruptSession = null;
           setIndicator(null);
         } else if (act.type === 'retrying') {
           setIndicator({

@@ -33,6 +33,10 @@ import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-se
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
+import {
+  nextStopRemountPhase,
+  type StopRemountPhase,
+} from '@/components/agents/chat-composer-stop-remount';
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { VoiceInputStatus } from '@/components/voice-input-control';
@@ -128,11 +132,14 @@ export function ChatComposer({
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
   // Remount the input row after Stop. iOS leaves the multiline TextInput
-  // non-interactive after the Stop↔Send swap until the screen is left and
-  // re-entered (Item 14 E2E gate). A fresh mount matches that recovery without
-  // navigating away. Draft text is restored after remount.
+  // non-interactive after the editable=false→true flip that happens when
+  // the SDK unlocks the composer post-interrupt (Item 14 E2E gate). Defer
+  // the remount until disabled transitions to false so the new TextInput
+  // mounts with editable=true from the start. Draft text is restored after
+  // remount.
   const [inputEpoch, setInputEpoch] = useState(0);
   const pendingDraftRestoreRef = useRef<string | null>(null);
+  const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
 
   // Single send-admission authority. `settleVoiceInputBeforeSubmit` owns
   // this lock for the full voice-settle + asynchronous send sequence, and
@@ -185,6 +192,19 @@ export function ChatComposer({
     setSlashCommandInput(getSlashCommandCandidate(draft));
     measure.setText(draft);
   }, [inputEpoch, measure]);
+
+  // After Stop, remount the input row once the parent clears the disabled
+  // lock (Item 14 E2E gate).  The state machine proves the Stop lock was
+  // observed true before it clears, so the TextInput mounts with
+  // editable=true on the first render instead of transitioning from
+  // editable=false after the SDK's restoreAfterInterrupt.
+  useEffect(() => {
+    const transition = nextStopRemountPhase(stopRemountPhaseRef.current, disabled);
+    stopRemountPhaseRef.current = transition.phase;
+    if (transition.shouldRemount) {
+      setInputEpoch(epoch => epoch + 1);
+    }
+  }, [disabled]);
 
   // Compute base composer disabled before the voice hook so voice can react to it.
   // `isStreaming` is intentionally NOT a composer gate (see
@@ -359,7 +379,13 @@ export function ChatComposer({
     pendingDraftRestoreRef.current = textRef.current;
     Keyboard.dismiss();
     setIsFocused(false);
-    setInputEpoch(epoch => epoch + 1);
+    // Always arm a deferred remount — never bump epoch directly. The state
+    // machine (nextStopRemountPhase, driven by the disabled effect below)
+    // proves the Stop lock was observed true before it clears, then remounts
+    // only after that observed lock returns to false. This guarantees the
+    // new TextInput mounts with editable=true instead of transitioning from
+    // editable=false after the SDK's restoreAfterInterrupt (Item 14 E2E gate).
+    stopRemountPhaseRef.current = 'armed';
     void onStop?.();
   }
 

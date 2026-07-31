@@ -678,12 +678,18 @@ def has_image(m):
 configured = sys.argv[1]
 # `openclaw models list` keys are provider-qualified ("kilocode/kilo-auto/balanced")
 # while the configured value may omit the provider prefix; match on either.
+#
+# Match the FULL route, never a trailing segment. Suffix matching on the last
+# segment ("balanced") would also match an unrelated family such as
+# "some-other-route/balanced", so the assertion could pass on a model that is not
+# the configured one — which is precisely the substitution this check exists to
+# rule out.
 wanted = configured.split("/", 1)[1] if configured.startswith("kilocode/") else configured
 match = next(
     (m for m in models
      if isinstance(m, dict)
-     and str(m.get("key", "")).split("/", 1)[-1].endswith(wanted.split("/")[-1])
-     and wanted.split("/")[-1] in str(m.get("key", ""))),
+     and (str(m.get("key", "")).split("/", 1)[-1] == wanted
+          or str(m.get("key", "")) == configured)),
     None,
 )
 if len(models) < 50:

@@ -170,6 +170,7 @@ ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL "https://github.com/openclaw/gogcli/releases/download/v0.34.1/gogcli_0.34.1_linux_${ARCH}.tar.gz" \
        | tar xz -C /usr/local/bin gog \
+    && /usr/local/bin/gog --version \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
     && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.4.3 \
     && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.3 \

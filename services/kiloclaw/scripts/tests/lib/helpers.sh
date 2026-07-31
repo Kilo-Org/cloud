@@ -439,7 +439,13 @@ assert_exec_approvals_policy() {
   local cid="$1"
   local details
 
-  if details=$(docker exec -i "$cid" python3 - <<'PY' 2>&1
+  # No if/else around this: the probe prints the actual policy on success and the
+  # reason on failure, so `$details` is already the value to compare either way.
+  # Branching on the exit status and then calling `check` identically in both arms
+  # would look meaningful while doing nothing, and would let a later edit to one
+  # arm silently apply to only one outcome. `|| true` keeps a non-zero probe from
+  # aborting the whole smoke under `set -euo pipefail`.
+  details=$(docker exec -i "$cid" python3 - <<'PY' 2>&1 || true
 import json
 from pathlib import Path
 
@@ -450,11 +456,8 @@ if security != 'allowlist' or ask != 'on-miss':
     raise SystemExit(f"security={security!r} ask={ask!r} (expected allowlist/on-miss)")
 print('allowlist/on-miss')
 PY
-  ); then
-    check "exec-approvals default policy" "allowlist/on-miss" "$details"
-  else
-    check "exec-approvals default policy" "allowlist/on-miss" "$details"
-  fi
+  )
+  check "exec-approvals default policy" "allowlist/on-miss" "$details"
 }
 
 # An image model must be configured or the agent cannot process images at all,
@@ -468,23 +471,45 @@ assert_image_model_configured() {
   local cid="$1"
   local details
 
-  if details=$(docker exec -i "$cid" python3 - <<'PY' 2>&1
+  # Assert on the fields that actually NAME a model, not on the mere presence of a
+  # container object. `tools.media` existing as e.g. {"image": {"enabled": false}}
+  # says nothing about an image model being wired up, so treating it as truthy
+  # evidence would let this report "configured" in exactly the state it exists to
+  # catch. These are the two settings OpenClaw itself names when it refuses:
+  # "Configure tools.media.image.models or agents.defaults.imageModel.primary".
+  #
+  # Unconditional `check` (see the note on the sibling above): `$details` already
+  # carries either the resolved model or the reason, so branching would be inert.
+  details=$(docker exec -i "$cid" python3 - <<'PY' 2>&1 || true
 import json
 from pathlib import Path
 
 cfg = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
-image_model = (cfg.get('agents', {}).get('defaults', {}) or {}).get('imageModel')
-media = (cfg.get('tools', {}) or {}).get('media')
-primary = (image_model or {}).get('primary') if isinstance(image_model, dict) else image_model
-if not primary and not media:
-    raise SystemExit('neither agents.defaults.imageModel nor tools.media is set')
-print('configured')
+
+image_model = ((cfg.get('agents') or {}).get('defaults') or {}).get('imageModel')
+primary = image_model.get('primary') if isinstance(image_model, dict) else image_model
+primary = primary if isinstance(primary, str) and primary.strip() else None
+
+media_models = (((cfg.get('tools') or {}).get('media') or {}).get('image') or {}).get('models')
+media_named = bool(media_models) if isinstance(media_models, (list, tuple, dict)) else False
+
+if primary:
+    print(f'configured ({primary})')
+elif media_named:
+    print('configured (tools.media.image.models)')
+else:
+    raise SystemExit(
+        'no image model named: agents.defaults.imageModel.primary and '
+        'tools.media.image.models are both unset'
+    )
 PY
-  ); then
-    check "image model configured" "configured" "$details"
-  else
-    check "image model configured" "configured" "$details"
-  fi
+  )
+  # Compare on the prefix so the resolved model name can be shown without having
+  # to hard-code which model an instance happens to be seeded with.
+  case "$details" in
+    configured*) check "image model configured" "configured" "configured" ;;
+    *)           check "image model configured" "configured" "$details" ;;
+  esac
 }
 
 # End-to-end image round trip: push a real image through the SAME gateway method
@@ -519,8 +544,10 @@ assert_image_round_trip() {
   # remaining legs. That is not hypothetical: the unguarded `grep` this replaced
   # took the run down when it found no match, which is precisely the case this
   # assertion exists to report.
-  local send_out
-  if ! send_out=$(docker exec "$cid" sh -c '
+  # Output is discarded, not captured-then-ignored: this call's stdout/stderr can
+  # carry provider/model response content, so it must never reach the console.
+  # Only the exit status is used.
+  if ! docker exec "$cid" sh -c '
     set -e
     SK="'"$session_key"'"
     IMG=/usr/local/lib/node_modules/openclaw/dist/control-ui/favicon-32.png
@@ -545,10 +572,13 @@ print(json.dumps({
 }))
 PY
     openclaw gateway call chat.send --params "$(cat /tmp/kc-img-params.json)" \
-      --expect-final --timeout 240000 --json 2>&1
-  ' 2>&1); then
+      --expect-final --timeout 240000 --json
+  ' >/dev/null 2>&1; then
     check "image round trip (promptImages >= 1)" "image-received" "chat.send failed"
-    echo "  details: $(printf '%s' "$send_out" | tail -3)"
+    # assert_live_agent_turn suppresses this same class of output, and
+    # DEVELOPMENT.md states the live smoke does not dump provider responses or
+    # controller logs. This assertion must not be the hole in that guarantee.
+    echo "  Gateway output suppressed because provider responses can contain sensitive data."
     return 0
   fi
 

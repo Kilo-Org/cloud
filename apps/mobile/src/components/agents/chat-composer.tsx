@@ -133,19 +133,6 @@ export function ChatComposer({
   // navigating away. Draft text is restored after remount.
   const [inputEpoch, setInputEpoch] = useState(0);
   const pendingDraftRestoreRef = useRef<string | null>(null);
-  useEffect(() => {
-    const draft = pendingDraftRestoreRef.current;
-    if (draft === null) return;
-    pendingDraftRestoreRef.current = null;
-    if (!draft) return;
-    inputRef.current?.setNativeProps({
-      text: draft,
-      selection: { start: draft.length, end: draft.length },
-    });
-    setHasText(draft.trim().length > 0);
-    setSlashCommandInput(getSlashCommandCandidate(draft));
-    measure.setText(draft);
-  }, [inputEpoch, measure]);
 
   // Single send-admission authority. `settleVoiceInputBeforeSubmit` owns
   // this lock for the full voice-settle + asynchronous send sequence, and
@@ -180,6 +167,24 @@ export function ChatComposer({
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
+
+  useEffect(() => {
+    const draft = pendingDraftRestoreRef.current;
+    if (draft === null) {
+      return;
+    }
+    pendingDraftRestoreRef.current = null;
+    if (!draft) {
+      return;
+    }
+    inputRef.current?.setNativeProps({
+      text: draft,
+      selection: { start: draft.length, end: draft.length },
+    });
+    setHasText(draft.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(draft));
+    measure.setText(draft);
+  }, [inputEpoch, measure]);
 
   // Compute base composer disabled before the voice hook so voice can react to it.
   // `isStreaming` is intentionally NOT a composer gate (see

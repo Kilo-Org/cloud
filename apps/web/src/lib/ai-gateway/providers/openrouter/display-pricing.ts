@@ -1,5 +1,4 @@
 import type { StoredModel } from '@kilocode/db';
-import { isOpenRouterGpt56PromoModel } from '@/lib/ai-gateway/providers/openai';
 
 export type EndpointPricing = NonNullable<StoredModel['endpoints'][number]['pricing']>;
 
@@ -19,9 +18,8 @@ export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
 }
 
 export function getModelDisplayPricing(
-  modelId: string,
   pricing: EndpointPricing | undefined
 ): EndpointPricing | undefined {
   if (!pricing) return undefined;
-  return isOpenRouterGpt56PromoModel(modelId) ? pricing : undoPricingDiscount(pricing);
+  return undoPricingDiscount(pricing);
 }

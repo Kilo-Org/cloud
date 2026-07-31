@@ -1018,6 +1018,12 @@ export async function suspendAgreementForPaymentReview(providerSubscriptionId: s
       .where(eq(kilo_pass_org_agreements.provider_subscription_id, providerSubscriptionId))
       .for('update');
     if (!agreement) return;
+    if (
+      processingCondition(agreement) === KiloPassOrgProcessingCondition.SuspendedForReview &&
+      agreement.payment_review_required_at
+    ) {
+      return;
+    }
     const suspendedAt = new Date().toISOString();
     await tx
       .update(kilo_pass_org_agreements)
@@ -1035,7 +1041,7 @@ export async function suspendAgreementForPaymentReview(providerSubscriptionId: s
         processingCondition: KiloPassOrgProcessingCondition.SuspendedForReview,
         paymentReviewRequiredAt: suspendedAt,
       },
-      idempotencyKey: `kpo:payment-review:${agreement.id}:${suspendedAt}`,
+      idempotencyKey: `kpo:payment-review:${agreement.id}`,
     });
   });
 }

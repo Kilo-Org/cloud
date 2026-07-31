@@ -49,10 +49,7 @@ export async function assertOrganizationHierarchyChangeAllowed(
         ne(kilo_pass_org_agreements.state, 'ended')
       )
     )
-    .orderBy(
-      desc(kilo_pass_org_allocation_plans.effective_window_start),
-      desc(kilo_pass_org_allocation_plans.version)
-    )
+    .orderBy(desc(kilo_pass_org_allocation_plans.version))
     .limit(1)
     .for('update');
 

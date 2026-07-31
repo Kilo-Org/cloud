@@ -3045,7 +3045,7 @@ export const kilo_pass_org_notification_deliveries = pgTable(
     recipient_kilo_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    status: text().notNull().default('pending').$type<'pending' | 'sending' | 'sent'>(),
+    status: text().notNull().default('pending').$type<'pending' | 'sending' | 'sent' | 'failed'>(),
     attempt_count: integer().notNull().default(0),
     lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -3063,7 +3063,7 @@ export const kilo_pass_org_notification_deliveries = pgTable(
     index('IDX_kilo_pass_org_notification_deliveries_status').on(table.status, table.created_at),
     check(
       'kilo_pass_org_notification_deliveries_status_check',
-      sql`${table.status} IN ('pending', 'sending', 'sent')`
+      sql`${table.status} IN ('pending', 'sending', 'sent', 'failed')`
     ),
     check(
       'kilo_pass_org_notification_deliveries_attempt_count_check',
@@ -3071,7 +3071,7 @@ export const kilo_pass_org_notification_deliveries = pgTable(
     ),
     check(
       'kilo_pass_org_notification_deliveries_sent_check',
-      sql`(${table.status} = 'sent' AND ${table.sent_at} IS NOT NULL AND ${table.lease_expires_at} IS NULL) OR (${table.status} = 'sending' AND ${table.sent_at} IS NULL AND ${table.lease_expires_at} IS NOT NULL) OR (${table.status} = 'pending' AND ${table.sent_at} IS NULL AND ${table.lease_expires_at} IS NULL)`
+      sql`(${table.status} = 'sent' AND ${table.sent_at} IS NOT NULL AND ${table.lease_expires_at} IS NULL) OR (${table.status} = 'sending' AND ${table.sent_at} IS NULL AND ${table.lease_expires_at} IS NOT NULL) OR (${table.status} IN ('pending', 'failed') AND ${table.sent_at} IS NULL AND ${table.lease_expires_at} IS NULL)`
     ),
   ]
 );

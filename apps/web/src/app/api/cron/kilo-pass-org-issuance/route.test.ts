@@ -63,4 +63,26 @@ describe('GET /api/cron/kilo-pass-org-issuance', () => {
     expect(mockRunOrganizationPassIssuanceCron).toHaveBeenCalledTimes(1);
     expect(mockRunOrganizationPassIssuanceCron.mock.calls[0]?.[0]).toBe(db);
   });
+
+  test('reports issuance failures before notification dispatch and returns a failure status', async () => {
+    const summary = {
+      examined: 1,
+      processed: 0,
+      issued: 0,
+      blocked: 0,
+      failed: 1,
+      failures: [{ agreementId: 'agreement-1', message: 'issuance failed' }],
+    };
+    mockRunOrganizationPassIssuanceCron.mockResolvedValue(summary);
+    mockDispatchNotifications.mockRejectedValue(new Error('mail unavailable'));
+
+    const response = await GET(request('Bearer cron-secret'));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      summary,
+      error: 'Notification dispatch failed',
+    });
+  });
 });

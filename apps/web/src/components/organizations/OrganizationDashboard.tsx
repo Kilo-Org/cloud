@@ -167,9 +167,10 @@ export function OrganizationDashboard({
               <OrganizationAdminMembers organizationId={organizationId} />
             </LockableContainer>
             <SeatUsageCard organizationId={organizationId} />
-            {canManageOrganizationBilling(currentRole) && (
-              <KiloPassUsageCard organizationId={organizationId} />
-            )}
+            {canManageOrganizationBilling(currentRole) &&
+              organizationData?.parent_organization_id === null && (
+                <KiloPassUsageCard organizationId={organizationId} />
+              )}
             {canManageOrganizationBilling(currentRole) && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}

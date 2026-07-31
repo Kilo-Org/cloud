@@ -14,6 +14,7 @@ import { db } from '@/lib/drizzle';
 import { sendKiloPassOrgBlockedEmail } from '@/lib/email';
 
 const DELIVERY_BATCH_SIZE = 100;
+const MAX_DELIVERY_ATTEMPTS = 3;
 
 export async function dispatchOrganizationPassBlockedNotifications(
   database: typeof db = db
@@ -33,7 +34,8 @@ export async function dispatchOrganizationPassBlockedNotifications(
               lt(kilo_pass_org_notification_deliveries.lease_expires_at, now.toISOString())
             )
           ),
-          isNull(kilo_pass_org_notification_deliveries.sent_at)
+          isNull(kilo_pass_org_notification_deliveries.sent_at),
+          lt(kilo_pass_org_notification_deliveries.attempt_count, MAX_DELIVERY_ATTEMPTS)
         )
       )
       .limit(DELIVERY_BATCH_SIZE)
@@ -110,10 +112,7 @@ export async function dispatchOrganizationPassBlockedNotifications(
       });
       if (!result.sent) {
         failed++;
-        await database
-          .update(kilo_pass_org_notification_deliveries)
-          .set({ status: 'pending', lease_expires_at: null })
-          .where(eq(kilo_pass_org_notification_deliveries.id, candidate.deliveryId));
+        await resetClaimedDelivery(database, candidate.deliveryId, true);
         continue;
       }
       await database
@@ -132,10 +131,7 @@ export async function dispatchOrganizationPassBlockedNotifications(
       sent++;
     } catch (error) {
       failed++;
-      await database
-        .update(kilo_pass_org_notification_deliveries)
-        .set({ status: 'pending', lease_expires_at: null })
-        .where(eq(kilo_pass_org_notification_deliveries.id, candidate.deliveryId));
+      await resetClaimedDelivery(database, candidate.deliveryId, false);
       captureException(error, {
         tags: { source: 'kilo-pass-org-blocked-notification' },
         extra: {
@@ -148,4 +144,31 @@ export async function dispatchOrganizationPassBlockedNotifications(
   }
 
   return { examined: claimedIds.length, sent, failed };
+}
+
+async function resetClaimedDelivery(
+  database: typeof db,
+  deliveryId: string,
+  permanentFailure: boolean
+) {
+  try {
+    await database
+      .update(kilo_pass_org_notification_deliveries)
+      .set({
+        status: permanentFailure ? 'failed' : 'pending',
+        lease_expires_at: null,
+      })
+      .where(
+        and(
+          eq(kilo_pass_org_notification_deliveries.id, deliveryId),
+          eq(kilo_pass_org_notification_deliveries.status, 'sending'),
+          isNull(kilo_pass_org_notification_deliveries.sent_at)
+        )
+      );
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'kilo-pass-org-blocked-notification', failure: 'claim-reset' },
+      extra: { deliveryId },
+    });
+  }
 }

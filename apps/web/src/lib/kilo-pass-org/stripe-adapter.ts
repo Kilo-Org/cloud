@@ -3,7 +3,10 @@ import 'server-only';
 import type Stripe from 'stripe';
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { kilo_pass_org_agreements, organization_seats_purchases } from '@kilocode/db/schema';
-import { KiloPassOrgAgreementState } from '@kilocode/db/schema-types';
+import {
+  KiloPassOrgAgreementState,
+  KiloPassOrgProcessingCondition,
+} from '@kilocode/db/schema-types';
 import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { db } from '@/lib/drizzle';
 import { client as stripe } from '@/lib/stripe-client';
@@ -53,6 +56,20 @@ function organizationPassItem(subscription: Stripe.Subscription) {
   const item = subscription.items.data.find(item => !isSeatLineItem(item));
   if (!item) throw new Error(`Subscription ${subscription.id} has no Kilo Pass organization item`);
   return item;
+}
+
+function scheduleItemsMatch(
+  actual: Stripe.SubscriptionSchedule.Phase.Item[],
+  expected: { price: string; quantity: number }[]
+) {
+  return (
+    actual.length === expected.length &&
+    actual.every(item =>
+      expected.some(
+        candidate => candidate.price === String(item.price) && candidate.quantity === item.quantity
+      )
+    )
+  );
 }
 
 function paidSeatItem(subscription: Stripe.Subscription) {
@@ -240,6 +257,8 @@ export async function handleOrganizationKiloPassInvoicePaid(params: {
   });
   if (
     agreement.state === KiloPassOrgAgreementState.Active &&
+    agreement.processing_condition !== KiloPassOrgProcessingCondition.Manual &&
+    agreement.processing_condition !== KiloPassOrgProcessingCondition.SuspendedForReview &&
     (seats > previousSeats || paidIncreaseSupersedesPendingCapacity)
   ) {
     await createParentSupplement({
@@ -295,27 +314,43 @@ export async function scheduleOrganizationKiloPassCancellation(input: {
     typeof existingSchedule === 'string'
       ? await stripe.subscriptionSchedules.retrieve(existingSchedule)
       : existingSchedule;
+  const currentItems = subscription.items.data.map(item => ({
+    price: item.price.id,
+    quantity: item.quantity ?? 1,
+  }));
+  let target = schedule;
   if (schedule) {
-    const expectedRetainedPrices = new Set(retainedItems.map(item => item.price));
+    const currentPhase = schedule.phases[0];
     const removalPhase = schedule.phases[1];
+    const isOwnedSchedule =
+      schedule.metadata?.origin === ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN;
     const hasRemovalScheduled =
-      schedule.metadata?.origin === ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN &&
+      isOwnedSchedule &&
       schedule.phases.length === 2 &&
-      removalPhase?.items.length === retainedItems.length &&
-      removalPhase.items.every(item => expectedRetainedPrices.has(String(item.price)));
+      removalPhase !== undefined &&
+      scheduleItemsMatch(removalPhase.items, retainedItems);
     if (hasRemovalScheduled) return;
-    throw new Error('SCHEDULE_REWRITE_UNSAFE');
+    const isResumedSchedule =
+      isOwnedSchedule &&
+      schedule.phases.length === 2 &&
+      removalPhase !== undefined &&
+      scheduleItemsMatch(removalPhase.items, currentItems);
+    const isOrphanedCreate =
+      !schedule.metadata?.origin &&
+      schedule.phases.length === 1 &&
+      currentPhase !== undefined &&
+      scheduleItemsMatch(currentPhase.items, currentItems);
+    if (!isResumedSchedule && !isOrphanedCreate) throw new Error('SCHEDULE_REWRITE_UNSAFE');
+  } else {
+    target = await stripe.subscriptionSchedules.create({ from_subscription: subscription.id });
   }
-  const target = await stripe.subscriptionSchedules.create({ from_subscription: subscription.id });
+  if (!target) throw new Error('SCHEDULE_REWRITE_UNSAFE');
   await stripe.subscriptionSchedules.update(target.id, {
     metadata: { origin: ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN },
     end_behavior: 'release',
     phases: [
       {
-        items: subscription.items.data.map(item => ({
-          price: item.price.id,
-          quantity: item.quantity ?? 1,
-        })),
+        items: currentItems,
         start_date: Math.floor(period.start.getTime() / 1000),
         end_date: Math.floor(period.end.getTime() / 1000),
       },

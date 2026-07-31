@@ -13,18 +13,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const summary = await runOrganizationPassIssuanceCron(db);
-  // Dispatch after issuance so newly created blocked-run deliveries are included.
-  const notifications = await dispatchOrganizationPassBlockedNotifications(db);
   for (const failure of summary.failures) {
     sentryLogger('kilo-pass-org-issuance', 'error')('Agreement issuance failed', {
       agreementId: failure.agreementId,
       error: failure.message,
     });
   }
-  return NextResponse.json({
-    success: true,
-    summary,
-    notifications,
-    timestamp: new Date().toISOString(),
-  });
+  let notifications: Awaited<ReturnType<typeof dispatchOrganizationPassBlockedNotifications>>;
+  try {
+    // Dispatch after issuance so newly created blocked-run deliveries are included.
+    notifications = await dispatchOrganizationPassBlockedNotifications(db);
+  } catch (error) {
+    sentryLogger('kilo-pass-org-issuance', 'error')('Notification dispatch failed', { error });
+    return NextResponse.json(
+      { success: false, summary, error: 'Notification dispatch failed' },
+      { status: 500 }
+    );
+  }
+  const success = summary.failed === 0 && notifications.failed === 0;
+  return NextResponse.json(
+    { success, summary, notifications, timestamp: new Date().toISOString() },
+    { status: success ? 200 : 500 }
+  );
 }

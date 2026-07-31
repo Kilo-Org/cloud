@@ -90,6 +90,7 @@ function dbAgreement(overrides: Record<string, unknown> = {}) {
     purchased_pass_capacity: 3,
     issuance_anchor_at: '2026-01-01T00:00:00.000Z',
     state: 'active',
+    processing_condition: 'ready',
     ...overrides,
   };
 }
@@ -427,6 +428,37 @@ describe('organization Kilo Pass Stripe adapter', () => {
     );
   });
 
+  test('does not grant a supplement while payment review suspends issuance', async () => {
+    const suspended = dbAgreement({ processing_condition: 'suspended_for_review' });
+    select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          orderBy: () => ({ limit: async () => [suspended] }),
+        }),
+      }),
+    });
+    retrieve.mockResolvedValue(subscription());
+    const invoice = {
+      parent: { subscription_details: { subscription: 'sub_1' } },
+      lines: {
+        data: [
+          {
+            id: 'line_pass',
+            period: { start: 1_767_528_000, end: 1_769_904_000 },
+            parent: { subscription_item_details: { subscription_item: 'si_pass' } },
+          },
+        ],
+      },
+    } as unknown as Stripe.Invoice;
+    const { handleOrganizationKiloPassInvoicePaid } = await import('./stripe-adapter');
+
+    await expect(
+      handleOrganizationKiloPassInvoicePaid({ invoice, paidSeatCount: 9 })
+    ).resolves.toBe(true);
+    expect(activatePaidAgreement).toHaveBeenCalled();
+    expect(createParentSupplement).not.toHaveBeenCalled();
+  });
+
   test('schedules removal of only the pass item at renewal', async () => {
     retrieve.mockResolvedValue(subscription());
     scheduleCreate.mockResolvedValue({ id: 'sub_sched_1' });
@@ -445,6 +477,78 @@ describe('organization Kilo Pass Stripe adapter', () => {
           expect.objectContaining({ items: [{ price: 'price_seat', quantity: 9 }] }),
         ]),
       })
+    );
+  });
+
+  test('re-adopts the owned schedule after resume and allows cancellation again', async () => {
+    const resumedSchedule = {
+      id: 'sched_cancel',
+      status: 'active',
+      metadata: { origin: 'kilo-pass-org-cancellation' },
+      phases: [
+        {
+          start_date: 1_767_225_600,
+          end_date: 1_769_904_000,
+          items: [
+            { price: 'price_seat', quantity: 9 },
+            { price: 'price_pass', quantity: 9 },
+          ],
+        },
+        {
+          items: [
+            { price: 'price_seat', quantity: 9 },
+            { price: 'price_pass', quantity: 9 },
+          ],
+        },
+      ],
+    } as unknown as Stripe.SubscriptionSchedule;
+    retrieve.mockResolvedValue(subscription({ schedule: resumedSchedule }));
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await scheduleOrganizationKiloPassCancellation({
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+    });
+
+    expect(scheduleCreate).not.toHaveBeenCalled();
+    expect(scheduleUpdate).toHaveBeenCalledWith(
+      'sched_cancel',
+      expect.objectContaining({
+        phases: expect.arrayContaining([
+          expect.objectContaining({ items: [{ price: 'price_seat', quantity: 9 }] }),
+        ]),
+      })
+    );
+  });
+
+  test('adopts a safe orphaned from-subscription schedule after an update failure', async () => {
+    const orphanedSchedule = {
+      id: 'sched_orphaned',
+      status: 'active',
+      metadata: {},
+      phases: [
+        {
+          start_date: 1_767_225_600,
+          end_date: 1_769_904_000,
+          items: [
+            { price: 'price_seat', quantity: 9 },
+            { price: 'price_pass', quantity: 9 },
+          ],
+        },
+      ],
+    } as unknown as Stripe.SubscriptionSchedule;
+    retrieve.mockResolvedValue(subscription({ schedule: orphanedSchedule }));
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await scheduleOrganizationKiloPassCancellation({
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+    });
+
+    expect(scheduleCreate).not.toHaveBeenCalled();
+    expect(scheduleUpdate).toHaveBeenCalledWith(
+      'sched_orphaned',
+      expect.objectContaining({ metadata: { origin: 'kilo-pass-org-cancellation' } })
     );
   });
 

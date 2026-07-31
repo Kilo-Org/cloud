@@ -20,15 +20,17 @@ export async function getDefaultAllowedModel(
 
   // Resolve the organization's default policy once. When it imposes no
   // restriction (non-Enterprise, or an unrestricted grant with no deny list and
-  // no provider ceiling), every candidate is allowed, so skip the per-model
-  // checks and preserve the "no restrictions → global default" fast path.
+  // no provider ceiling), return `globalDefault` exactly as the pre-policy code
+  // did. The organization's own `default_model` is only consulted on the
+  // restricted path below, after `isAllowed` accepts it, because it may hold a
+  // non-routable virtual id such as `organization-auto`.
   const policy = await resolveOrganizationDefaultModelPolicy({ organizationId });
   const isUnrestricted =
     policy.memberGrant.mode === 'unrestricted' &&
     policy.organizationModelDenyList.length === 0 &&
     !policy.organizationProviderCeiling;
   if (isUnrestricted) {
-    return organization.settings?.default_model || globalDefault;
+    return globalDefault;
   }
 
   const isAllowed = async (modelId: string) =>

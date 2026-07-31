@@ -23,8 +23,12 @@ export const OrganizationGroupMcpServerAccessPolicySchema = z
   .strict();
 
 // Assert the runtime schema stays structurally compatible with the persisted
-// database shape defined in `@kilocode/db`.
-export type _AssertMcpServerAccessMatchesDb =
+// database shape defined in `@kilocode/db`. `AssertTrue` is what makes drift a
+// build error: a bare conditional type may legally resolve to `false`, and
+// `never` would even satisfy `extends true`, so neither fails typecheck alone.
+type AssertTrue<T extends true> = T;
+
+export type _AssertMcpServerAccessMatchesDb = AssertTrue<
   z.infer<
     typeof OrganizationGroupMcpServerAccessPolicySchema
   > extends OrganizationGroupMcpServerAccessPolicy
@@ -32,8 +36,9 @@ export type _AssertMcpServerAccessMatchesDb =
         typeof OrganizationGroupMcpServerAccessPolicySchema
       >
       ? true
-      : never
-    : never;
+      : false
+    : false
+>;
 
 export const DEFAULT_GROUP_MCP_SERVER_ACCESS_POLICY = {
   type: ORGANIZATION_GROUP_MCP_SERVER_ACCESS_POLICY_TYPE,

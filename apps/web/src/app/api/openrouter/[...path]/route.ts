@@ -474,6 +474,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
           subject: { type: 'member', kiloUserId: user.id },
         }).then(evaluateEffectiveModelAccessPolicy)
       : null;
+  // The prefetch is awaited only on the authorized, non-bypassed path below, and
+  // roughly a dozen earlier returns can skip it entirely. Attach a no-op handler
+  // so a policy-context failure can never surface as an unhandled rejection; the
+  // await below still receives the original error.
+  void organizationGroupPolicyPromise?.catch(() => {});
 
   // Fraud/project headers are pure header parsing; resolve them here so the
   // classifier-overhead billing below can be scheduled before any downstream

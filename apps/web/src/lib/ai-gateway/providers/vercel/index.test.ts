@@ -1,5 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import {
+  applyVercelSettings,
   convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
@@ -125,6 +126,47 @@ describe('convertProviderOptions', () => {
 
     expect(providerOptions.gateway?.only).toEqual(['anthropic']);
     expect(provider?.only).toEqual(['anthropic', 'amazon-bedrock']);
+  });
+});
+
+describe('applyVercelSettings BYOK pinning', () => {
+  function byokRequest(ignore: string[]): GatewayRequest {
+    return {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ignore },
+      },
+    };
+  }
+
+  it('drops a BYOK provider the caller ignored when another key remains', async () => {
+    const request = byokRequest(['anthropic']);
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+      { decryptedAPIKey: 'sk-openai', providerId: 'openai' },
+    ]);
+
+    expect(Object.keys(request.body.providerOptions?.gateway?.byok ?? {})).toEqual(['openai']);
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['openai']);
+  });
+
+  // Regression: an empty BYOK map sends `only: []` with no credential, so the
+  // request loses BYOK pinning and bills Kilo's Vercel account while still
+  // counting as BYOK downstream (which skips the zero-balance rejection).
+  it('keeps BYOK credentials when the caller ignores every provider it holds keys for', async () => {
+    const request = byokRequest(['anthropic']);
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      anthropic: [{ apiKey: 'sk-anthropic' }],
+    });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['anthropic']);
   });
 });
 

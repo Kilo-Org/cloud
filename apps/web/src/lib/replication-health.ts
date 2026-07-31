@@ -48,6 +48,14 @@ export function getExpectedReplicaTargets(): ReplicaTarget[] {
 export const REPLICA_LAG_ALERT_SECONDS = 300;
 
 /**
+ * Number of read replicas we expect in production, one per POSTGRES_REPLICA_*
+ * connection string (US + two EU). If fewer are configured (env var dropped,
+ * renamed, or misspelled), the monitor would otherwise probe nothing and still
+ * report `healthy: true` — so we surface it as an error in production.
+ */
+export const EXPECTED_REPLICA_COUNT = 3;
+
+/**
  * `pg_replication_slots.wal_status` values that mean the slot is at, or past,
  * the point of losing WAL it still needs. 'lost' is unrecoverable; 'unreserved'
  * is imminent. 'reserved' and 'extended' are both still safe.
@@ -240,6 +248,18 @@ export async function collectReplicationHealth(options?: {
   const targets = options?.targets ?? getExpectedReplicaTargets();
   const probe = options?.probe ?? probeReplica;
   const errors: string[] = [];
+
+  // A monitor that silently checks zero replicas is itself an invisible failure.
+  // In production every replica URL should be set, so treat a short inventory as
+  // an error (which forces `healthy: false` and triggers the cron's alert).
+  // Preview/dev deployments legitimately run without replica URLs, so gate on
+  // VERCEL_ENV to avoid false alarms there.
+  if (process.env.VERCEL_ENV === 'production' && targets.length < EXPECTED_REPLICA_COUNT) {
+    errors.push(
+      `expected ${EXPECTED_REPLICA_COUNT} read replicas but only ${targets.length} configured; ` +
+        `check POSTGRES_REPLICA_* env vars`
+    );
+  }
 
   const [replicas, walSenders, slots] = await Promise.all([
     // Isolate each probe: `probeReplica` is contracted not to throw, but a

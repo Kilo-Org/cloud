@@ -108,8 +108,57 @@ describe('classifyReplicaRow', () => {
 });
 
 describe('collectReplicationHealth', () => {
+  const originalVercelEnv = process.env.VERCEL_ENV;
+
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    process.env.VERCEL_ENV = originalVercelEnv;
+  });
+
+  it('reports an error when fewer than the expected replicas are configured in production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    mockPrimary([walSenderRow()], [slotRow()]);
+
+    const report = await collectReplicationHealth({
+      targets: [],
+      probe: async target => okProbe(target.name),
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.errors).toEqual([expect.stringContaining('expected 3 read replicas but only 0')]);
+  });
+
+  it('does not flag a short inventory outside production', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    mockPrimary([walSenderRow()], [slotRow()]);
+
+    const report = await collectReplicationHealth({
+      targets: [],
+      probe: async target => okProbe(target.name),
+    });
+
+    expect(report.errors).toEqual([]);
+    expect(report.healthy).toBe(true);
+  });
+
+  it('accepts the full replica inventory in production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    mockPrimary([walSenderRow()], [slotRow()]);
+
+    const report = await collectReplicationHealth({
+      targets: [
+        { name: 'us-west', url: 'postgres://a' },
+        { name: 'eu-central-1', url: 'postgres://b' },
+        { name: 'eu-central-2', url: 'postgres://c' },
+      ],
+      probe: async target => okProbe(target.name),
+    });
+
+    expect(report.errors).toEqual([]);
+    expect(report.healthy).toBe(true);
   });
 
   it('is healthy when replicas are caught up and slots are safe', async () => {

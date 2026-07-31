@@ -108,75 +108,71 @@ export function CostInsightsSettingsView({
               </div>
             </section>
 
-            <div className="border-border ml-6 divide-y border-l sm:ml-10">
-              {!data.enabled && (
-                <p className="type-label text-muted-foreground px-6 py-4" role="status">
-                  Spend Alerts are off. Saved anomaly and threshold settings apply when you turn
-                  Spend Alerts on again.
-                </p>
-              )}
-              <section
-                className="grid gap-5 px-6 py-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]"
-                aria-labelledby="anomaly-setting-title"
-              >
-                <div>
-                  <h3 id="anomaly-setting-title" className="type-body font-semibold">
-                    Spend anomalies
-                  </h3>
-                  <p className="type-label text-muted-foreground mt-1">
-                    Compare current-hour usage-based spend with your recent hourly pattern.
-                  </p>
-                </div>
-                <div className="flex min-h-control-touch items-center gap-3 md:justify-end">
-                  <span className="type-label text-muted-foreground" aria-hidden="true">
-                    {data.anomalyAlertsEnabled ? 'On' : 'Off'}
-                  </span>
-                  <Label htmlFor="spend-anomalies-enabled" className="sr-only">
-                    Spend anomalies
-                  </Label>
-                  <Switch
-                    id="spend-anomalies-enabled"
-                    className="relative before:absolute before:inset-x-0 before:-inset-y-2.5"
-                    checked={data.anomalyAlertsEnabled}
-                    disabled={disabled}
-                    onCheckedChange={anomalyAlertsEnabled => onChange?.({ anomalyAlertsEnabled })}
-                  />
-                </div>
-              </section>
+            {data.enabled && (
+              <div className="border-border ml-6 divide-y border-l sm:ml-10">
+                <section
+                  className="grid gap-5 px-6 py-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]"
+                  aria-labelledby="anomaly-setting-title"
+                >
+                  <div>
+                    <h3 id="anomaly-setting-title" className="type-body font-semibold">
+                      Spend anomalies
+                    </h3>
+                    <p className="type-label text-muted-foreground mt-1">
+                      Compare current-hour usage-based spend with your recent hourly pattern.
+                    </p>
+                  </div>
+                  <div className="flex min-h-control-touch items-center gap-3 md:justify-end">
+                    <span className="type-label text-muted-foreground" aria-hidden="true">
+                      {data.anomalyAlertsEnabled ? 'On' : 'Off'}
+                    </span>
+                    <Label htmlFor="spend-anomalies-enabled" className="sr-only">
+                      Spend anomalies
+                    </Label>
+                    <Switch
+                      id="spend-anomalies-enabled"
+                      className="relative before:absolute before:inset-x-0 before:-inset-y-2.5"
+                      checked={data.anomalyAlertsEnabled}
+                      disabled={disabled}
+                      onCheckedChange={anomalyAlertsEnabled => onChange?.({ anomalyAlertsEnabled })}
+                    />
+                  </div>
+                </section>
 
-              <ThresholdOption
-                id="spend-threshold-24h"
-                title="24-hour spend threshold"
-                description="Optional. Includes all Credit spend in a rolling 24-hour period."
-                value={data.thresholdUsd}
-                validation={thresholdValidation}
-                disabled={disabled}
-                readOnly={data.readOnly}
-                onChange={thresholdUsd => onChange?.({ thresholdUsd })}
-              />
+                <ThresholdOption
+                  id="spend-threshold-24h"
+                  title="24-hour spend threshold"
+                  description="Optional. Includes all Credit spend in a rolling 24-hour period."
+                  value={data.thresholdUsd}
+                  validation={thresholdValidation}
+                  disabled={disabled}
+                  readOnly={data.readOnly}
+                  onChange={thresholdUsd => onChange?.({ thresholdUsd })}
+                />
 
-              <ThresholdOption
-                id="spend-threshold-7d"
-                title="7-day spend threshold"
-                description="Optional. Includes all Credit spend in a rolling 7-day period."
-                value={data.threshold7DayUsd ?? ''}
-                validation={threshold7DayValidation}
-                disabled={disabled}
-                readOnly={data.readOnly}
-                onChange={threshold7DayUsd => onChange?.({ threshold7DayUsd })}
-              />
+                <ThresholdOption
+                  id="spend-threshold-7d"
+                  title="7-day spend threshold"
+                  description="Optional. Includes all Credit spend in a rolling 7-day period."
+                  value={data.threshold7DayUsd ?? ''}
+                  validation={threshold7DayValidation}
+                  disabled={disabled}
+                  readOnly={data.readOnly}
+                  onChange={threshold7DayUsd => onChange?.({ threshold7DayUsd })}
+                />
 
-              <ThresholdOption
-                id="spend-threshold-30d"
-                title="30-day spend threshold"
-                description="Optional. Includes all Credit spend in a rolling 30-day period."
-                value={data.threshold30DayUsd}
-                validation={threshold30DayValidation}
-                disabled={disabled}
-                readOnly={data.readOnly}
-                onChange={threshold30DayUsd => onChange?.({ threshold30DayUsd })}
-              />
-            </div>
+                <ThresholdOption
+                  id="spend-threshold-30d"
+                  title="30-day spend threshold"
+                  description="Optional. Includes all Credit spend in a rolling 30-day period."
+                  value={data.threshold30DayUsd}
+                  validation={threshold30DayValidation}
+                  disabled={disabled}
+                  readOnly={data.readOnly}
+                  onChange={threshold30DayUsd => onChange?.({ threshold30DayUsd })}
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

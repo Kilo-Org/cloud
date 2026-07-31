@@ -9,6 +9,7 @@ import {
   shouldAbortVoiceInputForOwner,
   showFeedback,
 } from './use-voice-input-actions';
+import { __resetVoiceInputLanguageTagCacheForTests } from './voice-input-language';
 
 const hapticsMock = vi.hoisted(() => ({
   impactAsync: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -34,6 +35,13 @@ const localizationMock = vi.hoisted(() => ({
   getLocales: vi.fn<() => { languageTag: string }[]>(() => [{ languageTag: 'en-US' }]),
 }));
 
+const getSupportedLocalesMock = vi.hoisted(() =>
+  vi.fn<() => Promise<{ locales: string[]; installedLocales: string[] }>>().mockResolvedValue({
+    locales: ['en-US', 'nl-NL'],
+    installedLocales: [],
+  })
+);
+
 vi.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
   impactAsync: hapticsMock.impactAsync,
@@ -41,6 +49,12 @@ vi.mock('expo-haptics', () => ({
 
 vi.mock('expo-localization', () => ({
   getLocales: localizationMock.getLocales,
+}));
+
+vi.mock('expo-speech-recognition', () => ({
+  ExpoSpeechRecognitionModule: {
+    getSupportedLocales: getSupportedLocalesMock,
+  },
 }));
 
 vi.mock('sonner-native', () => ({
@@ -135,6 +149,11 @@ describe('useVoiceInput integration', () => {
     vi.clearAllMocks();
     mockController.setSnapshot(idleSnapshot());
     localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-US' }]);
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['en-US', 'nl-NL'],
+      installedLocales: [],
+    });
+    __resetVoiceInputLanguageTagCacheForTests();
   });
 
   afterEach(() => {
@@ -184,6 +203,24 @@ describe('useVoiceInput integration', () => {
         expect(startOptions.owner).toBe(owner);
         expect(startOptions.onDraftChange).toBe(onDraftChange);
         expect(startOptions.onFeedback).toBe(showFeedback);
+      });
+
+      it('resolves an en-DE device locale to en-US when the supported list contains en-AU and en-US', async () => {
+        const { actions } = buildActions();
+        mockController.setSnapshot(idleSnapshot());
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['en-AU', 'en-US'],
+          installedLocales: [],
+        });
+
+        await actions.toggle();
+
+        const startOptions = mockController.start.mock.calls[0]?.[0];
+        if (!startOptions) {
+          throw new Error('controller.start was not called');
+        }
+        expect(startOptions.languageTag).toBe('en-US');
       });
 
       it('emits a medium haptic and stops when already listening', async () => {

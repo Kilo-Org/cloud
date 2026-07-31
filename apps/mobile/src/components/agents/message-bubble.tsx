@@ -73,10 +73,13 @@ export function MessageBubble({
   }
 
   if (isUser) {
+    // Composer, queued-message synthesis, and slash commands emit exactly one
+    // human-authored text part, so the separator separates it from synthesized
+    // attachment notices.
     const textContent = message.parts
       .filter(isTextPart)
       .map(p => p.text)
-      .join('');
+      .join('\n\n');
     const fileParts = message.parts.filter(isFilePart);
     const showQueuedBadge = deliveryState?.status === 'queued';
     const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: true, canCopy: true });

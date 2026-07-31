@@ -49,8 +49,8 @@ vi.mock('./part-renderer', () => ({
   PartRenderer: () => null,
 }));
 vi.mock('./part-types', () => ({
-  isFilePart: () => false,
-  isTextPart: () => false,
+  isFilePart: vi.fn(() => false),
+  isTextPart: vi.fn(() => false),
 }));
 vi.mock('./use-message-copy', () => ({
   useMessageCopy: () => ({ copyMessage: vi.fn() }),
@@ -97,6 +97,34 @@ describe('MessageBubble regressions', () => {
   });
 });
 
+describe('MessageBubble user text join', () => {
+  it('joins text parts with \\n\\n so synthesized attachment notices get a blank line', async () => {
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockReturnValue(true);
+
+    const { ChatMarkdownText: MockChatMarkdownText } = await import('./chat-markdown-text');
+
+    const message = userMessage('m8');
+    message.parts = [
+      { id: 'm8-prompt', sessionID: 'ses_1', messageID: 'm8', type: 'text', text: 'prompt' },
+      {
+        id: 'm8-attachment',
+        sessionID: 'ses_1',
+        messageID: 'm8',
+        type: 'text',
+        text: 'attachment saved: file.pdf',
+      },
+    ] as typeof message.parts;
+
+    const tree = await renderBubble(message);
+
+    const mockFn = vi.mocked(MockChatMarkdownText as (...args: never[]) => null);
+    const element = findElementByTypeFn(tree, mockFn);
+    expect(element).not.toBeNull();
+    expect(element?.props.value as string).toContain('\n\n');
+  });
+});
+
 describe('MessageBubble in-bubble text selection context', () => {
   it('wraps the assistant parts view in InMessageBubbleContext.Provider with value true', async () => {
     const { InMessageBubbleContext } = await import('./bubble-text-selection-context');
@@ -116,6 +144,31 @@ describe('MessageBubble in-bubble text selection context', () => {
     expect(provider?.props.value).toBe(true);
   });
 });
+
+function findElementByTypeFn(
+  node: unknown,
+  typeFn: (...args: never[]) => null
+): { type: unknown; props: Record<string, unknown> } | null {
+  if (node == null || typeof node !== 'object') {
+    return null;
+  }
+  const element = node as { type?: unknown; props?: Record<string, unknown> };
+  if (element.type === typeFn) {
+    return element as { type: unknown; props: Record<string, unknown> };
+  }
+  const children = element.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const hit = findElementByTypeFn(child, typeFn);
+      if (hit) {
+        return hit;
+      }
+    }
+  } else if (children && typeof children === 'object') {
+    return findElementByTypeFn(children, typeFn);
+  }
+  return null;
+}
 
 function findProvider(
   node: unknown,

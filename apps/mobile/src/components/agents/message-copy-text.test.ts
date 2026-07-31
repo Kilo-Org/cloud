@@ -48,4 +48,68 @@ describe('collectCopyableText', () => {
     };
     expect(collectCopyableText(message)).toBe('User typed this');
   });
+
+  it('includes reasoning text parts', () => {
+    const message = {
+      parts: [
+        { type: 'text', text: 'First' },
+        { type: 'reasoning', text: 'I should think step by step.' },
+        { type: 'text', text: 'Second' },
+      ],
+    };
+    expect(collectCopyableText(message)).toBe('First\n\nI should think step by step.\n\nSecond');
+  });
+
+  it('includes a bash tool part with command and output', () => {
+    const message = {
+      parts: [
+        {
+          type: 'tool',
+          tool: 'bash',
+          state: {
+            status: 'completed',
+            input: { command: 'ls -la', description: 'List files' },
+            output: 'total 0\ndrwxr-xr-x',
+          },
+        },
+      ],
+    };
+    expect(collectCopyableText(message)).toBe(
+      'bash\n{\n  "command": "ls -la",\n  "description": "List files"\n}\ntotal 0\ndrwxr-xr-x'
+    );
+  });
+
+  it('includes a tool part with an error and no output', () => {
+    const message = {
+      parts: [
+        {
+          type: 'tool',
+          tool: 'read',
+          state: {
+            status: 'error',
+            input: { filePath: '/missing.txt' },
+            error: 'No such file or directory',
+          },
+        },
+      ],
+    };
+    expect(collectCopyableText(message)).toBe(
+      'read\n{\n  "filePath": "/missing.txt"\n}\nError: No such file or directory'
+    );
+  });
+
+  it('skips a tool part with no input, output, or error', () => {
+    const message = {
+      parts: [
+        { type: 'text', text: 'Hello' },
+        {
+          type: 'tool',
+          tool: 'pending_tool',
+          state: { status: 'pending', input: {} },
+        },
+        { type: 'text', text: 'Goodbye' },
+      ],
+    };
+    expect(collectCopyableText(message)).toBe('Hello\n\nGoodbye');
+  });
 });

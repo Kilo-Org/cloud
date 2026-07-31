@@ -3,6 +3,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { ReadMarkdownPreview } from '../read-markdown-preview';
 import { isMarkdownPath, resolveMarkdownPreview } from '../read-tool-markdown';
@@ -11,6 +12,7 @@ import { ToolCardShell } from '../tool-card-shell';
 import { getFilename } from '../tool-card-utils';
 
 export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const textSelectable = useTranscriptTextSelectable();
   const input = part.state.input;
   const filePath = typeof input.filePath === 'string' ? input.filePath : '';
   const offset = typeof input.offset === 'number' ? input.offset : undefined;
@@ -53,7 +55,7 @@ export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
         <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
       ) : null}
       {error ? (
-        <Text selectable className="text-xs text-destructive">
+        <Text selectable={textSelectable} className="text-xs text-destructive">
           {error}
         </Text>
       ) : null}

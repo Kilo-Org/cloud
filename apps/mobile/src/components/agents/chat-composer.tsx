@@ -140,6 +140,8 @@ export function ChatComposer({
   const [inputEpoch, setInputEpoch] = useState(0);
   const pendingDraftRestoreRef = useRef<string | null>(null);
   const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
+  const [stopCompleted, setStopCompleted] = useState(false);
+  const stopGenerationRef = useRef(0);
 
   // Single send-admission authority. `settleVoiceInputBeforeSubmit` owns
   // this lock for the full voice-settle + asynchronous send sequence, and
@@ -174,6 +176,11 @@ export function ChatComposer({
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
+  // useTextHeight() returns a new object every render.  Hold the latest
+  // measure in a ref so the draft-restore effect only runs after an
+  // inputEpoch bump (remount), never on a stray measure identity change.
+  const measureRef = useRef(measure);
+  measureRef.current = measure;
 
   useEffect(() => {
     const draft = pendingDraftRestoreRef.current;
@@ -190,21 +197,22 @@ export function ChatComposer({
     });
     setHasText(draft.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(draft));
-    measure.setText(draft);
-  }, [inputEpoch, measure]);
+    measureRef.current.setText(draft);
+  }, [inputEpoch]);
 
-  // After Stop, remount the input row once the parent clears the disabled
-  // lock (Item 14 E2E gate).  The state machine proves the Stop lock was
-  // observed true before it clears, so the TextInput mounts with
-  // editable=true on the first render instead of transitioning from
-  // editable=false after the SDK's restoreAfterInterrupt.
+  // After Stop, remount the input row once the SDK has restored the composer
+  // (Item 14 E2E gate).  The state machine is armed in handleStop and
+  // progresses when onStop's promise settles (stopCompleted) and the parent's
+  // disabled prop clears.  Tracking stop completion directly avoids the race
+  // where React batches the SDK's false→true→false atom writes into a single
+  // render that never commits disabled=true.
   useEffect(() => {
-    const transition = nextStopRemountPhase(stopRemountPhaseRef.current, disabled);
+    const transition = nextStopRemountPhase(stopRemountPhaseRef.current, disabled, stopCompleted);
     stopRemountPhaseRef.current = transition.phase;
     if (transition.shouldRemount) {
       setInputEpoch(epoch => epoch + 1);
     }
-  }, [disabled]);
+  }, [disabled, stopCompleted]);
 
   // Compute base composer disabled before the voice hook so voice can react to it.
   // `isStreaming` is intentionally NOT a composer gate (see
@@ -379,14 +387,28 @@ export function ChatComposer({
     pendingDraftRestoreRef.current = textRef.current;
     Keyboard.dismiss();
     setIsFocused(false);
-    // Always arm a deferred remount — never bump epoch directly. The state
-    // machine (nextStopRemountPhase, driven by the disabled effect below)
-    // proves the Stop lock was observed true before it clears, then remounts
-    // only after that observed lock returns to false. This guarantees the
-    // new TextInput mounts with editable=true instead of transitioning from
-    // editable=false after the SDK's restoreAfterInterrupt (Item 14 E2E gate).
+    // Arm the state machine and clear the completion flag.  The effect
+    // watching [disabled, stopCompleted] transitions armed→settled→idle
+    // after the interrupt round-trip finishes and the parent clears the
+    // disabled lock.  A generation counter prevents a stale completion
+    // from a superseded stop call from triggering a premature remount.
     stopRemountPhaseRef.current = 'armed';
-    void onStop?.();
+    setStopCompleted(false);
+    stopGenerationRef.current += 1;
+    const gen = stopGenerationRef.current;
+    const complete = async () => {
+      try {
+        await onStop?.();
+      } catch {
+        // onStop failures are deliberately swallowed — finally already
+        // signalled stopCompleted with the generation guard.
+      } finally {
+        if (stopGenerationRef.current === gen) {
+          setStopCompleted(true);
+        }
+      }
+    };
+    void complete();
   }
 
   function handleInputLayout(event: LayoutChangeEvent) {

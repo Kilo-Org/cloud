@@ -198,9 +198,9 @@ describe('startRun — profile purpose', () => {
     const entries = [{ model: 'vendor/m', variant: 'xhigh' }];
     vi.mocked(markProfilesRunningForRun).mockRejectedValueOnce(new Error('claim failed'));
 
-    await expect(
-      startRun(env, 'decider', { purpose: 'profile', entries })
-    ).rejects.toThrow('claim failed');
+    await expect(startRun(env, 'decider', { purpose: 'profile', entries })).rejects.toThrow(
+      'claim failed'
+    );
 
     // Run was marked failed via failRunAndDrain
     expect(markRunFailed).toHaveBeenCalledWith(

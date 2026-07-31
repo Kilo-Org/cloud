@@ -338,7 +338,8 @@ async function lockOrganizationMembershipMutation(
 
 export async function addSsoUserToOrganization(
   organizationId: Organization['id'],
-  userId: User['id']
+  userId: User['id'],
+  options?: { isNewUser?: boolean }
 ): Promise<boolean> {
   return db.transaction(async tx => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
@@ -354,7 +355,20 @@ export async function addSsoUserToOrganization(
       .limit(1);
 
     if (removal) return false;
-    return addUserToOrganization(organizationId, userId, 'member', tx);
+    const added = await addUserToOrganization(organizationId, userId, 'member', tx);
+
+    // A brand-new account provisioned through SSO exists only because of the
+    // organization, so it has no standalone personal account. Mirror the
+    // invite-driven signup behavior (acceptOrganizationInvite) and disable it.
+    // Existing users who authenticate through SSO keep their current value.
+    if (added && options?.isNewUser) {
+      await tx
+        .update(kilocode_users)
+        .set({ personal_account_disabled: true })
+        .where(eq(kilocode_users.id, userId));
+    }
+
+    return added;
   });
 }
 

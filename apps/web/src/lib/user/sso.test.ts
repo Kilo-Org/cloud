@@ -106,6 +106,8 @@ describe('processSSOUserLogin', () => {
       'impact-click-123',
       trackingContext
     );
-    expect(mockAddSsoUserToOrganization).toHaveBeenCalledWith('org-local', 'user-workos');
+    expect(mockAddSsoUserToOrganization).toHaveBeenCalledWith('org-local', 'user-workos', {
+      isNewUser: true,
+    });
   });
 });

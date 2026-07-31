@@ -19,7 +19,7 @@ export type ModelOption = {
   pricing?: { prompt?: string; completion?: string };
 };
 
-export type ModelResponse = {
+type ModelResponse = {
   data: {
     id: string;
     name: string;

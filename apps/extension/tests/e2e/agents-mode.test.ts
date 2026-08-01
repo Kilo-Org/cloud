@@ -191,7 +191,7 @@ test('Agents opens a cloud session and streams the transcript', async () => {
 });
 
 test('Agents can send a message on a cloud session', async () => {
-  const { cleanup, getSidePanel, mockResult } = await setupAgentsTest();
+  const { cleanup, getSidePanel } = await setupAgentsTest();
   try {
     const sidePanel = await getSidePanel();
     await navigateToAgentsMode(sidePanel);
@@ -208,11 +208,8 @@ test('Agents can send a message on a cloud session', async () => {
       timeout: 10_000,
     });
 
-    // The cloud-agent SDK sends through tRPC and the mock fixture proves the
-    // transport/UI contract in the surrounding stream assertions. The bundle
-    // can finish streaming before its fire-and-forget mutation reaches the
-    // route callback on slow CI workers, so don't couple this UI test to that
-    // scheduler race.
+    // The submitted prompt appears in the transcript after the composer clears.
+    await expect(sidePanel.getByText('Check the tests')).toBeVisible();
   } finally {
     await cleanup();
   }

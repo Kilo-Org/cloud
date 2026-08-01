@@ -594,6 +594,7 @@ const mockManager = {
   rejectQuestion: vi.fn(),
   respondToPermission: vi.fn(),
   loadOlderMessages: vi.fn(),
+  destroy: vi.fn(),
 };
 
 let storedAtomValues: Record<string, unknown> = {};
@@ -1410,5 +1411,16 @@ describe('agents session view integration', () => {
     const h1 = container.querySelector('h1');
     expect(h1).not.toBeNull();
     expect(h1!.textContent).toBe('Session');
+  });
+
+  // ---- Unmount destroys manager transport ----
+
+  it('calls manager.destroy() on unmount', async () => {
+    const { unmount } = await renderView();
+    expect(mockManager.destroy).not.toHaveBeenCalled();
+
+    unmount();
+    // eslint-disable-next-line vitest/prefer-called-times -- current linter also requires CalledOnce.
+    expect(mockManager.destroy).toHaveBeenCalledOnce();
   });
 });

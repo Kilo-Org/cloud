@@ -71,6 +71,14 @@ export const AgentsSessionView = ({
     void manager.switchSession(kiloSessionId as KiloSessionId);
   }, [kiloSessionId, manager]);
 
+  // Destroy transport on unmount so WS/remote subscriptions close.
+  useEffect(
+    () => () => {
+      manager.destroy();
+    },
+    [manager]
+  );
+
   const handleSend = useCallback(
     async (text: string) => {
       setRetrySucceeded(false);

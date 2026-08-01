@@ -128,9 +128,6 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
       ? undefined
       : { width: natural.width * zoom, height: natural.height * zoom };
 
-  const clamp = (value: number) =>
-    Number.isFinite(value) ? Math.min(Math.max(value, ZOOM_MIN), ZOOM_MAX) : ZOOM_DEFAULT;
-
   // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pinch().
   const pinch = Gesture.Pinch()
     .simultaneousWithExternalGesture(...scrollGestureRefs)
@@ -139,14 +136,19 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
     })
     .onUpdate(e => {
       if (gestureSession.value === session.value) {
-        scale.value = clamp(savedScale.value * e.scale);
+        const next = savedScale.value * e.scale;
+        scale.value = Number.isFinite(next)
+          ? Math.min(Math.max(next, ZOOM_MIN), ZOOM_MAX)
+          : ZOOM_DEFAULT;
       }
     })
     .onEnd(() => {
       if (gestureSession.value !== session.value) {
         return;
       }
-      const next = clamp(scale.value);
+      const next = Number.isFinite(scale.value)
+        ? Math.min(Math.max(scale.value, ZOOM_MIN), ZOOM_MAX)
+        : ZOOM_DEFAULT;
       scale.value = next;
       savedScale.value = next;
       scheduleOnRN(applyZoom, next, gestureSession.value);

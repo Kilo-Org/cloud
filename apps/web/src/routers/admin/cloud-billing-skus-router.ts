@@ -10,6 +10,7 @@ import {
   queryContainerUsageAnalytics,
   type ContainerUsageAnalyticsResult,
 } from '@/lib/cloudflare/container-usage-analytics';
+import { sharedContainerCapacity } from '@/lib/cloudflare/container-capacity';
 import {
   cloud_billing_sku,
   container_usage_interval,
@@ -109,8 +110,6 @@ const usageReconciliationSchema = z
 const BILLING_HEALTH_WINDOW_MS = 24 * 60 * 60 * 1_000;
 const STALE_OPEN_INTERVAL_MS = 15 * 60 * 1_000;
 const PROVIDER_BOUNDARY_PADDING_MS = 5_000;
-const MEBIBYTE_BYTES = 1024 ** 2;
-const MEGABYTE_BYTES = 1_000_000;
 const CAPACITY_CROSS_CHECK_RELATIVE_TOLERANCE = 1e-6;
 const COMPARISON_METHOD =
   'Cloudflare memory and disk byte-seconds are queried with five seconds of boundary tolerance, normalized by configured instance capacity, and compared with accepted meter seconds for each exact meter run. CPU time is included as a secondary usage diagnostic.';
@@ -269,44 +268,6 @@ function providerIdentityForMeterRow(row: {
   };
 }
 
-// Cloud Agent values mirror services/cloud-agent-next/wrangler.jsonc. Gastown
-// uses Cloudflare standard-4, documented as 12 GiB of provisioned memory.
-type ProvisionedCapacity = { memoryBytes: number; diskBytes: number };
-
-function provisionedCapacityForService(service: string): ProvisionedCapacity | null {
-  switch (service) {
-    case 'gastown':
-    case 'cloud-agent-next-sandbox':
-    case 'cloud-agent-next-sandbox-containment':
-      return { memoryBytes: 12_288 * MEBIBYTE_BYTES, diskBytes: 20_000 * MEGABYTE_BYTES };
-    case 'cloud-agent-next-sandbox-small':
-    case 'cloud-agent-next-sandbox-dind':
-    case 'cloud-agent-next-sandbox-small-containment':
-      return { memoryBytes: 6_144 * MEBIBYTE_BYTES, diskBytes: 10_000 * MEGABYTE_BYTES };
-    case 'cloud-agent-next-sandbox-code-review':
-    case 'cloud-agent-next-sandbox-code-review-containment':
-      return { memoryBytes: 4_096 * MEBIBYTE_BYTES, diskBytes: 8_000 * MEGABYTE_BYTES };
-    default:
-      return null;
-  }
-}
-
-function sharedProvisionedCapacity(services: Set<string>): ProvisionedCapacity | null {
-  let shared: ProvisionedCapacity | null = null;
-  for (const service of services) {
-    const capacity = provisionedCapacityForService(service);
-    if (!capacity) return null;
-    if (
-      shared &&
-      (shared.memoryBytes !== capacity.memoryBytes || shared.diskBytes !== capacity.diskBytes)
-    ) {
-      return null;
-    }
-    shared = capacity;
-  }
-  return shared;
-}
-
 function addMeterReconciliationRow(
   rows: Map<string, MeterReconciliationRow>,
   meter: {
@@ -412,7 +373,7 @@ function normalizedReconciliationRows(
       statusDetail = 'Cloudflare returned only part of the required provider data.';
     } else {
       matchedProvider = candidates[0] ?? null;
-      const provisionedCapacity = sharedProvisionedCapacity(meter.services);
+      const provisionedCapacity = sharedContainerCapacity(meter.services);
       if (!provisionedCapacity) {
         status = 'comparison_unavailable';
         statusDetail = 'The recorded service has no single verified provisioned-capacity mapping.';

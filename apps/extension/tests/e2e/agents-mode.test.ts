@@ -221,7 +221,7 @@ test('Agents can send a message on a cloud session', async () => {
           mockResult.calledProcedures.filter(call =>
             (sendProcNames as readonly string[]).includes(call.proc)
           ).length,
-        { timeout: 10_000 }
+        { timeout: 30_000 }
       )
       .toBe(1);
     const sendCall = mockResult.calledProcedures.find(

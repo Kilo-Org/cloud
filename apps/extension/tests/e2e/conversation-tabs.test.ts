@@ -219,7 +219,9 @@ test('inactive conversation completion does not switch the selected conversation
 
     releaseFirstCompletion();
 
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText('Visible request');
+    await expect(sidePanel.getByRole('tab', { selected: true }).last()).toContainText(
+      'Visible request'
+    );
     await expect(sidePanel.getByText('Inactive tab finished.')).toBeHidden();
     await sidePanel.getByRole('tab', { name: /Inactive request/u }).click();
     await expect(sidePanel.getByText('Inactive tab finished.')).toBeVisible();
@@ -277,7 +279,9 @@ test('conversation controls stay tied to the selected conversation', async () =>
     await expect(sidePanel.getByText('First settings reply.')).toBeVisible();
 
     await sidePanel.getByLabel('New conversation').click();
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText('Conversation 2');
+    await expect(sidePanel.getByRole('tab', { selected: true }).last()).toContainText(
+      'Conversation 2'
+    );
     await sidePanel.getByLabel('Target tab').selectOption({ label: 'Second target tab' });
     await selectModelById(sidePanel, 'model-two');
     await sidePanel.getByLabel('Thinking effort').selectOption('high');
@@ -360,7 +364,7 @@ test('conversation mode controls the selected conversation request tools', async
     });
     await sidePanel.reload();
 
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
+    await expect(sidePanel.getByRole('tab', { selected: true }).last()).toContainText(
       'Dangerous saved conversation'
     );
     await sidePanel.getByLabel('Message agent').fill('Use dangerous tools');
@@ -673,8 +677,11 @@ test('history reuses an empty inactive tab when opening a closed conversation', 
     await sidePanel.getByLabel('History').click();
     await sidePanel.getByLabel('Open Restore me').click();
 
-    await expect(sidePanel.getByRole('tab')).toHaveCount(1);
-    await expect(sidePanel.getByRole('tab', { name: /Restore me/u })).toBeVisible();
+    const conversationTabs = sidePanel
+      .getByRole('tablist', { name: 'Conversation tabs' })
+      .getByRole('tab');
+    await expect(conversationTabs).toHaveCount(1);
+    await expect(conversationTabs.filter({ hasText: 'Restore me' })).toBeVisible();
     await expect(sidePanel.getByText('Restore me reply.')).toBeVisible();
   } finally {
     await context.close();

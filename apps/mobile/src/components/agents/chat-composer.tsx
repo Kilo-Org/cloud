@@ -33,7 +33,11 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
-import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
+import {
+  COMPOSER_INPUT_PADDING_HORIZONTAL,
+  resolveComposerTextContentWidth,
+  shouldEnableComposerInputScroll,
+} from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -64,7 +68,6 @@ import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-subm
 const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
 const TEXT_INPUT_VERTICAL_PADDING = 24;
-const TEXT_INPUT_HORIZONTAL_PADDING = 32;
 const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
@@ -200,7 +203,7 @@ export function ChatComposer({
     minHeight: TEXT_INPUT_MIN_HEIGHT,
     maxHeight: TEXT_INPUT_MAX_HEIGHT,
     verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
-    textContentWidth: inputWidth - TEXT_INPUT_HORIZONTAL_PADDING,
+    textContentWidth: resolveComposerTextContentWidth(inputWidth),
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
@@ -577,7 +580,7 @@ export function ChatComposer({
   }
 
   function handleInputLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
+    const nextWidth = Math.max(Math.floor(event.nativeEvent.layout.width), 0);
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
@@ -594,7 +597,7 @@ export function ChatComposer({
     height: measure.height,
     includeFontPadding: false,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
-    paddingHorizontal: 16,
+    paddingHorizontal: COMPOSER_INPUT_PADDING_HORIZONTAL,
     paddingVertical: 12,
     textAlignVertical: 'top',
     width: '100%',

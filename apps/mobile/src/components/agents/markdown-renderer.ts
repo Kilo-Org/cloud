@@ -2,6 +2,7 @@ import { createElement, type ReactNode } from 'react';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
+  type ImageStyle,
   Text,
   type TextStyle,
   View,
@@ -11,6 +12,8 @@ import { Renderer } from 'react-native-marked';
 
 import { openExternalUrl } from '@/lib/external-link';
 
+import { parseHtmlImages } from './markdown-html-image';
+import { MarkdownImage } from './markdown-image';
 import {
   getLinkAccessibilityActions,
   getLinkLongPressHandler,
@@ -53,6 +56,7 @@ export class MarkdownRenderer extends Renderer {
   // as rows/cells grow. A fresh renderer per parse restarts this counter, so
   // the k-th table keeps `md-table-(k-1)` across re-parses regardless of size.
   private tableIndex = 0;
+  private imageIndex = 0;
 
   constructor(palette: MarkdownPalette, selectable: boolean, handlers: MarkdownRendererHandlers) {
     super();
@@ -163,8 +167,36 @@ export class MarkdownRenderer extends Renderer {
     return this.textNode(text, styles);
   }
 
+  // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
+  override image(uri: string, alt?: string, _style?: ImageStyle, title?: string): ReactNode {
+    const key = `md-image-${this.imageIndex}`;
+    this.imageIndex += 1;
+    return createElement(MarkdownImage, {
+      key,
+      uri,
+      alt: alt ?? title ?? '',
+    });
+  }
+
   override html(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(text, styles);
+    const images = typeof text === 'string' ? parseHtmlImages(text) : [];
+    if (images.length === 0) {
+      return this.textNode(text, styles);
+    }
+    const key = `md-html-image-${this.imageIndex}`;
+    this.imageIndex += 1;
+    return createElement(
+      View,
+      { key },
+      images.map((image, index) =>
+        createElement(MarkdownImage, {
+          key: index,
+          uri: image.src,
+          alt: image.alt,
+          aspectRatio: image.aspectRatio,
+        })
+      )
+    );
   }
 
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface

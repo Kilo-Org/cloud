@@ -59,6 +59,9 @@ vi.mock('react-native-svg', () => ({
 vi.mock('./markdown-table', () => ({
   MarkdownTable: 'MarkdownTable',
 }));
+vi.mock('./markdown-image', () => ({
+  MarkdownImage: 'MarkdownImage',
+}));
 vi.mock('./markdown-link', () => ({
   getLinkAccessibilityActions: () => [],
   getLinkLongPressHandler: () => undefined,
@@ -95,6 +98,15 @@ function tableHostKey(
 ): string | null {
   const element = renderer.table(header, rows, emptyStyle, emptyStyle, emptyStyle) as ReactElement;
   return element.key ?? null;
+}
+
+function imageHostKey(renderer: MarkdownRenderer, uri: string): string | null {
+  const element = renderer.image(uri) as ReactElement;
+  return element.key ?? null;
+}
+
+function htmlElement(renderer: MarkdownRenderer, text: string): ReactElement | null {
+  return renderer.html(text) as ReactElement | null;
 }
 
 describe('MarkdownRenderer key stability', () => {
@@ -140,5 +152,44 @@ describe('MarkdownRenderer key stability', () => {
     const largeRows: ReactNode[][][] = [[['1', '2', '3']], [['4', '5', '6']], [['7', '8', '9']]];
     expect(tableHostKey(a, smallHeader, smallRows)).toBe('md-table-0');
     expect(tableHostKey(b, largeHeader, largeRows)).toBe('md-table-0');
+  });
+
+  it('image() host keys are ordinal in call order', async () => {
+    const renderer = await createRenderer();
+    expect(imageHostKey(renderer, 'https://a.com/1.png')).toBe('md-image-0');
+    expect(imageHostKey(renderer, 'https://a.com/2.png')).toBe('md-image-1');
+    expect(imageHostKey(renderer, 'https://a.com/3.png')).toBe('md-image-2');
+  });
+
+  it('image() host key is independent of preceding getKey() consumption', async () => {
+    const a = await createRenderer();
+    const b = await createRenderer();
+    keySequence(a, 2);
+    keySequence(b, 11);
+    expect(imageHostKey(a, 'https://a.com/1.png')).toBe('md-image-0');
+    expect(imageHostKey(b, 'https://a.com/1.png')).toBe('md-image-0');
+  });
+
+  it('html(<img …>) returns element whose child is MarkdownImage host', async () => {
+    const renderer = await createRenderer();
+    const element = htmlElement(renderer, '<img alt="a" src="https://x/a.png">');
+    expect(element).not.toBeNull();
+    if (!element) throw new Error('expected element');
+    expect(element.type).toBe('View');
+    const props = element.props as { children?: ReactNode[] };
+    const children = props.children ?? [];
+    expect(children).toHaveLength(1);
+    const child = children[0];
+    if (!child) throw new Error('expected child');
+    expect((child as ReactElement).type).toBe('MarkdownImage');
+    expect((child as ReactElement).props).toMatchObject({ uri: 'https://x/a.png', alt: 'a' });
+  });
+
+  it('html(comment) returns a Text node (unchanged)', async () => {
+    const renderer = await createRenderer();
+    const element = htmlElement(renderer, '<!-- a comment -->');
+    expect(element).not.toBeNull();
+    if (!element) throw new Error('expected element');
+    expect(element.type).toBe('Text');
   });
 });

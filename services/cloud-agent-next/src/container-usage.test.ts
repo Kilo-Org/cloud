@@ -196,6 +196,9 @@ describe('MeteredSandbox', () => {
           origin: 'cloud-agent',
           container_class: 'SandboxSmallContainment',
           durable_object_id: 'do-id',
+          vcpu: '2',
+          memory_mib: '6144',
+          disk_mb: '10000',
         },
       })
     );
@@ -241,6 +244,9 @@ describe('MeteredSandbox', () => {
         metadata: {
           container_class: 'SandboxDIND',
           durable_object_id: 'do-id',
+          vcpu: '2',
+          memory_mib: '6144',
+          disk_mb: '10000',
           origin: 'cloud-agent',
         },
       })

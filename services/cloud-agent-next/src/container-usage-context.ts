@@ -20,6 +20,22 @@ export const SANDBOX_USAGE_SKUS = {
 } as const;
 
 export type SandboxClassName = keyof typeof SANDBOX_USAGE_SKUS;
+
+// Production values mirror this service's top-level wrangler.jsonc entries and
+// apps/web/src/lib/cloudflare/container-capacity.ts. The parity test reads all three sources.
+// Development intentionally uses different named instance types and does not query Analytics.
+export const SANDBOX_CAPACITIES: Record<
+  SandboxClassName,
+  { vcpu: number; memoryMiB: number; diskMB: number }
+> = {
+  Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
+  SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
+  SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
+  SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
+};
 export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
   sandboxId: SandboxId;
 };

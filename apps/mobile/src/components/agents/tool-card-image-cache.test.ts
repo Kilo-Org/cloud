@@ -116,14 +116,14 @@ describe('cacheToolCardImage', () => {
     });
     expect(expoFileSystemMock.File).toHaveBeenCalled();
     const file = fileInstances[0];
-    expect(file?.filename).toBe('part-1-png');
+    expect(file?.filename).toBe('part-1.png');
     expect(file?.write).toHaveBeenCalledWith('QUJD', { encoding: 'base64' });
-    expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1-png');
+    expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
   });
 
   it('derives jpg for image/jpeg', () => {
     cacheToolCardImage('part-jpg', 'image/jpeg', 'data:image/jpeg;base64,AAA');
-    expect(fileInstances[0]?.filename).toBe('part-jpg-jpg');
+    expect(fileInstances[0]?.filename).toBe('part-jpg.jpg');
   });
 
   it('does not rewrite when the same part id is cached twice (Set dedupe)', () => {
@@ -157,7 +157,7 @@ describe('cacheToolCardImage', () => {
 
     expect(fileInstances[0]?.write).not.toHaveBeenCalled();
     expect(getToolCardImageUri('part-exists')).toBe(
-      'file:///cache/tool-card-images/part-exists-png'
+      'file:///cache/tool-card-images/part-exists.png'
     );
     // Second call must still be deduped by the Set (no second File).
     cacheToolCardImage('part-exists', 'image/png', 'data:image/png;base64,BBB');
@@ -193,7 +193,7 @@ describe('cacheToolCardImage', () => {
     cacheToolCardImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
     expect(fileInstances).toHaveLength(2);
     expect(fileInstances[1]?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
-    expect(getToolCardImageUri('part-fail')).toBe('file:///cache/tool-card-images/part-fail-png');
+    expect(getToolCardImageUri('part-fail')).toBe('file:///cache/tool-card-images/part-fail.png');
   });
 
   it('never throws on invalid input', () => {
@@ -232,7 +232,7 @@ describe('cacheToolAttachment', () => {
     cacheToolAttachment('part-img', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
 
     const file = fileInstances[0];
-    expect(file?.filename).toBe('part-img-png');
+    expect(file?.filename).toBe('part-img.png');
     expect(file?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
   });
 
@@ -264,7 +264,7 @@ describe('cacheToolAttachment', () => {
     const file = fileInstances[0];
     // getSafeCacheFilename({ id: 'part-xss', filename: 'vnd.<script>alert' })
     // mock sanitizes → 'vnd._script_alert'
-    expect(file?.filename).toBe('part-xss-vnd._script_alert');
+    expect(file?.filename).toBe('part-xss.vnd._script_alert');
     expect(file?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
   });
 
@@ -279,7 +279,7 @@ describe('cacheToolAttachment', () => {
     // The mock does not truncate, but the real getSafeCacheFilename bounds
     // to 255 bytes.  This test verifies the code path routes through the safe
     // function instead of raw concatenation.
-    expect(file?.filename).toMatch(/^part-long-/);
+    expect(file?.filename).toMatch(/^part-long\./);
     expect(file?.write).toHaveBeenCalled();
   });
 
@@ -292,9 +292,9 @@ describe('cacheToolAttachment', () => {
     });
 
     expect(fileInstances).toHaveLength(1);
-    expect(fileInstances[0]?.filename).toBe('part-shared-png');
+    expect(fileInstances[0]?.filename).toBe('part-shared.png');
     expect(getToolCardImageUri('part-shared')).toBe(
-      'file:///cache/tool-card-images/part-shared-png'
+      'file:///cache/tool-card-images/part-shared.png'
     );
   });
 });
@@ -304,6 +304,6 @@ describe('useToolCardImageUri', () => {
     expect(typeof useToolCardImageUri).toBe('function');
     expect(getToolCardImageUri('missing')).toBeUndefined();
     cacheToolCardImage('part-hook', 'image/png', 'data:image/png;base64,AAA');
-    expect(getToolCardImageUri('part-hook')).toBe('file:///cache/tool-card-images/part-hook-png');
+    expect(getToolCardImageUri('part-hook')).toBe('file:///cache/tool-card-images/part-hook.png');
   });
 });

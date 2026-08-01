@@ -85,11 +85,19 @@ export function stripDataUrlBase64Prefix(dataUrl: string, mime: string): string 
   return dataUrl.slice(prefix.length);
 }
 
+/** Marker inserted before the extension so `getSafeCacheFilename`-processed
+ *  filenames can be restored to legacy `<partId>.<extension>` naming. */
+const DOT_MARKER = '_DOT_';
+
 function cacheFilenameForAttachment(partId: string, mime: string, filename?: string): string {
   if (filename) {
     return getSafeCacheFilename({ id: partId, filename });
   }
-  return getSafeCacheFilename({ id: partId, filename: extensionForMime(mime) });
+  const safe = getSafeCacheFilename({
+    id: partId,
+    filename: `${DOT_MARKER}${extensionForMime(mime)}`,
+  });
+  return safe.replace(`-${DOT_MARKER}`, '.');
 }
 
 function recordUri(partId: string, uri: string): void {

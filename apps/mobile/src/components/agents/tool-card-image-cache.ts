@@ -89,7 +89,7 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
   if (filename) {
     return getSafeCacheFilename({ id: partId, filename });
   }
-  return `${partId}.${extensionForMime(mime)}`;
+  return getSafeCacheFilename({ id: partId, filename: extensionForMime(mime) });
 }
 
 function recordUri(partId: string, uri: string): void {

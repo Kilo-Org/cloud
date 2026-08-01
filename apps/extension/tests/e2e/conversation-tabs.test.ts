@@ -219,9 +219,11 @@ test('inactive conversation completion does not switch the selected conversation
 
     releaseFirstCompletion();
 
-    await expect(sidePanel.getByRole('tab', { selected: true }).last()).toContainText(
-      'Visible request'
-    );
+    await expect(
+      sidePanel
+        .getByRole('tablist', { name: 'Conversation tabs' })
+        .getByRole('tab', { selected: true })
+    ).toContainText('Visible request');
     await expect(sidePanel.getByText('Inactive tab finished.')).toBeHidden();
     await sidePanel.getByRole('tab', { name: /Inactive request/u }).click();
     await expect(sidePanel.getByText('Inactive tab finished.')).toBeVisible();
@@ -279,9 +281,11 @@ test('conversation controls stay tied to the selected conversation', async () =>
     await expect(sidePanel.getByText('First settings reply.')).toBeVisible();
 
     await sidePanel.getByLabel('New conversation').click();
-    await expect(sidePanel.getByRole('tab', { selected: true }).last()).toContainText(
-      'Conversation 2'
-    );
+    await expect(
+      sidePanel
+        .getByRole('tablist', { name: 'Conversation tabs' })
+        .getByRole('tab', { selected: true })
+    ).toContainText('Conversation 2');
     await sidePanel.getByLabel('Target tab').selectOption({ label: 'Second target tab' });
     await selectModelById(sidePanel, 'model-two');
     await sidePanel.getByLabel('Thinking effort').selectOption('high');
@@ -364,9 +368,11 @@ test('conversation mode controls the selected conversation request tools', async
     });
     await sidePanel.reload();
 
-    await expect(sidePanel.getByRole('tab', { selected: true }).last()).toContainText(
-      'Dangerous saved conversation'
-    );
+    await expect(
+      sidePanel
+        .getByRole('tablist', { name: 'Conversation tabs' })
+        .getByRole('tab', { selected: true })
+    ).toContainText('Dangerous saved conversation');
     await sidePanel.getByLabel('Message agent').fill('Use dangerous tools');
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByText('Dangerous mode reply.')).toBeVisible();

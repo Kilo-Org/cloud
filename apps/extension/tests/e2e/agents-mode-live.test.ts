@@ -169,8 +169,10 @@ test('live local backend: open remote CLI session, send, assert reply, send long
     await composer.fill('What is 2+2? Output only the number.');
     await composer.press('Enter');
 
-    // Wait for the assistant response — use "4" which does NOT appear in the user's prompt text
-    await expect(sidePanel.getByText('4')).toBeVisible({ timeout: 120_000 });
+    // Wait for the assistant response — scope to assistant-only message container
+    await expect(sidePanel.locator('.flex.justify-start').getByText('4')).toBeVisible({
+      timeout: 120_000,
+    });
 
     // ---- Phase 2: Send a long prompt, interrupt, assert recovery ----
     await composer.fill('Write a very detailed explanation of TypeScript generics with examples.');

@@ -5,7 +5,6 @@ import * as z from 'zod';
 import {
   cancelCodingPlanSubscription,
   getAvailableCodingPlanIds,
-  getAssignedCodingPlanApiKey,
   getCodingPlanAvailabilityIntentPlanIds,
   getKeyInventoryCounts,
   requestCodingPlanAvailabilityNotification,
@@ -17,7 +16,10 @@ import {
   CodingPlanQuotaWindowsSchema,
   CodingPlanUsageError,
 } from '@/lib/coding-plans/usage-contract';
-import { getCodingPlanUsage, hasCodingPlanUsageAdapter } from '@/lib/coding-plans/usage';
+import {
+  CodingPlanUsageEligibilityError,
+  getCodingPlanUsageResponse,
+} from '@/lib/coding-plans/usage';
 import {
   listManualCredentialRevocations,
   markCredentialManuallyRevoked,
@@ -31,7 +33,6 @@ import {
   getCodingPlanPrice,
 } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
-import { sentryLogger } from '@/lib/utils.server';
 import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
 import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
@@ -42,9 +43,6 @@ import {
   credit_transactions,
   kilocode_users,
 } from '@kilocode/db/schema';
-
-const logUsageWarning = sentryLogger('coding-plans', 'warning');
-const logUsageError = sentryLogger('coding-plans', 'error');
 
 const CodingPlanIdSchema = z.enum(CODING_PLAN_IDS);
 const CodingPlanProviderIdSchema = UserByokProviderIdSchema;
@@ -224,70 +222,20 @@ export const codingPlansRouter = createTRPCRouter({
     .output(CodingPlanUsageOutputSchema)
     .query(async ({ input, ctx }) => {
       const subscription = await getOwnedSubscription(ctx.user.id, input.subscriptionId);
-      const plan = getCodingPlanPrice(subscription.planId);
-      // Lifecycle sweeps own termination; usage stays visible while the
-      // subscription status is non-terminal, even just past a period deadline.
-      if (
-        !['active', 'past_due'].includes(subscription.status) ||
-        !plan ||
-        subscription.providerId !== plan.providerId ||
-        !hasCodingPlanUsageAdapter(plan.providerId)
-      ) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Coding Plan subscription is not eligible for usage.',
-        });
-      }
-      if (!subscription.keyInventoryId) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Coding Plan usage is unavailable.',
-        });
-      }
-
-      const apiKey = await getAssignedCodingPlanApiKey({
-        inventoryId: subscription.keyInventoryId,
-        userId: ctx.user.id,
-        planId: subscription.planId,
-        providerId: subscription.providerId,
-      });
-      if (!apiKey) {
-        logUsageError('Coding Plan usage credential lookup failed', {
-          subscriptionId: subscription.id,
-        });
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Coding Plan usage is unavailable.',
-        });
-      }
-
-      const usage = await getCodingPlanUsage(plan.providerId, apiKey).catch(error => {
+      try {
+        return await getCodingPlanUsageResponse(ctx.user.id, subscription);
+      } catch (error) {
+        if (error instanceof CodingPlanUsageEligibilityError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
         if (error instanceof CodingPlanUsageError) {
-          logUsageWarning('Coding Plan usage fetch failed', {
-            subscriptionId: subscription.id,
-            providerId: plan.providerId,
-            code: error.code,
-          });
           throw new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
         }
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Coding Plan usage is unavailable.',
         });
-      });
-
-      return {
-        schemaVersion: 1 as const,
-        fetchedAt: usage.fetchedAt,
-        subscription: {
-          id: subscription.id,
-          planId: plan.planId,
-          planName: plan.name,
-          providerId: plan.providerId,
-          providerName: plan.providerName,
-          windows: usage.windows,
-        },
-      };
+      }
     }),
 
   getBillingHistory: baseProcedure

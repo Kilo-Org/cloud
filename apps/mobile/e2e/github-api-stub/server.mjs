@@ -42,6 +42,11 @@ const ts = minutes => {
   return d.toISOString();
 };
 
+// 64x32 solid PNG, inlined so fixture bodies need no asset server and no port substitution.
+const SAMPLE_IMAGE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAIAAAAt/+nTAAAANklEQVR42u3PQQkAAAgEsMt5/XtoBp/CYAWWaV+LgICAgICAgICAgICAgICAgICAgICAgMDVAlyYmMTFPMh1AAAAAElFTkSuQmCC';
+const BROKEN_IMAGE = 'http://127.0.0.1:1/missing.png';
+
 const AVATAR = 'https://avatars.githubusercontent.com/u/1?v=4';
 const author = login => ({ login, avatarUrl: AVATAR });
 const restUser = login => ({
@@ -141,7 +146,19 @@ function buildMixedFixture(idSuffix) {
 
   return {
     title: 'Mixed discussion fixture',
-    body: 'PR body for mixed fixture.',
+    body: [
+      'PR body for mixed fixture.',
+      '',
+      `![markdown image](${SAMPLE_IMAGE})`,
+      '',
+      `<img width="200" height="100" alt="html image" src="${SAMPLE_IMAGE}">`,
+      '',
+      `<img alt="broken image" src="${BROKEN_IMAGE}">`,
+      '',
+      '```',
+      '<img src="https://example.com/not-an-image.png">',
+      '```',
+    ].join('\n'),
     files: stubFiles(),
     threads: [
       {
@@ -292,7 +309,7 @@ function buildMixedFixture(idSuffix) {
         THUMBS_UP: { count: 1, viewerHasReacted: false },
       }),
       conversationComment(db(2003), 'erin', 'Conversation comment at T+3', 3, s),
-      conversationComment(db(2006), 'frank', 'Conversation comment at T+6', 6, s),
+      conversationComment(db(2006), 'frank', `Conversation comment at T+6\n\n![comment image](${SAMPLE_IMAGE})`, 6, s),
     ],
   };
 }

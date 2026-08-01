@@ -106,6 +106,8 @@ Note nextjs reads `GIT_TOKEN_SERVICE_API_URL` from `apps/web/.env.development.lo
 
 Pinned surface only: REST pull/repo/check-runs/statuses/`pulls/{n}/files` (paginated via `page`/`per_page`) plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`.
 
+The `discussion-mixed` fixture body carries a markdown image, an HTML `<img>`, a deliberately unreachable image (`http://127.0.0.1:1/missing.png`) and a fenced code block containing an `<img>` tag, and its third conversation comment (T+6) carries a markdown image. The working images are inline `data:` URIs, so image rendering is verifiable with no network and no asset server.
+
 ## iOS Simulator
 
 The bundle owner claims and builds before dispatch. The start wrapper does both

@@ -85,10 +85,7 @@ export function appendNewSessionPrefill(base: string, params: NewSessionPrefillP
   return `${base}${separator}${query}`;
 }
 
-function getFirstParam(
-  record: Record<string, string | string[] | undefined>,
-  key: string
-): string {
+function getFirstParam(record: Record<string, string | string[] | undefined>, key: string): string {
   const val = record[key];
   if (Array.isArray(val)) {
     return val[0] ?? '';

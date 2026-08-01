@@ -4,11 +4,11 @@ import {
   appendNewSessionPrefill,
   buildContinuePrefillParams,
   describePrefillFallback,
+  type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
   resolvePrefillRepo,
 } from './new-session-prefill';
-import type { NewSessionPrefill } from './new-session-prefill';
 
 vi.mock('lucide-react-native', () => ({
   Bug: 'Bug',
@@ -284,19 +284,31 @@ describe('describePrefillFallback', () => {
   it.each([
     {
       desc: 'both requested, only repos settled',
-      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
+      prefill: {
+        mode: 'code',
+        repo: 'owner/repo',
+        model: 'anthropic/claude-sonnet-4',
+      } satisfies NewSessionPrefill,
       repos: settled,
       models: unsettled,
     },
     {
       desc: 'both requested, only models settled',
-      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
+      prefill: {
+        mode: 'code',
+        repo: 'owner/repo',
+        model: 'anthropic/claude-sonnet-4',
+      } satisfies NewSessionPrefill,
       repos: unsettled,
       models: settled,
     },
     {
       desc: 'both matched',
-      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
+      prefill: {
+        mode: 'code',
+        repo: 'owner/repo',
+        model: 'anthropic/claude-sonnet-4',
+      } satisfies NewSessionPrefill,
       repos: matched,
       models: matched,
     },

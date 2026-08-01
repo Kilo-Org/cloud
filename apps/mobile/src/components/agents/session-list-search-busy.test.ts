@@ -38,49 +38,27 @@ describe('selectAwaitingCommit', () => {
 });
 
 describe('selectShowSearchBusy', () => {
-  it('returns true during the debounce window (awaitingCommit true)', () => {
-    // Scenario: user typed "hel" but the debounced query hasn't committed yet
+  it('returns true during the debounce window (typed text not yet committed)', () => {
     expect(
       selectShowSearchBusy({ awaitingCommit: true, isSearching: false, isFetching: false })
     ).toBe(true);
   });
 
-  it('returns true during the first fetch (isSearching, isPending true, isFetching true)', () => {
-    // keepPreviousData has no previous data — isPending + isFetching
+  it('returns true while fetching or refetching (isSearching and isFetching)', () => {
+    // Covers first fetch, refinement under keepPreviousData, same-key retry:
+    // the selector only sees awaitingCommit, isSearching, isFetching.
     expect(
       selectShowSearchBusy({ awaitingCommit: false, isSearching: true, isFetching: true })
     ).toBe(true);
   });
 
-  it('returns true during a refinement fetch with previous data (isFetching, !isPending)', () => {
-    // keepPreviousData has stale results — isPending false, isFetching true
-    expect(
-      selectShowSearchBusy({ awaitingCommit: false, isSearching: true, isFetching: true })
-    ).toBe(true);
-  });
-
-  it('returns false when search is idle (not searching)', () => {
+  it('returns false when search is idle (no awaiting commit, not searching)', () => {
     expect(
       selectShowSearchBusy({ awaitingCommit: false, isSearching: false, isFetching: false })
     ).toBe(false);
   });
 
-  it('returns false on clear-X (not searching, no awaitingCommit)', () => {
-    // On clear, searchQuery becomes '' immediately — isSearching false,
-    // no fetch triggered, awaitingCommit false.
-    expect(
-      selectShowSearchBusy({ awaitingCommit: false, isSearching: false, isFetching: false })
-    ).toBe(false);
-  });
-
-  it('returns true during same-key refetch/retry (isFetching without isPending)', () => {
-    // isPlaceholderData is false here — still covers it via isFetching
-    expect(
-      selectShowSearchBusy({ awaitingCommit: false, isSearching: true, isFetching: true })
-    ).toBe(true);
-  });
-
-  it('returns true when both awaitingCommit and isFetching are true (edge: commit lands mid-debounce)', () => {
+  it('returns true when both awaitingCommit and isFetching are true (mid-debounce edge)', () => {
     expect(
       selectShowSearchBusy({ awaitingCommit: true, isSearching: true, isFetching: true })
     ).toBe(true);

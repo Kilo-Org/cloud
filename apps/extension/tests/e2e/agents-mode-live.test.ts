@@ -164,13 +164,13 @@ test('live local backend: open remote CLI session, send, assert reply, send long
       throw new Error('Remote CLI session is read-only — expected an interactive session');
     }
 
-    // ---- Phase 1: Send a short prompt and assert the assistant replies "ok" ----
+    // ---- Phase 1: Send a short prompt and assert the assistant replies with a distinct response ----
     const composer = sidePanel.locator('#agents-message');
-    await composer.fill('Reply with exactly: ok');
+    await composer.fill('What is 2+2? Output only the number.');
     await composer.press('Enter');
 
-    // Wait for the assistant response (up to 120s for live LLM)
-    await expect(sidePanel.getByText('ok')).toBeVisible({ timeout: 120_000 });
+    // Wait for the assistant response — use "4" which does NOT appear in the user's prompt text
+    await expect(sidePanel.getByText('4')).toBeVisible({ timeout: 120_000 });
 
     // ---- Phase 2: Send a long prompt, interrupt, assert recovery ----
     await composer.fill('Write a very detailed explanation of TypeScript generics with examples.');

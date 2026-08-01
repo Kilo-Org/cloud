@@ -325,7 +325,19 @@ const HistorySessionsSection = ({
   organizationId: string | null;
 }): JSX.Element => {
   const { trpcClient } = useExtensionAgents();
+  const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Debounce search input so we don't request on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(inputValue);
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [inputValue]);
+
   const isSearching = searchQuery.trim().length >= MIN_SEARCH_LENGTH;
 
   const {
@@ -426,11 +438,11 @@ const HistorySessionsSection = ({
           aria-label="Search sessions"
           className="h-8 w-full rounded-md border border-border bg-input-bg pl-7.5 pr-2 type-body text-foreground placeholder:text-foreground-muted outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
           onChange={changeEvent => {
-            setSearchQuery(changeEvent.currentTarget.value);
+            setInputValue(changeEvent.currentTarget.value);
           }}
           placeholder="Search sessions…"
           type="search"
-          value={searchQuery}
+          value={inputValue}
         />
       </div>
 

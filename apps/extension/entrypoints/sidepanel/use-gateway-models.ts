@@ -23,6 +23,7 @@ export const useGatewayModels = ({
   readonly refetchModels: () => Promise<unknown>;
 } => {
   const query = useQuery({
+    enabled: auth.token !== '',
     queryFn: ({ signal }) =>
       fetchKiloGatewayModels({
         apiBaseUrl,

@@ -556,7 +556,7 @@ export const AgentsNewSession = ({
             {modelDropdownOpen ? (
               <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-56 overflow-y-auto rounded-lg border border-border bg-surface-overlay py-1 shadow-lg">
                 {(() => {
-                  if (modelLoadError !== null) {
+                  if (modelLoadError !== undefined) {
                     return (
                       <div className="px-3 py-2">
                         <p className="type-label text-status-red-400">{modelLoadError}</p>
@@ -608,7 +608,7 @@ export const AgentsNewSession = ({
             if (modelDropdownOpen) {
               return null;
             }
-            if (modelLoadError !== null) {
+            if (modelLoadError !== undefined) {
               return (
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="size-3.5 shrink-0 text-status-red-400" />
@@ -650,19 +650,14 @@ export const AgentsNewSession = ({
           {/* Variant picker */}
           {availableVariants.length > 0 ? (
             <div className="relative">
-              <button
-                aria-label="Select thinking effort"
-                className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isSubmitting}
-                onClick={() => {
-                  setModelDropdownOpen(false);
-                }}
-                type="button"
-              >
+              <div className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-within:ring-2 focus-within:ring-brand-primary-ring">
                 <select
                   aria-label="Thinking effort"
-                  className="appearance-none bg-transparent outline-none"
+                  className="appearance-none bg-transparent outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={isSubmitting}
+                  onFocus={() => {
+                    setModelDropdownOpen(false);
+                  }}
                   onChange={changeEvent => {
                     handleVariantSelect(changeEvent.target.value);
                   }}
@@ -675,7 +670,7 @@ export const AgentsNewSession = ({
                     </option>
                   ))}
                 </select>
-              </button>
+              </div>
             </div>
           ) : null}
 

@@ -14,7 +14,7 @@
     "e2e:chrome": "VITE_POSTHOG_API_KEY=e2e-test-key pnpm run build && playwright test -c playwright.config.ts --grep-invert \"firefox build installs\"",
     "e2e:debug": "pnpm run build && pnpm run build:firefox && playwright test -c playwright.config.ts --debug",
     "e2e:firefox": "echo 'Running Firefox extension e2e via Selenium/geckodriver' && tsx tests/e2e/firefox-selenium-e2e.ts",
-    "e2e:local": "eval \"$(pnpm -w dev:status --json | node scripts/resolve-e2e-ports.mjs)\" && EXTENSION_LOCAL_BACKEND_E2E=1 pnpm run build && EXTENSION_LOCAL_BACKEND_E2E=1 playwright test -c playwright.config.ts tests/e2e/local-backend-live.test.ts tests/e2e/agents-mode-live.test.ts",
+    "e2e:local": "E2E_PORTS=\"$(pnpm -s -w dev:status --json | node scripts/resolve-e2e-ports.mjs)\" && eval \"$E2E_PORTS\" && EXTENSION_LOCAL_BACKEND_E2E=1 pnpm run build && EXTENSION_LOCAL_BACKEND_E2E=1 playwright test -c playwright.config.ts tests/e2e/local-backend-live.test.ts tests/e2e/agents-mode-live.test.ts",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox --mv3",
     "typecheck": "tsc --noEmit",

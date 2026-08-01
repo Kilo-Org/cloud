@@ -1,6 +1,6 @@
 /* eslint-disable import/max-dependencies */
 import { storage } from '#imports';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import { normalizeOrganizationId } from '@/src/shared/organization-normalization';
@@ -139,6 +139,7 @@ export const SignedInView = ({
 }): JSX.Element => {
   const [headerBeforeSettings, setHeaderBeforeSettings] = useState<ReactNode>();
   const [mode, setMode] = useState<SidePanelMode>('browser');
+  const userSelectedMode = useRef(false);
   const { organizationOptions, selectOrganization, selectedOrganizationId } =
     useOrganizationCreditAccount(auth.token);
 
@@ -146,13 +147,22 @@ export const SignedInView = ({
   useEffect(() => {
     void (async () => {
       const persisted = await loadSidePanelMode(storage);
-      setMode(persisted);
+      if (!userSelectedMode.current) {
+        setMode(persisted);
+      }
     })();
   }, []);
 
   const handleModeChange = useCallback((nextMode: SidePanelMode) => {
+    userSelectedMode.current = true;
     setMode(nextMode);
-    void saveSidePanelMode(storage, nextMode);
+    void (async () => {
+      try {
+        await saveSidePanelMode(storage, nextMode);
+      } catch {
+        // Persistence is best-effort; mode is already applied locally.
+      }
+    })();
   }, []);
 
   const agentsOrgId = normalizeOrganizationId(selectedOrganizationId);

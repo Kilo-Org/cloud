@@ -1103,9 +1103,8 @@ describe('agents session view integration', () => {
       expect(mockManager.send).toHaveBeenCalled();
     });
 
-    // Force a re-render to confirm banner persists
-    const { container: container2 } = await renderView();
-    expect(container2.textContent).toContain('Message failed to send');
+    // Assert on same container — no fresh mount
+    expect(container.textContent).toContain('Message failed to send');
   });
 
   it('keeps failed-prompt banner when composer send rejects', async () => {
@@ -1136,8 +1135,8 @@ describe('agents session view integration', () => {
       expect(mockManager.send).toHaveBeenCalled();
     });
 
-    const { container: container2 } = await renderView();
-    expect(container2.textContent).toContain('Message failed to send');
+    // Assert on same container — no fresh mount
+    expect(container.textContent).toContain('Message failed to send');
   });
 
   it('reshows failed-prompt banner when a different failed prompt arrives after send', async () => {
@@ -1146,7 +1145,7 @@ describe('agents session view integration', () => {
     storedAtomValues['canSend'] = true;
     storedAtomValues['isStreaming'] = false;
 
-    const { container } = await renderView();
+    const { container, rerender } = await renderView();
     expect(container.textContent).toContain('Message failed to send');
 
     // Send a new message — banner hides
@@ -1163,8 +1162,11 @@ describe('agents session view integration', () => {
 
     // A new failed prompt arrives — banner should reappear
     storedAtomValues['failedPrompt'] = 'another failure';
-    const { container: container2 } = await renderView();
-    expect(container2.textContent).toContain('Message failed to send');
+    const { AgentsSessionView } = await import('./agents-session-view');
+    rerender(h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }));
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Message failed to send');
+    });
   });
 
   // ---- Fix 4: org-aware credits URL in status indicator ----

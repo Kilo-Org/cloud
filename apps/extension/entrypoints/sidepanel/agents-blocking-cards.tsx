@@ -26,6 +26,7 @@ const PermissionCard = ({
       setResponding(true);
       try {
         await onRespond(permission.requestId, response);
+        setResponding(false);
       } catch {
         setError('Failed to respond. Please try again.');
         setResponding(false);
@@ -183,6 +184,7 @@ const QuestionCard = ({
     try {
       const answers = question.questions.map((_unused, index) => [selected[index]!]);
       await onAnswer(question.requestId, answers);
+      setSending(false);
     } catch {
       setError('Failed to submit answer. Please try again.');
       setSending(false);
@@ -194,6 +196,7 @@ const QuestionCard = ({
     setSending(true);
     try {
       await onReject(question.requestId);
+      setSending(false);
     } catch {
       setError('Failed to dismiss. Please try again.');
       setSending(false);
@@ -264,6 +267,7 @@ export const AgentsBlockingCards = ({
     return (
       <div className="shrink-0 border-t border-status-yellow-500/30 bg-status-yellow-500/10 px-4 py-3">
         <QuestionCard
+          key={activeQuestion.requestId}
           onAnswer={onAnswerQuestion}
           onReject={onRejectQuestion}
           question={activeQuestion}
@@ -275,7 +279,11 @@ export const AgentsBlockingCards = ({
   if (activePermission) {
     return (
       <div className="shrink-0 border-t border-status-yellow-500/30 bg-status-yellow-500/10 px-4 py-3">
-        <PermissionCard onRespond={onRespondToPermission} permission={activePermission} />
+        <PermissionCard
+          key={activePermission.requestId}
+          onRespond={onRespondToPermission}
+          permission={activePermission}
+        />
       </div>
     );
   }

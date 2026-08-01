@@ -474,7 +474,6 @@ test('Agents new session shows credits error (402) with Add credits CTA', async 
     const genericError = sidePanel.getByText('Session creation failed');
     try {
       await errorText.waitFor({ timeout: 5000 });
-      await expect(sidePanel.getByRole('link', { name: 'Add credits' })).toBeVisible();
     } catch {
       // If error text not found, check what IS visible
       const foundBack = await backButton.isVisible().catch(() => false);
@@ -485,9 +484,12 @@ test('Agents new session shows credits error (402) with Add credits CTA', async 
           call.proc === 'organizations.cloudAgentNext.prepareSession'
       );
       throw new Error(
-        `Error text not found. Back button visible: ${String(foundBack)}. Generic error visible: ${String(foundGeneric)}. prepareSession calls: ${JSON.stringify(prepareCalls)}. All calls: ${mockResult.calledProcedures.length}`
+        `Credits error text not found. Back button visible: ${String(foundBack)}. Generic error visible: ${String(foundGeneric)}. prepareSession calls: ${JSON.stringify(prepareCalls)}. All calls: ${mockResult.calledProcedures.length}`
       );
     }
+    await expect(sidePanel.getByRole('link', { name: 'Add credits' })).toBeVisible({
+      timeout: 5000,
+    });
   } finally {
     await cleanup();
   }

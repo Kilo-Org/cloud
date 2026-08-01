@@ -153,7 +153,8 @@ test('live local backend: open remote CLI session, send, assert reply, send long
     await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 15_000 });
 
     // Wait for the initial transcript to replace the session-loading skeleton.
-    await expect(sidePanel.getByText('Loading session…')).toBeHidden({ timeout: 30_000 });
+    const composer = sidePanel.locator('#agents-message');
+    await expect(composer).toBeVisible({ timeout: 30_000 });
 
     // The remote CLI session should be interactive (not read-only)
     const isReadOnly = await sidePanel
@@ -170,7 +171,6 @@ test('live local backend: open remote CLI session, send, assert reply, send long
     const assistant4 = sidePanel.locator('.flex.justify-start').filter({ hasText: '4' });
     const countBefore = await assistant4.count();
 
-    const composer = sidePanel.locator('#agents-message');
     await composer.fill('What is 2+2? Output only the number.');
     await composer.press('Enter');
 

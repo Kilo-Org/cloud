@@ -202,6 +202,7 @@ test('Agents can send a message on a cloud session', async () => {
     const composer = sidePanel.locator('#agents-message');
     await composer.fill('Check the tests');
     await composer.press('Enter');
+    await expect(composer).toHaveValue('');
 
     // After stream completes, composer reverts to Send
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({

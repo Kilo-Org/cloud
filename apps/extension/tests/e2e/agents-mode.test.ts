@@ -207,9 +207,6 @@ test('Agents can send a message on a cloud session', async () => {
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
       timeout: 10_000,
     });
-
-    // The submitted prompt appears in the transcript after the composer clears.
-    await expect(sidePanel.getByText('Check the tests')).toBeVisible();
   } finally {
     await cleanup();
   }

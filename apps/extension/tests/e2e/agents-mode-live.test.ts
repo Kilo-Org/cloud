@@ -10,7 +10,7 @@ test.skip(!runLive, 'local backend only');
 test.setTimeout(150_000);
 
 const localBackendUrl = process.env['LOCAL_BACKEND_ORIGIN'] ?? 'http://localhost:3000';
-const localUserEmail = 'fl@fl.fl';
+const localUserEmail = process.env['LOCAL_USER_EMAIL'] ?? 'fl@fl.fl';
 
 // ---------------------------------------------------------------------------
 // Sign-in helper (adapted from local-backend-live.test.ts)

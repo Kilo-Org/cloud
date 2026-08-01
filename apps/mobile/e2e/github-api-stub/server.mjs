@@ -141,7 +141,16 @@ function buildMixedFixture(idSuffix) {
 
   return {
     title: 'Mixed discussion fixture',
-    body: 'PR body for mixed fixture.',
+    body: [
+      'PR body for mixed fixture.',
+      '',
+      '| ColAlpha | ColBeta | ColGamma | ColDelta | ColEpsilon |',
+      '| --- | --- | --- | --- | --- |',
+      '| ZoomCellA1 | ZoomCellB1 | ZoomCellC1 | ZoomCellD1 | ZoomCellE1 |',
+      '| ZoomCellA2 | ZoomCellB2 | ZoomCellC2 | ZoomCellD2 | ZoomCellE2 |',
+      '| ZoomCellA3 | ZoomCellB3 | ZoomCellC3 | ZoomCellD3 | ZoomCellE3 |',
+      '| ZoomCellA4 | ZoomCellB4 | ZoomCellC4 | ZoomCellD4 | ZoomCellE4 |',
+    ].join('\n'),
     files: stubFiles(),
     threads: [
       {

@@ -92,6 +92,11 @@ export async function getCodingPlanUsageResponse(userId: string, subscription: U
       });
       throw error;
     }
+    logError('Coding Plan usage fetch failed unexpectedly', {
+      subscriptionId: subscription.id,
+      providerId: plan.providerId,
+      name: error instanceof Error ? error.name : typeof error,
+    });
     throw new CodingPlanUsageUnavailableError();
   });
 

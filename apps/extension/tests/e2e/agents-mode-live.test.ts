@@ -152,8 +152,8 @@ test('live local backend: open remote CLI session, send, assert reply, send long
     await remoteRow.click();
     await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 15_000 });
 
-    // Wait for transcript to load — at least one message should be visible
-    await sidePanel.waitForTimeout(3000);
+    // Wait for the initial transcript to replace the session-loading skeleton.
+    await expect(sidePanel.getByText('Loading session…')).toBeHidden({ timeout: 30_000 });
 
     // The remote CLI session should be interactive (not read-only)
     const isReadOnly = await sidePanel

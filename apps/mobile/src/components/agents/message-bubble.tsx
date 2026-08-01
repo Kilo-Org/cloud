@@ -105,7 +105,7 @@ export function MessageBubble({
             <View
               accessibilityRole={isQueued ? 'text' : undefined}
               accessibilityLabel={isQueued ? 'Message queued' : undefined}
-              accessible={isQueued ? true : false}
+              accessible={isQueued}
               {...(!isQueued
                 ? {
                     accessibilityElementsHidden: true as const,

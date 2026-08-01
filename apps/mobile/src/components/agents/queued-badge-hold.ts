@@ -1,4 +1,4 @@
-import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
+import { type MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
 
 /**
  * Returns the next held-queued-id set given the previous set, the current
@@ -27,12 +27,10 @@ export function nextHeldQueuedIds(
 
   // Add every queued id we don't yet hold.
   for (const [id, state] of pendingMessages) {
-    if (state?.status !== 'queued') continue;
-    if (prev.has(id)) continue;
-    if (next === null) {
-      next = new Set(prev);
+    if (state.status === 'queued' && !prev.has(id)) {
+      next ??= new Set(prev);
+      next.add(id);
     }
-    next.add(id);
   }
 
   return next ?? prev;

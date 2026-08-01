@@ -63,14 +63,17 @@ describe('MessageBubble queued badge', () => {
       p => typeof p.className === 'string' && p.className.includes(BADGE_CLASS)
     );
     expect(badge).not.toBeNull();
-    expect(badge!.props.accessible).toBe(true);
-    expect(badge!.props.accessibilityRole).toBe('text');
-    expect(badge!.props.accessibilityLabel).toBe('Message queued');
-    expect(badge!.props.accessibilityElementsHidden).toBeUndefined();
-    expect(badge!.props.importantForAccessibility).toBeUndefined();
-    expect(badge!.props.pointerEvents).toBe('auto');
-    expect(typeof badge!.props.className).toBe('string');
-    expect(badge!.props.className).toContain('opacity-100');
+    if (!badge) {
+      throw new Error('expected badge');
+    }
+    expect(badge.props.accessible).toBe(true);
+    expect(badge.props.accessibilityRole).toBe('text');
+    expect(badge.props.accessibilityLabel).toBe('Message queued');
+    expect(badge.props.accessibilityElementsHidden).toBeUndefined();
+    expect(badge.props.importantForAccessibility).toBeUndefined();
+    expect(badge.props.pointerEvents).toBe('auto');
+    expect(typeof badge.props.className).toBe('string');
+    expect(badge.props.className).toContain('opacity-100');
   });
 
   it('renders a held badge slot when holdQueuedSlot is set but deliveryState is absent', async () => {
@@ -82,14 +85,17 @@ describe('MessageBubble queued badge', () => {
       p => typeof p.className === 'string' && p.className.includes(BADGE_CLASS)
     );
     expect(badge).not.toBeNull();
-    expect(badge!.props.accessible).toBe(false);
-    expect(badge!.props.accessibilityRole).toBeUndefined();
-    expect(badge!.props.accessibilityLabel).toBeUndefined();
-    expect(badge!.props.accessibilityElementsHidden).toBe(true);
-    expect(badge!.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(badge!.props.pointerEvents).toBe('none');
-    expect(typeof badge!.props.className).toBe('string');
-    expect(badge!.props.className).toContain('opacity-0');
+    if (!badge) {
+      throw new Error('expected badge');
+    }
+    expect(badge.props.accessible).toBe(false);
+    expect(badge.props.accessibilityRole).toBeUndefined();
+    expect(badge.props.accessibilityLabel).toBeUndefined();
+    expect(badge.props.accessibilityElementsHidden).toBe(true);
+    expect(badge.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(badge.props.pointerEvents).toBe('none');
+    expect(typeof badge.props.className).toBe('string');
+    expect(badge.props.className).toContain('opacity-0');
   });
 
   it('does not render the badge when neither deliveryState nor holdQueuedSlot is set', async () => {
@@ -112,13 +118,16 @@ describe('MessageBubble queued badge', () => {
     );
     expect(queuedBadge).not.toBeNull();
     expect(heldBadge).not.toBeNull();
+    if (!queuedBadge || !heldBadge) {
+      throw new Error('expected badges');
+    }
     // Both render as plain Views with the same structural Tailwind classes
     // (only opacity differs).
     const baseClass = 'flex-row items-center gap-1 self-end pr-1';
-    expect(typeof queuedBadge!.props.className).toBe('string');
-    expect((queuedBadge!.props.className as string).replace(/ opacity-[^\s]+/, '')).toBe(baseClass);
-    expect(typeof heldBadge!.props.className).toBe('string');
-    expect((heldBadge!.props.className as string).replace(/ opacity-[^\s]+/, '')).toBe(baseClass);
+    expect(typeof queuedBadge.props.className).toBe('string');
+    expect((queuedBadge.props.className as string).replace(/ opacity-[^\s]+/, '')).toBe(baseClass);
+    expect(typeof heldBadge.props.className).toBe('string');
+    expect((heldBadge.props.className as string).replace(/ opacity-[^\s]+/, '')).toBe(baseClass);
     // Both contain the Queued text child
     expect(findText(heldBadge, t => t === 'Queued')).toBe(true);
   });
@@ -155,8 +164,11 @@ describe('MessageBubble regressions', () => {
       p => typeof p.className === 'string' && p.className.includes(BADGE_CLASS)
     );
     expect(badge).not.toBeNull();
-    expect(badge!.props.accessible).toBe(false);
-    expect(badge!.props.pointerEvents).toBe('none');
+    if (!badge) {
+      throw new Error('expected badge');
+    }
+    expect(badge.props.accessible).toBe(false);
+    expect(badge.props.pointerEvents).toBe('none');
   });
 
   it('does not render badge when holdQueuedSlot is not set after dequeue', async () => {

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { MarkdownTable } from './markdown-table';
+
+import { type MarkdownPalette } from './markdown-palette';
+
 // Stub native modules that markdown-table.tsx imports at module scope.
 // `useState` returns `true` so the modal renders its children, exposing
 // the close Pressable in the element tree for direct-call assertions.
@@ -27,10 +31,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 
-import { MarkdownTable } from './markdown-table';
-
-import type { MarkdownPalette } from './markdown-palette';
-
 const mockPalette: MarkdownPalette = {
   textColor: '#000000',
   mutedTextColor: '#888888',
@@ -52,22 +52,21 @@ type RenderedElement = {
 
 /** Walk the element tree for a Pressable with accessibilityLabel="Close table". */
 function findClosePressable(element: unknown): RenderedElement | null {
-  if (!element || typeof element !== 'object') return null;
+  if (!element || typeof element !== 'object') {
+    return null;
+  }
   const node = element as RenderedElement;
-  if (
-    node.type === 'Pressable' &&
-    typeof node.props === 'object' &&
-    node.props !== null &&
-    node.props.accessibilityLabel === 'Close table'
-  ) {
+  if (node.type === 'Pressable' && node.props.accessibilityLabel === 'Close table') {
     return node;
   }
-  const children = node.props?.children;
+  const children = node.props.children;
   if (children) {
     const list = Array.isArray(children) ? children : [children];
     for (const child of list) {
       const found = findClosePressable(child);
-      if (found) return found;
+      if (found) {
+        return found;
+      }
     }
   }
   return null;
@@ -75,10 +74,14 @@ function findClosePressable(element: unknown): RenderedElement | null {
 
 describe('MarkdownTable close button', () => {
   it('renders a close Pressable with accessibilityLabel "Close table" and hitSlop 8', () => {
+    // eslint-disable-next-line new-cap
     const element = MarkdownTable({ palette: mockPalette, header, rows });
     const closeButton = findClosePressable(element);
 
     expect(closeButton).not.toBeNull();
+    if (!closeButton) {
+      throw new Error('closeButton should not be null');
+    }
     expect(closeButton.props.accessibilityLabel).toBe('Close table');
     expect(closeButton.props.accessibilityRole).toBe('button');
     expect(closeButton.props.hitSlop).toBe(8);

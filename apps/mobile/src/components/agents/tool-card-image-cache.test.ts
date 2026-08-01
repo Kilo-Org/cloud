@@ -236,6 +236,21 @@ describe('cacheToolAttachment', () => {
     expect(file?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
   });
 
+  it('preserves _DOT_ in the partId, replacing only the appended final -_DOT_ suffix', () => {
+    cacheToolAttachment('part-_DOT_42', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,AAA',
+    });
+
+    const file = fileInstances[0];
+    // partId "part-_DOT_42" + filename "_DOT_png" →
+    //   mock getSafeCacheFilename → "part-_DOT_42-_DOT_png"
+    //   _DOT_ in partId must survive; only final -_DOT_ before ext is replaced →
+    //   "part-_DOT_42.png"
+    expect(file?.filename).toBe('part-_DOT_42.png');
+    expect(file?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+  });
+
   it('deduplicates same part id across cacheToolAttachment calls', () => {
     cacheToolAttachment('part-dup', {
       mime: 'image/png',

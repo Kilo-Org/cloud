@@ -97,7 +97,7 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
     id: partId,
     filename: `${DOT_MARKER}${extensionForMime(mime)}`,
   });
-  return safe.replace(`-${DOT_MARKER}`, '.');
+  return safe.replace(/-_DOT_(?!.*-_DOT_)/, '.');
 }
 
 function recordUri(partId: string, uri: string): void {

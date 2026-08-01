@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeOrganizationId } from './organization-normalization';
 
-describe('normalizeOrganizationId', () => {
+describe('normalizeOrganizationId()', () => {
   it('returns null for undefined', () => {
-    expect(normalizeOrganizationId(undefined)).toBeNull();
+    const undefinedInput: string | undefined = undefined;
+    expect(normalizeOrganizationId(undefinedInput)).toBeNull();
   });
 
   it('returns null for empty string', () => {

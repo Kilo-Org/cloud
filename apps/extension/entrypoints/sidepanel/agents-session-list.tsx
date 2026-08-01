@@ -1,22 +1,23 @@
 /* eslint-disable import/max-dependencies */
-import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import type { JSX } from "react";
-import { AlertTriangle, Bot, History, Plus, Search, WifiOff } from "lucide-react";
-import { useExtensionAgents } from "./agents-provider";
+/* eslint-disable max-lines -- Cohesive list component; splitting Active/History sections would reduce clarity */
+import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import type { JSX } from 'react';
+import { AlertTriangle, Bot, History, Plus, Search, WifiOff } from 'lucide-react';
+import { useExtensionAgents } from './agents-provider';
 
 // ---------------------------------------------------------------------------
 // Pinned query keys — same constants for queries and invalidations
 // ---------------------------------------------------------------------------
 
 const activeSessionsQueryKey = (organizationId: string | null) =>
-  ["agents", "active-sessions", organizationId] as const;
+  ['agents', 'active-sessions', organizationId] as const;
 
 const sessionHistoryQueryKey = (organizationId: string | null) =>
-  ["agents", "session-history", organizationId] as const;
+  ['agents', 'session-history', organizationId] as const;
 
 const sessionSearchQueryKey = (organizationId: string | null, query: string) =>
-  ["agents", "session-search", organizationId, query] as const;
+  ['agents', 'session-search', organizationId, query] as const;
 
 // Exported for focused test coverage.
 export { activeSessionsQueryKey, sessionHistoryQueryKey, sessionSearchQueryKey };
@@ -31,21 +32,21 @@ const ACTIVE_POLL_DISCONNECTED_MS = 10_000;
 // Types
 // ---------------------------------------------------------------------------
 
-type ActiveSessionRow = {
+interface ActiveSessionRow {
   id: string;
   title: string | null;
   status: string | null;
   repository: string | null;
   gitBranch: string | null;
   isCloudAgent: boolean;
-};
+}
 
 /**
  * Maps a typed active session wire row to the row the UI expects.
  * Extracted so tests can assert the `connectionId === 'cloud-agent'`
  * marker and gitUrl/gitBranch/status field access.
  */
-export function mapActiveSessionRow(s: {
+export function mapActiveSessionRow(params: {
   id: string;
   title: string;
   status: string;
@@ -54,35 +55,35 @@ export function mapActiveSessionRow(s: {
   gitBranch?: string;
 }): ActiveSessionRow {
   return {
-    id: s.id,
-    title: s.title ?? null,
-    status: s.status,
-    repository: s.gitUrl ?? null,
-    gitBranch: s.gitBranch ?? null,
-    isCloudAgent: s.connectionId === "cloud-agent",
+    gitBranch: params.gitBranch ?? null,
+    id: params.id,
+    isCloudAgent: params.connectionId === 'cloud-agent',
+    repository: params.gitUrl ?? null,
+    status: params.status,
+    title: params.title ?? null,
   };
 }
 
-type HistorySessionRow = {
+interface HistorySessionRow {
   id: string;
   title: string | null;
   updatedAt: string;
-};
+}
 
 /**
  * Maps a typed history/list wire row (as received from cliSessionsV2.list or
  * cliSessionsV2.search) to the UI row. Extracted so tests can assert the
  * `results`/`cliSessions` field mapping without rendering the component.
  */
-export function mapHistorySessionRow(s: {
+export function mapHistorySessionRow(params: {
   session_id: string;
   title: string | null;
   updated_at: string;
 }): HistorySessionRow {
   return {
-    id: s.session_id,
-    title: s.title,
-    updatedAt: s.updated_at,
+    id: params.session_id,
+    title: params.title,
+    updatedAt: params.updated_at,
   };
 }
 
@@ -91,17 +92,19 @@ export function mapHistorySessionRow(s: {
 // ---------------------------------------------------------------------------
 
 export const sessionStatusBadge = (
-  status: string | null,
+  status: string | null
 ): { label: string; className: string } | null => {
-  if (status === null) return null;
-  const s = status.toLowerCase();
-  if (s === "question" || s === "permission") {
-    return { label: "Needs input", className: "bg-status-yellow-500/15 text-status-yellow-500" };
+  if (status === null) {
+    return null;
   }
-  if (s === "running") {
-    return { label: "Running", className: "bg-status-green-500/15 text-status-green-500" };
+  const lowerStatus = status.toLowerCase();
+  if (lowerStatus === 'question' || lowerStatus === 'permission') {
+    return { className: 'bg-status-yellow-500/15 text-status-yellow-500', label: 'Needs input' };
   }
-  return { label: status, className: "bg-surface-selected text-foreground-muted" };
+  if (lowerStatus === 'running') {
+    return { className: 'bg-status-green-500/15 text-status-green-500', label: 'Running' };
+  }
+  return { className: 'bg-surface-selected text-foreground-muted', label: status };
 };
 
 // ---------------------------------------------------------------------------
@@ -120,8 +123,8 @@ const ActiveSessionsSection = ({
   const [connected, setConnected] = useState(() => userWebConnection.isConnected());
 
   useEffect(() => {
-    const unsubscribe = userWebConnection.onConnectionChange((c: boolean) => {
-      setConnected(c);
+    const unsubscribe = userWebConnection.onConnectionChange((connectedStatus: boolean) => {
+      setConnected(connectedStatus);
     });
     return unsubscribe;
   }, [userWebConnection]);
@@ -129,41 +132,43 @@ const ActiveSessionsSection = ({
   // Subscribe UserWeb events → invalidate active list
   useEffect(() => {
     const eventNames = [
-      "session.created",
-      "session.updated",
-      "session.status.updated",
-      "session.deleted",
+      'session.created',
+      'session.updated',
+      'session.status.updated',
+      'session.deleted',
     ] as const;
 
-    const unsubs = eventNames.map((event) =>
+    const unsubs = eventNames.map(event =>
       userWebConnection.onSessionEvent(event, () => {
         void queryClient.invalidateQueries({ queryKey: activeSessionsQueryKey(organizationId) });
-      }),
+      })
     );
 
     return () => {
-      for (const unsub of unsubs) unsub();
+      for (const unsub of unsubs) {
+        unsub();
+      }
     };
   }, [userWebConnection, queryClient, organizationId]);
 
   const listInput = useMemo(
     () =>
       ({
-        organizationId,
         includeCloudAgentSessions: true,
+        organizationId,
       }) satisfies { organizationId: string | null; includeCloudAgentSessions: boolean },
-    [organizationId],
+    [organizationId]
   );
 
   const { data, error, isError, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: activeSessionsQueryKey(organizationId),
     queryFn: () => trpcClient.activeSessions.list.query(listInput),
+    queryKey: activeSessionsQueryKey(organizationId),
     refetchInterval: connected ? ACTIVE_POLL_CONNECTED_MS : ACTIVE_POLL_DISCONNECTED_MS,
   });
 
   const sessions: ActiveSessionRow[] = useMemo(
-    () => data?.sessions.map((s) => mapActiveSessionRow(s)) ?? [],
-    [data],
+    () => data?.sessions.map(session => mapActiveSessionRow(session)) ?? [],
+    [data]
   );
 
   if (isLoading) {
@@ -191,7 +196,7 @@ const ActiveSessionsSection = ({
             <div className="min-w-0 flex-1">
               <p className="type-label text-status-red-400">Failed to load active sessions</p>
               <p className="type-label mt-0.5 text-foreground-muted">
-                {error instanceof Error ? error.message : "An unexpected error occurred"}
+                {error instanceof Error ? error.message : 'An unexpected error occurred'}
               </p>
             </div>
             <button
@@ -200,7 +205,7 @@ const ActiveSessionsSection = ({
               onClick={() => void refetch()}
               type="button"
             >
-              {isRefetching ? "Retrying…" : "Retry"}
+              {isRefetching ? 'Retrying…' : 'Retry'}
             </button>
           </div>
         </div>
@@ -213,12 +218,12 @@ const ActiveSessionsSection = ({
       <div className="flex items-center gap-2">
         <Bot className="size-4 text-foreground-muted" />
         <span className="type-label text-foreground-muted">Active</span>
-        {!connected ? (
+        {connected ? null : (
           <span className="flex items-center gap-1 rounded-full bg-surface-selected px-1.5 py-0.5 type-label text-foreground-muted">
             <WifiOff className="size-3" />
             Offline
           </span>
-        ) : null}
+        )}
       </div>
       {isError ? (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-raised p-2">
@@ -232,7 +237,7 @@ const ActiveSessionsSection = ({
             onClick={() => void refetch()}
             type="button"
           >
-            {isRefetching ? "Retrying…" : "Retry"}
+            {isRefetching ? 'Retrying…' : 'Retry'}
           </button>
         </div>
       ) : null}
@@ -240,7 +245,7 @@ const ActiveSessionsSection = ({
         <p className="type-label text-foreground-muted pl-6">No active sessions</p>
       ) : (
         <div className="space-y-0.5">
-          {sessions.map((session) => {
+          {sessions.map(session => {
             const badge = sessionStatusBadge(session.status);
             return (
               <button
@@ -253,7 +258,7 @@ const ActiveSessionsSection = ({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-foreground">
-                    {session.title ?? "Unnamed session"}
+                    {session.title ?? 'Unnamed session'}
                   </span>
                   {badge ? (
                     <span
@@ -263,12 +268,12 @@ const ActiveSessionsSection = ({
                     </span>
                   ) : null}
                 </div>
-                {session.repository || session.gitBranch ? (
+                {session.repository === null && session.gitBranch === null ? null : (
                   <div className="mt-0.5 flex items-center gap-1.5 truncate type-label text-foreground-muted">
-                    {session.repository ? <span>{session.repository}</span> : null}
-                    {session.gitBranch ? <span>{session.gitBranch}</span> : null}
+                    {session.repository === null ? null : <span>{session.repository}</span>}
+                    {session.gitBranch === null ? null : <span>{session.gitBranch}</span>}
                   </div>
-                ) : null}
+                )}
                 {session.isCloudAgent ? (
                   <div className="mt-0.5">
                     <span className="rounded-full bg-surface-selected px-1.5 py-0.5 type-label text-foreground-muted">
@@ -294,12 +299,20 @@ const relativeTime = (dateStr: string): string => {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 1) {
+    return 'Just now';
+  }
+  if (diffMin < 60) {
+    return `${diffMin}m ago`;
+  }
   const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 30) return `${diffDays}d ago`;
+  if (diffDays < 30) {
+    return `${diffDays}d ago`;
+  }
   const diffMonths = Math.floor(diffDays / 30);
   return `${diffMonths}mo ago`;
 };
@@ -312,7 +325,7 @@ const HistorySessionsSection = ({
   organizationId: string | null;
 }): JSX.Element => {
   const { trpcClient } = useExtensionAgents();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const isSearching = searchQuery.trim().length >= MIN_SEARCH_LENGTH;
 
   const {
@@ -323,14 +336,14 @@ const HistorySessionsSection = ({
     refetch: searchRefetch,
     isRefetching: isSearchRefetching,
   } = useQuery({
-    queryKey: sessionSearchQueryKey(organizationId, searchQuery.trim()),
+    enabled: isSearching,
     queryFn: () =>
       trpcClient.cliSessionsV2.search.query({
-        search_string: searchQuery.trim(),
         limit: SEARCH_LIMIT,
         organizationId,
+        search_string: searchQuery.trim(),
       }),
-    enabled: isSearching,
+    queryKey: sessionSearchQueryKey(organizationId, searchQuery.trim()),
   });
 
   const {
@@ -344,43 +357,56 @@ const HistorySessionsSection = ({
     refetch: historyRefetch,
     isRefetching: isHistoryRefetching,
   } = useInfiniteQuery({
-    queryKey: sessionHistoryQueryKey(organizationId),
+    enabled: !isSearching,
+    getNextPageParam: lastPage =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC infinite query page shape
+      (lastPage as { nextCursor?: string }).nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) =>
       trpcClient.cliSessionsV2.list.query({
-        limit: HISTORY_PAGE_LIMIT,
-        orderBy: "updated_at",
         includeChildren: false,
+        limit: HISTORY_PAGE_LIMIT,
+        orderBy: 'updated_at',
         organizationId,
-        ...(pageParam ? { cursor: pageParam as string } : {}),
+        ...(pageParam === undefined ? {} : { cursor: pageParam }),
       }),
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    initialPageParam: undefined as string | undefined,
-    enabled: !isSearching,
+    queryKey: sessionHistoryQueryKey(organizationId),
   });
 
+  /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-type-assertion -- tRPC infinite query page type is unknown */
   const allHistoryRows: HistorySessionRow[] = useMemo(
     () =>
       historyData?.pages.flatMap(
-        (page) => page.cliSessions?.map((s) => mapHistorySessionRow(s)) ?? [],
+        page =>
+          (
+            page as {
+              cliSessions?: { session_id: string; title: string | null; updated_at: string }[];
+            }
+          ).cliSessions?.map(session => mapHistorySessionRow(session)) ?? []
       ) ?? [],
-    [historyData],
+    [historyData]
   );
+  /* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-type-assertion */
 
   const searchRows: HistorySessionRow[] = useMemo(
-    () => (searchData ? (searchData.results?.map((s) => mapHistorySessionRow(s)) ?? []) : []),
-    [searchData],
+    () =>
+      searchData ? (searchData.results?.map(session => mapHistorySessionRow(session)) ?? []) : [],
+    [searchData]
   );
 
   const errorMessage =
     (searchError instanceof Error ? searchError.message : undefined) ??
     (historyError instanceof Error ? historyError.message : undefined) ??
-    "Failed to load history";
+    'Failed to load history';
 
   const hasError = isSearching ? isSearchError : isHistoryError;
   const isLoading = isSearching ? isSearchLoading : isHistoryLoading;
   const refetch = () => {
-    if (isSearching) void searchRefetch();
-    else void historyRefetch();
+    if (isSearching) {
+      void searchRefetch();
+    } else {
+      void historyRefetch();
+    }
   };
   const isRefetching = isSearching ? isSearchRefetching : isHistoryRefetching;
   const rows = isSearching ? searchRows : allHistoryRows;
@@ -399,8 +425,8 @@ const HistorySessionsSection = ({
         <input
           aria-label="Search sessions"
           className="h-8 w-full rounded-md border border-border bg-input-bg pl-7.5 pr-2 type-body text-foreground placeholder:text-foreground-muted outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-          onChange={(e) => {
-            setSearchQuery(e.currentTarget.value);
+          onChange={changeEvent => {
+            setSearchQuery(changeEvent.currentTarget.value);
           }}
           placeholder="Search sessions…"
           type="search"
@@ -422,7 +448,7 @@ const HistorySessionsSection = ({
               onClick={refetch}
               type="button"
             >
-              {isRefetching ? "Retrying…" : "Retry"}
+              {isRefetching ? 'Retrying…' : 'Retry'}
             </button>
           </div>
         </div>
@@ -431,8 +457,8 @@ const HistorySessionsSection = ({
       {/* Loading state */}
       {isLoading ? (
         <div className="space-y-2 py-1">
-          {[1, 2, 3].map((i) => (
-            <div className="flex items-center gap-2 px-2 py-1.5" key={i}>
+          {[1, 2, 3].map(idx => (
+            <div className="flex items-center gap-2 px-2 py-1.5" key={idx}>
               <span className="h-3 flex-1 animate-pulse rounded bg-surface-selected" />
               <span className="h-3 w-10 animate-pulse rounded bg-surface-selected" />
             </div>
@@ -445,8 +471,8 @@ const HistorySessionsSection = ({
         <div className="py-3 text-center">
           <p className="type-body text-foreground-muted">
             {isSearching
-              ? "No sessions match your search."
-              : "No sessions yet. Create your first cloud session!"}
+              ? 'No sessions match your search.'
+              : 'No sessions yet. Create your first cloud session!'}
           </p>
         </div>
       ) : null}
@@ -454,7 +480,7 @@ const HistorySessionsSection = ({
       {/* Row list */}
       {!hasError && !isLoading && rows.length > 0 ? (
         <div className="space-y-0.5">
-          {rows.map((session) => (
+          {rows.map(session => (
             <button
               className="w-full rounded-md px-2 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
               key={session.id}
@@ -464,7 +490,7 @@ const HistorySessionsSection = ({
               type="button"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-foreground">{session.title ?? "New session"}</span>
+                <span className="truncate text-foreground">{session.title ?? 'New session'}</span>
                 <span className="shrink-0 type-label text-foreground-muted">
                   {relativeTime(session.updatedAt)}
                 </span>
@@ -484,7 +510,7 @@ const HistorySessionsSection = ({
           }}
           type="button"
         >
-          {isFetchingNextPage ? "Loading…" : "Load more"}
+          {isFetchingNextPage ? 'Loading…' : 'Load more'}
         </button>
       ) : null}
     </div>
@@ -495,6 +521,7 @@ const HistorySessionsSection = ({
 // Session list root
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line max-lines -- Cohesive list component; splitting Active/History sections would reduce clarity
 export const AgentsSessionList = ({
   onNewSession,
   onOpenSession,

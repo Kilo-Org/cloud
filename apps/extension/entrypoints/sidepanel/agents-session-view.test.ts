@@ -1,3 +1,4 @@
+/* eslint-disable capitalized-comments, id-length, jest/max-expects, max-lines, sort-keys */
 // @vitest-environment jsdom
 
 import { createElement as h } from 'react';
@@ -16,7 +17,7 @@ import { AgentsMessageList } from './agents-message-list';
 
 // ---- AgentsMessageList rendering ----
 
-describe('AgentsMessageList', () => {
+describe('agents message list rendering', () => {
   it('renders empty state when no messages', () => {
     const { container } = render(h(AgentsMessageList, { messages: [] }));
     expect(container.textContent).toContain('No messages yet');
@@ -163,7 +164,7 @@ describe('AgentsMessageList', () => {
 
 // ---- AgentsComposer rendering ----
 
-describe('AgentsComposer', () => {
+describe('agents composer rendering', () => {
   it('renders read-only banner when isReadOnly is true', () => {
     const { container } = render(
       h(AgentsComposer, {
@@ -291,6 +292,7 @@ describe('AgentsComposer', () => {
   });
 
   it('handles rejected onSend without unhandled rejection', async () => {
+    // eslint-disable-next-line require-await -- async makes throw a promise rejection
     const rejectingSend = vi.fn(async () => {
       throw new Error('send failed');
     });
@@ -328,6 +330,7 @@ describe('AgentsComposer', () => {
     // Give microtasks time to flush — unhandled rejection would surface here
     await vi.waitFor(() => {
       // No unhandled rejection — test completes without Vitest error
+      // eslint-disable-next-line vitest/prefer-called-once
       expect(rejectingSend).toHaveBeenCalledTimes(1);
     });
   });
@@ -335,9 +338,9 @@ describe('AgentsComposer', () => {
 
 // ---- AgentsBlockingCards rendering ----
 
-describe('AgentsBlockingCards', () => {
-  const asyncNoop = async () => {};
+const asyncNoop = async () => {};
 
+describe('agents blocking cards rendering', () => {
   it('renders nothing when no active question or permission', () => {
     const { container } = render(
       h(AgentsBlockingCards, {
@@ -413,8 +416,9 @@ describe('AgentsBlockingCards', () => {
 
 // ---- PermissionCard error handling (Fix 4) ----
 
-describe('PermissionCard error handling', () => {
+describe('permission card error handling', () => {
   it('shows error and re-enables buttons after a failed respondToPermission', async () => {
+    // eslint-disable-next-line require-await -- async makes throw a promise rejection
     const failingRespond = vi.fn(async () => {
       throw new Error('boom');
     });
@@ -457,8 +461,9 @@ describe('PermissionCard error handling', () => {
 
 // ---- QuestionCard error handling (Fix 4) ----
 
-describe('QuestionCard error handling', () => {
+describe('question card error handling', () => {
   it('shows error and re-enables after a failed answerQuestion', async () => {
+    // eslint-disable-next-line require-await -- async makes throw a promise rejection
     const failingAnswer = vi.fn(async () => {
       throw new Error('boom');
     });
@@ -507,6 +512,7 @@ describe('QuestionCard error handling', () => {
   });
 
   it('shows error and re-enables after a failed rejectQuestion', async () => {
+    // eslint-disable-next-line require-await -- async makes throw a promise rejection
     const failingReject = vi.fn(async () => {
       throw new Error('boom');
     });
@@ -595,27 +601,33 @@ let storedOrganizationId: string | null = null;
 
 const mockGetKiloApiBaseUrl = vi.fn(() => 'https://app.kilocode.com');
 
+// eslint-disable-next-line jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- mock type inference is sufficient; dynamic import changes factory signature
 vi.mock('@/src/shared/auth', () => ({
   getKiloApiBaseUrl: () => mockGetKiloApiBaseUrl(),
 }));
 
+// eslint-disable-next-line jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- mock type inference is sufficient; dynamic import changes factory signature
 vi.mock('./agents-provider', () => ({
   useExtensionAgents: () => ({ manager: mockManager, organizationId: storedOrganizationId }),
 }));
 
+// eslint-disable-next-line jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- mock type inference is sufficient; dynamic import changes factory signature
 vi.mock('jotai', async () => {
   const actual = await vi.importActual('jotai');
   return {
     ...(actual as object),
     useAtomValue: (atom: object) => {
       const label = atomMap.get(atom);
-      if (label !== undefined && label in storedAtomValues) return storedAtomValues[label];
+      if (label !== undefined && label in storedAtomValues) {
+        return storedAtomValues[label];
+      }
       return null;
     },
   };
 });
 
-describe('AgentsSessionView', () => {
+describe('agents session view integration', () => {
+  // eslint-disable-next-line jest/no-hooks -- beforeEach is standard for test setup
   beforeEach(() => {
     vi.clearAllMocks();
     storedOrganizationId = null;
@@ -636,11 +648,13 @@ describe('AgentsSessionView', () => {
       isLoadingOlderMessages: false,
       olderMessagesError: null,
     };
+    /* eslint-disable unicorn/no-useless-undefined -- void-returning mock placValue */
     mockManager.switchSession.mockResolvedValue(undefined);
     mockManager.send.mockResolvedValue(true);
     mockManager.answerQuestion.mockResolvedValue(undefined);
     mockManager.rejectQuestion.mockResolvedValue(undefined);
     mockManager.respondToPermission.mockResolvedValue(undefined);
+    /* eslint-enable unicorn/no-useless-undefined */
   });
 
   async function renderView() {
@@ -723,7 +737,9 @@ describe('AgentsSessionView', () => {
   // ---- Failed prompt Retry ----
 
   it('shows Retrying… state on failed prompt while send is pending', async () => {
+    // eslint-disable-next-line init-declarations -- resolved inside Promise constructor
     let resolveSend!: (value: boolean | PromiseLike<boolean>) => void;
+    // eslint-disable-next-line promise/avoid-new -- Promise is the standard pattern for delayed resolution in tests
     const sendPromise = new Promise<boolean>(resolve => {
       resolveSend = resolve;
     });
@@ -745,7 +761,7 @@ describe('AgentsSessionView', () => {
       expect(updated?.textContent).toBe('Retrying…');
     });
 
-    resolveSend!(true);
+    resolveSend(true);
     await sendPromise;
   });
 
@@ -769,7 +785,7 @@ describe('AgentsSessionView', () => {
       expect(container.textContent).not.toContain('Message failed to send');
     });
 
-    expect(mockManager.clearError).toHaveBeenCalled();
+    expect(mockManager.clearError).toHaveBeenCalledWith();
   });
 
   // ---- Failed prompt retry: false keeps row ----
@@ -801,7 +817,9 @@ describe('AgentsSessionView', () => {
   // ---- Error retry: disabled state (same as switch retry) ----
 
   it('shows Retrying… on error atom Retry while switchSession is pending', async () => {
+    // eslint-disable-next-line init-declarations -- resolved inside Promise constructor
     let resolveSwitch!: (value: void | PromiseLike<void>) => void;
+    // eslint-disable-next-line promise/avoid-new -- Promise is the standard pattern for delayed resolution in tests
     const switchPromise = new Promise<void>(resolve => {
       resolveSwitch = resolve;
     });
@@ -820,7 +838,7 @@ describe('AgentsSessionView', () => {
       expect(updated?.textContent).toBe('Retrying…');
     });
 
-    resolveSwitch!(undefined);
+    resolveSwitch();
     await switchPromise;
   });
 
@@ -940,7 +958,7 @@ describe('AgentsSessionView', () => {
       b => b.textContent === 'Retry'
     );
     // The only Retry button should be the failed-prompt one
-    expect(retryBtns.length).toBe(1);
+    expect(retryBtns).toHaveLength(1);
     // Verify it's the failed-prompt retry (not the status retry)
     expect(container.textContent).toContain('Message failed to send');
   });
@@ -1001,6 +1019,7 @@ describe('AgentsSessionView', () => {
     fireEvent.click(sendBtn!);
 
     expect(mockManager.send.mock.calls.length).toBeGreaterThan(0);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- test validates shape via assertions
     const payload = mockManager.send.mock.calls[0]?.[0]?.payload;
     expect(payload).toBeDefined();
     expect(payload).not.toHaveProperty('variant');
@@ -1079,6 +1098,7 @@ describe('AgentsSessionView', () => {
 
     // Banner should remain visible since send returned false
     await vi.waitFor(() => {
+      // eslint-disable-next-line jest/prefer-called-with -- checking call count not args
       expect(mockManager.send).toHaveBeenCalled();
     });
 
@@ -1111,6 +1131,7 @@ describe('AgentsSessionView', () => {
 
     // Banner should remain visible since send rejected
     await vi.waitFor(() => {
+      // eslint-disable-next-line jest/prefer-called-with -- checking call count not args
       expect(mockManager.send).toHaveBeenCalled();
     });
 
@@ -1263,7 +1284,8 @@ describe('AgentsSessionView', () => {
     let retryBtns = [...container.querySelectorAll('button')].filter(
       b => b.textContent === 'Retry'
     );
-    expect(retryBtns.length).toBe(1); // only the failed-prompt Retry
+    // only the failed-prompt Retry
+    expect(retryBtns).toHaveLength(1);
 
     // Click failed-prompt Retry — succeeds, row hides
     fireEvent.click(retryBtns[0]!);
@@ -1273,7 +1295,7 @@ describe('AgentsSessionView', () => {
 
     // Now status indicator Retry should reappear (retrySucceeded is true)
     retryBtns = [...container.querySelectorAll('button')].filter(b => b.textContent === 'Retry');
-    expect(retryBtns.length).toBe(1);
+    expect(retryBtns).toHaveLength(1);
     expect(container.textContent).toContain('Dismiss');
   });
 
@@ -1292,7 +1314,7 @@ describe('AgentsSessionView', () => {
     const retryBtns = [...container.querySelectorAll('button')].filter(
       b => b.textContent === 'Retry'
     );
-    expect(retryBtns.length).toBe(1);
+    expect(retryBtns).toHaveLength(1);
     expect(container.textContent).toContain('Message failed to send');
   });
 
@@ -1309,7 +1331,8 @@ describe('AgentsSessionView', () => {
     let retryBtns = [...container.querySelectorAll('button')].filter(
       b => b.textContent === 'Retry'
     );
-    expect(retryBtns.length).toBe(1); // only the failed-prompt Retry
+    // only the failed-prompt Retry
+    expect(retryBtns).toHaveLength(1);
 
     // Click failed-prompt Retry — succeeds, row hides
     fireEvent.click(retryBtns[0]!);
@@ -1319,7 +1342,7 @@ describe('AgentsSessionView', () => {
 
     // Now error atom Retry should reappear (retrySucceeded is true)
     retryBtns = [...container.querySelectorAll('button')].filter(b => b.textContent === 'Retry');
-    expect(retryBtns.length).toBe(1);
+    expect(retryBtns).toHaveLength(1);
     expect(container.textContent).toContain('Connection lost');
   });
 
@@ -1335,6 +1358,57 @@ describe('AgentsSessionView', () => {
     const retryBtns = [...container.querySelectorAll('button')].filter(
       b => b.textContent === 'Retry'
     );
-    expect(retryBtns.length).toBe(1);
+    expect(retryBtns).toHaveLength(1);
+  });
+
+  // ---- Regression: empty mode defaults to 'code' ----
+
+  it('defaults mode to code when sessionConfig.mode is empty string', async () => {
+    storedAtomValues['sessionConfig'] = { mode: '', model: 'gpt-4' };
+    storedAtomValues['canSend'] = true;
+    storedAtomValues['isStreaming'] = false;
+
+    const { container } = await renderView();
+
+    const textarea = container.querySelector('textarea');
+    fireEvent.change(textarea!, { target: { value: 'hello' } });
+
+    const sendBtn = [...container.querySelectorAll('button')].find(
+      b => b.textContent === 'Send message'
+    );
+    fireEvent.click(sendBtn!);
+
+    expect(mockManager.send).toHaveBeenCalledWith({
+      payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'gpt-4' },
+    });
+  });
+
+  it('defaults mode to code on failed-prompt retry when sessionConfig.mode is empty string', async () => {
+    storedAtomValues['sessionConfig'] = { mode: '', model: 'gpt-4' };
+    storedAtomValues['failedPrompt'] = 'hello world';
+    storedAtomValues['isStreaming'] = false;
+
+    const { container } = await renderView();
+
+    const retryBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry');
+    fireEvent.click(retryBtn!);
+
+    expect(mockManager.send).toHaveBeenCalledWith({
+      payload: {
+        type: 'prompt',
+        prompt: 'hello world',
+        mode: 'code',
+        model: 'gpt-4',
+      },
+    });
+  });
+
+  it('defaults title to Session when fetchedSessionData.title is empty string', async () => {
+    storedAtomValues['fetchedSessionData'] = { title: '', gitUrl: null, gitBranch: null };
+
+    const { container } = await renderView();
+    const h1 = container.querySelector('h1');
+    expect(h1).not.toBeNull();
+    expect(h1!.textContent).toBe('Session');
   });
 });

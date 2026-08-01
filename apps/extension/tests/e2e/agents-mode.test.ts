@@ -28,7 +28,8 @@ const setupAgentsTest = async (mockOptions?: AgentsFixtureOptions) => {
   // Install default mock before page creation so Settings always appears.
   const mockResult = await mockAgentsApi(context, mockOptions);
 
-  let sidePanel: ReturnType<(typeof context)['newPage']> extends Promise<infer T> ? T : never;
+  // eslint-disable-next-line init-declarations
+  let sidePanel: Awaited<ReturnType<(typeof context)['newPage']>>;
 
   return {
     cleanup: async () => {
@@ -68,7 +69,7 @@ test('Agents mode tab is visible and can switch between modes', async () => {
 
     // Switch to Agents mode
     await navigateToAgentsMode(sidePanel);
-    await expect(sidePanel.getByRole('button', { name: 'New session', exact: true })).toBeVisible();
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible();
     await expect(sidePanel.getByLabel('Message agent')).toBeHidden();
 
     // Switch back to Browser
@@ -85,14 +86,14 @@ test('Agents mode persists active state through side panel reload', async () => 
     const sidePanel = await getSidePanel();
 
     await navigateToAgentsMode(sidePanel);
-    await expect(sidePanel.getByRole('button', { name: 'New session', exact: true })).toBeVisible();
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible();
 
     // Reload — Agents mode must persist
     await sidePanel.reload();
     await expect(sidePanel.getByRole('tab', { name: 'Agents', selected: true })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(sidePanel.getByRole('button', { name: 'New session', exact: true })).toBeVisible({
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible({
       timeout: 10_000,
     });
   } finally {
@@ -209,7 +210,7 @@ test('Agents can send a message on a cloud session', async () => {
 
     // Prove the sendMessage mutation fired with the expected payload shape.
     // Poll to avoid a race: the composer reverts to "Send message" before the
-    // async sendMessage mutation reaches the mock's calledProcedures array.
+    // Async sendMessage mutation reaches the mock's calledProcedures array.
     const sendProcNames = [
       'cloudAgentNext.sendMessage',
       'organizations.cloudAgentNext.sendMessage',
@@ -217,27 +218,27 @@ test('Agents can send a message on a cloud session', async () => {
     await expect
       .poll(
         () =>
-          mockResult.calledProcedures.filter(c =>
-            (sendProcNames as readonly string[]).includes(c.proc)
+          mockResult.calledProcedures.filter(call =>
+            (sendProcNames as readonly string[]).includes(call.proc)
           ).length,
         { timeout: 10_000 }
       )
       .toBe(1);
-    const sendCalls = mockResult.calledProcedures.filter(
-      c =>
-        c.proc === 'cloudAgentNext.sendMessage' ||
-        c.proc === 'organizations.cloudAgentNext.sendMessage'
+    const sendCall = mockResult.calledProcedures.find(
+      call =>
+        call.proc === 'cloudAgentNext.sendMessage' ||
+        call.proc === 'organizations.cloudAgentNext.sendMessage'
     );
-    expect(sendCalls[0]?.input).toMatchObject({
+    expect(sendCall?.input).toMatchObject({
+      autoCommit: true,
       cloudAgentSessionId: 'agent_11111111-1111-4111-8111-111111111111',
+      messageId: expect.any(String),
       payload: {
-        type: 'prompt',
-        prompt: 'Check the tests',
         mode: expect.any(String),
         model: expect.any(String),
+        prompt: 'Check the tests',
+        type: 'prompt',
       },
-      autoCommit: true,
-      messageId: expect.any(String),
     });
   } finally {
     await cleanup();
@@ -268,9 +269,9 @@ test('Agents can interrupt a running cloud session', async () => {
 
     // Prove interruptSession mutation fired
     const interruptCalls = mockResult.calledProcedures.filter(
-      c =>
-        c.proc === 'cloudAgentNext.interruptSession' ||
-        c.proc === 'organizations.cloudAgentNext.interruptSession'
+      call =>
+        call.proc === 'cloudAgentNext.interruptSession' ||
+        call.proc === 'organizations.cloudAgentNext.interruptSession'
     );
     expect(interruptCalls.length).toBe(1);
     expect(interruptCalls[0]?.input).toMatchObject({
@@ -304,14 +305,14 @@ test('Agents cloud session shows question card and can answer', async () => {
 
     // Prove answerQuestion mutation fired
     const answerCalls = mockResult.calledProcedures.filter(
-      c =>
-        c.proc === 'cloudAgentNext.answerQuestion' ||
-        c.proc === 'organizations.cloudAgentNext.answerQuestion'
+      call =>
+        call.proc === 'cloudAgentNext.answerQuestion' ||
+        call.proc === 'organizations.cloudAgentNext.answerQuestion'
     );
     expect(answerCalls.length).toBe(1);
     expect(answerCalls[0]?.input).toMatchObject({
-      sessionId: 'agent_11111111-1111-4111-8111-111111111111',
       questionId: 'q-1',
+      sessionId: 'agent_11111111-1111-4111-8111-111111111111',
     });
   } finally {
     await cleanup();
@@ -339,15 +340,15 @@ test('Agents cloud session shows permission card and can respond', async () => {
 
     // Prove answerPermission mutation fired
     const permCalls = mockResult.calledProcedures.filter(
-      c =>
-        c.proc === 'cloudAgentNext.answerPermission' ||
-        c.proc === 'organizations.cloudAgentNext.answerPermission'
+      call =>
+        call.proc === 'cloudAgentNext.answerPermission' ||
+        call.proc === 'organizations.cloudAgentNext.answerPermission'
     );
     expect(permCalls.length).toBe(1);
     expect(permCalls[0]?.input).toMatchObject({
-      sessionId: 'agent_11111111-1111-4111-8111-111111111111',
       permissionId: 'perm-1',
       response: 'once',
+      sessionId: 'agent_11111111-1111-4111-8111-111111111111',
     });
   } finally {
     await cleanup();
@@ -361,7 +362,8 @@ test('Agents cloud session shows permission card and can respond', async () => {
 test('Agents opens an active remote CLI session and shows interactive controls', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest({
     activeSessions: [DEFAULT_REMOTE_SESSION],
-    historySessions: [], // no null-title history row to cause strict mode in navigateToAgentsMode
+    // No null-title history row to cause strict mode in navigateToAgentsMode.
+    historySessions: [],
   });
   try {
     const sidePanel = await getSidePanel();
@@ -411,7 +413,7 @@ test('Agents new session shows the create form and navigates to the new session 
     await navigateToAgentsMode(sidePanel);
 
     // Click "New session"
-    await sidePanel.getByRole('button', { name: 'New session', exact: true }).click();
+    await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
     await expect(sidePanel.getByText('New Cloud Session')).toBeVisible({ timeout: 10_000 });
 
     // Fill the form
@@ -441,20 +443,20 @@ test('Agents new session shows the create form and navigates to the new session 
 
 test('Agents new session shows credits error (402) with Add credits CTA', async () => {
   const { cleanup, getSidePanel, mockResult } = await setupAgentsTest({
-    prepareSessionStatusCode: 402,
     prepareSessionError: {
       error: {
-        message: 'Insufficient credits',
-        code: -32000,
+        code: -32_000,
         data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+        message: 'Insufficient credits',
       },
     },
+    prepareSessionStatusCode: 402,
   });
   try {
     const sidePanel = await getSidePanel();
     await navigateToAgentsMode(sidePanel);
 
-    await sidePanel.getByRole('button', { name: 'New session', exact: true }).click();
+    await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
     await expect(sidePanel.getByText('New Cloud Session')).toBeVisible({ timeout: 10_000 });
 
     const promptArea = sidePanel.getByLabel('What would you like to do?');
@@ -478,9 +480,9 @@ test('Agents new session shows credits error (402) with Add credits CTA', async 
       const foundBack = await backButton.isVisible().catch(() => false);
       const foundGeneric = await genericError.isVisible().catch(() => false);
       const prepareCalls = mockResult.calledProcedures.filter(
-        c =>
-          c.proc === 'cloudAgentNext.prepareSession' ||
-          c.proc === 'organizations.cloudAgentNext.prepareSession'
+        call =>
+          call.proc === 'cloudAgentNext.prepareSession' ||
+          call.proc === 'organizations.cloudAgentNext.prepareSession'
       );
       throw new Error(
         `Error text not found. Back button visible: ${String(foundBack)}. Generic error visible: ${String(foundGeneric)}. prepareSession calls: ${JSON.stringify(prepareCalls)}. All calls: ${mockResult.calledProcedures.length}`

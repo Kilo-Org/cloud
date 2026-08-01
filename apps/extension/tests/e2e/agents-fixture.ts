@@ -8,28 +8,28 @@ import type { BrowserContext, Page } from '@playwright/test';
 const DEFAULT_ORG_ID = '11111111-1111-4111-8111-111111111111';
 
 export const DEFAULT_CLOUD_SESSION: CloudAgentSessionSeed = {
-  kiloSessionId: 'ses_cloudsession00000000001',
   cloudAgentSessionId: 'agent_11111111-1111-4111-8111-111111111111',
-  title: 'Fix login bug',
-  status: 'running',
-  gitUrl: 'github.com/org/repo',
   gitBranch: 'fix/login',
+  gitUrl: 'github.com/org/repo',
+  kiloSessionId: 'ses_cloudsession00000000001',
   mode: 'code',
   model: 'anthropic/claude-sonnet-4',
+  status: 'running',
+  title: 'Fix login bug',
 };
 
 export const DEFAULT_REMOTE_SESSION: RemoteSessionSeed = {
-  kiloSessionId: 'ses_remotesession00000000002',
-  title: 'Deploy to staging',
-  status: 'idle',
-  gitUrl: 'github.com/org/repo',
   gitBranch: 'main',
+  gitUrl: 'github.com/org/repo',
+  kiloSessionId: 'ses_remotesession00000000002',
+  status: 'idle',
+  title: 'Deploy to staging',
 };
 
 export const DEFAULT_HISTORY_SESSION_1: HistorySessionSeed = {
   sessionId: 'ses_historysession10000000001',
   title: 'Refactor auth module',
-  updatedAt: new Date(Date.now() - 3600_000).toISOString(),
+  updatedAt: new Date(Date.now() - 3_600_000).toISOString(),
 };
 
 export const DEFAULT_HISTORY_SESSION_2: HistorySessionSeed = {
@@ -43,22 +43,22 @@ export const DEFAULT_HISTORY_SESSION_2: HistorySessionSeed = {
 // ---------------------------------------------------------------------------
 
 export interface CloudAgentSessionSeed {
-  kiloSessionId: string;
   cloudAgentSessionId: string;
-  title: string;
-  status: string;
-  gitUrl: string;
   gitBranch: string;
+  gitUrl: string;
+  kiloSessionId: string;
   mode: string;
   model: string;
+  status: string;
+  title: string;
 }
 
 export interface RemoteSessionSeed {
-  kiloSessionId: string;
-  title: string;
-  status: string;
-  gitUrl: string;
   gitBranch: string;
+  gitUrl: string;
+  kiloSessionId: string;
+  status: string;
+  title: string;
 }
 
 export interface HistorySessionSeed {
@@ -68,24 +68,37 @@ export interface HistorySessionSeed {
 }
 
 export interface AgentsFixtureOptions {
-  activeSessions?: (CloudAgentSessionSeed | RemoteSessionSeed)[];
-  historySessions?: HistorySessionSeed[];
   activeListFailuresBeforeSuccess?: number;
-  historyListFailuresBeforeSuccess?: number;
-  getSessionFailuresBeforeSuccess?: number;
-  prepareSessionStatusCode?: number;
-  prepareSessionError?: Record<string, unknown>;
+  activeSessions?: (CloudAgentSessionSeed | RemoteSessionSeed)[];
   cloudAgentWsEvents?: unknown[];
+  getSessionFailuresBeforeSuccess?: number;
+  historyListFailuresBeforeSuccess?: number;
+  historySessions?: HistorySessionSeed[];
   onCloudAgentClientMessage?: (message: unknown) => void;
   onIngestClientMessage?: (message: unknown) => void;
+  prepareSessionError?: Record<string, unknown>;
+  prepareSessionStatusCode?: number;
 }
 
 export interface AgentsFixtureResult {
+  /** Every tRPC procedure dispatched through the mock (name + input). */
+  calledProcedures: { input: unknown; proc: string }[];
   cloudAgentClientMessages: unknown[];
   ingestClientMessages: unknown[];
-  /** Every tRPC procedure dispatched through the mock (name + input). */
-  calledProcedures: { proc: string; input: unknown }[];
 }
+
+// ---------------------------------------------------------------------------
+// Type guards
+// ---------------------------------------------------------------------------
+
+const isCloudAgentSessionSeed = (
+  session: CloudAgentSessionSeed | RemoteSessionSeed
+): session is CloudAgentSessionSeed => 'cloudAgentSessionId' in session;
+
+const isRecordObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const hasStringOptional = (record: Record<string, unknown>, key: string): string | undefined =>
+  typeof record[key] === 'string' ? record[key] : undefined;
 
 // ---------------------------------------------------------------------------
 // URL helpers
@@ -95,7 +108,9 @@ const proceduresFromUrl = (url: string): string | null => {
   try {
     const { pathname } = new URL(url);
     const suffix = pathname.replace('/api/trpc/', '');
-    if (!suffix || suffix === '') return null;
+    if (suffix === '' || suffix.length === 0) {
+      return null;
+    }
     return suffix;
   } catch {
     return null;
@@ -106,7 +121,9 @@ const parseTrpcInput = (url: string): unknown => {
   try {
     const parsed = new URL(url);
     const raw = parsed.searchParams.get('input');
-    if (raw) return JSON.parse(raw);
+    if (raw !== null && raw !== '') {
+      return JSON.parse(raw) as unknown;
+    }
     return undefined;
   } catch {
     return undefined;
@@ -123,11 +140,10 @@ const unwrapTrpcBatchInputs = (raw: unknown, count: number): unknown[] => {
   if (Array.isArray(raw)) {
     return raw;
   }
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    const dict = raw as Record<string, unknown>;
-    const numericKeys = Object.keys(dict).filter(key => /^\d+$/.test(key));
+  if (isRecordObject(raw)) {
+    const numericKeys = Object.keys(raw).filter(key => /^\d+$/.test(key));
     if (numericKeys.length > 0) {
-      return Array.from({ length: count }, (_unused, idx) => dict[String(idx)]);
+      return Array.from({ length: count }, (_unused, idx) => raw[String(idx)]);
     }
   }
   return [raw];
@@ -137,27 +153,40 @@ const unwrapTrpcBatchInputs = (raw: unknown, count: number): unknown[] => {
 // Mock builders
 // ---------------------------------------------------------------------------
 
-const activeSessionFromCloudAgent = (s: CloudAgentSessionSeed) => ({
-  id: s.kiloSessionId,
-  title: s.title,
-  status: s.status,
-  gitUrl: s.gitUrl,
-  gitBranch: s.gitBranch,
+const activeSessionFromCloudAgent = (session: CloudAgentSessionSeed) => ({
   connectionId: 'cloud-agent',
+  gitBranch: session.gitBranch,
+  gitUrl: session.gitUrl,
+  id: session.kiloSessionId,
+  status: session.status,
+  title: session.title,
 });
 
-const activeSessionFromRemote = (s: RemoteSessionSeed) => ({
-  id: s.kiloSessionId,
-  title: s.title,
-  status: s.status,
-  gitUrl: s.gitUrl,
-  gitBranch: s.gitBranch,
+const activeSessionFromRemote = (session: RemoteSessionSeed) => ({
   connectionId: 'cli-connection-1',
+  gitBranch: session.gitBranch,
+  gitUrl: session.gitUrl,
+  id: session.kiloSessionId,
+  status: session.status,
+  title: session.title,
 });
 
-type TrpcResultItem = {
+interface TrpcResultItem {
+  error?: { data: { code: string; httpStatus: number }; message: string };
   result?: { data: unknown };
-  error?: { message: string; data: { code: string; httpStatus: number } };
+}
+
+// ---------------------------------------------------------------------------
+// JSON parse helper for WebSocket messages
+// ---------------------------------------------------------------------------
+
+const parseJsonMessage = (message: unknown): unknown => {
+  const text = typeof message === 'string' ? message : String(message);
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return message;
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -175,7 +204,7 @@ export const mockAgentsApi = async (
   ];
   const cloudAgentClientMessages: unknown[] = [];
   const ingestClientMessages: unknown[] = [];
-  const calledProcedures: { proc: string; input: unknown }[] = [];
+  const calledProcedures: { input: unknown; proc: string }[] = [];
   let activeListFailures = options.activeListFailuresBeforeSuccess ?? 0;
   let historyListFailures = options.historyListFailuresBeforeSuccess ?? 0;
   let getSessionFailures = options.getSessionFailuresBeforeSuccess ?? 0;
@@ -225,13 +254,15 @@ export const mockAgentsApi = async (
           activeListFailures -= 1;
           return {
             error: {
-              message: 'Server error',
               data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+              message: 'Server error',
             },
           };
         }
-        const sessions = activeSessions.map(s =>
-          'cloudAgentSessionId' in s ? activeSessionFromCloudAgent(s) : activeSessionFromRemote(s)
+        const sessions = activeSessions.map(session =>
+          isCloudAgentSessionSeed(session)
+            ? activeSessionFromCloudAgent(session)
+            : activeSessionFromRemote(session)
         );
         return { result: { data: { sessions } } };
       }
@@ -241,18 +272,18 @@ export const mockAgentsApi = async (
           historyListFailures -= 1;
           return {
             error: {
-              message: 'Server error',
               data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+              message: 'Server error',
             },
           };
         }
         return {
           result: {
             data: {
-              cliSessions: historySessions.map(s => ({
-                session_id: s.sessionId,
-                title: s.title,
-                updated_at: s.updatedAt,
+              cliSessions: historySessions.map(histSess => ({
+                session_id: histSess.sessionId,
+                title: histSess.title,
+                updated_at: histSess.updatedAt,
               })),
               nextCursor: null,
             },
@@ -261,20 +292,19 @@ export const mockAgentsApi = async (
       }
 
       if (proc === 'cliSessionsV2.search') {
-        const searchStr =
-          typeof (input as Record<string, unknown> | undefined)?.['search_string'] === 'string'
-            ? ((input as Record<string, unknown>)['search_string'] as string).toLowerCase()
-            : '';
+        const inputRecord = isRecordObject(input) ? input : {};
+        const searchStr = hasStringOptional(inputRecord, 'search_string') ?? '';
+        const term = searchStr.toLowerCase();
         const matching = historySessions.filter(
-          s => s.title?.toLowerCase().includes(searchStr) ?? false
+          histSess => histSess.title?.toLowerCase().includes(term) ?? false
         );
         return {
           result: {
             data: {
-              results: matching.map(s => ({
-                session_id: s.sessionId,
-                title: s.title,
-                updated_at: s.updatedAt,
+              results: matching.map(histSess => ({
+                session_id: histSess.sessionId,
+                title: histSess.title,
+                updated_at: histSess.updatedAt,
               })),
             },
           },
@@ -286,66 +316,65 @@ export const mockAgentsApi = async (
           getSessionFailures -= 1;
           return {
             error: {
-              message: 'Server error',
               data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+              message: 'Server error',
             },
           };
         }
-        const requestedId =
-          typeof (input as Record<string, unknown> | undefined)?.['session_id'] === 'string'
-            ? (input as Record<string, unknown>)['session_id']
-            : '';
+        const inputRecord = isRecordObject(input) ? input : {};
+        const requestedId = hasStringOptional(inputRecord, 'session_id') ?? '';
 
         // Prepared session always resolves with runtime state and
-        // cloud_agent_session_id so the UI treats it as interactive.
+        // Cloud_agent_session_id so the UI treats it as interactive.
         if (requestedId === preparedKiloSessionId && requestedId !== '') {
           return {
             result: {
               data: {
-                session_id: requestedId,
                 cloud_agent_session_id: 'agent_new0000000-0000-4000-8000-000000000001',
-                title: 'Test Session',
-                organization_id: DEFAULT_ORG_ID,
-                git_url: 'github.com/org/repo',
                 git_branch: 'main',
+                git_url: 'github.com/org/repo',
+                organization_id: DEFAULT_ORG_ID,
                 parent_session_id: null,
                 runtimeState: {
+                  githubRepo: 'github.com/org/repo',
+                  initiatedAt: new Date().toISOString(),
                   mode: 'code',
                   model: 'anthropic/claude-sonnet-4',
-                  githubRepo: 'github.com/org/repo',
-                  upstreamBranch: 'main',
-                  initiatedAt: new Date().toISOString(),
                   preparedAt: new Date().toISOString(),
+                  upstreamBranch: 'main',
                 },
+                session_id: requestedId,
+                title: 'Test Session',
                 total_cost_microdollars: 0,
               },
             },
           };
         }
         const cloudSession = activeSessions.find(
-          s => 'cloudAgentSessionId' in s && s.kiloSessionId === requestedId
-        ) as CloudAgentSessionSeed | undefined;
+          (session): session is CloudAgentSessionSeed =>
+            isCloudAgentSessionSeed(session) && session.kiloSessionId === requestedId
+        );
         const runtimeState = cloudSession
           ? {
+              githubRepo: cloudSession.gitUrl,
+              initiatedAt: new Date().toISOString(),
               mode: cloudSession.mode,
               model: cloudSession.model,
-              githubRepo: cloudSession.gitUrl,
-              upstreamBranch: cloudSession.gitBranch,
-              initiatedAt: new Date().toISOString(),
               preparedAt: new Date().toISOString(),
+              upstreamBranch: cloudSession.gitBranch,
             }
           : null;
         return {
           result: {
             data: {
-              session_id: requestedId,
               ...(cloudSession ? { cloud_agent_session_id: cloudSession.cloudAgentSessionId } : {}),
-              title: cloudSession?.title ?? 'Test Session',
-              organization_id: DEFAULT_ORG_ID,
-              git_url: cloudSession?.gitUrl ?? null,
               git_branch: cloudSession?.gitBranch ?? null,
+              git_url: cloudSession?.gitUrl ?? null,
+              organization_id: DEFAULT_ORG_ID,
               parent_session_id: null,
               runtimeState,
+              session_id: requestedId,
+              title: cloudSession?.title ?? 'Test Session',
               total_cost_microdollars: 0,
             },
           },
@@ -356,8 +385,8 @@ export const mockAgentsApi = async (
         return {
           result: {
             data: {
-              kiloSessionId: 'ses_cloudsession00000000001',
               info: { id: 'ses_cloudsession00000000001' },
+              kiloSessionId: 'ses_cloudsession00000000001',
               messages: [],
             },
           },
@@ -368,8 +397,8 @@ export const mockAgentsApi = async (
         return {
           result: {
             data: {
-              kiloSessionId: 'ses_cloudsession00000000001',
               history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+              kiloSessionId: 'ses_cloudsession00000000001',
             },
           },
         };
@@ -390,8 +419,8 @@ export const mockAgentsApi = async (
         return {
           result: {
             data: {
-              repositories: [{ id: 1, name: 'repo', fullName: 'org/repo', private: false }],
               integrationInstalled: true,
+              repositories: [{ fullName: 'org/repo', id: 1, name: 'repo', private: false }],
             },
           },
         };
@@ -415,14 +444,14 @@ export const mockAgentsApi = async (
       const requestUrl = route.request().url();
       const method = route.request().method();
       const procListRaw = proceduresFromUrl(requestUrl);
-      const procList = procListRaw ? procListRaw.split(',') : [];
+      const procList = procListRaw === null ? [] : procListRaw.split(',');
       const isBatch = procList.length > 1;
 
       // Parse inputs: POST body dict/array or GET query param.
       let inputs: unknown[] = [];
       if (method === 'POST') {
         try {
-          const body = route.request().postDataJSON();
+          const body: unknown = route.request().postDataJSON();
           inputs = unwrapTrpcBatchInputs(body, procList.length);
         } catch {
           inputs = [];
@@ -450,9 +479,9 @@ export const mockAgentsApi = async (
           if (statusCode !== undefined) {
             const errorBody = options.prepareSessionError ?? {
               error: {
-                message: 'Insufficient credits',
-                code: -32000,
+                code: -32_000,
                 data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+                message: 'Insufficient credits',
               },
             };
             await route.fulfill({ json: errorBody, status: statusCode });
@@ -506,13 +535,9 @@ export const mockAgentsApi = async (
   // ---- WebSocket: cloud-agent-next ----
   await context.routeWebSocket('wss://cloud-agent-next.kilosessions.ai/*', ws => {
     ws.onMessage(message => {
-      try {
-        const parsed = JSON.parse(typeof message === 'string' ? message : message.toString());
-        cloudAgentClientMessages.push(parsed);
-        options.onCloudAgentClientMessage?.(parsed);
-      } catch {
-        cloudAgentClientMessages.push(message);
-      }
+      const parsed = parseJsonMessage(message);
+      cloudAgentClientMessages.push(parsed);
+      options.onCloudAgentClientMessage?.(parsed);
     });
     const events = options.cloudAgentWsEvents ?? buildDefaultCloudAgentStream();
     for (const event of events) {
@@ -523,25 +548,21 @@ export const mockAgentsApi = async (
   // ---- WebSocket: session ingest ----
   await context.routeWebSocket('wss://ingest.kilosessions.ai/api/user/web', ws => {
     ws.onMessage(message => {
-      try {
-        const parsed = JSON.parse(typeof message === 'string' ? message : message.toString());
-        ingestClientMessages.push(parsed);
-        options.onIngestClientMessage?.(parsed);
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          (parsed as Record<string, unknown>)['type'] === 'command'
-        ) {
-          const cmd = parsed as { type: string; id: string; command: string };
-          ws.send(JSON.stringify({ type: 'response', id: cmd.id, result: {} }));
-        }
-      } catch {
-        ingestClientMessages.push(message);
+      const parsed = parseJsonMessage(message);
+      ingestClientMessages.push(parsed);
+      options.onIngestClientMessage?.(parsed);
+      if (
+        isRecordObject(parsed) &&
+        typeof parsed['type'] === 'string' &&
+        parsed['type'] === 'command'
+      ) {
+        const cmdId = typeof parsed['id'] === 'string' ? parsed['id'] : '';
+        ws.send(JSON.stringify({ id: cmdId, result: {}, type: 'response' }));
       }
     });
   });
 
-  return { cloudAgentClientMessages, ingestClientMessages, calledProcedures };
+  return { calledProcedures, cloudAgentClientMessages, ingestClientMessages };
 };
 
 // ---------------------------------------------------------------------------
@@ -554,77 +575,77 @@ const buildDefaultCloudAgentStream = (): Record<string, unknown>[] => {
   _eventCounter = 0;
   const sessionId = 'ses_cloudsession00000000001';
 
-  const ev = (streamEventType: string, data: unknown): Record<string, unknown> => ({
+  const ev = (streamEventType: string, eventData: unknown): Record<string, unknown> => ({
+    data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-1',
     sessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
-    data,
   });
 
   const kilocode = (type: string, properties: unknown): Record<string, unknown> =>
-    ev('kilocode', { type, properties });
+    ev('kilocode', { properties, type });
 
   return [
     kilocode('session.created', { info: { id: sessionId } }),
     kilocode('session.status', { sessionID: sessionId, status: { type: 'busy' } }),
     kilocode('message.updated', {
       info: {
-        id: 'msg-u-1',
-        sessionID: sessionId,
-        role: 'user',
-        time: { created: Date.now() },
         agent: 'build',
-        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        id: 'msg-u-1',
+        model: { modelID: 'claude-sonnet-4', providerID: 'anthropic' },
+        role: 'user',
+        sessionID: sessionId,
+        time: { created: Date.now() },
       },
     }),
     kilocode('message.part.updated', {
       part: {
         id: 'p-u-1',
-        sessionID: sessionId,
         messageID: 'msg-u-1',
-        type: 'text',
+        sessionID: sessionId,
         text: 'Fix the login bug',
+        type: 'text',
       },
     }),
     kilocode('message.updated', {
       info: {
-        id: 'msg-a-1',
-        sessionID: sessionId,
-        role: 'assistant',
-        time: { created: Date.now() },
-        parentID: 'msg-u-1',
-        modelID: 'claude-sonnet-4',
-        providerID: 'anthropic',
-        mode: 'code',
         agent: 'build',
-        path: { cwd: '/', root: '/' },
         cost: 0,
-        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        id: 'msg-a-1',
+        mode: 'code',
+        modelID: 'claude-sonnet-4',
+        parentID: 'msg-u-1',
+        path: { cwd: '/', root: '/' },
+        providerID: 'anthropic',
+        role: 'assistant',
+        sessionID: sessionId,
+        time: { created: Date.now() },
+        tokens: { cache: { read: 0, write: 0 }, input: 0, output: 0, reasoning: 0 },
       },
     }),
     kilocode('message.part.delta', {
-      sessionID: sessionId,
+      delta: 'I found',
+      field: 'text',
       messageID: 'msg-a-1',
       partID: 'p-a-1',
-      field: 'text',
-      delta: 'I found',
+      sessionID: sessionId,
     }),
     kilocode('message.part.delta', {
-      sessionID: sessionId,
+      delta: ' the issue.',
+      field: 'text',
       messageID: 'msg-a-1',
       partID: 'p-a-1',
-      field: 'text',
-      delta: ' the issue.',
+      sessionID: sessionId,
     }),
     kilocode('message.part.updated', {
       part: {
         id: 'p-a-1',
-        sessionID: sessionId,
         messageID: 'msg-a-1',
-        type: 'text',
+        sessionID: sessionId,
         text: 'I found the issue.',
+        type: 'text',
       },
     }),
     ev('complete', { currentBranch: 'main' }),
@@ -639,38 +660,38 @@ export const buildRunningCloudAgentStream = (
   sessionId = 'ses_cloudsession00000000001'
 ): Record<string, unknown>[] => {
   _eventCounter = 0;
-  const ev = (streamEventType: string, data: unknown): Record<string, unknown> => ({
+  const ev = (streamEventType: string, eventData: unknown): Record<string, unknown> => ({
+    data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-1',
     sessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
-    data,
   });
 
   const kilocode = (type: string, properties: unknown): Record<string, unknown> =>
-    ev('kilocode', { type, properties });
+    ev('kilocode', { properties, type });
 
   return [
     kilocode('session.created', { info: { id: sessionId } }),
     kilocode('session.status', { sessionID: sessionId, status: { type: 'busy' } }),
     kilocode('message.updated', {
       info: {
-        id: 'msg-u-run',
-        sessionID: sessionId,
-        role: 'user',
-        time: { created: Date.now() },
         agent: 'build',
-        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        id: 'msg-u-run',
+        model: { modelID: 'claude-sonnet-4', providerID: 'anthropic' },
+        role: 'user',
+        sessionID: sessionId,
+        time: { created: Date.now() },
       },
     }),
     kilocode('message.part.updated', {
       part: {
         id: 'p-u-run',
-        sessionID: sessionId,
         messageID: 'msg-u-run',
-        type: 'text',
+        sessionID: sessionId,
         text: 'Long running task',
+        type: 'text',
       },
     }),
   ];
@@ -680,51 +701,51 @@ export const buildQuestionCloudAgentStream = (
   sessionId = 'ses_cloudsession00000000001'
 ): Record<string, unknown>[] => {
   _eventCounter = 0;
-  const ev = (streamEventType: string, data: unknown): Record<string, unknown> => ({
+  const ev = (streamEventType: string, eventData: unknown): Record<string, unknown> => ({
+    data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-q',
     sessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
-    data,
   });
 
   const kilocode = (type: string, properties: unknown): Record<string, unknown> =>
-    ev('kilocode', { type, properties });
+    ev('kilocode', { properties, type });
 
   return [
     kilocode('session.created', { info: { id: sessionId } }),
     kilocode('session.status', { sessionID: sessionId, status: { type: 'question' } }),
     kilocode('message.updated', {
       info: {
-        id: 'msg-u-q',
-        sessionID: sessionId,
-        role: 'user',
-        time: { created: Date.now() },
         agent: 'build',
-        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        id: 'msg-u-q',
+        model: { modelID: 'claude-sonnet-4', providerID: 'anthropic' },
+        role: 'user',
+        sessionID: sessionId,
+        time: { created: Date.now() },
       },
     }),
     kilocode('message.part.updated', {
       part: {
         id: 'p-u-q',
-        sessionID: sessionId,
         messageID: 'msg-u-q',
-        type: 'text',
+        sessionID: sessionId,
         text: 'Deploy the app',
+        type: 'text',
       },
     }),
     ev('question.asked', {
-      id: 'q-1',
       callID: 'call-q-1',
+      id: 'q-1',
       questions: [
         {
           header: 'Deployment target',
-          question: 'Which environment?',
           options: [
-            { label: 'Staging', description: 'Deploy to staging' },
-            { label: 'Production', description: 'Deploy to production' },
+            { description: 'Deploy to staging', label: 'Staging' },
+            { description: 'Deploy to production', label: 'Production' },
           ],
+          question: 'Which environment?',
         },
       ],
     }),
@@ -736,47 +757,47 @@ export const buildPermissionCloudAgentStream = (
   sessionId = 'ses_cloudsession00000000001'
 ): Record<string, unknown>[] => {
   _eventCounter = 0;
-  const ev = (streamEventType: string, data: unknown): Record<string, unknown> => ({
+  const ev = (streamEventType: string, eventData: unknown): Record<string, unknown> => ({
+    data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-p',
     sessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
-    data,
   });
 
   const kilocode = (type: string, properties: unknown): Record<string, unknown> =>
-    ev('kilocode', { type, properties });
+    ev('kilocode', { properties, type });
 
   return [
     kilocode('session.created', { info: { id: sessionId } }),
     kilocode('session.status', { sessionID: sessionId, status: { type: 'permission' } }),
     kilocode('message.updated', {
       info: {
-        id: 'msg-u-p',
-        sessionID: sessionId,
-        role: 'user',
-        time: { created: Date.now() },
         agent: 'build',
-        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        id: 'msg-u-p',
+        model: { modelID: 'claude-sonnet-4', providerID: 'anthropic' },
+        role: 'user',
+        sessionID: sessionId,
+        time: { created: Date.now() },
       },
     }),
     kilocode('message.part.updated', {
       part: {
         id: 'p-u-p',
-        sessionID: sessionId,
         messageID: 'msg-u-p',
-        type: 'text',
+        sessionID: sessionId,
         text: 'Read the env file',
+        type: 'text',
       },
     }),
     ev('permission.asked', {
-      id: 'perm-1',
-      callID: 'call-p-1',
-      permission: 'read /app/.env.production',
-      patterns: ['/app/.env.production', '/app/.env.*'],
-      metadata: {},
       always: [],
+      callID: 'call-p-1',
+      id: 'perm-1',
+      metadata: {},
+      patterns: ['/app/.env.production', '/app/.env.*'],
+      permission: 'read /app/.env.production',
     }),
     ev('session.status', { sessionID: sessionId, status: { type: 'permission' } }),
   ];
@@ -790,7 +811,7 @@ export const navigateToAgentsMode = async (sidePanel: Page): Promise<void> => {
   const agentsTab = sidePanel.getByRole('tab', { name: 'Agents' });
   await agentsTab.click();
   await sidePanel
-    .getByRole('button', { name: 'New session', exact: true })
+    .getByRole('button', { exact: true, name: 'New session' })
     .waitFor({ state: 'visible', timeout: 15_000 });
   await sidePanel.waitForTimeout(500);
 };

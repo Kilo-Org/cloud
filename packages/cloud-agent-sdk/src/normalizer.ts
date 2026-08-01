@@ -100,7 +100,12 @@ export type ServiceEvent =
       /** Tool call ID that emitted this suggestion, when available. */
       callId?: string | undefined;
     }
-  | { type: 'suggestion.accepted'; requestId: string; index: number; action?: SuggestionAction | undefined }
+  | {
+      type: 'suggestion.accepted';
+      requestId: string;
+      index: number;
+      action?: SuggestionAction | undefined;
+    }
   | { type: 'suggestion.dismissed'; requestId: string }
   | {
       type: 'stopped';
@@ -129,15 +134,17 @@ export type ServiceEvent =
       output?: string | undefined;
       safeError?: string | undefined;
       exitCode?: number | undefined;
-      attempt?: {
-        id: string;
-        triggerMessageId: string;
-        status: 'running' | 'completed' | 'failed';
-        startedAt: number;
-        completedAt?: number | undefined;
-        safeError?: string | undefined;
-        revision: number;
-      } | undefined;
+      attempt?:
+        | {
+            id: string;
+            triggerMessageId: string;
+            status: 'running' | 'completed' | 'failed';
+            startedAt: number;
+            completedAt?: number | undefined;
+            safeError?: string | undefined;
+            revision: number;
+          }
+        | undefined;
       stepSnapshot?: PreparationStepSnapshot | undefined;
     }
   | { type: 'autocommit_started'; messageId: string; message?: string | undefined }

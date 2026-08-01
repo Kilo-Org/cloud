@@ -68,11 +68,13 @@ export type ProcessedMessage = {
 export type SessionInfo = {
   id: string;
   parentID?: string | undefined;
-  model?: {
-    providerID: string;
-    id: string;
-    variant?: string | undefined;
-  } | undefined;
+  model?:
+    | {
+        providerID: string;
+        id: string;
+        variant?: string | undefined;
+      }
+    | undefined;
 };
 
 export type SessionPhase =

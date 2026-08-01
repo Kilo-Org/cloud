@@ -1,19 +1,19 @@
-import { createTRPCClient } from '@trpc/client';
-import {
-  type CloudAgentSessionId,
-  type FetchedSessionData,
-  type JotaiStore,
-  type KiloSessionId,
-  type KiloSdkMessageHistory,
-  type KiloSdkMessageHistoryPage,
-  type ResolvedSession,
-  type SessionManager,
-  type SessionSnapshot,
-  type SessionSnapshotPage,
-  type SessionSnapshotPageOutcome,
-  type UserWebConnection,
-  createBrowserLifecycleHooks,
-  createSessionManager,
+/* eslint-disable max-lines -- factory function assembles all SDK callbacks; splitting would scatter related transport logic across files */
+import type { createTRPCClient } from '@trpc/client';
+import { createBrowserLifecycleHooks, createSessionManager } from '@kilocode/cloud-agent-sdk';
+import type {
+  CloudAgentSessionId,
+  FetchedSessionData,
+  JotaiStore,
+  KiloSessionId,
+  KiloSdkMessageHistory,
+  KiloSdkMessageHistoryPage,
+  ResolvedSession,
+  SessionManager,
+  SessionSnapshot,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
+  UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import type { MobileRouter, inferRouterOutputs } from '@kilocode/trpc/mobile';
 import { getCloudAgentWsUrl } from './cloud-agent-config';
@@ -31,31 +31,40 @@ type TrpcClient = ReturnType<typeof createTRPCClient<MobileRouter>>;
 // Error code extraction — extension-owned copy of the mobile classifier
 // ---------------------------------------------------------------------------
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 /**
  * Walk tRPC error shapes for a code string.
  * Extension-owned copy; mirrors `readFetchSessionErrorCode` from the mobile
  * session-manager so the extension has no dependency on mobile internals.
  */
 export function readFetchSessionErrorCode(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') {
+  if (!isObject(error)) {
     return undefined;
   }
-  const record = error as Record<string, unknown>;
-  const data = record['data'];
-  if (data && typeof data === 'object') {
-    const code = (data as Record<string, unknown>)['code'];
-    if (typeof code === 'string') return code;
-  }
-  const shape = record['shape'];
-  if (shape && typeof shape === 'object') {
-    const shapeData = (shape as Record<string, unknown>)['data'];
-    if (shapeData && typeof shapeData === 'object') {
-      const code = (shapeData as Record<string, unknown>)['code'];
-      if (typeof code === 'string') return code;
+  const { data } = error;
+  if (isObject(data)) {
+    const { code } = data;
+    if (typeof code === 'string') {
+      return code;
     }
   }
-  const top = record['code'];
-  if (typeof top === 'string') return top;
+  const { shape } = error;
+  if (isObject(shape)) {
+    const shapeData = shape['data'];
+    if (isObject(shapeData)) {
+      const { code } = shapeData;
+      if (typeof code === 'string') {
+        return code;
+      }
+    }
+  }
+  const top = error['code'];
+  if (typeof top === 'string') {
+    return top;
+  }
   return undefined;
 }
 
@@ -77,6 +86,7 @@ export async function fetchSessionWithNotFoundRetry(
   let attempt = 0;
   for (;;) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- intentional sequential retry loop
       return await options.query(kiloSessionId);
     } catch (error) {
       if (
@@ -86,14 +96,16 @@ export async function fetchSessionWithNotFoundRetry(
         throw error;
       }
       attempt += 1;
+      // eslint-disable-next-line no-await-in-loop -- intentional sequential retry delay
       await sleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
     }
   }
 }
 
 async function defaultFetchSessionSleep(ms: number): Promise<void> {
+  // eslint-disable-next-line promise/avoid-new -- setTimeout wrapper is the simplest cross-runtime sleep
   await new Promise<void>(resolve => {
-    setTimeout(() => resolve(), ms);
+    setTimeout(resolve, ms);
   });
 }
 
@@ -117,14 +129,15 @@ async function fetchExtensionSessionSnapshotPage(
 ): Promise<SessionSnapshotPageOutcome | null> {
   const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query({
     session_id: kiloSessionId,
-    ...(options.cursor ? { cursor: options.cursor } : {}),
+    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC result shape is server-validated
   const history = result.history as KiloSdkMessageHistory | null;
   if (history === null) {
     return {
-      kind: 'success',
       info: { id: result.kiloSessionId },
+      kind: 'success',
       messages: [],
       nextCursor: null,
       omittedItemCount: 0,
@@ -133,8 +146,9 @@ async function fetchExtensionSessionSnapshotPage(
 
   if (isHistoryPage(history)) {
     return {
-      kind: 'success',
       info: { id: result.kiloSessionId },
+      kind: 'success',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated shape
       messages: history.messages as SessionSnapshotPage['messages'],
       nextCursor: history.nextCursor,
       omittedItemCount: history.omittedItemCount,
@@ -148,7 +162,7 @@ async function fetchExtensionSessionSnapshotPage(
 // Factory
 // ---------------------------------------------------------------------------
 
-type CreateExtensionAgentSessionManagerOptions = {
+interface CreateExtensionAgentSessionManagerOptions {
   store: JotaiStore;
   trpcClient: TrpcClient;
   /** Organization context. `null` = personal, a UUID = that organization. */
@@ -158,7 +172,7 @@ type CreateExtensionAgentSessionManagerOptions = {
   /** Kilo API base URL (injected so tests can provide a test origin). */
   apiBaseUrl: string;
   userWebConnection: UserWebConnection;
-};
+}
 
 /**
  * Create a cloud-agent session manager for the browser extension.
@@ -179,63 +193,124 @@ export function createExtensionAgentSessionManager({
   userWebConnection,
 }: Readonly<CreateExtensionAgentSessionManagerOptions>): SessionManager {
   return createSessionManager({
-    store,
-    websocketBaseUrl: getCloudAgentWsUrl(),
-    lifecycleHooks: createBrowserLifecycleHooks(),
-    userWebConnection,
-
-    // ---- resolveSession ----
-    resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
-      // cliSessionsV2.get first. A failed query propagates — it must NOT
-      // be silently classified as read-only.
-      const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
-      if (session.cloud_agent_session_id) {
-        return {
-          type: 'cloud-agent',
-          kiloSessionId,
-          cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
+    // ---- api (personal/org twins) ----
+    api: {
+      answer: async payload => {
+        const input = {
+          answers: payload.answers,
+          questionId: payload.requestId,
+          sessionId: payload.sessionId,
         };
-      }
-
-      // same-org activeSessions.list
-      const listInput = organizationId ? { organizationId } : { organizationId: null };
-      const active = await trpcClient.activeSessions.list.query(
-        listInput as { organizationId: string | null }
-      );
-      const activeSession = active.sessions.find(s => s.id === kiloSessionId);
-      if (!activeSession) {
-        return { type: 'read-only', kiloSessionId };
-      }
-      return {
-        type: 'remote',
-        kiloSessionId,
-        ...(activeSession.capabilities ? { capabilities: activeSession.capabilities } : {}),
-      };
+        if (organizationId !== null) {
+          await trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
+            { ...input, organizationId },
+            skipBatchOptions
+          );
+          return;
+        }
+        await trpcClient.cloudAgentNext.answerQuestion.mutate(input, skipBatchOptions);
+      },
+      interrupt: async payload => {
+        if (organizationId !== null) {
+          await trpcClient.organizations.cloudAgentNext.interruptSession.mutate(
+            { organizationId, sessionId: payload.sessionId },
+            skipBatchOptions
+          );
+          return;
+        }
+        await trpcClient.cloudAgentNext.interruptSession.mutate(
+          { sessionId: payload.sessionId },
+          skipBatchOptions
+        );
+      },
+      reject: async payload => {
+        const input = {
+          questionId: payload.requestId,
+          sessionId: payload.sessionId,
+        };
+        if (organizationId !== null) {
+          await trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
+            { ...input, organizationId },
+            skipBatchOptions
+          );
+          return;
+        }
+        await trpcClient.cloudAgentNext.rejectQuestion.mutate(input, skipBatchOptions);
+      },
+      respondToPermission: async payload => {
+        const input = {
+          permissionId: payload.requestId,
+          response: payload.response,
+          sessionId: payload.sessionId,
+        };
+        if (organizationId !== null) {
+          await trpcClient.organizations.cloudAgentNext.answerPermission.mutate(
+            { ...input, organizationId },
+            skipBatchOptions
+          );
+          return;
+        }
+        await trpcClient.cloudAgentNext.answerPermission.mutate(input, skipBatchOptions);
+      },
+      send: async input => {
+        const baseInput = {
+          autoCommit: true,
+          cloudAgentSessionId: input.sessionId as string,
+          messageId: input.messageId,
+          payload: input.payload,
+          ...(input.attachments ? { attachments: input.attachments } : {}),
+        };
+        if (organizationId !== null) {
+          await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
+            { ...baseInput, organizationId },
+            skipBatchOptions
+          );
+          return;
+        }
+        await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
+      },
     },
 
-    // ---- getTicket ----
-    getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
-      const token = getToken();
-      const body: Record<string, string> = { cloudAgentSessionId: sessionId };
-      if (organizationId) {
-        body['organizationId'] = organizationId;
-      }
-      const response = await fetch(`${apiBaseUrl}/api/cloud-agent-next/sessions/stream-ticket`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(body),
+    // ---- fetchSession ----
+    fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
+      const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId, {
+        query: id => trpcClient.cliSessionsV2.getWithRuntimeState.query({ session_id: id }),
       });
-      const data = (await response.json()) as { ticket?: string; error?: string };
-      if (!response.ok) {
-        throw new Error(data.error ?? 'Failed to get stream ticket');
-      }
-      if (!data.ticket) {
-        throw new Error('Missing ticket in stream-ticket response');
-      }
-      return data.ticket;
+      const rs = sessionResult.runtimeState;
+      return {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC output type differs from SDK type
+        associatedPr: (sessionResult.associatedPr ?? null) as FetchedSessionData['associatedPr'],
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated branded string
+        cloudAgentSessionId: sessionResult.cloud_agent_session_id as CloudAgentSessionId | null,
+        ...(sessionResult.created_on_platform === null
+          ? {}
+          : { createdOnPlatform: sessionResult.created_on_platform }),
+        gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
+        gitUrl: sessionResult.git_url,
+        initialMessageId: rs?.initialMessageId ?? null,
+        isInitiated: Boolean(rs?.initiatedAt),
+        isPreparingAsync: Boolean(
+          rs !== null &&
+          (rs.preparedAt === undefined || rs.preparedAt === null || rs.preparedAt === 0)
+        ),
+        kiloSessionId,
+        mode: rs?.mode ?? null,
+        model: rs?.model ?? null,
+        needsLegacyPrepare: Boolean(
+          sessionResult.cloud_agent_session_id !== null &&
+          sessionResult.cloud_agent_session_id !== '' &&
+          !rs
+        ),
+        organizationId: sessionResult.organization_id,
+        prompt: rs?.prompt ?? null,
+        repository: rs?.githubRepo ?? null,
+        ...(rs?.runtimeAgents === undefined ? {} : { runtimeAgents: rs.runtimeAgents }),
+        title: sessionResult.title,
+        ...(sessionResult.total_cost_microdollars === null
+          ? {}
+          : { totalCostMicrodollars: sessionResult.total_cost_microdollars }),
+        variant: rs?.variant ?? null,
+      };
     },
 
     // ---- fetchSnapshot ----
@@ -249,9 +324,10 @@ export function createExtensionAgentSessionManager({
       return {
         info: {
           id: snapshotInfo.id ?? sessionData.session_id,
-          ...(parentID != null ? { parentID } : {}),
+          ...(parentID === undefined ? {} : { parentID }),
           ...(snapshotInfo.model ? { model: snapshotInfo.model } : {}),
         },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated shape
         messages: messagesResult.messages as SessionSnapshot['messages'],
       } satisfies SessionSnapshot;
     },
@@ -260,108 +336,35 @@ export function createExtensionAgentSessionManager({
     fetchSnapshotPage: (kiloSessionId, options) =>
       fetchExtensionSessionSnapshotPage(trpcClient, kiloSessionId, options),
 
-    // ---- api (personal/org twins) ----
-    api: {
-      send: async input => {
-        const baseInput = {
-          cloudAgentSessionId: input.sessionId as string,
-          payload: input.payload,
-          autoCommit: true,
-          messageId: input.messageId,
-          ...(input.attachments ? { attachments: input.attachments } : {}),
-        };
-        if (organizationId) {
-          await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
-            { ...baseInput, organizationId },
-            skipBatchOptions
-          );
-          return;
-        }
-        await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
-      },
-      interrupt: async payload => {
-        if (organizationId) {
-          await trpcClient.organizations.cloudAgentNext.interruptSession.mutate(
-            { organizationId, sessionId: payload.sessionId },
-            skipBatchOptions
-          );
-          return;
-        }
-        await trpcClient.cloudAgentNext.interruptSession.mutate(
-          { sessionId: payload.sessionId },
-          skipBatchOptions
-        );
-      },
-      answer: async payload => {
-        const input = {
-          sessionId: payload.sessionId,
-          questionId: payload.requestId,
-          answers: payload.answers,
-        };
-        if (organizationId) {
-          await trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
-            { ...input, organizationId },
-            skipBatchOptions
-          );
-          return;
-        }
-        await trpcClient.cloudAgentNext.answerQuestion.mutate(input, skipBatchOptions);
-      },
-      reject: async payload => {
-        const input = {
-          sessionId: payload.sessionId,
-          questionId: payload.requestId,
-        };
-        if (organizationId) {
-          await trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
-            { ...input, organizationId },
-            skipBatchOptions
-          );
-          return;
-        }
-        await trpcClient.cloudAgentNext.rejectQuestion.mutate(input, skipBatchOptions);
-      },
-      respondToPermission: async payload => {
-        const input = {
-          sessionId: payload.sessionId,
-          permissionId: payload.requestId,
-          response: payload.response,
-        };
-        if (organizationId) {
-          await trpcClient.organizations.cloudAgentNext.answerPermission.mutate(
-            { ...input, organizationId },
-            skipBatchOptions
-          );
-          return;
-        }
-        await trpcClient.cloudAgentNext.answerPermission.mutate(input, skipBatchOptions);
-      },
-    },
-
-    // ---- prepare ----
-    prepare: async input => {
-      // Reject initialPayload with a clear v1 error before any tRPC call.
-      if (input.initialPayload) {
-        throw new Error(
-          'initialPayload is not supported in extension v1 sessions. ' +
-            'Start with a plain text prompt or /command instead.'
-        );
+    // ---- getTicket ----
+    getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
+      const token = getToken();
+      const body: Record<string, string> = { cloudAgentSessionId: sessionId };
+      if (organizationId !== null) {
+        body['organizationId'] = organizationId;
       }
-      const result = organizationId
-        ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate(
-            { ...input, organizationId } as never,
-            skipBatchOptions
-          )
-        : await trpcClient.cloudAgentNext.prepareSession.mutate(input as never, skipBatchOptions);
-      return {
-        cloudAgentSessionId: result.cloudAgentSessionId as CloudAgentSessionId,
-        kiloSessionId: result.kiloSessionId as KiloSessionId,
-      };
+      const response = await fetch(`${apiBaseUrl}/api/cloud-agent-next/sessions/stream-ticket`, {
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token === undefined || token === '' ? {} : { Authorization: `Bearer ${token}` }),
+        },
+        method: 'POST',
+      });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- fetch json is untyped
+      const data = (await response.json()) as { ticket?: string; error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? 'Failed to get stream ticket');
+      }
+      if (data.ticket === undefined) {
+        throw new Error('Missing ticket in stream-ticket response');
+      }
+      return data.ticket;
     },
 
     // ---- initiate ----
     initiate: async input => {
-      if (organizationId) {
+      if (organizationId !== null) {
         await trpcClient.organizations.cloudAgentNext.initiateFromPreparedSession.mutate(
           { cloudAgentSessionId: input.cloudAgentSessionId, organizationId },
           skipBatchOptions
@@ -374,37 +377,67 @@ export function createExtensionAgentSessionManager({
       );
     },
 
-    // ---- fetchSession ----
-    fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
-      const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId, {
-        query: id => trpcClient.cliSessionsV2.getWithRuntimeState.query({ session_id: id }),
-      });
-      const rs = sessionResult.runtimeState;
+    lifecycleHooks: createBrowserLifecycleHooks(),
+
+    // ---- prepare ----
+    prepare: async input => {
+      // Reject initialPayload with a clear v1 error before any tRPC call.
+      if (input.initialPayload) {
+        throw new Error(
+          'initialPayload is not supported in extension v1 sessions. ' +
+            'Start with a plain text prompt or /command instead.'
+        );
+      }
+      const result =
+        organizationId === null
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- SDK input differs from tRPC input
+            await trpcClient.cloudAgentNext.prepareSession.mutate(input as never, skipBatchOptions)
+          : // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- org endpoint adds organizationId
+            await trpcClient.organizations.cloudAgentNext.prepareSession.mutate(
+              // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- org mutation shape differs from SDK input type
+              { ...input, organizationId } as never,
+              skipBatchOptions
+            );
       return {
-        kiloSessionId,
-        cloudAgentSessionId: sessionResult.cloud_agent_session_id as CloudAgentSessionId | null,
-        title: sessionResult.title,
-        organizationId: sessionResult.organization_id,
-        gitUrl: sessionResult.git_url,
-        gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
-        mode: rs?.mode ?? null,
-        model: rs?.model ?? null,
-        variant: rs?.variant ?? null,
-        repository: rs?.githubRepo ?? null,
-        isInitiated: Boolean(rs?.initiatedAt),
-        needsLegacyPrepare: Boolean(sessionResult.cloud_agent_session_id && !rs),
-        isPreparingAsync: Boolean(rs && !rs.preparedAt),
-        prompt: rs?.prompt ?? null,
-        initialMessageId: rs?.initialMessageId ?? null,
-        associatedPr: (sessionResult.associatedPr ?? null) as FetchedSessionData['associatedPr'],
-        ...(rs?.runtimeAgents ? { runtimeAgents: rs.runtimeAgents } : {}),
-        ...(sessionResult.total_cost_microdollars != null
-          ? { totalCostMicrodollars: sessionResult.total_cost_microdollars as number }
-          : {}),
-        ...(sessionResult.created_on_platform != null
-          ? { createdOnPlatform: sessionResult.created_on_platform as string }
-          : {}),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated branded string
+        cloudAgentSessionId: result.cloudAgentSessionId as CloudAgentSessionId,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated branded string
+        kiloSessionId: result.kiloSessionId as KiloSessionId,
       };
     },
+
+    // ---- resolveSession ----
+    resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
+      // CliSessionsV2.get first. A failed query propagates — it must NOT
+      // Be silently classified as read-only.
+      const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+      if (session.cloud_agent_session_id !== null && session.cloud_agent_session_id !== '') {
+        return {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated branded string
+          cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
+          kiloSessionId,
+          type: 'cloud-agent',
+        };
+      }
+
+      // Same-org activeSessions.list
+      const listInput = organizationId === null ? { organizationId: null } : { organizationId };
+      const active = await trpcClient.activeSessions.list.query(
+        listInput as { organizationId: string | null }
+      );
+      const activeSession = active.sessions.find(item => item.id === kiloSessionId);
+      if (!activeSession) {
+        return { kiloSessionId, type: 'read-only' };
+      }
+      return {
+        kiloSessionId,
+        type: 'remote',
+        ...(activeSession.capabilities ? { capabilities: activeSession.capabilities } : {}),
+      };
+    },
+
+    store,
+    userWebConnection,
+    websocketBaseUrl: getCloudAgentWsUrl(),
   });
 }

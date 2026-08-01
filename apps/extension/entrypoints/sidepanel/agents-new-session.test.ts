@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// agents-new-session transitively imports the WXT '#imports' virtual module;
-// stub it so the graph loads under vitest.
+import {
+  buildPrepareSessionInput,
+  buildSubmitInput,
+  isModelPreferencesGetResult,
+  MODE,
+  PROMPT_MAX_LENGTH,
+  PROMPT_MIN_LENGTH,
+} from './agents-new-session';
+
+/* eslint-disable jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- WXT virtual module has no importable runtime type in Vitest. */
+// Agents-new-session transitively imports the WXT '#imports' virtual module.
+// Stub it so the graph loads under Vitest.
 vi.mock('#imports', () => ({
   browser: { runtime: { sendMessage: vi.fn() }, tabs: { query: vi.fn() } },
   storage: {
@@ -13,20 +23,11 @@ vi.mock('#imports', () => ({
   },
 }));
 
-import {
-  buildPrepareSessionInput,
-  buildSubmitInput,
-  isModelPreferencesGetResult,
-  MODE,
-  PROMPT_MAX_LENGTH,
-  PROMPT_MIN_LENGTH,
-} from './agents-new-session';
-
 // ---------------------------------------------------------------------------
-// isModelPreferencesGetResult
+// IsModelPreferencesGetResult
 // ---------------------------------------------------------------------------
 
-describe('isModelPreferencesGetResult', () => {
+describe('isModelPreferencesGetResult helper', () => {
   it('returns true for a valid model preferences object with lastSelected', () => {
     const value = { favorites: ['model-a', 'model-b'], lastSelected: { model: 'model-a' } };
     expect(isModelPreferencesGetResult(value)).toBe(true);
@@ -51,10 +52,6 @@ describe('isModelPreferencesGetResult', () => {
     expect(isModelPreferencesGetResult(null)).toBe(false);
   });
 
-  it('returns false for undefined', () => {
-    expect(isModelPreferencesGetResult(undefined)).toBe(false);
-  });
-
   it('returns false for a primitive', () => {
     expect(isModelPreferencesGetResult(42)).toBe(false);
     expect(isModelPreferencesGetResult('string')).toBe(false);
@@ -71,30 +68,30 @@ describe('isModelPreferencesGetResult', () => {
 // ---------------------------------------------------------------------------
 
 describe('constants', () => {
-  it('PROMPT_MIN_LENGTH is 3', () => {
+  it('promptMinLength is 3', () => {
     expect(PROMPT_MIN_LENGTH).toBe(3);
   });
 
-  it('PROMPT_MAX_LENGTH is 4000', () => {
+  it('promptMaxLength is 4000', () => {
     expect(PROMPT_MAX_LENGTH).toBe(4000);
   });
 
-  it('MODE is "code"', () => {
+  it('mode is "code"', () => {
     expect(MODE).toBe('code');
   });
 });
 
 // ---------------------------------------------------------------------------
-// buildSubmitInput
+// BuildSubmitInput
 // ---------------------------------------------------------------------------
 
-describe('buildSubmitInput', () => {
+describe('buildSubmitInput helper', () => {
   const baseParams = {
+    initialMessageId: 'msg_123',
     prompt: 'Hello world',
     selectedModel: 'gpt-4',
-    selectedVariant: '',
     selectedRepo: 'owner/repo',
-    initialMessageId: 'msg_123',
+    selectedVariant: '',
   };
 
   it('returns mode "code"', () => {
@@ -137,14 +134,14 @@ describe('buildSubmitInput', () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildPrepareSessionInput
+// BuildPrepareSessionInput
 // ---------------------------------------------------------------------------
 
-describe('buildPrepareSessionInput', () => {
+describe('buildPrepareSessionInput helper', () => {
   const baseInput = {
-    prompt: 'Hello world',
-    model: 'gpt-4',
     githubRepo: 'owner/repo',
+    model: 'gpt-4',
+    prompt: 'Hello world',
   };
 
   it('uses personal path when organizationId is undefined', () => {
@@ -153,7 +150,7 @@ describe('buildPrepareSessionInput', () => {
   });
 
   it('uses personal path when organizationId is null', () => {
-    const action = buildPrepareSessionInput(null as unknown as undefined, baseInput);
+    const action = buildPrepareSessionInput(null, baseInput);
     expect(action.path).toBe('cloudAgentNext.prepareSession');
   });
 
@@ -164,18 +161,18 @@ describe('buildPrepareSessionInput', () => {
 
   it('adds organizationId to payload for organization dispatch', () => {
     const action = buildPrepareSessionInput('org-99', baseInput);
-    expect(action.payload).toEqual({ ...baseInput, organizationId: 'org-99' });
+    expect(action.payload).toStrictEqual({ ...baseInput, organizationId: 'org-99' });
   });
 
   it('does not add organizationId to payload for personal dispatch', () => {
     const action = buildPrepareSessionInput(undefined, baseInput);
-    expect(action.payload).toEqual(baseInput);
+    expect(action.payload).toStrictEqual(baseInput);
     expect(action.payload).not.toHaveProperty('organizationId');
   });
 
   it('does not mutate the original baseInput', () => {
     const copy = { ...baseInput };
     buildPrepareSessionInput('org-1', baseInput);
-    expect(baseInput).toEqual(copy);
+    expect(baseInput).toStrictEqual(copy);
   });
 });

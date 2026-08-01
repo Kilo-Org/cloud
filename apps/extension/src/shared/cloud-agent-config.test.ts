@@ -1,3 +1,4 @@
+/* eslint-disable vitest/prefer-describe-function-title -- conflicts with jest/valid-title which requires string titles */
 import { describe, expect, it, vi } from 'vitest';
 import { getCloudAgentWsUrl, getSessionIngestWsUrl } from './cloud-agent-config';
 

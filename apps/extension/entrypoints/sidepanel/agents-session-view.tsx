@@ -1,6 +1,8 @@
+/* eslint-disable max-lines -- Cohesive single view component; splitting would reduce clarity */
 import { useAtomValue } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
+import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import { useExtensionAgents } from './agents-provider';
@@ -11,6 +13,17 @@ import { AgentsBlockingCards } from './agents-blocking-cards';
 const CREDITS_KEYWORDS =
   /(?:insufficient\s*credits|add\s*(?:at\s*least\s*)?\$\d|payment\s*required)/i;
 
+const statusIndicatorClass = (type: string): string => {
+  if (type === 'error') {
+    return 'border-status-red-500/30 bg-status-red-500/10 text-status-red-400';
+  }
+  if (type === 'warning') {
+    return 'border-status-yellow-500/30 bg-status-yellow-500/10 text-status-yellow-300';
+  }
+  return 'border-border bg-surface-selected text-foreground-muted';
+};
+
+// eslint-disable-next-line max-lines -- Single cohesive view component; splitting would reduce clarity
 export const AgentsSessionView = ({
   kiloSessionId,
   onBack,
@@ -49,26 +62,31 @@ export const AgentsSessionView = ({
 
   // Switch session on mount / id change.
   useEffect(() => {
-    if (switchedRef.current === kiloSessionId) return;
+    if (switchedRef.current === kiloSessionId) {
+      return;
+    }
     switchedRef.current = kiloSessionId;
     manager.clearError();
-    void manager.switchSession(kiloSessionId as import('@kilocode/cloud-agent-sdk').KiloSessionId);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- branded ID from untyped hook input
+    void manager.switchSession(kiloSessionId as KiloSessionId);
   }, [kiloSessionId, manager]);
 
   const handleSend = useCallback(
     async (text: string) => {
       setRetrySucceeded(false);
-      const mode = sessionConfig?.mode || 'code';
-      const model = sessionConfig?.model || '';
-      const variant = sessionConfig?.variant;
+      const rawMode = sessionConfig?.mode ?? '';
+      const rawModel = sessionConfig?.model ?? '';
+      const mode = rawMode === '' ? 'code' : rawMode;
+      const model = rawModel === '' ? '' : rawModel;
+      const variant = sessionConfig?.variant ?? undefined;
       try {
         const ok = await manager.send({
           payload: {
-            type: 'prompt',
-            prompt: text,
             mode,
             model,
-            ...(variant ? { variant } : {}),
+            prompt: text,
+            type: 'prompt',
+            ...(variant === undefined ? {} : { variant }),
           },
         });
         if (ok) {
@@ -86,17 +104,21 @@ export const AgentsSessionView = ({
   }, [manager]);
 
   const handleRetryFailedPrompt = useCallback(async () => {
-    if (failedPrompt === null) return;
+    if (failedPrompt === null) {
+      return;
+    }
     setRetryingPrompt(true);
     try {
-      const variant = sessionConfig?.variant;
+      const variant = sessionConfig?.variant ?? undefined;
+      const retryRawMode = sessionConfig?.mode ?? '';
+      const retryRawModel = sessionConfig?.model ?? '';
       const ok = await manager.send({
         payload: {
-          type: 'prompt',
+          mode: retryRawMode === '' ? 'code' : retryRawMode,
+          model: retryRawModel === '' ? '' : retryRawModel,
           prompt: failedPrompt,
-          mode: sessionConfig?.mode || 'code',
-          model: sessionConfig?.model || '',
-          ...(variant ? { variant } : {}),
+          type: 'prompt',
+          ...(variant === undefined ? {} : { variant }),
         },
       });
       if (ok) {
@@ -112,9 +134,14 @@ export const AgentsSessionView = ({
 
   const handleRetrySwitchSession = useCallback(() => {
     setRetryingSwitch(true);
-    void manager
-      .switchSession(kiloSessionId as import('@kilocode/cloud-agent-sdk').KiloSessionId)
-      .finally(() => setRetryingSwitch(false));
+    void (async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- branded ID from untyped hook input
+        await manager.switchSession(kiloSessionId as KiloSessionId);
+      } finally {
+        setRetryingSwitch(false);
+      }
+    })();
   }, [kiloSessionId, manager]);
 
   const handleDismissError = useCallback(() => {
@@ -152,9 +179,11 @@ export const AgentsSessionView = ({
     void manager.loadOlderMessages();
   }, [manager]);
 
-  const title = fetchedSessionData?.title || 'Session';
-  const repository = fetchedSessionData?.repository || fetchedSessionData?.gitUrl;
+  const rawTitle = fetchedSessionData?.title ?? '';
+  const title = rawTitle === '' ? 'Session' : rawTitle;
+  const repository = fetchedSessionData?.repository ?? fetchedSessionData?.gitUrl;
   const gitBranch = fetchedSessionData?.gitBranch;
+  const hasRepoInfo = (repository ?? '') !== '' || (gitBranch ?? '') !== '';
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -171,7 +200,7 @@ export const AgentsSessionView = ({
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="truncate type-body font-medium text-foreground">{title}</h1>
-            {repository || gitBranch ? (
+            {hasRepoInfo ? (
               <p className="truncate type-label text-foreground-muted">
                 {[repository, gitBranch].filter(Boolean).join(' · ')}
               </p>
@@ -181,90 +210,98 @@ export const AgentsSessionView = ({
       </div>
 
       {/* Status indicator */}
-      {statusIndicator ? (
+      {statusIndicator === null ? null : (
         <div
-          className={`shrink-0 border-b px-4 py-2 type-label ${
-            statusIndicator.type === 'error'
-              ? 'border-status-red-500/30 bg-status-red-500/10 text-status-red-400'
-              : statusIndicator.type === 'warning'
-                ? 'border-status-yellow-500/30 bg-status-yellow-500/10 text-status-yellow-300'
-                : statusIndicator.type === 'progress'
-                  ? 'border-border bg-surface-selected text-foreground-muted'
-                  : 'border-border bg-surface-selected text-foreground-muted'
-          }`}
+          className={`shrink-0 border-b px-4 py-2 type-label ${statusIndicatorClass(statusIndicator.type)}`}
         >
           <div className="flex items-center justify-between gap-2">
             <span className="min-w-0 truncate">{statusIndicator.message}</span>
-            {statusIndicator.type === 'error' && !isCreditsStatus ? (
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  className="type-label underline outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-                  onClick={handleDismissError}
-                  type="button"
-                >
-                  Dismiss
-                </button>
-                {failedPrompt === null || retrySucceeded ? (
+            {(() => {
+              if (statusIndicator.type === 'error' && !isCreditsStatus) {
+                return (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      className="type-label underline outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+                      onClick={handleDismissError}
+                      type="button"
+                    >
+                      Dismiss
+                    </button>
+                    {failedPrompt === null || retrySucceeded ? (
+                      <button
+                        className="rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
+                        disabled={retryingSwitch}
+                        onClick={handleRetrySwitchSession}
+                        type="button"
+                      >
+                        {retryingSwitch ? 'Retrying…' : 'Retry'}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              }
+              if (isCreditsStatus) {
+                return (
+                  <a
+                    className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+                    href={
+                      organizationId === null
+                        ? `${getKiloApiBaseUrl()}/credits`
+                        : `${getKiloApiBaseUrl()}/organizations/${encodeURIComponent(organizationId)}`
+                    }
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    Add credits
+                  </a>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Error atom row */}
+      {error === null ? null : (
+        <div className="shrink-0 border-b border-status-red-500/30 bg-status-red-500/10 px-4 py-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-red-400" />
+            <span className="min-w-0 flex-1 type-label text-status-red-400">{error}</span>
+            {(() => {
+              if (isCreditsError) {
+                return (
+                  <a
+                    className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+                    href={
+                      organizationId === null
+                        ? `${getKiloApiBaseUrl()}/credits`
+                        : `${getKiloApiBaseUrl()}/organizations/${encodeURIComponent(organizationId)}`
+                    }
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    Add credits
+                  </a>
+                );
+              }
+              if (failedPrompt === null || retrySucceeded) {
+                return (
                   <button
-                    className="rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
+                    className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
                     disabled={retryingSwitch}
                     onClick={handleRetrySwitchSession}
                     type="button"
                   >
                     {retryingSwitch ? 'Retrying…' : 'Retry'}
                   </button>
-                ) : null}
-              </div>
-            ) : isCreditsStatus ? (
-              <a
-                className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-                href={
-                  organizationId
-                    ? `${getKiloApiBaseUrl()}/organizations/${encodeURIComponent(organizationId)}`
-                    : `${getKiloApiBaseUrl()}/credits`
-                }
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                Add credits
-              </a>
-            ) : null}
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
-      ) : null}
-
-      {/* Error atom row */}
-      {error ? (
-        <div className="shrink-0 border-b border-status-red-500/30 bg-status-red-500/10 px-4 py-2">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-red-400" />
-            <span className="min-w-0 flex-1 type-label text-status-red-400">{error}</span>
-            {isCreditsError ? (
-              <a
-                className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-                href={
-                  organizationId
-                    ? `${getKiloApiBaseUrl()}/organizations/${encodeURIComponent(organizationId)}`
-                    : `${getKiloApiBaseUrl()}/credits`
-                }
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                Add credits
-              </a>
-            ) : failedPrompt === null || retrySucceeded ? (
-              <button
-                className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
-                disabled={retryingSwitch}
-                onClick={handleRetrySwitchSession}
-                type="button"
-              >
-                {retryingSwitch ? 'Retrying…' : 'Retry'}
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      )}
 
       {/* Failed prompt */}
       {failedPrompt !== null && !retrySucceeded && !isCreditsStatus && !isCreditsError ? (
@@ -276,7 +313,9 @@ export const AgentsSessionView = ({
             <button
               className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
               disabled={retryingPrompt}
-              onClick={handleRetryFailedPrompt}
+              onClick={() => {
+                void handleRetryFailedPrompt();
+              }}
               type="button"
             >
               {retryingPrompt ? 'Retrying…' : 'Retry'}
@@ -333,8 +372,8 @@ export const AgentsSessionView = ({
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="agent-conversation-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4">
             <div className="space-y-3">
-              {[1, 2, 3, 4].map(i => (
-                <div className="flex justify-start" key={i}>
+              {[1, 2, 3, 4].map(idx => (
+                <div className="flex justify-start" key={idx}>
                   <div className="max-w-[88%] space-y-1.5 rounded-lg px-3 py-2">
                     <span className="block h-3 w-48 animate-pulse rounded bg-surface-selected" />
                     <span className="block h-3 w-36 animate-pulse rounded bg-surface-selected" />
@@ -347,7 +386,7 @@ export const AgentsSessionView = ({
             canSend={false}
             canInterrupt={false}
             isStreaming={false}
-            isLoading={true}
+            isLoading
             isReadOnly={false}
             onSend={() => {}}
             onStop={() => {}}

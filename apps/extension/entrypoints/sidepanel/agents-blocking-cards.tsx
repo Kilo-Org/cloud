@@ -1,4 +1,5 @@
-import { useCallback, useState, type JSX } from 'react';
+import { useCallback, useState } from 'react';
+import type { JSX } from 'react';
 import type {
   StandaloneQuestion,
   StandalonePermission,
@@ -39,10 +40,10 @@ const PermissionCard = ({
       <p className="type-body mb-1 text-foreground">{permission.permission}</p>
       {permission.patterns.length > 0 ? (
         <div className="mb-2 space-y-0.5">
-          {permission.patterns.map((pattern, index) => (
+          {permission.patterns.map((pattern, _index) => (
             <code
               className="block rounded bg-surface-selected px-1.5 py-0.5 font-mono text-xs text-foreground-muted"
-              key={`${permission.requestId}-${index}`}
+              key={`${permission.requestId}-${pattern}`}
             >
               {pattern}
             </code>
@@ -53,7 +54,9 @@ const PermissionCard = ({
         <button
           className="h-8 rounded-md border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
           disabled={responding}
-          onClick={() => respond('once')}
+          onClick={() => {
+            void respond('once');
+          }}
           type="button"
         >
           Yes, once
@@ -61,7 +64,9 @@ const PermissionCard = ({
         <button
           className="h-8 rounded-md border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
           disabled={responding}
-          onClick={() => respond('always')}
+          onClick={() => {
+            void respond('always');
+          }}
           type="button"
         >
           Yes, always
@@ -69,13 +74,15 @@ const PermissionCard = ({
         <button
           className="h-8 rounded-md border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
           disabled={responding}
-          onClick={() => respond('reject')}
+          onClick={() => {
+            void respond('reject');
+          }}
           type="button"
         >
           No
         </button>
       </div>
-      {error ? <p className="mt-2 type-label text-status-red-400">{error}</p> : null}
+      {error === null ? null : <p className="mt-2 type-label text-status-red-400">{error}</p>}
     </div>
   );
 };
@@ -94,7 +101,9 @@ const QuestionOptionButton = ({
   <button
     className="flex flex-col items-start rounded-md border border-border bg-surface-overlay px-3 py-2 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
     disabled={disabled}
-    onClick={() => onPick(option.label)}
+    onClick={() => {
+      onPick(option.label);
+    }}
     type="button"
   >
     <span className="text-foreground">{option.label}</span>
@@ -131,14 +140,16 @@ const QuestionBlock = ({
         <QuestionOptionButton
           disabled={disabled}
           key={option.label}
-          onPick={label => onPick(index, label)}
+          onPick={label => {
+            onPick(index, label);
+          }}
           option={option}
         />
       ))}
     </div>
-    {selected !== undefined ? (
+    {selected === undefined ? null : (
       <p className="type-label text-foreground-muted">Selected: {selected}</p>
-    ) : null}
+    )}
   </div>
 );
 
@@ -157,18 +168,20 @@ const QuestionCard = ({
 
   const allAnswered =
     question.questions.length > 0 &&
-    question.questions.every((_, index) => selected[index] !== undefined);
+    question.questions.every((_unused, index) => selected[index] !== undefined);
 
   const pick = useCallback((questionIndex: number, label: string) => {
     setSelected(prev => ({ ...prev, [questionIndex]: label }));
   }, []);
 
   const submit = useCallback(async () => {
-    if (!allAnswered) return;
+    if (!allAnswered) {
+      return;
+    }
     setError(null);
     setSending(true);
     try {
-      const answers = question.questions.map((_, index) => [selected[index]!]);
+      const answers = question.questions.map((_unused, index) => [selected[index]!]);
       await onAnswer(question.requestId, answers);
     } catch {
       setError('Failed to submit answer. Please try again.');
@@ -190,13 +203,14 @@ const QuestionCard = ({
   return (
     <div className="rounded-lg border border-border bg-surface-raised px-4 py-3">
       <div className="space-y-3">
-        {question.questions.map((q, index) => (
+        {question.questions.map((questionInfo, index) => (
           <QuestionBlock
             disabled={sending}
             index={index}
+            // eslint-disable-next-line react/no-array-index-key -- requestId plus index make a stable key even with duplicate headers
             key={`${question.requestId}-${index}`}
             onPick={pick}
-            question={q}
+            question={questionInfo}
             selected={selected[index]}
           />
         ))}
@@ -205,7 +219,9 @@ const QuestionCard = ({
         <button
           className="h-8 rounded-md border border-transparent bg-brand-primary px-3 type-label text-brand-primary-foreground transition hover:bg-brand-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle"
           disabled={!allAnswered || sending}
-          onClick={submit}
+          onClick={() => {
+            void submit();
+          }}
           type="button"
         >
           Answer
@@ -213,13 +229,15 @@ const QuestionCard = ({
         <button
           className="h-8 rounded-md border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
           disabled={sending}
-          onClick={dismiss}
+          onClick={() => {
+            void dismiss();
+          }}
           type="button"
         >
           Dismiss
         </button>
       </div>
-      {error ? <p className="mt-2 type-label text-status-red-400">{error}</p> : null}
+      {error === null ? null : <p className="mt-2 type-label text-status-red-400">{error}</p>}
     </div>
   );
 };

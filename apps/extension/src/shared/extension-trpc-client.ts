@@ -21,17 +21,17 @@ export const createExtensionTrpcClient = ({
 }): ReturnType<typeof createTRPCClient<MobileRouter>> => {
   const trpcUrl = `${trimTrailingSlash(apiBaseUrl)}/api/trpc`;
 
-  const headers = async (): Promise<Record<string, string>> => {
+  const headers = (): Record<string, string> => {
     const token = getToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return token === undefined || token === '' ? {} : { Authorization: `Bearer ${token}` };
   };
 
   return createTRPCClient<MobileRouter>({
     links: [
       splitLink({
         condition: op => op.context['skipBatch'] === true,
-        true: httpLink({ url: trpcUrl, headers }),
-        false: httpBatchLink({ url: trpcUrl, headers }),
+        false: httpBatchLink({ headers, url: trpcUrl }),
+        true: httpLink({ headers, url: trpcUrl }),
       }),
     ],
   });

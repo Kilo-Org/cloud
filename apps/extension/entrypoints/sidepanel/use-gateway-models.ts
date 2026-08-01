@@ -35,8 +35,8 @@ export const useGatewayModels = ({
   });
 
   return {
-    modelLoadError: query.isError ? 'Could not load models.' : undefined,
     isLoading: query.isLoading,
+    modelLoadError: query.isError ? 'Could not load models.' : undefined,
     modelOptions: query.data ?? emptyModelOptions,
     refetchModels: query.refetch,
   };

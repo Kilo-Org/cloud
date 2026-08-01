@@ -1,4 +1,5 @@
-import { useCallback, useState, type ChangeEvent, type JSX, type KeyboardEvent } from 'react';
+import { useCallback, useState } from 'react';
+import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 
 export const AgentsComposer = ({
   canSend,
@@ -22,13 +23,19 @@ export const AgentsComposer = ({
 
   const submit = useCallback((): void => {
     const trimmed = draft.trim();
-    if (trimmed === '' || !canSend) return;
+    if (trimmed === '' || !canSend) {
+      return;
+    }
     setDraft('');
     const result = onSend(trimmed);
     if (result instanceof Promise) {
-      result.catch(() => {
-        // Rejection handled by SDK atoms — suppress unhandled rejection
-      });
+      void (async () => {
+        try {
+          await result;
+        } catch {
+          // Rejection handled by SDK atoms
+        }
+      })();
     }
   }, [draft, canSend, onSend]);
 

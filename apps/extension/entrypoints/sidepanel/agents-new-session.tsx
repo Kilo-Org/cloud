@@ -1,3 +1,5 @@
+/* eslint-disable import/max-dependencies */
+/* eslint-disable max-lines -- Cohesive single-purpose new-session form; splitting would scatter form state */
 import { storage } from '#imports';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,7 +34,8 @@ const PROMPT_MIN_LENGTH = 3;
 const PROMPT_MAX_LENGTH = 4000;
 const MODE = 'code' as const;
 
-export { PROMPT_MAX_LENGTH, PROMPT_MIN_LENGTH, MODE }; // Exported for focused test coverage.
+export { PROMPT_MAX_LENGTH, PROMPT_MIN_LENGTH, MODE };
+// Exported for focused test coverage.
 
 // ---------------------------------------------------------------------------
 // Stored Auth hook
@@ -58,28 +61,28 @@ const useStoredAuth = (): {
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-type RepoOption = {
+interface RepoOption {
   readonly id: number;
   readonly name: string;
   readonly fullName: string;
   readonly private: boolean;
-};
+}
 
-type LastSelected = {
+interface LastSelected {
   readonly model: string;
   readonly variant?: string;
-};
+}
 
-export type PrepareSessionAction = {
+export interface PrepareSessionAction {
   readonly path: 'cloudAgentNext.prepareSession' | 'organizations.cloudAgentNext.prepareSession';
   readonly payload: Record<string, unknown>;
-};
+}
 
 export const buildPrepareSessionInput = (
   organizationId: string | null | undefined,
   baseInput: Record<string, unknown>
 ): PrepareSessionAction => {
-  if (organizationId) {
+  if (organizationId !== null && organizationId !== undefined) {
     return {
       path: 'organizations.cloudAgentNext.prepareSession',
       payload: { ...baseInput, organizationId },
@@ -94,11 +97,11 @@ export const buildPrepareSessionInput = (
 const trimValue = (value: string): string => value.trim();
 
 export const buildSubmitInput = ({
+  initialMessageId,
   prompt,
   selectedModel,
-  selectedVariant,
   selectedRepo,
-  initialMessageId,
+  selectedVariant,
 }: {
   prompt: string;
   selectedModel: string;
@@ -106,13 +109,13 @@ export const buildSubmitInput = ({
   selectedRepo: string;
   initialMessageId: string;
 }): Record<string, unknown> => ({
-  prompt,
-  mode: MODE,
-  model: selectedModel,
-  githubRepo: selectedRepo,
   autoCommit: true,
   autoInitiate: true,
+  githubRepo: selectedRepo,
   initialMessageId,
+  mode: MODE,
+  model: selectedModel,
+  prompt,
   ...(selectedVariant ? { variant: selectedVariant } : {}),
 });
 
@@ -124,12 +127,14 @@ const isModelPreferencesGetResult = (
   'favorites' in value &&
   Array.isArray((value as Record<string, unknown>)['favorites']);
 
-export { isModelPreferencesGetResult }; // Exported for focused test coverage.
+export { isModelPreferencesGetResult };
+// Exported for focused test coverage.
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line max-lines -- Cohesive single-purpose new-session form; splitting would scatter form state
 export const AgentsNewSession = ({
   onCreated,
   onCancel,
@@ -156,21 +161,25 @@ export const AgentsNewSession = ({
 
   // ---- Model preferences (lastSelected) ----
   const { data: modelPrefsData } = useQuery({
-    queryKey: ['agents-new-session', 'model-preferences', organizationId],
-    queryFn: async () => {
-      const input = organizationId ? { organizationId } : undefined;
+    enabled: auth !== undefined && auth.token !== '',
+    queryFn: () => {
+      const input = organizationId === null ? undefined : { organizationId };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC query input union
       return trpcClient.modelPreferences.get.query(input as never);
     },
-    enabled: auth !== undefined && auth.token !== '',
+    queryKey: ['agents-new-session', 'model-preferences', organizationId],
   });
 
   const lastSelected: LastSelected | null = useMemo(() => {
-    if (!modelPrefsData || !isModelPreferencesGetResult(modelPrefsData)) return null;
+    if (!modelPrefsData || !isModelPreferencesGetResult(modelPrefsData)) {
+      return null;
+    }
     return modelPrefsData.lastSelected;
   }, [modelPrefsData]);
 
   const setLastSelectedMutation = useMutation({
     mutationFn: (input: { model: string; variant?: string }) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC mutation input union
       trpcClient.modelPreferences.setLastSelected.mutate(input as never),
   });
 
@@ -182,17 +191,19 @@ export const AgentsNewSession = ({
     refetch: refetchRepos,
     isRefetching: isRepoRefetching,
   } = useQuery({
-    queryKey: ['agents-new-session', 'repos', organizationId],
-    queryFn: async () =>
-      organizationId
-        ? trpcClient.organizations.cloudAgentNext.listGitHubRepositories.query({
-            organizationId,
+    enabled: auth !== undefined && auth.token !== '',
+    queryFn: () =>
+      organizationId === null
+        ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- personal endpoint is untyped
+          trpcClient.cloudAgentNext.listGitHubRepositories.query({
             forceRefresh: false,
           } as never)
-        : trpcClient.cloudAgentNext.listGitHubRepositories.query({
+        : // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- org endpoint adds organizationId
+          trpcClient.organizations.cloudAgentNext.listGitHubRepositories.query({
             forceRefresh: false,
+            organizationId,
           } as never),
-    enabled: auth !== undefined && auth.token !== '',
+    queryKey: ['agents-new-session', 'repos', organizationId],
     retry: 2,
   });
 
@@ -223,12 +234,14 @@ export const AgentsNewSession = ({
 
   // ---- Close dropdowns on outside click ----
   useEffect(() => {
-    const handler = (e: MouseEvent): void => {
-      if (repoDropdownRef.current && !repoDropdownRef.current.contains(e.target as Node)) {
+    const handler = (evt: MouseEvent): void => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- browser DOM event target
+      if (repoDropdownRef.current && !repoDropdownRef.current.contains(evt.target as Node)) {
         setRepoDropdownOpen(false);
         setRepoSearch('');
       }
-      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- browser DOM event target
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(evt.target as Node)) {
         setModelDropdownOpen(false);
       }
     };
@@ -240,16 +253,18 @@ export const AgentsNewSession = ({
 
   // ---- Auto-select model from lastSelected, then first available ----
   useEffect(() => {
-    if (isModelUserSelected || modelOptions.length === 0) return;
+    if (isModelUserSelected || modelOptions.length === 0) {
+      return;
+    }
 
-    if (lastSelected?.model) {
-      const match = modelOptions.find(m => m.id === lastSelected.model);
+    if (lastSelected?.model !== undefined) {
+      const match = modelOptions.find(opt => opt.id === lastSelected.model);
       if (match) {
         setSelectedModel(match.id);
-        if (lastSelected.variant !== undefined) {
-          setSelectedVariant(lastSelected.variant);
-        } else {
+        if (lastSelected.variant === undefined) {
           setSelectedVariant('');
+        } else {
+          setSelectedVariant(lastSelected.variant);
         }
         return;
       }
@@ -262,13 +277,15 @@ export const AgentsNewSession = ({
 
   // ---- Auto-select repo: if only one, use it ----
   useEffect(() => {
-    if (selectedRepo || repos.length !== 1) return;
+    if (selectedRepo || repos.length !== 1) {
+      return;
+    }
     setSelectedRepo(repos[0]?.fullName ?? '');
   }, [repos, selectedRepo]);
 
   // ---- Variants for current model ----
   const selectedModelOption = useMemo(
-    () => modelOptions.find(m => m.id === selectedModel),
+    () => modelOptions.find(opt => opt.id === selectedModel),
     [modelOptions, selectedModel]
   );
   const availableVariants = selectedModelOption?.variants ?? [];
@@ -277,19 +294,26 @@ export const AgentsNewSession = ({
   const trimmed = trimValue(prompt);
   const isPromptValid = trimmed.length >= PROMPT_MIN_LENGTH && trimmed.length <= PROMPT_MAX_LENGTH;
   const isFormValid = isPromptValid && selectedModel !== '' && selectedRepo !== '';
-  const repoStatus: 'loading' | 'ready' | 'error' = isRepoLoading
-    ? 'loading'
-    : isRepoError
-      ? 'error'
-      : 'ready';
+  const repoStatus = (() => {
+    if (isRepoLoading) {
+      return 'loading';
+    }
+    if (isRepoError) {
+      return 'error';
+    }
+    return 'ready';
+  })();
 
   // Filter repos by search term
   const filteredRepos = useMemo(() => {
     const normalized = repoSearch.toLowerCase().trim();
-    if (normalized.length === 0) return repos;
+    if (normalized.length === 0) {
+      return repos;
+    }
     return repos.filter(
-      r =>
-        r.fullName.toLowerCase().includes(normalized) || r.name.toLowerCase().includes(normalized)
+      repo =>
+        repo.fullName.toLowerCase().includes(normalized) ||
+        repo.name.toLowerCase().includes(normalized)
     );
   }, [repos, repoSearch]);
 
@@ -317,18 +341,20 @@ export const AgentsNewSession = ({
   );
 
   const handleSubmit = useCallback(async () => {
-    if (!isFormValid || isSubmitting) return;
+    if (!isFormValid || isSubmitting) {
+      return;
+    }
 
     setSubmitError(null);
     setIsSubmitting(true);
 
     const messageId = generateMessageId();
     const input = buildSubmitInput({
+      initialMessageId: messageId,
       prompt: trimmed,
       selectedModel,
-      selectedVariant,
       selectedRepo,
-      initialMessageId: messageId,
+      selectedVariant,
     });
 
     const action = buildPrepareSessionInput(organizationId, input);
@@ -336,13 +362,18 @@ export const AgentsNewSession = ({
     try {
       const result =
         action.path === 'organizations.cloudAgentNext.prepareSession'
-          ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate(
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- org endpoint payload is untyped
+            await trpcClient.organizations.cloudAgentNext.prepareSession.mutate(
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- org endpoint payload is untyped
               action.payload as never
             )
-          : await trpcClient.cloudAgentNext.prepareSession.mutate(action.payload as never);
+          : await trpcClient.cloudAgentNext.prepareSession.mutate(
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- personal endpoint payload is untyped
+              action.payload as never
+            );
 
-      const kiloSessionId = (result as { kiloSessionId?: string }).kiloSessionId;
-      if (!kiloSessionId) {
+      const { kiloSessionId } = result as { kiloSessionId?: string };
+      if (kiloSessionId === undefined || kiloSessionId === '') {
         setSubmitError('Session creation failed. Please try again.');
         setIsSubmitting(false);
         return;
@@ -379,9 +410,9 @@ export const AgentsNewSession = ({
   // ---- Credits CTA URL ----
   const creditsUrl = useMemo(() => {
     const base = getKiloApiBaseUrl().replace(/\/+$/, '');
-    return organizationId
-      ? `${base}/organizations/${encodeURIComponent(organizationId)}`
-      : `${base}/credits`;
+    return organizationId === null
+      ? `${base}/credits`
+      : `${base}/organizations/${encodeURIComponent(organizationId)}`;
   }, [organizationId]);
 
   // ---- isSubmitting error display ----
@@ -390,26 +421,33 @@ export const AgentsNewSession = ({
   // ---- Textarea auto-resize ----
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
-    if (!ta) return;
+    if (!ta) {
+      return;
+    }
     ta.style.height = 'auto';
     const maxHeight = window.innerHeight * 0.35;
     ta.style.height = `${Math.min(ta.scrollHeight, maxHeight)}px`;
   }, []);
 
   const handlePromptChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setPrompt(e.target.value);
+    (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setPrompt(evt.target.value);
       resizeTextarea();
     },
     [resizeTextarea]
   );
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        if (isFormValid) void handleSubmit();
+    (evt: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // eslint-disable-next-line react/no-deprecated -- keyCode 229 catches Chrome IME composition on older input method paths
+      if (evt.nativeEvent.isComposing || evt.nativeEvent.keyCode === 229) {
+        return;
+      }
+      if (evt.key === 'Enter' && (evt.metaKey || evt.ctrlKey)) {
+        evt.preventDefault();
+        if (isFormValid) {
+          void handleSubmit();
+        }
       }
     },
     [isFormValid, handleSubmit]
@@ -441,7 +479,7 @@ export const AgentsNewSession = ({
       </div>
 
       {/* Error banner */}
-      {displayError !== null ? (
+      {displayError === null ? null : (
         <div className="shrink-0 px-4 pt-3">
           <div className="flex items-start gap-2 rounded-lg border border-border bg-surface-raised p-3">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-red-400" />
@@ -472,7 +510,7 @@ export const AgentsNewSession = ({
             )}
           </div>
         </div>
-      ) : null}
+      )}
 
       {/* Form body */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
@@ -517,25 +555,36 @@ export const AgentsNewSession = ({
             </button>
             {modelDropdownOpen ? (
               <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-56 overflow-y-auto rounded-lg border border-border bg-surface-overlay py-1 shadow-lg">
-                {modelLoadError ? (
-                  <div className="px-3 py-2">
-                    <p className="type-label text-status-red-400">{modelLoadError}</p>
-                    <button
-                      className="mt-1 type-label text-link hover:text-link-hover underline underline-offset-4"
-                      onClick={() => {
-                        void refetchModels();
-                      }}
-                      type="button"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : isModelsLoading ? (
-                  <p className="px-3 py-2 type-label text-foreground-muted">Loading models…</p>
-                ) : modelOptions.length === 0 ? (
-                  <p className="px-3 py-2 type-label text-foreground-muted">No models available</p>
-                ) : (
-                  modelOptions.map(model => (
+                {(() => {
+                  if (modelLoadError !== null) {
+                    return (
+                      <div className="px-3 py-2">
+                        <p className="type-label text-status-red-400">{modelLoadError}</p>
+                        <button
+                          className="mt-1 type-label text-link hover:text-link-hover underline underline-offset-4"
+                          onClick={() => {
+                            void refetchModels();
+                          }}
+                          type="button"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    );
+                  }
+                  if (isModelsLoading) {
+                    return (
+                      <p className="px-3 py-2 type-label text-foreground-muted">Loading models…</p>
+                    );
+                  }
+                  if (modelOptions.length === 0) {
+                    return (
+                      <p className="px-3 py-2 type-label text-foreground-muted">
+                        No models available
+                      </p>
+                    );
+                  }
+                  return modelOptions.map(model => (
                     <button
                       className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
                       key={model.id}
@@ -550,41 +599,53 @@ export const AgentsNewSession = ({
                         <Check className="size-3.5 shrink-0 text-brand-primary" />
                       ) : null}
                     </button>
-                  ))
-                )}
+                  ));
+                })()}
               </div>
             ) : null}
           </div>
-          {modelDropdownOpen ? null : modelLoadError ? (
-            <div className="flex items-center gap-1.5">
-              <AlertTriangle className="size-3.5 shrink-0 text-status-red-400" />
-              <span className="type-label text-status-red-400">{modelLoadError}</span>
-              <button
-                className="type-label text-link hover:text-link-hover underline underline-offset-4"
-                onClick={() => {
-                  void refetchModels();
-                }}
-                type="button"
-              >
-                Retry
-              </button>
-            </div>
-          ) : isModelsLoading ? (
-            <span className="type-label text-foreground-muted">Loading models…</span>
-          ) : modelOptions.length === 0 ? (
-            <div className="flex items-center gap-1.5">
-              <span className="type-label text-foreground-muted">No models available</span>
-              <button
-                className="type-label text-link hover:text-link-hover underline underline-offset-4"
-                onClick={() => {
-                  void refetchModels();
-                }}
-                type="button"
-              >
-                Retry
-              </button>
-            </div>
-          ) : null}
+          {(() => {
+            if (modelDropdownOpen) {
+              return null;
+            }
+            if (modelLoadError !== null) {
+              return (
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="size-3.5 shrink-0 text-status-red-400" />
+                  <span className="type-label text-status-red-400">{modelLoadError}</span>
+                  <button
+                    className="type-label text-link hover:text-link-hover underline underline-offset-4"
+                    onClick={() => {
+                      void refetchModels();
+                    }}
+                    type="button"
+                  >
+                    Retry
+                  </button>
+                </div>
+              );
+            }
+            if (isModelsLoading) {
+              return <span className="type-label text-foreground-muted">Loading models…</span>;
+            }
+            if (modelOptions.length === 0) {
+              return (
+                <div className="flex items-center gap-1.5">
+                  <span className="type-label text-foreground-muted">No models available</span>
+                  <button
+                    className="type-label text-link hover:text-link-hover underline underline-offset-4"
+                    onClick={() => {
+                      void refetchModels();
+                    }}
+                    type="button"
+                  >
+                    Retry
+                  </button>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           {/* Variant picker */}
           {availableVariants.length > 0 ? (
@@ -602,15 +663,15 @@ export const AgentsNewSession = ({
                   aria-label="Thinking effort"
                   className="appearance-none bg-transparent outline-none"
                   disabled={isSubmitting}
-                  onChange={e => {
-                    handleVariantSelect(e.target.value);
+                  onChange={changeEvent => {
+                    handleVariantSelect(changeEvent.target.value);
                   }}
                   value={selectedVariant}
                 >
                   <option value="">Auto</option>
-                  {availableVariants.map(v => (
-                    <option key={v} value={v}>
-                      {thinkingEffortLabel(v)}
+                  {availableVariants.map(variant => (
+                    <option key={variant} value={variant}>
+                      {thinkingEffortLabel(variant)}
                     </option>
                   ))}
                 </select>
@@ -645,93 +706,111 @@ export const AgentsNewSession = ({
             </button>
             {repoDropdownOpen ? (
               <div className="absolute right-0 top-full z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-border bg-surface-overlay py-1 shadow-lg">
-                {repoStatus === 'loading' ? (
-                  <p className="px-3 py-2 type-label text-foreground-muted">
-                    Loading repositories...
-                  </p>
-                ) : repoStatus === 'error' ? (
-                  <div className="px-3 py-2">
-                    <p className="type-label text-status-red-400">Failed to load repositories</p>
-                    <button
-                      className="mt-1 flex items-center gap-1 type-label text-link hover:text-link-hover underline underline-offset-4"
-                      disabled={isRepoRefetching}
-                      onClick={() => {
-                        void refetchRepos();
-                      }}
-                      type="button"
-                    >
-                      <RefreshCw className={`size-3 ${isRepoRefetching ? 'animate-spin' : ''}`} />
-                      {isRepoRefetching ? 'Retrying...' : 'Retry'}
-                    </button>
-                  </div>
-                ) : !integrationInstalled ? (
-                  <div className="px-3 py-2 text-center">
-                    <p className="type-label text-foreground-muted">
-                      GitHub integration not connected
-                    </p>
-                    <p className="mt-1 type-label text-foreground-muted">
-                      <a
-                        className="text-link hover:text-link-hover underline underline-offset-4"
-                        href={`${getKiloApiBaseUrl().replace(/\/+$/, '')}${organizationId ? `/organizations/${organizationId}/integrations` : '/integrations'}`}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        Connect GitHub
-                      </a>{' '}
-                      to start a session
-                    </p>
-                  </div>
-                ) : repos.length === 0 ? (
-                  <div className="px-3 py-2 text-center">
-                    <p className="type-label text-foreground-muted">No repositories found</p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Repo search */}
-                    <div className="sticky top-0 z-10 border-b border-border bg-surface-overlay px-2 py-1.5">
-                      <div className="flex items-center gap-1.5 rounded-md border border-border bg-input-bg px-2 py-1">
-                        <Search className="size-3 shrink-0 text-foreground-muted" />
-                        <input
-                          aria-label="Search repositories"
-                          className="w-full bg-transparent type-label text-foreground placeholder:text-foreground-muted outline-none"
-                          onChange={e => {
-                            setRepoSearch(e.target.value);
-                          }}
-                          placeholder="Search repositories..."
-                          type="text"
-                          value={repoSearch}
-                        />
-                      </div>
-                    </div>
-                    {filteredRepos.length === 0 ? (
+                {(() => {
+                  if (repoStatus === 'loading') {
+                    return (
                       <p className="px-3 py-2 type-label text-foreground-muted">
-                        No repositories match your search
+                        Loading repositories...
                       </p>
-                    ) : (
-                      filteredRepos.map(repo => (
+                    );
+                  }
+                  if (repoStatus === 'error') {
+                    return (
+                      <div className="px-3 py-2">
+                        <p className="type-label text-status-red-400">
+                          Failed to load repositories
+                        </p>
                         <button
-                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
-                          key={repo.id}
+                          className="mt-1 flex items-center gap-1 type-label text-link hover:text-link-hover underline underline-offset-4"
+                          disabled={isRepoRefetching}
                           onClick={() => {
-                            setSelectedRepo(repo.fullName);
-                            setRepoDropdownOpen(false);
-                            setRepoSearch('');
+                            void refetchRepos();
                           }}
                           type="button"
                         >
-                          <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
-                          <span className="truncate flex-1">{repo.fullName}</span>
-                          {repo.private ? (
-                            <Lock className="size-3 shrink-0 text-foreground-muted" />
-                          ) : null}
-                          {repo.fullName === selectedRepo ? (
-                            <Check className="size-3.5 shrink-0 text-brand-primary" />
-                          ) : null}
+                          <RefreshCw
+                            className={`size-3 ${isRepoRefetching ? 'animate-spin' : ''}`}
+                          />
+                          {isRepoRefetching ? 'Retrying...' : 'Retry'}
                         </button>
-                      ))
-                    )}
-                  </>
-                )}
+                      </div>
+                    );
+                  }
+                  if (!integrationInstalled) {
+                    return (
+                      <div className="px-3 py-2 text-center">
+                        <p className="type-label text-foreground-muted">
+                          GitHub integration not connected
+                        </p>
+                        <p className="mt-1 type-label text-foreground-muted">
+                          <a
+                            className="text-link hover:text-link-hover underline underline-offset-4"
+                            href={`${getKiloApiBaseUrl().replace(/\/+$/, '')}${organizationId === null ? '/integrations' : `/organizations/${organizationId}/integrations`}`}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Connect GitHub
+                          </a>{' '}
+                          to start a session
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (repos.length === 0) {
+                    return (
+                      <div className="px-3 py-2 text-center">
+                        <p className="type-label text-foreground-muted">No repositories found</p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <>
+                      {/* Repo search */}
+                      <div className="sticky top-0 z-10 border-b border-border bg-surface-overlay px-2 py-1.5">
+                        <div className="flex items-center gap-1.5 rounded-md border border-border bg-input-bg px-2 py-1">
+                          <Search className="size-3 shrink-0 text-foreground-muted" />
+                          <input
+                            aria-label="Search repositories"
+                            className="w-full bg-transparent type-label text-foreground placeholder:text-foreground-muted outline-none"
+                            onChange={changeEvent => {
+                              setRepoSearch(changeEvent.target.value);
+                            }}
+                            placeholder="Search repositories..."
+                            type="text"
+                            value={repoSearch}
+                          />
+                        </div>
+                      </div>
+                      {filteredRepos.length === 0 ? (
+                        <p className="px-3 py-2 type-label text-foreground-muted">
+                          No repositories match your search
+                        </p>
+                      ) : (
+                        filteredRepos.map(repo => (
+                          <button
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
+                            key={repo.id}
+                            onClick={() => {
+                              setSelectedRepo(repo.fullName);
+                              setRepoDropdownOpen(false);
+                              setRepoSearch('');
+                            }}
+                            type="button"
+                          >
+                            <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
+                            <span className="truncate flex-1">{repo.fullName}</span>
+                            {repo.private ? (
+                              <Lock className="size-3 shrink-0 text-foreground-muted" />
+                            ) : null}
+                            {repo.fullName === selectedRepo ? (
+                              <Check className="size-3.5 shrink-0 text-brand-primary" />
+                            ) : null}
+                          </button>
+                        ))
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             ) : null}
           </div>

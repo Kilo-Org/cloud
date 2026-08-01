@@ -9,7 +9,7 @@ test.skip(!runLive, 'local backend only');
 
 test.setTimeout(150_000);
 
-const localBackendUrl = process.env['LOCAL_BACKEND_ORIGIN'] || 'http://localhost:3000';
+const localBackendUrl = process.env['LOCAL_BACKEND_ORIGIN'] ?? 'http://localhost:3000';
 const localUserEmail = 'fl@fl.fl';
 
 // ---------------------------------------------------------------------------
@@ -110,19 +110,21 @@ test('live local backend: open remote CLI session, send, assert reply, send long
       .poll(
         async () => {
           const count = await sessionRows.count();
-          for (let i = 0; i < count; i += 1) {
+          for (let idx = 0; idx < count; idx += 1) {
             const hasCloudBadge = await sessionRows
-              .nth(i)
+              .nth(idx)
               .locator('text=Cloud')
               .isVisible()
               .catch(() => false);
-            if (!hasCloudBadge) return true;
+            if (!hasCloudBadge) {
+              return true;
+            }
           }
           return false;
         },
         {
-          timeout: 60_000,
           message: 'No non-Cloud active sessions found — expected at least one remote CLI session',
+          timeout: 60_000,
         }
       )
       .toBe(true);

@@ -4,10 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import { normalizeOrganizationId } from '@/src/shared/organization-normalization';
-import {
-  loadSidePanelMode,
-  saveSidePanelMode,
-} from '@/src/shared/side-panel-mode';
+import { loadSidePanelMode, saveSidePanelMode } from '@/src/shared/side-panel-mode';
 import type { SidePanelMode } from '@/src/shared/side-panel-mode';
 import { AgentChatPanel } from './agent-chat-panel';
 import { AgentsMode } from './agents-mode';
@@ -147,7 +144,7 @@ export const SignedInView = ({
 
   // Hydrate persisted panel mode on mount (async WXT storage).
   useEffect(() => {
-    (async () => {
+    void (async () => {
       const persisted = await loadSidePanelMode(storage);
       setMode(persisted);
     })();

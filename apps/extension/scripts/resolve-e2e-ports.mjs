@@ -1,6 +1,7 @@
+/* eslint-disable import/no-nodejs-modules, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access, typescript-eslint/strict-boolean-expressions */
 // Resolves live service ports from `pnpm dev:status --json` for E2E tests.
 // Reads JSON from stdin, outputs `export VAR=val` lines for any VITE_*/LOCAL_*
-// variables not already set in the environment.
+// Variables not already set in the environment.
 import { createInterface } from 'node:readline';
 
 let input = '';
@@ -9,7 +10,9 @@ for await (const line of rl) {
   input += line;
 }
 
+/** @type {{ services?: Array<{ name: string, port: number }>, portOffset?: number }} */
 const data = JSON.parse(input);
+/** @type {(name: string) => { port: number } | undefined} */
 const svc = name => data.services?.find(service => service.name === name);
 
 const portOffset = Number.isInteger(data.portOffset) ? data.portOffset : 0;
@@ -33,5 +36,8 @@ if (!process.env.VITE_SESSION_INGEST_WS_URL) {
   vars.push(`VITE_SESSION_INGEST_WS_URL=${url}`);
 }
 
-if (vars.length > 0) process.stdout.write(`export ${vars.join(' ')}\n`);
-else process.stdout.write(':\n');
+if (vars.length > 0) {
+  process.stdout.write(`export ${vars.join(' ')}\n`);
+} else {
+  process.stdout.write(':\n');
+}

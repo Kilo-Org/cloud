@@ -1,29 +1,30 @@
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion, vitest/prefer-describe-function-title, jest/no-hooks -- vitest mock calls destructuring requires typed casts; prefer-describe-function-title conflicts with jest/valid-title; hooks used for standard test setup */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { createExtensionTrpcClient } from './extension-trpc-client';
 
 const mockFetch = vi.fn();
 
 vi.stubGlobal('fetch', mockFetch);
 
-import { createExtensionTrpcClient } from './extension-trpc-client';
-
 const FAKE_BASE_URL = 'https://api.example.com';
 const FAKE_SESSION_ID = 'test-session-id';
 const PROMPT_PAYLOAD = {
   cloudAgentSessionId: FAKE_SESSION_ID,
-  payload: { type: 'prompt' as const, prompt: 'hello', mode: 'plan' as const, model: 'test-model' },
+  payload: { mode: 'plan' as const, model: 'test-model', prompt: 'hello', type: 'prompt' as const },
 };
 const PROMPT_FIRST = {
   cloudAgentSessionId: FAKE_SESSION_ID,
-  payload: { type: 'prompt' as const, prompt: 'first', mode: 'plan' as const, model: 'test-model' },
+  payload: { mode: 'plan' as const, model: 'test-model', prompt: 'first', type: 'prompt' as const },
 };
 const PROMPT_SECOND = {
   cloudAgentSessionId: FAKE_SESSION_ID,
-  payload: { type: 'prompt' as const, prompt: 'second', mode: 'plan' as const, model: 'test-model' },
+  payload: {
+    mode: 'plan' as const,
+    model: 'test-model',
+    prompt: 'second',
+    type: 'prompt' as const,
+  },
 };
-
-beforeEach(() => {
-  vi.clearAllMocks();
-});
 
 /**
  * Builds a realistic tRPC JSON response for an unbatched mutation call and
@@ -31,10 +32,10 @@ beforeEach(() => {
  */
 const respondWithTRPCResult = (payload: unknown): void => {
   mockFetch.mockResolvedValueOnce(
-    new Response(
-      JSON.stringify({
+    Response.json(
+      {
         result: { data: payload },
-      }),
+      },
       {
         headers: {
           'content-type': 'application/json',
@@ -46,6 +47,10 @@ const respondWithTRPCResult = (payload: unknown): void => {
 };
 
 describe('createExtensionTrpcClient', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('sends unbatched request to .../api/trpc/<procedure> when using skipBatch', async () => {
     respondWithTRPCResult({ ok: true });
 
@@ -54,10 +59,9 @@ describe('createExtensionTrpcClient', () => {
       getToken: () => 'my-token',
     });
 
-    await client['cloudAgentNext']['sendMessage'].mutate(
-      PROMPT_PAYLOAD,
-      { context: { skipBatch: true } }
-    );
+    await client['cloudAgentNext']['sendMessage'].mutate(PROMPT_PAYLOAD, {
+      context: { skipBatch: true },
+    });
 
     const [url] = mockFetch.mock.calls[0] as [string];
     expect(url).toBe(`${FAKE_BASE_URL}/api/trpc/cloudAgentNext.sendMessage`);
@@ -85,10 +89,9 @@ describe('createExtensionTrpcClient', () => {
       getToken: () => 'my-token',
     });
 
-    await client['cloudAgentNext']['sendMessage'].mutate(
-      PROMPT_PAYLOAD,
-      { context: { skipBatch: true } }
-    );
+    await client['cloudAgentNext']['sendMessage'].mutate(PROMPT_PAYLOAD, {
+      context: { skipBatch: true },
+    });
 
     const [url] = mockFetch.mock.calls[0] as [string];
     expect(url).toBe(`${FAKE_BASE_URL}/api/trpc/cloudAgentNext.sendMessage`);
@@ -102,10 +105,9 @@ describe('createExtensionTrpcClient', () => {
       getToken: () => 'my-bearer-token',
     });
 
-    await client['cloudAgentNext']['sendMessage'].mutate(
-      PROMPT_PAYLOAD,
-      { context: { skipBatch: true } }
-    );
+    await client['cloudAgentNext']['sendMessage'].mutate(PROMPT_PAYLOAD, {
+      context: { skipBatch: true },
+    });
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(init?.headers).toBeDefined();
@@ -118,13 +120,31 @@ describe('createExtensionTrpcClient', () => {
 
     const client = createExtensionTrpcClient({
       apiBaseUrl: FAKE_BASE_URL,
+      // eslint-disable-next-line unicorn/no-useless-undefined -- testing getToken undefined (no-token) path
       getToken: () => undefined,
     });
 
-    await client['cloudAgentNext']['sendMessage'].mutate(
-      PROMPT_PAYLOAD,
-      { context: { skipBatch: true } }
-    );
+    await client['cloudAgentNext']['sendMessage'].mutate(PROMPT_PAYLOAD, {
+      context: { skipBatch: true },
+    });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init?.headers).toBeDefined();
+    const headers = init.headers as Record<string, string>;
+    expect(headers['Authorization']).toBeUndefined();
+  });
+
+  it('omits Authorization header when getToken returns empty string', async () => {
+    respondWithTRPCResult({ ok: true });
+
+    const client = createExtensionTrpcClient({
+      apiBaseUrl: FAKE_BASE_URL,
+      getToken: () => '',
+    });
+
+    await client['cloudAgentNext']['sendMessage'].mutate(PROMPT_PAYLOAD, {
+      context: { skipBatch: true },
+    });
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(init?.headers).toBeDefined();
@@ -147,15 +167,13 @@ describe('createExtensionTrpcClient', () => {
       getToken,
     });
 
-    await client['cloudAgentNext']['sendMessage'].mutate(
-      PROMPT_FIRST,
-      { context: { skipBatch: true } }
-    );
+    await client['cloudAgentNext']['sendMessage'].mutate(PROMPT_FIRST, {
+      context: { skipBatch: true },
+    });
 
-    await client['cloudAgentNext']['sendMessage'].mutate(
-      PROMPT_SECOND,
-      { context: { skipBatch: true } }
-    );
+    await client['cloudAgentNext']['sendMessage'].mutate(PROMPT_SECOND, {
+      context: { skipBatch: true },
+    });
 
     expect(getToken).toHaveBeenCalledTimes(2);
 

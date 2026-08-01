@@ -1,20 +1,21 @@
+/* eslint-disable vitest/prefer-describe-function-title -- conflicts with jest/valid-title which requires string titles */
 import { describe, expect, it } from 'vitest';
 import {
   SIDE_PANEL_MODE_STORAGE_KEY,
   loadSidePanelMode,
   saveSidePanelMode,
-  type SidePanelMode,
 } from './side-panel-mode';
+import type { SidePanelMode } from './side-panel-mode';
 
-const makeStorage = (initial: unknown = undefined) => {
+const makeStorage = (initial?: unknown) => {
   let stored: unknown = initial;
   return {
     getItem: () => stored,
-    setItem: (_key: string, value: SidePanelMode) => {
-      stored = value;
-    },
     removeItem: () => {
       stored = undefined;
+    },
+    setItem: (_key: string, value: SidePanelMode) => {
+      stored = value;
     },
   };
 };
@@ -53,7 +54,9 @@ describe('loadSidePanelMode', () => {
   it('returns browser when getItem throws', async () => {
     const storage = {
       ...makeStorage(),
-      getItem: () => { throw new Error('boom'); },
+      getItem: () => {
+        throw new Error('boom');
+      },
     };
     const mode = await loadSidePanelMode(storage);
     expect(mode).toBe('browser');
@@ -93,13 +96,14 @@ describe('saveSidePanelMode', () => {
   });
 
   it('uses the correct storage key', async () => {
+    // eslint-disable-next-line init-declarations -- captured by closure, initialized before use
     let capturedKey: string | undefined;
     const storage = {
-      getItem: (_key: unknown) => undefined,
+      getItem: (_key: unknown) => {},
+      removeItem: () => {},
       setItem: (key: string, _value: SidePanelMode) => {
         capturedKey = key;
       },
-      removeItem: () => {},
     };
     await saveSidePanelMode(storage, 'agents');
     expect(capturedKey).toBe(SIDE_PANEL_MODE_STORAGE_KEY);

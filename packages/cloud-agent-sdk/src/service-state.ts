@@ -28,21 +28,20 @@ type ServiceStateConfig = {
   onError?: ((message: string) => void) | undefined;
   onQuestionAsked?: ((requestId: string, questions?: QuestionInfo[]) => void) | undefined;
   onQuestionResolved?: ((requestId: string) => void) | undefined;
-  onPermissionAsked?: ((
-    requestId: string,
-    permission?: string,
-    patterns?: string[],
-    metadata?: Record<string, unknown>,
-    always?: string[]
-  ) => void) | undefined;
+  onPermissionAsked?:
+    | ((
+        requestId: string,
+        permission?: string,
+        patterns?: string[],
+        metadata?: Record<string, unknown>,
+        always?: string[]
+      ) => void)
+    | undefined;
   onPermissionResolved?: ((requestId: string) => void) | undefined;
   /** Fired when a `suggest` tool asks the user to pick an action. */
-  onSuggestionAsked?: ((
-    requestId: string,
-    text: string,
-    actions: SuggestionAction[],
-    callId?: string
-  ) => void) | undefined;
+  onSuggestionAsked?:
+    | ((requestId: string, text: string, actions: SuggestionAction[], callId?: string) => void)
+    | undefined;
   /** Fired when a suggestion is resolved (accepted or dismissed). */
   onSuggestionResolved?: ((requestId: string) => void) | undefined;
   onBranchChanged?: ((branch: string) => void) | undefined;
@@ -57,10 +56,9 @@ type ServiceStateConfig = {
   /** Fired when a queued user message's execution terminates in 'completed'. */
   onMessageCompleted?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message fails delivery or its execution fails. */
-  onMessageFailed?: ((
-    messageId: string,
-    state: Extract<MessageDeliveryState, { status: 'failed' }>
-  ) => void) | undefined;
+  onMessageFailed?:
+    | ((messageId: string, state: Extract<MessageDeliveryState, { status: 'failed' }>) => void)
+    | undefined;
 };
 
 type ServiceState = {

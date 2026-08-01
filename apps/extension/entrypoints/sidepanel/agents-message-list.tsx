@@ -6,22 +6,36 @@ import type { StoredMessage, Part } from '@kilocode/cloud-agent-sdk';
 const remarkPlugins = [remarkGfm];
 
 const toolStatusLabel = (status: string): string => {
-  if (status === 'pending') return 'pending';
-  if (status === 'running') return 'running';
-  if (status === 'completed') return 'completed';
-  if (status === 'error') return 'error';
+  if (status === 'pending') {
+    return 'pending';
+  }
+  if (status === 'running') {
+    return 'running';
+  }
+  if (status === 'completed') {
+    return 'completed';
+  }
+  if (status === 'error') {
+    return 'error';
+  }
   return status;
 };
 
 const toolStatusColor = (status: string): string => {
-  if (status === 'error') return 'text-status-red-400';
-  if (status === 'completed') return 'text-status-green-500';
-  if (status === 'running') return 'text-foreground-muted';
+  if (status === 'error') {
+    return 'text-status-red-400';
+  }
+  if (status === 'completed') {
+    return 'text-status-green-500';
+  }
+  if (status === 'running') {
+    return 'text-foreground-muted';
+  }
   return 'text-foreground-muted';
 };
 
 const ToolPartRow = ({ part }: { part: Extract<Part, { type: 'tool' }> }): JSX.Element => {
-  const status = part.state.status;
+  const { status } = part.state;
   return (
     <div className="flex items-center gap-1.5 text-xs">
       <span className="text-foreground-muted">{part.tool}</span>
@@ -57,9 +71,11 @@ const PartRow = ({ part }: { part: Part }): JSX.Element | null => {
 const MessageRow = ({ message }: { message: StoredMessage }): JSX.Element => {
   const isUser = message.info.role === 'user';
   const isStreaming =
-    message.info.role === 'assistant' && !message.info.time.completed && !message.info.error;
-  const textParts = message.parts.filter(p => p.type === 'text');
-  const nonTextParts = message.parts.filter(p => p.type !== 'text');
+    message.info.role === 'assistant' &&
+    message.info.time.completed === undefined &&
+    !message.info.error;
+  const textParts = message.parts.filter(part => part.type === 'text');
+  const nonTextParts = message.parts.filter(part => part.type !== 'text');
   const hasContent = message.parts.length > 0;
 
   return (
@@ -71,14 +87,7 @@ const MessageRow = ({ message }: { message: StoredMessage }): JSX.Element => {
             : 'max-w-[88%] rounded-lg px-3 py-2'
         }
       >
-        {!hasContent ? (
-          <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
-            <span
-              className={`inline-block size-1.5 rounded-full ${isStreaming ? 'animate-pulse bg-foreground-muted' : 'bg-foreground-muted'}`}
-            />
-            {isStreaming ? 'Thinking…' : 'No content'}
-          </div>
-        ) : (
+        {hasContent ? (
           <div className="space-y-1">
             {textParts.map(part => (
               <PartRow key={part.id} part={part} />
@@ -86,6 +95,13 @@ const MessageRow = ({ message }: { message: StoredMessage }): JSX.Element => {
             {nonTextParts.map(part => (
               <PartRow key={part.id} part={part} />
             ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
+            <span
+              className={`inline-block size-1.5 rounded-full ${isStreaming ? 'animate-pulse bg-foreground-muted' : 'bg-foreground-muted'}`}
+            />
+            {isStreaming ? 'Thinking…' : 'No content'}
           </div>
         )}
       </div>

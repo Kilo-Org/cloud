@@ -73,13 +73,13 @@ export type ServiceEvent =
   | { type: 'session.status'; sessionId: string; status: SessionStatus }
   | { type: 'session.created'; info: SessionInfo }
   | { type: 'session.updated'; info: SessionInfo }
-  | { type: 'session.error'; error: string; sessionId?: string }
+  | { type: 'session.error'; error: string; sessionId?: string | undefined }
   | { type: 'session.idle'; sessionId: string }
-  | { type: 'session.turn.close'; sessionId?: string; reason?: string }
+  | { type: 'session.turn.close'; sessionId?: string | undefined; reason?: string | undefined }
   | {
       type: 'question.asked';
       requestId: string;
-      questions?: QuestionInfo[];
+      questions?: QuestionInfo[] | undefined;
     }
   | { type: 'question.replied'; requestId: string }
   | { type: 'question.rejected'; requestId: string }
@@ -98,88 +98,88 @@ export type ServiceEvent =
       text: string;
       actions: SuggestionAction[];
       /** Tool call ID that emitted this suggestion, when available. */
-      callId?: string;
+      callId?: string | undefined;
     }
-  | { type: 'suggestion.accepted'; requestId: string; index: number; action?: SuggestionAction }
+  | { type: 'suggestion.accepted'; requestId: string; index: number; action?: SuggestionAction | undefined }
   | { type: 'suggestion.dismissed'; requestId: string }
   | {
       type: 'stopped';
       reason: 'complete' | 'interrupted' | 'disconnected' | 'transport-disconnected' | 'error';
-      branch?: string;
+      branch?: string | undefined;
     }
   | { type: 'warning' }
   | {
       type: 'preparing';
       step: string;
       message: string;
-      branch?: string;
-      version?: 2;
-      attemptId?: string;
-      triggerMessageId?: string;
-      revision?: number;
-      timestamp?: number;
-      action?: string;
-      stepId?: string;
-      kind?: 'phase' | 'setup_command';
-      label?: string;
-      command?: string;
-      commandIndex?: number;
-      commandCount?: number;
-      detail?: string;
-      output?: string;
-      safeError?: string;
-      exitCode?: number;
+      branch?: string | undefined;
+      version?: 2 | undefined;
+      attemptId?: string | undefined;
+      triggerMessageId?: string | undefined;
+      revision?: number | undefined;
+      timestamp?: number | undefined;
+      action?: string | undefined;
+      stepId?: string | undefined;
+      kind?: 'phase' | 'setup_command' | undefined;
+      label?: string | undefined;
+      command?: string | undefined;
+      commandIndex?: number | undefined;
+      commandCount?: number | undefined;
+      detail?: string | undefined;
+      output?: string | undefined;
+      safeError?: string | undefined;
+      exitCode?: number | undefined;
       attempt?: {
         id: string;
         triggerMessageId: string;
         status: 'running' | 'completed' | 'failed';
         startedAt: number;
-        completedAt?: number;
-        safeError?: string;
+        completedAt?: number | undefined;
+        safeError?: string | undefined;
         revision: number;
-      };
-      stepSnapshot?: PreparationStepSnapshot;
+      } | undefined;
+      stepSnapshot?: PreparationStepSnapshot | undefined;
     }
-  | { type: 'autocommit_started'; messageId: string; message?: string }
+  | { type: 'autocommit_started'; messageId: string; message?: string | undefined }
   | {
       type: 'autocommit_completed';
       messageId: string;
       success: boolean;
-      message?: string;
-      skipped?: boolean;
-      commitHash?: string;
-      commitMessage?: string;
+      message?: string | undefined;
+      skipped?: boolean | undefined;
+      commitHash?: string | undefined;
+      commitMessage?: string | undefined;
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
   | {
       type: 'connected';
-      sessionStatus?: SessionStatus;
-      cloudStatus?: CloudStatus;
+      sessionStatus?: SessionStatus | undefined;
+      cloudStatus?: CloudStatus | undefined;
     }
   | { type: 'commands.available'; commands: SlashCommandInfo[] }
   | {
       type: 'cloud.message.queued';
       messageId: string;
-      executionId?: string;
-      content?: string;
+      executionId?: string | undefined;
+      content?: string | undefined;
     }
   | {
       type: 'cloud.message.sent';
       messageId: string;
-      executionId?: string;
+      executionId?: string | undefined;
     }
   | {
       type: 'cloud.message.completed';
       messageId: string;
-      executionId?: string;
+      executionId?: string | undefined;
     }
   | {
       type: 'cloud.message.failed';
       messageId: string;
-      executionId?: string;
+      executionId?: string | undefined;
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
-      attempts?: number;
+      attempts?: number | undefined;
     }
   | {
       type: 'queue.changed';
@@ -228,10 +228,10 @@ const sessionModelSchema = z.object({
 });
 
 function normalizeSessionInfo(rawInfo: { id: string; [key: string]: unknown }): SessionInfo {
-  const model = sessionModelSchema.safeParse(rawInfo.model);
+  const model = sessionModelSchema.safeParse(rawInfo['model']);
   return {
     id: rawInfo.id,
-    parentID: rawInfo.parentID != null ? String(rawInfo.parentID) : undefined,
+    parentID: rawInfo['parentID'] != null ? String(rawInfo['parentID']) : undefined,
     ...(model.success ? { model: model.data } : {}),
   };
 }

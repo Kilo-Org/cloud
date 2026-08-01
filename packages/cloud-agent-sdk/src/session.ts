@@ -78,7 +78,9 @@ type CloudAgentSessionConfig = {
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onTransportCapabilityChange?: () => void;
-  onTransportCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onTransportCapabilitiesChange?:
+    | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
+    | undefined;
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
   onReplayComplete?: () => void;
@@ -101,10 +103,10 @@ type CloudAgentSessionConfig = {
 
 type CloudAgentSessionSendInput = {
   payload: TransportSendPayload;
-  messageId?: string;
-  attachments?: CloudAgentAttachments;
-  images?: Images;
-  remoteModelOverride?: RemoteModelOverride;
+  messageId?: string | undefined;
+  attachments?: CloudAgentAttachments | undefined;
+  images?: Images | undefined;
+  remoteModelOverride?: RemoteModelOverride | undefined;
   /**
    * Ready file parts to forward to a CAPABLE remote CLI session. The
    * session-manager gate already enforces that this is only non-empty for
@@ -112,7 +114,7 @@ type CloudAgentSessionSendInput = {
    * true`; transports that don't support the path (cloud-agent, read-only,
    * non-capable remote) simply ignore it.
    */
-  attachmentParts?: RemoteAttachmentPart[];
+  attachmentParts?: RemoteAttachmentPart[] | undefined;
 };
 
 type CloudAgentSessionAnswerInput = {
@@ -142,13 +144,15 @@ type CloudAgentSessionDismissSuggestionInput = {
 
 type CloudAgentSessionTransport = {
   // Cloud Agent transport construction
-  getTicket?: (
-    sessionId: CloudAgentSessionId
-  ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
-  api?: CloudAgentApi;
+  getTicket?:
+    | ((
+        sessionId: CloudAgentSessionId
+      ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>)
+    | undefined;
+  api?: CloudAgentApi | undefined;
 
   // Shared
-  fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware root snapshot fetch. The transport uses this for its initial
    * bounded read and any reconnect snapshot replays. After a successful
@@ -157,17 +161,19 @@ type CloudAgentSessionTransport = {
    * fire that callback so the user's already-advanced older-messages cursor
    * isn't reset to the latest 50 on every reconnect.
    */
-  fetchSnapshotPage?: (
-    kiloSessionId: KiloSessionId,
-    options: { cursor?: string }
-  ) => Promise<SessionSnapshotPageOutcome | null>;
+  fetchSnapshotPage?:
+    | ((
+        kiloSessionId: KiloSessionId,
+        options: { cursor?: string }
+      ) => Promise<SessionSnapshotPageOutcome | null>)
+    | undefined;
   /** Called by the transport after a successful initial bounded page read. */
-  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
-  lifecycleHooks?: ConnectionLifecycleHooks;
-  websocketHeaders?: WebSocketHeaders;
+  onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
+  lifecycleHooks?: ConnectionLifecycleHooks | undefined;
+  websocketHeaders?: WebSocketHeaders | undefined;
 
   // Remote CLI live transport construction
-  userWebConnection?: UserWebConnection;
+  userWebConnection?: UserWebConnection | undefined;
 };
 
 type CloudAgentSession = {
@@ -304,7 +310,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           kiloSessionId: resolved.kiloSessionId,
           userWebConnection: config.transport.userWebConnection,
           fetchSnapshot: config.transport.fetchSnapshot,
-          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          ...(config.transport.fetchSnapshotPage
+            ? { fetchSnapshotPage: config.transport.fetchSnapshotPage }
+            : {}),
           onInitialPageLoaded: config.transport.onInitialPageLoaded,
           onError: config.onError,
           onRemoteModelStateChange: config.onRemoteModelStateChange,
@@ -338,7 +346,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           api: config.transport.api,
           getTicket: config.transport.getTicket,
           fetchSnapshot: config.transport.fetchSnapshot,
-          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          ...(config.transport.fetchSnapshotPage
+            ? { fetchSnapshotPage: config.transport.fetchSnapshotPage }
+            : {}),
           onInitialPageLoaded: config.transport.onInitialPageLoaded,
           websocketBaseUrl: config.websocketBaseUrl,
           onError: config.onError,
@@ -355,7 +365,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         return createCliHistoricalTransport({
           kiloSessionId: resolved.kiloSessionId,
           fetchSnapshot: config.transport.fetchSnapshot,
-          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          ...(config.transport.fetchSnapshotPage
+            ? { fetchSnapshotPage: config.transport.fetchSnapshotPage }
+            : {}),
           onInitialPageLoaded: config.transport.onInitialPageLoaded,
           onError: config.onError,
         });

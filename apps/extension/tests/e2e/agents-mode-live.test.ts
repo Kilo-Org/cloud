@@ -120,7 +120,10 @@ test('live local backend: open remote CLI session, send, assert reply, send long
           }
           return false;
         },
-        { timeout: 60_000, message: 'No non-Cloud active sessions found — expected at least one remote CLI session' }
+        {
+          timeout: 60_000,
+          message: 'No non-Cloud active sessions found — expected at least one remote CLI session',
+        }
       )
       .toBe(true);
 

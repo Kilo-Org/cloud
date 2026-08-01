@@ -15,7 +15,7 @@ function stripFilePartContent(part: FilePart): FilePart {
     messageID: part.messageID,
     type: 'file',
     mime: part.mime,
-    filename: part.filename,
+    ...(part.filename !== undefined ? { filename: part.filename } : {}),
     url: '',
   };
   if (part.source) {

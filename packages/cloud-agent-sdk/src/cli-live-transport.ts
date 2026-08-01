@@ -57,7 +57,7 @@ function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
   userWebConnection: UserWebConnection;
-  fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware root snapshot fetch. When provided, every `replayCurrentSnapshot`
    * (initial bounded read AND reconnect immediate + delayed resync) uses it
@@ -74,11 +74,11 @@ type CliLiveTransportConfig = {
    * delayed-resync replays do NOT call this so the user's already-advanced
    * older-messages cursor is never reset to the latest 50.
    */
-  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
-  onError?: (message: string) => void;
-  onRemoteModelStateChange?: (state: RemoteModelState) => void;
-  onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-  onCapabilityChange?: () => void;
+  onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
+  onRemoteModelStateChange?: ((state: RemoteModelState) => void) | undefined;
+  onRemoteCommandStateChange?: ((state: RemoteCommandState) => void) | undefined;
+  onCapabilityChange?: (() => void) | undefined;
   /**
    * Fired whenever the per-session capabilities advertised by the owning
    * CLI in `sessions.heartbeat` / `sessions.list` change (upgrade, downgrade,
@@ -87,7 +87,9 @@ type CliLiveTransportConfig = {
    * whose session list dropped this session). The session manager uses this
    * to recompute the `supportsAttachments` gate.
    */
-  onCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onCapabilitiesChange?:
+    | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
+    | undefined;
 };
 
 // How long after a reconnect to re-fetch the snapshot a second time. Covers
@@ -127,8 +129,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
      * payload that omitted this session). Compared structurally on every
      * new observation; only emitted on a real change.
      */
-    let currentCapabilities: { attachments?: boolean } | undefined = undefined;
-    function publishCapabilities(next: { attachments?: boolean } | undefined): void {
+    let currentCapabilities: { attachments?: boolean | undefined } | undefined = undefined;
+    function publishCapabilities(next: { attachments?: boolean | undefined } | undefined): void {
       const previousAttachments = currentCapabilities?.attachments;
       const nextAttachments = next?.attachments;
       if (previousAttachments === nextAttachments) return;

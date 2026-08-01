@@ -15,11 +15,7 @@ import {
   mockAgentsApi,
   navigateToAgentsMode,
 } from './agents-fixture';
-import type {
-  AgentsFixtureOptions,
-  AgentsFixtureResult,
-  RemoteSessionSeed,
-} from './agents-fixture';
+import type { AgentsFixtureOptions } from './agents-fixture';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -214,10 +210,16 @@ test('Agents can send a message on a cloud session', async () => {
     // Prove the sendMessage mutation fired with the expected payload shape.
     // Poll to avoid a race: the composer reverts to "Send message" before the
     // async sendMessage mutation reaches the mock's calledProcedures array.
-    const sendProcNames = ['cloudAgentNext.sendMessage', 'organizations.cloudAgentNext.sendMessage'] as const;
+    const sendProcNames = [
+      'cloudAgentNext.sendMessage',
+      'organizations.cloudAgentNext.sendMessage',
+    ] as const;
     await expect
       .poll(
-        () => mockResult.calledProcedures.filter(c => (sendProcNames as readonly string[]).includes(c.proc)).length,
+        () =>
+          mockResult.calledProcedures.filter(c =>
+            (sendProcNames as readonly string[]).includes(c.proc)
+          ).length,
         { timeout: 10_000 }
       )
       .toBe(1);
@@ -231,11 +233,11 @@ test('Agents can send a message on a cloud session', async () => {
       payload: {
         type: 'prompt',
         prompt: 'Check the tests',
-        mode: expect.any(String) as string,
-        model: expect.any(String) as string,
+        mode: expect.any(String),
+        model: expect.any(String),
       },
       autoCommit: true,
-      messageId: expect.any(String) as string,
+      messageId: expect.any(String),
     });
   } finally {
     await cleanup();

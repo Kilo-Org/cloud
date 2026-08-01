@@ -19,7 +19,7 @@ type ChatProcessor = {
 };
 
 type ChatProcessorOptions = {
-  onImageAttachment?: (partId: string, mime: string, dataUrl: string) => void;
+  onImageAttachment?: ((partId: string, mime: string, dataUrl: string) => void) | undefined;
 };
 
 function hasTextField(part: { text?: string } | unknown): part is { text: string } {

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Cohesive single view component; splitting would reduce clarity */
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
@@ -61,14 +61,33 @@ export const AgentsSessionView = ({
 
   // Single session lifecycle: clear error + switch on setup, destroy on cleanup.
   // On id change cleanup runs first (destroy old), then setup reconnects fresh.
-  // Under StrictMode cleanup/re-setup cycles destroy + reconnect correctly —
-  // No stale guard to skip the reconnect.
+  /* eslint-disable capitalized-comments -- multi-line block; sentence continuations like "switcSession" and "mount" are fine */
+  // Under StrictMode the first effect's switchSession is async. Cleanup
+  // fires before it settles and the default destroy() kills the transport.
+  // Defer destroy via setTimeout(0) so a StrictMode re-mount can cancel it
+  // before it fires. This keeps exactly one live connection after the double
+  // mount and prevents canSend from resolving before the transport is ready.
+  /* eslint-enable capitalized-comments */
+  const destroyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
+    // Cancel any pending destroy from a prior StrictMode or id-change cleanup cycle.
+    if (destroyTimerRef.current !== null) {
+      clearTimeout(destroyTimerRef.current);
+      destroyTimerRef.current = null;
+    }
+
     manager.clearError();
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- branded ID from untyped hook input
     void manager.switchSession(kiloSessionId as KiloSessionId);
+
     return () => {
-      manager.destroy();
+      // Defer destroy so a StrictMode re-mount can cancel it before it fires.
+      // If this is a real unmount, the timer fires and tears down the transport.
+      destroyTimerRef.current = setTimeout(() => {
+        manager.destroy();
+        destroyTimerRef.current = null;
+      }, 0);
     };
   }, [kiloSessionId, manager]);
 

@@ -1,7 +1,7 @@
 /* eslint-disable capitalized-comments, id-length, jest/max-expects, max-lines, sort-keys */
 // @vitest-environment jsdom
 
-import { createElement as h } from 'react';
+import { createElement as h, StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import type {
@@ -1418,24 +1418,36 @@ describe('agents session view integration', () => {
   // ---- Unmount destroys manager transport ----
 
   it('calls manager.destroy() on unmount', async () => {
+    vi.useFakeTimers();
     const { unmount } = await renderView();
     expect(mockManager.destroy).not.toHaveBeenCalled();
 
     unmount();
+    // destroy is deferred via setTimeout(0) — not called synchronously
+    expect(mockManager.destroy).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(0);
     // eslint-disable-next-line vitest/prefer-called-times -- current linter also requires CalledOnce.
     expect(mockManager.destroy).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 
   // ---- StrictMode-safe lifecycle: cleanup/re-setup reconnects ----
 
   it('calls switchSession again after cleanup/re-setup (StrictMode simulation)', async () => {
-    // Simulate StrictMode: mount → unmount → remount with the same session id.
+    vi.useFakeTimers();
+
     const { unmount } = await renderView();
     // eslint-disable-next-line vitest/prefer-called-times -- current linter requires CalledOnce; avoiding contradiction
     expect(mockManager.switchSession).toHaveBeenCalledOnce();
     expect(mockManager.destroy).not.toHaveBeenCalled();
 
+    // StrictMode cleanup: destroy is deferred via setTimeout(0)
     unmount();
+    // Deferred by setTimeout — not called synchronously
+    expect(mockManager.destroy).not.toHaveBeenCalled();
+
+    // Advance timers — deferred destroy fires for the first StrictMode cycle
+    vi.advanceTimersByTime(0);
     // eslint-disable-next-line vitest/prefer-called-times -- current linter requires CalledOnce; avoiding contradiction
     expect(mockManager.destroy).toHaveBeenCalledOnce();
 
@@ -1445,6 +1457,40 @@ describe('agents session view integration', () => {
     expect(mockManager.clearError).toHaveBeenCalledTimes(2);
 
     unmount2();
+    vi.advanceTimersByTime(0);
     expect(mockManager.destroy).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it('preserves transport through StrictMode re-mount by cancelling deferred destroy', async () => {
+    vi.useFakeTimers();
+
+    const { AgentsSessionView } = await import('./agents-session-view');
+
+    // Wrap in React StrictMode so React double-mounts the component.
+    // This simulates the production/dev StrictMode cycle where:
+    //   mount → effect (switchSession) → cleanup (defer destroy) → remount → effect (cancel + switchSession)
+    const { unmount } = render(
+      h(StrictMode, {}, h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }))
+    );
+
+    // StrictMode causes double mount: switchSession fires twice within the same component instance.
+    // The first cleanup's deferred destroy was cancelled by the second effect's clearTimeout.
+    expect(mockManager.switchSession).toHaveBeenCalledTimes(2);
+    expect(mockManager.clearError).toHaveBeenCalledTimes(2);
+
+    // Advance timers — no destroy should have fired because the first cleanup's
+    // setTimeout was cancelled by the second effect (shared destroyTimerRef).
+    vi.advanceTimersByTime(0);
+    expect(mockManager.destroy).not.toHaveBeenCalled();
+
+    // Final unmount: the second effect's cleanup defers destroy
+    unmount();
+    vi.advanceTimersByTime(0);
+    // eslint-disable-next-line vitest/prefer-called-times -- current linter requires CalledOnce; avoiding contradiction
+    expect(mockManager.destroy).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
   });
 });

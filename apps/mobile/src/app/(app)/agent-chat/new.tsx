@@ -224,7 +224,7 @@ function NewSessionScreenBody() {
       <ScreenHeader
         title="New session"
         eyebrow={eyebrow}
-        showBackButton={flowMode === 'steps' && step === 2}
+        showBackButton={flowMode === 'steps' && step === 2 ? true : undefined}
         onBack={flowMode === 'steps' && step === 2 ? handleStepBack : undefined}
       />
       <NewSessionFlowBody

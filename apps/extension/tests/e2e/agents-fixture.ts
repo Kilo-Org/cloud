@@ -367,7 +367,7 @@ export const mockAgentsApi = async (
         return {
           result: {
             data: {
-              ...(cloudSession ? { cloud_agent_session_id: cloudSession.cloudAgentSessionId } : {}),
+              cloud_agent_session_id: cloudSession?.cloudAgentSessionId ?? null,
               git_branch: cloudSession?.gitBranch ?? null,
               git_url: cloudSession?.gitUrl ?? null,
               organization_id: DEFAULT_ORG_ID,

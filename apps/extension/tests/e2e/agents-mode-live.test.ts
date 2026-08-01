@@ -165,14 +165,17 @@ test('live local backend: open remote CLI session, send, assert reply, send long
     }
 
     // ---- Phase 1: Send a short prompt and assert the assistant replies with a distinct response ----
+    // Count existing assistant messages containing '4' before sending, so a
+    // Pre-existing remote transcript doesn't cause a false pass.
+    const assistant4 = sidePanel.locator('.flex.justify-start').filter({ hasText: '4' });
+    const countBefore = await assistant4.count();
+
     const composer = sidePanel.locator('#agents-message');
     await composer.fill('What is 2+2? Output only the number.');
     await composer.press('Enter');
 
-    // Wait for the assistant response — scope to assistant-only message container
-    await expect(sidePanel.locator('.flex.justify-start').getByText('4')).toBeVisible({
-      timeout: 120_000,
-    });
+    // Assert at least one new assistant message containing '4' appears.
+    await expect.poll(() => assistant4.count(), { timeout: 120_000 }).toBeGreaterThan(countBefore);
 
     // ---- Phase 2: Send a long prompt, interrupt, assert recovery ----
     await composer.fill('Write a very detailed explanation of TypeScript generics with examples.');

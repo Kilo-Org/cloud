@@ -1,14 +1,18 @@
 import * as Sentry from '@sentry/react-native';
 
-// Session replay, screenshots, and view-hierarchy capture must not run
-// before the user accepts consent (the consent copy only promises
-// "anonymous performance and crash data" — see consent-card.tsx). This is
-// the pure decision function; src/app/_layout.tsx re-inits Sentry with
-// these options (via reinitSentryForConsent below) whenever the stored
-// consent state changes.
+// Session replay, screenshots, view-hierarchy capture, and performance
+// tracing (TTID/TTFD, app start) must not run before the user accepts
+// consent (the consent copy only promises "anonymous performance and crash
+// data" — see consent-card.tsx). This is the pure decision function;
+// src/app/_layout.tsx re-inits Sentry with these options (via
+// reinitSentryForConsent below) whenever the stored consent state changes.
+//
+// Per-launch startup timing therefore comes from the PostHog `app_startup`
+// event in src/lib/startup-timing.ts, not from Sentry traces.
 type SentryConsentOptions = {
   readonly replaysSessionSampleRate: number;
   readonly replaysOnErrorSampleRate: number;
+  readonly tracesSampleRate: number;
   readonly attachScreenshot: boolean;
   readonly attachViewHierarchy: boolean;
 };
@@ -18,6 +22,7 @@ export function sentryOptionsForConsent(consented: boolean): SentryConsentOption
     return {
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,
+      tracesSampleRate: 0,
       attachScreenshot: false,
       attachViewHierarchy: false,
     };
@@ -26,6 +31,7 @@ export function sentryOptionsForConsent(consented: boolean): SentryConsentOption
   return {
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1,
+    tracesSampleRate: 0.1,
     attachScreenshot: true,
     attachViewHierarchy: true,
   };

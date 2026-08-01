@@ -16,6 +16,11 @@ import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
+import {
+  appendNewSessionPrefill,
+  buildContinuePrefillParams,
+} from '@/components/agents/new-session-prefill';
+import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
@@ -716,6 +721,17 @@ export function SessionDetailContent({
     [manager, router]
   );
 
+  const handleContinueInNewSession = useCallback(() => {
+    const base = getNewAgentSessionPath(organizationId ?? null);
+    const params = buildContinuePrefillParams({
+      gitUrl: fetchedData?.gitUrl,
+      mode: currentMode,
+      model: currentModel,
+      variant: currentVariant,
+    });
+    router.push(appendNewSessionPrefill(base, params) as Href);
+  }, [organizationId, fetchedData?.gitUrl, currentMode, currentModel, currentVariant, router]);
+
   const isFocused = useIsFocused();
   // Focus bounds the awake window to the visible working UI; a backgrounded
   // or covered screen must not hold the OS idle timer.
@@ -878,10 +894,18 @@ export function SessionDetailContent({
         ) : null}
 
         {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
-          <View className="border-t border-border bg-secondary px-4 py-3">
+          <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
               This is a read-only session
             </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              accessibilityLabel="Continue in a new session"
+              onPress={handleContinueInNewSession}
+            >
+              <Text>Continue in a new session</Text>
+            </Button>
           </View>
         ) : null}
 

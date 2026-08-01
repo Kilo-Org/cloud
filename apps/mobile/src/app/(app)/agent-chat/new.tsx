@@ -82,6 +82,7 @@ function NewSessionScreenBody() {
     data: instancesData,
     isFetched: isInstancesFetched,
     isError: isInstancesError,
+    isPaused: isInstancesPaused,
     refetch: refetchInstances,
   } = useQuery({
     ...trpc.activeSessions.listInstances.queryOptions(undefined, {
@@ -177,7 +178,8 @@ function NewSessionScreenBody() {
     }
     void submitCreate();
   }, [remoteSpawn, runOnInstance, submitCreate]);
-  const instancesSettled = !showRunOnSelector || isInstancesFetched || isInstancesError;
+  const instancesSettled =
+    !showRunOnSelector || isInstancesFetched || isInstancesError || isInstancesPaused;
   if (!flowModeLatchedRef.current && instancesSettled) {
     flowModeLatchedRef.current = true;
     const resolved = resolveNewSessionFlowMode({
@@ -222,6 +224,7 @@ function NewSessionScreenBody() {
       <ScreenHeader
         title="New session"
         eyebrow={eyebrow}
+        showBackButton={flowMode === 'steps' && step === 2}
         onBack={flowMode === 'steps' && step === 2 ? handleStepBack : undefined}
       />
       <NewSessionFlowBody

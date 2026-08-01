@@ -97,7 +97,7 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
     id: partId,
     filename: `${DOT_MARKER}${extensionForMime(mime)}`,
   });
-  const pattern = DOT_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = DOT_MARKER.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   return safe.replace(new RegExp(`-${pattern}(?!.*-${pattern})`), '.');
 }
 

@@ -96,16 +96,17 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
       lastTypedRef.current = text;
       handleSearchChange(text);
 
-      // Only trigger a render when awaitingCommit transitions
-      // false → true. The functional updater keeps true → true a
-      // no-op: additional keystrokes between the first typed char
-      // and the debounce commit do not force SectionList renders.
+      // Only trigger a render when awaitingCommit transitions.
+      // The functional updater returns prev when it already equals
+      // shouldAwait so React skips the rerender. Both true→false
+      // (backspace to match committed query before debounce fires)
+      // and false→true (first typed char) are allowed transitions.
       const shouldAwait = selectAwaitingCommit({
         hasText: hasTextNow,
         lastTyped: text,
         searchQuery: searchQueryRef.current,
       });
-      setAwaitingCommit(prev => prev || shouldAwait);
+      setAwaitingCommit(prev => (prev === shouldAwait ? prev : shouldAwait));
     },
     [handleSearchChange]
   );

@@ -13,7 +13,7 @@ export function ContinueClient({ to }: { to: string }) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-12">
-      <BigLoader title="Signing you in" />
+      <BigLoader title="Continuing" />
       <noscript>
         <a href={to} className="underline">
           Continue

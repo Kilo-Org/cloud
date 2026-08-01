@@ -8,6 +8,7 @@ import {
   resolvePrefillModel,
   resolvePrefillRepo,
 } from './new-session-prefill';
+import type { NewSessionPrefill } from './new-session-prefill';
 
 vi.mock('lucide-react-native', () => ({
   Bug: 'Bug',
@@ -94,13 +95,13 @@ describe('appendNewSessionPrefill', () => {
     );
   });
 
-  it.each([
-    { repo: '', mode: '', desc: 'empty strings' },
-    { desc: 'no params' },
-  ])('returns base unchanged with $desc', (params) => {
-    const result = appendNewSessionPrefill('/agent-chat/new', params);
-    expect(result).toBe('/agent-chat/new');
-  });
+  it.each([{ repo: '', mode: '', desc: 'empty strings' }, { desc: 'no params' }])(
+    'returns base unchanged with $desc',
+    params => {
+      const result = appendNewSessionPrefill('/agent-chat/new', params);
+      expect(result).toBe('/agent-chat/new');
+    }
+  );
 
   it('appends only non-empty params', () => {
     const result = appendNewSessionPrefill('/agent-chat/new', {
@@ -158,7 +159,11 @@ describe('readNewSessionPrefill', () => {
   });
 
   it('treats empty strings as absent', () => {
-    const prefill = readNewSessionPrefill({ prefillRepo: '', prefillMode: 'debug', prefillModel: '' });
+    const prefill = readNewSessionPrefill({
+      prefillRepo: '',
+      prefillMode: 'debug',
+      prefillModel: '',
+    });
     expect(prefill).toEqual({ mode: 'debug' });
   });
 
@@ -260,14 +265,14 @@ describe('describePrefillFallback', () => {
   it.each([
     {
       desc: 'repo unmatched, model not requested',
-      prefill: { mode: 'code', repo: 'owner/repo' },
+      prefill: { mode: 'code', repo: 'owner/repo' } satisfies NewSessionPrefill,
       repos: settled,
       models: unsettled,
       expected: 'owner/repo is no longer available. Pick a repository below.',
     },
     {
       desc: 'model unmatched, repo not requested',
-      prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' },
+      prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
       repos: unsettled,
       models: settled,
       expected: 'anthropic/claude-sonnet-4 is no longer available. Using your default model.',
@@ -279,31 +284,31 @@ describe('describePrefillFallback', () => {
   it.each([
     {
       desc: 'both requested, only repos settled',
-      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' },
+      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
       repos: settled,
       models: unsettled,
     },
     {
       desc: 'both requested, only models settled',
-      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' },
+      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
       repos: unsettled,
       models: settled,
     },
     {
       desc: 'both matched',
-      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' },
+      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
       repos: matched,
       models: matched,
     },
     {
       desc: 'only repo requested, matched',
-      prefill: { mode: 'code', repo: 'owner/repo' },
+      prefill: { mode: 'code', repo: 'owner/repo' } satisfies NewSessionPrefill,
       repos: matched,
       models: unsettled,
     },
     {
       desc: 'only model requested, matched',
-      prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' },
+      prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
       repos: unsettled,
       models: matched,
     },

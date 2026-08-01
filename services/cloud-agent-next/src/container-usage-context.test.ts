@@ -5,6 +5,7 @@ import {
   assertSandboxBillingAllocation,
   buildSandboxBillingInput,
   configureSandboxBillingInput,
+  SANDBOX_CAPACITIES,
   SANDBOX_USAGE_SKUS,
 } from './container-usage-context.js';
 
@@ -28,6 +29,18 @@ describe('container usage context', () => {
       SandboxDIND: 'cloud-agent-dind-2026-07',
       SandboxCodeReview: 'cloud-agent-code-review-2026-07',
       SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
+    });
+  });
+
+  it('snapshots the configured capacity for every sandbox class', () => {
+    expect(SANDBOX_CAPACITIES).toEqual({
+      Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
+      SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
+      SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+      SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+      SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+      SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
+      SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
     });
   });
 

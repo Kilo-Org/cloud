@@ -27,6 +27,8 @@ describe('buildContinuePrefillParams', () => {
     ['https://github.com/Kilo-Org/cloud.git', 'Kilo-Org/cloud'],
     ['git@github.com:Kilo-Org/cloud.git', 'Kilo-Org/cloud'],
     ['https://github.com/owner/repo.git', 'owner/repo'],
+    ['https://GitHub.com/owner/repo', 'owner/repo'],
+    ['git@GitHub.com:owner/repo.git', 'owner/repo'],
   ])('extracts owner/repo from %s', (gitUrl, expected) => {
     const params = buildContinuePrefillParams({ gitUrl, mode: 'code', model: '', variant: '' });
     expect(params.repo).toBe(expected);
@@ -36,6 +38,10 @@ describe('buildContinuePrefillParams', () => {
   it.each([
     { gitUrl: null as string | null, desc: 'null' },
     { gitUrl: 'https://github.com/group/sub/repo', desc: 'too many segments' },
+    { gitUrl: 'https://gitlab.com/owner/repo.git', desc: 'non-GitHub HTTPS' },
+    { gitUrl: 'git@gitlab.com:owner/repo.git', desc: 'non-GitHub scp-style' },
+    { gitUrl: 'https://git.example.com/owner/repo.git', desc: 'self-hosted HTTPS' },
+    { gitUrl: 'git@git.example.com:owner/repo.git', desc: 'self-hosted scp-style' },
   ])('omits repo when gitUrl is $desc', ({ gitUrl }) => {
     const params = buildContinuePrefillParams({ gitUrl, mode: 'code', model: '', variant: '' });
     expect(params.repo).toBeUndefined();

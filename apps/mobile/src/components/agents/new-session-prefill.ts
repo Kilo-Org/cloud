@@ -22,6 +22,20 @@ function isValidOwnerRepo(value: string): boolean {
   return segments.length === 2;
 }
 
+function isGitHubUrl(gitUrl: string): boolean {
+  // SCP-style: git@github.com:owner/repo.git (case-insensitive host)
+  if (/^git@github\.com:/i.test(gitUrl)) {
+    return true;
+  }
+  // HTTPS-style: https://github.com/owner/repo.git
+  try {
+    const url = new URL(gitUrl);
+    return url.hostname.toLowerCase() === 'github.com';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Build query-param prefill values from a session's displayed targets.
  * Each field is included only when non-empty; repo is included only when
@@ -37,7 +51,7 @@ export function buildContinuePrefillParams(input: {
 
   if (input.gitUrl) {
     const project = formatGitUrlProject(input.gitUrl);
-    if (isValidOwnerRepo(project)) {
+    if (isGitHubUrl(input.gitUrl) && isValidOwnerRepo(project)) {
       params.repo = project;
     }
   }

@@ -144,7 +144,7 @@ const filesFixture = (title, files) => ({
 const pad3 = n => String(n).padStart(3, '0');
 
 /** One-hunk patch body for generated files, reusing Alpha shapes. */
-const genPatch = (n) =>
+const genPatch = n =>
   `@@ -${10 + n * 13},3 +${10 + n * 13},5 @@ export function fn${pad3(n)}() {\n-  return ${n};\n+  // stub change\n+  return ${n + 100};\n+}\n+\n+export function extra${pad3(n)}() {\n+  return ${n + 200};\n }`;
 
 /** Three-hunk patch for file-010.ts (~15 lines per hunk), reusing Alpha/Beta shapes. */
@@ -161,16 +161,16 @@ const MULTI_HUNK_PATCH =
  * `src/gen/file-{n-1}.ts`. File 010 gets a multi-hunk patch; file 060 gets
  * `patch: null`; every other file gets a small one-hunk patch.
  */
-const manyFiles = (n) => {
+const manyFiles = n => {
   const files = [];
   for (let i = 0; i < n; i++) {
     const filename = `src/gen/file-${pad3(i)}.ts`;
     if (i === 60) {
       files.push(prFile(filename, 0, 0, null));
     } else if (i === 10) {
-      files.push(prFile(filename, 20, 15, MULTI_HUNK_PATCH));
+      files.push(prFile(filename, 18, 3, MULTI_HUNK_PATCH));
     } else {
-      files.push(prFile(filename, 4, 1, genPatch(i)));
+      files.push(prFile(filename, 6, 1, genPatch(i)));
     }
   }
   return files;
@@ -185,10 +185,10 @@ const manyFiles = (n) => {
 const dupeFiles = () => {
   const files = [];
   for (let i = 0; i <= 49; i++) {
-    files.push(prFile(`src/gen/file-${pad3(i)}.ts`, 3, 1, genPatch(i)));
+    files.push(prFile(`src/gen/file-${pad3(i)}.ts`, 6, 1, genPatch(i)));
   }
   // Page-two first entry duplicates page-one last entry's path.
-  files.push(prFile('src/gen/file-049.ts', 2, 1, genPatch(49)));
+  files.push(prFile('src/gen/file-049.ts', 6, 1, genPatch(49)));
   return files;
 };
 
@@ -384,7 +384,10 @@ const FIXTURES = {
     conversationComments: [],
   },
   'kilo-stub/files-many/4': filesFixture('Many files fixture (120)', manyFiles(120)),
-  'kilo-stub/files-dupe/5': filesFixture('Duplicate file fixture (51 entries, 50 unique)', dupeFiles()),
+  'kilo-stub/files-dupe/5': filesFixture(
+    'Duplicate file fixture (51 entries, 50 unique)',
+    dupeFiles()
+  ),
 };
 
 function logLine(obj) {

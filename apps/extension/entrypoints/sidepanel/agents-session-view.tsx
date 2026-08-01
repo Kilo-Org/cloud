@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Cohesive single view component; splitting would reduce clarity */
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
@@ -50,7 +50,6 @@ export const AgentsSessionView = ({
   const isLoadingOlderMessages = useAtomValue(atoms.isLoadingOlderMessages);
   const olderMessagesError = useAtomValue(atoms.olderMessagesError);
 
-  const switchedRef = useRef<string | null>(null);
   const [retryingPrompt, setRetryingPrompt] = useState(false);
   const [retryingSwitch, setRetryingSwitch] = useState(false);
   const [retrySucceeded, setRetrySucceeded] = useState(false);
@@ -60,24 +59,18 @@ export const AgentsSessionView = ({
     setRetrySucceeded(false);
   }, [failedPrompt]);
 
-  // Switch session on mount / id change.
+  // Single session lifecycle: clear error + switch on setup, destroy on cleanup.
+  // On id change cleanup runs first (destroy old), then setup reconnects fresh.
+  // Under StrictMode cleanup/re-setup cycles destroy + reconnect correctly —
+  // No stale guard to skip the reconnect.
   useEffect(() => {
-    if (switchedRef.current === kiloSessionId) {
-      return;
-    }
-    switchedRef.current = kiloSessionId;
     manager.clearError();
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- branded ID from untyped hook input
     void manager.switchSession(kiloSessionId as KiloSessionId);
-  }, [kiloSessionId, manager]);
-
-  // Destroy transport on unmount so WS/remote subscriptions close.
-  useEffect(
-    () => () => {
+    return () => {
       manager.destroy();
-    },
-    [manager]
-  );
+    };
+  }, [kiloSessionId, manager]);
 
   const handleSend = useCallback(
     async (text: string) => {

@@ -1423,4 +1423,26 @@ describe('agents session view integration', () => {
     // eslint-disable-next-line vitest/prefer-called-times -- current linter also requires CalledOnce.
     expect(mockManager.destroy).toHaveBeenCalledOnce();
   });
+
+  // ---- StrictMode-safe lifecycle: cleanup/re-setup reconnects ----
+
+  it('calls switchSession again after cleanup/re-setup (StrictMode simulation)', async () => {
+    // Simulate StrictMode: mount → unmount → remount with the same session id.
+    const { unmount } = await renderView();
+    // eslint-disable-next-line vitest/prefer-called-times -- current linter requires CalledOnce; avoiding contradiction
+    expect(mockManager.switchSession).toHaveBeenCalledOnce();
+    expect(mockManager.destroy).not.toHaveBeenCalled();
+
+    unmount();
+    // eslint-disable-next-line vitest/prefer-called-times -- current linter requires CalledOnce; avoiding contradiction
+    expect(mockManager.destroy).toHaveBeenCalledOnce();
+
+    // Re-mount the same session — must reconnect rather than skip via stale guard.
+    const { unmount: unmount2 } = await renderView();
+    expect(mockManager.switchSession).toHaveBeenCalledTimes(2);
+    expect(mockManager.clearError).toHaveBeenCalledTimes(2);
+
+    unmount2();
+    expect(mockManager.destroy).toHaveBeenCalledTimes(2);
+  });
 });

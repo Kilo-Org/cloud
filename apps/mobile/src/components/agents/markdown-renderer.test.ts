@@ -174,13 +174,17 @@ describe('MarkdownRenderer key stability', () => {
     const renderer = await createRenderer();
     const element = htmlElement(renderer, '<img alt="a" src="https://x/a.png">');
     expect(element).not.toBeNull();
-    if (!element) throw new Error('expected element');
+    if (!element) {
+      throw new Error('expected element');
+    }
     expect(element.type).toBe('View');
     const props = element.props as { children?: ReactNode[] };
     const children = props.children ?? [];
     expect(children).toHaveLength(1);
     const child = children[0];
-    if (!child) throw new Error('expected child');
+    if (!child) {
+      throw new Error('expected child');
+    }
     expect((child as ReactElement).type).toBe('MarkdownImage');
     expect((child as ReactElement).props).toMatchObject({ uri: 'https://x/a.png', alt: 'a' });
   });
@@ -189,7 +193,9 @@ describe('MarkdownRenderer key stability', () => {
     const renderer = await createRenderer();
     const element = htmlElement(renderer, '<!-- a comment -->');
     expect(element).not.toBeNull();
-    if (!element) throw new Error('expected element');
+    if (!element) {
+      throw new Error('expected element');
+    }
     expect(element.type).toBe('Text');
   });
 });

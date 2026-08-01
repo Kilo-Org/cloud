@@ -27,13 +27,21 @@ describe('parseHtmlImages parser', () => {
   it('missing width/height → undefined aspectRatio', () => {
     const result = parseHtmlImages('<img alt="a" src="https://x/b.png">');
     expect(result).toHaveLength(1);
-    expect(result[0]!.aspectRatio).toBeUndefined();
+    const image = result[0];
+    if (!image) {
+      throw new Error('expected image');
+    }
+    expect(image.aspectRatio).toBeUndefined();
   });
 
   it('missing alt → empty string', () => {
     const result = parseHtmlImages('<img src="https://x/c.png">');
     expect(result).toHaveLength(1);
-    expect(result[0]!.alt).toBe('');
+    const image = result[0];
+    if (!image) {
+      throw new Error('expected image');
+    }
+    expect(image.alt).toBe('');
   });
 
   it('decodes &amp; in src', () => {
@@ -41,8 +49,12 @@ describe('parseHtmlImages parser', () => {
       '<img src="https://x/a.png?foo=bar&amp;baz=qux" alt="&amp; test">'
     );
     expect(result).toHaveLength(1);
-    expect(result[0]!.src).toBe('https://x/a.png?foo=bar&baz=qux');
-    expect(result[0]!.alt).toBe('& test');
+    const image = result[0];
+    if (!image) {
+      throw new Error('expected image');
+    }
+    expect(image.src).toBe('https://x/a.png?foo=bar&baz=qux');
+    expect(image.alt).toBe('& test');
   });
 
   it('drops relative src', () => {
@@ -53,7 +65,11 @@ describe('parseHtmlImages parser', () => {
   it('keeps data:image/png;base64,… src', () => {
     const result = parseHtmlImages('<img alt="data" src="data:image/png;base64,iVBORw0KGgo=">');
     expect(result).toHaveLength(1);
-    expect(result[0]!.src).toBe('data:image/png;base64,iVBORw0KGgo=');
+    const image = result[0];
+    if (!image) {
+      throw new Error('expected image');
+    }
+    expect(image.src).toBe('data:image/png;base64,iVBORw0KGgo=');
   });
 
   it('no <img> → empty array', () => {
@@ -106,12 +122,20 @@ describe('parseHtmlImages parser', () => {
   it('decodes &#39; &lt; &gt; in alt text', () => {
     const result = parseHtmlImages('<img alt="it&#39;s &lt;cool&gt;" src="https://x/a.png">');
     expect(result).toHaveLength(1);
-    expect(result[0]!.alt).toBe("it's <cool>");
+    const image = result[0];
+    if (!image) {
+      throw new Error('expected image');
+    }
+    expect(image.alt).toBe("it's <cool>");
   });
 
   it('decodes &quot; in alt text', () => {
     const result = parseHtmlImages('<img alt="say &quot;hello&quot;" src="https://x/a.png">');
     expect(result).toHaveLength(1);
-    expect(result[0]!.alt).toBe('say "hello"');
+    const image = result[0];
+    if (!image) {
+      throw new Error('expected image');
+    }
+    expect(image.alt).toBe('say "hello"');
   });
 });

@@ -5,7 +5,8 @@
 # lock around a multi-command helper.
 #
 #   appium.sh <device> test [-e KEY=VALUE]... <flow.js> [more-flows.js]
-#   appium.sh <device> hierarchy
+#   appium.sh <device> hierarchy [out.xml]   # writes the XML to a file and
+#                                            # prints its path; never stdout
 #   appium.sh <device> server start|stop|status
 #   appium.sh <device> --exec <command...>
 #
@@ -154,8 +155,12 @@ case "$cmd" in
       node "$SCRIPT_DIR/wdio/run-flow.js" "${FLOWS[@]}"
     ;;
   hierarchy)
+    # Always a file, never stdout: a raw XML dump into an agent session is
+    # large enough to kill the session silently. Grep the file for selectors.
+    OUT="${2:-$(mktemp "${TMPDIR:-/tmp}/kilo-hierarchy.XXXXXX.xml")}"
     ensure_server
-    env DEVICE="$DEVICE" APPIUM_PORT="$APPIUM_PORT" node "$SCRIPT_DIR/wdio/hierarchy.js"
+    env DEVICE="$DEVICE" APPIUM_PORT="$APPIUM_PORT" node "$SCRIPT_DIR/wdio/hierarchy.js" > "$OUT"
+    echo "hierarchy: $OUT ($(grep -c '<' "$OUT") elements)"
     ;;
   *)
     echo "usage: appium.sh <device> test|hierarchy|server|--exec ..." >&2

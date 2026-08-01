@@ -25,9 +25,10 @@ module.exports = async function openApp(ctx) {
   await h.launchApp(BUNDLE_ID);
 
   // Cold launch and bundling are slow; wait for any known state before
-  // settling. Android under load gets the long budget; it returns as soon as
-  // a state renders, so healthy runs never pay it.
-  const launchTimeout = ctx.platform === 'android' ? 420000 : 30000;
+  // settling. Both platforms get a long budget under parallel-workflow host
+  // load; the wait returns as soon as a state renders, so healthy runs never
+  // pay it.
+  const launchTimeout = ctx.platform === 'android' ? 420000 : 120000;
   for (let anr = 0; ; anr++) {
     try {
       await h.waitVisible(S.ANY_STATE, { timeout: launchTimeout });

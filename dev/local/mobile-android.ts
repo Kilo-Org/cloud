@@ -680,8 +680,29 @@ async function main(): Promise<void> {
   }
   if (command === 'emulator-start') {
     const { avd, gpu, wait } = parseEmulatorStartArgs(args);
-    const record = await startAndroidEmulator(env, worktreeRoot, avd, gpu);
-    if (wait) await waitForAndroidBoot(env, record);
+    // One automatic relaunch encodes the launch/GPU policy the runbook used
+    // to hand to callers: a missed boot envelope keeps the same GPU (the
+    // process was healthy, the host was slow); every pre-boot launch failure
+    // and mid-boot death switches to software rendering. A second failure is
+    // the caller's test-environment blocker — never a third launch.
+    const attempt = async (attemptGpu: string) => {
+      const record = await startAndroidEmulator(env, worktreeRoot, avd, attemptGpu);
+      if (wait) await waitForAndroidBoot(env, record);
+      return record;
+    };
+    let record: EmulatorRecord;
+    try {
+      record = await attempt(gpu);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const bootEnvelopeMissed = message.includes('did not reach sys.boot_completed=1');
+      const retryGpu = bootEnvelopeMissed ? gpu : 'swiftshader_indirect';
+      console.error(
+        `emulator-start attempt 1 failed: ${message}\nstopping leftovers and retrying once with --gpu ${retryGpu}`
+      );
+      await stopAndroidEmulator(env, worktreeRoot);
+      record = await attempt(retryGpu);
+    }
     console.log(JSON.stringify(record, null, 2));
     return;
   }

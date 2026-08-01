@@ -312,6 +312,15 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
             deviceId: device.id,
             worktreeRoot,
             claimedAt: new Date().toISOString(),
+            // Recorded before the rename so a claim that dies mid-boot can
+            // still restore the device's real name on release.
+            originalDeviceName: device.name,
+            // Boot INTENT, recorded before the boot happens: prepare boots
+            // exactly when the device is not already running. If anything
+            // later loses the post-boot rewrite, release still powers off a
+            // device this claim booted (shutting down an already-shutdown
+            // device is a tolerated no-op).
+            bootedByClaim: device.state !== 'Booted',
           }),
           { flag: 'wx' }
         );

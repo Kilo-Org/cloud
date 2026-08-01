@@ -12,9 +12,26 @@
 set -euo pipefail
 
 resolve_adb() {
+  # Mirror apps/mobile/e2e/appium.sh and dev/local/mobile-android.ts so the
+  # agent PATH never matters (Homebrew android-commandlinetools is the usual
+  # install; plain `adb` is often absent from the shell).
   local candidate found
+  if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+    for candidate in /opt/homebrew/share/android-commandlinetools /usr/local/share/android-commandlinetools "$HOME/Library/Android/sdk"; do
+      if [ -x "$candidate/platform-tools/adb" ]; then
+        export ANDROID_HOME="$candidate" ANDROID_SDK_ROOT="$candidate"
+        break
+      fi
+    done
+  fi
   found=$(command -v adb 2>/dev/null || true)
-  for candidate in "$found" "${ANDROID_HOME:-}/platform-tools/adb" "$HOME/Library/Android/sdk/platform-tools/adb"; do
+  for candidate in \
+    "$found" \
+    "${ANDROID_HOME:-}/platform-tools/adb" \
+    "${ANDROID_SDK_ROOT:-}/platform-tools/adb" \
+    /opt/homebrew/share/android-commandlinetools/platform-tools/adb \
+    /usr/local/share/android-commandlinetools/platform-tools/adb \
+    "$HOME/Library/Android/sdk/platform-tools/adb"; do
     if [ -n "$candidate" ] && [ -x "$candidate" ]; then
       printf '%s' "$candidate"
       return 0

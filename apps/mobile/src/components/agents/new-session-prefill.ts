@@ -1,4 +1,4 @@
-import type { AgentMode } from '@/components/agents/mode-selector';
+import { type AgentMode } from '@/components/agents/mode-selector';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 
@@ -85,6 +85,17 @@ export function appendNewSessionPrefill(base: string, params: NewSessionPrefillP
   return `${base}${separator}${query}`;
 }
 
+function getFirstParam(
+  record: Record<string, string | string[] | undefined>,
+  key: string
+): string {
+  const val = record[key];
+  if (Array.isArray(val)) {
+    return val[0] ?? '';
+  }
+  return val ?? '';
+}
+
 /**
  * Read prefill values from route search params. Each param can be
  * `string | string[]` — take the first element of an array. Mode is
@@ -94,18 +105,10 @@ export function appendNewSessionPrefill(base: string, params: NewSessionPrefillP
 export function readNewSessionPrefill(
   raw: Record<string, string | string[] | undefined>
 ): NewSessionPrefill {
-  function first(raw: Record<string, string | string[] | undefined>, key: string): string {
-    const val = raw[key];
-    if (Array.isArray(val)) {
-      return val[0] ?? '';
-    }
-    return val ?? '';
-  }
-
-  const rawMode = first(raw, 'prefillMode');
-  const rawRepo = first(raw, 'prefillRepo');
-  const rawModel = first(raw, 'prefillModel');
-  const rawVariant = first(raw, 'prefillVariant');
+  const rawMode = getFirstParam(raw, 'prefillMode');
+  const rawRepo = getFirstParam(raw, 'prefillRepo');
+  const rawModel = getFirstParam(raw, 'prefillModel');
+  const rawVariant = getFirstParam(raw, 'prefillVariant');
 
   return {
     mode: normalizeAgentMode(rawMode || undefined),

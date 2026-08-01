@@ -1,13 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('lucide-react-native', () => ({
-  Bug: 'Bug',
-  Code: 'Code',
-  HelpCircle: 'HelpCircle',
-  NotebookPen: 'NotebookPen',
-  Workflow: 'Workflow',
-}));
-
 import {
   appendNewSessionPrefill,
   buildContinuePrefillParams,
@@ -17,60 +9,34 @@ import {
   resolvePrefillRepo,
 } from './new-session-prefill';
 
+vi.mock('lucide-react-native', () => ({
+  Bug: 'Bug',
+  Code: 'Code',
+  HelpCircle: 'HelpCircle',
+  NotebookPen: 'NotebookPen',
+  Workflow: 'Workflow',
+}));
+
 // ════════════════════════════════════════════════════════════════
 // buildContinuePrefillParams
 // ════════════════════════════════════════════════════════════════
 
 describe('buildContinuePrefillParams', () => {
-  it('extracts owner/repo from https URL', () => {
-    const params = buildContinuePrefillParams({
-      gitUrl: 'https://github.com/Kilo-Org/cloud.git',
-      mode: 'code',
-      model: '',
-      variant: '',
-    });
-    expect(params.repo).toBe('Kilo-Org/cloud');
+  it.each([
+    ['https://github.com/Kilo-Org/cloud.git', 'Kilo-Org/cloud'],
+    ['git@github.com:Kilo-Org/cloud.git', 'Kilo-Org/cloud'],
+    ['https://github.com/owner/repo.git', 'owner/repo'],
+  ])('extracts owner/repo from %s', (gitUrl, expected) => {
+    const params = buildContinuePrefillParams({ gitUrl, mode: 'code', model: '', variant: '' });
+    expect(params.repo).toBe(expected);
     expect(params.mode).toBe('code');
   });
 
-  it('extracts owner/repo from git@ SSH URL', () => {
-    const params = buildContinuePrefillParams({
-      gitUrl: 'git@github.com:Kilo-Org/cloud.git',
-      mode: 'code',
-      model: '',
-      variant: '',
-    });
-    expect(params.repo).toBe('Kilo-Org/cloud');
-  });
-
-  it('strips .git suffix', () => {
-    const params = buildContinuePrefillParams({
-      gitUrl: 'https://github.com/owner/repo.git',
-      mode: 'code',
-      model: '',
-      variant: '',
-    });
-    expect(params.repo).toBe('owner/repo');
-  });
-
-  it('omits repo when gitUrl is null', () => {
-    const params = buildContinuePrefillParams({
-      gitUrl: null,
-      mode: 'code',
-      model: '',
-      variant: '',
-    });
-    expect(params.repo).toBeUndefined();
-    expect(params.mode).toBe('code');
-  });
-
-  it('omits repo when gitUrl does not reduce to exactly two segments', () => {
-    const params = buildContinuePrefillParams({
-      gitUrl: 'https://github.com/group/sub/repo',
-      mode: 'code',
-      model: '',
-      variant: '',
-    });
+  it.each([
+    { gitUrl: null as string | null, desc: 'null' },
+    { gitUrl: 'https://github.com/group/sub/repo', desc: 'too many segments' },
+  ])('omits repo when gitUrl is $desc', ({ gitUrl }) => {
+    const params = buildContinuePrefillParams({ gitUrl, mode: 'code', model: '', variant: '' });
     expect(params.repo).toBeUndefined();
   });
 
@@ -107,9 +73,7 @@ describe('buildContinuePrefillParams', () => {
 
 describe('appendNewSessionPrefill', () => {
   it('uses ? when base has no query string', () => {
-    const result = appendNewSessionPrefill('/agent-chat/new', {
-      repo: 'owner/repo',
-    });
+    const result = appendNewSessionPrefill('/agent-chat/new', { repo: 'owner/repo' });
     expect(result).toBe('/agent-chat/new?prefillRepo=owner%2Frepo');
   });
 
@@ -130,16 +94,11 @@ describe('appendNewSessionPrefill', () => {
     );
   });
 
-  it('returns base unchanged when params are empty', () => {
-    const result = appendNewSessionPrefill('/agent-chat/new', {});
-    expect(result).toBe('/agent-chat/new');
-  });
-
-  it('returns base unchanged when all params are empty strings', () => {
-    const result = appendNewSessionPrefill('/agent-chat/new', {
-      repo: '',
-      mode: '',
-    });
+  it.each([
+    { repo: '', mode: '', desc: 'empty strings' },
+    { desc: 'no params' },
+  ])('returns base unchanged with $desc', (params) => {
+    const result = appendNewSessionPrefill('/agent-chat/new', params);
     expect(result).toBe('/agent-chat/new');
   });
 
@@ -180,17 +139,16 @@ describe('readNewSessionPrefill', () => {
       prefillRepo: ['owner/repo', 'other/repo'],
       prefillMode: ['plan'],
     });
-    expect(prefill).toEqual({
-      mode: 'plan',
-      repo: 'owner/repo',
-    });
+    expect(prefill).toEqual({ mode: 'plan', repo: 'owner/repo' });
   });
 
-  it('normalizes unknown mode to code', () => {
-    const prefill = readNewSessionPrefill({
-      prefillMode: 'unknown',
-    });
-    expect(prefill.mode).toBe('code');
+  it.each([
+    ['unknown', 'code'],
+    ['architect', 'plan'],
+    ['build', 'code'],
+  ])('normalizes mode "%s" to "%s"', (input, expected) => {
+    const prefill = readNewSessionPrefill({ prefillMode: input });
+    expect(prefill.mode).toBe(expected);
   });
 
   it('defaults mode to code when missing', () => {
@@ -200,33 +158,12 @@ describe('readNewSessionPrefill', () => {
   });
 
   it('treats empty strings as absent', () => {
-    const prefill = readNewSessionPrefill({
-      prefillRepo: '',
-      prefillMode: 'debug',
-      prefillModel: '',
-    });
+    const prefill = readNewSessionPrefill({ prefillRepo: '', prefillMode: 'debug', prefillModel: '' });
     expect(prefill).toEqual({ mode: 'debug' });
   });
 
-  it('normalizes "architect" to "plan"', () => {
-    const prefill = readNewSessionPrefill({
-      prefillMode: 'architect',
-    });
-    expect(prefill.mode).toBe('plan');
-  });
-
-  it('normalizes "build" to "code"', () => {
-    const prefill = readNewSessionPrefill({
-      prefillMode: 'build',
-    });
-    expect(prefill.mode).toBe('code');
-  });
-
   it('handles undefined params', () => {
-    const prefill = readNewSessionPrefill({
-      prefillRepo: undefined,
-      prefillMode: undefined,
-    });
+    const prefill = readNewSessionPrefill({ prefillRepo: undefined, prefillMode: undefined });
     expect(prefill).toEqual({ mode: 'code' });
   });
 });
@@ -247,10 +184,7 @@ describe('resolvePrefillModel', () => {
       model: 'anthropic/claude-sonnet-4',
       variant: 'thinking',
     });
-    expect(result).toEqual({
-      model: 'anthropic/claude-sonnet-4',
-      variant: 'thinking',
-    });
+    expect(result).toEqual({ model: 'anthropic/claude-sonnet-4', variant: 'thinking' });
   });
 
   it('falls back to first variant when requested variant is unsupported', () => {
@@ -259,10 +193,7 @@ describe('resolvePrefillModel', () => {
       model: 'anthropic/claude-sonnet-4',
       variant: 'xhigh',
     });
-    expect(result).toEqual({
-      model: 'anthropic/claude-sonnet-4',
-      variant: 'default',
-    });
+    expect(result).toEqual({ model: 'anthropic/claude-sonnet-4', variant: 'default' });
   });
 
   it('falls back to empty string variant when no variants exist', () => {
@@ -271,38 +202,16 @@ describe('resolvePrefillModel', () => {
       model: 'kilo-auto/efficient',
       variant: 'thinking',
     });
-    expect(result).toEqual({
-      model: 'kilo-auto/efficient',
-      variant: '',
-    });
+    expect(result).toEqual({ model: 'kilo-auto/efficient', variant: '' });
   });
 
-  it('returns null when model is absent from catalog', () => {
-    const result = resolvePrefillModel(catalog, {
-      mode: 'code',
-      model: 'unknown/model',
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when catalog is empty', () => {
-    const result = resolvePrefillModel([], {
-      mode: 'code',
-      model: 'anthropic/claude-sonnet-4',
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when prefill.model is absent', () => {
-    const result = resolvePrefillModel(catalog, { mode: 'code' });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when prefill.model is empty string', () => {
-    const result = resolvePrefillModel(catalog, {
-      mode: 'code',
-      model: '',
-    });
+  it.each([
+    { model: 'unknown/model' },
+    { model: 'anthropic/claude-sonnet-4', catOverride: [] as { id: string; variants: string[] }[] },
+    { model: undefined },
+    { model: '' },
+  ])('returns null when model="%s"', ({ model, catOverride }) => {
+    const result = resolvePrefillModel(catOverride ?? catalog, { mode: 'code', model });
     expect(result).toBeNull();
   });
 });
@@ -315,39 +224,17 @@ describe('resolvePrefillRepo', () => {
   const repos = [{ fullName: 'Kilo-Org/cloud' }, { fullName: 'kilo-org/mobile' }];
 
   it('matches case-insensitively and returns canonical casing', () => {
-    const result = resolvePrefillRepo(repos, {
-      mode: 'code',
-      repo: 'kilo-org/cloud',
-    });
+    const result = resolvePrefillRepo(repos, { mode: 'code', repo: 'kilo-org/cloud' });
     expect(result).toBe('Kilo-Org/cloud');
   });
 
-  it('returns null for no match', () => {
-    const result = resolvePrefillRepo(repos, {
-      mode: 'code',
-      repo: 'other/repo',
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null for empty list', () => {
-    const result = resolvePrefillRepo([], {
-      mode: 'code',
-      repo: 'Kilo-Org/cloud',
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when prefill.repo is absent', () => {
-    const result = resolvePrefillRepo(repos, { mode: 'code' });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when prefill.repo is empty string', () => {
-    const result = resolvePrefillRepo(repos, {
-      mode: 'code',
-      repo: '',
-    });
+  it.each([
+    { repo: 'other/repo', reposOverride: undefined, desc: 'no match' },
+    { repo: 'Kilo-Org/cloud', reposOverride: [] as { fullName: string }[], desc: 'empty list' },
+    { repo: undefined, reposOverride: undefined, desc: 'absent' },
+    { repo: '', reposOverride: undefined, desc: 'empty string' },
+  ])('returns null when repo is $desc', ({ repo, reposOverride }) => {
+    const result = resolvePrefillRepo(reposOverride ?? repos, { mode: 'code', repo });
     expect(result).toBeNull();
   });
 });
@@ -370,42 +257,58 @@ describe('describePrefillFallback', () => {
     expect(note).toBeNull();
   });
 
-  it('returns repo message when repo requested + settled + unmatched, model not requested and unsettled', () => {
-    const note = describePrefillFallback({
+  it.each([
+    {
+      desc: 'repo unmatched, model not requested',
       prefill: { mode: 'code', repo: 'owner/repo' },
       repos: settled,
       models: unsettled,
-    });
-    expect(note).toBe('owner/repo is no longer available. Pick a repository below.');
-  });
-
-  it('returns model message when model requested + settled + unmatched, repo not requested and unsettled', () => {
-    const note = describePrefillFallback({
+      expected: 'owner/repo is no longer available. Pick a repository below.',
+    },
+    {
+      desc: 'model unmatched, repo not requested',
       prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' },
       repos: unsettled,
       models: settled,
-    });
-    expect(note).toBe(
-      'anthropic/claude-sonnet-4 is no longer available. Using your default model.'
-    );
+      expected: 'anthropic/claude-sonnet-4 is no longer available. Using your default model.',
+    },
+  ])('returns per-field message when $desc', ({ prefill, repos, models, expected }) => {
+    expect(describePrefillFallback({ prefill, repos, models })).toBe(expected);
   });
 
-  it('returns null when both requested but only one settled', () => {
-    const note = describePrefillFallback({
+  it.each([
+    {
+      desc: 'both requested, only repos settled',
       prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' },
       repos: settled,
       models: unsettled,
-    });
-    expect(note).toBeNull();
-  });
-
-  it('returns null when both requested but only models settled', () => {
-    const note = describePrefillFallback({
+    },
+    {
+      desc: 'both requested, only models settled',
       prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' },
       repos: unsettled,
       models: settled,
-    });
-    expect(note).toBeNull();
+    },
+    {
+      desc: 'both matched',
+      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' },
+      repos: matched,
+      models: matched,
+    },
+    {
+      desc: 'only repo requested, matched',
+      prefill: { mode: 'code', repo: 'owner/repo' },
+      repos: matched,
+      models: unsettled,
+    },
+    {
+      desc: 'only model requested, matched',
+      prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' },
+      repos: unsettled,
+      models: matched,
+    },
+  ])('returns null when $desc', ({ prefill, repos, models }) => {
+    expect(describePrefillFallback({ prefill, repos, models })).toBeNull();
   });
 
   it('returns combined message when both requested + settled + both unmatched', () => {
@@ -417,32 +320,5 @@ describe('describePrefillFallback', () => {
     expect(note).toBe(
       "The original session's repository and model are no longer available. Pick them below."
     );
-  });
-
-  it('returns null when requested + settled + matched', () => {
-    const note = describePrefillFallback({
-      prefill: { mode: 'code', repo: 'owner/repo', model: 'anthropic/claude-sonnet-4' },
-      repos: matched,
-      models: matched,
-    });
-    expect(note).toBeNull();
-  });
-
-  it('returns null when only repo requested + settled + matched', () => {
-    const note = describePrefillFallback({
-      prefill: { mode: 'code', repo: 'owner/repo' },
-      repos: matched,
-      models: unsettled,
-    });
-    expect(note).toBeNull();
-  });
-
-  it('returns null when only model requested + settled + matched', () => {
-    const note = describePrefillFallback({
-      prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' },
-      repos: unsettled,
-      models: matched,
-    });
-    expect(note).toBeNull();
   });
 });

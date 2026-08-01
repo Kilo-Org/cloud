@@ -4,10 +4,10 @@ import { toast } from 'sonner-native';
 
 import {
   describePrefillFallback,
+  type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
   resolvePrefillRepo,
-  type NewSessionPrefill,
 } from '@/components/agents/new-session-prefill';
 
 /**
@@ -25,7 +25,7 @@ export function useNewSessionPrefill(): NewSessionPrefill {
   const { prefillRepo, prefillMode, prefillModel, prefillVariant } = raw;
 
   const prefill = useMemo(
-    () => readNewSessionPrefill(raw),
+    () => readNewSessionPrefill({ prefillRepo, prefillMode, prefillModel, prefillVariant }),
     [prefillRepo, prefillMode, prefillModel, prefillVariant]
   );
 
@@ -34,9 +34,11 @@ export function useNewSessionPrefill(): NewSessionPrefill {
 
 export type UseNewSessionPrefillTargetsInput = {
   repositories: { fullName: string }[];
-  reposSettled: boolean; // !isLoadingRepos && !isReposError && repositories.length > 0
+  // !isLoadingRepos && !isReposError && repositories.length > 0
+  reposSettled: boolean;
   models: { id: string; variants: string[] }[];
-  modelsSettled: boolean; // !isLoadingModels && !isModelsError && models.length > 0
+  // !isLoadingModels && !isModelsError && models.length > 0
+  modelsSettled: boolean;
 };
 
 /**

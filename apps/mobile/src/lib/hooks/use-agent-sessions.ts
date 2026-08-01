@@ -7,6 +7,7 @@ import {
   buildActiveSessionsTrayInput,
   filterActiveSessionsByOrganization,
 } from '@/lib/active-sessions-live';
+import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import {
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
@@ -254,7 +255,19 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage: stored.fetchNextPage,
     refetch: async () => {
-      await Promise.all([stored.refetch(), active.refetch()]);
+      await Promise.all([
+        stored.refetch(),
+        (async () => {
+          // The live-sync owner writes and cancels this same query key, so a
+          // plain refetch alone can be swallowed by it. Drive the owner when
+          // one is attached — it is keyed to the same organization context
+          // this hook is given — and fall back to the plain refetch otherwise.
+          if (await refreshActiveSessionsNow()) {
+            return;
+          }
+          await active.refetch();
+        })(),
+      ]);
     },
   };
 }

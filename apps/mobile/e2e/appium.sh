@@ -165,7 +165,7 @@ ensure_server() {
       fi
       sleep 1
     done
-    stop_server
+    APPIUM_CLEANUP_OWNED=1 stop_server
     echo "appium.sh: server attempt on port $APPIUM_PORT failed; last log lines:" >&2
     tail -n 10 "$STATE_DIR/appium.log" >&2
   done
@@ -193,8 +193,16 @@ stop_server() {
         if [ "$LSOF_OK" -eq 1 ]; then
           LISTENER=$(lsof -ti "tcp:$STOP_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
           if [ -n "$LISTENER" ] && [ "$LISTENER" != "$PID" ]; then
-            echo "appium.sh: port $STOP_PORT is owned by pid $LISTENER, not our recorded pid $PID; skipping kill" >&2
-            SHOULD_KILL=0
+            if [ "${APPIUM_CLEANUP_OWNED:-0}" = "1" ]; then
+              # Start-loop cleanup: PID is freshly spawned by us. Kill it
+              # (alive but not the listener — it failed to bind) and clean
+              # up state so the loop continues to the next port block.
+              echo "appium.sh: port $STOP_PORT is owned by pid $LISTENER, not our just-spawned pid $PID; cleaning up" >&2
+              SHOULD_KILL=1
+            else
+              echo "appium.sh: port $STOP_PORT is owned by pid $LISTENER, not our recorded pid $PID; skipping kill" >&2
+              SHOULD_KILL=0
+            fi
           fi
         fi
         if [ "$SHOULD_KILL" -eq 1 ]; then

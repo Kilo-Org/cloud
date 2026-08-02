@@ -457,7 +457,29 @@ test('stop_server does not require literal binary path for ownership', () => {
   assert.match(fn, /ps -ww -o command=.*"\$PID"/);
   // When lsof proves a foreign listener owns the port, keep state and return
   // nonzero (matching the survived-SIGKILL safety) instead of deleting the
-  // handle and leaving an untracked process.
+  // handle and leaving an untracked process. The start-loop's
+  // APPIUM_CLEANUP_OWNED=1 context overrides this — the PID is provably ours
+  // and the loop must continue.
   const killBlock = fn.slice(fn.indexOf('if [ "$SHOULD_KILL" -eq 1 ]'));
   assert.match(killBlock, /else\n[^\n]*foreign listener[^\n]*\n[^\n]*return 1/);
+  assert.match(fn, /APPIUM_CLEANUP_OWNED/);
+  assert.match(fn, /our just-spawned pid/);
+  assert.match(fn, /cleaning up/);
+});
+
+test('start-loop stop_server call sets APPIUM_CLEANUP_OWNED so foreign-listener cleanup does not abort', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const ensureStart = script.indexOf('ensure_server()');
+  const ensureEnd = script.indexOf('\n}\n\nstop_server', ensureStart);
+  const ensureFn = script.slice(ensureStart, ensureEnd);
+
+  // The start loop's cleanup must set APPIUM_CLEANUP_OWNED=1 so that
+  // stop_server kills our just-spawned PID (not the foreign listener) and
+  // continues to the next port block instead of returning non-zero.
+  assert.match(ensureFn, /APPIUM_CLEANUP_OWNED=1 stop_server/);
+  // ensure_server contains three stop_server calls: two in the adoption block
+  // (no context, correct for stale/hung-server stop) and one in the start-loop
+  // cleanup (with APPIUM_CLEANUP_OWNED=1, correct for just-spawned PID).
+  const stopCalls = [...ensureFn.matchAll(/\bstop_server\b/g)];
+  assert.equal(stopCalls.length, 3, 'ensure_server must have exactly three stop_server calls');
 });

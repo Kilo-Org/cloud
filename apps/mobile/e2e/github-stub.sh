@@ -89,7 +89,12 @@ seed_token() {
   JAR=$(mktemp "$STATE_DIR/jar.XXXXXX")
   seed_fail() {
     echo "github-stub: token seed failed at $1 for $EMAIL (HTTP ${2:-?})${3:+: $3}" >&2
-    [ "$1" = existing-row ] || echo "github-stub: the user must exist (sign in on the device first, or pnpm dev:seed app:create-user)" >&2
+    # The missing-user hint fits only the login/seed steps; the row branches
+    # just proved the user exists (their row answered).
+    case $1 in
+      existing-row | row-probe) ;;
+      *) echo "github-stub: the user must exist (sign in on the device first, or pnpm dev:seed app:create-user)" >&2 ;;
+    esac
     # In a start, the EXIT trap (cleanup_start) undoes session, env line,
     # state, and port claim; in `seed` mode there is nothing to undo.
     exit 1

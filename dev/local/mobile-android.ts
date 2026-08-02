@@ -697,9 +697,10 @@ async function main(): Promise<void> {
       record = await attempt(gpu);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // The already-exists guard is an instruction, not a launch failure: a
-      // retry here would tear down a live emulator under whoever uses it.
-      if (message.includes('already exists')) throw error;
+      // These guards signal a healthy emulator owned by this or another
+      // process — retrying would tear down a live emulator mid-use.
+      if (message.includes('already exists') || message.includes('locked by another live process'))
+        throw error;
       const bootEnvelopeMissed = message.includes('did not reach sys.boot_completed=1');
       const retryGpu = bootEnvelopeMissed ? gpu : 'swiftshader_indirect';
       console.error(

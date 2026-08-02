@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldAutoSendPrefilledShare } from './composer-auto-send';
+import { shouldArmAutoSendOnDelivery, shouldAutoSendPrefilledShare } from './composer-auto-send';
 
 function makeTrue(): ReturnType<typeof shouldAutoSendPrefilledShare> extends boolean
   ? Parameters<typeof shouldAutoSendPrefilledShare>[0]
@@ -69,5 +69,23 @@ describe('shouldAutoSendPrefilledShare', () => {
         attachmentsEnabled: true,
       })
     ).toBe(true);
+  });
+});
+
+describe('shouldArmAutoSendOnDelivery', () => {
+  it('arms when autoSend is true and delivered text is non-empty', () => {
+    expect(shouldArmAutoSendOnDelivery({ autoSend: true, deliveredText: 'hello' })).toBe(true);
+  });
+
+  it('does not arm when autoSend is false (text-only)', () => {
+    expect(shouldArmAutoSendOnDelivery({ autoSend: false, deliveredText: 'hello' })).toBe(false);
+  });
+
+  it('does not arm when delivered text is empty (attachments-only delivery)', () => {
+    expect(shouldArmAutoSendOnDelivery({ autoSend: true, deliveredText: '' })).toBe(false);
+  });
+
+  it('does not arm when delivered text is only whitespace', () => {
+    expect(shouldArmAutoSendOnDelivery({ autoSend: true, deliveredText: '   ' })).toBe(false);
   });
 });

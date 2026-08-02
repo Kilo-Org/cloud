@@ -36,3 +36,16 @@ export function shouldAutoSendPrefilledShare(input: {
   }
   return true;
 }
+
+/**
+ * Whether to arm the auto-send latch when a share payload is delivered.
+ * Arms only when auto-send is requested AND the delivered text is
+ * non-empty. An attachments-only delivery must never arm, or the next
+ * typed character would auto-send text the user never composed.
+ */
+export function shouldArmAutoSendOnDelivery(params: {
+  autoSend: boolean;
+  deliveredText: string;
+}): boolean {
+  return params.autoSend && params.deliveredText.trim().length > 0;
+}

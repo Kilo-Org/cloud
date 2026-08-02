@@ -56,7 +56,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
-import { shouldAutoSendPrefilledShare } from '@/lib/composer-auto-send';
+import {
+  shouldArmAutoSendOnDelivery,
+  shouldAutoSendPrefilledShare,
+} from '@/lib/composer-auto-send';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
@@ -160,6 +163,10 @@ export function ChatComposer({
   const autoSendRef = useRef(autoSend === true);
   autoSendRef.current = autoSend === true;
   const [shareDelivered, setShareDelivered] = useState(false);
+  // Ref copy of shareDelivered so handleChangeText (a regular function body)
+  // always reads the current value without depending on a state variable that
+  // React batches behind the render.
+  const shareDeliveredRef = useRef(false);
   // Remount the input row after Stop. iOS leaves the multiline TextInput
   // non-interactive after the editable=false→true flip that happens when
   // the SDK unlocks the composer post-interrupt (Item 14 E2E gate). Defer
@@ -262,6 +269,13 @@ export function ChatComposer({
     measure.setText(value);
     setHasText(value.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(value));
+    // Delivery applies text BEFORE onDelivered fires, so any
+    // handleChangeText after shareDelivered is a user edit. Disarm
+    // so a later gate resolution (upload completion) cannot
+    // auto-send the user's modified draft.
+    if (shareDeliveredRef.current) {
+      setAutoSendArmed(false);
+    }
   }
 
   const { addCandidates, removeAttachment, retryAttachment } = upload;
@@ -273,8 +287,14 @@ export function ChatComposer({
     onChangeText: handleChangeText,
     addCandidates,
     onDelivered: () => {
-      setAutoSendArmed(autoSendRef.current);
+      setAutoSendArmed(
+        shouldArmAutoSendOnDelivery({
+          autoSend: autoSendRef.current,
+          deliveredText: textRef.current,
+        })
+      );
       setShareDelivered(true);
+      shareDeliveredRef.current = true;
     },
   });
 

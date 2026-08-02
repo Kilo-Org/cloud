@@ -26,6 +26,7 @@ import {
   REMOTE_SPAWN_RETRYABLE_TOAST,
   resolveRemoteSubmitOutcome,
 } from '@/lib/remote-submit-outcome';
+import { resolveRemoteSpawnAdmission } from '@/lib/remote-spawn-admission';
 import { putSharePayload, type SharePayload } from '@/lib/share-payload';
 import { appendShareParams } from '@/lib/share-navigation';
 
@@ -194,6 +195,14 @@ export function useRemoteSpawnDispatch({
     const fields = spawnFieldsRef.current;
     // Press-time snapshot. Read once, here, before any await.
     const submitPayload = getSubmitPayloadRef.current?.() ?? null;
+    const admission = resolveRemoteSpawnAdmission({
+      instance: runOnInstance,
+      payload: submitPayload,
+    });
+    if (!admission.allowed) {
+      toast.error(admission.toast);
+      return;
+    }
     const createInput = buildCreateRemoteSessionInput({
       mode: fields.mode,
       model: fields.model,

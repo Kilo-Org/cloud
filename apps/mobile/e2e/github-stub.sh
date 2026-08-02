@@ -78,6 +78,11 @@ case "${1:-}" in
     port_free "$STUB_PORT" && { echo "github-stub: server did not bind port $STUB_PORT" >&2; tmux kill-session -t "=$SESSION" 2>/dev/null || true; exit 1; }
 
     remove_env_line
+    # A .env.local without a trailing newline would merge our append into its
+    # last line — and stop's marker removal would then delete that variable.
+    if [ -s "$ENV_LOCAL" ] && [ "$(tail -c1 "$ENV_LOCAL")" != "" ]; then
+      printf '\n' >> "$ENV_LOCAL"
+    fi
     printf 'GITHUB_API_BASE_URL=http://127.0.0.1:%s %s\n' "$STUB_PORT" "$MARKER" >> "$ENV_LOCAL"
 
     # Seed a token row for the E2E user through next-auth fake-login. The
@@ -99,13 +104,13 @@ case "${1:-}" in
     CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/api/auth/callback/fake-login" \
       --data-urlencode "csrfToken=$CSRF" \
       --data-urlencode "email=$EMAIL" \
-      --data-urlencode "json=true")
+      --data-urlencode "json=true") || seed_fail fake-login transport
     case $CODE in 2*|3*) ;; *) seed_fail fake-login "$CODE" ;; esac
     GH_USER_ID="9$(date +%s | tail -c 6)$((RANDOM % 90 + 10))"
     SEED_BODY=$(mktemp "$STATE_DIR/seed.XXXXXX")
     CODE=$(curl -s -o "$SEED_BODY" -w '%{http_code}' -b "$JAR" -X POST "$BASE/api/trpc/githubApps.devSeedUserGithubToken" \
       -H 'content-type: application/json' \
-      -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}")
+      -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}") || seed_fail trpc-seed transport
     case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
     grep -q '"error"' "$SEED_BODY" && seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
     rm -f "$JAR" "$SEED_BODY"

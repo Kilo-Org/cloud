@@ -695,12 +695,24 @@ async function main(): Promise<void> {
       record = await attempt(gpu);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // The already-exists guard is an instruction, not a launch failure: a
+      // retry here would tear down a live emulator under whoever uses it.
+      if (message.includes('already exists')) throw error;
       const bootEnvelopeMissed = message.includes('did not reach sys.boot_completed=1');
       const retryGpu = bootEnvelopeMissed ? gpu : 'swiftshader_indirect';
       console.error(
         `emulator-start attempt 1 failed: ${message}\nstopping leftovers and retrying once with --gpu ${retryGpu}`
       );
-      await stopAndroidEmulator(env, worktreeRoot);
+      try {
+        await stopAndroidEmulator(env, worktreeRoot);
+      } catch (stopError) {
+        // Keep attempt 1's failure as the reason; never boot a second
+        // emulator over state the teardown could not clear.
+        console.error(
+          `teardown after attempt 1 failed: ${stopError instanceof Error ? stopError.message : String(stopError)}`
+        );
+        throw error;
+      }
       record = await attempt(retryGpu);
     }
     console.log(JSON.stringify(record, null, 2));

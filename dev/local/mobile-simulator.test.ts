@@ -40,10 +40,7 @@ function recordingRename(behavior?: (deviceId: string, name: string) => void) {
 
 function recordingShutdown() {
   const calls: string[] = [];
-  return {
-    shutdown: (deviceId: string): void => void calls.push(deviceId),
-    calls,
-  };
+  return { shutdown: (deviceId: string): void => void calls.push(deviceId), calls };
 }
 
 function tempDir(prefix: string): string {
@@ -69,18 +66,9 @@ function readRecord(lockRoot: string, deviceId: string): Record<string, unknown>
 // ── parseClaimArgs ───────────────────────────────────────────────────
 
 test('parseClaimArgs accepts claim, claim <udid>, and release <udid>', () => {
-  assert.deepEqual(parseClaimArgs(['claim']), {
-    command: 'claim',
-    udid: undefined,
-  });
-  assert.deepEqual(parseClaimArgs(['claim', 'UDID-1']), {
-    command: 'claim',
-    udid: 'UDID-1',
-  });
-  assert.deepEqual(parseClaimArgs(['release', 'UDID-1']), {
-    command: 'release',
-    udid: 'UDID-1',
-  });
+  assert.deepEqual(parseClaimArgs(['claim']), { command: 'claim', udid: undefined });
+  assert.deepEqual(parseClaimArgs(['claim', 'UDID-1']), { command: 'claim', udid: 'UDID-1' });
+  assert.deepEqual(parseClaimArgs(['release', 'UDID-1']), { command: 'release', udid: 'UDID-1' });
 });
 
 test('parseClaimArgs rejects unknown commands, extra args, and a missing release udid', () => {
@@ -160,10 +148,7 @@ test('claim only auto-selects iPhone simulators and prefers shutdown devices', (
 
   const result = claimSimulator({
     devices: [
-      device({
-        id: 'IPAD',
-        deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPad',
-      }),
+      device({ id: 'IPAD', deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPad' }),
       device({ id: 'BOOTED', state: 'Booted' }),
       device({ id: 'FREE' }),
     ],
@@ -214,10 +199,7 @@ test('claim reclaims a device whose owning worktree no longer exists', () => {
   const worktreeRoot = tempDir('worktree-');
   fs.writeFileSync(
     path.join(lockRoot, 'UDID-1.json'),
-    JSON.stringify({
-      deviceId: 'UDID-1',
-      worktreeRoot: '/nonexistent/worktree-gone',
-    })
+    JSON.stringify({ deviceId: 'UDID-1', worktreeRoot: '/nonexistent/worktree-gone' })
   );
   const { rename } = recordingRename();
 
@@ -347,11 +329,7 @@ test('a claim whose process died before labeling is relabeled on reclaim', () =>
   // after prepare. A crash in between leaves exactly this record.
   fs.writeFileSync(
     path.join(lockRoot, 'UDID-1.json'),
-    JSON.stringify({
-      deviceId: 'UDID-1',
-      worktreeRoot,
-      claimedAt: new Date().toISOString(),
-    })
+    JSON.stringify({ deviceId: 'UDID-1', worktreeRoot, claimedAt: new Date().toISOString() })
   );
   const { rename, calls: renames } = recordingRename();
 
@@ -530,12 +508,7 @@ test('bootSimulator does not shut down a device whose boot never started', () =>
     call.args[1] === 'boot' ? new Error('boot exec failed') : undefined
   );
   assert.throws(
-    () =>
-      bootSimulator(device(), exec, () => ({
-        stdout: '',
-        stderr: '',
-        status: 0,
-      })),
+    () => bootSimulator(device(), exec, () => ({ stdout: '', stderr: '', status: 0 })),
     /boot exec failed/
   );
   assert.deepEqual(
@@ -579,21 +552,12 @@ test('release refuses a claim owned by another worktree', () => {
   const mine = tempDir('worktree-');
   fs.writeFileSync(
     path.join(lockRoot, 'UDID-1.json'),
-    JSON.stringify({
-      deviceId: 'UDID-1',
-      worktreeRoot: '/some/other/worktree',
-    })
+    JSON.stringify({ deviceId: 'UDID-1', worktreeRoot: '/some/other/worktree' })
   );
   const { rename } = recordingRename();
 
   assert.throws(
-    () =>
-      releaseSimulator({
-        deviceId: 'UDID-1',
-        lockRoot,
-        worktreeRoot: mine,
-        rename,
-      }),
+    () => releaseSimulator({ deviceId: 'UDID-1', lockRoot, worktreeRoot: mine, rename }),
     /is claimed by \/some\/other\/worktree/
   );
   assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-1.json')), true);
@@ -637,13 +601,7 @@ test('release powers off a device its own claim booted', () => {
   const { rename } = recordingRename();
   const { shutdown, calls: shutdowns } = recordingShutdown();
 
-  releaseSimulator({
-    deviceId: 'UDID-1',
-    lockRoot,
-    worktreeRoot,
-    rename,
-    shutdown,
-  });
+  releaseSimulator({ deviceId: 'UDID-1', lockRoot, worktreeRoot, rename, shutdown });
 
   assert.deepEqual(shutdowns, ['UDID-1']);
   assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-1.json')), false);
@@ -659,13 +617,7 @@ test('release leaves a device that was already booted before the claim running',
   const { rename } = recordingRename();
   const { shutdown, calls: shutdowns } = recordingShutdown();
 
-  releaseSimulator({
-    deviceId: 'UDID-1',
-    lockRoot,
-    worktreeRoot,
-    rename,
-    shutdown,
-  });
+  releaseSimulator({ deviceId: 'UDID-1', lockRoot, worktreeRoot, rename, shutdown });
 
   assert.deepEqual(shutdowns, []);
   assert.equal(fs.existsSync(path.join(lockRoot, 'UDID-1.json')), false);
@@ -714,12 +666,7 @@ test('release-all powers off every device this worktree booted and skips foreign
   const { rename } = recordingRename();
   const { shutdown, calls: shutdowns } = recordingShutdown();
 
-  const released = releaseWorktreeSimulators({
-    lockRoot,
-    worktreeRoot: mine,
-    rename,
-    shutdown,
-  });
+  const released = releaseWorktreeSimulators({ lockRoot, worktreeRoot: mine, rename, shutdown });
 
   assert.deepEqual(released.sort(), ['MINE-ADOPTED', 'MINE-BOOTED']);
   assert.deepEqual(shutdowns, ['MINE-BOOTED']);
@@ -774,12 +721,7 @@ test('listIosDevices flattens iOS runtimes and drops malformed entries', () => {
   const payload = {
     devices: {
       'com.apple.CoreSimulator.SimRuntime.iOS-26-0': [
-        {
-          udid: 'A',
-          name: 'iPhone 16',
-          state: 'Shutdown',
-          deviceTypeIdentifier: IPHONE_TYPE,
-        },
+        { udid: 'A', name: 'iPhone 16', state: 'Shutdown', deviceTypeIdentifier: IPHONE_TYPE },
         { udid: '', name: 'broken', state: 'Shutdown' },
         { name: 'no-udid', state: 'Shutdown' },
       ],
@@ -790,11 +732,6 @@ test('listIosDevices flattens iOS runtimes and drops malformed entries', () => {
   };
   const devices = listIosDevices(() => Buffer.from(JSON.stringify(payload)));
   assert.deepEqual(devices, [
-    {
-      id: 'A',
-      name: 'iPhone 16',
-      state: 'Shutdown',
-      deviceTypeIdentifier: IPHONE_TYPE,
-    },
+    { id: 'A', name: 'iPhone 16', state: 'Shutdown', deviceTypeIdentifier: IPHONE_TYPE },
   ]);
 });

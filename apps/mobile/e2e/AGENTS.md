@@ -42,9 +42,9 @@ A scenario that needs a real GitHub integration (for example cloud agents clonin
 pnpm dev:seed app:github-integration-copy <email>
 ```
 
-The command finds the newest valid integration, re-encrypts its tokens for the account, and reports the donor login and expiries. When it fails with "No valid GitHub integration found", the scenario cannot run: report `VERIFICATION BLOCKED.` with that message — never fake the integration or skip the scenario silently. The copy shares the donor's token; if the connection later shows as expired, run the copy again.
+The command finds the newest valid integration, re-encrypts its tokens for the account, and reports the donor login and expiries. When it fails with "No valid GitHub integration found", the scenario cannot run. Report `VERIFICATION BLOCKED.` with that message. Never fake the integration, and never skip the scenario silently. The copy shares the donor's token; when the connection later shows as expired, run the copy again.
 
-An account holds one token row. The copy and the PR-review stub (`github-stub.sh`) both write it, so they must never share an account: use one account for stub scenarios and a different account for integration scenarios. To take an account back for the stub, remove the copy first: `pnpm dev:seed app:github-integration-copy --remove <email>`.
+An account holds one token row. The copy and the PR-review stub (`github-stub.sh`) both write it, so they must never share an account. Use one account for stub scenarios and a different account for integration scenarios. To take an account back for the stub, remove the copy first: `pnpm dev:seed app:github-integration-copy --remove <email>`.
 
 # Start the stack (bundle owner)
 
@@ -166,7 +166,7 @@ apps/mobile/e2e/github-stub.sh seed <email>    # token row for one more signed-i
 apps/mobile/e2e/github-stub.sh stop            # reverses everything
 ```
 
-The email is the account the app is signed in as; the user must exist (sign in on the device first). Fixtures: `kilo-stub/discussion-mixed#1` (iOS verifier), `kilo-stub/discussion-mixed#11` (Android verifier — the two run in parallel and must never share one mixed fixture, its thread state is mutable), `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`. `stop` does not remove the seeded token row; until the next `start`, the PR-review screen keeps its URL input and real GitHub calls fail as an expired connection — that residue is expected, not a defect. If the app stalls on "GitHub connection expired" with repeated `githubPrReview.getPullRequest 412` in the nextjs log, run `pnpm dev:env -y cloudflare-git-token-service && pnpm dev:restart cloudflare-git-token-service` (nextjs reads `GIT_TOKEN_SERVICE_API_URL` from `apps/web/.env.development.local`).
+The email is the account the app is signed in as; the user must exist (sign in on the device first). Fixtures: `kilo-stub/discussion-mixed#1` (iOS verifier), `kilo-stub/discussion-mixed#11` (Android verifier), `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`. The mixed fixtures have mutable thread state, so parallel iOS and Android verifiers must never share one. `stop` does not remove the seeded token row. Until the next `start`, the PR-review screen keeps its URL input and real GitHub calls fail as an expired connection; that residue is expected, not a defect. If the app stalls on "GitHub connection expired" with repeated `githubPrReview.getPullRequest 412` in the nextjs log, run `pnpm dev:env -y cloudflare-git-token-service && pnpm dev:restart cloudflare-git-token-service` (nextjs reads `GIT_TOKEN_SERVICE_API_URL` from `apps/web/.env.development.local`).
 
 # Remote CLI sessions
 

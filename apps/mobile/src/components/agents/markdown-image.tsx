@@ -84,14 +84,16 @@ export function MarkdownImage({
           }}
         />
       </Pressable>
-      <ImageViewerModal
-        visible={viewerVisible}
-        uri={uri}
-        filename={filename}
-        onClose={() => {
-          setViewerVisible(false);
-        }}
-      />
+      {viewerVisible && (
+        <ImageViewerModal
+          visible={viewerVisible}
+          uri={uri}
+          filename={filename}
+          onClose={() => {
+            setViewerVisible(false);
+          }}
+        />
+      )}
     </>
   );
 }

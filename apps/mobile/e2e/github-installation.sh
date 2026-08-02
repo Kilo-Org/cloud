@@ -73,27 +73,25 @@ grep -q '"success":true' "$BODY" || fail trpc-add-installation "$CODE" "$(cut -c
 
 # `success:true` only proves the mutation ran. The upsert keys on the
 # installation id, so a second id gives the account a second github row, and
-# the two readers can then disagree: the installation screen orders by health
-# and recency, while the cloud-agent repository list takes one row with no
-# ordering. Assert both, because only the second one is what a cloud-agent
-# scenario depends on.
+# the readers then disagree: the installation screen orders by health and
+# recency, the cloud-agent repository list takes one row with no ordering.
+# Requiring exactly one row makes every reader resolve the same installation,
+# which no per-reader check can prove on its own.
 CHECK="$WORK_DIR/check"
 CODE=$(curl -s --max-time 120 -o "$CHECK" -w '%{http_code}' -b "$JAR" \
-  "$BASE/api/trpc/githubApps.getInstallation") || fail readback transport
+  "$BASE/api/trpc/githubApps.listIntegrations") || fail readback transport
 case $CODE in 2*) ;; *) fail readback "$CODE" "$(cut -c1-300 "$CHECK")" ;; esac
-read -r LIVE_ID INSTALLED <<<"$(node -e '
+LIVE_IDS="$(node -e '
 const response = JSON.parse(require("fs").readFileSync(0, "utf8"));
-const data = response.result?.data?.json ?? response.result?.data;
-const installation = data?.installation;
-if (!installation) process.exit(0);
-process.stdout.write(`${installation.installationId} ${data.installed}`);
+const rows = response.result?.data?.json ?? response.result?.data;
+if (!Array.isArray(rows)) process.exit(0);
+process.stdout.write(rows.map(row => row.platform_installation_id).join(","));
 ' < "$CHECK")"
-[ "$LIVE_ID" = "$INSTALLATION_ID" ] && [ "$INSTALLED" = "true" ] \
-  || fail readback "$CODE" "the account resolves installation ${LIVE_ID:-none} (installed=${INSTALLED:-none}), not $INSTALLATION_ID — check the account's github integration rows"
+[ "$LIVE_IDS" = "$INSTALLATION_ID" ] \
+  || fail readback "$CODE" "the account holds github installations [${LIVE_IDS:-none}]; expected exactly $INSTALLATION_ID — remove the other rows, because each reader picks its own"
 
-# The unordered reader: `fetchGitHubRepositoriesForUser` is what the mobile
-# new-session screen calls, so an empty list here means the app cannot start a
-# cloud agent even when the installation screen looks right.
+# The repository list the mobile new-session screen calls. An empty list means
+# the app cannot start a cloud agent, whatever the integration row says.
 REPOS="$WORK_DIR/repos"
 CODE=$(curl -s --max-time 120 -o "$REPOS" -w '%{http_code}' -b "$JAR" -G \
   --data-urlencode 'input={"forceRefresh":false}' \

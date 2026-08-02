@@ -13,11 +13,14 @@ import { trpcClient } from '@/lib/trpc';
  * (after the text part).
  *
  * Contract:
- *  - `filename` on the wire is the SERVER-ISSUED `remoteName`
- *    (`<uuid>.<ext>`), NEVER the original picker filename.
+ *  - `filename` on the wire is the original picker filename
+ *    (`originalName`), NEVER the server-issued `remoteName`
+ *    (`<uuid>.<ext>`).
  *  - `mime` is derived SOLELY from the `remoteName` extension via the
  *    canonical table in `agent-attachments/validate` — the picker MIME
  *    is not consulted.
+ *  - `url` is a presigned GET URL minted from `remoteName`; the content
+ *    is served from the R2 key.
  *
  * Sequencing: callers `await` the full array; one failed presign
  * propagates so the composer can surface the failure through the
@@ -36,7 +39,7 @@ export async function buildRemoteAttachmentParts(
       return {
         type: 'file',
         mime,
-        filename: file.remoteName,
+        filename: file.originalName,
         url: result.signedUrl,
       } satisfies RemoteAttachmentPart;
     })

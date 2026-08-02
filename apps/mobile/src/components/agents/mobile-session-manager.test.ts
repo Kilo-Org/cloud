@@ -98,19 +98,19 @@ describe('buildRemoteAttachmentParts', () => {
       {
         type: 'file',
         mime: 'application/octet-stream',
-        filename: 'msg-uuid.zip',
+        filename: 'archive.zip',
         url: 'https://r2.example.com/signed',
       },
       {
         type: 'file',
         mime: 'text/plain',
-        filename: 'msg-uuid.txt',
+        filename: 'notes.txt',
         url: 'https://r2.example.com/signed',
       },
       {
         type: 'file',
         mime: 'image/png',
-        filename: 'msg-uuid.png',
+        filename: 'image.png',
         url: 'https://r2.example.com/signed',
       },
     ]);

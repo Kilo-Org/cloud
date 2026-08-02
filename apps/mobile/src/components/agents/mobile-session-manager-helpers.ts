@@ -1,7 +1,11 @@
 import { type RemoteAttachmentPart } from '@kilocode/cloud-agent-sdk';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
-import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
+import {
+  mimeForExtension,
+  normalizeAttachmentExtension,
+  sanitizeAttachmentFilename,
+} from '@/lib/agent-attachments/validate';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -13,9 +17,11 @@ import { trpcClient } from '@/lib/trpc';
  * (after the text part).
  *
  * Contract:
- *  - `filename` on the wire is the original picker filename
+ *  - `filename` on the wire is the sanitized original picker filename
  *    (`originalName`), NEVER the server-issued `remoteName`
- *    (`<uuid>.<ext>`).
+ *    (`<uuid>.<ext>`). Path separators, traversal, control characters,
+ *    and excess length are stripped before emission (see
+ *    `sanitizeAttachmentFilename`).
  *  - `mime` is derived SOLELY from the `remoteName` extension via the
  *    canonical table in `agent-attachments/validate` — the picker MIME
  *    is not consulted.
@@ -39,7 +45,7 @@ export async function buildRemoteAttachmentParts(
       return {
         type: 'file',
         mime,
-        filename: file.originalName,
+        filename: sanitizeAttachmentFilename(file.originalName),
         url: result.signedUrl,
       } satisfies RemoteAttachmentPart;
     })

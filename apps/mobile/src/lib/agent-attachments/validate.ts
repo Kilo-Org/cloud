@@ -5,6 +5,7 @@ import {
   AGENT_ATTACHMENT_MAX_BYTES,
   AGENT_ATTACHMENT_MAX_FILES,
   AGENT_ATTACHMENT_MIME_BY_EXTENSION,
+  AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH,
   type AgentAttachmentExtension,
   type AgentAttachmentMime,
 } from './constants';
@@ -49,6 +50,68 @@ export function mimeForExtension(extension: string): AgentAttachmentMime {
   const mimeByExtension: Readonly<Record<string, AgentAttachmentMime | undefined>> =
     AGENT_ATTACHMENT_MIME_BY_EXTENSION;
   return mimeByExtension[extension] ?? 'application/octet-stream';
+}
+
+/**
+ * Sanitize a picker filename for the remote CLI wire payload.
+ *
+ * The original picker name reaches CLI filesystem materialization.
+ * This function strips path separators, traversal sequences,
+ * control characters, and excess length so the emitted filename
+ * cannot create an unsafe path.
+ *
+ * - Strips leading path components (basename only).
+ * - Strips control characters (ASCII 0x00–0x1f, 0x7f).
+ * - Strips path separators (`/`, `\`).
+ * - Truncates to {@link AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH}
+ *   by code point so no surrogate pair is split.
+ * - Preserves safe basename names byte-for-byte, including repeated
+ *   and trailing dots.
+ * - Falls back to "file.bin" when sanitization produces an empty string
+ *   or a bare traversal token (`.` or `..`).
+ */
+export function sanitizeAttachmentFilename(raw: string): string {
+  // Strip to basename only — drop any directory prefix
+  let sanitized = raw.replace(/^.*[/\\]/, '');
+
+  // Strip control characters
+  {
+    let out = '';
+    for (const c of sanitized) {
+      const code = c.codePointAt(0);
+      // eslint-disable-next-line eslint-plugin-unicorn/number-literal-case — oxfmt prefers lowercase hex
+      if (code !== undefined && code > 0x1f && code !== 0x7f) {
+        out += c;
+      }
+    }
+    sanitized = out;
+  }
+
+  // Strip any remaining path separators
+  sanitized = sanitized.replaceAll('/', '').replaceAll('\\', '');
+
+  // Unicode-safe length truncation: slice by code points so no
+  // surrogate pair is split.
+  if (sanitized.length > AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH) {
+    // eslint-disable-next-line typescript-eslint/no-misused-spread — split by code points to avoid unpaired surrogates
+    const chars = [...sanitized];
+    sanitized = chars.slice(0, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH).join('');
+  }
+
+  // If empty, use the safe fallback
+  if (sanitized.length === 0) {
+    return `file.${AGENT_ATTACHMENT_FALLBACK_EXTENSION}`;
+  }
+
+  // Reject bare traversal tokens (`.` and `..`).
+  // These survive basename extraction when the original name IS the
+  // traversal token — e.g. `..`, `a/..`, or `../..` — and must never
+  // reach the remote wire field.
+  if (sanitized === '.' || sanitized === '..') {
+    return `file.${AGENT_ATTACHMENT_FALLBACK_EXTENSION}`;
+  }
+
+  return sanitized;
 }
 
 type ClassifiedAttachment =

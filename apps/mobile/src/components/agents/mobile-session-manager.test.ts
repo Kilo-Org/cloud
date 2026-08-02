@@ -115,6 +115,59 @@ describe('buildRemoteAttachmentParts', () => {
       },
     ]);
   });
+
+  it('sanitizes an unsafe original name before it reaches the wire payload', async () => {
+    mutate.mockResolvedValue({
+      signedUrl: 'https://r2.example.com/signed',
+      key: 'user-id/cloud-agent/msg-uuid/file',
+      expiresAt: new Date().toISOString(),
+    });
+
+    const submission: AgentAttachmentSubmissionPayload = {
+      messageUuid: 'msg-uuid',
+      wire: {
+        path: 'upload-path',
+        files: ['msg-uuid.bin'],
+      },
+      files: [{ remoteName: 'msg-uuid.bin', originalName: '../../etc/passwd', size: 100 }],
+    };
+
+    const parts = await buildRemoteAttachmentParts(submission);
+    expect(parts).toHaveLength(1);
+    // Basename extraction strips the directory prefix; the isolated
+    // basename has no separators and is safe.
+    expect(parts[0]?.filename).toBe('passwd');
+    // URL and MIME still derived from remoteName
+    expect(parts[0]?.url).toBe('https://r2.example.com/signed');
+    expect(parts[0]?.mime).toBe('application/octet-stream');
+  });
+
+  it('maps bare traversal dot tokens to the wire-safe fallback', async () => {
+    mutate.mockResolvedValue({
+      signedUrl: 'https://r2.example.com/signed',
+      key: 'user-id/cloud-agent/msg-uuid/file',
+      expiresAt: new Date().toISOString(),
+    });
+
+    const submission: AgentAttachmentSubmissionPayload = {
+      messageUuid: 'msg-uuid',
+      wire: {
+        path: 'upload-path',
+        files: ['msg-uuid.bin', 'msg-uuid.bin', 'msg-uuid.bin'],
+      },
+      files: [
+        { remoteName: 'msg-uuid.bin', originalName: '.', size: 100 },
+        { remoteName: 'msg-uuid.bin', originalName: '..', size: 100 },
+        { remoteName: 'msg-uuid.bin', originalName: 'a/..', size: 100 },
+      ],
+    };
+
+    const parts = await buildRemoteAttachmentParts(submission);
+    expect(parts).toHaveLength(3);
+    expect(parts[0]?.filename).toBe('file.bin');
+    expect(parts[1]?.filename).toBe('file.bin');
+    expect(parts[2]?.filename).toBe('file.bin');
+  });
 });
 
 describe('readFetchSessionErrorCode', () => {

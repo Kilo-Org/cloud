@@ -11,6 +11,7 @@ import {
   describeClassificationFailure,
   mimeForExtension,
   normalizeAttachmentExtension,
+  sanitizeAttachmentFilename,
 } from './validate';
 
 describe('normalizeAttachmentExtension', () => {
@@ -38,6 +39,105 @@ describe('normalizeAttachmentExtension', () => {
     // also fall through to `bin` if the MIME lookup would fail.
     const ext = normalizeAttachmentExtension('clip.mov');
     expect(ext).toBe('mov');
+  });
+});
+
+describe('sanitizeAttachmentFilename', () => {
+  it('passes a safe picker name unchanged', () => {
+    expect(sanitizeAttachmentFilename('inbound-8mib.bin')).toBe('inbound-8mib.bin');
+  });
+
+  it('passes common safe names unchanged', () => {
+    expect(sanitizeAttachmentFilename('archive.zip')).toBe('archive.zip');
+    expect(sanitizeAttachmentFilename('notes.txt')).toBe('notes.txt');
+    expect(sanitizeAttachmentFilename('image.png')).toBe('image.png');
+    expect(sanitizeAttachmentFilename('report.PDF')).toBe('report.PDF');
+    expect(sanitizeAttachmentFilename('some_large_document-v2.pdf')).toBe(
+      'some_large_document-v2.pdf'
+    );
+  });
+
+  it('strips directory traversal with forward slash', () => {
+    // Basename extraction drops the directory prefix; the isolated
+    // basename is safe because it has no separators.
+    expect(sanitizeAttachmentFilename('../../etc/passwd')).toBe('passwd');
+    expect(sanitizeAttachmentFilename('a/../../../b.txt')).toBe('b.txt');
+    expect(sanitizeAttachmentFilename('/root/secret.key')).toBe('secret.key');
+  });
+
+  it('strips directory traversal with backslash', () => {
+    expect(sanitizeAttachmentFilename(String.raw`..\..\windows\system.ini`)).toBe('system.ini');
+    expect(sanitizeAttachmentFilename(String.raw`C:\Users\admin\desktop.ini`)).toBe('desktop.ini');
+  });
+
+  it('maps bare traversal tokens to safe fallback', () => {
+    // Direct traversal tokens reach the sanitizer when the picker
+    // reports a raw name that IS the traversal entry itself.
+    expect(sanitizeAttachmentFilename('.')).toBe('file.bin');
+    expect(sanitizeAttachmentFilename('..')).toBe('file.bin');
+  });
+
+  it('maps path-prefixed traversal tokens to safe fallback', () => {
+    // The basename is `..` after prefix stripping; it must fall back.
+    expect(sanitizeAttachmentFilename('../..')).toBe('file.bin');
+    expect(sanitizeAttachmentFilename('a/..')).toBe('file.bin');
+    expect(sanitizeAttachmentFilename(String.raw`..\..`)).toBe('file.bin');
+  });
+
+  it('preserves safe names with multiple consecutive dots', () => {
+    expect(sanitizeAttachmentFilename('file..backup.txt')).toBe('file..backup.txt');
+    expect(sanitizeAttachmentFilename('version..2.bin')).toBe('version..2.bin');
+    expect(sanitizeAttachmentFilename('a...b.txt')).toBe('a...b.txt');
+  });
+
+  it('strips control characters', () => {
+    expect(sanitizeAttachmentFilename('test\u0000file.txt')).toBe('testfile.txt');
+    expect(sanitizeAttachmentFilename('foo\u001Fbar.bin')).toBe('foobar.bin');
+    expect(sanitizeAttachmentFilename('name\u007F.txt')).toBe('name.txt');
+  });
+
+  it('truncates excess length to 255 chars', () => {
+    const long = `${'a'.repeat(500)}.txt`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(result.length).toBeLessThanOrEqual(255);
+    expect(result.length).toBe(255);
+  });
+
+  it('truncates Unicode text without splitting surrogate pairs', () => {
+    // 🌟 is U+1F31F, encoded as surrogate pair \uD83C\uDF1F
+    const star = '🌟';
+    const long = star.repeat(300);
+    const result = sanitizeAttachmentFilename(long);
+    // No unpaired surrogates
+    const hasUnpaired =
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(result);
+    expect(hasUnpaired).toBe(false);
+    // Code-point count stays within the documented limit
+    // eslint-disable-next-line typescript-eslint/no-misused-spread — intentional code-point split
+    expect([...result].length).toBeLessThanOrEqual(255);
+    // Each star is one code point; all 255 code points are preserved
+    // eslint-disable-next-line typescript-eslint/no-misused-spread — intentional code-point split
+    expect([...result].length).toBe(255);
+  });
+
+  it('returns safe fallback for empty input', () => {
+    expect(sanitizeAttachmentFilename('')).toBe('file.bin');
+  });
+
+  it('preserves whitespace-only filenames', () => {
+    // Spaces are above control range so they survive. The CLI handles
+    // whitespace-only filenames.
+    expect(sanitizeAttachmentFilename('   ')).toBe('   ');
+  });
+
+  it('returns safe fallback for control-char-only input', () => {
+    expect(sanitizeAttachmentFilename('\u0000\u0001\u0002')).toBe('file.bin');
+    expect(sanitizeAttachmentFilename('\u001F\u007F')).toBe('file.bin');
+  });
+
+  it('preserves trailing dots', () => {
+    expect(sanitizeAttachmentFilename('data.')).toBe('data.');
+    expect(sanitizeAttachmentFilename('something....')).toBe('something....');
   });
 });
 

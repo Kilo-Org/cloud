@@ -128,16 +128,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // running this burn a lot of turns guessing at raw ECONNREFUSED output.
   let target: { id: string } | undefined;
   try {
+    // Exact sign-in email first: normalized_email is not unique, so an
+    // unordered OR could pick a different account that normalizes the same.
     [target] = await db
       .select({ id: kilocode_users.id })
       .from(kilocode_users)
-      .where(
-        or(
-          eq(kilocode_users.normalized_email, normalizedEmail),
-          eq(kilocode_users.google_user_email, trimmedEmail)
-        )
-      )
+      .where(eq(kilocode_users.google_user_email, trimmedEmail))
       .limit(1);
+    if (!target) {
+      [target] = await db
+        .select({ id: kilocode_users.id })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.normalized_email, normalizedEmail))
+        .limit(1);
+    }
   } catch (error) {
     // The driver throws an AggregateError whose per-address causes carry the
     // code, so check codes and nested errors, not just the top message.
@@ -255,6 +259,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         ne(user_github_app_tokens.kilo_user_id, target.id),
         gt(user_github_app_tokens.refresh_token_expires_at, sql`now()`),
         lt(user_github_app_tokens.refresh_token_expires_at, sql`now() + interval '2 years'`),
+        // git-token-service refreshes inside a 5-minute expiry buffer, and
+        // the copy cannot refresh. A donor whose access token expires soon
+        // would pass the live probe and then fail on first real use, so
+        // require a usable margin (10 minutes: twice the service buffer).
+        gt(user_github_app_tokens.access_token_expires_at, sql`now() + interval '10 minutes'`),
         // Synthetic ids (stub seeds and earlier copies) are 13 digits; real
         // GitHub user ids are shorter. A copy must never donate: revocation
         // lands on the real row only, so a surviving copy could hand out
@@ -370,6 +379,18 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         credential_version: sql`${user_github_app_tokens.credential_version} + 1`,
         updated_at: new Date().toISOString(),
       },
+      // The pre-check above is not atomic: a real OAuth callback can land
+      // between it and this write. Re-assert synthetic-only here, so the
+      // update itself can never destroy a real connection.
+      setWhere: sql`${user_github_app_tokens.github_user_id} ~ '^[89][0-9]{12}$'`,
+    })
+    .returning({ id: user_github_app_tokens.id })
+    .then(rows => {
+      if (rows.length === 0) {
+        throw new Error(
+          `${toEmail} gained a REAL GitHub connection while this copy ran; nothing was written. Use a different account.`
+        );
+      }
     });
 
   return {

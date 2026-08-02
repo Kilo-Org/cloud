@@ -62,9 +62,9 @@ type NewSessionConfigureFormProps = {
 
 /**
  * THE new-session screen body — one screen for every entry point (cloud,
- * remote CLI, share-staged). Sections condition on the selected target;
- * remote has no prompt/repo because a spawned CLI session inherits
- * model+repo. Switching the target switches the sections in place.
+ * remote CLI, share-staged). The composer, the mode and the model controls
+ * are shared by both targets. Only the repository section is cloud-only,
+ * because a spawned CLI session inherits its repository from the CLI.
  */
 export function NewSessionConfigureForm({
   attachments,
@@ -137,30 +137,28 @@ export function NewSessionConfigureForm({
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
     >
-      {!isRemote ? (
-        <NewSessionPrompt
-          attachments={attachments}
-          attachmentMax={attachmentMax}
-          isCreating={isCreating}
-          isModelsError={isModelsError}
-          isLoadingModels={isLoadingModels}
-          mode={mode}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onChangeText={onChangeText}
-          onModeChange={onModeChange}
-          onModelSelect={onModelSelect}
-          onAddAttachment={onAddAttachment}
-          onRemoveAttachment={onRemoveAttachment}
-          onRetryAttachment={onRetryAttachment}
-          onRefetchModels={onRefetchModels}
-          onPrefillAttachments={onPrefillAttachments}
-          shareId={shareId}
-          voiceInputSettlerRef={voiceInputSettlerRef}
-          initialPrompt={initialPrompt}
-        />
-      ) : null}
+      <NewSessionPrompt
+        attachments={attachments}
+        attachmentMax={attachmentMax}
+        isCreating={isStarting}
+        isModelsError={isModelsError}
+        isLoadingModels={isLoadingModels}
+        mode={mode}
+        model={model}
+        variant={variant}
+        modelOptions={modelOptions}
+        onChangeText={onChangeText}
+        onModeChange={onModeChange}
+        onModelSelect={onModelSelect}
+        onAddAttachment={onAddAttachment}
+        onRemoveAttachment={onRemoveAttachment}
+        onRetryAttachment={onRetryAttachment}
+        onRefetchModels={onRefetchModels}
+        onPrefillAttachments={onPrefillAttachments}
+        shareId={shareId}
+        voiceInputSettlerRef={voiceInputSettlerRef}
+        initialPrompt={initialPrompt}
+      />
 
       {runTargetBlock}
 

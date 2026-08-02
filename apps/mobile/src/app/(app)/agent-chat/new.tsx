@@ -101,12 +101,13 @@ function NewSessionScreenBody() {
   });
 
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
-    shareId,
     organizationId,
     runOnInstance,
     setRunOnInstance,
     refetchInstances,
     instanceList,
+    promptRef,
+    attachments: attachments.attachments,
   });
 
   const handleModelSelect = useCallback(
@@ -125,7 +126,7 @@ function NewSessionScreenBody() {
     setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
   }
 
-  const submitCreate = useCallback(async () => {
+  const submitWithVoiceSettled = useCallback(async (submit: () => Promise<void>) => {
     await settleVoiceInputBeforeSubmit({
       lock: submissionLockRef,
       onPendingChange: setIsSubmitting,
@@ -137,9 +138,9 @@ function NewSessionScreenBody() {
         const settled = await settleVoiceInput();
         return settled;
       },
-      submit: createSessionFromDraft,
+      submit,
     });
-  }, [createSessionFromDraft]);
+  }, []);
 
   const { addCandidates, removeAttachment, retryAttachment } = attachments;
   const handleAddAttachment = useCallback(async () => {
@@ -162,7 +163,7 @@ function NewSessionScreenBody() {
 
   const isRemoteTargetSelected = runOnInstance !== null;
   const isStartDisabled = isRemoteTargetSelected
-    ? remoteSpawn.isSpawningRemote
+    ? remoteSpawn.isSpawningRemote || isSubmitting || attachments.hasFailedAttachments
     : resolveNewSessionSubmitDisabled({
         attachmentsHasFailed: attachments.hasFailedAttachments,
         attachmentsIsUploading: attachments.isUploading,
@@ -176,11 +177,14 @@ function NewSessionScreenBody() {
 
   const handleStartSession = useCallback(() => {
     if (runOnInstance !== null) {
-      remoteSpawn.onStart();
+      void submitWithVoiceSettled(async () => {
+        remoteSpawn.onStart();
+        await Promise.resolve();
+      });
       return;
     }
-    void submitCreate();
-  }, [remoteSpawn, runOnInstance, submitCreate]);
+    void submitWithVoiceSettled(createSessionFromDraft);
+  }, [createSessionFromDraft, remoteSpawn, runOnInstance, submitWithVoiceSettled]);
 
   return (
     <View className="flex-1 bg-background">

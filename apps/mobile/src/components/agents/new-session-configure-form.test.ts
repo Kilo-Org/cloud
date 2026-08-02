@@ -187,7 +187,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 3: Remote, selector shown ──
-  it('hides prompt and repo, shows "Run on" label, when remote target with selector shown', async () => {
+  it('shows prompt and "Run on" label, hides repo section, when remote target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -197,14 +197,14 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
     }) as Node;
 
-    expect(findElementByType(element, 'NewSessionPrompt')).toBeNull();
+    expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
     expect(findTextContent(element, t => t === 'Run on')).toBe(true);
     expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
   });
 
   // ── Case 4: Remote, selector hidden ──
-  it('shows muted context line, hides prompt and repo, when remote target with selector hidden', async () => {
+  it('shows muted context line and prompt, hides repo section, when remote target with selector hidden', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -214,7 +214,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: false,
     }) as Node;
 
-    expect(findElementByType(element, 'NewSessionPrompt')).toBeNull();
+    expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
     expect(findTextContent(element, t => t === 'Run on: ')).toBe(true);
     expect(findTextContent(element, t => t.includes('laptop'))).toBe(true);
@@ -325,7 +325,7 @@ describe('NewSessionConfigureForm', () => {
     expect(selector!.value).toBe(INSTANCE);
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion
     expect(selector!.isLoading).toBe(true);
-    expect(findElementByType(element, 'NewSessionPrompt')).toBeNull();
+    expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
   });
 
@@ -345,5 +345,22 @@ describe('NewSessionConfigureForm', () => {
     expect(prompt).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(prompt!.initialPrompt).toBe('carried across the switch');
+  });
+
+  // ── Case 9: remote target forwards spawn-flag as isCreating ──
+  it('passes isSpawningRemote as isCreating on NewSessionPrompt for a remote target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      isSpawningRemote: true,
+    }) as Node;
+
+    const prompt = findElementByType(element, 'NewSessionPrompt');
+    expect(prompt).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(prompt!.isCreating).toBe(true);
   });
 });

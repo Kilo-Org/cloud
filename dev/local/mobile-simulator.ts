@@ -21,7 +21,11 @@ type CommandResult = {
   stderr: string;
   status: number | null;
 };
-type ExecWithOutputFn = (command: string, args: readonly string[]) => CommandResult;
+type ExecWithOutputFn = (
+  command: string,
+  args: readonly string[],
+  options?: { timeoutMs?: number }
+) => CommandResult;
 // Rename hook used to set and restore the visible simulator name.
 // Production wires this to `xcrun simctl rename <device> <name>`.
 // Injectable for deterministic tests.
@@ -67,6 +71,10 @@ type ClaimArgs = {
   // device was already running and was adopted as-is. That answer is
   // only knowable here, so it is recorded in the claim for release.
   prepare?: (device: SimulatorDevice) => boolean | void;
+  // Shutdown hook used on claim rollback: when prepare booted the device
+  // but a later step (the rename) failed, the abandoned claim's device is
+  // powered back off. Without it a booted device would sit unclaimed.
+  shutdown?: ShutdownFn;
   fileOperations?: {
     readFileSync?: (filePath: string, encoding: 'utf8') => string;
   };
@@ -120,6 +128,22 @@ function parseClaimArgs(
 
 function lockPath(lockRoot: string, deviceId: string): string {
   return path.join(lockRoot, `${deviceId}.json`);
+}
+
+// Write a claim record atomically. A plain writeFileSync truncates in place,
+// so an unlocked reader (release-all, a peer's claim scan) can see a partial
+// file, judge it corrupt, and delete a live claim. Temp file plus rename (or
+// link for exclusive creation — it throws EEXIST exactly like flag "wx")
+// makes every read see whole bytes, old or new.
+function writeClaimAtomic(filePath: string, data: string, options?: { exclusive?: boolean }): void {
+  const tempPath = `${filePath}.tmp.${process.pid}`;
+  fs.writeFileSync(tempPath, data);
+  try {
+    if (options?.exclusive) fs.linkSync(tempPath, filePath);
+    else fs.renameSync(tempPath, filePath);
+  } finally {
+    fs.rmSync(tempPath, { force: true });
+  }
 }
 
 // Read the on-disk claim. Malformed files and claims whose worktree no
@@ -179,8 +203,12 @@ function withClaimMutationLock<T>(lockRoot: string, deviceId: string, mutate: ()
 // when the command exits non-zero so the existing thrown-error handling path
 // still surfaces non-zero failures. The caller is responsible for parsing the
 // captured output for terminal-failure indicators that can appear with exit 0.
-function execWithOutput(command: string, args: readonly string[]): CommandResult {
-  const result = spawnSync(command, args, { encoding: 'utf8' });
+function execWithOutput(
+  command: string,
+  args: readonly string[],
+  options?: { timeoutMs?: number }
+): CommandResult {
+  const result = spawnSync(command, args, { encoding: 'utf8', timeout: options?.timeoutMs });
   if (result.error) throw result.error;
   if (result.signal) {
     throw new Error(`${command} ${args.join(' ')} terminated with ${result.signal}`);
@@ -234,7 +262,12 @@ function bootSimulator(
   try {
     exec('xcrun', ['simctl', 'boot', device.id], { stdio: 'ignore' });
     booted = true;
-    const result = runWithOutput('xcrun', ['simctl', 'bootstatus', device.id, '-b']);
+    // Bounded: a wedged CoreSimulator otherwise blocks the claim forever.
+    // 15 minutes clears even a heavily loaded host; the timeout kill lands
+    // in the catch below, which shuts the device back down.
+    const result = runWithOutput('xcrun', ['simctl', 'bootstatus', device.id, '-b'], {
+      timeoutMs: 900_000,
+    });
     if (isBootstatusTerminalFailure(result)) {
       const combined = `${result.stdout}\n${result.stderr}`.trim();
       // Echo a bounded tail of the captured output so the user can see why the
@@ -302,18 +335,27 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
               currentDeviceName: targetLabel,
               originalDeviceName: existing.originalDeviceName ?? device.name,
             };
-            fs.writeFileSync(lockPath(lockRoot, device.id), JSON.stringify(next), { flag: 'w' });
+            writeClaimAtomic(lockPath(lockRoot, device.id), JSON.stringify(next));
           }
           return true;
         }
-        fs.writeFileSync(
+        writeClaimAtomic(
           lockPath(lockRoot, device.id),
           JSON.stringify({
             deviceId: device.id,
             worktreeRoot,
             claimedAt: new Date().toISOString(),
+            // Recorded before the rename so a claim that dies mid-boot can
+            // still restore the device's real name on release.
+            originalDeviceName: device.name,
+            // Boot INTENT, recorded before the boot happens: prepare boots
+            // exactly when the device is not already running. If anything
+            // later loses the post-boot rewrite, release still powers off a
+            // device this claim booted (shutting down an already-shutdown
+            // device is a tolerated no-op).
+            bootedByClaim: device.state !== 'Booted',
           }),
-          { flag: 'wx' }
+          { exclusive: true }
         );
         return false;
       });
@@ -334,10 +376,9 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
             args.fileOperations?.readFileSync ?? fs.readFileSync
           );
           if (current) {
-            fs.writeFileSync(
+            writeClaimAtomic(
               lockPath(lockRoot, device.id),
-              JSON.stringify({ ...current, bootedByClaim }),
-              { flag: 'w' }
+              JSON.stringify({ ...current, bootedByClaim })
             );
           }
         });
@@ -360,10 +401,20 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
         }
         args.rename(device.id, targetLabel);
       } catch (error) {
-        const mayBeRunning =
+        let keepClaim =
           error instanceof Error &&
           (error as Error & { deviceMayBeRunning?: boolean }).deviceMayBeRunning === true;
-        if (!mayBeRunning) {
+        // The boot succeeded but the claim is being abandoned (the rename
+        // failed): power the device back off, or keep the claim so a peer
+        // cannot adopt a device this attempt left booted.
+        if (!keepClaim && bootedByClaim && args.shutdown) {
+          try {
+            args.shutdown(device.id);
+          } catch {
+            keepClaim = true;
+          }
+        }
+        if (!keepClaim) {
           withClaimMutationLock(lockRoot, device.id, () => {
             fs.rmSync(lockPath(lockRoot, device.id), { force: true });
           });
@@ -371,7 +422,7 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
         throw error;
       }
       withClaimMutationLock(lockRoot, device.id, () => {
-        fs.writeFileSync(
+        writeClaimAtomic(
           lockPath(lockRoot, device.id),
           JSON.stringify({
             deviceId: device.id,
@@ -380,8 +431,7 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
             originalDeviceName: device.name,
             currentDeviceName: targetLabel,
             bootedByClaim,
-          }),
-          { flag: 'w' }
+          })
         );
       });
       return { device: { ...device, name: targetLabel }, alreadyOwned: false };
@@ -586,6 +636,7 @@ function main(): void {
       requestedId: parsed.udid,
       rename: defaultRename,
       prepare: device => bootSimulator(device),
+      shutdown: defaultShutdown,
     });
     console.log(
       JSON.stringify({ ...claim, worktreeRoot, label: buildSimulatorLabel(worktreeRoot) })

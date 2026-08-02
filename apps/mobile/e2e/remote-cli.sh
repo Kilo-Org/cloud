@@ -175,7 +175,7 @@ cmd_start() {
   prepare_env "$OPT_EMAIL" "$OPT_REINSTALL"
 
   echo "==> launching CLI in tmux session '$SESSION'"
-  tmux kill-session -t "$SESSION" 2>/dev/null || true
+  tmux kill-session -t "=$SESSION" 2>/dev/null || true
   tmux new-session -d -s "$SESSION" -c "$CLI_HOME" -x 220 -y 50
   tmux send-keys -t "$SESSION" "source '$ENV_FILE' && clear && kilo" Enter
 
@@ -215,7 +215,7 @@ cmd_exec() {
 }
 
 cmd_status() {
-  if tmux has-session -t "$SESSION" 2>/dev/null; then
+  if tmux has-session -t "=$SESSION" 2>/dev/null; then
     echo "Remote CLI session '$SESSION' is running."
     tmux capture-pane -p -t "$SESSION" -S -40 | sed -e 's/[[:space:]]*$//' | grep -v '^$' | tail -20 || true
   else
@@ -232,7 +232,7 @@ cmd_stop() {
       *) echo "Unknown option: $arg" >&2; exit 2 ;;
     esac
   done
-  tmux kill-session -t "$SESSION" 2>/dev/null && echo "Stopped '$SESSION'." || echo "No session '$SESSION' to stop."
+  tmux kill-session -t "=$SESSION" 2>/dev/null && echo "Stopped '$SESSION'." || echo "No session '$SESSION' to stop."
   rm -f "$ENV_FILE"
   if [ "$purge" = "1" ]; then
     rm -rf "$CLI_HOME"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseHtmlImages } from './markdown-html-image';
+import { parseHtmlImages, stripToFixedPoint } from './markdown-html-image';
 
 describe('parseHtmlImages parser', () => {
   it('parses double-quoted attributes', () => {
@@ -166,5 +166,28 @@ describe('parseHtmlImages parser', () => {
 
   it('data-src only (no real src) → empty array', () => {
     expect(parseHtmlImages('<img data-src="https://x/a.png">')).toStrictEqual([]);
+  });
+
+  it('stripToFixedPoint clears a boundary-joined residual comment (single pass cannot)', () => {
+    // A single global pass leaves the complete comment `<!-- -->`; the loop clears it.
+    expect(stripToFixedPoint('<<!-- -->!-- -->', /<!--[\s\S]*?-->/g)).toBe('');
+  });
+
+  it('stripToFixedPoint is a no-op on input without comments', () => {
+    expect(stripToFixedPoint('<img src="https://x/a.png">', /<!--[\s\S]*?-->/g)).toBe(
+      '<img src="https://x/a.png">'
+    );
+  });
+
+  // Behavior locks for adversarial comment input: these pass before and after the
+  // fix and pin the parser's contract on nested-comment tricks.
+  it('nested-comment trick stays comment-only → empty array', () => {
+    expect(parseHtmlImages('<!<!-- -->-->')).toStrictEqual([]);
+  });
+
+  it('nested-comment prefix does not hide a following <img>', () => {
+    const result = parseHtmlImages('<!<!-- -->--><img src="https://x/a.png">');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ src: 'https://x/a.png' });
   });
 });

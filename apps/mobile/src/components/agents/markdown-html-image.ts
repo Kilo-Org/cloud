@@ -32,13 +32,33 @@ function attrValue(tag: string, re: RegExp): string | undefined {
   return tag.match(re)?.[1];
 }
 
-/** Strip HTML comments then check whether a token carries nothing but tags and whitespace. */
+/** A token renders as images only when it carries nothing but tags and whitespace. Caller strips comments first. */
+const TAGS_AND_WHITESPACE_RE = /^(\s|<[^>]*>)*$/;
+
 function isImagesOnly(cleaned: string): boolean {
-  return cleaned.replaceAll(/<[^>]*>/g, '').replaceAll(/\s/g, '').length === 0;
+  return TAGS_AND_WHITESPACE_RE.test(cleaned);
 }
 
 export function isSupportedScheme(src: string): boolean {
   return src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:image/');
+}
+
+/**
+ * Remove every match of `re`, iterating to a fixed point. A single global pass can
+ * join the survivors of one match into a new match across the removal boundary:
+ * `<<!-- -->!-- -->` single-passes to the residual comment `<!-- -->`, which the
+ * loop then clears. Each pass either removes at least one character or makes no
+ * change, so the loop terminates.
+ */
+export function stripToFixedPoint(value: string, re: RegExp): string {
+  let current = value;
+  for (;;) {
+    const next = current.replaceAll(re, '');
+    if (next === current) {
+      return current;
+    }
+    current = next;
+  }
 }
 
 function imgTagToImage(tag: string): HtmlImage | null {
@@ -78,7 +98,7 @@ function imgTagToImage(tag: string): HtmlImage | null {
  */
 export function parseHtmlImages(html: string): HtmlImage[] {
   // 1. Strip HTML comments.
-  const stripped = html.replaceAll(/<!--[\s\S]*?-->/g, '');
+  const stripped = stripToFixedPoint(html, /<!--[\s\S]*?-->/g);
 
   // 2. Match every <img …> tag.
   const tags = stripped.match(IMG_TAG_RE);

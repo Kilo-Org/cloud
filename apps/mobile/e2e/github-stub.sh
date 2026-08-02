@@ -91,6 +91,9 @@ seed_token() {
     -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}") || seed_fail trpc-seed transport
   case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
   grep -q '"error"' "$SEED_BODY" && seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
+  # The endpoint can answer 200 with success:false (row not upserted);
+  # trusting the status code alone would report a seed that never landed.
+  grep -q '"success":true' "$SEED_BODY" || seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
   rm -f "$JAR" "$SEED_BODY"
 }
 

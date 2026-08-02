@@ -25,8 +25,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
-SESSION="kilo-e2e-github-stub-$(basename "$REPO_ROOT")"
-STATE_DIR="${TMPDIR:-/tmp}/kilo-e2e-github-stub/$(basename "$REPO_ROOT")"
+# Tmux session names disallow '.' and ':'; worktree basenames can contain
+# both. Replace them so the session name is always valid.
+SANITIZED="$(basename "$REPO_ROOT" | tr '.:' '--')"
+SESSION="kilo-e2e-github-stub-$SANITIZED"
+STATE_DIR="${TMPDIR:-/tmp}/kilo-e2e-github-stub/$SANITIZED"
 ENV_LOCAL="$REPO_ROOT/.env.local"
 MARKER="# kilo-e2e-github-stub"
 
@@ -43,7 +46,7 @@ case "${1:-}" in
     if [ "${KILO_STUB_LOCKED:-}" != "1" ]; then
       mkdir -p "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks"
       exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
-        --wait 900 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$(basename "$REPO_ROOT")" -- \
+        --wait 900 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$SANITIZED" -- \
         env KILO_STUB_LOCKED=1 "$0" "$@"
     fi
     ;;
@@ -84,8 +87,20 @@ release_port() { [ -z "${STUB_PORT:-}" ] || rmdir "$PORT_CLAIMS/$STUB_PORT" 2>/d
 remove_env_line() {
   # Remove only the line this script added (tagged with the marker).
   [ -f "$ENV_LOCAL" ] || return 0
-  grep -v "$MARKER" "$ENV_LOCAL" > "$ENV_LOCAL.tmp.$$" || true
-  mv "$ENV_LOCAL.tmp.$$" "$ENV_LOCAL"
+  local grep_rc=0 tmp perms
+  tmp="$ENV_LOCAL.tmp.$$"
+  grep -v "$MARKER" "$ENV_LOCAL" > "$tmp" || grep_rc=$?
+  # grep exit 1 = no marker lines (tmp is a full copy — safe to replace).
+  # grep exit >1 = error (tmp may be empty — refuse to overwrite).
+  if [ "$grep_rc" -gt 1 ]; then
+    echo "github-stub: failed to read $ENV_LOCAL (grep error $grep_rc); refusing to overwrite" >&2
+    rm -f "$tmp"
+    return 1
+  fi
+  # Preserve original file permissions before replacing.
+  perms=$(stat -f '%p' "$ENV_LOCAL" 2>/dev/null)
+  [ -n "$perms" ] && chmod "${perms: -3}" "$tmp" 2>/dev/null || true
+  mv "$tmp" "$ENV_LOCAL"
 }
 
 # Seed a token row for EMAIL through next-auth fake-login. The githubUserId

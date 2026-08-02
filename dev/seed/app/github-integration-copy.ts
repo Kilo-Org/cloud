@@ -158,10 +158,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     const collect = (value: unknown): void => {
       if (!(value instanceof Error)) return;
       codes.push(value.message);
-      const code = (value as Error & { code?: string }).code;
-      if (code) codes.push(code);
-      const nested = (value as AggregateError).errors;
-      if (Array.isArray(nested)) nested.forEach(collect);
+      if ('code' in value) {
+        const codeVal = value.code;
+        if (typeof codeVal === 'string') codes.push(codeVal);
+      }
+      if ('errors' in value) {
+        const errorsVal = value.errors;
+        if (Array.isArray(errorsVal)) errorsVal.forEach(err => collect(err));
+      }
       if (value.cause) collect(value.cause);
     };
     collect(error);
@@ -348,8 +352,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // unique, so the donor's id cannot appear twice. The 8 prefix plus 12
   // digits cannot collide with a real GitHub id or with a stub seed (which
   // uses a 9 prefix); deterministic per target so re-copies update in place.
+  // Derive from the raw sign-in email — not the normalized form — so accounts
+  // that differ only by Gmail dots or plus-suffixes (user+X@gmail.com vs.
+  // user+Y@gmail.com) produce distinct synthetic ids.
   const syntheticGithubUserId = `8${createHash('sha256')
-    .update(normalizedEmail)
+    .update(trimmedEmail)
     .digest('hex')
     .replace(/[a-f]/g, '')
     .slice(0, 12)}`;
@@ -363,7 +370,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // replace the revoked row (the upsert clears revoked_at).
   const values = {
     kilo_user_id: target.id,
-    github_app_type: 'standard' as const,
+    github_app_type: 'standard',
     github_user_id: syntheticGithubUserId,
     github_login: source.github_login,
     access_token_encrypted: encryptKeyedEnvelope(
@@ -382,7 +389,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     refresh_token_expires_at: new Date(Date.now() - 1000).toISOString(),
     revoked_at: null,
     revocation_reason: null,
-  };
+  } satisfies typeof user_github_app_tokens.$inferInsert;
 
   await db
     .insert(user_github_app_tokens)

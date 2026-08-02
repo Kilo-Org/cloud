@@ -79,7 +79,9 @@ function printUsage(): void {
   console.log("donor's login with an id GitHub does not know.");
   console.log('');
   console.log("The copy occupies the account's one token row, which the PR-review stub");
-  console.log('(github-stub.sh) also needs. Use different accounts for the two, or');
+  console.log(
+    '(apps/mobile/e2e/github-api-stub) also needs. Use different accounts for the two, or'
+  );
   console.log('remove the copy first: --remove <to-email>.');
 }
 

@@ -154,9 +154,12 @@ case "${1:-}" in
     # Signal handlers must exit, or the start would continue past a released
     # claim; a SIGKILL orphan is reaped by claim_port's staleness check.
     STARTED_OK=0 CREATED_SESSION=0 ENV_ADDED=0
+    SESSION_NAME="$SESSION-$$"
     cleanup_start() {
       if [ "$STARTED_OK" != 1 ]; then
-        [ "$CREATED_SESSION" != 1 ] || tmux kill-session -t "=$SESSION" 2>/dev/null || true
+        # SESSION_NAME is pid-unique until the rename succeeds, so killing it
+        # can never hit another start's session.
+        [ "$CREATED_SESSION" != 1 ] || tmux kill-session -t "=$SESSION_NAME" 2>/dev/null || true
         [ "$ENV_ADDED" != 1 ] || remove_env_line
         [ "$CREATED_SESSION" != 1 ] || rm -rf "$STATE_DIR"
       fi
@@ -166,12 +169,18 @@ case "${1:-}" in
     trap 'exit 130' INT TERM HUP
 
     mkdir -p "$STATE_DIR"
-    tmux new-session -d -s "$SESSION" -c "$STATE_DIR" \
-      "node $(printf '%q' "$SCRIPT_DIR/github-api-stub/server.mjs") $STUB_PORT" || {
+    # Create under a pid-unique name, then rename to claim the canonical one:
+    # the flag is armed BEFORE creation (killing our unique name is a no-op
+    # when creation never happened), and a failed rename means a concurrent
+    # start won — we tear down only our own uniquely named session.
+    CREATED_SESSION=1
+    tmux new-session -d -s "$SESSION_NAME" -c "$STATE_DIR" \
+      "node $(printf '%q' "$SCRIPT_DIR/github-api-stub/server.mjs") $STUB_PORT"
+    tmux rename-session -t "=$SESSION_NAME" "$SESSION" 2>/dev/null || {
       echo "github-stub: session $SESSION appeared concurrently; another start owns it" >&2
       exit 1
     }
-    CREATED_SESSION=1
+    SESSION_NAME=$SESSION
     for _ in $(seq 1 30); do
       if ! port_free "$STUB_PORT"; then break; fi
       sleep 0.5
@@ -191,8 +200,10 @@ case "${1:-}" in
     if [ -s "$ENV_LOCAL" ] && [ "$(tail -c1 "$ENV_LOCAL")" != "" ]; then
       printf '\n' >> "$ENV_LOCAL"
     fi
-    printf 'GITHUB_API_BASE_URL=http://127.0.0.1:%s %s\n' "$STUB_PORT" "$MARKER" >> "$ENV_LOCAL"
+    # Armed before the append: past the rename we own the stub, so any marker
+    # line cleanup removes is ours (or a stale leftover already removed above).
     ENV_ADDED=1
+    printf 'GITHUB_API_BASE_URL=http://127.0.0.1:%s %s\n' "$STUB_PORT" "$MARKER" >> "$ENV_LOCAL"
 
     BASE="http://127.0.0.1:$API_PORT"
     seed_token "$EMAIL"

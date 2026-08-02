@@ -89,24 +89,32 @@ ensure_server() {
         # that stays blind while our pid lives and /status answers, adopt on
         # pid+status (same evidence rule as the start loop) — dropping the
         # state here would orphan a healthy server on every invocation.
-        # lsof exits 1 on no match; without || true, pipefail + set -e would
-        # kill the script here.
+        # Every probe rechecks liveness and /status, so a server dying
+        # mid-probe is never adopted. lsof exits 1 on no match; without
+        # || true, pipefail + set -e would kill the script here.
         if [ "$LSOF_OK" -eq 0 ]; then return 0; fi
-        BLIND=0
-        while :; do
+        ADOPT=0 FOREIGN=0 BLIND=0
+        while kill -0 "$RECORDED_PID" 2>/dev/null && server_status; do
           LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
           if [ -n "$LISTENER" ] && [ "$LISTENER" = "$RECORDED_PID" ]; then
-            return 0
+            ADOPT=1; break
           fi
-          [ -z "$LISTENER" ] || break
+          [ -z "$LISTENER" ] || { FOREIGN=1; break; }
           BLIND=$((BLIND + 1))
           if [ "$BLIND" -ge 3 ]; then
             echo "appium.sh: lsof cannot attribute port $APPIUM_PORT while our recorded pid is alive and /status answers; adopting on pid+status" >&2
-            return 0
+            ADOPT=1; break
           fi
           sleep 1
         done
-        rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
+        [ "$ADOPT" -eq 0 ] || return 0
+        if [ "$FOREIGN" -eq 1 ]; then
+          # Not ours to kill: a recycled pid may be another device's appium.
+          rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
+        else
+          # Died or stopped answering mid-probe: clean up our own remains.
+          stop_server
+        fi
       else
         stop_server
       fi

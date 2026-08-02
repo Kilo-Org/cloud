@@ -235,34 +235,34 @@ describe('MarkdownRenderer key stability', () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, './relative.png', 'relative');
     expect(el?.type).toBe('Text');
-    expect((el as ReactElement).props.children).toBe('relative');
+    expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('relative');
   });
 
   it('image() renders alt text for file:// URL (no image node)', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'file:///tmp/img.png', 'local');
     expect(el?.type).toBe('Text');
-    expect((el as ReactElement).props.children).toBe('local');
+    expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('local');
   });
 
   it('image() empty alt uses title for unsupported URL', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'file:///tmp/img.png', '', 'Photo');
     expect(el?.type).toBe('Text');
-    expect((el as ReactElement).props.children).toBe('Photo');
+    expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('Photo');
   });
 
   it('image() empty alt uses title for supported URL', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'https://a.com/1.png', '', 'A Title');
     expect(el?.type).toBe('MarkdownImage');
-    expect((el as ReactElement).props.alt).toBe('A Title');
+    expect((el as ReactElement<Record<string, unknown>>).props.alt).toBe('A Title');
   });
 
   it('image() missing alt uses title for unsupported URL', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'file:///tmp/img.png', undefined, 'A Title');
     expect(el?.type).toBe('Text');
-    expect((el as ReactElement).props.children).toBe('A Title');
+    expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('A Title');
   });
 });

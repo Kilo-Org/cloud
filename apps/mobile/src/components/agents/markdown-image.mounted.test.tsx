@@ -16,7 +16,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 import { MarkdownImage } from './markdown-image';
 
 function viewerCount(root: TestRenderer.ReactTestInstance): number {
-  return root.findAll(node => node.type === 'ImageViewerModal').length;
+  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === 'ImageViewerModal').length;
 }
 
 describe('MarkdownImage viewer mounting', () => {
@@ -32,7 +32,7 @@ describe('MarkdownImage viewer mounting', () => {
     }
     expect(viewerCount(renderer.root)).toBe(0);
 
-    const button = renderer.root.find(node => node.type === 'Pressable');
+    const button = renderer.root.find(node => typeof node.type === 'string' && (node.type as string) === 'Pressable');
     await act(async () => {
       button.props.onPress();
     });

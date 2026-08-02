@@ -110,6 +110,8 @@ ensure_server() {
         [ "$ADOPT" -eq 0 ] || return 0
         if [ "$FOREIGN" -eq 1 ]; then
           # Not ours to kill: a recycled pid may be another device's appium.
+          # Record conflict so the external listener is traceable.
+          echo "$LISTENER $APPIUM_PORT $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$STATE_DIR/server.conflicts"
           rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
         else
           # Died or stopped answering mid-probe: clean up our own remains.
@@ -232,8 +234,10 @@ stop_server() {
             return 1
           fi
         else
-          echo "appium.sh: port $STOP_PORT has a foreign listener; keeping server state" >&2
-          return 1
+          echo "appium.sh: port $STOP_PORT has a foreign listener (pid $LISTENER); recording to conflict file, clearing active state" >&2
+          echo "$LISTENER $STOP_PORT $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$STATE_DIR/server.conflicts"
+          rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
+          return 0
         fi
       fi
     fi
@@ -251,7 +255,13 @@ case "$cmd" in
   server)
     case "${2:-}" in
       start) ensure_drivers && ensure_server ;;
-      stop) stop_server ;;
+      stop)
+        stop_server || exit 1
+        if [ -f "$STATE_DIR/server.conflicts" ]; then
+          echo "appium.sh: foreign-listener conflicts recorded:" >&2
+          cat "$STATE_DIR/server.conflicts" >&2
+        fi
+        ;;
       status)
         [ -f "$STATE_DIR/server.port" ] && APPIUM_PORT=$(cat "$STATE_DIR/server.port")
         server_status && echo "up ($DEVICE, port $APPIUM_PORT)" || { echo "down"; exit 1; }

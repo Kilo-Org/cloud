@@ -455,13 +455,17 @@ test('stop_server does not require literal binary path for ownership', () => {
 
   // ps must use -ww so macOS does not truncate the --port argument.
   assert.match(fn, /ps -ww -o command=.*"\$PID"/);
-  // When lsof proves a foreign listener owns the port, keep state and return
-  // nonzero (matching the survived-SIGKILL safety) instead of deleting the
-  // handle and leaving an untracked process. The start-loop's
-  // APPIUM_CLEANUP_OWNED=1 context overrides this — the PID is provably ours
-  // and the loop must continue.
+  // When lsof proves a foreign listener owns the port outside start-loop cleanup
+  // (SHOULD_KILL=0), record the conflict in server.conflicts, clear active state
+  // files, and return 0 so the port bump continues. Survived SIGKILL preserves
+  // state and returns 1. The start-loop's APPIUM_CLEANUP_OWNED=1 context
+  // overrides: the PID is provably ours and the loop must continue.
   const killBlock = fn.slice(fn.indexOf('if [ "$SHOULD_KILL" -eq 1 ]'));
-  assert.match(killBlock, /else\n[^\n]*foreign listener[^\n]*\n[^\n]*return 1/);
+  assert.match(killBlock, /else\n.*foreign listener.*\n.*server\.conflicts/s);
+  assert.match(killBlock, /else\n.*foreign listener.*\n.*rm -f.*appium\.pid/s);
+  assert.match(killBlock, /else\n.*foreign listener.*\n.*return 0/s);
+  // Survived SIGKILL must still return 1.
+  assert.match(killBlock, /survived SIGKILL.*\n.*return 1/s);
   assert.match(fn, /APPIUM_CLEANUP_OWNED/);
   assert.match(fn, /our just-spawned pid/);
   assert.match(fn, /cleaning up/);
@@ -548,6 +552,103 @@ test('start-loop APPIUM_CLEANUP_OWNED=1 stop_server is unguarded so port-bump co
   );
 });
 
+test('stop_server foreign listener returns 0 (clears state, records conflict) while survived SIGKILL returns 1 (keeps state)', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const start = script.indexOf('stop_server()');
+  const end = script.indexOf('\n}\n\ncmd=', start);
+  const fn = script.slice(start, end) + '\n}';
+
+  // Foreign listener (SHOULD_KILL=0): conflict recorded, state cleared, return 0.
+  const foreignBlock = fn.slice(fn.indexOf('else\n') + 5, fn.indexOf('return 0'));
+  assert.match(foreignBlock, /foreign listener/);
+  assert.match(foreignBlock, /server\.conflicts/);
+  assert.match(foreignBlock, /rm -f.*appium\.pid.*server\.port/);
+
+  // Survived SIGKILL (inside SHOULD_KILL=1): state preserved, return 1.
+  const survivedBlock = fn.slice(fn.indexOf('survived SIGKILL'));
+  assert.match(survivedBlock, /keeping server state/);
+  assert.match(survivedBlock, /return 1/);
+
+  // The survived-SIGKILL return must appear BEFORE the foreign-listener else
+  // block's return, verifying they are distinct code paths.
+  const survivedIdx = fn.indexOf('survived SIGKILL');
+  const foreignReturnIdx = fn.lastIndexOf('return 0');
+  assert.ok(
+    survivedIdx < foreignReturnIdx,
+    'survived-SIGKILL return must appear before foreign-listener return 0'
+  );
+});
+
+test('conflict file is appended to, never overwritten, and survives ensure_server cycles', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+
+  // Conflict file is written with >> (append), never with > (overwrite).
+  const stopServerStart = script.indexOf('stop_server()');
+  const stopServerEnd = script.indexOf('\n}\n\ncmd=', stopServerStart);
+  const stopFn = script.slice(stopServerStart, stopServerEnd) + '\n}';
+  const conflictWrites = [...stopFn.matchAll(/server\.conflicts/g)];
+  assert.ok(conflictWrites.length >= 1, 'stop_server must write to server.conflicts');
+  const conflictAppend = [...stopFn.matchAll(/>>"\$STATE_DIR\/server\.conflicts"/g)];
+  assert.ok(conflictAppend.length >= 1, 'conflict file must use >> (append), never > (overwrite)');
+
+  // Also in ensure_server adoption probe.
+  const ensureStart = script.indexOf('ensure_server()');
+  const ensureEnd = script.indexOf('\n}\n\nstop_server', ensureStart);
+  const ensureFn = script.slice(ensureStart, ensureEnd);
+  const ensureConflictAppend = [...ensureFn.matchAll(/>>"\$STATE_DIR\/server\.conflicts"/g)];
+  assert.equal(
+    ensureConflictAppend.length,
+    1,
+    'ensure_server adoption probe must also append to server.conflicts'
+  );
+
+  // No rm of server.conflicts anywhere — the file persists across cycles.
+  assert.doesNotMatch(
+    script,
+    /rm.*server\.conflicts/,
+    'server.conflicts must never be deleted by the script'
+  );
+});
+
+test('adoption probe foreign listener records conflict before clearing state', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const ensureStart = script.indexOf('ensure_server()');
+  const ensureEnd = script.indexOf('\n}\n\nstop_server', ensureStart);
+  const ensureFn = script.slice(ensureStart, ensureEnd);
+
+  // Find the FOREIGN=1 block: conflict record must come before rm -f.
+  const foreignBlockStart = ensureFn.indexOf('if [ "$FOREIGN" -eq 1 ]');
+  const foreignBlockEnd = ensureFn.indexOf('else', foreignBlockStart);
+  const foreignBlock = ensureFn.slice(foreignBlockStart, foreignBlockEnd);
+
+  const conflictIdx = foreignBlock.indexOf('server.conflicts');
+  const rmIdx = foreignBlock.indexOf('rm -f');
+  assert.ok(conflictIdx >= 0, 'conflict recording must exist in FOREIGN=1 block');
+  assert.ok(rmIdx >= 0, 'rm -f must exist in FOREIGN=1 block');
+  assert.ok(
+    conflictIdx < rmIdx,
+    'conflict recording must come before rm -f so the stale handle is preserved in the conflict file'
+  );
+});
+
+test('server stop reports conflict file after stop_server', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const serverHandler = script.slice(script.indexOf('server)\n'));
+  const stopHandler = serverHandler.slice(serverHandler.indexOf('stop)\n'));
+
+  // server stop calls stop_server, then checks for conflicts.
+  assert.match(stopHandler, /stop_server/);
+  assert.match(stopHandler, /server\.conflicts/);
+  assert.match(stopHandler, /cat.*server\.conflicts/);
+  assert.match(stopHandler, /foreign-listener conflicts/);
+});
+
+// No conflict guard is needed after the owned-child stop_server call in the
+// start loop because the PID is freshly spawned and stop_server's
+// APPIUM_CLEANUP_OWNED=1 path always kills our PID and cleans state.  The port
+// bump loop handles any failure gracefully.  This test confirms there is no
+// "refusing to overwrite" guard after the owned-child stop_server call — the
+// absence of a guard is intentional because the path is always recoverable.
 test('conflict-state guards appear before ensure_drivers so start loop is unreachable from a conflict', () => {
   const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
   const ensureStart = script.indexOf('ensure_server()');

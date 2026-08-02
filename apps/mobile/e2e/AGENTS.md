@@ -42,7 +42,9 @@ A scenario that needs a real GitHub integration (for example cloud agents clonin
 pnpm dev:seed app:github-integration-copy <email>
 ```
 
-The command finds the newest valid integration, validates its access token against GitHub, re-encrypts it for the account, and reports the donor login and expiry. When it fails with "No valid GitHub integration found", the scenario cannot run. Report `VERIFICATION BLOCKED.` with that message. Never fake the integration, and never skip the scenario silently. The copy carries only the donor's access token and can never refresh; when the connection shows as expired, run the copy again.
+The command finds the newest valid integration, validates its access token against GitHub, re-encrypts it for the account, and reports the donor login and a `usableUntil` time. When it fails with "No valid GitHub integration found", the scenario cannot run. Report `VERIFICATION BLOCKED.` with that message. Never fake the integration, and never skip the scenario silently.
+
+The copy stops working at `usableUntil` (at least 30 minutes). After that the connection reads as revoked, not expired, because the copy cannot refresh. Run the command again to replace the revoked row. Run integration scenarios promptly after the copy.
 
 The copy shares the donor developer's OAuth grant, not just a token. Never run a disconnect scenario on a copied account: disconnect revokes the donor's GitHub authorization, that developer must re-authorize the App by hand, and another copy cannot repair it. Report a scenario that needs disconnect as blocked and say why. Commits pushed through the copy carry the donor's login with a synthetic id, so treat commit-attribution assertions as out of scope on a copied account.
 

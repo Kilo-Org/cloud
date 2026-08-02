@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { computeDatabaseUrl } from '@kilocode/db';
 import { user_github_app_tokens, kilocode_users } from '@kilocode/db/schema';
 import { decryptKeyedEnvelope, encryptKeyedEnvelope } from '@kilocode/encryption';
-import { and, desc, eq, gt, isNull, lt, ne, notLike, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, ne, notLike, sql } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
@@ -56,9 +56,11 @@ function printUsage(): void {
   console.log('integration exists in the database, E2E requiring one is BLOCKED.');
   console.log('');
   console.log('Caveats: the copy carries only the donor access token, validated live');
-  console.log('against GitHub before copying, and can never refresh (a refresh would');
-  console.log("rotate and kill the donor's refresh token). When the copied access token");
-  console.log('expires, run the copy again.');
+  console.log('against GitHub before copying. Its refresh token is a dummy (a real one');
+  console.log("would rotate and kill the donor's), so the copy has a bounded life: once");
+  console.log('the access token nears expiry the service tries to refresh, that refresh');
+  console.log('is rejected, and the copy row is marked revoked. The tool reports the');
+  console.log('usable-until time; run the copy again to replace a revoked row.');
   console.log('');
   console.log("BLAST RADIUS — the copy shares the donor developer's OAuth GRANT, not");
   console.log('just a token. Disconnecting GitHub on the copied account (in the app, or');
@@ -194,7 +196,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         `Refusing to delete: ${toEmail} holds a REAL GitHub connection (${existing.githubLogin}, id ${existing.githubUserId}), not a copy or a stub seed. Disconnect it in the app if that is really what you want.`
       );
     }
-    await db
+    const deleted = await db
       .delete(user_github_app_tokens)
       .where(
         and(
@@ -202,11 +204,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
           eq(user_github_app_tokens.github_app_type, 'standard'),
           eq(user_github_app_tokens.github_user_id, existing.githubUserId)
         )
-      );
+      )
+      .returning({ id: user_github_app_tokens.id });
     return {
       targetEmail: toEmail,
-      removedRows: 1,
-      removed: `${existing.githubLogin} (${existing.githubUserId})`,
+      removedRows: deleted.length,
+      removed:
+        deleted.length > 0
+          ? `${existing.githubLogin} (${existing.githubUserId})`
+          : 'nothing — the row changed while this command ran',
     };
   }
 
@@ -259,11 +265,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         ne(user_github_app_tokens.kilo_user_id, target.id),
         gt(user_github_app_tokens.refresh_token_expires_at, sql`now()`),
         lt(user_github_app_tokens.refresh_token_expires_at, sql`now() + interval '2 years'`),
-        // git-token-service refreshes inside a 5-minute expiry buffer, and
-        // the copy cannot refresh. A donor whose access token expires soon
-        // would pass the live probe and then fail on first real use, so
-        // require a usable margin (10 minutes: twice the service buffer).
-        gt(user_github_app_tokens.access_token_expires_at, sql`now() + interval '10 minutes'`),
+        // The copy is usable only until git-token-service decides to refresh
+        // it, which it does once the ACCESS token is inside a 5-minute
+        // buffer. The copy's refresh token is a dummy, so that refresh fails
+        // and revokes the copy. Require a real working window (35 minutes
+        // leaves 30 usable) instead of handing back a copy that dies in
+        // minutes.
+        gt(user_github_app_tokens.access_token_expires_at, sql`now() + interval '35 minutes'`),
         // Synthetic ids (stub seeds and earlier copies) are 13 digits; real
         // GitHub user ids are shorter. A copy must never donate: revocation
         // lands on the real row only, so a surviving copy could hand out
@@ -333,12 +341,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .replace(/[a-f]/g, '')
     .slice(0, 12)}`;
 
-  // The copy must never refresh: GitHub refresh tokens rotate on use, so a
-  // copy that refreshed would kill the donor's stored refresh token and turn
-  // the donor into a stale-looking-but-dead row for every later copy. The
-  // copy gets a dummy refresh token that is already expired — the service's
-  // expiry check stops any refresh attempt before it reaches GitHub. When
-  // the copied access token expires, run the copy again.
+  // The copy carries a DUMMY refresh token on purpose: GitHub refresh tokens
+  // rotate on use, so a copy holding the real one would kill the donor's
+  // stored refresh token and poison every later copy. The cost is a bounded
+  // lifetime — git-token-service refreshes once the access token is inside
+  // its 5-minute buffer, that refresh is rejected, and the copy row is
+  // marked revoked. That is the expected end state; run the copy again to
+  // replace the revoked row (the upsert clears revoked_at).
   const values = {
     kilo_user_id: target.id,
     github_app_type: 'standard' as const,
@@ -393,10 +402,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       }
     });
 
+  // Usable until the service's refresh buffer opens, not until expiry.
+  const usableUntil = new Date(
+    new Date(source.access_token_expires_at).getTime() - 5 * 60 * 1000
+  ).toISOString();
   return {
     targetEmail: toEmail,
     donorLogin: source.github_login,
-    accessTokenExpiresAt: source.access_token_expires_at,
-    refreshable: false,
+    usableUntil,
+    afterThat: 'the copy is revoked — run this command again',
   };
 }

@@ -35,14 +35,15 @@ MARKER="# kilo-e2e-github-stub"
 # state dir — the lock removes that class instead of guarding every window.
 # status stays unlocked: it is read-only and must answer while a start holds
 # the lock. Every network call inside the lock carries --max-time 120 (the
-# nextjs API is slow under full parallel load), so a hung local API cannot
-# hold the lock indefinitely.
+# nextjs API is slow under full parallel load), so the worst-case hold is
+# about 8 minutes; --wait 900 stays above it, so a queued stop or seed waits
+# instead of failing with a lock error.
 case "${1:-}" in
   start | seed | stop)
     if [ "${KILO_STUB_LOCKED:-}" != "1" ]; then
       mkdir -p "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks"
       exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
-        --wait 300 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$(basename "$REPO_ROOT")" -- \
+        --wait 900 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$(basename "$REPO_ROOT")" -- \
         env KILO_STUB_LOCKED=1 "$0" "$@"
     fi
     ;;

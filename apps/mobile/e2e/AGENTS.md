@@ -34,6 +34,16 @@ apps/mobile/e2e/login.sh <device> >"$LOG" 2>&1 || { tail -n 100 "$LOG"; false; }
 
 Node must be v24 (root `.nvmrc`). If dependencies or local env files are missing, run `pnpm dev:worktree:prepare` once. Missing local env values are a human step: `pnpm dev:setup-env`. Test data: `pnpm dev:seed` (no arguments lists topics; `app:create-user`, `app:add-credits`, `app:api-token`, `app:user-id`).
 
+# Real GitHub integration (cloud agents and similar)
+
+A scenario that needs a real GitHub integration (for example cloud agents cloning or pushing) cannot use the stub. Copy a valid integration from the shared dev database onto the signed-in E2E account:
+
+```bash
+pnpm dev:seed app:github-integration-copy <email>
+```
+
+The command finds the newest valid integration, re-encrypts its tokens for the account, and reports the donor login and expiries. When it fails with "No valid GitHub integration found", the scenario cannot run: report `VERIFICATION BLOCKED.` with that message — never fake the integration or skip the scenario silently. The copy shares the donor's token; if the connection later shows as expired, run the copy again.
+
 # Start the stack (bundle owner)
 
 1. Record the pre-existing state, so you later stop only what you started:

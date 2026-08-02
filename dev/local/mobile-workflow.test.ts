@@ -14,11 +14,9 @@ test('cold launch clears leftover prompts, relaunches, then settles via the shar
   assert.ok(stopIndex < launchIndex);
   assert.ok(launchIndex < readyWaitIndex);
   assert.ok(readyWaitIndex < settleIndex);
-  // Long budgets that healthy runs never pay (the wait returns on first
-  // match), consumed in short slices so an ANR dialog is answered promptly
-  // instead of after the whole budget.
-  assert.match(flow, /launchBudget = ctx\.platform === 'android' \? 420000 : 120000/);
-  assert.match(flow, /Date\.now\(\) >= deadline\) throw/, 'the sliced wait must stay bounded');
+  // iOS keeps the 30s budget; Android under load gets a long one that healthy
+  // runs never pay (the wait returns on first match).
+  assert.match(flow, /launchTimeout = ctx\.platform === 'android' \? 420000 : 30000/);
   assert.match(flow, /isn\.t responding/, 'open-app should answer Android ANR dialogs');
   assert.doesNotMatch(flow.slice(readyWaitIndex), /optional: true/);
 });
@@ -117,9 +115,8 @@ test('settle flow handles the exact iOS external-app prompt within existing wait
     [3000, 5000, 5000, 5000, 5000, 15000],
     'settle-app should keep its wait budget and add no fixed wait'
   );
-  // The first wait is platform-aware and long-but-early-return on both
-  // platforms: reconnect bundling under parallel-workflow host load needs it.
-  assert.match(flow, /timeout: ctx\.platform === 'android' \? 300000 : 120000/);
+  // The first wait is platform-aware: 15s on iOS, long-but-early-return on Android.
+  assert.match(flow, /timeout: ctx\.platform === 'android' \? 300000 : 15000/);
   assert.doesNotMatch(flow, /when\(ctx, '(?:Allow|Open)'/);
   assert.doesNotMatch(flow, /tapOn\('(?:Allow\|Open|Open\|Allow)'\)/);
 });

@@ -37,7 +37,7 @@ function isImagesOnly(cleaned: string): boolean {
   return cleaned.replaceAll(/<[^>]*>/g, '').replaceAll(/\s/g, '').length === 0;
 }
 
-function isSupportedScheme(src: string): boolean {
+export function isSupportedScheme(src: string): boolean {
   return src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:image/');
 }
 

@@ -12,7 +12,7 @@ import { Renderer } from 'react-native-marked';
 
 import { openExternalUrl } from '@/lib/external-link';
 
-import { parseHtmlImages } from './markdown-html-image';
+import { isSupportedScheme, parseHtmlImages } from './markdown-html-image';
 import { MarkdownImage } from './markdown-image';
 import {
   getLinkAccessibilityActions,
@@ -169,12 +169,15 @@ export class MarkdownRenderer extends Renderer {
 
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
   override image(uri: string, alt?: string, _style?: ImageStyle, title?: string): ReactNode {
+    if (!isSupportedScheme(uri)) {
+      return this.textNode(alt || title || '', {});
+    }
     const key = `md-image-${this.imageIndex}`;
     this.imageIndex += 1;
     return createElement(MarkdownImage, {
       key,
       uri,
-      alt: alt ?? title ?? '',
+      alt: alt || title || '',
     });
   }
 

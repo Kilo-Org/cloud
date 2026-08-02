@@ -105,9 +105,15 @@ seed_token() {
     -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}") || seed_fail trpc-seed transport
   case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
   grep -q '"error"' "$SEED_BODY" && seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
-  # The endpoint can answer 200 with success:false (row not upserted);
-  # trusting the status code alone would report a seed that never landed.
-  grep -q '"success":true' "$SEED_BODY" || seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
+  # success:false with 200 and no error has exactly one cause: the account
+  # already holds a seeded row under an older (pre-deterministic) id, which
+  # the upsert's setWhere leaves untouched. That row is a usable seed (same
+  # fake token, far-future expiry) — keep it. Anything else in the body is
+  # an unknown shape and fails.
+  if ! grep -q '"success":true' "$SEED_BODY"; then
+    grep -q '"success":false' "$SEED_BODY" || seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
+    echo "github-stub: $EMAIL already has a seeded token row (older id); keeping it"
+  fi
   rm -f "$JAR" "$SEED_BODY"
 }
 
@@ -132,8 +138,11 @@ case "${1:-}" in
     # The claim only has to cover the choose-to-bind window; once our server
     # is bound the port itself blocks other pickers. The traps keep an
     # interrupted start from leaking the claim (EXIT alone misses untrapped
-    # signals); a SIGKILL orphan is reaped by claim_port's staleness check.
-    trap release_port EXIT INT TERM HUP
+    # signals) — signal handlers must exit, or the start would continue
+    # racing for a port it just released. A SIGKILL orphan is reaped by
+    # claim_port's staleness check.
+    trap release_port EXIT
+    trap 'exit 130' INT TERM HUP
 
     mkdir -p "$STATE_DIR"
     tmux new-session -d -s "$SESSION" -c "$STATE_DIR" \

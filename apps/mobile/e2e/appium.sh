@@ -113,13 +113,17 @@ ensure_server() {
       # one device's cleanup kill the other's server mid-flow.
       kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null || break
       if server_status; then
+        # Adopt only on proven ownership: a foreign pid means bump; an empty
+        # lsof (listener vanished or raced) means keep looping, never adopt.
         LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
-        if [ -n "$LISTENER" ] && [ "$LISTENER" != "$(cat "$STATE_DIR/appium.pid")" ]; then
+        if [ "$LISTENER" = "$(cat "$STATE_DIR/appium.pid")" ] && [ -n "$LISTENER" ]; then
+          echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
+          return 0
+        fi
+        if [ -n "$LISTENER" ]; then
           echo "appium.sh: port $APPIUM_PORT is owned by pid $LISTENER, not ours; bumping" >&2
           break
         fi
-        echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
-        return 0
       fi
       sleep 1
     done

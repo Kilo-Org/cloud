@@ -2,7 +2,6 @@
 import Module from 'node:module';
 import { type ReactElement, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-
 import { type MarkdownPalette } from './markdown-palette';
 import { type MarkdownRenderer } from './markdown-renderer';
 
@@ -33,7 +32,6 @@ const rnStub = {
   NativeModules: {},
   requireNativeComponent: () => 'NativeComponent',
 };
-
 type CjsLoad = (request: string, parent: NodeJS.Module | null, isMain: boolean) => unknown;
 const ModuleWithLoad = Module as unknown as { _load: CjsLoad };
 const originalLoad = ModuleWithLoad._load.bind(ModuleWithLoad);
@@ -46,7 +44,6 @@ ModuleWithLoad._load = (request: string, parent: NodeJS.Module | null, isMain: b
   }
   return originalLoad(request, parent, isMain);
 };
-
 vi.mock('react-native', () => rnStub);
 vi.mock('react-native-svg', () => ({
   default: 'Svg',
@@ -71,7 +68,6 @@ vi.mock('./markdown-link', () => ({
 vi.mock('@/lib/external-link', () => ({
   openExternalUrl: vi.fn(),
 }));
-
 const palette: MarkdownPalette = {
   textColor: '#111111',
   mutedTextColor: '#666666',
@@ -79,14 +75,11 @@ const palette: MarkdownPalette = {
   borderColor: '#cccccc',
   surfaceColor: '#ffffff',
 };
-
 const emptyStyle = undefined;
-
 async function createRenderer() {
   const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
   return new RendererClass(palette, true, {});
 }
-
 function keySequence(renderer: { getKey: () => string }, count: number): string[] {
   return Array.from({ length: count }, () => renderer.getKey());
 }
@@ -104,7 +97,6 @@ function imageHostKey(renderer: MarkdownRenderer, uri: string): string | null {
   const element = renderer.image(uri) as ReactElement;
   return element.key ?? null;
 }
-
 function htmlElement(renderer: MarkdownRenderer, text: string): ReactElement | null {
   return renderer.html(text) as ReactElement | null;
 }
@@ -116,21 +108,18 @@ function imageEl(
 ): ReactElement | null {
   return renderer.image(uri, opts?.alt, undefined, opts?.title) as ReactElement | null;
 }
-
 describe('MarkdownRenderer key stability', () => {
   it('two fresh instances produce identical getKey() sequences', async () => {
     const a = await createRenderer();
     const b = await createRenderer();
     expect(keySequence(a, 8)).toEqual(keySequence(b, 8));
   });
-
   it('a reused instance produces different keys across identical call sequences', async () => {
     const renderer = await createRenderer();
     const first = keySequence(renderer, 5);
     const second = keySequence(renderer, 5);
     expect(first).not.toEqual(second);
   });
-
   it('table hosts are keyed ordinally in call order', async () => {
     const renderer = await createRenderer();
     const header: ReactNode[][] = [['H']];
@@ -139,7 +128,6 @@ describe('MarkdownRenderer key stability', () => {
     expect(tableHostKey(renderer, header, rows)).toBe('md-table-1');
     expect(tableHostKey(renderer, header, rows)).toBe('md-table-2');
   });
-
   it('table host key is independent of preceding getKey() consumption', async () => {
     const a = await createRenderer();
     const b = await createRenderer();
@@ -150,7 +138,6 @@ describe('MarkdownRenderer key stability', () => {
     expect(tableHostKey(a, header, rows)).toBe('md-table-0');
     expect(tableHostKey(b, header, rows)).toBe('md-table-0');
   });
-
   it('table host key is independent of row/cell counts', async () => {
     const a = await createRenderer();
     const b = await createRenderer();
@@ -161,14 +148,12 @@ describe('MarkdownRenderer key stability', () => {
     expect(tableHostKey(a, smallHeader, smallRows)).toBe('md-table-0');
     expect(tableHostKey(b, largeHeader, largeRows)).toBe('md-table-0');
   });
-
   it('image() host keys are ordinal in call order', async () => {
     const renderer = await createRenderer();
     expect(imageHostKey(renderer, 'https://a.com/1.png')).toBe('md-image-0');
     expect(imageHostKey(renderer, 'https://a.com/2.png')).toBe('md-image-1');
     expect(imageHostKey(renderer, 'https://a.com/3.png')).toBe('md-image-2');
   });
-
   it('image() host key is independent of preceding getKey() consumption', async () => {
     const a = await createRenderer();
     const b = await createRenderer();
@@ -177,34 +162,18 @@ describe('MarkdownRenderer key stability', () => {
     expect(imageHostKey(a, 'https://a.com/1.png')).toBe('md-image-0');
     expect(imageHostKey(b, 'https://a.com/1.png')).toBe('md-image-0');
   });
-
-  it('html(<img …>) returns element whose child is MarkdownImage host', async () => {
+  it('html(<img …>) returns MarkdownImage directly (no View wrapper)', async () => {
     const renderer = await createRenderer();
-    const element = htmlElement(renderer, '<img alt="a" src="https://x/a.png">');
-    expect(element).not.toBeNull();
-    if (!element) {
-      throw new Error('expected element');
-    }
-    expect(element.type).toBe('View');
-    const props = element.props as { children?: ReactNode[] };
-    const children = props.children ?? [];
-    expect(children).toHaveLength(1);
-    const child = children[0];
-    if (!child) {
-      throw new Error('expected child');
-    }
-    expect((child as ReactElement).type).toBe('MarkdownImage');
-    expect((child as ReactElement).props).toMatchObject({ uri: 'https://x/a.png', alt: 'a' });
+    const el = htmlElement(renderer, '<img alt="a" src="https://x/a.png">');
+    expect(el).not.toBeNull();
+    expect(el?.type).toBe('MarkdownImage');
+    expect(el?.props).toMatchObject({ uri: 'https://x/a.png', alt: 'a' });
   });
-
   it('html(comment) returns a Text node (unchanged)', async () => {
     const renderer = await createRenderer();
-    const element = htmlElement(renderer, '<!-- a comment -->');
-    expect(element).not.toBeNull();
-    if (!element) {
-      throw new Error('expected element');
-    }
-    expect(element.type).toBe('Text');
+    const el = htmlElement(renderer, '<!-- a comment -->');
+    expect(el).not.toBeNull();
+    expect(el?.type).toBe('Text');
   });
 
   it('image() returns MarkdownImage for https URI', async () => {
@@ -271,5 +240,61 @@ describe('MarkdownRenderer key stability', () => {
     const el = imageEl(renderer, 'file:///tmp/img.png', { title: 'A Title' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('A Title');
+  });
+
+  it('does not wrap HTML images in Text', async () => {
+    const renderer = await createRenderer();
+    const single: ReactNode[] = [
+      renderer.text('before '),
+      renderer.html('<img alt="a" src="https://x/a.png">'),
+      renderer.text(' after'),
+    ];
+    const multiImageResult = renderer.html(
+      '<img alt="a" src="https://x/a.png"> <img alt="b" src="https://y/b.png">'
+    );
+    const nested: ReactNode[] = [
+      renderer.text('before '),
+      multiImageResult,
+      renderer.text(' after'),
+    ];
+    const laterImage: ReactNode[] = [
+      renderer.text('before '),
+      [renderer.strong('bold')],
+      renderer.html('<img alt="a" src="https://x/a.png">'),
+      renderer.text(' after'),
+    ];
+    for (const children of [single, nested, laterImage]) {
+      expect(Array.isArray(renderer.text(children))).toBe(true);
+    }
+  });
+
+  it('wraps text without images in Text', async () => {
+    const renderer = await createRenderer();
+    const children: ReactNode[] = [renderer.text('hello '), renderer.strong('world')];
+    const result = renderer.text(children);
+    expect(Array.isArray(result)).toBe(false);
+    const element = result as ReactElement<{ children: ReactNode[] }>;
+    expect(element.type).toBe('Text');
+    expect(element.props.children).toEqual(children);
+  });
+
+  it('does not wrap HTML images from inline formatting nodes', async () => {
+    const renderer = await createRenderer();
+    const children: ReactNode[] = [
+      renderer.text('before '),
+      renderer.html('<img alt="a" src="https://x/a.png">'),
+      renderer.text(' after'),
+    ];
+
+    for (const result of [
+      renderer.heading(children),
+      renderer.strong(children),
+      renderer.em(children),
+      renderer.del(children),
+      renderer.link(children, 'https://example.com'),
+    ]) {
+      expect(Array.isArray(result)).toBe(true);
+      expect((result as ReactNode[])[1]).toMatchObject({ type: 'MarkdownImage' });
+    }
   });
 });

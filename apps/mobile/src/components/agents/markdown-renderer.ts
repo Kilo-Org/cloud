@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, isValidElement, type ReactNode } from 'react';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
@@ -26,6 +26,20 @@ import { MarkdownTable } from './markdown-table';
 export type MarkdownLinkLongPressHandler = (href: string, event?: GestureResponderEvent) => void;
 
 export type MarkdownLinkPressHandler = (href: string) => boolean;
+
+/** Recursively checks whether any node in the tree is a MarkdownImage. */
+function containsMarkdownImage(nodes: ReactNode[]): boolean {
+  for (const node of nodes) {
+    if (Array.isArray(node)) {
+      if (containsMarkdownImage(node as ReactNode[])) {
+        return true;
+      }
+    } else if (isValidElement(node) && node.type === MarkdownImage) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // The library's default `Renderer` renders code blocks with the `em` text
 // style (italic) and renders tables with fixed column widths that frequently
@@ -74,8 +88,15 @@ export class MarkdownRenderer extends Renderer {
     );
   }
 
+  private textOrChildren(children: string | ReactNode[], styles?: TextStyle): ReactNode {
+    if (typeof children !== 'string' && children.length > 0 && containsMarkdownImage(children)) {
+      return children;
+    }
+    return this.textNode(children, styles);
+  }
+
   override heading(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(text, styles);
+    return this.textOrChildren(text, styles);
   }
 
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
@@ -112,6 +133,9 @@ export class MarkdownRenderer extends Renderer {
     styles?: TextStyle,
     title?: string
   ): ReactNode {
+    if (typeof children !== 'string' && children.length > 0 && containsMarkdownImage(children)) {
+      return children;
+    }
     const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
     const linkActionsEnabled = this.onLongPressLink !== undefined;
 
@@ -144,11 +168,11 @@ export class MarkdownRenderer extends Renderer {
   }
 
   override strong(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(children, styles);
+    return this.textOrChildren(children, styles);
   }
 
   override em(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(children, styles);
+    return this.textOrChildren(children, styles);
   }
 
   override codespan(text: string, styles?: TextStyle): ReactNode {
@@ -160,11 +184,11 @@ export class MarkdownRenderer extends Renderer {
   }
 
   override del(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(children, styles);
+    return this.textOrChildren(children, styles);
   }
 
   override text(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textNode(text, styles);
+    return this.textOrChildren(text, styles);
   }
 
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
@@ -188,20 +212,17 @@ export class MarkdownRenderer extends Renderer {
     if (images.length === 0) {
       return this.textNode(text, styles);
     }
-    const key = `md-html-image-${this.imageIndex}`;
+    const baseKey = `md-html-image-${this.imageIndex}`;
     this.imageIndex += 1;
-    return createElement(
-      View,
-      { key },
-      images.map((image, index) =>
-        createElement(MarkdownImage, {
-          key: index,
-          uri: image.src,
-          alt: image.alt,
-          aspectRatio: image.aspectRatio,
-        })
-      )
+    const elements = images.map((image, index) =>
+      createElement(MarkdownImage, {
+        key: `${baseKey}-${index}`,
+        uri: image.src,
+        alt: image.alt,
+        aspectRatio: image.aspectRatio,
+      })
     );
+    return elements.length === 1 ? elements[0] : elements;
   }
 
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface

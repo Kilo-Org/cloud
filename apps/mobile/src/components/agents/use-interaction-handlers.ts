@@ -35,8 +35,8 @@ export function useInteractionHandlers({
   activePermission,
   surface,
 }: InteractionHandlersArgs) {
-  const [isAnswering, setIsAnswering] = useState(false);
-  const [isRespondingToPermission, setIsRespondingToPermission] = useState(false);
+  const [answeringRequestId, setAnsweringRequestId] = useState<string | null>(null);
+  const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
   const [questionSubmissionError, setQuestionSubmissionError] = useState<{
     requestId: string;
     error: BlockingCardSubmissionError;
@@ -51,19 +51,22 @@ export function useInteractionHandlers({
       if (!activeQuestion) {
         return;
       }
+      const requestId = activeQuestion.requestId;
       setQuestionSubmissionError(null);
-      setIsAnswering(true);
+      setAnsweringRequestId(requestId);
       try {
-        await manager.answerQuestion(activeQuestion.requestId, answers);
+        await manager.answerQuestion(requestId, answers);
         ackSessionAttention(kiloSessionId);
         captureEvent(QUESTION_ANSWERED_EVENT, { surface, skipped: false });
       } catch (error) {
         const submissionError = classifyBlockingSubmissionError(error, 'question', 'answer');
-        setQuestionSubmissionError({ requestId: activeQuestion.requestId, error: submissionError });
+        setQuestionSubmissionError({ requestId, error: submissionError });
         announceForA11y(submissionError.message);
         toast.error(submissionError.message);
       } finally {
-        setIsAnswering(false);
+        // Guarded clear. The head can advance mid-flight, the user can submit the
+        // next request, and this late `finally` must not drop that newer spinner.
+        setAnsweringRequestId(current => (current === requestId ? null : current));
       }
     },
     [manager, kiloSessionId, activeQuestion, surface]
@@ -73,19 +76,20 @@ export function useInteractionHandlers({
     if (!activeQuestion) {
       return;
     }
+    const requestId = activeQuestion.requestId;
     setQuestionSubmissionError(null);
-    setIsAnswering(true);
+    setAnsweringRequestId(requestId);
     try {
-      await manager.rejectQuestion(activeQuestion.requestId);
+      await manager.rejectQuestion(requestId);
       ackSessionAttention(kiloSessionId);
       captureEvent(QUESTION_ANSWERED_EVENT, { surface, skipped: true });
     } catch (error) {
       const submissionError = classifyBlockingSubmissionError(error, 'question', 'reject');
-      setQuestionSubmissionError({ requestId: activeQuestion.requestId, error: submissionError });
+      setQuestionSubmissionError({ requestId, error: submissionError });
       announceForA11y(submissionError.message);
       toast.error(submissionError.message);
     } finally {
-      setIsAnswering(false);
+      setAnsweringRequestId(current => (current === requestId ? null : current));
     }
   }, [manager, kiloSessionId, activeQuestion, surface]);
 
@@ -94,30 +98,35 @@ export function useInteractionHandlers({
       if (!activePermission) {
         return;
       }
+      const requestId = activePermission.requestId;
       setPermissionSubmissionError(null);
-      setIsRespondingToPermission(true);
+      setRespondingRequestId(requestId);
       try {
-        await manager.respondToPermission(activePermission.requestId, response);
+        await manager.respondToPermission(requestId, response);
         ackSessionAttention(kiloSessionId);
         captureEvent(PERMISSION_RESPONDED_EVENT, { surface, response });
       } catch (error) {
         const submissionError = classifyBlockingSubmissionError(error, 'permission', 'respond');
         setPermissionSubmissionError({
-          requestId: activePermission.requestId,
+          requestId,
           error: submissionError,
         });
         announceForA11y(submissionError.message);
         toast.error(submissionError.message);
       } finally {
-        setIsRespondingToPermission(false);
+        setRespondingRequestId(current => (current === requestId ? null : current));
       }
     },
     [manager, kiloSessionId, activePermission, surface]
   );
 
   return {
-    isAnswering,
-    isRespondingToPermission,
+    // Scoped to the request in flight. When the queue head advances
+    // mid-flight, the next card must mount interactive, not wearing the
+    // previous request's spinner.
+    isAnswering: answeringRequestId != null && answeringRequestId === activeQuestion?.requestId,
+    isRespondingToPermission:
+      respondingRequestId != null && respondingRequestId === activePermission?.requestId,
     questionSubmissionError:
       questionSubmissionError != null &&
       questionSubmissionError.requestId === activeQuestion?.requestId

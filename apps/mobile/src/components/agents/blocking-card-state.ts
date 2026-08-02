@@ -240,6 +240,16 @@ function buildAnnouncement(kind: BlockingCardKind, state: BlockingCardUiState): 
     : 'Agent needs permission to continue. The composer is paused while you decide.';
 }
 
+/**
+ * Card title with a position hint when more than one blocking request waits.
+ * The card always renders the oldest pending request, so the position is
+ * always 1. `count` is the total of pending questions plus pending
+ * permissions, so the user sees every waiting request in one number.
+ */
+export function formatBlockingCardTitle(baseTitle: string, count: number): string {
+  return count > 1 ? `${baseTitle} (1 of ${count})` : baseTitle;
+}
+
 function buildProtocolExplanation(kind: BlockingCardKind, state: BlockingCardUiState): string {
   if (state === 'non-retryable') {
     return 'The agent has moved past this prompt. This card will close when the session continues.';

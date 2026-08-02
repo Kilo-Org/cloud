@@ -18,6 +18,7 @@ import { getBlockingInteraction } from '@/components/agents/agent-interaction-po
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
+import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
@@ -155,6 +156,8 @@ export function SessionDetailContent({
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
+  const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
     fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
@@ -565,6 +568,9 @@ export function SessionDetailContent({
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+  // One number for both kinds: the user must see every waiting request, not
+  // only the ones of the kind currently on screen.
+  const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
 
   // When a blocking question/permission card dismisses, hand screen-reader
   // focus back to the transcript so the user does not get stranded on a
@@ -710,6 +716,19 @@ export function SessionDetailContent({
     // tick, and the agents tab refetches on focus.
     const result = await createAndNavigateAgentSession({
       create: manager.createRemoteSession.bind(manager),
+      router,
+      organizationId,
+      onError: message => {
+        toast.error(message);
+      },
+    });
+    return result.success;
+  }, [manager, router, organizationId]);
+
+  const handleRestartSession = useCallback(async () => {
+    const result = await restartAgentSession({
+      create: manager.createRemoteSession.bind(manager),
+      exit: manager.exitRemoteSession.bind(manager),
       router,
       organizationId,
       onError: message => {
@@ -879,6 +898,7 @@ export function SessionDetailContent({
             isSubmitting={isAnswering}
             requestId={activeQuestion.requestId}
             submissionError={questionSubmissionError}
+            pendingCount={blockingRequestCount}
           />
         ) : null}
 
@@ -894,6 +914,7 @@ export function SessionDetailContent({
             isSubmitting={isRespondingToPermission}
             requestId={activePermission.requestId}
             submissionError={permissionSubmissionError}
+            pendingCount={blockingRequestCount}
           />
         ) : null}
 
@@ -919,6 +940,7 @@ export function SessionDetailContent({
                 onSend={handleSend}
                 onSendCommand={handleSendCommand}
                 onCreateSession={handleCreateSession}
+                onRestartSession={handleRestartSession}
                 onExitSession={handleExitSession}
                 onStop={handleStop}
                 disabled={isComposerDisabled}

@@ -26,9 +26,9 @@ function remoteState(overrides: Partial<RemoteCommandState> = {}): RemoteCommand
 }
 
 describe('createMobileSlashCommandList', () => {
-  it('returns the live CLI catalog with reserved /new and /clear injected', () => {
+  it('returns the live CLI catalog with reserved /new injected', () => {
     const list = createMobileSlashCommandList('remote', SAMPLE_COMMANDS, remoteState());
-    expect(list).toEqual([...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND]);
+    expect(list).toEqual([...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND]);
   });
 
   it('strips any CLI-reported /new and /clear before injecting the local reserved ones', () => {
@@ -40,36 +40,36 @@ describe('createMobileSlashCommandList', () => {
       })
     );
     expect(list.filter(command => command.name === 'new')).toEqual([LOCAL_NEW_SLASH_COMMAND]);
-    expect(list.filter(command => command.name === 'clear')).toEqual([LOCAL_CLEAR_SLASH_COMMAND]);
+    expect(list.filter(command => command.name === 'clear')).toEqual([]);
     expect(list[0]).toBe(COMPACT);
   });
 
-  it('still exposes /new and /clear when the remote catalog is empty but the session is live', () => {
+  it('still exposes /new when the remote catalog is empty but the session is live', () => {
     const list = createMobileSlashCommandList(
       'remote',
       [],
       remoteState({ commands: [], refresh: 'idle' })
     );
-    expect(list).toEqual([LOCAL_NEW_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND]);
+    expect(list).toEqual([LOCAL_NEW_SLASH_COMMAND]);
   });
 
-  it('exposes reserved /new and /clear when the remote catalog is empty and upgrade-required', () => {
+  it('exposes reserved /new when the remote catalog is empty and upgrade-required', () => {
     const list = createMobileSlashCommandList(
       'remote',
       [],
       remoteState({ commands: [], refresh: 'upgrade-required', message: 'Please upgrade your CLI' })
     );
-    expect(list).toEqual([LOCAL_NEW_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND]);
+    expect(list).toEqual([LOCAL_NEW_SLASH_COMMAND]);
     expect(list.some(command => command.name === 'compact')).toBe(false);
   });
 
-  it('keeps /new and /clear available under upgrade-required', () => {
+  it('keeps /new available under upgrade-required', () => {
     const list = createMobileSlashCommandList(
       'remote',
       SAMPLE_COMMANDS,
       remoteState({ refresh: 'upgrade-required', message: 'Please upgrade' })
     );
-    expect(list.map(command => command.name)).toEqual(['compact', 'review', 'new', 'clear']);
+    expect(list.map(command => command.name)).toEqual(['compact', 'review', 'new']);
   });
 
   it('returns the live catalog verbatim for cloud-agent sessions without injecting /new', () => {
@@ -80,6 +80,21 @@ describe('createMobileSlashCommandList', () => {
   it('exposes no commands for read-only, unresolved, or other noninteractive session types', () => {
     expect(createMobileSlashCommandList('read-only', SAMPLE_COMMANDS, null)).toEqual([]);
     expect(createMobileSlashCommandList(null, SAMPLE_COMMANDS, null)).toEqual([]);
+  });
+
+  it('includes /new, /exit, and /clear when canExitSession is true', () => {
+    const list = createMobileSlashCommandList(
+      'remote',
+      SAMPLE_COMMANDS,
+      remoteState({ canExitSession: true })
+    );
+    expect(list.map(command => command.name)).toEqual([
+      'compact',
+      'review',
+      'new',
+      'exit',
+      'clear',
+    ]);
   });
 });
 

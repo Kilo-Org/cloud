@@ -30,6 +30,16 @@ STATE_DIR="${TMPDIR:-/tmp}/kilo-e2e-github-stub/$(basename "$REPO_ROOT")"
 ENV_LOCAL="$REPO_ROOT/.env.local"
 MARKER="# kilo-e2e-github-stub"
 
+# One stub command at a time per worktree: concurrent starts (or a stop
+# racing a start) would fight over the session, the env line, and the state
+# dir — the lock removes that class instead of guarding every window.
+if [ "${KILO_STUB_LOCKED:-}" != "1" ]; then
+  mkdir -p "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks"
+  exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
+    --wait 300 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$(basename "$REPO_ROOT")" -- \
+    env KILO_STUB_LOCKED=1 "$0" "$@"
+fi
+
 nextjs_port() {
   local status
   status="$(cd "$REPO_ROOT" && pnpm -s dev:status --json)"
@@ -148,18 +158,16 @@ case "${1:-}" in
       if port_free "$p" && claim_port "$p"; then STUB_PORT=$p; break; fi
     done
     [ -n "$STUB_PORT" ] || { echo "github-stub: no free port in 4790-4890" >&2; exit 1; }
-    # Any exit before the final state write rolls back what THIS run did —
-    # and only that: a concurrent start that loses the session-creation race
-    # must not tear down the winner's session, env line, or state.
-    # Signal handlers must exit, or the start would continue past a released
-    # claim; a SIGKILL orphan is reaped by claim_port's staleness check.
+    # Any exit before the final state write rolls back everything this start
+    # did. The per-worktree lock guarantees no concurrent stub command, so
+    # inside it any "=$SESSION" session past the entry check is ours — the
+    # flags only order the rollback against signals, which must exit (or the
+    # start would continue past a released claim). A SIGKILL orphan is reaped
+    # by claim_port's staleness check.
     STARTED_OK=0 CREATED_SESSION=0 ENV_ADDED=0
-    SESSION_NAME="$SESSION-$$"
     cleanup_start() {
       if [ "$STARTED_OK" != 1 ]; then
-        # SESSION_NAME is pid-unique until the rename succeeds, so killing it
-        # can never hit another start's session.
-        [ "$CREATED_SESSION" != 1 ] || tmux kill-session -t "=$SESSION_NAME" 2>/dev/null || true
+        [ "$CREATED_SESSION" != 1 ] || tmux kill-session -t "=$SESSION" 2>/dev/null || true
         [ "$ENV_ADDED" != 1 ] || remove_env_line
         [ "$CREATED_SESSION" != 1 ] || rm -rf "$STATE_DIR"
       fi
@@ -169,18 +177,11 @@ case "${1:-}" in
     trap 'exit 130' INT TERM HUP
 
     mkdir -p "$STATE_DIR"
-    # Create under a pid-unique name, then rename to claim the canonical one:
-    # the flag is armed BEFORE creation (killing our unique name is a no-op
-    # when creation never happened), and a failed rename means a concurrent
-    # start won — we tear down only our own uniquely named session.
+    # Armed before the create: under the lock a kill of "=$SESSION" can only
+    # ever hit a session this start created (the entry check found none).
     CREATED_SESSION=1
-    tmux new-session -d -s "$SESSION_NAME" -c "$STATE_DIR" \
+    tmux new-session -d -s "$SESSION" -c "$STATE_DIR" \
       "node $(printf '%q' "$SCRIPT_DIR/github-api-stub/server.mjs") $STUB_PORT"
-    tmux rename-session -t "=$SESSION_NAME" "$SESSION" 2>/dev/null || {
-      echo "github-stub: session $SESSION appeared concurrently; another start owns it" >&2
-      exit 1
-    }
-    SESSION_NAME=$SESSION
     for _ in $(seq 1 30); do
       if ! port_free "$STUB_PORT"; then break; fi
       sleep 0.5

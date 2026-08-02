@@ -131,6 +131,7 @@ ensure_server() {
       echo "appium.sh: bumping to port block $APPIUM_PORT" >&2
     fi
     echo "appium.sh: starting appium server for $DEVICE on port $APPIUM_PORT" >&2
+    echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
     nohup "$APPIUM_BIN" --port "$APPIUM_PORT" --log-level warn \
       >"$STATE_DIR/appium.log" 2>&1 &
     echo $! >"$STATE_DIR/appium.pid"
@@ -146,12 +147,10 @@ ensure_server() {
         # environment cannot attribute sockets; adopt on pid+status rather
         # than killing a healthy server for 50 port blocks.
         if [ "$LSOF_OK" -eq 0 ]; then
-          echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
           return 0
         fi
         LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
         if [ "$LISTENER" = "$(cat "$STATE_DIR/appium.pid")" ] && [ -n "$LISTENER" ]; then
-          echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
           return 0
         fi
         if [ -n "$LISTENER" ]; then
@@ -161,7 +160,6 @@ ensure_server() {
         BLIND=$((BLIND + 1))
         if [ "$BLIND" -ge 3 ]; then
           echo "appium.sh: lsof cannot attribute port $APPIUM_PORT while our pid is alive and /status answers; adopting on pid+status" >&2
-          echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
           return 0
         fi
       fi
@@ -183,28 +181,40 @@ stop_server() {
       STOP_PORT=$(cat "$STATE_DIR/server.port")
     fi
     # Pids get recycled; only signal a process that is actually our Appium
-    # server for the recorded port. Both binary path AND --port must match:
-    # a wrapper containing the Appium path but not the server port is not
-    # signaled, and a recycled pid that runs something else is skipped.
+    # server for the recorded port. "--port" in the process command is the
+    # primary evidence — no longer require the literal binary path, because
+    # a pnpm shim (node …/node_modules/.bin/appium) or a shebang wrapper
+    # may not contain $APPIUM_BIN verbatim. When lsof can attribute the
+    # listener, the listener PID must also match our recorded PID.
     if kill -0 "$PID" 2>/dev/null; then
       PROCESS_CMD=$(ps -o command= -p "$PID" 2>/dev/null || true)
-      if [ -n "$STOP_PORT" ] && echo "$PROCESS_CMD" | grep -qF "$APPIUM_BIN" && echo "$PROCESS_CMD" | grep -qF -- "--port $STOP_PORT"; then
-        kill "$PID" 2>/dev/null || true
-        # Dropping the state while the process lives would leave an untracked
-        # listener squatting on the port; escalate before forgetting the pid,
-        # and keep the state (fail) if even SIGKILL does not take.
-        for _ in $(seq 1 10); do
-          kill -0 "$PID" 2>/dev/null || break
-          sleep 1
-        done
-        kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null || true
-        for _ in 1 2 3; do
-          kill -0 "$PID" 2>/dev/null || break
-          sleep 1
-        done
-        if kill -0 "$PID" 2>/dev/null; then
-          echo "appium.sh: pid $PID survived SIGKILL; keeping server state" >&2
-          return 1
+      if [ -n "$STOP_PORT" ] && echo "$PROCESS_CMD" | grep -qF -- "--port $STOP_PORT"; then
+        SHOULD_KILL=1
+        if [ "$LSOF_OK" -eq 1 ]; then
+          LISTENER=$(lsof -ti "tcp:$STOP_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
+          if [ -n "$LISTENER" ] && [ "$LISTENER" != "$PID" ]; then
+            echo "appium.sh: port $STOP_PORT is owned by pid $LISTENER, not our recorded pid $PID; skipping kill" >&2
+            SHOULD_KILL=0
+          fi
+        fi
+        if [ "$SHOULD_KILL" -eq 1 ]; then
+          kill "$PID" 2>/dev/null || true
+          # Dropping the state while the process lives would leave an untracked
+          # listener squatting on the port; escalate before forgetting the pid,
+          # and keep the state (fail) if even SIGKILL does not take.
+          for _ in $(seq 1 10); do
+            kill -0 "$PID" 2>/dev/null || break
+            sleep 1
+          done
+          kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null || true
+          for _ in 1 2 3; do
+            kill -0 "$PID" 2>/dev/null || break
+            sleep 1
+          done
+          if kill -0 "$PID" 2>/dev/null; then
+            echo "appium.sh: pid $PID survived SIGKILL; keeping server state" >&2
+            return 1
+          fi
         fi
       fi
     fi

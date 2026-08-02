@@ -306,13 +306,63 @@ test('github-stub session name slugifies unsafe worktree basenames', () => {
   const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
 
   // SESSION uses a safe slug, not the raw basename.
-  assert.match(stub, /STUB_SLUG="\$\(basename "\$REPO_ROOT" \| tr .*A-Za-z0-9_/);
+  assert.match(stub, /RAW_BASENAME="\$\(basename "\$REPO_ROOT"\)"/);
+  // Newline must be stripped from basename before slugification.
+  assert.match(stub, /\$\{RAW_BASENAME%[^}]*\\n/);
+  assert.match(stub, /STUB_SLUG="\$\(printf '%s' "\$RAW_BASENAME" \| tr -c 'A-Za-z0-9_' '-'\)"/);
   assert.match(stub, /SESSION="kilo-e2e-github-stub-\$STUB_SLUG"/);
-  // STATE_DIR and lock paths keep the raw basename — the slug must NOT
-  // replace basename there (a slug collision must not serialize two worktrees
-  // onto one state directory).
-  assert.doesNotMatch(stub, /STATE_DIR=.*STUB_SLUG/);
-  assert.doesNotMatch(stub, /kilo-e2e-github-stub-locks.*STUB_SLUG/);
+  // State and lock directories use a stable hash of the raw basename.
+  assert.match(stub, /DIR_HASH="\$\(printf '%s' "\$RAW_BASENAME" \| shasum/);
+  assert.match(stub, /STATE_DIR=.*DIR_HASH/);
+  assert.match(stub, /kilo-e2e-github-stub-locks.*DIR_HASH/);
+});
+
+test('github-stub slug adds hash when slugified name differs from raw basename', () => {
+  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
+
+  // When the slug differs from the raw basename, a short hash is appended.
+  assert.match(stub, /\[ "\$STUB_SLUG" != "\$RAW_BASENAME" \]/);
+  assert.match(stub, /STUB_SLUG="\$\{STUB_SLUG\}-.*shasum/);
+});
+
+test('github-stub session name has no artificial trailing dash from basename newline', () => {
+  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
+
+  // Basename newline stripped before tr: a simple basename produces no dash.
+  assert.match(stub, /\$\{RAW_BASENAME%[^}]*\\n/);
+});
+
+test('github-stub cleanup_start does not abort on remove_env_line failure', () => {
+  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
+  const fnStart = stub.indexOf('cleanup_start() {');
+  const fnEnd = stub.indexOf('trap cleanup_start EXIT');
+  const body = stub.slice(fnStart, fnEnd);
+
+  // remove_env_line in cleanup_start must use || true to defer failure past
+  // state cleanup and port release under set -e.
+  assert.match(body, /remove_env_line \|\| true/);
+  // rm -rf STATE_DIR must appear after remove_env_line.
+  const removeLine = body.indexOf('remove_env_line');
+  const rmState = body.indexOf('rm -rf "$STATE_DIR"');
+  assert.ok(rmState > removeLine, 'state cleanup must follow env line removal');
+  // release_port must come after the inner fi (outside the failure guard).
+  const releaseIdx = body.indexOf('release_port');
+  const fiIdx = body.lastIndexOf('fi');
+  assert.ok(releaseIdx > fiIdx, 'port release must be outside the failure guard');
+});
+
+test('github-stub stop does not abort on remove_env_line failure', () => {
+  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
+
+  // remove_env_line in stop must use || true so rm -rf still executes.
+  assert.match(stub, /remove_env_line \|\| true/);
+  // In the stop block, rm -rf must appear after remove_env_line.
+  const stopIdx = stub.indexOf('\n  stop)');
+  const nextStar = stub.indexOf('\n  *)', stopIdx);
+  const stopBlock = stub.slice(stopIdx, nextStar);
+  const removeLine = stopBlock.indexOf('remove_env_line');
+  const rmState = stopBlock.indexOf('rm -rf "$STATE_DIR"');
+  assert.ok(rmState > removeLine, 'state cleanup must follow env line removal');
 });
 
 test('dev CLI shares only the Docker proxy port between worktrees', () => {
@@ -322,7 +372,7 @@ test('dev CLI shares only the Docker proxy port between worktrees', () => {
   assert.match(cli, /Refusing to share occupied worktree service ports/);
 });
 
-test('stop_server only signals a process matching both the Appium binary and recorded port', () => {
+test('stop_server signals on --port match + lsof PID ownership, not binary path', () => {
   const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
   const start = script.indexOf('stop_server()');
   const end = script.indexOf('\n}\n\ncmd=', start);
@@ -332,19 +382,26 @@ test('stop_server only signals a process matching both the Appium binary and rec
   assert.match(fn, /PROCESS_CMD=\$\(ps -o command=/);
   // Port read from the authoritative state file, not global APPIUM_PORT.
   assert.match(fn, /STOP_PORT=\$\(cat "\$STATE_DIR\/server\.port"\)/);
-  // Both binary AND --port must match before any signal.
-  const conditionIdx = fn.indexOf('PROCESS_CMD');
-  const killIdx = fn.indexOf('kill "$PID" 2>/dev/null || true', conditionIdx);
-  assert.ok(killIdx > conditionIdx, 'SIGTERM must follow the full ownership condition');
-  assert.match(fn, /grep -qF "\$APPIUM_BIN"/);
+  // Ownership is based on "--port" in the logged command, not the literal
+  // binary path (a pnpm shim would not contain $APPIUM_BIN verbatim).
   assert.match(fn, /grep -qF -- "--port \$STOP_PORT"/);
+  assert.doesNotMatch(fn, /grep -qF "\$APPIUM_BIN"/);
   // No port file means no signal: STOP_PORT is guarded with -n.
   assert.match(fn, /-n "\$STOP_PORT"/);
-  // SIGKILL is inside the same guarded block — never reached without
-  // binary+port match.
-  const sigkillIdx = fn.indexOf('kill -9 "$PID"', conditionIdx);
+  // Two-tier ownership decision: SHOULD_KILL guards the kill block; lsof
+  // can override it for a foreign listener.
+  assert.match(fn, /SHOULD_KILL=1/);
+  assert.match(fn, /SHOULD_KILL=0/);
+  assert.match(fn, /LISTENER=\$\(lsof .*tcp:\$STOP_PORT/);
+  assert.match(fn, /\$LISTENER" != "\$PID/);
+  // SIGTERM follows the SHOULD_KILL guard.
+  const shouldIdx = fn.indexOf('SHOULD_KILL" -eq 1');
+  const killIdx = fn.indexOf('kill "$PID" 2>/dev/null || true', shouldIdx);
+  assert.ok(killIdx > shouldIdx, 'SIGTERM must follow the SHOULD_KILL guard');
+  // SIGKILL is inside the same SHOULD_KILL block.
+  const sigkillIdx = fn.indexOf('kill -9 "$PID"', shouldIdx);
   assert.ok(
-    sigkillIdx > conditionIdx && sigkillIdx < fn.lastIndexOf('fi'),
+    sigkillIdx > shouldIdx && sigkillIdx < fn.lastIndexOf('fi'),
     'SIGKILL must be inside the ownership guard'
   );
 });

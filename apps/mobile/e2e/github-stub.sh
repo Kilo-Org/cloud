@@ -25,13 +25,23 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
-# Safe slug for tmux session names: escrow-only characters like dots and
-# colons break tmux commands (":" is the command separator). The state and
-# lock directories keep the raw basename so concurrent worktrees with
-# different slugs but the same real name still serialize correctly.
-STUB_SLUG="$(basename "$REPO_ROOT" | tr -c 'A-Za-z0-9_-' '-')"
+# Safe slug for tmux session names: characters like dots and colons break
+# tmux commands (":" is the command separator). When the slugified basename
+# differs from the raw basename (unsafe characters were replaced), a short
+# hash of the raw name is appended so worktrees that differ only in unsafe
+# characters (e.g. "foo.bar" vs "foo-bar") never share a session.
+RAW_BASENAME="$(basename "$REPO_ROOT")"
+RAW_BASENAME="${RAW_BASENAME%$'\n'}"
+STUB_SLUG="$(printf '%s' "$RAW_BASENAME" | tr -c 'A-Za-z0-9_' '-')"
+if [ "$STUB_SLUG" != "$RAW_BASENAME" ]; then
+  STUB_SLUG="${STUB_SLUG}-$(printf '%s' "$RAW_BASENAME" | shasum -a 256 | tr -dc '0-9a-f' | cut -c1-6)"
+fi
 SESSION="kilo-e2e-github-stub-$STUB_SLUG"
-STATE_DIR="${TMPDIR:-/tmp}/kilo-e2e-github-stub/$(basename "$REPO_ROOT")"
+# State and lock directories use a stable hash of the raw basename so two
+# worktrees whose basenames differ only by unsafe characters never share
+# state, even when the slug differs from the raw name.
+DIR_HASH="$(printf '%s' "$RAW_BASENAME" | shasum -a 256 | tr -dc '0-9a-f' | cut -c1-8)"
+STATE_DIR="${TMPDIR:-/tmp}/kilo-e2e-github-stub/$DIR_HASH"
 ENV_LOCAL="$REPO_ROOT/.env.local"
 MARKER="# kilo-e2e-github-stub"
 
@@ -48,7 +58,7 @@ case "${1:-}" in
     if [ "${KILO_STUB_LOCKED:-}" != "1" ]; then
       mkdir -p "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks"
       exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
-        --wait 900 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$(basename "$REPO_ROOT")" -- \
+        --wait 900 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$DIR_HASH" -- \
         env KILO_STUB_LOCKED=1 "$0" "$@"
     fi
     ;;
@@ -201,7 +211,7 @@ case "${1:-}" in
     cleanup_start() {
       if [ "$STARTED_OK" != 1 ]; then
         [ "$CREATED_SESSION" != 1 ] || tmux kill-session -t "=$SESSION" 2>/dev/null || true
-        [ "$ENV_ADDED" != 1 ] || remove_env_line
+        [ "$ENV_ADDED" != 1 ] || remove_env_line || true
         [ "$CREATED_SESSION" != 1 ] || rm -rf "$STATE_DIR"
       fi
       release_port
@@ -286,7 +296,7 @@ case "${1:-}" in
 
   stop)
     tmux kill-session -t "=$SESSION" 2>/dev/null && echo "github-stub: stopped $SESSION" || echo "github-stub: no session to stop"
-    remove_env_line
+    remove_env_line || true
     rm -rf "$STATE_DIR"
     echo "github-stub: removed env line and state"
     ;;

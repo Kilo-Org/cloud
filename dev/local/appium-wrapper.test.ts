@@ -411,3 +411,45 @@ test('record.sh frame fails loudly when ffmpeg is missing', () => {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('server.port is written before nohup spawn so failed-start cleanup has a port', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const ensureStart = script.indexOf('ensure_server()');
+  const ensureEnd = script.indexOf('\n}\n\nstop_server', ensureStart);
+  const ensureFn = script.slice(ensureStart, ensureEnd);
+
+  // The port write must appear before the nohup command that spawns Appium.
+  const portWriteIdx = ensureFn.indexOf('echo "$APPIUM_PORT" >"$STATE_DIR/server.port"');
+  const nohupIdx = ensureFn.indexOf('nohup "$APPIUM_BIN"');
+  assert.ok(portWriteIdx >= 0, 'server.port write must exist in ensure_server');
+  assert.ok(nohupIdx >= 0, 'nohup spawn must exist in ensure_server');
+  assert.ok(
+    portWriteIdx < nohupIdx,
+    'server.port must be written BEFORE nohup spawn so stop_server always has a port'
+  );
+
+  // Port is not written again on readiness success (pre-spawn is the sole write).
+  const readinessSection = ensureFn.slice(nohupIdx);
+  assert.doesNotMatch(
+    readinessSection,
+    /echo "\$APPIUM_PORT" >"\$STATE_DIR\/server\.port"/,
+    'server.port should not be written again on readiness — pre-spawn is authoritative'
+  );
+});
+
+test('stop_server does not require literal binary path for ownership', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const start = script.indexOf('stop_server()');
+  const end = script.indexOf('\n}\n\ncmd=', start);
+  const fn = script.slice(start, end) + '\n}';
+
+  // Ownership is based on --port in the process command, not the binary path.
+  // A pnpm shim (node …/node_modules/.bin/appium) does not contain $APPIUM_BIN.
+  assert.doesNotMatch(fn, /grep -qF "\$APPIUM_BIN"/);
+  assert.match(fn, /grep -qF -- "--port \$STOP_PORT"/);
+  // When lsof can attribute the listener, a foreign PID overrides the kill.
+  assert.match(fn, /SHOULD_KILL=0/);
+  assert.match(fn, /SHOULD_KILL=1/);
+  assert.match(fn, /lsof .*tcp:\$STOP_PORT/);
+  assert.match(fn, /\$LISTENER" != "\$PID/);
+});

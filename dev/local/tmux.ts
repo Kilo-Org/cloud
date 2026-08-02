@@ -36,8 +36,7 @@ function getSessionName(): string {
 function sessionExists(sessionName?: string): boolean {
   const name = sessionName ?? getSessionName();
   try {
-    // `=` forces an exact match; a bare -t prefix-matches sibling sessions.
-    execSync(`tmux has-session -t ${escapeForShell(`=${name}`)}`, { stdio: 'ignore' });
+    execSync(`tmux has-session -t ${name}`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -117,7 +116,7 @@ function setSessionEnvironment(sessionName: string, env: Record<string, string>)
 
 function killSession(sessionName: string): void {
   try {
-    execSync(`tmux kill-session -t ${escapeForShell(`=${sessionName}`)}`, { stdio: 'ignore' });
+    execSync(`tmux kill-session -t ${sessionName}`, { stdio: 'ignore' });
   } catch {
     // Session doesn't exist — that's fine
   }

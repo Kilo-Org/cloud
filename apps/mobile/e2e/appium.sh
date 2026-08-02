@@ -136,12 +136,21 @@ stop_server() {
     if kill -0 "$PID" 2>/dev/null && ps -o command= -p "$PID" 2>/dev/null | grep -q appium; then
       kill "$PID" 2>/dev/null || true
       # Dropping the state while the process lives would leave an untracked
-      # listener squatting on the port; escalate before forgetting the pid.
+      # listener squatting on the port; escalate before forgetting the pid,
+      # and keep the state (fail) if even SIGKILL does not take.
       for _ in $(seq 1 10); do
         kill -0 "$PID" 2>/dev/null || break
         sleep 1
       done
       kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null || true
+      for _ in 1 2 3; do
+        kill -0 "$PID" 2>/dev/null || break
+        sleep 1
+      done
+      if kill -0 "$PID" 2>/dev/null; then
+        echo "appium.sh: pid $PID survived SIGKILL; keeping server state" >&2
+        return 1
+      fi
     fi
   fi
   rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"

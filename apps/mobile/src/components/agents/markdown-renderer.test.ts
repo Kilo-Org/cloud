@@ -112,10 +112,9 @@ function htmlElement(renderer: MarkdownRenderer, text: string): ReactElement | n
 function imageEl(
   renderer: MarkdownRenderer,
   uri: string,
-  alt?: string,
-  title?: string
+  opts?: { alt?: string; title?: string }
 ): ReactElement | null {
-  return renderer.image(uri, alt, undefined, title) as ReactElement | null;
+  return renderer.image(uri, opts?.alt, undefined, opts?.title) as ReactElement | null;
 }
 
 describe('MarkdownRenderer key stability', () => {
@@ -210,9 +209,13 @@ describe('MarkdownRenderer key stability', () => {
 
   it('image() returns MarkdownImage for https URI', async () => {
     const renderer = await createRenderer();
-    const el = imageEl(renderer, 'https://a.com/1.png', 'alt text');
-    expect(el?.type).toBe('MarkdownImage');
-    expect((el as ReactElement).props).toMatchObject({
+    const el = imageEl(renderer, 'https://a.com/1.png', { alt: 'alt text' });
+    expect(el).not.toBeNull();
+    if (!el) {
+      throw new Error('expected element');
+    }
+    expect(el.type).toBe('MarkdownImage');
+    expect(el.props).toMatchObject({
       uri: 'https://a.com/1.png',
       alt: 'alt text',
     });
@@ -220,48 +223,52 @@ describe('MarkdownRenderer key stability', () => {
 
   it('image() returns MarkdownImage for http URI', async () => {
     const renderer = await createRenderer();
-    const el = imageEl(renderer, 'http://a.com/1.png', 'alt text');
+    const el = imageEl(renderer, 'http://a.com/1.png', { alt: 'alt text' });
     expect(el?.type).toBe('MarkdownImage');
   });
 
   it('image() returns MarkdownImage for data:image URI', async () => {
     const renderer = await createRenderer();
-    const el = imageEl(renderer, 'data:image/png;base64,abc123', 'data image');
-    expect(el?.type).toBe('MarkdownImage');
-    expect((el as ReactElement).props).toMatchObject({ uri: 'data:image/png;base64,abc123' });
+    const el = imageEl(renderer, 'data:image/png;base64,abc123', { alt: 'data image' });
+    expect(el).not.toBeNull();
+    if (!el) {
+      throw new Error('expected element');
+    }
+    expect(el.type).toBe('MarkdownImage');
+    expect(el.props).toMatchObject({ uri: 'data:image/png;base64,abc123' });
   });
 
   it('image() renders alt text for relative URL (no image node)', async () => {
     const renderer = await createRenderer();
-    const el = imageEl(renderer, './relative.png', 'relative');
+    const el = imageEl(renderer, './relative.png', { alt: 'relative' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('relative');
   });
 
   it('image() renders alt text for file:// URL (no image node)', async () => {
     const renderer = await createRenderer();
-    const el = imageEl(renderer, 'file:///tmp/img.png', 'local');
+    const el = imageEl(renderer, 'file:///tmp/img.png', { alt: 'local' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('local');
   });
 
   it('image() empty alt uses title for unsupported URL', async () => {
     const renderer = await createRenderer();
-    const el = imageEl(renderer, 'file:///tmp/img.png', '', 'Photo');
+    const el = imageEl(renderer, 'file:///tmp/img.png', { alt: '', title: 'Photo' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('Photo');
   });
 
   it('image() empty alt uses title for supported URL', async () => {
     const renderer = await createRenderer();
-    const el = imageEl(renderer, 'https://a.com/1.png', '', 'A Title');
+    const el = imageEl(renderer, 'https://a.com/1.png', { alt: '', title: 'A Title' });
     expect(el?.type).toBe('MarkdownImage');
     expect((el as ReactElement<Record<string, unknown>>).props.alt).toBe('A Title');
   });
 
   it('image() missing alt uses title for unsupported URL', async () => {
     const renderer = await createRenderer();
-    const el = imageEl(renderer, 'file:///tmp/img.png', undefined, 'A Title');
+    const el = imageEl(renderer, 'file:///tmp/img.png', { title: 'A Title' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('A Title');
   });

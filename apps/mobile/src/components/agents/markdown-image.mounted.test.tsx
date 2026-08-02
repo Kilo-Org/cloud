@@ -3,6 +3,8 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { MarkdownImage } from './markdown-image';
+
 vi.mock('react-native', () => ({ Pressable: 'Pressable' }));
 vi.mock('lucide-react-native', () => ({ AlertCircle: 'AlertCircle' }));
 vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
@@ -13,33 +15,41 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),
 }));
 
-import { MarkdownImage } from './markdown-image';
-
 function viewerCount(root: TestRenderer.ReactTestInstance): number {
-  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === 'ImageViewerModal').length;
+  return root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'ImageViewerModal'
+  ).length;
 }
 
 describe('MarkdownImage viewer mounting', () => {
   it('mounts ImageViewerModal only after the image is pressed', async () => {
-    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
     await act(async () => {
-      renderer = TestRenderer.create(
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(
         createElement(MarkdownImage, { uri: 'https://x/a.png', alt: 'shot' })
       );
     });
+    const renderer = rendererRef.current;
     if (!renderer) {
       throw new Error('renderer was not created');
     }
     expect(viewerCount(renderer.root)).toBe(0);
 
-    const button = renderer.root.find(node => typeof node.type === 'string' && (node.type as string) === 'Pressable');
+    const button = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+    );
     await act(async () => {
-      button.props.onPress();
+      await Promise.resolve();
+      (button.props.onPress as () => void)();
     });
     expect(viewerCount(renderer.root)).toBe(1);
 
     await act(async () => {
-      renderer?.unmount();
+      await Promise.resolve();
+      renderer.unmount();
     });
   });
 });

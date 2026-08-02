@@ -170,6 +170,7 @@ export class MarkdownRenderer extends Renderer {
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
   override image(uri: string, alt?: string, _style?: ImageStyle, title?: string): ReactNode {
     if (!isSupportedScheme(uri)) {
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty string must fall back to title; ?? would skip ''
       return this.textNode(alt || title || '', {});
     }
     const key = `md-image-${this.imageIndex}`;
@@ -177,6 +178,7 @@ export class MarkdownRenderer extends Renderer {
     return createElement(MarkdownImage, {
       key,
       uri,
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty string must fall back to title; ?? would skip ''
       alt: alt || title || '',
     });
   }

@@ -30,15 +30,22 @@ STATE_DIR="${TMPDIR:-/tmp}/kilo-e2e-github-stub/$(basename "$REPO_ROOT")"
 ENV_LOCAL="$REPO_ROOT/.env.local"
 MARKER="# kilo-e2e-github-stub"
 
-# One stub command at a time per worktree: concurrent starts (or a stop
-# racing a start) would fight over the session, the env line, and the state
-# dir — the lock removes that class instead of guarding every window.
-if [ "${KILO_STUB_LOCKED:-}" != "1" ]; then
-  mkdir -p "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks"
-  exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
-    --wait 300 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$(basename "$REPO_ROOT")" -- \
-    env KILO_STUB_LOCKED=1 "$0" "$@"
-fi
+# One MUTATING stub command at a time per worktree: concurrent starts (or a
+# stop racing a start) would fight over the session, the env line, and the
+# state dir — the lock removes that class instead of guarding every window.
+# status stays unlocked: it is read-only and must answer while a start holds
+# the lock. Every network call inside the lock carries --max-time, so a hung
+# local API cannot hold the lock past its bound.
+case "${1:-}" in
+  start | seed | stop)
+    if [ "${KILO_STUB_LOCKED:-}" != "1" ]; then
+      mkdir -p "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks"
+      exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
+        --wait 300 "${TMPDIR:-/tmp}/kilo-e2e-github-stub-locks/$(basename "$REPO_ROOT")" -- \
+        env KILO_STUB_LOCKED=1 "$0" "$@"
+    fi
+    ;;
+esac
 
 nextjs_port() {
   local status
@@ -99,9 +106,9 @@ seed_token() {
     # state, and port claim; in `seed` mode there is nothing to undo.
     exit 1
   }
-  CSRF=$(curl -s -c "$JAR" "$BASE/api/auth/csrf" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).csrfToken)') \
-    || seed_fail csrf "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/auth/csrf")"
-  CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/api/auth/callback/fake-login" \
+  CSRF=$(curl -s --max-time 30 -c "$JAR" "$BASE/api/auth/csrf" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).csrfToken)') \
+    || seed_fail csrf "$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' "$BASE/api/auth/csrf")"
+  CODE=$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/api/auth/callback/fake-login" \
     --data-urlencode "csrfToken=$CSRF" \
     --data-urlencode "email=$EMAIL" \
     --data-urlencode "json=true") || seed_fail fake-login transport
@@ -112,7 +119,7 @@ seed_token() {
   # prefix plus 12 digits also cannot collide with a real GitHub user id.
   GH_USER_ID="9$(printf '%s' "$EMAIL" | shasum -a 256 | tr -dc '0-9' | cut -c1-12)"
   SEED_BODY=$(mktemp "$STATE_DIR/seed.XXXXXX")
-  CODE=$(curl -s -o "$SEED_BODY" -w '%{http_code}' -b "$JAR" -X POST "$BASE/api/trpc/githubApps.devSeedUserGithubToken" \
+  CODE=$(curl -s --max-time 30 -o "$SEED_BODY" -w '%{http_code}' -b "$JAR" -X POST "$BASE/api/trpc/githubApps.devSeedUserGithubToken" \
     -H 'content-type: application/json' \
     -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}") || seed_fail trpc-seed transport
   case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
@@ -129,7 +136,7 @@ seed_token() {
     # when the probe succeeds AND shows a connected stub row. A probe failure
     # proves nothing — never turn it into delete-the-row advice.
     AUTH_BODY=$(mktemp "$STATE_DIR/auth.XXXXXX")
-    AUTH_CODE=$(curl -s -o "$AUTH_BODY" -w '%{http_code}' -b "$JAR" "$BASE/api/trpc/githubApps.getUserAuthorization") || AUTH_CODE=000
+    AUTH_CODE=$(curl -s --max-time 30 -o "$AUTH_BODY" -w '%{http_code}' -b "$JAR" "$BASE/api/trpc/githubApps.getUserAuthorization") || AUTH_CODE=000
     if [ "${AUTH_CODE#2}" != "$AUTH_CODE" ] && ! grep -q '"error"' "$AUTH_BODY" \
       && grep -q '"githubLogin":"kilo-stub-user"' "$AUTH_BODY" && grep -q '"connected":true' "$AUTH_BODY"; then
       rm -f "$AUTH_BODY"
@@ -183,10 +190,17 @@ case "${1:-}" in
 
     mkdir -p "$STATE_DIR"
     # Armed before the create: under the lock a kill of "=$SESSION" can only
-    # ever hit a session this start created (the entry check found none).
+    # ever hit a session this start created (the entry check found none). The
+    # one exception is a survivor of a SIGKILLed lock wrapper creating the
+    # name first — the create then fails, and the flag resets before exit so
+    # cleanup does not touch the survivor's session.
     CREATED_SESSION=1
     tmux new-session -d -s "$SESSION" -c "$STATE_DIR" \
-      "node $(printf '%q' "$SCRIPT_DIR/github-api-stub/server.mjs") $STUB_PORT"
+      "node $(printf '%q' "$SCRIPT_DIR/github-api-stub/server.mjs") $STUB_PORT" || {
+      CREATED_SESSION=0
+      echo "github-stub: session $SESSION appeared concurrently (a survivor of a killed start?); stop it first" >&2
+      exit 1
+    }
     for _ in $(seq 1 30); do
       if ! port_free "$STUB_PORT"; then break; fi
       sleep 0.5
@@ -206,7 +220,7 @@ case "${1:-}" in
     if [ -s "$ENV_LOCAL" ] && [ "$(tail -c1 "$ENV_LOCAL")" != "" ]; then
       printf '\n' >> "$ENV_LOCAL"
     fi
-    # Armed before the append: past the rename we own the stub, so any marker
+    # Armed before the append: under the lock we own the stub, so any marker
     # line cleanup removes is ours (or a stale leftover already removed above).
     ENV_ADDED=1
     printf 'GITHUB_API_BASE_URL=http://127.0.0.1:%s %s\n' "$STUB_PORT" "$MARKER" >> "$ENV_LOCAL"

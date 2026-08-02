@@ -21,11 +21,7 @@ type CommandResult = {
   stderr: string;
   status: number | null;
 };
-type ExecWithOutputFn = (
-  command: string,
-  args: readonly string[],
-  options?: { timeoutMs?: number }
-) => CommandResult;
+type ExecWithOutputFn = (command: string, args: readonly string[]) => CommandResult;
 // Rename hook used to set and restore the visible simulator name.
 // Production wires this to `xcrun simctl rename <device> <name>`.
 // Injectable for deterministic tests.
@@ -71,10 +67,6 @@ type ClaimArgs = {
   // device was already running and was adopted as-is. That answer is
   // only knowable here, so it is recorded in the claim for release.
   prepare?: (device: SimulatorDevice) => boolean | void;
-  // Shutdown hook used on claim rollback: when prepare booted the device
-  // but a later step (the rename) failed, the abandoned claim's device is
-  // powered back off. Without it a booted device would sit unclaimed.
-  shutdown?: ShutdownFn;
   fileOperations?: {
     readFileSync?: (filePath: string, encoding: 'utf8') => string;
   };
@@ -128,22 +120,6 @@ function parseClaimArgs(
 
 function lockPath(lockRoot: string, deviceId: string): string {
   return path.join(lockRoot, `${deviceId}.json`);
-}
-
-// Write a claim record atomically. A plain writeFileSync truncates in place,
-// so an unlocked reader (release-all, a peer's claim scan) can see a partial
-// file, judge it corrupt, and delete a live claim. Temp file plus rename (or
-// link for exclusive creation — it throws EEXIST exactly like flag "wx")
-// makes every read see whole bytes, old or new.
-function writeClaimAtomic(filePath: string, data: string, options?: { exclusive?: boolean }): void {
-  const tempPath = `${filePath}.tmp.${process.pid}`;
-  fs.writeFileSync(tempPath, data);
-  try {
-    if (options?.exclusive) fs.linkSync(tempPath, filePath);
-    else fs.renameSync(tempPath, filePath);
-  } finally {
-    fs.rmSync(tempPath, { force: true });
-  }
 }
 
 // Read the on-disk claim. Malformed files and claims whose worktree no
@@ -203,15 +179,8 @@ function withClaimMutationLock<T>(lockRoot: string, deviceId: string, mutate: ()
 // when the command exits non-zero so the existing thrown-error handling path
 // still surfaces non-zero failures. The caller is responsible for parsing the
 // captured output for terminal-failure indicators that can appear with exit 0.
-function execWithOutput(
-  command: string,
-  args: readonly string[],
-  options?: { timeoutMs?: number }
-): CommandResult {
-  const result = spawnSync(command, args, {
-    encoding: 'utf8',
-    timeout: options?.timeoutMs,
-  });
+function execWithOutput(command: string, args: readonly string[]): CommandResult {
+  const result = spawnSync(command, args, { encoding: 'utf8' });
   if (result.error) throw result.error;
   if (result.signal) {
     throw new Error(`${command} ${args.join(' ')} terminated with ${result.signal}`);
@@ -265,12 +234,7 @@ function bootSimulator(
   try {
     exec('xcrun', ['simctl', 'boot', device.id], { stdio: 'ignore' });
     booted = true;
-    // Bounded: a wedged CoreSimulator otherwise blocks the claim forever.
-    // 15 minutes clears even a heavily loaded host; the timeout kill lands
-    // in the catch below, which shuts the device back down.
-    const result = runWithOutput('xcrun', ['simctl', 'bootstatus', device.id, '-b'], {
-      timeoutMs: 900_000,
-    });
+    const result = runWithOutput('xcrun', ['simctl', 'bootstatus', device.id, '-b']);
     if (isBootstatusTerminalFailure(result)) {
       const combined = `${result.stdout}\n${result.stderr}`.trim();
       // Echo a bounded tail of the captured output so the user can see why the
@@ -282,13 +246,7 @@ function bootSimulator(
     const wrapped = error instanceof Error ? error : new Error(String(error));
     if (booted) {
       try {
-        // A wedged CoreSimulator can hang simctl shutdown indefinitely after a
-        // bootstatus timeout, holding the claim forever. 60 s clears even a
-        // heavily-contended host; exceeding it means the device is wedged.
-        exec('xcrun', ['simctl', 'shutdown', device.id], {
-          stdio: 'ignore',
-          timeout: 60_000,
-        });
+        exec('xcrun', ['simctl', 'shutdown', device.id], { stdio: 'ignore' });
       } catch {
         // The device may still be running. Flag it so the caller keeps
         // the claim in place and a peer worktree cannot adopt a device
@@ -301,10 +259,7 @@ function bootSimulator(
   return true;
 }
 
-function claimSimulator(args: ClaimArgs): {
-  device: SimulatorDevice;
-  alreadyOwned: boolean;
-} {
+function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwned: boolean } {
   const { devices, lockRoot, worktreeRoot, requestedId } = args;
   fs.mkdirSync(lockRoot, { recursive: true });
   const candidates = requestedId
@@ -347,37 +302,25 @@ function claimSimulator(args: ClaimArgs): {
               currentDeviceName: targetLabel,
               originalDeviceName: existing.originalDeviceName ?? device.name,
             };
-            writeClaimAtomic(lockPath(lockRoot, device.id), JSON.stringify(next));
+            fs.writeFileSync(lockPath(lockRoot, device.id), JSON.stringify(next), { flag: 'w' });
           }
           return true;
         }
-        writeClaimAtomic(
+        fs.writeFileSync(
           lockPath(lockRoot, device.id),
           JSON.stringify({
             deviceId: device.id,
             worktreeRoot,
             claimedAt: new Date().toISOString(),
-            // Recorded before the rename so a claim that dies mid-boot can
-            // still restore the device's real name on release.
-            originalDeviceName: device.name,
-            // Boot INTENT, recorded before the boot happens: prepare boots
-            // exactly when the device is not already running. If anything
-            // later loses the post-boot rewrite, release still powers off a
-            // device this claim booted (shutting down an already-shutdown
-            // device is a tolerated no-op).
-            bootedByClaim: device.state !== 'Booted',
           }),
-          { exclusive: true }
+          { flag: 'wx' }
         );
         return false;
       });
 
       if (reclaimed) {
         if (device.state === 'Booted') {
-          return {
-            device: { ...device, name: targetLabel },
-            alreadyOwned: true,
-          };
+          return { device: { ...device, name: targetLabel }, alreadyOwned: true };
         }
         // A previous claim died mid-boot: the record exists but the device
         // is down. Boot through the same prepare hook as a fresh claim and
@@ -391,9 +334,10 @@ function claimSimulator(args: ClaimArgs): {
             args.fileOperations?.readFileSync ?? fs.readFileSync
           );
           if (current) {
-            writeClaimAtomic(
+            fs.writeFileSync(
               lockPath(lockRoot, device.id),
-              JSON.stringify({ ...current, bootedByClaim })
+              JSON.stringify({ ...current, bootedByClaim }),
+              { flag: 'w' }
             );
           }
         });
@@ -416,20 +360,10 @@ function claimSimulator(args: ClaimArgs): {
         }
         args.rename(device.id, targetLabel);
       } catch (error) {
-        let keepClaim =
+        const mayBeRunning =
           error instanceof Error &&
           (error as Error & { deviceMayBeRunning?: boolean }).deviceMayBeRunning === true;
-        // The boot succeeded but the claim is being abandoned (the rename
-        // failed): power the device back off, or keep the claim so a peer
-        // cannot adopt a device this attempt left booted.
-        if (!keepClaim && bootedByClaim && args.shutdown) {
-          try {
-            args.shutdown(device.id);
-          } catch {
-            keepClaim = true;
-          }
-        }
-        if (!keepClaim) {
+        if (!mayBeRunning) {
           withClaimMutationLock(lockRoot, device.id, () => {
             fs.rmSync(lockPath(lockRoot, device.id), { force: true });
           });
@@ -437,7 +371,7 @@ function claimSimulator(args: ClaimArgs): {
         throw error;
       }
       withClaimMutationLock(lockRoot, device.id, () => {
-        writeClaimAtomic(
+        fs.writeFileSync(
           lockPath(lockRoot, device.id),
           JSON.stringify({
             deviceId: device.id,
@@ -446,7 +380,8 @@ function claimSimulator(args: ClaimArgs): {
             originalDeviceName: device.name,
             currentDeviceName: targetLabel,
             bootedByClaim,
-          })
+          }),
+          { flag: 'w' }
         );
       });
       return { device: { ...device, name: targetLabel }, alreadyOwned: false };
@@ -622,23 +557,14 @@ function listIosDevices(exec: ExecFn = execFileSync): SimulatorDevice[] {
 // non-zero exit so callers can handle failures (e.g., restore the
 // original name on a claim rollback).
 function defaultRename(deviceId: string, name: string): void {
-  execFileSync('xcrun', ['simctl', 'rename', deviceId, name], {
-    stdio: 'ignore',
-  });
+  execFileSync('xcrun', ['simctl', 'rename', deviceId, name], { stdio: 'ignore' });
 }
 
 // Production shutdown: `xcrun simctl shutdown <device>`. A device that is
 // already off exits non-zero with "Unable to shutdown device in current state:
 // Shutdown" — the desired end state, so that one case is not an error.
 function defaultShutdown(deviceId: string): void {
-  const result = spawnSync('xcrun', ['simctl', 'shutdown', deviceId], {
-    encoding: 'utf8',
-    // A wedged CoreSimulator can hang simctl shutdown indefinitely, holding
-    // the claim forever after bootstatus timeout or a rename failure. 60 s
-    // clears even a heavily-contended host; exceeding it means the device is
-    // wedged.
-    timeout: 60_000,
-  });
+  const result = spawnSync('xcrun', ['simctl', 'shutdown', deviceId], { encoding: 'utf8' });
   if (result.error) throw result.error;
   if (result.status === 0) return;
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
@@ -660,14 +586,9 @@ function main(): void {
       requestedId: parsed.udid,
       rename: defaultRename,
       prepare: device => bootSimulator(device),
-      shutdown: defaultShutdown,
     });
     console.log(
-      JSON.stringify({
-        ...claim,
-        worktreeRoot,
-        label: buildSimulatorLabel(worktreeRoot),
-      })
+      JSON.stringify({ ...claim, worktreeRoot, label: buildSimulatorLabel(worktreeRoot) })
     );
     return;
   }

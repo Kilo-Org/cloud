@@ -11,7 +11,7 @@ import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import type { SeedResult } from '../index';
 
-export const usage = '<to-email>';
+export const usage = '<to-email> | --remove <to-email>';
 
 // Must match the single-source-of-truth helper in
 // apps/web/src/lib/integrations/platforms/github/user-token-envelope.ts and
@@ -35,6 +35,10 @@ function printUsage(): void {
   console.log('Caveats: the copy shares the donor token. GitHub refresh tokens are');
   console.log("single-use, so whichever row refreshes first invalidates the other row's");
   console.log('refresh token — re-run this copy when that happens.');
+  console.log('');
+  console.log("The copy occupies the account's one token row, which the PR-review stub");
+  console.log('(github-stub.sh) also needs. Use different accounts for the two, or');
+  console.log('remove the copy first: --remove <to-email>.');
 }
 
 // The private key never leaves git-token-service in production; locally its
@@ -70,7 +74,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     return;
   }
-  const [toEmail, ...rest] = args;
+  let remove = false;
+  let positional = args;
+  if (args[0] === '--remove') {
+    remove = true;
+    positional = args.slice(1);
+  }
+  const [toEmail, ...rest] = positional;
   if (!toEmail || rest.length > 0) {
     printUsage();
     throw new Error('exactly one argument expected: the target account email');
@@ -87,6 +97,22 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(
       `No user with email ${toEmail} — sign in on the device first, or pnpm dev:seed app:create-user`
     );
+  }
+
+  if (remove) {
+    // Deletes whatever token row the account holds — the copy this tool
+    // wrote, or a stub seed — so github-stub.sh or a fresh copy can start
+    // clean. Never touches any other account's row.
+    const deleted = await db
+      .delete(user_github_app_tokens)
+      .where(
+        and(
+          eq(user_github_app_tokens.kilo_user_id, target.id),
+          eq(user_github_app_tokens.github_app_type, 'standard')
+        )
+      )
+      .returning({ id: user_github_app_tokens.id });
+    return { targetEmail: toEmail, removedRows: deleted.length };
   }
 
   const devVars = readServiceDevVars();
@@ -116,7 +142,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         notLike(user_github_app_tokens.github_login, 'kilo-stub%'),
         ne(user_github_app_tokens.kilo_user_id, target.id),
         gt(user_github_app_tokens.refresh_token_expires_at, sql`now()`),
-        lt(user_github_app_tokens.refresh_token_expires_at, sql`now() + interval '2 years'`)
+        lt(user_github_app_tokens.refresh_token_expires_at, sql`now() + interval '2 years'`),
+        // Synthetic ids (stub seeds and earlier copies) are 13 digits; real
+        // GitHub user ids are shorter. A copy must never donate: revocation
+        // lands on the real row only, so a surviving copy could hand out
+        // dead credentials as a fresh success.
+        sql`length(${user_github_app_tokens.github_user_id}) < 13`
       )
     )
     .orderBy(desc(user_github_app_tokens.updated_at))

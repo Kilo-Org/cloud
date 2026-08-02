@@ -348,8 +348,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // unique, so the donor's id cannot appear twice. The 8 prefix plus 12
   // digits cannot collide with a real GitHub id or with a stub seed (which
   // uses a 9 prefix); deterministic per target so re-copies update in place.
+  // Hash the raw email so that +alias variants (which normalize to the same
+  // email) produce distinct synthetic GitHub user ids, avoiding a unique-index
+  // collision on (github_user_id, app_type).
   const syntheticGithubUserId = `8${createHash('sha256')
-    .update(normalizedEmail)
+    .update(trimmedEmail)
     .digest('hex')
     .replace(/[a-f]/g, '')
     .slice(0, 12)}`;

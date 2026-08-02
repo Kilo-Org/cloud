@@ -78,13 +78,9 @@ seed_token() {
   JAR=$(mktemp "$STATE_DIR/jar.XXXXXX")
   seed_fail() {
     echo "github-stub: token seed failed at $1 for $EMAIL (HTTP ${2:-?})${3:+: $3}" >&2
-    echo "github-stub: the user must exist (sign in on the device first, or pnpm dev:seed app:create-user)" >&2
-    if [ "$SEED_FAIL_MODE" = full ]; then
-      # Undo what start already did, so a failed start leaves nothing behind.
-      tmux kill-session -t "=$SESSION" 2>/dev/null || true
-      remove_env_line
-      rm -rf "$STATE_DIR"
-    fi
+    [ "$1" = existing-row ] || echo "github-stub: the user must exist (sign in on the device first, or pnpm dev:seed app:create-user)" >&2
+    # In a start, the EXIT trap (cleanup_start) undoes session, env line,
+    # state, and port claim; in `seed` mode there is nothing to undo.
     exit 1
   }
   CSRF=$(curl -s -c "$JAR" "$BASE/api/auth/csrf" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).csrfToken)') \
@@ -105,14 +101,20 @@ seed_token() {
     -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}") || seed_fail trpc-seed transport
   case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
   grep -q '"error"' "$SEED_BODY" && seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
-  # success:false with 200 and no error has exactly one cause: the account
-  # already holds a token row under a different github_user_id (an older
-  # random-id seed, or a real GitHub connection on this dev account). Either
-  # row works against the stub — it accepts any token — so keep it. Anything
-  # else in the body is an unknown shape and fails.
+  # success:false with 200 and no error means the account already holds a
+  # token row under a different github_user_id. An older stub seed is fine —
+  # the stub accepts any token. A REAL GitHub connection is not: its short
+  # expiry sends the next request down the refresh branch, which bypasses
+  # GITHUB_API_BASE_URL, hits real github.com, and permanently revokes the
+  # row. Tell them apart before keeping anything.
   if ! grep -q '"success":true' "$SEED_BODY"; then
     grep -q '"success":false' "$SEED_BODY" || seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
-    echo "github-stub: $EMAIL already has a token row (different github_user_id — an older seed or a real connection); keeping it, the stub accepts any token"
+    AUTH=$(curl -s -b "$JAR" "$BASE/api/trpc/githubApps.getUserAuthorization" || true)
+    if printf '%s' "$AUTH" | grep -q '"githubLogin":"kilo-stub-user"'; then
+      echo "github-stub: $EMAIL already has the stub token row; keeping it"
+    else
+      seed_fail existing-row "$CODE" "the account's token row is a real GitHub connection, not a stub seed — it would revoke itself under the stub; delete the user_github_app_tokens row for this account, then re-run"
+    fi
   fi
   rm -f "$JAR" "$SEED_BODY"
 }
@@ -135,13 +137,21 @@ case "${1:-}" in
       if port_free "$p" && claim_port "$p"; then STUB_PORT=$p; break; fi
     done
     [ -n "$STUB_PORT" ] || { echo "github-stub: no free port in 4790-4890" >&2; exit 1; }
-    # The claim only has to cover the choose-to-bind window; once our server
-    # is bound the port itself blocks other pickers. The traps keep an
-    # interrupted start from leaking the claim (EXIT alone misses untrapped
-    # signals) — signal handlers must exit, or the start would continue
-    # racing for a port it just released. A SIGKILL orphan is reaped by
-    # claim_port's staleness check.
-    trap release_port EXIT
+    # Any exit before the final state write rolls back everything start did
+    # (session, env line, state, port claim), so an aborted start is
+    # self-cleaning and the next start is not blocked by its leftovers.
+    # Signal handlers must exit, or the start would continue past a released
+    # claim; a SIGKILL orphan is reaped by claim_port's staleness check.
+    STARTED_OK=0
+    cleanup_start() {
+      if [ "$STARTED_OK" != 1 ]; then
+        tmux kill-session -t "=$SESSION" 2>/dev/null || true
+        remove_env_line
+        rm -rf "$STATE_DIR"
+      fi
+      release_port
+    }
+    trap cleanup_start EXIT
     trap 'exit 130' INT TERM HUP
 
     mkdir -p "$STATE_DIR"
@@ -153,9 +163,9 @@ case "${1:-}" in
     done
     # A bound port alone does not prove OUR server owns it — if our node lost
     # the bind and died, the session is gone and the listener is a stranger.
+    # The EXIT trap rolls back on failure.
     if port_free "$STUB_PORT" || ! tmux has-session -t "=$SESSION" 2>/dev/null; then
       echo "github-stub: server did not come up on port $STUB_PORT" >&2
-      tmux kill-session -t "=$SESSION" 2>/dev/null || true
       exit 1
     fi
     release_port
@@ -173,6 +183,7 @@ case "${1:-}" in
     seed_token "$EMAIL"
 
     printf 'port=%s\n' "$STUB_PORT" > "$STATE_DIR/state"
+    STARTED_OK=1
     echo "github-stub: up at http://127.0.0.1:$STUB_PORT (tmux $SESSION), token seeded for $EMAIL"
     echo "github-stub: relaunch the app now so the connection query refetches"
     ;;

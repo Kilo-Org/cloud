@@ -31,6 +31,10 @@ if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ]; then
 fi
 APPIUM_BIN="$REPO_ROOT/node_modules/.bin/appium"
 LOCK="${TMPDIR:-/tmp}/kilo-appium-locks/$DEVICE"
+# Port-ownership checks need lsof; without it, fall back to pid+status
+# adoption instead of killing healthy servers for 50 port blocks.
+LSOF_OK=1
+command -v lsof >/dev/null 2>&1 || LSOF_OK=0
 
 if [ "${KILO_APPIUM_LOCKED:-}" != "1" ]; then
   exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
@@ -81,9 +85,11 @@ ensure_server() {
       if server_status; then
         # Adopt only when the recorded pid actually owns the listener — a
         # recycled pid plus a sibling's server on this port answers /status
-        # while belonging to another device.
+        # while belonging to another device. Without lsof, pid+status is
+        # the best available evidence.
         # lsof exits 1 on no match; without || true, pipefail + set -e would
         # kill the script here instead of reaching the fallback below.
+        if [ "$LSOF_OK" -eq 0 ]; then return 0; fi
         LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
         if [ -n "$LISTENER" ] && [ "$LISTENER" = "$RECORDED_PID" ]; then
           return 0
@@ -95,10 +101,11 @@ ensure_server() {
     fi
   fi
   ensure_drivers
-  local base_port=$APPIUM_PORT attempt
+  local base_port=$APPIUM_PORT attempt BLIND
   # Hash collisions and foreign listeners both resolve by bumping one block.
   for attempt in $(seq 0 49); do
     APPIUM_PORT=$((base_port + attempt * 10))
+    BLIND=0
     port_free "$APPIUM_PORT" || continue
     if [ "$attempt" -gt 0 ]; then
       echo "appium.sh: bumping to port block $APPIUM_PORT" >&2
@@ -113,8 +120,15 @@ ensure_server() {
       # one device's cleanup kill the other's server mid-flow.
       kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null || break
       if server_status; then
-        # Adopt only on proven ownership: a foreign pid means bump; an empty
-        # lsof (listener vanished or raced) means keep looping, never adopt.
+        # Adopt only on proven ownership: a foreign pid means bump. An empty
+        # lsof (listener vanished or raced) means keep looping — but an lsof
+        # that stays blind while our pid lives and /status answers means the
+        # environment cannot attribute sockets; adopt on pid+status rather
+        # than killing a healthy server for 50 port blocks.
+        if [ "$LSOF_OK" -eq 0 ]; then
+          echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
+          return 0
+        fi
         LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
         if [ "$LISTENER" = "$(cat "$STATE_DIR/appium.pid")" ] && [ -n "$LISTENER" ]; then
           echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
@@ -123,6 +137,12 @@ ensure_server() {
         if [ -n "$LISTENER" ]; then
           echo "appium.sh: port $APPIUM_PORT is owned by pid $LISTENER, not ours; bumping" >&2
           break
+        fi
+        BLIND=$((BLIND + 1))
+        if [ "$BLIND" -ge 3 ]; then
+          echo "appium.sh: lsof cannot attribute port $APPIUM_PORT while our pid is alive and /status answers; adopting on pid+status" >&2
+          echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
+          return 0
         fi
       fi
       sleep 1

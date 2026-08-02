@@ -70,9 +70,10 @@ remove_env_line() {
 }
 
 # Seed a token row for EMAIL through next-auth fake-login. The githubUserId
-# must be fresh: github_user_id is unique across the shared postgres, so it
-# carries the pid — concurrent seeds in the same second cannot collide.
-# SEED_FAIL_MODE=full tears the whole start down; =report only reports.
+# derives deterministically from the email (see the GH_USER_ID line), so a
+# re-seed of an already-seeded account updates its own row. On failure inside
+# a start, the EXIT trap owns the rollback; in `seed` mode there is nothing
+# to undo.
 seed_token() {
   local EMAIL=$1 JAR CSRF CODE GH_USER_ID SEED_BODY
   JAR=$(mktemp "$STATE_DIR/jar.XXXXXX")
@@ -109,11 +110,21 @@ seed_token() {
   # row. Tell them apart before keeping anything.
   if ! grep -q '"success":true' "$SEED_BODY"; then
     grep -q '"success":false' "$SEED_BODY" || seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
-    AUTH=$(curl -s -b "$JAR" "$BASE/api/trpc/githubApps.getUserAuthorization" || true)
-    if printf '%s' "$AUTH" | grep -q '"githubLogin":"kilo-stub-user"'; then
-      echo "github-stub: $EMAIL already has the stub token row; keeping it"
+    # Prove what the existing row is before advising anything: keep it only
+    # when the probe succeeds AND shows a connected stub row. A probe failure
+    # proves nothing — never turn it into delete-the-row advice.
+    AUTH_BODY=$(mktemp "$STATE_DIR/auth.XXXXXX")
+    AUTH_CODE=$(curl -s -o "$AUTH_BODY" -w '%{http_code}' -b "$JAR" "$BASE/api/trpc/githubApps.getUserAuthorization") || AUTH_CODE=000
+    if [ "${AUTH_CODE#2}" != "$AUTH_CODE" ] && ! grep -q '"error"' "$AUTH_BODY" \
+      && grep -q '"githubLogin":"kilo-stub-user"' "$AUTH_BODY" && grep -q '"connected":true' "$AUTH_BODY"; then
+      rm -f "$AUTH_BODY"
+      echo "github-stub: $EMAIL already has the connected stub token row; keeping it"
+    elif [ "${AUTH_CODE#2}" != "$AUTH_CODE" ] && ! grep -q '"error"' "$AUTH_BODY"; then
+      rm -f "$AUTH_BODY"
+      seed_fail existing-row "$AUTH_CODE" "the account's token row is not a usable stub seed (a real GitHub connection, or a revoked row) — under the stub it stays broken; delete the user_github_app_tokens row for this account, then re-run"
     else
-      seed_fail existing-row "$CODE" "the account's token row is a real GitHub connection, not a stub seed — it would revoke itself under the stub; delete the user_github_app_tokens row for this account, then re-run"
+      rm -f "$AUTH_BODY"
+      seed_fail row-probe "$AUTH_CODE" "could not determine what the existing token row is (probe failed); investigate before changing anything"
     fi
   fi
   rm -f "$JAR" "$SEED_BODY"
@@ -137,17 +148,17 @@ case "${1:-}" in
       if port_free "$p" && claim_port "$p"; then STUB_PORT=$p; break; fi
     done
     [ -n "$STUB_PORT" ] || { echo "github-stub: no free port in 4790-4890" >&2; exit 1; }
-    # Any exit before the final state write rolls back everything start did
-    # (session, env line, state, port claim), so an aborted start is
-    # self-cleaning and the next start is not blocked by its leftovers.
+    # Any exit before the final state write rolls back what THIS run did —
+    # and only that: a concurrent start that loses the session-creation race
+    # must not tear down the winner's session, env line, or state.
     # Signal handlers must exit, or the start would continue past a released
     # claim; a SIGKILL orphan is reaped by claim_port's staleness check.
-    STARTED_OK=0
+    STARTED_OK=0 CREATED_SESSION=0 ENV_ADDED=0
     cleanup_start() {
       if [ "$STARTED_OK" != 1 ]; then
-        tmux kill-session -t "=$SESSION" 2>/dev/null || true
-        remove_env_line
-        rm -rf "$STATE_DIR"
+        [ "$CREATED_SESSION" != 1 ] || tmux kill-session -t "=$SESSION" 2>/dev/null || true
+        [ "$ENV_ADDED" != 1 ] || remove_env_line
+        [ "$CREATED_SESSION" != 1 ] || rm -rf "$STATE_DIR"
       fi
       release_port
     }
@@ -156,7 +167,11 @@ case "${1:-}" in
 
     mkdir -p "$STATE_DIR"
     tmux new-session -d -s "$SESSION" -c "$STATE_DIR" \
-      "node $(printf '%q' "$SCRIPT_DIR/github-api-stub/server.mjs") $STUB_PORT"
+      "node $(printf '%q' "$SCRIPT_DIR/github-api-stub/server.mjs") $STUB_PORT" || {
+      echo "github-stub: session $SESSION appeared concurrently; another start owns it" >&2
+      exit 1
+    }
+    CREATED_SESSION=1
     for _ in $(seq 1 30); do
       if ! port_free "$STUB_PORT"; then break; fi
       sleep 0.5
@@ -177,9 +192,9 @@ case "${1:-}" in
       printf '\n' >> "$ENV_LOCAL"
     fi
     printf 'GITHUB_API_BASE_URL=http://127.0.0.1:%s %s\n' "$STUB_PORT" "$MARKER" >> "$ENV_LOCAL"
+    ENV_ADDED=1
 
     BASE="http://127.0.0.1:$API_PORT"
-    SEED_FAIL_MODE=full
     seed_token "$EMAIL"
 
     printf 'port=%s\n' "$STUB_PORT" > "$STATE_DIR/state"
@@ -195,7 +210,6 @@ case "${1:-}" in
       exit 1
     }
     BASE="http://127.0.0.1:$(nextjs_port)"
-    SEED_FAIL_MODE=report
     seed_token "$EMAIL"
     echo "github-stub: token seeded for $EMAIL (stub untouched)"
     ;;

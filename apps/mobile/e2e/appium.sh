@@ -85,15 +85,27 @@ ensure_server() {
       if server_status; then
         # Adopt only when the recorded pid actually owns the listener — a
         # recycled pid plus a sibling's server on this port answers /status
-        # while belonging to another device. Without lsof, pid+status is
-        # the best available evidence.
+        # while belonging to another device. Without lsof, or with an lsof
+        # that stays blind while our pid lives and /status answers, adopt on
+        # pid+status (same evidence rule as the start loop) — dropping the
+        # state here would orphan a healthy server on every invocation.
         # lsof exits 1 on no match; without || true, pipefail + set -e would
-        # kill the script here instead of reaching the fallback below.
+        # kill the script here.
         if [ "$LSOF_OK" -eq 0 ]; then return 0; fi
-        LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
-        if [ -n "$LISTENER" ] && [ "$LISTENER" = "$RECORDED_PID" ]; then
-          return 0
-        fi
+        BLIND=0
+        while :; do
+          LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
+          if [ -n "$LISTENER" ] && [ "$LISTENER" = "$RECORDED_PID" ]; then
+            return 0
+          fi
+          [ -z "$LISTENER" ] || break
+          BLIND=$((BLIND + 1))
+          if [ "$BLIND" -ge 3 ]; then
+            echo "appium.sh: lsof cannot attribute port $APPIUM_PORT while our recorded pid is alive and /status answers; adopting on pid+status" >&2
+            return 0
+          fi
+          sleep 1
+        done
         rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
       else
         stop_server

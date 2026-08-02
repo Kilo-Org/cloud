@@ -141,10 +141,24 @@ function NewSessionScreenBody() {
     });
   }, [createSessionFromDraft]);
 
-  const { addCandidates } = attachments;
+  const { addCandidates, removeAttachment, retryAttachment } = attachments;
   const handleAddAttachment = useCallback(async () => {
     void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
   }, [addCandidates, showActionSheetWithOptions]);
+
+  const handleRemoveAttachment = useCallback(
+    (id: string) => {
+      removeAttachment(id);
+    },
+    [removeAttachment]
+  );
+
+  const handleRetryAttachment = useCallback(
+    (id: string) => {
+      retryAttachment(id);
+    },
+    [retryAttachment]
+  );
 
   const isRemoteTargetSelected = runOnInstance !== null;
   const isStartDisabled = isRemoteTargetSelected
@@ -186,8 +200,8 @@ function NewSessionScreenBody() {
         onModeChange={setMode}
         onModelSelect={handleModelSelect}
         onAddAttachment={() => void handleAddAttachment()}
-        onRemoveAttachment={attachments.removeAttachment}
-        onRetryAttachment={attachments.retryAttachment}
+        onRemoveAttachment={handleRemoveAttachment}
+        onRetryAttachment={handleRetryAttachment}
         onRefetchModels={() => void refetchModels()}
         onPrefillAttachments={addCandidates}
         shareId={shareId}

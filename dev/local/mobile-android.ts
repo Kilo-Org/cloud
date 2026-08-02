@@ -697,9 +697,15 @@ async function main(): Promise<void> {
       record = await attempt(gpu);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // The already-exists guard is an instruction, not a launch failure: a
-      // retry here would tear down a live emulator under whoever uses it.
-      if (message.includes('already exists')) throw error;
+      // The already-exists guard is an instruction, not a launch
+      // failure: a retry here would tear down a live emulator under
+      // whoever uses it. Lock contention likewise means another
+      // emulator launch owns the guard; GPU fallback would not help.
+      if (
+        message.includes('already exists') ||
+        message.includes('is locked by another live process')
+      )
+        throw error;
       const bootEnvelopeMissed = message.includes('did not reach sys.boot_completed=1');
       const retryGpu = bootEnvelopeMissed ? gpu : 'swiftshader_indirect';
       console.error(

@@ -2,7 +2,11 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
-import { __resetSharePayloadStoreForTests, peekSharePayload, type SharePayload } from '@/lib/share-payload';
+import {
+  __resetSharePayloadStoreForTests,
+  peekSharePayload,
+  type SharePayload,
+} from '@/lib/share-payload';
 import { buildCreateRemoteSessionInput } from '@/lib/hooks/remote-instance-spawn-classifier';
 
 import {
@@ -239,7 +243,11 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       'conn-abc',
-      buildCreateRemoteSessionInput({ mode: 'code', model: 'anthropic/claude-sonnet-4', variant: 'high' })
+      buildCreateRemoteSessionInput({
+        mode: 'code',
+        model: 'anthropic/claude-sonnet-4',
+        variant: 'high',
+      })
     );
   });
 

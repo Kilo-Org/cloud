@@ -42,6 +42,13 @@ NODE
 
 port_free() { ! nc -z 127.0.0.1 "$1" 2>/dev/null; }
 
+# Machine-global port claims: two worktrees starting stubs at the same moment
+# would otherwise pick the same free port, one node would lose the bind, and
+# both apps would silently share the winner's mutable fixture state.
+PORT_CLAIMS="${TMPDIR:-/tmp}/kilo-e2e-github-stub-ports"
+claim_port() { mkdir -p "$PORT_CLAIMS" && mkdir "$PORT_CLAIMS/$1" 2>/dev/null; }
+release_port() { [ -z "${STUB_PORT:-}" ] || rmdir "$PORT_CLAIMS/$STUB_PORT" 2>/dev/null || true; }
+
 remove_env_line() {
   # Remove only the line this script added (tagged with the marker).
   [ -f "$ENV_LOCAL" ] || return 0
@@ -64,7 +71,7 @@ case "${1:-}" in
     API_PORT=$(nextjs_port)
     STUB_PORT=""
     for p in $(seq 4790 4890); do
-      if port_free "$p"; then STUB_PORT=$p; break; fi
+      if port_free "$p" && claim_port "$p"; then STUB_PORT=$p; break; fi
     done
     [ -n "$STUB_PORT" ] || { echo "github-stub: no free port in 4790-4890" >&2; exit 1; }
 
@@ -75,7 +82,14 @@ case "${1:-}" in
       if ! port_free "$STUB_PORT"; then break; fi
       sleep 0.5
     done
-    port_free "$STUB_PORT" && { echo "github-stub: server did not bind port $STUB_PORT" >&2; tmux kill-session -t "=$SESSION" 2>/dev/null || true; exit 1; }
+    # A bound port alone does not prove OUR server owns it — if our node lost
+    # the bind and died, the session is gone and the listener is a stranger.
+    if port_free "$STUB_PORT" || ! tmux has-session -t "=$SESSION" 2>/dev/null; then
+      echo "github-stub: server did not come up on port $STUB_PORT" >&2
+      tmux kill-session -t "=$SESSION" 2>/dev/null || true
+      release_port
+      exit 1
+    fi
 
     remove_env_line
     # A .env.local without a trailing newline would merge our append into its
@@ -96,6 +110,7 @@ case "${1:-}" in
       # Undo what start already did, so a failed start leaves nothing behind.
       tmux kill-session -t "=$SESSION" 2>/dev/null || true
       remove_env_line
+      release_port
       rm -rf "$STATE_DIR"
       exit 1
     }
@@ -132,6 +147,8 @@ case "${1:-}" in
   stop)
     tmux kill-session -t "=$SESSION" 2>/dev/null && echo "github-stub: stopped $SESSION" || echo "github-stub: no session to stop"
     remove_env_line
+    STUB_PORT=$(sed -n 's/^port=//p' "$STATE_DIR/state" 2>/dev/null | head -1)
+    release_port
     rm -rf "$STATE_DIR"
     echo "github-stub: removed env line and state"
     ;;

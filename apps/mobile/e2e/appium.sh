@@ -52,9 +52,12 @@ ensure_drivers() {
   installed="$("$APPIUM_BIN" driver list --installed 2>&1 || true)"
   if ! grep -qw "$want" <<<"$installed"; then
     # Machine-global install: serialize so parallel first runs cannot race it.
+    # Re-check INSIDE the lock — the loser of the race would otherwise run a
+    # second install and fail on "already installed".
     "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
       --wait 1800 "${TMPDIR:-/tmp}/kilo-appium-locks/driver-install" -- \
-      "$APPIUM_BIN" driver install "$want"
+      bash -c '"$1" driver list --installed 2>&1 | grep -qw "$2" || exec "$1" driver install "$2"' \
+      _ "$APPIUM_BIN" "$want"
   fi
 }
 
@@ -92,12 +95,18 @@ ensure_server() {
       >"$STATE_DIR/appium.log" 2>&1 &
     echo $! >"$STATE_DIR/appium.pid"
     for _ in $(seq 1 60); do
+      # Liveness first, then /status, then port OWNERSHIP: a sibling device's
+      # server on this port also answers /status, and adopting it would let
+      # one device's cleanup kill the other's server mid-flow.
+      kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null || break
       if server_status; then
+        LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1)
+        if [ -n "$LISTENER" ] && [ "$LISTENER" != "$(cat "$STATE_DIR/appium.pid")" ]; then
+          echo "appium.sh: port $APPIUM_PORT is owned by pid $LISTENER, not ours; bumping" >&2
+          break
+        fi
         echo "$APPIUM_PORT" >"$STATE_DIR/server.port"
         return 0
-      fi
-      if ! kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null; then
-        break
       fi
       sleep 1
     done
@@ -114,7 +123,14 @@ stop_server() {
     PID=$(cat "$STATE_DIR/appium.pid")
     # Pids get recycled; only signal a process that is actually our appium.
     if kill -0 "$PID" 2>/dev/null && ps -o command= -p "$PID" 2>/dev/null | grep -q appium; then
-      kill "$PID" || true
+      kill "$PID" 2>/dev/null || true
+      # Dropping the state while the process lives would leave an untracked
+      # listener squatting on the port; escalate before forgetting the pid.
+      for _ in $(seq 1 10); do
+        kill -0 "$PID" 2>/dev/null || break
+        sleep 1
+      done
+      kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null || true
     fi
   fi
   rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
@@ -157,7 +173,9 @@ case "$cmd" in
   hierarchy)
     # Always a file, never stdout: a raw XML dump into an agent session is
     # large enough to kill the session silently. Grep the file for selectors.
-    OUT="${2:-$(mktemp "${TMPDIR:-/tmp}/kilo-hierarchy.XXXXXX.xml")}"
+    # Xs must end the template: BSD mktemp leaves embedded Xs literal, so a
+    # suffixed template gives one fixed path that fails on the second use.
+    OUT="${2:-$(mktemp "${TMPDIR:-/tmp}/kilo-hierarchy.XXXXXX")}"
     ensure_server
     env DEVICE="$DEVICE" APPIUM_PORT="$APPIUM_PORT" node "$SCRIPT_DIR/wdio/hierarchy.js" > "$OUT"
     echo "hierarchy: $OUT ($(grep -c '<' "$OUT") elements)"

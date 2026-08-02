@@ -119,7 +119,8 @@ apps/mobile/e2e/appium.sh <device> server stop           # at bundle cleanup
 
 ```bash
 pnpm dev:mobile:android adb -s <serial> shell uiautomator dump /sdcard/window.xml
-pnpm dev:mobile:android adb -s <serial> shell cat /sdcard/window.xml
+pnpm dev:mobile:android adb -s <serial> pull /sdcard/window.xml "$SCRATCH/window.xml"
+grep -o 'text="[^"]*" bounds="[^"]*"' "$SCRATCH/window.xml"   # grep the file, never cat it
 pnpm dev:mobile:android adb -s <serial> shell input tap <x> <y>
 pnpm dev:mobile:android adb -s <serial> shell input keyevent KEYCODE_BACK
 ```
@@ -151,7 +152,7 @@ apps/mobile/e2e/github-stub.sh start <email>   # server + env line + token seed;
 apps/mobile/e2e/github-stub.sh stop            # reverses everything
 ```
 
-The email is the account the app is signed in as; the user must exist (sign in on the device first). Fixtures: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`. If the app stalls on "GitHub connection expired" with repeated `githubPrReview.getPullRequest 412` in the nextjs log, run `pnpm dev:env -y cloudflare-git-token-service && pnpm dev:restart cloudflare-git-token-service` (nextjs reads `GIT_TOKEN_SERVICE_API_URL` from `apps/web/.env.development.local`).
+The email is the account the app is signed in as; the user must exist (sign in on the device first). Fixtures: `kilo-stub/discussion-mixed#1` (iOS verifier), `kilo-stub/discussion-mixed#11` (Android verifier — the two run in parallel and must never share one mixed fixture, its thread state is mutable), `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`. `stop` does not remove the seeded token row; until the next `start`, the PR-review screen keeps its URL input and real GitHub calls fail as an expired connection — that residue is expected, not a defect. If the app stalls on "GitHub connection expired" with repeated `githubPrReview.getPullRequest 412` in the nextjs log, run `pnpm dev:env -y cloudflare-git-token-service && pnpm dev:restart cloudflare-git-token-service` (nextjs reads `GIT_TOKEN_SERVICE_API_URL` from `apps/web/.env.development.local`).
 
 # Remote CLI sessions
 

@@ -155,7 +155,9 @@ function run(command: string, args: string[], env: AndroidEnvironment, cwd?: str
 }
 
 function tmuxSessionExists(session: string): boolean {
-  return spawnSync('tmux', ['has-session', '-t', session]).status === 0;
+  // `=` forces an exact session-name match; a bare -t prefix-matches, so a
+  // sibling worktree whose slug extends ours would answer for our session.
+  return spawnSync('tmux', ['has-session', '-t', `=${session}`]).status === 0;
 }
 
 function androidEmulatorSlug(worktreeRoot: string): string {
@@ -287,7 +289,7 @@ async function stopAndroidEmulator(env: AndroidEnvironment, worktreeRoot: string
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
     if (tmuxSessionExists(expectedSession))
-      spawnSync('tmux', ['kill-session', '-t', expectedSession], { stdio: 'ignore' });
+      spawnSync('tmux', ['kill-session', '-t', `=${expectedSession}`], { stdio: 'ignore' });
     return;
   }
   let parsed: unknown;
@@ -301,7 +303,7 @@ async function stopAndroidEmulator(env: AndroidEnvironment, worktreeRoot: string
   const record = parsed;
 
   if (tmuxSessionExists(record.session))
-    spawnSync('tmux', ['kill-session', '-t', record.session], { stdio: 'ignore' });
+    spawnSync('tmux', ['kill-session', '-t', `=${record.session}`], { stdio: 'ignore' });
   for (let i = 0; i < 50 && processIsAlive(record.pid); i++) await delay(100);
   if (recordedEmulatorStillOwnsPid(record, env)) {
     signalProcessIfPresent(record.pid, 'SIGTERM');
@@ -392,7 +394,7 @@ async function startAndroidEmulator(
         return record;
       } catch (error) {
         if (sessionStarted && tmuxSessionExists(session))
-          spawnSync('tmux', ['kill-session', '-t', session], { stdio: 'ignore' });
+          spawnSync('tmux', ['kill-session', '-t', `=${session}`], { stdio: 'ignore' });
         if (pid > 0) {
           const partialRecord = {
             avd,
@@ -713,7 +715,20 @@ async function main(): Promise<void> {
         );
         throw error;
       }
-      record = await attempt(retryGpu);
+      try {
+        record = await attempt(retryGpu);
+      } catch (retryError) {
+        // The second failure is the caller's blocker, but its emulator,
+        // session, and record must not outlive it.
+        try {
+          await stopAndroidEmulator(env, worktreeRoot);
+        } catch (stopError) {
+          console.error(
+            `teardown after attempt 2 failed: ${stopError instanceof Error ? stopError.message : String(stopError)}`
+          );
+        }
+        throw retryError;
+      }
     }
     console.log(JSON.stringify(record, null, 2));
     return;

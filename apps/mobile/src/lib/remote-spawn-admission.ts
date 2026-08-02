@@ -7,7 +7,11 @@ export function resolveRemoteSpawnAdmission(input: {
   instance: InstancePickerInstance;
   payload: SharePayload | null;
 }): { allowed: true } | { allowed: false; toast: string } {
-  if (input.payload?.files.length && input.instance.capabilities?.attachments === false) {
+  const { payload, instance } = input;
+  if (payload === null) {
+    return { allowed: true };
+  }
+  if (payload.files.length > 0 && instance.capabilities?.attachments !== true) {
     return { allowed: false, toast: REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST };
   }
 

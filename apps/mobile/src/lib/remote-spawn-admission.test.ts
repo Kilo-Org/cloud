@@ -32,8 +32,31 @@ describe('resolveRemoteSpawnAdmission', () => {
     ).toEqual({ allowed: false, toast: REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST });
   });
 
-  it('admits files when capability is unknown', () => {
+  it('rejects files when capability is absent', () => {
     expect(resolveRemoteSpawnAdmission({ instance, payload: filesPayload })).toEqual({
+      allowed: false,
+      toast: REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST,
+    });
+  });
+
+  it('admits files when capability is explicitly true', () => {
+    expect(
+      resolveRemoteSpawnAdmission({
+        instance: { ...instance, capabilities: { attachments: true } },
+        payload: filesPayload,
+      })
+    ).toEqual({ allowed: true });
+  });
+
+  it('admits a null payload without capability', () => {
+    expect(resolveRemoteSpawnAdmission({ instance, payload: null })).toEqual({
+      allowed: true,
+    });
+  });
+
+  it('admits a text-only payload without capability', () => {
+    const textOnly: SharePayload = { text: 'hello', files: [], failedFiles: [] };
+    expect(resolveRemoteSpawnAdmission({ instance, payload: textOnly })).toEqual({
       allowed: true,
     });
   });

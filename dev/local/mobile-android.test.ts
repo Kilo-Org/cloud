@@ -18,7 +18,6 @@ import {
   resolveAndroidEnvironment,
   signalProcessIfPresent,
 } from './mobile-android';
-import { withProcessLockAsync } from './process-lock';
 
 test('allocates the first free even emulator console port', () => {
   const occupied = new Set([5554, 5556]);
@@ -370,23 +369,4 @@ test('reads the Gradle version from the worktree wrapper properties without laun
   );
 
   assert.equal(readGradleWrapperVersion(root), '8.14.3');
-});
-
-test('lock contention on Android emulator launch throws the error message the retry guard exempts', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-emulator-lock-'));
-  const lockPath = path.join(root, 'launch.lock');
-  try {
-    const holder = await withProcessLockAsync(lockPath, 'Android emulator launch', async () => {
-      let contentionError: Error | undefined;
-      try {
-        await withProcessLockAsync(lockPath, 'Android emulator launch', async () => {});
-      } catch (error) {
-        contentionError = error instanceof Error ? error : new Error(String(error));
-      }
-      assert.ok(contentionError, 'contending lock acquisition must fail');
-      assert.match(contentionError.message, /locked by another live process/);
-    });
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
 });

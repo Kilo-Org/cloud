@@ -138,4 +138,33 @@ describe('parseHtmlImages parser', () => {
     }
     expect(image.alt).toBe('say "hello"');
   });
+
+  it('prefers real src over data-canonical-src (either order)', () => {
+    for (const html of [
+      '<img data-canonical-src="https://decoy/a.png" src="https://real/b.png">',
+      '<img src="https://real/b.png" data-canonical-src="https://decoy/a.png">',
+    ]) {
+      const result = parseHtmlImages(html);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ src: 'https://real/b.png' });
+    }
+  });
+
+  it('prefers real alt over data-alt', () => {
+    const result = parseHtmlImages('<img data-alt="decoy" alt="real" src="https://x/a.png">');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ alt: 'real' });
+  });
+
+  it('prefers real width/height over data-width/data-height', () => {
+    const result = parseHtmlImages(
+      '<img data-width="1" data-height="1" width="400" height="200" src="https://x/a.png">'
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ aspectRatio: 2 });
+  });
+
+  it('data-src only (no real src) → empty array', () => {
+    expect(parseHtmlImages('<img data-src="https://x/a.png">')).toStrictEqual([]);
+  });
 });

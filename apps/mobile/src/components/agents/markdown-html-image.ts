@@ -21,10 +21,10 @@ function decodeEntities(value: string): string {
   return value.replace(ENTITY_RE, match => ENTITIES[match] ?? match);
 }
 
-const ATTR_SRC = /src\s*=\s*["']([^"']*)["']/i;
-const ATTR_ALT = /alt\s*=\s*["']([^"']*)["']/i;
-const ATTR_WIDTH = /width\s*=\s*["']([^"']*)["']/i;
-const ATTR_HEIGHT = /height\s*=\s*["']([^"']*)["']/i;
+const ATTR_SRC = /(?:^|\s)src\s*=\s*["']([^"']*)["']/i;
+const ATTR_ALT = /(?:^|\s)alt\s*=\s*["']([^"']*)["']/i;
+const ATTR_WIDTH = /(?:^|\s)width\s*=\s*["']([^"']*)["']/i;
+const ATTR_HEIGHT = /(?:^|\s)height\s*=\s*["']([^"']*)["']/i;
 
 const IMG_TAG_RE = /<img\b[^>]*\/?>/gi;
 

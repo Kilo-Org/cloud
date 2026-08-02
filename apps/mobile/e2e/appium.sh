@@ -76,9 +76,20 @@ ensure_server() {
   # adopting it would interleave taps across devices.
   if [ -f "$STATE_DIR/server.port" ] && [ -f "$STATE_DIR/appium.pid" ]; then
     APPIUM_PORT=$(cat "$STATE_DIR/server.port")
-    if kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null; then
-      if server_status; then return 0; fi
-      stop_server
+    RECORDED_PID=$(cat "$STATE_DIR/appium.pid")
+    if kill -0 "$RECORDED_PID" 2>/dev/null; then
+      if server_status; then
+        # Adopt only when the recorded pid actually owns the listener — a
+        # recycled pid plus a sibling's server on this port answers /status
+        # while belonging to another device.
+        LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1)
+        if [ -n "$LISTENER" ] && [ "$LISTENER" = "$RECORDED_PID" ]; then
+          return 0
+        fi
+        rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
+      else
+        stop_server
+      fi
     fi
   fi
   ensure_drivers

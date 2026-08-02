@@ -7,6 +7,9 @@
 # exists). `stop` reverses all of it.
 #
 #   github-stub.sh start <email>   # the account the app is signed in as
+#   github-stub.sh seed <email>    # token row for one more signed-in account
+#                                  # (e.g. the other platform's verifier),
+#                                  # while the stub runs
 #   github-stub.sh status
 #   github-stub.sh stop
 #
@@ -56,6 +59,41 @@ remove_env_line() {
   mv "$ENV_LOCAL.tmp.$$" "$ENV_LOCAL"
 }
 
+# Seed a token row for EMAIL through next-auth fake-login. The githubUserId
+# must be fresh: github_user_id is unique across the shared postgres, so it
+# carries the pid — concurrent seeds in the same second cannot collide.
+# SEED_FAIL_MODE=full tears the whole start down; =report only reports.
+seed_token() {
+  local EMAIL=$1 JAR CSRF CODE GH_USER_ID SEED_BODY
+  JAR=$(mktemp "$STATE_DIR/jar.XXXXXX")
+  seed_fail() {
+    echo "github-stub: token seed failed at $1 for $EMAIL (HTTP ${2:-?})${3:+: $3}" >&2
+    echo "github-stub: the user must exist (sign in on the device first, or pnpm dev:seed app:create-user)" >&2
+    if [ "$SEED_FAIL_MODE" = full ]; then
+      # Undo what start already did, so a failed start leaves nothing behind.
+      tmux kill-session -t "=$SESSION" 2>/dev/null || true
+      remove_env_line
+      rm -rf "$STATE_DIR"
+    fi
+    exit 1
+  }
+  CSRF=$(curl -s -c "$JAR" "$BASE/api/auth/csrf" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).csrfToken)') \
+    || seed_fail csrf "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/auth/csrf")"
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/api/auth/callback/fake-login" \
+    --data-urlencode "csrfToken=$CSRF" \
+    --data-urlencode "email=$EMAIL" \
+    --data-urlencode "json=true") || seed_fail fake-login transport
+  case $CODE in 2*|3*) ;; *) seed_fail fake-login "$CODE" ;; esac
+  GH_USER_ID="9$(date +%s | tail -c 6)$(printf '%05d' $$)$((RANDOM % 90 + 10))"
+  SEED_BODY=$(mktemp "$STATE_DIR/seed.XXXXXX")
+  CODE=$(curl -s -o "$SEED_BODY" -w '%{http_code}' -b "$JAR" -X POST "$BASE/api/trpc/githubApps.devSeedUserGithubToken" \
+    -H 'content-type: application/json' \
+    -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}") || seed_fail trpc-seed transport
+  case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
+  grep -q '"error"' "$SEED_BODY" && seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
+  rm -f "$JAR" "$SEED_BODY"
+}
+
 case "${1:-}" in
   start)
     EMAIL="${2:?usage: github-stub.sh start <email>}"
@@ -74,6 +112,10 @@ case "${1:-}" in
       if port_free "$p" && claim_port "$p"; then STUB_PORT=$p; break; fi
     done
     [ -n "$STUB_PORT" ] || { echo "github-stub: no free port in 4790-4890" >&2; exit 1; }
+    # The claim only has to cover the choose-to-bind window; once our server
+    # is bound the port itself blocks other pickers. The trap keeps an
+    # interrupted start from leaking the claim.
+    trap release_port EXIT
 
     mkdir -p "$STATE_DIR"
     tmux new-session -d -s "$SESSION" -c "$STATE_DIR" \
@@ -87,9 +129,9 @@ case "${1:-}" in
     if port_free "$STUB_PORT" || ! tmux has-session -t "=$SESSION" 2>/dev/null; then
       echo "github-stub: server did not come up on port $STUB_PORT" >&2
       tmux kill-session -t "=$SESSION" 2>/dev/null || true
-      release_port
       exit 1
     fi
+    release_port
 
     remove_env_line
     # A .env.local without a trailing newline would merge our append into its
@@ -99,40 +141,25 @@ case "${1:-}" in
     fi
     printf 'GITHUB_API_BASE_URL=http://127.0.0.1:%s %s\n' "$STUB_PORT" "$MARKER" >> "$ENV_LOCAL"
 
-    # Seed a token row for the E2E user through next-auth fake-login. The
-    # githubUserId must be fresh: github_user_id is unique across the shared
-    # postgres, and reusing a sibling worktree's id fails the insert.
-    JAR=$(mktemp "$STATE_DIR/jar.XXXXXX")
     BASE="http://127.0.0.1:$API_PORT"
-    seed_fail() {
-      echo "github-stub: token seed failed at $1 for $EMAIL (HTTP ${2:-?})${3:+: $3}" >&2
-      echo "github-stub: the user must exist (sign in on the device first, or pnpm dev:seed app:create-user)" >&2
-      # Undo what start already did, so a failed start leaves nothing behind.
-      tmux kill-session -t "=$SESSION" 2>/dev/null || true
-      remove_env_line
-      release_port
-      rm -rf "$STATE_DIR"
-      exit 1
-    }
-    CSRF=$(curl -s -c "$JAR" "$BASE/api/auth/csrf" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).csrfToken)') \
-      || seed_fail csrf "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/auth/csrf")"
-    CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/api/auth/callback/fake-login" \
-      --data-urlencode "csrfToken=$CSRF" \
-      --data-urlencode "email=$EMAIL" \
-      --data-urlencode "json=true") || seed_fail fake-login transport
-    case $CODE in 2*|3*) ;; *) seed_fail fake-login "$CODE" ;; esac
-    GH_USER_ID="9$(date +%s | tail -c 6)$((RANDOM % 90 + 10))"
-    SEED_BODY=$(mktemp "$STATE_DIR/seed.XXXXXX")
-    CODE=$(curl -s -o "$SEED_BODY" -w '%{http_code}' -b "$JAR" -X POST "$BASE/api/trpc/githubApps.devSeedUserGithubToken" \
-      -H 'content-type: application/json' \
-      -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}") || seed_fail trpc-seed transport
-    case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
-    grep -q '"error"' "$SEED_BODY" && seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
-    rm -f "$JAR" "$SEED_BODY"
+    SEED_FAIL_MODE=full
+    seed_token "$EMAIL"
 
     printf 'port=%s\n' "$STUB_PORT" > "$STATE_DIR/state"
     echo "github-stub: up at http://127.0.0.1:$STUB_PORT (tmux $SESSION), token seeded for $EMAIL"
     echo "github-stub: relaunch the app now so the connection query refetches"
+    ;;
+
+  seed)
+    EMAIL="${2:?usage: github-stub.sh seed <email>}"
+    tmux has-session -t "=$SESSION" 2>/dev/null || {
+      echo "github-stub: no running stub — use start for the first account" >&2
+      exit 1
+    }
+    BASE="http://127.0.0.1:$(nextjs_port)"
+    SEED_FAIL_MODE=report
+    seed_token "$EMAIL"
+    echo "github-stub: token seeded for $EMAIL (stub untouched)"
     ;;
 
   status)
@@ -147,11 +174,9 @@ case "${1:-}" in
   stop)
     tmux kill-session -t "=$SESSION" 2>/dev/null && echo "github-stub: stopped $SESSION" || echo "github-stub: no session to stop"
     remove_env_line
-    STUB_PORT=$(sed -n 's/^port=//p' "$STATE_DIR/state" 2>/dev/null | head -1)
-    release_port
     rm -rf "$STATE_DIR"
     echo "github-stub: removed env line and state"
     ;;
 
-  *) echo "usage: github-stub.sh start <email> | status | stop" >&2; exit 1 ;;
+  *) echo "usage: github-stub.sh start <email> | seed <email> | status | stop" >&2; exit 1 ;;
 esac

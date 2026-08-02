@@ -119,8 +119,9 @@ apps/mobile/e2e/appium.sh <device> server stop           # at bundle cleanup
 
 ```bash
 pnpm dev:mobile:android adb -s <serial> shell uiautomator dump /sdcard/window.xml
-pnpm dev:mobile:android adb -s <serial> pull /sdcard/window.xml "$SCRATCH/window.xml"
-grep -o 'text="[^"]*" bounds="[^"]*"' "$SCRATCH/window.xml"   # grep the file, never cat it
+DUMP=$(mktemp /tmp/kilo-window.XXXXXX)
+pnpm dev:mobile:android adb -s <serial> pull /sdcard/window.xml "$DUMP"
+grep -o 'text="[^"]*" bounds="[^"]*"' "$DUMP"   # grep the file, never cat it
 pnpm dev:mobile:android adb -s <serial> shell input tap <x> <y>
 pnpm dev:mobile:android adb -s <serial> shell input keyevent KEYCODE_BACK
 ```
@@ -149,6 +150,7 @@ pnpm dev:mobile:android adb -s <serial> exec-out screencap -p > <path>
 
 ```bash
 apps/mobile/e2e/github-stub.sh start <email>   # server + env line + token seed; then relaunch the app
+apps/mobile/e2e/github-stub.sh seed <email>    # token row for one more signed-in account (other platform's verifier)
 apps/mobile/e2e/github-stub.sh stop            # reverses everything
 ```
 

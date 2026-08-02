@@ -8,8 +8,6 @@
  *   kilo-stub/discussion-mixed/11              — Android verifier (id suffix p11)
  *   kilo-stub/discussion-conversation-only#2   — conversation comments only (0 review threads)
  *   kilo-stub/discussion-empty#3               — empty discussion
- *   kilo-stub/files-many#4                     — 120 files (3 pages), file-010 multi-hunk, file-060 null patch
- *   kilo-stub/files-dupe#5                     — 51 entries / 50 unique paths, page-two dupe of file-049
  *
  * discussion-mixed timeline (T+minutes from T0):
  *   T+1 threadA c1, T+2 conv1 (dave), T+3 conv2, T+4 threadB c1,
@@ -128,69 +126,6 @@ const DIFF_HUNK_BETA =
   '@@ -18,3 +18,6 @@ export function beta() {\n-  return 1;\n+  return 2;\n+}\n+\n+export function betaExtra() {\n+  return 3;\n }';
 const DIFF_HUNK_ALPHA_OUTDATED =
   '@@ -7,5 +7,5 @@ export function alpha() {\n   const x = 0;\n-  return 1;\n+  return 1;\n   // end\n }';
-
-/**
- * Full-shape fixture helper. Every fixture needs title, body, files, threads,
- * and conversationComments so the GraphQL handlers do not fail.
- */
-const filesFixture = (title, files) => ({
-  title,
-  body: `PR body for ${title}.`,
-  files,
-  threads: [],
-  conversationComments: [],
-});
-
-const pad3 = n => String(n).padStart(3, '0');
-
-/** One-hunk patch body for generated files, reusing Alpha shapes. */
-const genPatch = n =>
-  `@@ -${10 + n * 13},3 +${10 + n * 13},5 @@ export function fn${pad3(n)}() {\n-  return ${n};\n+  // stub change\n+  return ${n + 100};\n+}\n+\n+export function extra${pad3(n)}() {\n+  return ${n + 200};\n }`;
-
-/** Three-hunk patch for file-010.ts (~15 lines per hunk), reusing Alpha/Beta shapes. */
-const MULTI_HUNK_PATCH =
-  '@@ -12,6 +12,11 @@ export function init() {\n-  return default;\n+  // first hunk alpha\n+  return configured;\n+}\n' +
-  '+\n+export function initExtra() {\n+  return 3;\n }\n' +
-  '@@ -24,5 +24,10 @@ export function middleware() {\n-  return next;\n+  // second hunk beta\n+  return wrapped;\n+}\n' +
-  '+\n+export function middlewareExtra() {\n+  return 3;\n }\n' +
-  '@@ -38,5 +38,11 @@ export function teardown() {\n-  return done;\n+  // third hunk combined\n+  return cleaned;\n+}\n' +
-  '+\n+export function teardownExtra() {\n+  return 3;\n }';
-
-/**
- * Generate `n` file entries with sorted stable paths `src/gen/file-000.ts` …
- * `src/gen/file-{n-1}.ts`. File 010 gets a multi-hunk patch; file 060 gets
- * `patch: null`; every other file gets a small one-hunk patch.
- */
-const manyFiles = n => {
-  const files = [];
-  for (let i = 0; i < n; i++) {
-    const filename = `src/gen/file-${pad3(i)}.ts`;
-    if (i === 60) {
-      files.push(prFile(filename, 0, 0, null));
-    } else if (i === 10) {
-      files.push(prFile(filename, 18, 3, MULTI_HUNK_PATCH));
-    } else {
-      files.push(prFile(filename, 6, 1, genPatch(i)));
-    }
-  }
-  return files;
-};
-
-/**
- * 51 entries, 50 unique paths. The 51st entry (index 50, first of page 2)
- * repeats the path of the 50th entry (index 49, last of page 1):
- * `src/gen/file-049.ts`. The overview reports 51 changed files; the Files-list
- * header reports 50 listed — that gap is the dedupe working.
- */
-const dupeFiles = () => {
-  const files = [];
-  for (let i = 0; i <= 49; i++) {
-    files.push(prFile(`src/gen/file-${pad3(i)}.ts`, 6, 1, genPatch(i)));
-  }
-  // Page-two first entry duplicates page-one last entry's path.
-  files.push(prFile('src/gen/file-049.ts', 6, 1, genPatch(49)));
-  return files;
-};
 
 /**
  * Fresh mixed-discussion fixture per call (D9). idSuffix is the platform key
@@ -383,11 +318,6 @@ const FIXTURES = {
     threads: [],
     conversationComments: [],
   },
-  'kilo-stub/files-many/4': filesFixture('Many files fixture (120)', manyFiles(120)),
-  'kilo-stub/files-dupe/5': filesFixture(
-    'Duplicate file fixture (51 entries, 50 unique)',
-    dupeFiles()
-  ),
 };
 
 function logLine(obj) {
@@ -469,9 +399,9 @@ function restPull(owner, repo, number, fx) {
     mergeable_state: 'clean',
     auto_merge: null,
     commits: 1,
-    changed_files: fx.files.length,
-    additions: fx.files.reduce((sum, f) => sum + (f.additions ?? 0), 0),
-    deletions: fx.files.reduce((sum, f) => sum + (f.deletions ?? 0), 0),
+    changed_files: 2,
+    additions: 10,
+    deletions: 2,
     user: restUser('alice'),
     head: {
       ref: 'feature/stub',

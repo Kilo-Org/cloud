@@ -104,7 +104,7 @@ git-token-service is missing its per-worktree Secrets Store binding:
 `pnpm dev:env -y cloudflare-git-token-service && pnpm dev:restart cloudflare-git-token-service`.
 Note nextjs reads `GIT_TOKEN_SERVICE_API_URL` from `apps/web/.env.development.local`, not root `.env.local`.
 
-Pinned surface only: REST pull/repo/check-runs/statuses/`pulls/{n}/files` (paginated via `page`/`per_page`) plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`, `kilo-stub/files-many#4` (120 files, 3 pages), `kilo-stub/files-dupe#5` (51 entries, 50 unique paths).
+Pinned surface only: REST pull/repo/check-runs/statuses/`pulls/{n}/files` (paginated via `page`/`per_page`) plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`.
 
 ## iOS Simulator
 

@@ -106,13 +106,13 @@ seed_token() {
   case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
   grep -q '"error"' "$SEED_BODY" && seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
   # success:false with 200 and no error has exactly one cause: the account
-  # already holds a seeded row under an older (pre-deterministic) id, which
-  # the upsert's setWhere leaves untouched. That row is a usable seed (same
-  # fake token, far-future expiry) — keep it. Anything else in the body is
-  # an unknown shape and fails.
+  # already holds a token row under a different github_user_id (an older
+  # random-id seed, or a real GitHub connection on this dev account). Either
+  # row works against the stub — it accepts any token — so keep it. Anything
+  # else in the body is an unknown shape and fails.
   if ! grep -q '"success":true' "$SEED_BODY"; then
     grep -q '"success":false' "$SEED_BODY" || seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")"
-    echo "github-stub: $EMAIL already has a seeded token row (older id); keeping it"
+    echo "github-stub: $EMAIL already has a token row (different github_user_id — an older seed or a real connection); keeping it, the stub accepts any token"
   fi
   rm -f "$JAR" "$SEED_BODY"
 }

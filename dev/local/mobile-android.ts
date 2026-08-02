@@ -155,9 +155,7 @@ function run(command: string, args: string[], env: AndroidEnvironment, cwd?: str
 }
 
 function tmuxSessionExists(session: string): boolean {
-  // `=` forces an exact session-name match; a bare -t prefix-matches, so a
-  // sibling worktree whose slug extends ours would answer for our session.
-  return spawnSync('tmux', ['has-session', '-t', `=${session}`]).status === 0;
+  return spawnSync('tmux', ['has-session', '-t', session]).status === 0;
 }
 
 function androidEmulatorSlug(worktreeRoot: string): string {
@@ -289,7 +287,7 @@ async function stopAndroidEmulator(env: AndroidEnvironment, worktreeRoot: string
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
     if (tmuxSessionExists(expectedSession))
-      spawnSync('tmux', ['kill-session', '-t', `=${expectedSession}`], { stdio: 'ignore' });
+      spawnSync('tmux', ['kill-session', '-t', expectedSession], { stdio: 'ignore' });
     return;
   }
   let parsed: unknown;
@@ -303,7 +301,7 @@ async function stopAndroidEmulator(env: AndroidEnvironment, worktreeRoot: string
   const record = parsed;
 
   if (tmuxSessionExists(record.session))
-    spawnSync('tmux', ['kill-session', '-t', `=${record.session}`], { stdio: 'ignore' });
+    spawnSync('tmux', ['kill-session', '-t', record.session], { stdio: 'ignore' });
   for (let i = 0; i < 50 && processIsAlive(record.pid); i++) await delay(100);
   if (recordedEmulatorStillOwnsPid(record, env)) {
     signalProcessIfPresent(record.pid, 'SIGTERM');
@@ -394,7 +392,7 @@ async function startAndroidEmulator(
         return record;
       } catch (error) {
         if (sessionStarted && tmuxSessionExists(session))
-          spawnSync('tmux', ['kill-session', '-t', `=${session}`], { stdio: 'ignore' });
+          spawnSync('tmux', ['kill-session', '-t', session], { stdio: 'ignore' });
         if (pid > 0) {
           const partialRecord = {
             avd,
@@ -682,60 +680,8 @@ async function main(): Promise<void> {
   }
   if (command === 'emulator-start') {
     const { avd, gpu, wait } = parseEmulatorStartArgs(args);
-    // One automatic relaunch encodes the launch/GPU policy the runbook used
-    // to hand to callers: a missed boot envelope keeps the same GPU (the
-    // process was healthy, the host was slow); every pre-boot launch failure
-    // and mid-boot death switches to software rendering. A second failure is
-    // the caller's test-environment blocker — never a third launch.
-    const attempt = async (attemptGpu: string) => {
-      const record = await startAndroidEmulator(env, worktreeRoot, avd, attemptGpu);
-      if (wait) await waitForAndroidBoot(env, record);
-      return record;
-    };
-    let record: EmulatorRecord;
-    try {
-      record = await attempt(gpu);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      // The already-exists guard is an instruction, not a launch
-      // failure: a retry here would tear down a live emulator under
-      // whoever uses it. Lock contention likewise means another
-      // emulator launch owns the guard; GPU fallback would not help.
-      if (
-        message.includes('already exists') ||
-        message.includes('is locked by another live process')
-      )
-        throw error;
-      const bootEnvelopeMissed = message.includes('did not reach sys.boot_completed=1');
-      const retryGpu = bootEnvelopeMissed ? gpu : 'swiftshader_indirect';
-      console.error(
-        `emulator-start attempt 1 failed: ${message}\nstopping leftovers and retrying once with --gpu ${retryGpu}`
-      );
-      try {
-        await stopAndroidEmulator(env, worktreeRoot);
-      } catch (stopError) {
-        // Keep attempt 1's failure as the reason; never boot a second
-        // emulator over state the teardown could not clear.
-        console.error(
-          `teardown after attempt 1 failed: ${stopError instanceof Error ? stopError.message : String(stopError)}`
-        );
-        throw error;
-      }
-      try {
-        record = await attempt(retryGpu);
-      } catch (retryError) {
-        // The second failure is the caller's blocker, but its emulator,
-        // session, and record must not outlive it.
-        try {
-          await stopAndroidEmulator(env, worktreeRoot);
-        } catch (stopError) {
-          console.error(
-            `teardown after attempt 2 failed: ${stopError instanceof Error ? stopError.message : String(stopError)}`
-          );
-        }
-        throw retryError;
-      }
-    }
+    const record = await startAndroidEmulator(env, worktreeRoot, avd, gpu);
+    if (wait) await waitForAndroidBoot(env, record);
     console.log(JSON.stringify(record, null, 2));
     return;
   }

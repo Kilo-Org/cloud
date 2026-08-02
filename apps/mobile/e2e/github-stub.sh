@@ -98,7 +98,7 @@ remove_env_line() {
     return 1
   fi
   # Preserve original file permissions before replacing.
-  perms=$(stat -f '%p' "$ENV_LOCAL" 2>/dev/null)
+  perms=$(stat -f '%p' "$ENV_LOCAL" 2>/dev/null || stat -c '%a' "$ENV_LOCAL" 2>/dev/null || true)
   [ -n "$perms" ] && chmod "${perms: -3}" "$tmp" 2>/dev/null || true
   mv "$tmp" "$ENV_LOCAL"
 }

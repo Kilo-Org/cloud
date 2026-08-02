@@ -477,9 +477,32 @@ test('start-loop stop_server call sets APPIUM_CLEANUP_OWNED so foreign-listener 
   // stop_server kills our just-spawned PID (not the foreign listener) and
   // continues to the next port block instead of returning non-zero.
   assert.match(ensureFn, /APPIUM_CLEANUP_OWNED=1 stop_server/);
+
   // ensure_server contains three stop_server calls: two in the adoption block
-  // (no context, correct for stale/hung-server stop) and one in the start-loop
-  // cleanup (with APPIUM_CLEANUP_OWNED=1, correct for just-spawned PID).
+  // (protection against stale/recycled PIDs) and one in the start-loop cleanup
+  // (with APPIUM_CLEANUP_OWNED=1, correct for just-spawned PID).
   const stopCalls = [...ensureFn.matchAll(/\bstop_server\b/g)];
   assert.equal(stopCalls.length, 3, 'ensure_server must have exactly three stop_server calls');
+
+  // Adoption-block stop_server calls must handle nonzero returns (|| true) so
+  // a foreign listener or a survived-SIGKILL stale PID does not abort the
+  // entire ensure_server under set -e. They must never set
+  // APPIUM_CLEANUP_OWNED=1 because those PIDs are not provably ours.
+  const adoptionStopCalls = [...ensureFn.matchAll(/stop_server \|\| true/g)];
+  assert.equal(
+    adoptionStopCalls.length,
+    2,
+    'adoption-block stop_server calls must use || true to handle nonzero returns'
+  );
+
+  // The owned-child call must NOT use || true — it must propagate failure
+  // so the start loop can retry the next port block.
+  const ownedStopCalls = [
+    ...ensureFn.matchAll(/APPIUM_CLEANUP_OWNED=1 stop_server\b(?! \|\| true)/g),
+  ];
+  assert.equal(
+    ownedStopCalls.length,
+    1,
+    'start-loop stop_server call must set APPIUM_CLEANUP_OWNED=1 and must NOT use || true'
+  );
 });

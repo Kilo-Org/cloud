@@ -113,10 +113,10 @@ ensure_server() {
           rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
         else
           # Died or stopped answering mid-probe: clean up our own remains.
-          stop_server
+          stop_server || true
         fi
       else
-        stop_server
+        stop_server || true
       fi
     fi
   fi

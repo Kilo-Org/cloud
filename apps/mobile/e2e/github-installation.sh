@@ -72,23 +72,41 @@ grep -q '"error"' "$BODY" && fail trpc-add-installation "$CODE" "$(cut -c1-300 "
 grep -q '"success":true' "$BODY" || fail trpc-add-installation "$CODE" "$(cut -c1-300 "$BODY")"
 
 # `success:true` only proves the mutation ran. The upsert keys on the
-# installation id, so a second id gives the account a second github row, while
-# every reader takes one row with no ordering — the repository list can land on
-# the row the app does not read. Read back the row the app resolves.
+# installation id, so a second id gives the account a second github row, and
+# the two readers can then disagree: the installation screen orders by health
+# and recency, while the cloud-agent repository list takes one row with no
+# ordering. Assert both, because only the second one is what a cloud-agent
+# scenario depends on.
 CHECK="$WORK_DIR/check"
 CODE=$(curl -s --max-time 120 -o "$CHECK" -w '%{http_code}' -b "$JAR" \
   "$BASE/api/trpc/githubApps.getInstallation") || fail readback transport
 case $CODE in 2*) ;; *) fail readback "$CODE" "$(cut -c1-300 "$CHECK")" ;; esac
-read -r LIVE_ID REPO_COUNT INSTALLED <<<"$(node -e '
+read -r LIVE_ID INSTALLED <<<"$(node -e '
 const response = JSON.parse(require("fs").readFileSync(0, "utf8"));
 const data = response.result?.data?.json ?? response.result?.data;
 const installation = data?.installation;
 if (!installation) process.exit(0);
-const repositories = Array.isArray(installation.repositories) ? installation.repositories : [];
-process.stdout.write(`${installation.installationId} ${repositories.length} ${data.installed}`);
+process.stdout.write(`${installation.installationId} ${data.installed}`);
 ' < "$CHECK")"
-[ "$LIVE_ID" = "$INSTALLATION_ID" ] && [ "$INSTALLED" = "true" ] && [ "${REPO_COUNT:-0}" -gt 0 ] \
-  || fail readback "$CODE" "the account resolves installation ${LIVE_ID:-none} with ${REPO_COUNT:-0} repositories (installed=${INSTALLED:-none}); expected $INSTALLATION_ID with at least one. A second github integration row on the account can win this read — check the account's rows"
+[ "$LIVE_ID" = "$INSTALLATION_ID" ] && [ "$INSTALLED" = "true" ] \
+  || fail readback "$CODE" "the account resolves installation ${LIVE_ID:-none} (installed=${INSTALLED:-none}), not $INSTALLATION_ID — check the account's github integration rows"
+
+# The unordered reader: `fetchGitHubRepositoriesForUser` is what the mobile
+# new-session screen calls, so an empty list here means the app cannot start a
+# cloud agent even when the installation screen looks right.
+REPOS="$WORK_DIR/repos"
+CODE=$(curl -s --max-time 120 -o "$REPOS" -w '%{http_code}' -b "$JAR" -G \
+  --data-urlencode 'input={"forceRefresh":false}' \
+  "$BASE/api/trpc/cloudAgentNext.listGitHubRepositories") || fail repo-readback transport
+case $CODE in 2*) ;; *) fail repo-readback "$CODE" "$(cut -c1-300 "$REPOS")" ;; esac
+REPO_COUNT="$(node -e '
+const response = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const data = response.result?.data?.json ?? response.result?.data;
+if (!data?.integrationInstalled || !Array.isArray(data.repositories)) process.exit(0);
+process.stdout.write(String(data.repositories.length));
+' < "$REPOS")"
+[ "${REPO_COUNT:-0}" -gt 0 ] \
+  || fail repo-readback "$CODE" "the cloud-agent repository list is empty; that reader picks one of the account's github rows without ordering, so remove any other row"
 
 echo "github-installation: installation $INSTALLATION_ID ($ACCOUNT_LOGIN) added for $EMAIL, $REPO_COUNT repositories"
 echo "github-installation: relaunch the app now so the repository query refetches"

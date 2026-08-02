@@ -84,7 +84,7 @@ release_port() { [ -z "${STUB_PORT:-}" ] || rmdir "$PORT_CLAIMS/$STUB_PORT" 2>/d
 remove_env_line() {
   # Remove only the line this script added (tagged with the marker).
   [ -f "$ENV_LOCAL" ] || return 0
-  grep -v "$MARKER" "$ENV_LOCAL" > "$ENV_LOCAL.tmp.$$" || true
+  grep -v "$MARKER" "$ENV_LOCAL" > "$ENV_LOCAL.tmp.$$" || [ $? -eq 1 ]
   mv "$ENV_LOCAL.tmp.$$" "$ENV_LOCAL"
 }
 

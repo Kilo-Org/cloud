@@ -23,7 +23,7 @@ This directory is the mobile E2E harness. The scripts do the mechanics; this run
 - Never create proxies, redirects, tunnels, NAT rules, or listeners to repair stale client or bundler state. Never map port 8081 to a worktree Metro port. Port 23750 is the one repo-owned exception (shared Docker proxy); never kill a `socat` owned by another worktree.
 - If an unexpected listener exists, report its PID, parent, command, and port. Stop it only when you can prove you created it.
 - Never commit E2E fixtures. Generate per-run data in a temporary directory and delete it before you finish. The committed harness code in this directory is not a fixture.
-- Big outputs kill sessions. Bound every command that can print a lot — pipe it through `tail -c 2000`, or write it to a file and grep the file. This applies to Appium runs, hierarchy dumps, `--json` diagnostics, and service logs.
+- Big outputs kill sessions. Bound every command that can print a lot. For log-like output (Appium runs, service logs), pipe through `tail -c 2000` or write to a file and grep the file. For JSON output, never `tail` it — that leaves an unparseable fragment; select the fields you need instead: `pnpm -s dev:status --json | jq -r '.services[] | "\(.name) \(.status)"'`.
 - Appium output is large. Keep success output out of context; on failure show a bounded tail:
 
 ```bash
@@ -87,7 +87,11 @@ pnpm dev:mobile:simulator release-all            # at cleanup; powers off what i
 
 # Android emulator (bundle owner)
 
-Do not conclude Android is unavailable from `command -v adb`; the wrappers resolve the SDK themselves. Run `pnpm dev:mobile:android doctor` first; it prints resolved paths and AVDs. Never add `--json` to it: that prints the whole environment, including PATH, and an output that large can kill your session outright.
+Do not conclude Android is unavailable from `command -v adb`; the wrappers resolve the SDK themselves. Check the SDK and AVDs first, bounded — `doctor` takes no flags and always dumps the whole environment as JSON, PATH included, which can kill your session outright:
+
+```bash
+pnpm -s dev:mobile:android doctor | jq -r '.sdkRoot, .avds[]'
+```
 
 ```bash
 EMULATOR=$(pnpm -s dev:mobile:android emulator-start <avd-name> --wait)

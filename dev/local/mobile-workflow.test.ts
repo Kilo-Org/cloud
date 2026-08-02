@@ -343,5 +343,8 @@ test('stop_server only signals a process matching both the Appium binary and rec
   // SIGKILL is inside the same guarded block — never reached without
   // binary+port match.
   const sigkillIdx = fn.indexOf('kill -9 "$PID"', conditionIdx);
-  assert.ok(sigkillIdx > conditionIdx && sigkillIdx < fn.lastIndexOf('fi'), 'SIGKILL must be inside the ownership guard');
+  assert.ok(
+    sigkillIdx > conditionIdx && sigkillIdx < fn.lastIndexOf('fi'),
+    'SIGKILL must be inside the ownership guard'
+  );
 });

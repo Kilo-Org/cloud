@@ -552,17 +552,28 @@ test('start-loop APPIUM_CLEANUP_OWNED=1 stop_server is unguarded so port-bump co
   );
 });
 
-test('stop_server foreign listener returns 0 (clears state, records conflict) while survived SIGKILL returns 1 (keeps state)', () => {
+test('stop_server foreign listener returns 0 (clears state, records conflict with both PIDs) while survived SIGKILL returns 1 (keeps state)', () => {
   const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
   const start = script.indexOf('stop_server()');
   const end = script.indexOf('\n}\n\ncmd=', start);
   const fn = script.slice(start, end) + '\n}';
 
+  // Anchor to the unique "has a foreign listener" message instead of the first
+  // nested else — the function has multiple else blocks.
+  const foreignMarkerIdx = fn.indexOf('has a foreign listener');
+  assert.ok(foreignMarkerIdx >= 0, 'foreign listener message must exist');
+  const elseIdx = fn.lastIndexOf('else\n', foreignMarkerIdx);
+  assert.ok(elseIdx >= 0, 'else must precede the foreign listener message');
+  const foreignBlock = fn.slice(elseIdx + 5, fn.indexOf('return 0', elseIdx));
+
   // Foreign listener (SHOULD_KILL=0): conflict recorded, state cleared, return 0.
-  const foreignBlock = fn.slice(fn.indexOf('else\n') + 5, fn.indexOf('return 0'));
   assert.match(foreignBlock, /foreign listener/);
   assert.match(foreignBlock, /server\.conflicts/);
   assert.match(foreignBlock, /rm -f.*appium\.pid.*server\.port/);
+
+  // Conflict record must include both the foreign listener PID and the
+  // abandoned recorded PID.
+  assert.match(foreignBlock, /\$LISTENER.*\$STOP_PORT.*recorded=\$PID/);
 
   // Survived SIGKILL (inside SHOULD_KILL=1): state preserved, return 1.
   const survivedBlock = fn.slice(fn.indexOf('survived SIGKILL'));
@@ -610,7 +621,7 @@ test('conflict file is appended to, never overwritten, and survives ensure_serve
   );
 });
 
-test('adoption probe foreign listener records conflict before clearing state', () => {
+test('adoption probe foreign listener records both foreign and recorded PIDs before clearing state', () => {
   const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
   const ensureStart = script.indexOf('ensure_server()');
   const ensureEnd = script.indexOf('\n}\n\nstop_server', ensureStart);
@@ -629,6 +640,10 @@ test('adoption probe foreign listener records conflict before clearing state', (
     conflictIdx < rmIdx,
     'conflict recording must come before rm -f so the stale handle is preserved in the conflict file'
   );
+
+  // Conflict record must include both the foreign listener PID and the
+  // abandoned recorded PID.
+  assert.match(foreignBlock, /\$LISTENER.*\$APPIUM_PORT.*recorded=\$RECORDED_PID/);
 });
 
 test('server stop reports conflict file after stop_server', () => {
@@ -639,7 +654,7 @@ test('server stop reports conflict file after stop_server', () => {
   // server stop calls stop_server, then checks for conflicts.
   assert.match(stopHandler, /stop_server/);
   assert.match(stopHandler, /server\.conflicts/);
-  assert.match(stopHandler, /cat.*server\.conflicts/);
+  assert.match(stopHandler, /tail -n 20.*server\.conflicts/);
   assert.match(stopHandler, /foreign-listener conflicts/);
 });
 

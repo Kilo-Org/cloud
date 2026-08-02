@@ -46,6 +46,13 @@ function isSyntheticGithubUserId(githubUserId: string): boolean {
   return /^[89]\d{12}$/.test(githubUserId);
 }
 
+// A copy stops working when git-token-service opens its 5-minute refresh
+// buffer, not at the access token's expiry — the refresh fails and revokes
+// the copy. Every lifetime the tool promises or reports uses this.
+function usableUntilMs(accessTokenExpiresAt: string): number {
+  return new Date(accessTokenExpiresAt).getTime() - 5 * 60 * 1000;
+}
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:github-integration-copy ${usage}`);
   console.log('');
@@ -321,6 +328,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       );
       continue;
     }
+    // The SQL margin was measured before these probes, which can take a
+    // while: re-assert the promised 30 usable minutes against the clock now.
+    if (usableUntilMs(row.access_token_expires_at) - Date.now() < 30 * 60 * 1000) {
+      console.log(`  skipping donor ${row.github_login}: less than 30 usable minutes left`);
+      continue;
+    }
     accessToken = candidateToken;
     source = row;
     break;
@@ -402,14 +415,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       }
     });
 
-  // Usable until the service's refresh buffer opens, not until expiry.
-  const usableUntil = new Date(
-    new Date(source.access_token_expires_at).getTime() - 5 * 60 * 1000
-  ).toISOString();
   return {
     targetEmail: toEmail,
     donorLogin: source.github_login,
-    usableUntil,
+    usableUntil: new Date(usableUntilMs(source.access_token_expires_at)).toISOString(),
     afterThat: 'the copy is revoked — run this command again',
   };
 }

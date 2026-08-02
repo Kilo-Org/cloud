@@ -25,23 +25,19 @@ module.exports = async function openApp(ctx) {
   await h.launchApp(BUNDLE_ID);
 
   // Cold launch and bundling are slow; wait for any known state before
-  // settling. Both platforms get a long budget under parallel-workflow host
-  // load; the wait returns as soon as a state renders, so healthy runs never
-  // pay it. The wait runs in short slices with an ANR check between them —
-  // an ANR dialog over a blank splash would otherwise sit unanswered for the
-  // whole budget before the first check.
-  const launchBudget = ctx.platform === 'android' ? 420000 : 120000;
-  const slice = 30000;
-  const deadline = Date.now() + launchBudget;
-  for (;;) {
+  // settling. Android under load gets the long budget; it returns as soon as
+  // a state renders, so healthy runs never pay it.
+  const launchTimeout = ctx.platform === 'android' ? 420000 : 30000;
+  for (let anr = 0; ; anr++) {
     try {
-      await h.waitVisible(S.ANY_STATE, {
-        timeout: Math.min(slice, Math.max(deadline - Date.now(), 1)),
-      });
+      await h.waitVisible(S.ANY_STATE, { timeout: launchTimeout });
       break;
     } catch (err) {
-      if (Date.now() >= deadline) throw err;
-      if (await ctx.h.visible(ANR_DIALOG)) await h.tapOn('Wait');
+      if (anr < 3 && (await ctx.h.visible(ANR_DIALOG))) {
+        await h.tapOn('Wait');
+        continue;
+      }
+      throw err;
     }
   }
   await when(ctx, ANR_DIALOG, () => h.tapOn('Wait'));

@@ -5,7 +5,7 @@
 # Usage:
 #   e2e/logout.sh <device-udid>
 #
-# See e2e/AGENTS.md ("Sign in and out").
+# See e2e/AGENTS.md ("Sign In and Out").
 set -euo pipefail
 
 DEVICE="${1:?usage: logout.sh <device-udid>}"

@@ -44,7 +44,9 @@ Cloud agents need a real GitHub App installation on the account: the installatio
 apps/mobile/e2e/github-installation.sh <email>
 ```
 
-The script signs in as the account through fake-login and calls the dev-only `githubApps.devAddInstallation` mutation, which writes the integration and its repository list. It defaults to the shared dev installation `144771093` (account `iscekic`); pass another as `github-installation.sh <email> <installation-id> <account-login>`. Relaunch the app afterwards so the repository query refetches.
+The script signs in as the account through fake-login and calls the dev-only `githubApps.devAddInstallation` mutation, which writes the integration and its repository list. It defaults to the shared dev installation `144771093` (account `iscekic`); pass another as `github-installation.sh <email> <installation-id> <account-login>`. It then reads the integration back and reports the repository count. Relaunch the app afterwards so the repository query refetches.
+
+Keep one installation per account. A second installation id adds a second row, and every reader takes one row without ordering, so the app can resolve either. The readback fails when the account does not resolve the installation the script just wrote.
 
 Re-running is safe: the mutation upserts the same rows. Pass the exact sign-in email, because fake-login creates a missing account, so a typo adds a junk account instead of failing. The installation never expires and it always reads real `api.github.com`, even while the stub runs: `GITHUB_API_BASE_URL` changes only the PR-review client.
 

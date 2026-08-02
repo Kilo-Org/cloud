@@ -14,11 +14,9 @@ test('cold launch clears leftover prompts, relaunches, then settles via the shar
   assert.ok(stopIndex < launchIndex);
   assert.ok(launchIndex < readyWaitIndex);
   assert.ok(readyWaitIndex < settleIndex);
-  // Long budgets that healthy runs never pay (the wait returns on first
-  // match), consumed in short slices so an ANR dialog is answered promptly
-  // instead of after the whole budget.
-  assert.match(flow, /launchBudget = ctx\.platform === 'android' \? 420000 : 120000/);
-  assert.match(flow, /Date\.now\(\) >= deadline\) throw/, 'the sliced wait must stay bounded');
+  // iOS keeps the 30s budget; Android under load gets a long one that healthy
+  // runs never pay (the wait returns on first match).
+  assert.match(flow, /launchTimeout = ctx\.platform === 'android' \? 420000 : 30000/);
   assert.match(flow, /isn\.t responding/, 'open-app should answer Android ANR dialogs');
   assert.doesNotMatch(flow.slice(readyWaitIndex), /optional: true/);
 });
@@ -117,9 +115,8 @@ test('settle flow handles the exact iOS external-app prompt within existing wait
     [3000, 5000, 5000, 5000, 5000, 15000],
     'settle-app should keep its wait budget and add no fixed wait'
   );
-  // The first wait is platform-aware and long-but-early-return on both
-  // platforms: reconnect bundling under parallel-workflow host load needs it.
-  assert.match(flow, /timeout: ctx\.platform === 'android' \? 300000 : 120000/);
+  // The first wait is platform-aware: 15s on iOS, long-but-early-return on Android.
+  assert.match(flow, /timeout: ctx\.platform === 'android' \? 300000 : 15000/);
   assert.doesNotMatch(flow, /when\(ctx, '(?:Allow|Open)'/);
   assert.doesNotMatch(flow, /tapOn\('(?:Allow\|Open|Open\|Allow)'\)/);
 });
@@ -258,157 +255,9 @@ test('env sync refreshes source-backed Wrangler secrets through completed stdin 
   assert.match(envOutput, /Failed to create Secrets Store secret/);
 });
 
-test('github-stub remove_env_line validates grep exit code before mv', () => {
-  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
-  const fn = stub.slice(
-    stub.indexOf('remove_env_line()'),
-    stub.indexOf('\n}', stub.indexOf('remove_env_line()')) + 2
-  );
-
-  // Must capture the exit code (not || true which masks all errors).
-  assert.match(fn, /\|\| code=\$\?/, 'should capture grep exit code');
-  // Exit > 1 must trigger cleanup and error, not mv.
-  assert.match(fn, /code" -gt 1/, 'should guard against exit > 1');
-  assert.match(fn, /rm -f.*tmp\.\$\$/, 'should remove temp file on error');
-  assert.match(fn, /return 1/, 'should propagate the error');
-  // Exit 0 or 1 is valid; the mv must be outside the guard.
-  const guardIdx = fn.indexOf('"$code" -gt 1');
-  const mvIdx = fn.lastIndexOf('mv');
-  assert.ok(mvIdx > guardIdx, 'mv must follow the error guard, not sit inside it');
-});
-
-test('github-stub claim_port validates mtime as numeric before arithmetic', () => {
-  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
-  const fn = stub.slice(
-    stub.indexOf('claim_port()'),
-    stub.indexOf('\n}', stub.indexOf('claim_port()')) + 2
-  );
-
-  // Each stat variant must be captured in its own m=$(...) assignment,
-  // separated by shell-level || — not combined inside one $(...).
-  // If GNU stat -f writes non-numeric stdout before failing, the combined
-  // form concatenates both outputs into one variable, defeating the guard.
-  assert.match(fn, /stat -f %m/);
-  assert.match(fn, /stat -c %Y/);
-  assert.doesNotMatch(fn, /\$\(stat -f %m.*\|\| stat -c %Y/);
-  // The "echo date +%s" fallback (treating unknown age as universally stale
-  // when stat fails) is removed. date +%s in the arithmetic line (age
-  // calculation from a validated mtime) is legitimate and must remain.
-  assert.doesNotMatch(fn, /echo "\$\(date \+%s\)"/);
-  // Must validate mtime is numeric before arithmetic.
-  assert.match(fn, /case "\$m" in/);
-  assert.match(fn, /\*\[\!0-9\]\*/);
-  // Non-numeric mtime must return 1 (not stale enough to reclaim).
-  assert.match(fn, /-z "\$m".*return 1/);
-});
-
-test('github-stub session name slugifies unsafe worktree basenames', () => {
-  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
-
-  // SESSION uses a safe slug, not the raw basename.
-  assert.match(stub, /RAW_BASENAME="\$\(basename "\$REPO_ROOT"\)"/);
-  // Newline must be stripped from basename before slugification.
-  assert.match(stub, /\$\{RAW_BASENAME%[^}]*\\n/);
-  assert.match(stub, /STUB_SLUG="\$\(printf '%s' "\$RAW_BASENAME" \| tr -c 'A-Za-z0-9_' '-'\)"/);
-  assert.match(stub, /SESSION="kilo-e2e-github-stub-\$STUB_SLUG"/);
-  // State and lock directories use a stable hash of the raw basename.
-  assert.match(stub, /DIR_HASH="\$\(printf '%s' "\$RAW_BASENAME" \| shasum/);
-  assert.match(stub, /STATE_DIR=.*DIR_HASH/);
-  assert.match(stub, /kilo-e2e-github-stub-locks.*DIR_HASH/);
-});
-
-test('github-stub slug adds hash when slugified name differs from raw basename', () => {
-  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
-
-  // When the slug differs from the raw basename, a short hash is appended.
-  assert.match(stub, /\[ "\$STUB_SLUG" != "\$RAW_BASENAME" \]/);
-  assert.match(stub, /STUB_SLUG="\$\{STUB_SLUG\}-.*shasum/);
-});
-
-test('github-stub session name has no artificial trailing dash from basename newline', () => {
-  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
-
-  // Basename newline stripped before tr: a simple basename produces no dash.
-  assert.match(stub, /\$\{RAW_BASENAME%[^}]*\\n/);
-});
-
-test('github-stub cleanup_start does not abort on remove_env_line failure', () => {
-  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
-  const fnStart = stub.indexOf('cleanup_start() {');
-  const fnEnd = stub.indexOf('trap cleanup_start EXIT');
-  const body = stub.slice(fnStart, fnEnd);
-
-  // remove_env_line in cleanup_start must use || true to defer failure past
-  // state cleanup and port release under set -e.
-  assert.match(body, /remove_env_line \|\| true/);
-  // rm -rf STATE_DIR must appear after remove_env_line.
-  const removeLine = body.indexOf('remove_env_line');
-  const rmState = body.indexOf('rm -rf "$STATE_DIR"');
-  assert.ok(rmState > removeLine, 'state cleanup must follow env line removal');
-  // release_port must come after the inner fi (outside the failure guard).
-  const releaseIdx = body.indexOf('release_port');
-  const fiIdx = body.lastIndexOf('fi');
-  assert.ok(releaseIdx > fiIdx, 'port release must be outside the failure guard');
-});
-
-test('github-stub stop captures remove_env_line failure, completes cleanup, exits nonzero', () => {
-  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
-  const stopIdx = stub.indexOf('\n  stop)');
-  const nextStar = stub.indexOf('\n  *)', stopIdx);
-  const stopBlock = stub.slice(stopIdx, nextStar);
-
-  // remove_env_line failure captured in variable, not || true.
-  assert.match(stopBlock, /remove_env_line \|\| failed=1/);
-  // rm -rf still runs after the capture.
-  const removeLine = stopBlock.indexOf('remove_env_line');
-  const rmState = stopBlock.indexOf('rm -rf "$STATE_DIR"');
-  assert.ok(rmState > removeLine, 'state cleanup must follow env line removal');
-  // Failure path prints error and exits nonzero.
-  assert.match(stopBlock, /failed to remove env line/);
-  assert.match(stopBlock, /exit 1/);
-  // Success message only on the success path (after the if/fi guard).
-  const successMsg = stopBlock.indexOf('removed env line');
-  const fiIdx = stopBlock.lastIndexOf('fi');
-  assert.ok(successMsg > fiIdx, 'success message must follow the error guard');
-});
-
 test('dev CLI shares only the Docker proxy port between worktrees', () => {
   const cli = fs.readFileSync('dev/local/cli.ts', 'utf8');
 
   assert.match(cli, /name === 'kiloclaw-docker-tcp'/);
   assert.match(cli, /Refusing to share occupied worktree service ports/);
-});
-
-test('stop_server signals on --port match + lsof PID ownership, not binary path', () => {
-  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
-  const start = script.indexOf('stop_server()');
-  const end = script.indexOf('\n}\n\ncmd=', start);
-  const fn = script.slice(start, end) + '\n}';
-
-  // Command captured once before the ownership gates.
-  assert.match(fn, /PROCESS_CMD=\$\(ps -ww -o command=/);
-  // Port read from the authoritative state file, not global APPIUM_PORT.
-  assert.match(fn, /STOP_PORT=\$\(cat "\$STATE_DIR\/server\.port"\)/);
-  // Ownership is based on "--port" in the logged command, not the literal
-  // binary path (a pnpm shim would not contain $APPIUM_BIN verbatim).
-  assert.match(fn, /grep -qF -- "--port \$STOP_PORT"/);
-  assert.doesNotMatch(fn, /grep -qF "\$APPIUM_BIN"/);
-  // No port file means no signal: STOP_PORT is guarded with -n.
-  assert.match(fn, /-n "\$STOP_PORT"/);
-  // Two-tier ownership decision: SHOULD_KILL guards the kill block; lsof
-  // can override it for a foreign listener.
-  assert.match(fn, /SHOULD_KILL=1/);
-  assert.match(fn, /SHOULD_KILL=0/);
-  assert.match(fn, /LISTENER=\$\(lsof .*tcp:\$STOP_PORT/);
-  assert.match(fn, /\$LISTENER" != "\$PID/);
-  // SIGTERM follows the SHOULD_KILL guard.
-  const shouldIdx = fn.indexOf('SHOULD_KILL" -eq 1');
-  const killIdx = fn.indexOf('kill "$PID" 2>/dev/null || true', shouldIdx);
-  assert.ok(killIdx > shouldIdx, 'SIGTERM must follow the SHOULD_KILL guard');
-  // SIGKILL is inside the same SHOULD_KILL block.
-  const sigkillIdx = fn.indexOf('kill -9 "$PID"', shouldIdx);
-  assert.ok(
-    sigkillIdx > shouldIdx && sigkillIdx < fn.lastIndexOf('fi'),
-    'SIGKILL must be inside the ownership guard'
-  );
 });

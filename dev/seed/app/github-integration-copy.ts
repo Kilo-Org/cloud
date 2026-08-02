@@ -349,7 +349,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // digits cannot collide with a real GitHub id or with a stub seed (which
   // uses a 9 prefix); deterministic per target so re-copies update in place.
   const syntheticGithubUserId = `8${createHash('sha256')
-    .update(normalizedEmail)
+    .update(target.id)
     .digest('hex')
     .replace(/[a-f]/g, '')
     .slice(0, 12)}`;

@@ -114,9 +114,17 @@ ensure_server() {
         else
           # Died or stopped answering mid-probe: clean up our own remains.
           stop_server || true
+          if [ -f "$STATE_DIR/appium.pid" ]; then
+            echo "appium.sh: cannot reap pid $(cat "$STATE_DIR/appium.pid") — conflict state preserved; refusing to overwrite. Manage it manually or wait for it to exit, then remove $(printf '%q\n' "$STATE_DIR")/appium.pid." >&2
+            return 1
+          fi
         fi
       else
         stop_server || true
+        if [ -f "$STATE_DIR/appium.pid" ]; then
+          echo "appium.sh: cannot reap pid $(cat "$STATE_DIR/appium.pid") — conflict state preserved; refusing to overwrite. Manage it manually or wait for it to exit, then remove $(printf '%q\n' "$STATE_DIR")/appium.pid." >&2
+          return 1
+        fi
       fi
     fi
   fi

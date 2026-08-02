@@ -506,3 +506,65 @@ test('start-loop stop_server call sets APPIUM_CLEANUP_OWNED so foreign-listener 
     'start-loop stop_server call must set APPIUM_CLEANUP_OWNED=1 and must NOT use || true'
   );
 });
+
+test('adoption-block stop_server || true calls are followed by conflict-state guards', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const ensureStart = script.indexOf('ensure_server()');
+  const ensureEnd = script.indexOf('\n}\n\nstop_server', ensureStart);
+  const ensureFn = script.slice(ensureStart, ensureEnd);
+
+  // After each adoption-block stop_server || true there must be a guard that
+  // checks for preserved state files and returns 1, preventing the start loop
+  // from overwriting a conflict record.
+  const guardPattern = /stop_server \|\| true\n\s*if \[ -f "\$STATE_DIR\/appium\.pid" \]; then/;
+  const guards = [...ensureFn.matchAll(new RegExp(guardPattern.source, 'g'))];
+  assert.equal(
+    guards.length,
+    2,
+    'both adoption-block stop_server || true calls must be followed by conflict-state guards'
+  );
+
+  // Each guard must return 1 (not fall through to start loop).
+  const guardReturns = [...ensureFn.matchAll(/refusing to overwrite[^\n]*\n\s*return 1/g)];
+  assert.equal(guardReturns.length, 2, 'each guard must return 1');
+});
+
+test('start-loop APPIUM_CLEANUP_OWNED=1 stop_server is unguarded so port-bump continues', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const ensureStart = script.indexOf('ensure_server()');
+  const ensureEnd = script.indexOf('\n}\n\nstop_server', ensureStart);
+  const ensureFn = script.slice(ensureStart, ensureEnd);
+
+  // Find the APPIUM_CLEANUP_OWNED=1 stop_server call position.
+  const ownedCallIdx = ensureFn.indexOf('APPIUM_CLEANUP_OWNED=1 stop_server');
+  assert.ok(ownedCallIdx >= 0, 'APPIUM_CLEANUP_OWNED=1 stop_server must exist');
+
+  // The text after that call (up to 2 lines) must NOT contain a conflict guard.
+  const afterOwned = ensureFn.slice(ownedCallIdx, ownedCallIdx + 200);
+  assert.doesNotMatch(
+    afterOwned,
+    /refusing to overwrite/,
+    'start-loop stop_server must NOT have a conflict guard — port-bump recovery must proceed'
+  );
+});
+
+test('conflict-state guards appear before ensure_drivers so start loop is unreachable from a conflict', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const ensureStart = script.indexOf('ensure_server()');
+  const ensureEnd = script.indexOf('\n}\n\nstop_server', ensureStart);
+  const ensureFn = script.slice(ensureStart, ensureEnd);
+
+  // Both guards must come before ensure_drivers (the first start-loop step).
+  const driversIdx = ensureFn.indexOf('ensure_drivers');
+  assert.ok(driversIdx >= 0, 'ensure_drivers must exist');
+
+  const guardIdxs = [...ensureFn.matchAll(/refusing to overwrite/g)];
+  assert.equal(guardIdxs.length, 2, 'both guards must exist');
+
+  for (const m of guardIdxs) {
+    assert.ok(
+      typeof m.index === 'number' && m.index < driversIdx,
+      'conflict guard must appear before ensure_drivers so state is not overwritten'
+    );
+  }
+});

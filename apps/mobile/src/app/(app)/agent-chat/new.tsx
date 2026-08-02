@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
 
-import { NewSessionFlowBody } from '@/components/agents/new-session-flow-body';
+import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
 import {
   NewSessionModelProvider,
@@ -24,7 +24,6 @@ import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
-import { type NewSessionFlowMode, resolveNewSessionFlowMode } from '@/lib/new-session-flow-state';
 
 export default function NewSessionScreen() {
   const { organizationId } = useLocalSearchParams<{
@@ -53,9 +52,6 @@ function NewSessionScreenBody() {
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
 
-  const [step, setStep] = useState<1 | 2>(1);
-  const flowModeLatchedRef = useRef(false);
-  const [flowMode, setFlowMode] = useState<NewSessionFlowMode>('pending');
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
   const {
@@ -80,15 +76,12 @@ function NewSessionScreenBody() {
   // Keep the inline selector and picker list in sync.
   const {
     data: instancesData,
-    isFetched: isInstancesFetched,
-    isError: isInstancesError,
-    isPaused: isInstancesPaused,
+    isLoading: isLoadingInstances,
     refetch: refetchInstances,
   } = useQuery({
     ...trpc.activeSessions.listInstances.queryOptions(undefined, {
       refetchOnWindowFocus: true,
       staleTime: 5000,
-      refetchInterval: flowMode === 'steps' && step === 1 ? 10_000 : false,
     }),
     enabled: showRunOnSelector,
   });
@@ -107,11 +100,7 @@ function NewSessionScreenBody() {
     variant,
   });
 
-  const {
-    remoteSpawn,
-    handleRunOnInstanceChange,
-    isShareStaged: isShareStagedFn,
-  } = useNewSessionShareRemote({
+  const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
     shareId,
     organizationId,
     runOnInstance,
@@ -178,100 +167,47 @@ function NewSessionScreenBody() {
     }
     void submitCreate();
   }, [remoteSpawn, runOnInstance, submitCreate]);
-  const instancesSettled =
-    !showRunOnSelector || isInstancesFetched || isInstancesError || isInstancesPaused;
-  if (!flowModeLatchedRef.current && instancesSettled) {
-    flowModeLatchedRef.current = true;
-    const resolved = resolveNewSessionFlowMode({
-      instancesSettled,
-      instanceCount: instanceList.length,
-      isShareStaged: isShareStagedFn(),
-    });
-    if (resolved !== 'pending') {
-      setFlowMode(resolved);
-    }
-  }
-
-  const handleSelectTarget = useCallback(
-    (instance: InstancePickerInstance | null) => {
-      handleRunOnInstanceChange(instance);
-      setStep(2);
-    },
-    [handleRunOnInstanceChange]
-  );
-
-  useEffect(() => {
-    if (flowMode !== 'steps' || step !== 2) {
-      return undefined;
-    }
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      setStep(1);
-      return true;
-    });
-    return () => {
-      sub.remove();
-    };
-  }, [flowMode, step]);
-
-  const instancesLoading = showRunOnSelector && !isInstancesFetched && !isInstancesError;
-  const eyebrow = flowMode === 'steps' ? `Step ${step} of 2` : undefined;
-  const handleStepBack = () => {
-    setStep(1);
-  };
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title="New session"
-        eyebrow={eyebrow}
-        showBackButton={flowMode === 'steps' && step === 2 ? true : undefined}
-        onBack={flowMode === 'steps' && step === 2 ? handleStepBack : undefined}
-      />
-      <NewSessionFlowBody
-        flowMode={flowMode}
-        step={step}
+      <ScreenHeader title="New session" />
+      <NewSessionConfigureForm
+        attachments={attachments.attachments}
+        attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
+        isCreating={isCreating}
+        isModelsError={isModelsError}
+        isLoadingModels={isLoadingModels}
+        mode={mode}
+        model={model}
+        variant={variant}
+        modelOptions={models}
+        initialPrompt={promptRef.current}
+        onChangeText={handlePromptChange}
+        onModeChange={setMode}
+        onModelSelect={handleModelSelect}
+        onAddAttachment={() => void handleAddAttachment()}
+        onRemoveAttachment={attachments.removeAttachment}
+        onRetryAttachment={attachments.retryAttachment}
+        onRefetchModels={() => void refetchModels()}
+        onPrefillAttachments={addCandidates}
+        shareId={shareId}
+        voiceInputSettlerRef={voiceInputSettlerRef}
+        showRunOnSelector={showRunOnSelector}
         runOnInstance={runOnInstance}
         instanceList={instanceList}
-        initialPrompt={promptRef.current}
-        onSelectTarget={handleSelectTarget}
-        configureProps={{
-          attachments: attachments.attachments,
-          attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
-          isCreating,
-          isModelsError,
-          isLoadingModels,
-          mode,
-          model,
-          variant,
-          modelOptions: models,
-          initialPrompt: promptRef.current,
-          onChangeText: handlePromptChange,
-          onModeChange: setMode,
-          onModelSelect: handleModelSelect,
-          onAddAttachment: () => void handleAddAttachment(),
-          onRemoveAttachment: attachments.removeAttachment,
-          onRetryAttachment: attachments.retryAttachment,
-          onRefetchModels: () => void refetchModels(),
-          onPrefillAttachments: addCandidates,
-          shareId,
-          voiceInputSettlerRef,
-          showRunOnSelector,
-          runOnInstance,
-          instanceList,
-          isLoadingInstances: instancesLoading,
-          onChangeRunOnInstance: handleRunOnInstanceChange,
-          showInstanceDisconnectedNote: remoteSpawn.showInstanceDisconnectedNote,
-          view,
-          isRetrying,
-          onChangeRepo: setSelectedRepo,
-          onOpenGitHubIntegration: openGitHub,
-          onRefreshRepos: () => void refreshReposForceFresh(),
-          repositories,
-          selectedRepo,
-          isStartDisabled,
-          isSpawningRemote: remoteSpawn.isSpawningRemote,
-          onStartSession: handleStartSession,
-        }}
+        isLoadingInstances={isLoadingInstances}
+        onChangeRunOnInstance={handleRunOnInstanceChange}
+        showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
+        view={view}
+        isRetrying={isRetrying}
+        onChangeRepo={setSelectedRepo}
+        onOpenGitHubIntegration={openGitHub}
+        onRefreshRepos={() => void refreshReposForceFresh()}
+        repositories={repositories}
+        selectedRepo={selectedRepo}
+        isStartDisabled={isStartDisabled}
+        isSpawningRemote={remoteSpawn.isSpawningRemote}
+        onStartSession={handleStartSession}
       />
     </View>
   );

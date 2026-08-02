@@ -306,4 +306,44 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'ActivityIndicator')).toBeNull();
   });
+
+  // ── Case 7: remote target keeps its context in the selector value ──
+  it('passes the remote target and loading flag to the selector', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      isLoadingInstances: true,
+    }) as Node;
+
+    const selector = findElementByType(element, 'InstanceSelector');
+    expect(selector).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(selector!.value).toBe(INSTANCE);
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion
+    expect(selector!.isLoading).toBe(true);
+    expect(findElementByType(element, 'NewSessionPrompt')).toBeNull();
+    expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
+  });
+
+  // ── Case 8: prompt carry-over survives a target switch back to cloud ──
+  it('seeds the prompt with initialPrompt when the cloud target renders', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      initialPrompt: 'carried across the switch',
+    }) as Node;
+
+    const prompt = findElementByType(element, 'NewSessionPrompt');
+    expect(prompt).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(prompt!.initialPrompt).toBe('carried across the switch');
+  });
 });

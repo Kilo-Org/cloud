@@ -61,11 +61,10 @@ type NewSessionConfigureFormProps = {
 };
 
 /**
- * THE configure step of the new-session flow — one implementation for
- * step 2 (cloud or remote), single-screen (no instances / error /
- * share-staged). Sections condition on the selected target; remote has no
- * prompt/repo because a spawned CLI session inherits model+repo. Back to
- * step 1 is the switch-target path in steps mode.
+ * THE new-session screen body — one screen for every entry point (cloud,
+ * remote CLI, share-staged). Sections condition on the selected target;
+ * remote has no prompt/repo because a spawned CLI session inherits
+ * model+repo. Switching the target switches the sections in place.
  */
 export function NewSessionConfigureForm({
   attachments,

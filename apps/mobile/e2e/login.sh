@@ -43,7 +43,7 @@ latest_email() {
   local f newest=""
   shopt -s nullglob
   for f in "$OUTBOX"/*.html; do
-    if grep -q "Intended recipient: $EMAIL" "$f" 2>/dev/null &&
+    if grep -qF "Intended recipient: $EMAIL" "$f" 2>/dev/null &&
       { [ -z "$newest" ] || [ "$f" -nt "$newest" ]; }; then
       newest="$f"
     fi

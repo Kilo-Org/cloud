@@ -187,7 +187,7 @@ stop_server() {
     # may not contain $APPIUM_BIN verbatim. When lsof can attribute the
     # listener, the listener PID must also match our recorded PID.
     if kill -0 "$PID" 2>/dev/null; then
-      PROCESS_CMD=$(ps -o command= -p "$PID" 2>/dev/null || true)
+      PROCESS_CMD=$(ps -ww -o command= -p "$PID" 2>/dev/null || true)
       if [ -n "$STOP_PORT" ] && echo "$PROCESS_CMD" | grep -qF -- "--port $STOP_PORT"; then
         SHOULD_KILL=1
         if [ "$LSOF_OK" -eq 1 ]; then
@@ -215,6 +215,9 @@ stop_server() {
             echo "appium.sh: pid $PID survived SIGKILL; keeping server state" >&2
             return 1
           fi
+        else
+          echo "appium.sh: port $STOP_PORT has a foreign listener; keeping server state" >&2
+          return 1
         fi
       fi
     fi

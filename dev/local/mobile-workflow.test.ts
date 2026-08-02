@@ -351,18 +351,25 @@ test('github-stub cleanup_start does not abort on remove_env_line failure', () =
   assert.ok(releaseIdx > fiIdx, 'port release must be outside the failure guard');
 });
 
-test('github-stub stop does not abort on remove_env_line failure', () => {
+test('github-stub stop captures remove_env_line failure, completes cleanup, exits nonzero', () => {
   const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
-
-  // remove_env_line in stop must use || true so rm -rf still executes.
-  assert.match(stub, /remove_env_line \|\| true/);
-  // In the stop block, rm -rf must appear after remove_env_line.
   const stopIdx = stub.indexOf('\n  stop)');
   const nextStar = stub.indexOf('\n  *)', stopIdx);
   const stopBlock = stub.slice(stopIdx, nextStar);
+
+  // remove_env_line failure captured in variable, not || true.
+  assert.match(stopBlock, /remove_env_line \|\| failed=1/);
+  // rm -rf still runs after the capture.
   const removeLine = stopBlock.indexOf('remove_env_line');
   const rmState = stopBlock.indexOf('rm -rf "$STATE_DIR"');
   assert.ok(rmState > removeLine, 'state cleanup must follow env line removal');
+  // Failure path prints error and exits nonzero.
+  assert.match(stopBlock, /failed to remove env line/);
+  assert.match(stopBlock, /exit 1/);
+  // Success message only on the success path (after the if/fi guard).
+  const successMsg = stopBlock.indexOf('removed env line');
+  const fiIdx = stopBlock.lastIndexOf('fi');
+  assert.ok(successMsg > fiIdx, 'success message must follow the error guard');
 });
 
 test('dev CLI shares only the Docker proxy port between worktrees', () => {
@@ -379,7 +386,7 @@ test('stop_server signals on --port match + lsof PID ownership, not binary path'
   const fn = script.slice(start, end) + '\n}';
 
   // Command captured once before the ownership gates.
-  assert.match(fn, /PROCESS_CMD=\$\(ps -o command=/);
+  assert.match(fn, /PROCESS_CMD=\$\(ps -ww -o command=/);
   // Port read from the authoritative state file, not global APPIUM_PORT.
   assert.match(fn, /STOP_PORT=\$\(cat "\$STATE_DIR\/server\.port"\)/);
   // Ownership is based on "--port" in the logged command, not the literal

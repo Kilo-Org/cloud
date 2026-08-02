@@ -296,8 +296,13 @@ case "${1:-}" in
 
   stop)
     tmux kill-session -t "=$SESSION" 2>/dev/null && echo "github-stub: stopped $SESSION" || echo "github-stub: no session to stop"
-    remove_env_line || true
+    failed=0
+    remove_env_line || failed=1
     rm -rf "$STATE_DIR"
+    if [ "$failed" = 1 ]; then
+      echo "github-stub: failed to remove env line; remove the GITHUB_API_BASE_URL line from $ENV_LOCAL manually" >&2
+      exit 1
+    fi
     echo "github-stub: removed env line and state"
     ;;
 

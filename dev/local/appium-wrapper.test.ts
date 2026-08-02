@@ -452,4 +452,12 @@ test('stop_server does not require literal binary path for ownership', () => {
   assert.match(fn, /SHOULD_KILL=1/);
   assert.match(fn, /lsof .*tcp:\$STOP_PORT/);
   assert.match(fn, /\$LISTENER" != "\$PID/);
+
+  // ps must use -ww so macOS does not truncate the --port argument.
+  assert.match(fn, /ps -ww -o command=.*"\$PID"/);
+  // When lsof proves a foreign listener owns the port, keep state and return
+  // nonzero (matching the survived-SIGKILL safety) instead of deleting the
+  // handle and leaving an untracked process.
+  const killBlock = fn.slice(fn.indexOf('if [ "$SHOULD_KILL" -eq 1 ]'));
+  assert.match(killBlock, /else\n[^\n]*foreign listener[^\n]*\n[^\n]*return 1/);
 });

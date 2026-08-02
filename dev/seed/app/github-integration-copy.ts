@@ -124,16 +124,41 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const trimmedEmail = toEmail.trim();
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
   // normalized_email is nullable on older rows; fall back to the sign-in email.
-  const [target] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(
-      or(
-        eq(kilocode_users.normalized_email, normalizedEmail),
-        eq(kilocode_users.google_user_email, trimmedEmail)
+  // A dead database must fail with the fix, not a driver stack trace: agents
+  // running this burn a lot of turns guessing at raw ECONNREFUSED output.
+  let target: { id: string } | undefined;
+  try {
+    [target] = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(
+        or(
+          eq(kilocode_users.normalized_email, normalizedEmail),
+          eq(kilocode_users.google_user_email, trimmedEmail)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
+  } catch (error) {
+    // The driver throws an AggregateError whose per-address causes carry the
+    // code, so check codes and nested errors, not just the top message.
+    const codes: string[] = [];
+    const collect = (value: unknown): void => {
+      if (!(value instanceof Error)) return;
+      codes.push(value.message);
+      const code = (value as Error & { code?: string }).code;
+      if (code) codes.push(code);
+      const nested = (value as AggregateError).errors;
+      if (Array.isArray(nested)) nested.forEach(collect);
+      if (value.cause) collect(value.cause);
+    };
+    collect(error);
+    if (/ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ETIMEDOUT|timeout/i.test(codes.join(' '))) {
+      throw new Error(
+        'Cannot reach the local database — start the stack first (pnpm dev:start), then re-run this command.'
+      );
+    }
+    throw error;
+  }
   if (!target) {
     throw new Error(
       `No user with email ${toEmail} — sign in on the device first, or pnpm dev:seed app:create-user`
@@ -257,13 +282,22 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     }
     // Database metadata cannot prove a token still works: a rotation or a
     // GitHub-side revocation leaves the row looking fresh. Ask GitHub.
-    const probe = await fetch('https://api.github.com/user', {
-      headers: {
-        authorization: `Bearer ${candidateToken}`,
-        'user-agent': 'kilo-dev-seed-integration-copy',
-      },
-      signal: AbortSignal.timeout(15_000),
-    });
+    let probe: Response;
+    try {
+      probe = await fetch('https://api.github.com/user', {
+        headers: {
+          authorization: `Bearer ${candidateToken}`,
+          'user-agent': 'kilo-dev-seed-integration-copy',
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      // No internet is an environment problem, not a dead donor: say so once
+      // instead of walking the whole candidate list and reporting BLOCKED.
+      throw new Error(
+        'Cannot reach api.github.com to validate the donor token — check network access, then re-run this command.'
+      );
+    }
     if (!probe.ok) {
       console.log(
         `  skipping donor ${row.github_login}: GitHub rejected its access token (${probe.status})`

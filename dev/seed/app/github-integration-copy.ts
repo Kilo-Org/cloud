@@ -53,6 +53,14 @@ function usableUntilMs(accessTokenExpiresAt: string): number {
   return new Date(accessTokenExpiresAt).getTime() - 5 * 60 * 1000;
 }
 
+// The documented E2E target pattern is e2e-mobile-<worktree>-<platform>@example.com
+// (apps/mobile/e2e/login.sh). A worktree slug may contain hyphens. Only this
+// precise shape gets a first-time credential copy; an arbitrary @example.com
+// address would silently occupy the one token row and break real OAuth callbacks.
+export function isE2eTargetEmail(email: string): boolean {
+  return /^e2e-mobile-.+-(?:ios|android)@example\.com$/.test(email);
+}
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:github-integration-copy ${usage}`);
   console.log('');
@@ -241,6 +249,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (targetRow && !isSyntheticGithubUserId(targetRow.githubUserId)) {
     throw new Error(
       `${toEmail} already holds a REAL GitHub connection (${targetRow.githubLogin}, id ${targetRow.githubUserId}); a copy would destroy it. Use a different account, or disconnect that connection in the app first.`
+    );
+  }
+
+  // A non-E2E account with no existing token row (non-seeded) must not receive a
+  // copy — a mistyped email would silently occupy the one token row, and a later
+  // real OAuth callback would hit a unique-constraint conflict.
+  if (!targetRow && !isE2eTargetEmail(trimmedEmail)) {
+    throw new Error(
+      `${toEmail} is not an E2E account. Only E2E accounts matching the documented mobile pattern can receive a first-time GitHub integration copy: e2e-mobile-<worktree>-<ios|android>@example.com`
     );
   }
 

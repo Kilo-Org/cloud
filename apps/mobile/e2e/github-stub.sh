@@ -25,7 +25,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
-SESSION="kilo-e2e-github-stub-$(basename "$REPO_ROOT")"
+# Safe slug for tmux session names: escrow-only characters like dots and
+# colons break tmux commands (":" is the command separator). The state and
+# lock directories keep the raw basename so concurrent worktrees with
+# different slugs but the same real name still serialize correctly.
+STUB_SLUG="$(basename "$REPO_ROOT" | tr -c 'A-Za-z0-9_-' '-')"
+SESSION="kilo-e2e-github-stub-$STUB_SLUG"
 STATE_DIR="${TMPDIR:-/tmp}/kilo-e2e-github-stub/$(basename "$REPO_ROOT")"
 ENV_LOCAL="$REPO_ROOT/.env.local"
 MARKER="# kilo-e2e-github-stub"
@@ -74,7 +79,14 @@ claim_port() {
   # Self-heal an orphaned claim (a start killed inside the claim window):
   # old enough that no live start can still own it, and nothing listening.
   local m
-  m=$(stat -f %m "$PORT_CLAIMS/$1" 2>/dev/null || stat -c %Y "$PORT_CLAIMS/$1" 2>/dev/null || echo "$(date +%s)")
+  # Capture each stat variant separately: a failed BSD stat must not
+  # contribute its stdout into the same command substitution as the GNU
+  # fallback. Non-numeric output (e.g. filesystem info from stat -f on
+  # GNU) is rejected by the case guard below.
+  m=$(stat -f %m "$PORT_CLAIMS/$1" 2>/dev/null) || m=$(stat -c %Y "$PORT_CLAIMS/$1" 2>/dev/null) || true
+  # Defend against both stat variants failing: empty or non-numeric output.
+  case "$m" in '' | *[!0-9]* ) m="" ;; esac
+  if [ -z "$m" ]; then return 1; fi  # Cannot determine age; treat as fresh.
   [ $(($(date +%s) - m)) -gt 120 ] && port_free "$1" || return 1
   rmdir "$PORT_CLAIMS/$1" 2>/dev/null || true
   mkdir "$PORT_CLAIMS/$1" 2>/dev/null
@@ -84,7 +96,14 @@ release_port() { [ -z "${STUB_PORT:-}" ] || rmdir "$PORT_CLAIMS/$STUB_PORT" 2>/d
 remove_env_line() {
   # Remove only the line this script added (tagged with the marker).
   [ -f "$ENV_LOCAL" ] || return 0
-  grep -v "$MARKER" "$ENV_LOCAL" > "$ENV_LOCAL.tmp.$$" || true
+  local code=0
+  grep -v "$MARKER" "$ENV_LOCAL" > "$ENV_LOCAL.tmp.$$" || code=$?
+  if [ "$code" -gt 1 ]; then
+    rm -f "$ENV_LOCAL.tmp.$$"
+    echo "github-stub: failed to read $ENV_LOCAL while removing marker line (exit $code)" >&2
+    return 1
+  fi
+  # Exit 0 (lines written) or 1 (no non-marker lines, output empty) — both valid.
   mv "$ENV_LOCAL.tmp.$$" "$ENV_LOCAL"
 }
 

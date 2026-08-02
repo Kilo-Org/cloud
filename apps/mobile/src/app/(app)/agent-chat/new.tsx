@@ -244,6 +244,7 @@ function NewSessionScreenBody() {
           model,
           variant,
           modelOptions: models,
+          initialPrompt: promptRef.current,
           onChangeText: handlePromptChange,
           onModeChange: setMode,
           onModelSelect: handleModelSelect,

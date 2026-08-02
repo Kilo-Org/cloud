@@ -258,9 +258,90 @@ test('env sync refreshes source-backed Wrangler secrets through completed stdin 
   assert.match(envOutput, /Failed to create Secrets Store secret/);
 });
 
+test('github-stub remove_env_line validates grep exit code before mv', () => {
+  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
+  const fn = stub.slice(
+    stub.indexOf('remove_env_line()'),
+    stub.indexOf('\n}', stub.indexOf('remove_env_line()')) + 2
+  );
+
+  // Must capture the exit code (not || true which masks all errors).
+  assert.match(fn, /\|\| code=\$\?/, 'should capture grep exit code');
+  // Exit > 1 must trigger cleanup and error, not mv.
+  assert.match(fn, /code" -gt 1/, 'should guard against exit > 1');
+  assert.match(fn, /rm -f.*tmp\.\$\$/, 'should remove temp file on error');
+  assert.match(fn, /return 1/, 'should propagate the error');
+  // Exit 0 or 1 is valid; the mv must be outside the guard.
+  const guardIdx = fn.indexOf('"$code" -gt 1');
+  const mvIdx = fn.lastIndexOf('mv');
+  assert.ok(mvIdx > guardIdx, 'mv must follow the error guard, not sit inside it');
+});
+
+test('github-stub claim_port validates mtime as numeric before arithmetic', () => {
+  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
+  const fn = stub.slice(
+    stub.indexOf('claim_port()'),
+    stub.indexOf('\n}', stub.indexOf('claim_port()')) + 2
+  );
+
+  // Each stat variant must be captured in its own m=$(...) assignment,
+  // separated by shell-level || — not combined inside one $(...).
+  // If GNU stat -f writes non-numeric stdout before failing, the combined
+  // form concatenates both outputs into one variable, defeating the guard.
+  assert.match(fn, /stat -f %m/);
+  assert.match(fn, /stat -c %Y/);
+  assert.doesNotMatch(fn, /\$\(stat -f %m.*\|\| stat -c %Y/);
+  // The "echo date +%s" fallback (treating unknown age as universally stale
+  // when stat fails) is removed. date +%s in the arithmetic line (age
+  // calculation from a validated mtime) is legitimate and must remain.
+  assert.doesNotMatch(fn, /echo "\$\(date \+%s\)"/);
+  // Must validate mtime is numeric before arithmetic.
+  assert.match(fn, /case "\$m" in/);
+  assert.match(fn, /\*\[\!0-9\]\*/);
+  // Non-numeric mtime must return 1 (not stale enough to reclaim).
+  assert.match(fn, /-z "\$m".*return 1/);
+});
+
+test('github-stub session name slugifies unsafe worktree basenames', () => {
+  const stub = fs.readFileSync('apps/mobile/e2e/github-stub.sh', 'utf8');
+
+  // SESSION uses a safe slug, not the raw basename.
+  assert.match(stub, /STUB_SLUG="\$\(basename "\$REPO_ROOT" \| tr .*A-Za-z0-9_/);
+  assert.match(stub, /SESSION="kilo-e2e-github-stub-\$STUB_SLUG"/);
+  // STATE_DIR and lock paths keep the raw basename — the slug must NOT
+  // replace basename there (a slug collision must not serialize two worktrees
+  // onto one state directory).
+  assert.doesNotMatch(stub, /STATE_DIR=.*STUB_SLUG/);
+  assert.doesNotMatch(stub, /kilo-e2e-github-stub-locks.*STUB_SLUG/);
+});
+
 test('dev CLI shares only the Docker proxy port between worktrees', () => {
   const cli = fs.readFileSync('dev/local/cli.ts', 'utf8');
 
   assert.match(cli, /name === 'kiloclaw-docker-tcp'/);
   assert.match(cli, /Refusing to share occupied worktree service ports/);
+});
+
+test('stop_server only signals a process matching both the Appium binary and recorded port', () => {
+  const script = fs.readFileSync('apps/mobile/e2e/appium.sh', 'utf8');
+  const start = script.indexOf('stop_server()');
+  const end = script.indexOf('\n}\n\ncmd=', start);
+  const fn = script.slice(start, end) + '\n}';
+
+  // Command captured once before the ownership gates.
+  assert.match(fn, /PROCESS_CMD=\$\(ps -o command=/);
+  // Port read from the authoritative state file, not global APPIUM_PORT.
+  assert.match(fn, /STOP_PORT=\$\(cat "\$STATE_DIR\/server\.port"\)/);
+  // Both binary AND --port must match before any signal.
+  const conditionIdx = fn.indexOf('PROCESS_CMD');
+  const killIdx = fn.indexOf('kill "$PID" 2>/dev/null || true', conditionIdx);
+  assert.ok(killIdx > conditionIdx, 'SIGTERM must follow the full ownership condition');
+  assert.match(fn, /grep -qF "\$APPIUM_BIN"/);
+  assert.match(fn, /grep -qF -- "--port \$STOP_PORT"/);
+  // No port file means no signal: STOP_PORT is guarded with -n.
+  assert.match(fn, /-n "\$STOP_PORT"/);
+  // SIGKILL is inside the same guarded block — never reached without
+  // binary+port match.
+  const sigkillIdx = fn.indexOf('kill -9 "$PID"', conditionIdx);
+  assert.ok(sigkillIdx > conditionIdx && sigkillIdx < fn.lastIndexOf('fi'), 'SIGKILL must be inside the ownership guard');
 });

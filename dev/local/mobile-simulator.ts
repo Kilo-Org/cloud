@@ -208,7 +208,10 @@ function execWithOutput(
   args: readonly string[],
   options?: { timeoutMs?: number }
 ): CommandResult {
-  const result = spawnSync(command, args, { encoding: 'utf8', timeout: options?.timeoutMs });
+  const result = spawnSync(command, args, {
+    encoding: 'utf8',
+    timeout: options?.timeoutMs,
+  });
   if (result.error) throw result.error;
   if (result.signal) {
     throw new Error(`${command} ${args.join(' ')} terminated with ${result.signal}`);
@@ -279,7 +282,13 @@ function bootSimulator(
     const wrapped = error instanceof Error ? error : new Error(String(error));
     if (booted) {
       try {
-        exec('xcrun', ['simctl', 'shutdown', device.id], { stdio: 'ignore' });
+        // A wedged CoreSimulator can hang simctl shutdown indefinitely after a
+        // bootstatus timeout, holding the claim forever. 60 s clears even a
+        // heavily-contended host; exceeding it means the device is wedged.
+        exec('xcrun', ['simctl', 'shutdown', device.id], {
+          stdio: 'ignore',
+          timeout: 60_000,
+        });
       } catch {
         // The device may still be running. Flag it so the caller keeps
         // the claim in place and a peer worktree cannot adopt a device
@@ -292,7 +301,10 @@ function bootSimulator(
   return true;
 }
 
-function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwned: boolean } {
+function claimSimulator(args: ClaimArgs): {
+  device: SimulatorDevice;
+  alreadyOwned: boolean;
+} {
   const { devices, lockRoot, worktreeRoot, requestedId } = args;
   fs.mkdirSync(lockRoot, { recursive: true });
   const candidates = requestedId
@@ -362,7 +374,10 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
 
       if (reclaimed) {
         if (device.state === 'Booted') {
-          return { device: { ...device, name: targetLabel }, alreadyOwned: true };
+          return {
+            device: { ...device, name: targetLabel },
+            alreadyOwned: true,
+          };
         }
         // A previous claim died mid-boot: the record exists but the device
         // is down. Boot through the same prepare hook as a fresh claim and
@@ -607,14 +622,23 @@ function listIosDevices(exec: ExecFn = execFileSync): SimulatorDevice[] {
 // non-zero exit so callers can handle failures (e.g., restore the
 // original name on a claim rollback).
 function defaultRename(deviceId: string, name: string): void {
-  execFileSync('xcrun', ['simctl', 'rename', deviceId, name], { stdio: 'ignore' });
+  execFileSync('xcrun', ['simctl', 'rename', deviceId, name], {
+    stdio: 'ignore',
+  });
 }
 
 // Production shutdown: `xcrun simctl shutdown <device>`. A device that is
 // already off exits non-zero with "Unable to shutdown device in current state:
 // Shutdown" — the desired end state, so that one case is not an error.
 function defaultShutdown(deviceId: string): void {
-  const result = spawnSync('xcrun', ['simctl', 'shutdown', deviceId], { encoding: 'utf8' });
+  const result = spawnSync('xcrun', ['simctl', 'shutdown', deviceId], {
+    encoding: 'utf8',
+    // A wedged CoreSimulator can hang simctl shutdown indefinitely, holding
+    // the claim forever after bootstatus timeout or a rename failure. 60 s
+    // clears even a heavily-contended host; exceeding it means the device is
+    // wedged.
+    timeout: 60_000,
+  });
   if (result.error) throw result.error;
   if (result.status === 0) return;
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
@@ -639,7 +663,11 @@ function main(): void {
       shutdown: defaultShutdown,
     });
     console.log(
-      JSON.stringify({ ...claim, worktreeRoot, label: buildSimulatorLabel(worktreeRoot) })
+      JSON.stringify({
+        ...claim,
+        worktreeRoot,
+        label: buildSimulatorLabel(worktreeRoot),
+      })
     );
     return;
   }

@@ -127,7 +127,7 @@ function configureProps() {
     isSpawningRemote: false,
     isStartDisabled: false,
     onStartSession: vi.fn(),
-    initialPrompt: 'seed prompt',
+    initialPrompt: 'configure-default',
   };
 }
 
@@ -173,7 +173,7 @@ describe('NewSessionFlowBody', () => {
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(form!.showRunOnSelector).toBe(true);
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion
-    expect(form!.initialPrompt).toBe('seed prompt');
+    expect(form!.initialPrompt).toBe('configure-default');
   });
 
   // ── Case 3: single, remote ──
@@ -227,7 +227,7 @@ describe('NewSessionFlowBody', () => {
       step: 2,
       runOnInstance: null,
       instanceList: [],
-      initialPrompt: 'seed prompt',
+      initialPrompt: 'route-override',
       onSelectTarget: vi.fn<(instance: InstancePickerInstance | null) => void>(),
       configureProps: configureProps(),
     }) as Node;
@@ -238,7 +238,7 @@ describe('NewSessionFlowBody', () => {
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion
     expect(form!.showRunOnSelector).toBe(false);
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion
-    expect(form!.initialPrompt).toBe('seed prompt');
+    expect(form!.initialPrompt).toBe('route-override');
   });
 
   // ── Case 6: steps, step 2, remote ──
@@ -251,7 +251,7 @@ describe('NewSessionFlowBody', () => {
       step: 2,
       runOnInstance: INSTANCE,
       instanceList: [INSTANCE],
-      initialPrompt: 'seed prompt',
+      initialPrompt: 'route-override',
       onSelectTarget: vi.fn<(instance: InstancePickerInstance | null) => void>(),
       configureProps: configureProps(),
     }) as Node;
@@ -261,5 +261,7 @@ describe('NewSessionFlowBody', () => {
     expect(form).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion
     expect(form!.showRunOnSelector).toBe(false);
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion
+    expect(form!.initialPrompt).toBe('route-override');
   });
 });

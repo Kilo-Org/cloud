@@ -12,8 +12,8 @@
 #
 # This writes the INSTALLATION (platform_integrations), not the user's OAuth
 # token row. It never touches `user_github_app_tokens`, so it coexists with
-# github-stub.sh and with app:github-integration-copy. It also ignores
-# GITHUB_API_BASE_URL: the integration adapter always talks to api.github.com.
+# github-stub.sh. It also ignores GITHUB_API_BASE_URL: the integration adapter
+# always talks to api.github.com.
 #
 # Re-running is safe: the mutation upserts the same rows. Pass the exact
 # sign-in email: fake-login CREATES the account when it does not exist, so a

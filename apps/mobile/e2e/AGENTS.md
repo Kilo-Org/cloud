@@ -38,14 +38,7 @@ Node must be v24 (root `.nvmrc`). If dependencies or local env files are missing
 
 # Real GitHub integration (cloud agents and similar)
 
-A scenario that needs real GitHub cannot use the stub. Two independent rows exist; give the account the one the scenario needs.
-
-- The **installation** (`platform_integrations`) drives cloud agents: the repository list, the clone, and the push. Add it with `github-installation.sh`.
-- The **user token** (`user_github_app_tokens`) drives user-level GitHub calls, for example PR review against real GitHub. Add it with the integration copy.
-
-They are different rows, so one account can hold both.
-
-## Installation (cloud agents)
+Cloud agents need a real GitHub App installation on the account: the installation drives the repository list, the clone, and the push. Add the shared dev installation:
 
 ```bash
 apps/mobile/e2e/github-installation.sh <email>
@@ -53,23 +46,9 @@ apps/mobile/e2e/github-installation.sh <email>
 
 The script signs in as the account through fake-login and calls the dev-only `githubApps.devAddInstallation` mutation, which writes the integration and its repository list. It defaults to the shared dev installation `144771093` (account `iscekic`); pass another as `github-installation.sh <email> <installation-id> <account-login>`. Relaunch the app afterwards so the repository query refetches.
 
-Re-running is safe: the mutation upserts the same rows. Pass the exact sign-in email, because fake-login creates a missing account, so a typo adds a junk account instead of failing. The installation does not expire the way the copy below does. It always reads real `api.github.com`, even while the stub runs: `GITHUB_API_BASE_URL` changes only the PR-review client.
+Re-running is safe: the mutation upserts the same rows. Pass the exact sign-in email, because fake-login creates a missing account, so a typo adds a junk account instead of failing. The installation never expires and it always reads real `api.github.com`, even while the stub runs: `GITHUB_API_BASE_URL` changes only the PR-review client.
 
-## User token (real GitHub, not the stub)
-
-Copy a valid integration from the shared dev database onto the signed-in E2E account:
-
-```bash
-pnpm dev:seed app:github-integration-copy <email>
-```
-
-The command finds the newest valid integration, validates its access token against GitHub, re-encrypts it for the account, and reports the donor login and a `usableUntil` time. When it fails with "No valid GitHub integration found", the scenario cannot run. Report `VERIFICATION BLOCKED.` with that message. Never fake the integration, and never skip the scenario silently.
-
-The copy stops working at `usableUntil` (at least 30 minutes). After that the connection reads as revoked, not expired, because the copy cannot refresh. Run the command again to replace the revoked row. Run integration scenarios promptly after the copy.
-
-The copy shares the donor developer's OAuth grant, not just a token. Never run a disconnect scenario on a copied account: disconnect revokes the donor's GitHub authorization, that developer must re-authorize the App by hand, and another copy cannot repair it. Report a scenario that needs disconnect as blocked and say why. Commits pushed through the copy carry the donor's login with a synthetic id, so treat commit-attribution assertions as out of scope on a copied account.
-
-An account holds one token row. The copy and the PR-review stub (`github-stub.sh`) both write it, so they must never share an account. Use one account for stub scenarios and a different account for integration scenarios. To take an account back for the stub, remove the copy first: `pnpm dev:seed app:github-integration-copy --remove <email>`. The command removes only a copy or a stub seed; it refuses to delete a real connection.
+The installation is a different row from the user's OAuth token (`user_github_app_tokens`), which only PR review needs. One account can hold both, so the installation and `github-stub.sh` never conflict. Nothing in this harness gives an account a real user token: a scenario that needs one (real PR-review data, or GitHub disconnect) is out of scope. Report it as `VERIFICATION BLOCKED.` and say why. Never fake an integration, and never skip a scenario silently.
 
 # Start the stack (bundle owner)
 

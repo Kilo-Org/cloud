@@ -44,7 +44,9 @@ pnpm dev:seed app:github-integration-copy <email>
 
 The command finds the newest valid integration, validates its access token against GitHub, re-encrypts it for the account, and reports the donor login and expiry. When it fails with "No valid GitHub integration found", the scenario cannot run. Report `VERIFICATION BLOCKED.` with that message. Never fake the integration, and never skip the scenario silently. The copy carries only the donor's access token and can never refresh; when the connection shows as expired, run the copy again.
 
-An account holds one token row. The copy and the PR-review stub (`github-stub.sh`) both write it, so they must never share an account. Use one account for stub scenarios and a different account for integration scenarios. To take an account back for the stub, remove the copy first: `pnpm dev:seed app:github-integration-copy --remove <email>`.
+The copy shares the donor developer's OAuth grant, not just a token. Never run a disconnect scenario on a copied account: disconnect revokes the donor's GitHub authorization, that developer must re-authorize the App by hand, and another copy cannot repair it. Report a scenario that needs disconnect as blocked and say why. Commits pushed through the copy carry the donor's login with a synthetic id, so treat commit-attribution assertions as out of scope on a copied account.
+
+An account holds one token row. The copy and the PR-review stub (`github-stub.sh`) both write it, so they must never share an account. Use one account for stub scenarios and a different account for integration scenarios. To take an account back for the stub, remove the copy first: `pnpm dev:seed app:github-integration-copy --remove <email>`. The command removes only a copy or a stub seed; it refuses to delete a real connection.
 
 # Start the stack (bundle owner)
 

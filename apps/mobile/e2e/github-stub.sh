@@ -34,8 +34,9 @@ MARKER="# kilo-e2e-github-stub"
 # stop racing a start) would fight over the session, the env line, and the
 # state dir — the lock removes that class instead of guarding every window.
 # status stays unlocked: it is read-only and must answer while a start holds
-# the lock. Every network call inside the lock carries --max-time, so a hung
-# local API cannot hold the lock past its bound.
+# the lock. Every network call inside the lock carries --max-time 120 (the
+# nextjs API is slow under full parallel load), so a hung local API cannot
+# hold the lock indefinitely.
 case "${1:-}" in
   start | seed | stop)
     if [ "${KILO_STUB_LOCKED:-}" != "1" ]; then
@@ -106,9 +107,9 @@ seed_token() {
     # state, and port claim; in `seed` mode there is nothing to undo.
     exit 1
   }
-  CSRF=$(curl -s --max-time 30 -c "$JAR" "$BASE/api/auth/csrf" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).csrfToken)') \
-    || seed_fail csrf "$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' "$BASE/api/auth/csrf")"
-  CODE=$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/api/auth/callback/fake-login" \
+  CSRF=$(curl -s --max-time 120 -c "$JAR" "$BASE/api/auth/csrf" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).csrfToken)') \
+    || seed_fail csrf "$(curl -s --max-time 120 -o /dev/null -w '%{http_code}' "$BASE/api/auth/csrf")"
+  CODE=$(curl -s --max-time 120 -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/api/auth/callback/fake-login" \
     --data-urlencode "csrfToken=$CSRF" \
     --data-urlencode "email=$EMAIL" \
     --data-urlencode "json=true") || seed_fail fake-login transport
@@ -119,7 +120,7 @@ seed_token() {
   # prefix plus 12 digits also cannot collide with a real GitHub user id.
   GH_USER_ID="9$(printf '%s' "$EMAIL" | shasum -a 256 | tr -dc '0-9' | cut -c1-12)"
   SEED_BODY=$(mktemp "$STATE_DIR/seed.XXXXXX")
-  CODE=$(curl -s --max-time 30 -o "$SEED_BODY" -w '%{http_code}' -b "$JAR" -X POST "$BASE/api/trpc/githubApps.devSeedUserGithubToken" \
+  CODE=$(curl -s --max-time 120 -o "$SEED_BODY" -w '%{http_code}' -b "$JAR" -X POST "$BASE/api/trpc/githubApps.devSeedUserGithubToken" \
     -H 'content-type: application/json' \
     -d "{\"token\":\"e2e-stub-token\",\"githubLogin\":\"kilo-stub-user\",\"githubUserId\":\"$GH_USER_ID\"}") || seed_fail trpc-seed transport
   case $CODE in 2*) ;; *) seed_fail trpc-seed "$CODE" "$(cut -c1-300 "$SEED_BODY")" ;; esac
@@ -136,7 +137,7 @@ seed_token() {
     # when the probe succeeds AND shows a connected stub row. A probe failure
     # proves nothing — never turn it into delete-the-row advice.
     AUTH_BODY=$(mktemp "$STATE_DIR/auth.XXXXXX")
-    AUTH_CODE=$(curl -s --max-time 30 -o "$AUTH_BODY" -w '%{http_code}' -b "$JAR" "$BASE/api/trpc/githubApps.getUserAuthorization") || AUTH_CODE=000
+    AUTH_CODE=$(curl -s --max-time 120 -o "$AUTH_BODY" -w '%{http_code}' -b "$JAR" "$BASE/api/trpc/githubApps.getUserAuthorization") || AUTH_CODE=000
     if [ "${AUTH_CODE#2}" != "$AUTH_CODE" ] && ! grep -q '"error"' "$AUTH_BODY" \
       && grep -q '"githubLogin":"kilo-stub-user"' "$AUTH_BODY" && grep -q '"connected":true' "$AUTH_BODY"; then
       rm -f "$AUTH_BODY"
@@ -198,7 +199,11 @@ case "${1:-}" in
     tmux new-session -d -s "$SESSION" -c "$STATE_DIR" \
       "node $(printf '%q' "$SCRIPT_DIR/github-api-stub/server.mjs") $STUB_PORT" || {
       CREATED_SESSION=0
-      echo "github-stub: session $SESSION appeared concurrently (a survivor of a killed start?); stop it first" >&2
+      if tmux has-session -t "=$SESSION" 2>/dev/null; then
+        echo "github-stub: session $SESSION appeared concurrently (a survivor of a killed start?); stop it first" >&2
+      else
+        echo "github-stub: tmux could not create session $SESSION (see the tmux error above)" >&2
+      fi
       exit 1
     }
     for _ in $(seq 1 30); do
@@ -246,10 +251,15 @@ case "${1:-}" in
     ;;
 
   status)
-    if tmux has-session -t "=$SESSION" 2>/dev/null; then
+    # The state file is written last, so session-without-state means a start is
+    # still running (or died mid-way): report starting, never up.
+    if ! tmux has-session -t "=$SESSION" 2>/dev/null; then
+      echo "down"
+      exit 1
+    elif [ -f "$STATE_DIR/state" ]; then
       echo "up (tmux $SESSION, $(sed -n 's/^port=/port /p' "$STATE_DIR/state" 2>/dev/null))"
     else
-      echo "down"
+      echo "starting (tmux $SESSION exists, no state yet — a start is in progress or died)"
       exit 1
     fi
     ;;

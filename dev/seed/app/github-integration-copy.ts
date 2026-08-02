@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { computeDatabaseUrl } from '@kilocode/db';
 import { user_github_app_tokens, kilocode_users } from '@kilocode/db/schema';
 import { decryptKeyedEnvelope, encryptKeyedEnvelope } from '@kilocode/encryption';
-import { and, desc, eq, gt, isNull, lt, ne, notLike, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, ne, notLike, or, sql } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
@@ -23,6 +24,28 @@ function tokenAad(kiloUserId: string, githubUserId: string, kind: 'access' | 're
   return `github-user-authorization:v1:${kiloUserId}:standard:${githubUserId}:${kind}`;
 }
 
+// This tool relocates real credentials, so "dev-only" must be enforced, not
+// advisory. Same guard as dev/seed/cost-insights/spend-evidence.ts.
+function assertLocalDatabaseTarget(): void {
+  if (process.env.USE_PRODUCTION_DB === 'true') {
+    throw new Error('app:github-integration-copy refuses to run with USE_PRODUCTION_DB=true.');
+  }
+  const databaseUrl = new URL(computeDatabaseUrl());
+  const localHostnames = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+  if (!localHostnames.has(databaseUrl.hostname)) {
+    throw new Error(
+      `app:github-integration-copy requires a loopback database host; received ${databaseUrl.hostname}.`
+    );
+  }
+}
+
+// Rows this tool writes carry a 13-digit id with an 8 prefix; stub seeds use a
+// 9 prefix and 13 digits. Real GitHub ids are shorter. Only synthetic rows may
+// be deleted or overwritten — a real developer's connection never may be.
+function isSyntheticGithubUserId(githubUserId: string): boolean {
+  return /^[89]\d{12}$/.test(githubUserId);
+}
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:github-integration-copy ${usage}`);
   console.log('');
@@ -36,6 +59,15 @@ function printUsage(): void {
   console.log('against GitHub before copying, and can never refresh (a refresh would');
   console.log("rotate and kill the donor's refresh token). When the copied access token");
   console.log('expires, run the copy again.');
+  console.log('');
+  console.log("BLAST RADIUS — the copy shares the donor developer's OAuth GRANT, not");
+  console.log('just a token. Disconnecting GitHub on the copied account (in the app, or');
+  console.log("in a scenario that exercises disconnect) revokes the DONOR's GitHub");
+  console.log('authorization: that developer must re-authorize the App by hand, and');
+  console.log('re-running this copy cannot repair it. Never run disconnect scenarios on');
+  console.log('a copied account. Commits pushed through the copy are attributed to');
+  console.log('<synthetic-id>+<donor-login>@users.noreply.github.com, so they show the');
+  console.log("donor's login with an id GitHub does not know.");
   console.log('');
   console.log("The copy occupies the account's one token row, which the PR-review stub");
   console.log('(github-stub.sh) also needs. Use different accounts for the two, or');
@@ -87,12 +119,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('exactly one argument expected: the target account email');
   }
 
+  assertLocalDatabaseTarget();
   const db = getSeedDb();
-  const normalizedEmail = normalizeSeedEmail(toEmail.trim());
+  const trimmedEmail = toEmail.trim();
+  const normalizedEmail = normalizeSeedEmail(trimmedEmail);
+  // normalized_email is nullable on older rows; fall back to the sign-in email.
   const [target] = await db
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, normalizedEmail))
+    .where(
+      or(
+        eq(kilocode_users.normalized_email, normalizedEmail),
+        eq(kilocode_users.google_user_email, trimmedEmail)
+      )
+    )
     .limit(1);
   if (!target) {
     throw new Error(
@@ -101,19 +141,65 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   if (remove) {
-    // Deletes whatever token row the account holds — the copy this tool
-    // wrote, or a stub seed — so github-stub.sh or a fresh copy can start
-    // clean. Never touches any other account's row.
-    const deleted = await db
-      .delete(user_github_app_tokens)
+    // Deletes only a SYNTHETIC row (a copy this tool wrote, or a stub seed),
+    // so a mistyped email cannot destroy a real developer's connection in the
+    // shared dev database. Reports exactly what was removed.
+    const [existing] = await db
+      .select({
+        githubUserId: user_github_app_tokens.github_user_id,
+        githubLogin: user_github_app_tokens.github_login,
+      })
+      .from(user_github_app_tokens)
       .where(
         and(
           eq(user_github_app_tokens.kilo_user_id, target.id),
           eq(user_github_app_tokens.github_app_type, 'standard')
         )
       )
-      .returning({ id: user_github_app_tokens.id });
-    return { targetEmail: toEmail, removedRows: deleted.length };
+      .limit(1);
+    if (!existing) {
+      return { targetEmail: toEmail, removedRows: 0, removed: 'nothing' };
+    }
+    if (!isSyntheticGithubUserId(existing.githubUserId)) {
+      throw new Error(
+        `Refusing to delete: ${toEmail} holds a REAL GitHub connection (${existing.githubLogin}, id ${existing.githubUserId}), not a copy or a stub seed. Disconnect it in the app if that is really what you want.`
+      );
+    }
+    await db
+      .delete(user_github_app_tokens)
+      .where(
+        and(
+          eq(user_github_app_tokens.kilo_user_id, target.id),
+          eq(user_github_app_tokens.github_app_type, 'standard'),
+          eq(user_github_app_tokens.github_user_id, existing.githubUserId)
+        )
+      );
+    return {
+      targetEmail: toEmail,
+      removedRows: 1,
+      removed: `${existing.githubLogin} (${existing.githubUserId})`,
+    };
+  }
+
+  // Never overwrite a real connection the target account made itself: the
+  // ciphertext is unrecoverable once replaced. Synthetic rows are ours.
+  const [targetRow] = await db
+    .select({
+      githubUserId: user_github_app_tokens.github_user_id,
+      githubLogin: user_github_app_tokens.github_login,
+    })
+    .from(user_github_app_tokens)
+    .where(
+      and(
+        eq(user_github_app_tokens.kilo_user_id, target.id),
+        eq(user_github_app_tokens.github_app_type, 'standard')
+      )
+    )
+    .limit(1);
+  if (targetRow && !isSyntheticGithubUserId(targetRow.githubUserId)) {
+    throw new Error(
+      `${toEmail} already holds a REAL GitHub connection (${targetRow.githubLogin}, id ${targetRow.githubUserId}); a copy would destroy it. Use a different account, or disconnect that connection in the app first.`
+    );
   }
 
   const devVars = readServiceDevVars();

@@ -98,8 +98,14 @@ remove_env_line() {
     return 1
   fi
   # Preserve original file permissions before replacing.
-  perms=$(stat -f '%p' "$ENV_LOCAL" 2>/dev/null || stat -c '%a' "$ENV_LOCAL" 2>/dev/null || true)
-  [ -n "$perms" ] && chmod "${perms: -3}" "$tmp" 2>/dev/null || true
+  # GNU stat -c '%a' first: on GNU stat -f '%p' succeeds with a placeholder
+  # (exit 0, output "?"), which would block the fallback and lose the mode.
+  # BSD stat -c fails (unrecognized flag), falling through to -f '%p'.
+  # Only apply chmod when the result contains strictly octal digits.
+  perms=$(stat -c '%a' "$ENV_LOCAL" 2>/dev/null || stat -f '%p' "$ENV_LOCAL" 2>/dev/null || true)
+  if [[ "$perms" =~ ^[0-7]+$ ]]; then
+    chmod "${perms: -3}" "$tmp" 2>/dev/null || true
+  fi
   mv "$tmp" "$ENV_LOCAL"
 }
 

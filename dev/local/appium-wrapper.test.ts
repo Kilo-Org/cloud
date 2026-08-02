@@ -529,9 +529,12 @@ setInterval(() => {}, 1000);
   fs.chmodSync(patchedScript, 0o755);
 
   // Pre-create stale state: pid alive, server.port exists, but /status will fail.
+  // Pre-seeded sentinel pid that the test does not own — cleanup must never
+  // signal it if the test fails before the stub writes its own pid.
+  const SENTINEL_PID = 99999;
   const stateDir = path.join(tmp, 'kilo-appium', slugFor('test-device'));
   fs.mkdirSync(stateDir, { recursive: true });
-  fs.writeFileSync(path.join(stateDir, 'appium.pid'), '99999');
+  fs.writeFileSync(path.join(stateDir, 'appium.pid'), String(SENTINEL_PID));
   fs.writeFileSync(path.join(stateDir, 'server.port'), '4730');
 
   const binPath = `${bin}:${process.env.PATH}`;
@@ -562,12 +565,18 @@ setInterval(() => {}, 1000);
   } finally {
     // Kill the stub appium process that ensure_server started; the kill
     // stub in $PATH is a no-op, so stop_server cannot reap it.
+    // Only kill when the pid differs from the pre-seeded sentinel —
+    // if setup failed early, the pid file still holds the sentinel
+    // and we must not signal an unowned process.
     const pidFile = path.join(stateDir, 'appium.pid');
     if (fs.existsSync(pidFile)) {
-      try {
-        process.kill(parseInt(fs.readFileSync(pidFile, 'utf8').trim(), 10), 'SIGKILL');
-      } catch {
-        // process already dead
+      const currentPid = parseInt(fs.readFileSync(pidFile, 'utf8').trim(), 10);
+      if (currentPid !== SENTINEL_PID) {
+        try {
+          process.kill(currentPid, 'SIGKILL');
+        } catch {
+          // process already dead
+        }
       }
     }
     fs.rmSync(root, { recursive: true, force: true });

@@ -3,25 +3,19 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { View } from 'react-native';
 
 import { RunTargetStep } from '@/components/agents/run-target-step';
-import { NewSessionCloudForm } from '@/components/agents/new-session-cloud-form';
-import { RemoteSpawnComposer } from '@/components/agents/remote-spawn-composer';
+import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type NewSessionFlowMode } from '@/lib/new-session-flow-state';
-import { isRepositorySectionVisible } from '@/lib/is-repository-section-visible';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 
 type NewSessionFlowBodyProps = {
   flowMode: NewSessionFlowMode;
   step: 1 | 2;
-  // Step 1
   runOnInstance: InstancePickerInstance | null;
   instanceList: InstancePickerInstance[];
   initialPrompt: string;
   onSelectTarget: (instance: InstancePickerInstance | null) => void;
-  // Cloud form
-  cloudFormProps: ComponentProps<typeof NewSessionCloudForm>;
-  // Remote composer
-  remoteComposerProps: ComponentProps<typeof RemoteSpawnComposer>;
+  configureProps: ComponentProps<typeof NewSessionConfigureForm>;
 };
 
 const SKELETON_BLOCK_COUNT = 3;
@@ -37,8 +31,7 @@ export function NewSessionFlowBody({
   instanceList,
   initialPrompt,
   onSelectTarget,
-  cloudFormProps,
-  remoteComposerProps,
+  configureProps,
 }: Readonly<NewSessionFlowBodyProps>) {
   if (flowMode === 'pending') {
     return (
@@ -54,11 +47,7 @@ export function NewSessionFlowBody({
   }
 
   if (flowMode === 'single') {
-    return isRepositorySectionVisible(runOnInstance) ? (
-      <NewSessionCloudForm {...cloudFormProps} />
-    ) : (
-      <RemoteSpawnComposer {...remoteComposerProps} />
-    );
+    return <NewSessionConfigureForm {...configureProps} />;
   }
 
   if (step === 1) {
@@ -75,15 +64,11 @@ export function NewSessionFlowBody({
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-      {runOnInstance ? (
-        <RemoteSpawnComposer {...remoteComposerProps} showRunOnSelector={false} />
-      ) : (
-        <NewSessionCloudForm
-          {...cloudFormProps}
-          initialPrompt={initialPrompt}
-          showRunOnSelector={false}
-        />
-      )}
+      <NewSessionConfigureForm
+        {...configureProps}
+        initialPrompt={initialPrompt}
+        showRunOnSelector={false}
+      />
     </Animated.View>
   );
 }

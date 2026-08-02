@@ -234,7 +234,7 @@ function NewSessionScreenBody() {
         instanceList={instanceList}
         initialPrompt={promptRef.current}
         onSelectTarget={handleSelectTarget}
-        cloudFormProps={{
+        configureProps={{
           attachments: attachments.attachments,
           attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
           isCreating,
@@ -268,17 +268,8 @@ function NewSessionScreenBody() {
           repositories,
           selectedRepo,
           isStartDisabled,
-          onStartSession: handleStartSession,
-        }}
-        remoteComposerProps={{
-          runOnInstance,
-          instanceList,
-          isLoadingInstances: instancesLoading,
-          onChangeRunOnInstance: handleRunOnInstanceChange,
           isSpawningRemote: remoteSpawn.isSpawningRemote,
-          isStartDisabled,
-          onStart: handleStartSession,
-          showRunOnSelector,
+          onStartSession: handleStartSession,
         }}
       />
     </View>

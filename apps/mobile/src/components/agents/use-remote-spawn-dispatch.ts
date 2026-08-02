@@ -218,7 +218,7 @@ export function useRemoteSpawnDispatch({
       if (outcome.status === 'ready') {
         if (shouldCancelReadyNavigationRef.current?.() === true) {
           // Cancel contract: toast via callback, then leave the user on the
-          // cloud composer — not on RemoteSpawnComposer with a live selection.
+          // unified configure form with the remote selection cleared.
           onReadyNavigationCancelledRef.current?.();
           setRunOnInstance(null);
           return;

@@ -12,6 +12,33 @@ import {
 
 const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>(['png', 'jpg', 'jpeg', 'webp', 'gif']);
 
+function utf8Length(s: string): number {
+  return new TextEncoder().encode(s).length;
+}
+
+/**
+ * Truncate `s` to at most `maxBytes` UTF-8 bytes without splitting
+ * Unicode characters. Iterates code points and keeps only complete
+ * characters that fit within the byte budget.
+ */
+function truncateToUtf8Bytes(s: string, maxBytes: number): string {
+  if (maxBytes <= 0) {
+    return '';
+  }
+  const encoder = new TextEncoder();
+  let out = '';
+  let byteCount = 0;
+  for (const c of s) {
+    const charBytes = encoder.encode(c).length;
+    if (byteCount + charBytes > maxBytes) {
+      break;
+    }
+    out += c;
+    byteCount += charBytes;
+  }
+  return out;
+}
+
 /**
  * Normalize a candidate's filename extension.
  *
@@ -64,7 +91,9 @@ export function mimeForExtension(extension: string): AgentAttachmentMime {
  * - Strips control characters (ASCII 0x00–0x1f, 0x7f).
  * - Strips path separators (`/`, `\`).
  * - Truncates to {@link AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH}
- *   by code point so no surrogate pair is split.
+ *   UTF-8 bytes without splitting Unicode characters.
+ * - When truncation removes name characters, the extension is
+ *   retained so the receiving CLI can still identify the file type.
  * - Preserves safe basename names byte-for-byte, including repeated
  *   and trailing dots.
  * - Falls back to "file.bin" when sanitization produces an empty string
@@ -90,12 +119,33 @@ export function sanitizeAttachmentFilename(raw: string): string {
   // Strip any remaining path separators
   sanitized = sanitized.replaceAll('/', '').replaceAll('\\', '');
 
-  // Unicode-safe length truncation: slice by code points so no
-  // surrogate pair is split.
-  if (sanitized.length > AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH) {
-    // eslint-disable-next-line typescript-eslint/no-misused-spread — split by code points to avoid unpaired surrogates
-    const chars = [...sanitized];
-    sanitized = chars.slice(0, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH).join('');
+  // Truncate to the byte budget, preserving the extension when
+  // truncation removes characters from the name part.
+  if (utf8Length(sanitized) > AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH) {
+    const dot = sanitized.lastIndexOf('.');
+    if (dot > 0 && dot < sanitized.length - 1) {
+      // Filename has a non-leading, non-trailing dot → extension present.
+      const ext = sanitized.slice(dot + 1);
+      const name = sanitized.slice(0, dot);
+      const extBytes = utf8Length(ext);
+      const dotByte = 1;
+      const nameBudget = AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH - extBytes - dotByte;
+      if (nameBudget > 0) {
+        const truncatedName = truncateToUtf8Bytes(name, nameBudget);
+        // When no complete code point fits in the name budget, the
+        // truncated name is empty. Emitting `.ext` alone would create a
+        // leading-dot name — fall back to unadorned truncation instead.
+        sanitized =
+          truncatedName.length > 0
+            ? `${truncatedName}.${ext}`
+            : truncateToUtf8Bytes(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+      } else {
+        sanitized = truncateToUtf8Bytes(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+      }
+    } else {
+      // No parsable extension — truncate the whole string.
+      sanitized = truncateToUtf8Bytes(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+    }
   }
 
   // If empty, use the safe fallback

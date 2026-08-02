@@ -96,15 +96,16 @@ describe('sanitizeAttachmentFilename', () => {
     expect(sanitizeAttachmentFilename('name\u007F.txt')).toBe('name.txt');
   });
 
-  it('truncates excess length to 255 chars', () => {
+  it('truncates excess UTF-8 bytes to 255 and preserves the extension', () => {
     const long = `${'a'.repeat(500)}.txt`;
     const result = sanitizeAttachmentFilename(long);
-    expect(result.length).toBeLessThanOrEqual(255);
-    expect(result.length).toBe(255);
+    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    expect(new TextEncoder().encode(result).length).toBe(255);
+    expect(result.endsWith('.txt')).toBe(true);
   });
 
-  it('truncates Unicode text without splitting surrogate pairs', () => {
-    // 🌟 is U+1F31F, encoded as surrogate pair \uD83C\uDF1F
+  it('truncates a multibyte filename to at most 255 bytes without unpaired surrogates', () => {
+    // 🌟 is U+1F31F, encoded as surrogate pair \uD83C\uDF1F, 4 UTF-8 bytes each
     const star = '🌟';
     const long = star.repeat(300);
     const result = sanitizeAttachmentFilename(long);
@@ -112,12 +113,68 @@ describe('sanitizeAttachmentFilename', () => {
     const hasUnpaired =
       /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(result);
     expect(hasUnpaired).toBe(false);
-    // Code-point count stays within the documented limit
-    // eslint-disable-next-line typescript-eslint/no-misused-spread — intentional code-point split
-    expect([...result].length).toBeLessThanOrEqual(255);
-    // Each star is one code point; all 255 code points are preserved
-    // eslint-disable-next-line typescript-eslint/no-misused-spread — intentional code-point split
-    expect([...result].length).toBe(255);
+    // Byte count stays within the bound (each star is 4 UTF-8 bytes)
+    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    // 63 stars × 4 bytes = 252 bytes; 64 × 4 = 256 > 255
+    expect(new TextEncoder().encode(result).length).toBe(252);
+  });
+
+  it('preserves the extension when truncating a multibyte filename', () => {
+    // 日本語 = 3 CJK chars, each 3 UTF-8 bytes = 9 bytes per unit
+    const cjk = '日本語';
+    // 30 repetitions = 270 bytes for name, extension "txt" = 3 bytes, dot = 1 byte
+    // Budget: 255 - 3 - 1 = 251 bytes for name → 251 / 9 = 27 full chars = 243 bytes
+    const long = `${cjk.repeat(30)}.txt`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    expect(result.endsWith('.txt')).toBe(true);
+  });
+
+  it('preserves the extension for an extreme emoji name', () => {
+    // 4 UTF-8 bytes
+    const rocket = '🚀';
+    const long = `${rocket.repeat(100)}.pdf`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    expect(result.endsWith('.pdf')).toBe(true);
+    // No unpaired surrogates
+    const hasUnpaired =
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(result);
+    expect(hasUnpaired).toBe(false);
+  });
+
+  it('truncates without an extension when none is present', () => {
+    // CJK-only filename, no dot → no extension to preserve
+    const long = '日'.repeat(200);
+    const result = sanitizeAttachmentFilename(long);
+    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    // 85 × 3 = 255 bytes exactly
+    expect(new TextEncoder().encode(result).length).toBe(255);
+    expect(result.includes('.')).toBe(false);
+  });
+
+  it('falls back when no complete stem code point fits in the name budget', () => {
+    // ñ is U+00F1, 2 UTF-8 bytes. Extension is 253 ASCII bytes.
+    // Total: 2 + 1 + 253 = 256 > 255. nameBudget = 255 - 253 - 1 = 1.
+    // The 2-byte stem does not fit in 1 byte, so the truncated name is
+    // empty. The result must NOT be ".a…a" — a leading-dot name.
+    const ext253 = 'a'.repeat(253);
+    const long = `ñ.${ext253}`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    // Must not start with a dot
+    expect(result.startsWith('.')).toBe(false);
+    // The stem ñ (2 bytes) + dot (1 byte) + 252 'a' chars = 255 bytes
+    expect(new TextEncoder().encode(result).length).toBe(255);
+    expect(result.startsWith('ñ.')).toBe(true);
+  });
+
+  it('preserves extension from a safe ASCII name at the byte boundary', () => {
+    // 251 'a' + '.txt' = 251 + 1 + 3 = 255 bytes
+    const long = `${'a'.repeat(300)}.txt`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(new TextEncoder().encode(result).length).toBe(255);
+    expect(result).toBe(`${'a'.repeat(251)}.txt`);
   });
 
   it('returns safe fallback for empty input', () => {

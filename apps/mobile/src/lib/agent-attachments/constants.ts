@@ -1,6 +1,6 @@
 export const AGENT_ATTACHMENT_MAX_FILES = 5;
 export const AGENT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
-/** Common safe filename length bound used by sanitizeAttachmentFilename. */
+/** Maximum UTF-8 byte count for a sanitized filename emitted by sanitizeAttachmentFilename. */
 export const AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH = 255;
 
 /**

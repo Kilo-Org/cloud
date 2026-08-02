@@ -7,7 +7,7 @@ const THREE_BYTE_CODE_POINT_MAX = 65_535;
  * or half of a surrogate pair). Does not validate surrogates; callers
  * must iterate `for … of` over well-formed strings.
  */
-export function utf8CodePointByteLength(character: string): number {
+function utf8CodePointByteLength(character: string): number {
   const codePoint = character.codePointAt(0) ?? 0;
   if (codePoint <= ONE_BYTE_CODE_POINT_MAX) {
     return 1;

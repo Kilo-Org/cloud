@@ -11,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ChildSessionHydrationState } from '@/lib/cloud-agent-sdk';
+import type { ChildSessionHydrationState } from '@kilocode/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
 import { MessageBubble } from './MessageBubble';
 import { MessageErrorBoundary } from './MessageErrorBoundary';

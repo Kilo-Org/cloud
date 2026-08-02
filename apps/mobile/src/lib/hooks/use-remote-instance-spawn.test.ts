@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { type KiloSessionId, type UserWebConnection } from 'cloud-agent-sdk';
+import { type KiloSessionId, type UserWebConnection } from '@kilocode/cloud-agent-sdk';
 // kilocode_change - K1/C2: runtime imports via the narrow subpath alias —
 // see the matching comment in remote-instance-spawn-classifier.ts and
 // vitest.config.ts for why the full `cloud-agent-sdk` barrel is unsafe here.
-import { CommandDeliveredError, UserWebCommandError } from 'cloud-agent-sdk/user-web-connection';
+import {
+  CommandDeliveredError,
+  UserWebCommandError,
+} from '@kilocode/cloud-agent-sdk/user-web-connection';
 
 // kilocode_change - K1/C2: imported from the classifier module, not
 // `use-remote-instance-spawn.ts` — that file's `useRemoteInstanceSpawn` hook
@@ -12,9 +15,12 @@ import { CommandDeliveredError, UserWebCommandError } from 'cloud-agent-sdk/user
 // Native/Expo modules containing Flow syntax the Node vitest environment
 // cannot parse. See that file's header comment for the full explanation.
 import {
+  buildCreateRemoteSessionInput,
   classifyCreateSessionResult,
   createSessionSpawner,
   type CreateSessionSpawner,
+  mergeSpawnOrganizationId,
+  resolveSpawnOrganizationId,
   SESSION_OWNER_NOT_FOUND_LITERAL,
 } from './remote-instance-spawn-classifier';
 
@@ -109,6 +115,112 @@ describe('classifyCreateSessionResult', () => {
   });
 });
 
+describe('buildCreateRemoteSessionInput', () => {
+  it('returns undefined when every field is empty or absent', () => {
+    expect(buildCreateRemoteSessionInput({})).toBeUndefined();
+    expect(buildCreateRemoteSessionInput({ mode: '', model: '', variant: '' })).toBeUndefined();
+  });
+
+  it('maps mode to agent when non-empty', () => {
+    expect(buildCreateRemoteSessionInput({ mode: 'code' })).toEqual({ agent: 'code' });
+  });
+
+  it('maps model to kilo provider modelID without variant when variant is empty', () => {
+    expect(buildCreateRemoteSessionInput({ model: 'kilo-auto/efficient', variant: '' })).toEqual({
+      model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+    });
+  });
+
+  it('includes variant only when non-empty', () => {
+    expect(
+      buildCreateRemoteSessionInput({
+        model: 'anthropic/claude-sonnet-4',
+        variant: 'high',
+      })
+    ).toEqual({
+      model: {
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+        variant: 'high',
+      },
+    });
+  });
+
+  it('maps organizationId to orgId when non-empty', () => {
+    expect(buildCreateRemoteSessionInput({ organizationId: 'org-abc' })).toEqual({
+      orgId: 'org-abc',
+    });
+  });
+
+  it('combines mode, model, variant, and organizationId', () => {
+    expect(
+      buildCreateRemoteSessionInput({
+        mode: 'plan',
+        model: 'kilo-auto/efficient',
+        variant: 'medium',
+        organizationId: 'org-xyz',
+      })
+    ).toEqual({
+      agent: 'plan',
+      model: {
+        providerID: 'kilo',
+        modelID: 'kilo-auto/efficient',
+        variant: 'medium',
+      },
+      orgId: 'org-xyz',
+    });
+  });
+
+  it('omits model when only variant is set', () => {
+    expect(buildCreateRemoteSessionInput({ variant: 'high' })).toBeUndefined();
+  });
+});
+
+describe('resolveSpawnOrganizationId', () => {
+  it('inherits context when explicit arg is omitted (zero-arg callers)', () => {
+    expect(resolveSpawnOrganizationId(undefined, 'context-org')).toBe('context-org');
+    expect(resolveSpawnOrganizationId(undefined, null)).toBeNull();
+  });
+
+  it('null means personal and wins over a live context org', () => {
+    expect(resolveSpawnOrganizationId(null, 'context-org')).toBeNull();
+  });
+
+  it('string means that org and wins over context', () => {
+    expect(resolveSpawnOrganizationId('route-org', 'context-org')).toBe('route-org');
+  });
+});
+
+describe('mergeSpawnOrganizationId', () => {
+  it('returns opts unchanged when orgId is already set', () => {
+    const opts = { agent: 'code', orgId: 'explicit-org' };
+    expect(mergeSpawnOrganizationId(opts, 'context-org')).toBe(opts);
+  });
+
+  it('adds orgId from the context when opts omit it', () => {
+    expect(mergeSpawnOrganizationId({ agent: 'code' }, 'context-org')).toEqual({
+      agent: 'code',
+      orgId: 'context-org',
+    });
+  });
+
+  it('returns opts unchanged when context org is null/undefined/empty', () => {
+    expect(mergeSpawnOrganizationId({ agent: 'code' }, null)).toEqual({ agent: 'code' });
+    expect(mergeSpawnOrganizationId({ agent: 'code' }, undefined)).toEqual({ agent: 'code' });
+    expect(mergeSpawnOrganizationId({ agent: 'code' }, '')).toEqual({ agent: 'code' });
+  });
+
+  it('creates an opts object from context alone when opts are undefined', () => {
+    expect(mergeSpawnOrganizationId(undefined, 'context-org')).toEqual({
+      orgId: 'context-org',
+    });
+  });
+
+  it('returns undefined when both opts and context are empty', () => {
+    expect(mergeSpawnOrganizationId(undefined, null)).toBeUndefined();
+  });
+});
+
 describe('createSessionSpawner', () => {
   it('exposes a stable creationKey and a spawn function', () => {
     const spawner: CreateSessionSpawner = createSessionSpawner(
@@ -135,6 +247,40 @@ describe('createSessionSpawner', () => {
     );
     const outcome = await spawner.spawn('cli-owner-1');
     expect(outcome).toEqual({ status: 'ready', sessionID: VALID_SESSION_ID });
+  });
+
+  it('spawn forwards CreateRemoteSessionInput to createRemoteSessionOnConnection', async () => {
+    // eslint-disable-next-line typescript-eslint/require-await -- no await needed; return value is the whole point
+    const send = vi.fn(async () => ({ protocolVersion: 1, sessionID: VALID_SESSION_ID }));
+    const spawner = createSessionSpawner(makeConnection(send));
+    const opts = {
+      agent: 'code',
+      model: { providerID: 'kilo' as const, modelID: 'kilo-auto/efficient', variant: 'high' },
+      orgId: 'org-1',
+    };
+    await spawner.spawn('cli-owner-1', opts);
+    expect(send).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: {
+        protocolVersion: 1,
+        agent: 'code',
+        model: { providerID: 'kilo', modelID: 'kilo-auto/efficient', variant: 'high' },
+        orgId: 'org-1',
+      },
+      expectedConnectionId: 'cli-owner-1',
+    });
+  });
+
+  it('spawn without opts sends bare protocolVersion only', async () => {
+    // eslint-disable-next-line typescript-eslint/require-await -- no await needed; return value is the whole point
+    const send = vi.fn(async () => ({ protocolVersion: 1, sessionID: VALID_SESSION_ID }));
+    const spawner = createSessionSpawner(makeConnection(send));
+    await spawner.spawn('cli-owner-1');
+    expect(send).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
   });
 
   it('spawn wraps delivered bare-string errors via the classifier', async () => {

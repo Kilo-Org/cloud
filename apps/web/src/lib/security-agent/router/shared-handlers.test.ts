@@ -40,6 +40,10 @@ const mockLogSecurityAudit = jest.fn();
 const mockCreateSecurityAuditLog = jest.fn();
 const mockUpsertSecurityAgentConfig = jest.fn();
 const mockSetSecurityAgentEnabled = jest.fn();
+const mockCheckDependabotAlertsAvailability =
+  jest.fn<
+    (installationId: string, appType: string, repositories: unknown[]) => Promise<unknown[]>
+  >();
 const mockAutoDismissEligibleFindings =
   jest.fn<
     (
@@ -65,6 +69,9 @@ jest.mock('../services/manual-remediation-client', () => ({
 jest.mock('../github/permissions', () => ({
   hasSecurityReviewPermissions: () => true,
   getReauthorizeUrl: jest.fn(),
+}));
+jest.mock('../github/dependabot-api', () => ({
+  checkDependabotAlertsAvailability: mockCheckDependabotAlertsAvailability,
 }));
 jest.mock('../posthog-tracking', () => ({
   trackSecurityAgentEnabled: jest.fn(),
@@ -134,6 +141,7 @@ beforeEach(() => {
   mockGetSecurityAgentConfigWithStatus.mockResolvedValue(null);
   mockGetRemediationAttemptHistory.mockResolvedValue([]);
   mockEnqueueBacklogFindings.mockResolvedValue(0);
+  mockCheckDependabotAlertsAvailability.mockResolvedValue([]);
 });
 
 function createHandlers() {
@@ -151,7 +159,7 @@ function createHandlers() {
         id: 'integration-123',
         integration_status: 'active',
         platform_installation_id: 'installation-123',
-        repositories: [{ id: 1, full_name: 'kilo/repo' }],
+        repositories: [{ id: 1, full_name: 'kilo/repo', name: 'repo', private: true }],
       }) as never,
     trackingExtras: () => ({}),
   });
@@ -257,6 +265,43 @@ describe('trackUiInteraction', () => {
     expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
     expect(mockCreateSecurityAuditLog).not.toHaveBeenCalled();
     expect(mockLogSecurityAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('getRepositories', () => {
+  it('includes Dependabot alerts availability for each repository', async () => {
+    mockCheckDependabotAlertsAvailability.mockResolvedValueOnce([{ id: 1, status: 'disabled' }]);
+
+    await expect(createHandlers().getRepositories({ ctx: context, input: {} })).resolves.toEqual([
+      {
+        id: 1,
+        fullName: 'kilo/repo',
+        name: 'repo',
+        private: true,
+        dependabotAlerts: 'disabled',
+      },
+    ]);
+
+    expect(mockCheckDependabotAlertsAvailability).toHaveBeenCalledWith(
+      'installation-123',
+      'standard',
+      [
+        {
+          id: 1,
+          fullName: 'kilo/repo',
+          name: 'repo',
+          private: true,
+        },
+      ]
+    );
+  });
+
+  it('keeps repository selection available when the availability check fails', async () => {
+    mockCheckDependabotAlertsAvailability.mockRejectedValueOnce(new Error('GitHub unavailable'));
+
+    await expect(createHandlers().getRepositories({ ctx: context, input: {} })).resolves.toEqual([
+      expect.objectContaining({ id: 1, dependabotAlerts: 'unknown' }),
+    ]);
   });
 });
 

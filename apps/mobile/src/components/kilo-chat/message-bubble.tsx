@@ -1,7 +1,7 @@
 import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@kilocode/kilo-chat';
 import { Reply } from 'lucide-react-native';
 import { memo } from 'react';
-import { Pressable, View } from 'react-native';
+import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 import Animated, {
@@ -15,6 +15,8 @@ import Animated, {
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { buildMessageBubbleAccessibilityProps } from './message-bubble-a11y';
+import { MessageBubbleContent } from './message-bubble-content';
 import {
   getSwipeReplyActiveOffsetX,
   resolveLongPressFeedback,
@@ -22,7 +24,6 @@ import {
   SWIPE_REPLY_DISTANCE,
   SWIPE_REPLY_MAX_TRANSLATE,
 } from './message-gesture-state';
-import { MessageBubbleContent } from './message-bubble-content';
 import { isMessageEdited, type ReplyPreviewSource } from './message-presentation';
 import { MessageReactionPills } from './message-reaction-pills';
 
@@ -106,6 +107,33 @@ function MessageBubbleComponent({
     onLongPress?.(message);
   }
 
+  // Mirror the long-press (action menu) and swipe-reply gestures as
+  // accessibility custom actions so VoiceOver / TalkBack rotor users
+  // reach the same affordances without a discoverable gesture. The
+  // wrapping Pressable is explicitly `accessible={false}` so iOS does not
+  // collapse the message text, exec-approval buttons, reaction pills, or
+  // attachment buttons into a single, unnavigable node. The actions themselves
+  // live on an inset-matched, non-interactive, focusable overlay so the rotor
+  // still has a target while the message subtree stays individually navigable.
+  // The overlay is only rendered when at least one action exists; otherwise it
+  // would become a content-free duplicate VoiceOver stop.
+  function handleBubbleAccessibilityAction(event: AccessibilityActionEvent) {
+    if (event.nativeEvent.actionName === 'reply') {
+      onSwipeReply?.(message);
+      return;
+    }
+    if (event.nativeEvent.actionName === 'more-actions') {
+      onLongPress?.(message);
+    }
+  }
+
+  const bubbleA11y = buildMessageBubbleAccessibilityProps({
+    isFromMe,
+    authorLabel,
+    canSwipeReply,
+    canLongPress: onLongPress !== undefined,
+  });
+
   // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
   const swipeGesture = Gesture.Pan()
     .activeOffsetX(getSwipeReplyActiveOffsetX())
@@ -151,6 +179,7 @@ function MessageBubbleComponent({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onLongPress={onLongPress ? handleLongPress : undefined}
+        accessible={bubbleA11y.accessible}
         className={cn(
           'px-4 py-1',
           isFromMe ? 'items-end' : 'items-start',
@@ -226,6 +255,17 @@ function MessageBubbleComponent({
             onReactionPress={onReactionPress}
           />
         </Animated.View>
+
+        {bubbleA11y.accessibilityActions.length > 0 && (
+          <View
+            accessible
+            accessibilityLabel={bubbleA11y.accessibilityLabel}
+            accessibilityActions={bubbleA11y.accessibilityActions}
+            onAccessibilityAction={handleBubbleAccessibilityAction}
+            className="absolute inset-0 opacity-0"
+            pointerEvents="none"
+          />
+        )}
       </Pressable>
     </GestureDetector>
   );

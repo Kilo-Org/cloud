@@ -1308,6 +1308,86 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.objectContaining({ terminalReason: undefined })
       );
     });
+
+    it('derives the terminal reason from the structured failure payload', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Agent wrapper failed while processing the message',
+          failure: { stage: 'agent_activity', code: 'wrapper_error_after_activity' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'wrapper_failed' })
+      );
+    });
+
+    it('keeps rate limiting distinct from generic assistant failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          failure: { code: 'assistant_error', message: 'Assistant request was rate limited' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'assistant_rate_limited' })
+      );
+    });
+
+    // model_missing arrives with the generic message 'No model was selected',
+    // which the message-based model-not-found check cannot match. Without the
+    // structured path re-applying normalization the row would stay 'failed' and
+    // the customer would get generic copy instead of the actionable message.
+    it('normalizes status to cancelled for a structured model_missing failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'No model was selected',
+          failure: { stage: 'pre_dispatch', code: 'model_missing' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'cancelled', terminalReason: 'model_not_found' })
+      );
+    });
+
+    // errorMessage is deliberately omitted. The real payment_required safe
+    // message contains 'insufficient credits', which the earlier text-based
+    // billing heuristic matches, so including it would set terminalReason before
+    // the structured branch runs and the assertion would pass even if the
+    // payment_required mapping were deleted.
+    it('normalizes status to failed for a structured payment_required failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'interrupted',
+          failure: { code: 'payment_required' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'billing' })
+      );
+    });
   });
 
   describe('attempt tracking and infra retry', () => {
@@ -2871,6 +2951,99 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         }),
         'standard'
       );
+    });
+
+    // Notification only: the customer is told the cause, but the check stays a
+    // plain failure and Code Reviewer is not disabled. A provider rate limit is
+    // transient and there is nothing to reconfigure.
+    it('names the customer key for a byok rate limit without requiring action', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'failure',
+          output: expect.objectContaining({
+            title: 'Kilo Code Review rate limited',
+            summary: 'Your provider API key hit its rate limit.',
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    // A customer's exhausted quota will still be exhausted a moment later, so
+    // retrying burns a second review against the same closed door.
+    it('does not auto-retry a byok rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+    });
+
+    // The GitLab commit status is built by a separate function from the GitHub
+    // check run, so it needs its own coverage.
+    it('names the customer key in the GitLab commit status', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Your provider API key hit its rate limit.',
+        }),
+        'https://gitlab.com'
+      );
+    });
+
+    // Our own capacity can free up, so this one stays retryable.
+    it('still auto-retries a managed key rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_managed',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalled();
     });
 
     it('uses failure conclusion for non-billing failures', async () => {

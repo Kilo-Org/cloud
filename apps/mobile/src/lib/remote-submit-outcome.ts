@@ -1,4 +1,4 @@
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { type CreateSessionOutcome } from '@/lib/hooks/use-remote-instance-spawn';

@@ -1,4 +1,5 @@
 import type { Repository } from '@/components/code-reviews/RepositoryMultiSelect';
+import type { DependabotAlertsAvailability } from '@/lib/security-agent/core/types';
 
 export type SlaConfig = {
   critical: number;
@@ -19,6 +20,7 @@ export type SecurityRepository = {
   fullName: string;
   name: string;
   private: boolean;
+  dependabotAlerts: DependabotAlertsAvailability;
 };
 
 export type SecurityConfigFormState = {

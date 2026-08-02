@@ -1,4 +1,4 @@
-import { type MessageDeliveryState, type StoredMessage } from 'cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from 'lucide-react-native';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -7,9 +7,11 @@ import { Bubble } from '@/components/ui/bubble';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
+import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { PartRenderer } from './part-renderer';
 import { isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
@@ -27,8 +29,6 @@ type MessageBubbleProps = {
   /** Opens the message-details sheet; long-press never triggers the copy ActionSheet. */
   onLongPressDetails?: (message: StoredMessage) => void;
 };
-
-const DETAILS_HINT = 'Long press for message details';
 
 export function MessageBubble({
   message,
@@ -48,9 +48,14 @@ export function MessageBubble({
     onLongPressDetails?.(message);
   };
 
-  // Long-press opens details; keep the VoiceOver/TalkBack rotor "copy" action
-  // on the bubble so a11y tooling still reaches the existing ActionSheet path.
-  const copyAccessibilityActions = [{ name: 'copy', label: 'Copy message' }];
+  // Long-press opens the details sheet; the VoiceOver/TalkBack rotor "copy"
+  // action stays available so a11y tooling still reaches the existing
+  // ActionSheet copy path. The wrapping `Pressable` is explicitly
+  // `accessible={false}` so iOS does not collapse the message subtree
+  // (permission/question `Button`s, child-session "open" `Pressable`, tool
+  // cards, file parts, markdown link handlers) into a single, unnavigable
+  // node; the role/label/hint/copy action live on a dedicated,
+  // non-interactive focusable overlay so the rotor still has a target.
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === 'copy') {
       void copyMessage(message);
@@ -74,25 +79,20 @@ export function MessageBubble({
       .join('');
     const fileParts = message.parts.filter(isFilePart);
     const showQueuedBadge = deliveryState?.status === 'queued';
+    const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: true, canCopy: true });
 
     return (
-      <Pressable
-        onLongPress={handleLongPress}
-        className="px-4 py-1"
-        accessibilityRole="text"
-        accessibilityLabel="User message"
-        accessibilityHint={DETAILS_HINT}
-        accessibilityActions={copyAccessibilityActions}
-        onAccessibilityAction={handleAccessibilityAction}
-      >
+      <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
         <View className="items-end gap-1">
           <Bubble side="user">
-            {textContent ? (
-              <ChatMarkdownText value={textContent} variant="user" selectable={false} />
-            ) : null}
-            {fileParts.map(part => (
-              <FilePartRenderer key={part.id} part={part} />
-            ))}
+            <InMessageBubbleContext.Provider value>
+              {textContent ? (
+                <ChatMarkdownText value={textContent} variant="user" selectable={false} />
+              ) : null}
+              {fileParts.map(part => (
+                <FilePartRenderer key={part.id} part={part} />
+              ))}
+            </InMessageBubbleContext.Provider>
           </Bubble>
           {showQueuedBadge ? (
             <Animated.View
@@ -107,35 +107,54 @@ export function MessageBubble({
             </Animated.View>
           ) : null}
         </View>
+        {a11y.accessibilityActions.length > 0 ? (
+          <View
+            accessible
+            accessibilityRole={a11y.accessibilityRole}
+            accessibilityLabel={a11y.accessibilityLabel}
+            accessibilityHint={a11y.accessibilityHint}
+            accessibilityActions={a11y.accessibilityActions}
+            onAccessibilityAction={handleAccessibilityAction}
+            className="absolute inset-0 opacity-0"
+            pointerEvents="none"
+          />
+        ) : null}
       </Pressable>
     );
   }
 
   // Assistant messages: render parts sequentially without a bubble
   const isStreaming = isLastAssistantMessage && isSessionStreaming;
+  const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: false, canCopy: true });
 
   return (
-    <Pressable
-      className="px-4 py-2"
-      onLongPress={handleLongPress}
-      accessibilityRole="text"
-      accessibilityLabel="Assistant message"
-      accessibilityHint={DETAILS_HINT}
-      accessibilityActions={copyAccessibilityActions}
-      onAccessibilityAction={handleAccessibilityAction}
-    >
-      <View className="gap-2">
-        {message.parts.map(part => (
-          <PartRenderer
-            key={part.id}
-            part={part}
-            isStreaming={isStreaming}
-            getChildMessages={getChildMessages}
-            defaultReasoningExpanded={defaultReasoningExpanded}
-            onOpenChildSession={onOpenChildSession}
-          />
-        ))}
-      </View>
+    <Pressable className="px-4 py-2" onLongPress={handleLongPress} accessible={a11y.accessible}>
+      <InMessageBubbleContext.Provider value>
+        <View className="gap-2">
+          {message.parts.map(part => (
+            <PartRenderer
+              key={part.id}
+              part={part}
+              isStreaming={isStreaming}
+              getChildMessages={getChildMessages}
+              defaultReasoningExpanded={defaultReasoningExpanded}
+              onOpenChildSession={onOpenChildSession}
+            />
+          ))}
+        </View>
+      </InMessageBubbleContext.Provider>
+      {a11y.accessibilityActions.length > 0 ? (
+        <View
+          accessible
+          accessibilityRole={a11y.accessibilityRole}
+          accessibilityLabel={a11y.accessibilityLabel}
+          accessibilityHint={a11y.accessibilityHint}
+          accessibilityActions={a11y.accessibilityActions}
+          onAccessibilityAction={handleAccessibilityAction}
+          className="absolute inset-0 opacity-0"
+          pointerEvents="none"
+        />
+      ) : null}
     </Pressable>
   );
 }

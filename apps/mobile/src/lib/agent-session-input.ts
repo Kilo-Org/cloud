@@ -79,3 +79,17 @@ export function buildAgentSessionSearchInput(options: {
     organizationId: options.organizationId,
   };
 }
+
+/**
+ * Pure input-builder for the `activeSessions.list` tRPC query.
+ *
+ * An absent context collapses to `null` (personal): the tray must never show
+ * organization sessions before the context has loaded, and every caller in the
+ * same context must produce the *same* query key — the live-sync owner writes WS
+ * payloads straight into that key, so a mismatch would silently split the cache.
+ */
+export function buildActiveSessionsInput(organizationId: string | null | undefined): {
+  organizationId: string | null;
+} {
+  return { organizationId: organizationId ?? null };
+}

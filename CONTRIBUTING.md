@@ -102,7 +102,8 @@ pnpm dev:stop
 pnpm test
 ```
 
-This runs the web tests and web environment tests. They should pass against the local PostgreSQL database.
+This runs the web, web environment, and local development-tool tests. They
+should pass against the local PostgreSQL database.
 
 ## Repo Layout
 
@@ -143,7 +144,7 @@ The repo includes a seed runner for creating local fixtures via `pnpm dev:seed`.
 | `pnpm dev:restart` | Restart a running service |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` |
 | `pnpm web:env set <VARIABLE>` | Add or rotate shared web env vars across dotenv defaults, Vercel, and 1Password |
-| `pnpm test` | Run web tests and web environment tests |
+| `pnpm test` | Run web, web environment, and local development-tool tests |
 | `pnpm test:e2e` | Run Playwright end-to-end tests |
 | `pnpm typecheck` | Run TypeScript type checking |
 | `pnpm lint` | Lint all source files |

@@ -1,0 +1,1 @@
+ALTER TABLE `benchmark_runs` ADD `purpose` text DEFAULT 'platform' NOT NULL;

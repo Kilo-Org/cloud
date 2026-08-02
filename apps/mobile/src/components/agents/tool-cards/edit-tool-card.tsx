@@ -1,14 +1,16 @@
 import { View } from 'react-native';
 import { Pencil } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
 import { getFilename } from '../tool-card-utils';
 
 export function EditToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const textSelectable = useTranscriptTextSelectable();
   const input = part.state.input;
   const filePath = typeof input.filePath === 'string' ? input.filePath : '';
   const oldString = typeof input.oldString === 'string' ? input.oldString : '';
@@ -42,7 +44,7 @@ export function EditToolCard({ part }: Readonly<{ part: ToolPart }>) {
         </View>
       ) : null}
       {error ? (
-        <Text selectable className="text-xs text-destructive">
+        <Text selectable={textSelectable} className="text-xs text-destructive">
           {error}
         </Text>
       ) : null}

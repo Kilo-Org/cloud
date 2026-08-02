@@ -1,9 +1,11 @@
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
-import { ActionSheetIOS, Alert, Modal, Platform, Pressable, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Platform, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
-import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -17,16 +19,20 @@ import {
   composeStoredSessionVisibleMeta,
   formatMeta,
   formatSessionTotalCost,
-  repoNameFromGitUrl,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
-import { SessionPlatformIcon, sessionPlatformIconKind } from './session-platform-icon';
+import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import {
   formatSpokenCost,
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
-import { copySessionId, showDeleteConfirm, showRenamePrompt } from './session-row-actions';
+import {
+  copySessionId,
+  showDeleteConfirm,
+  showRenamePrompt,
+  showSessionActionMenu,
+} from './session-row-actions';
 
 /** Container shape only. `'list'` (default) keeps the Agents list look
  * (`stripMode="inline"`, inner padding so the strip sits inside the
@@ -91,9 +97,10 @@ export function StoredSessionRow({
   metaWhileLive = false,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
+  const { showActionSheetWithOptions } = useActionSheet();
   const title = session.title && session.title.length > 0 ? session.title : 'Untitled session';
   const [renameVisible, setRenameVisible] = useState(false);
-  const renameTextRef = useRef(title);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
@@ -109,63 +116,31 @@ export function StoredSessionRow({
     reconcileSessionAttention(session.session_id, session.status, session.status_updated_at);
   }, [session.session_id, session.status, session.status_updated_at, revision]);
 
-  const handleRenameConfirm = () => {
-    const newName = renameTextRef.current.trim();
-    setRenameVisible(false);
-    if (newName && newName !== title) {
-      onRename?.(newName);
-    }
-  };
-
   const handleLongPress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Copy session ID', 'Rename', 'Delete session', 'Cancel'],
-          cancelButtonIndex: 3,
-          destructiveButtonIndex: 2,
-        },
-        buttonIndex => {
-          if (buttonIndex === 0) {
-            void copySessionId(session.session_id);
-          } else if (buttonIndex === 1 && onRename) {
-            showRenamePrompt(title, newTitle => {
-              onRename(newTitle);
-            });
-          } else if (buttonIndex === 2 && onDelete) {
+    showSessionActionMenu({
+      showActionSheetWithOptions,
+      bottomInset: bottom,
+      onCopySessionId: () => {
+        void copySessionId(session.session_id);
+      },
+      onRename: onRename
+        ? () => {
+            if (Platform.OS === 'ios') {
+              showRenamePrompt(title, newTitle => {
+                onRename(newTitle);
+              });
+            } else {
+              setRenameVisible(true);
+            }
+          }
+        : undefined,
+      onDelete: onDelete
+        ? () => {
             showDeleteConfirm(onDelete);
           }
-        }
-      );
-    } else {
-      Alert.alert('Session actions', undefined, [
-        {
-          text: 'Copy session ID',
-          onPress: () => {
-            void copySessionId(session.session_id);
-          },
-        },
-        {
-          text: 'Rename',
-          onPress: () => {
-            renameTextRef.current = title;
-            setRenameVisible(true);
-          },
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            if (onDelete) {
-              showDeleteConfirm(onDelete);
-            }
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
+        : undefined,
+    });
   };
 
   // Visible and spoken meta mirror `formatMeta(timestamp)`. When `needsInput`
@@ -185,8 +160,13 @@ export function StoredSessionRow({
 
   // Platform icon only on the Agents list variant. Home cards stay
   // byte-identical (platformIcon defaults to undefined).
-  const platformIconKind =
-    variant === 'list' ? sessionPlatformIconKind(session.created_on_platform) : null;
+  const { iconKind: platformIconKind, spokenPlatform: a11yPlatform } =
+    selectRowPlatformPresentation({
+      platform: session.created_on_platform,
+      variant,
+      needsInput,
+      gitUrl: session.git_url,
+    });
   const platformIcon =
     platformIconKind != null ? (
       <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
@@ -197,14 +177,6 @@ export function StoredSessionRow({
         />
       </View>
     ) : undefined;
-
-  // Speak the platform only when an icon is shown, not needs-input, AND the
-  // eyebrow badge is a repo name (otherwise the badge already speaks the
-  // platform label and appending would be redundant).
-  const a11yPlatform =
-    platformIconKind != null && !needsInput && repoNameFromGitUrl(session.git_url) != null
-      ? session.created_on_platform
-      : undefined;
 
   return (
     <>
@@ -235,54 +207,22 @@ export function StoredSessionRow({
         />
       </Pressable>
 
-      <Modal
-        visible={renameVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setRenameVisible(false);
-        }}
-      >
-        <View className="flex-1 items-center justify-center bg-black/50 px-8">
-          <View className="w-full gap-4 rounded-xl bg-card p-5">
-            <Text className="text-base font-semibold">Rename session</Text>
-            <TextInput
-              defaultValue={title}
-              onChangeText={text => {
-                renameTextRef.current = text;
-              }}
-              onSubmitEditing={handleRenameConfirm}
-              returnKeyType="done"
-              autoFocus
-              className="rounded-lg border border-border px-3 py-2.5 text-sm leading-5 text-foreground"
-              placeholderTextColor={colors.mutedForeground}
-              selectionColor={colors.primary}
-            />
-            <View className="flex-row justify-end gap-4">
-              <Pressable
-                onPress={() => {
-                  setRenameVisible(false);
-                }}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel"
-                className="active:opacity-70"
-              >
-                <Text className="text-sm text-muted-foreground">Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleRenameConfirm}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Rename"
-                className="active:opacity-70"
-              >
-                <Text className="text-sm font-semibold text-primary">Rename</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {renameVisible && (
+        <RenameModal
+          title="Rename session"
+          placeholder="Session name"
+          initialValue={title}
+          onClose={() => {
+            setRenameVisible(false);
+          }}
+          onSave={async name => {
+            // Resolve immediately so RenameModal closes like today's list flow;
+            // mutation errors toast + roll back outside the modal (r5b-3).
+            onRename?.(name);
+            await Promise.resolve();
+          }}
+        />
+      )}
     </>
   );
 }

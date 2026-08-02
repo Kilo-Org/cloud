@@ -62,6 +62,10 @@ export type ConnectedInstanceRow = {
   name: string;
   projectName: string;
   version?: string;
+  // Latest capabilities from the CLI socket attachment. Omitted when the
+  // attachment has no capabilities (legacy CLI / pre-field build) so the
+  // response stays byte-identical for those clients.
+  capabilities?: ConnectionCapabilities;
 };
 
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
@@ -156,6 +160,27 @@ const CLI_COMMAND_ERROR = {
   message: 'Command failed',
 };
 
+type ReadyPushEntry = {
+  kiloUserId: string;
+  title: string;
+  fireAt: number;
+  attempts: number;
+};
+
+type RenameEntry = {
+  title: string;
+  at: number;
+};
+
+const READY_PUSH_KEY_PREFIX = 'readyPush:';
+const RENAME_KEY_PREFIX = 'rename:';
+const SESSION_READY_PUSH_DELAY_MS = 5_000;
+/** Backoff between ready-push claim retries so the 3-attempt bound spans real time. */
+const READY_PUSH_RETRY_BACKOFF_MS = 5_000;
+const READY_PUSH_MAX_ATTEMPTS = 3;
+/** Drop offline rename catch-up entries that never matched a heartbeat title. */
+const RENAME_ENTRY_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+
 export class UserConnectionDO extends DurableObject<Env> {
   private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
   private static readonly PENDING_COMMAND_TTL_MS = 35_000;
@@ -187,6 +212,10 @@ export class UserConnectionDO extends DurableObject<Env> {
   >();
   // Last heartbeat timestamp per CLI connectionId (for staleness eviction)
   private lastHeartbeatAt = new Map<string, number>();
+  // In-memory mirror of readyPush KV fireAt values — scheduling only; KV is source of truth
+  private readyPushFireAt = new Map<string, number>();
+  // One-shot post-eviction rebuild gate; reset whenever ensureState actually reconstructs
+  private readyPushRebuilt = false;
 
   private stateReconstructed = false;
 
@@ -234,6 +263,8 @@ export class UserConnectionDO extends DurableObject<Env> {
     });
 
     this.stateReconstructed = true;
+    // Fresh reconstruction must re-list readyPush KV once for scheduling.
+    this.readyPushRebuilt = false;
   }
 
   fetch(request: Request): Response {
@@ -364,6 +395,7 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     const now = Date.now();
     this.expirePendingCommands(now);
+    await this.fireReadyPushes(now);
     const staleConnectionIds: string[] = [];
 
     for (const [connectionId, lastSeen] of this.lastHeartbeatAt) {
@@ -464,14 +496,26 @@ export class UserConnectionDO extends DurableObject<Env> {
       if (previousOwner && previousOwner !== connectionId) {
         this.failPendingCommandsForOwnerChange(session.id, connectionId);
       }
-      // First sight of a main session on this DO means it just became
-      // remote-controllable — the only moment the session-ready push fires.
-      // The durable claim in SessionIngestDO makes reconnect re-sights no-ops.
+      // First sight of a main session on this DO: schedule a delayed session-ready
+      // push (Decision 9). The durable claim in SessionIngestDO makes reconnect
+      // re-sights no-ops once the delayed claim lands.
       if (!previousOwner && !session.parentSessionId && attachment.kiloUserId) {
-        this.claimSessionReadyPush(attachment.kiloUserId, session.id, session.title);
+        this.scheduleSessionReadyPush(attachment.kiloUserId, session.id, session.title);
       }
       this.sessionOwners.set(session.id, connectionId);
     }
+
+    // Offline rename catch-up: re-emit stored renames whose heartbeat title still
+    // differs; delete entries once the CLI title matches (self-cleaning).
+    // Lazy KV read per heartbeat (no in-memory rename mirror). Keep alive via
+    // waitUntil so the DO does not hibernate before catch-up finishes.
+    this.ctx.waitUntil(
+      this.catchUpPendingRenames(ws, sessions).catch((error: unknown) => {
+        console.error('Failed to catch up pending renames (non-fatal)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+    );
 
     // Replay existing subscriptions for sessions newly owned by this CLI
     const previousIds = new Set(previousSessions.map(s => s.id));
@@ -514,19 +558,164 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   /**
-   * Fire-and-forget "session ready to control from your phone" push via the
-   * session's SessionIngestDO, which holds the durable once-ever claim.
+   * Schedule a delayed session-ready push: KV put (awaited) then arm alarm.
+   * All inside waitUntil so the heartbeat path stays sync.
+   * No-op when a pending entry already exists (mirror or KV) so reconnect
+   * first-sights do not slide fireAt or reset attempts.
    */
-  private claimSessionReadyPush(kiloUserId: string, sessionId: string, title: string): void {
-    const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
+  private scheduleSessionReadyPush(kiloUserId: string, sessionId: string, title: string): void {
+    if (this.readyPushFireAt.has(sessionId)) return;
+
+    const key = `${READY_PUSH_KEY_PREFIX}${sessionId}`;
     this.ctx.waitUntil(
-      stub.claimSessionReadyPush(kiloUserId, sessionId, title).catch((error: unknown) => {
-        console.error('Failed to claim session-ready push (non-fatal)', {
+      (async () => {
+        const existing = await this.ctx.storage.get<ReadyPushEntry>(key);
+        if (existing) {
+          this.readyPushFireAt.set(sessionId, existing.fireAt);
+          this.scheduleNextAlarm(Date.now());
+          return;
+        }
+        const fireAt = Date.now() + SESSION_READY_PUSH_DELAY_MS;
+        await this.ctx.storage.put(key, {
+          kiloUserId,
+          title,
+          fireAt,
+          attempts: 0,
+        } satisfies ReadyPushEntry);
+        this.readyPushFireAt.set(sessionId, fireAt);
+        this.scheduleNextAlarm(Date.now());
+      })().catch((error: unknown) => {
+        console.error('Failed to schedule session-ready push (non-fatal)', {
           sessionId,
           error: error instanceof Error ? error.message : String(error),
         });
       })
     );
+  }
+
+  /**
+   * Await the SessionIngestDO claim. Rejects on DO/transport failure — the
+   * throw class the ready-push retry bound covers. Notification-dispatch
+   * failures are swallowed inside SessionIngestDO (unchanged).
+   */
+  private async claimSessionReadyPush(
+    kiloUserId: string,
+    sessionId: string,
+    title?: string
+  ): Promise<void> {
+    const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
+    await stub.claimSessionReadyPush(kiloUserId, sessionId, title);
+  }
+
+  private async fireReadyPushes(now: number): Promise<void> {
+    let pending: Map<string, ReadyPushEntry>;
+    try {
+      pending = await this.ctx.storage.list<ReadyPushEntry>({ prefix: READY_PUSH_KEY_PREFIX });
+    } catch (error: unknown) {
+      console.error('Failed to list readyPush entries', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    for (const [key, entry] of pending) {
+      if (!entry || typeof entry.fireAt !== 'number') continue;
+      if (entry.fireAt > now) continue;
+
+      const sessionId = key.slice(READY_PUSH_KEY_PREFIX.length);
+      if (!sessionId) continue;
+
+      // Freshest title: heartbeat title only if it exists and differs from stored;
+      // else undefined so notifications falls back to the live DB title.
+      const heartbeatTitle = this.findHeartbeatTitle(sessionId);
+      const freshest =
+        heartbeatTitle !== undefined && heartbeatTitle !== entry.title ? heartbeatTitle : undefined;
+
+      try {
+        await this.claimSessionReadyPush(entry.kiloUserId, sessionId, freshest);
+        await this.ctx.storage.delete(key);
+        this.readyPushFireAt.delete(sessionId);
+      } catch (error: unknown) {
+        const attempts = (entry.attempts ?? 0) + 1;
+        if (attempts >= READY_PUSH_MAX_ATTEMPTS) {
+          await this.ctx.storage.delete(key);
+          this.readyPushFireAt.delete(sessionId);
+          console.error('Dropping session-ready push after max attempts', {
+            sessionId,
+            attempts,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        } else {
+          const fireAt = now + READY_PUSH_RETRY_BACKOFF_MS;
+          await this.ctx.storage.put(key, { ...entry, attempts, fireAt });
+          this.readyPushFireAt.set(sessionId, fireAt);
+          console.error('Session-ready push claim failed; will retry', {
+            sessionId,
+            attempts,
+            fireAt,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+  }
+
+  private findHeartbeatTitle(sessionId: string): string | undefined {
+    for (const sessions of this.connectionSessions.values()) {
+      for (const session of sessions) {
+        if (session.id === sessionId) return session.title;
+      }
+    }
+    return undefined;
+  }
+
+  private async catchUpPendingRenames(ws: WebSocket, sessions: HeartbeatSession[]): Promise<void> {
+    const now = Date.now();
+    for (const session of sessions) {
+      const key = `${RENAME_KEY_PREFIX}${session.id}`;
+      let entry: RenameEntry | undefined;
+      try {
+        entry = await this.ctx.storage.get<RenameEntry>(key);
+      } catch (error: unknown) {
+        console.error('Failed to read rename catch-up entry', {
+          sessionId: session.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      if (!entry) continue;
+
+      // Prune entries past TTL so finished/ignored renames do not re-emit forever.
+      if (typeof entry.at === 'number' && now - entry.at > RENAME_ENTRY_TTL_MS) {
+        try {
+          await this.ctx.storage.delete(key);
+        } catch (error: unknown) {
+          console.error('Failed to delete expired rename entry', {
+            sessionId: session.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        continue;
+      }
+
+      if (session.title === entry.title) {
+        try {
+          await this.ctx.storage.delete(key);
+        } catch (error: unknown) {
+          console.error('Failed to delete matched rename entry', {
+            sessionId: session.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        continue;
+      }
+
+      this.sendToCli(ws, {
+        type: 'system',
+        event: 'session.renamed',
+        data: { sessionId: session.id, title: entry.title },
+      });
+    }
   }
 
   private handleCliEvent(
@@ -856,7 +1045,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     });
 
     // Fail pending commands that targeted this specific socket
-    this.failPendingCommandsForSocket(disconnectedWs);
+    this.failPendingCommandsForSocket(disconnectedWs, !replaced);
 
     if (replaced) {
       console.log('Stale CLI socket closed (already replaced)', { connectionId });
@@ -1007,6 +1196,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         name: att.instance.name,
         projectName: att.instance.projectName,
         ...(att.instance.version ? { version: att.instance.version } : {}),
+        ...(att.capabilities ? { capabilities: att.capabilities } : {}),
       });
     }
     return { instances };
@@ -1032,6 +1222,34 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
     return { delivered };
+  }
+
+  /**
+   * Persist a web→CLI rename under KV (offline catch-up) and deliver
+   * `session.renamed` to the owning CLI socket when one is connected.
+   */
+  async notifySessionRenamed(sessionId: string, title: string): Promise<{ delivered: boolean }> {
+    this.ensureState();
+    await this.ctx.storage.put(`${RENAME_KEY_PREFIX}${sessionId}`, {
+      title,
+      at: Date.now(),
+    } satisfies RenameEntry);
+
+    const ownerConnectionId = this.sessionOwners.get(sessionId);
+    if (!ownerConnectionId) {
+      return { delivered: false };
+    }
+    const cliWs = this.findCliByConnectionId(ownerConnectionId);
+    if (!cliWs) {
+      return { delivered: false };
+    }
+
+    this.sendToCli(cliWs, {
+      type: 'system',
+      event: 'session.renamed',
+      data: { sessionId, title },
+    });
+    return { delivered: true };
   }
 
   hasActiveCliSession(sessionId: string): boolean {
@@ -1078,7 +1296,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       const att = ws.deserializeAttachment() as WSAttachment | null;
       if (att?.role === 'cli' && att.connectionId === connectionId) {
         console.log('Closing stale CLI socket for reconnect', { connectionId });
-        this.failPendingCommandsForSocket(ws);
+        this.failPendingCommandsForSocket(ws, false);
         // Preserve session ownership — the reconnecting CLI still owns these sessions
         ws.close(1000, 'replaced by reconnect');
         return true;
@@ -1127,16 +1345,25 @@ export class UserConnectionDO extends DurableObject<Env> {
     return undefined;
   }
 
-  private failPendingCommandsForSocket(targetWs: WebSocket): void {
+  private failPendingCommandsForSocket(targetWs: WebSocket, cliGone: boolean): void {
     for (const [id, entry] of this.pendingCommands) {
-      if (entry.targetCliWs === targetWs) {
-        this.sendToWeb(entry.ws, {
-          type: 'response',
-          id: entry.originalId,
-          error: entry.expectedOwnerConnectionId ? SESSION_OWNER_CHANGED_ERROR : 'CLI disconnected',
-        });
-        this.pendingCommands.delete(id);
-      }
+      if (entry.targetCliWs !== targetWs) continue;
+      // The owning CLI is really gone, so a forwarded `exit_cli` got what it
+      // asked for: this session is no longer owned by anyone.
+      const exited = cliGone && entry.command === 'exit_cli';
+      this.sendToWeb(
+        entry.ws,
+        exited
+          ? { type: 'response', id: entry.originalId, result: {} }
+          : {
+              type: 'response',
+              id: entry.originalId,
+              error: entry.expectedOwnerConnectionId
+                ? SESSION_OWNER_CHANGED_ERROR
+                : 'CLI disconnected',
+            }
+      );
+      this.pendingCommands.delete(id);
     }
   }
 
@@ -1149,11 +1376,15 @@ export class UserConnectionDO extends DurableObject<Env> {
         continue;
       }
       this.pendingCommands.delete(id);
-      this.sendToWeb(entry.ws, {
-        type: 'response',
-        id: entry.originalId,
-        error: SESSION_OWNER_CHANGED_ERROR,
-      });
+      // `exit_cli` asked for exactly this: the session is no longer owned.
+      // Ownership moving to another CLI is a genuine owner change and still fails.
+      const exited = entry.command === 'exit_cli' && nextOwnerConnectionId === undefined;
+      this.sendToWeb(
+        entry.ws,
+        exited
+          ? { type: 'response', id: entry.originalId, result: {} }
+          : { type: 'response', id: entry.originalId, error: SESSION_OWNER_CHANGED_ERROR }
+      );
     }
   }
 
@@ -1170,6 +1401,32 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   private scheduleNextAlarm(now: number): void {
+    // Post-eviction one-shot: rebuild readyPushFireAt from KV when the mirror
+    // is empty and we have not yet successfully refreshed this wake.
+    if (this.readyPushFireAt.size === 0 && !this.readyPushRebuilt) {
+      this.ctx.waitUntil(
+        (async () => {
+          try {
+            const pending = await this.ctx.storage.list<ReadyPushEntry>({
+              prefix: READY_PUSH_KEY_PREFIX,
+            });
+            for (const [key, entry] of pending) {
+              if (!entry || typeof entry.fireAt !== 'number') continue;
+              const sessionId = key.slice(READY_PUSH_KEY_PREFIX.length);
+              if (sessionId) this.readyPushFireAt.set(sessionId, entry.fireAt);
+            }
+            this.readyPushRebuilt = true;
+            this.scheduleNextAlarm(Date.now());
+          } catch (error: unknown) {
+            // Leave readyPushRebuilt false so the next schedule retries.
+            console.error('Failed to rebuild readyPush mirror', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })()
+      );
+    }
+
     let nextAlarmAt: number | undefined;
 
     for (const lastSeen of this.lastHeartbeatAt.values()) {
@@ -1182,6 +1439,20 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const entry of this.pendingCommands.values()) {
       if (entry.expiresAt > now && (nextAlarmAt === undefined || entry.expiresAt < nextAlarmAt)) {
         nextAlarmAt = entry.expiresAt;
+      }
+    }
+
+    // readyPush entries are NEVER filtered by fireAt > now: if any exists and
+    // min(fireAt) <= now, arm at now (immediate fire). Arm whenever any
+    // readyPush exists, even with zero heartbeat/pending candidates.
+    if (this.readyPushFireAt.size > 0) {
+      let minFireAt = Infinity;
+      for (const fireAt of this.readyPushFireAt.values()) {
+        if (fireAt < minFireAt) minFireAt = fireAt;
+      }
+      const readyAt = minFireAt <= now ? now : minFireAt;
+      if (nextAlarmAt === undefined || readyAt < nextAlarmAt) {
+        nextAlarmAt = readyAt;
       }
     }
 

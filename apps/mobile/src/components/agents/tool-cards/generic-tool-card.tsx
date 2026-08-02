@@ -1,9 +1,10 @@
 import { View } from 'react-native';
 import { Plug } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
 import { getGenericToolTitle } from '../tool-card-utils';
@@ -17,6 +18,7 @@ function formatInput(input: Record<string, unknown>): string {
 }
 
 export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const textSelectable = useTranscriptTextSelectable();
   const input = part.state.input;
   const stateTitle =
     part.state.status === 'running' || part.state.status === 'completed'
@@ -31,7 +33,13 @@ export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const hasExpandedContent = Boolean(inputStr) || Boolean(output) || Boolean(error);
 
   return (
-    <ToolCardShell icon={Plug} title={part.tool} subtitle={subtitle} status={part.state.status}>
+    <ToolCardShell
+      icon={Plug}
+      title={part.tool}
+      subtitle={subtitle}
+      status={part.state.status}
+      part={part}
+    >
       {hasExpandedContent ? (
         <View className="gap-2">
           {inputStr ? (
@@ -45,7 +53,7 @@ export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
             <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
           ) : null}
           {error ? (
-            <Text selectable className="text-xs text-destructive">
+            <Text selectable={textSelectable} className="text-xs text-destructive">
               {error}
             </Text>
           ) : null}

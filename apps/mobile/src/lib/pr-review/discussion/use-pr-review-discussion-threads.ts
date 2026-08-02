@@ -18,6 +18,7 @@
 // only — simpler than flatten-then-dedupe and matches the guarantee.
 
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useTRPC } from '@/lib/trpc';
@@ -50,7 +51,10 @@ export function usePrReviewDiscussionThreads(args: {
   // Flat list of all threads across all loaded pages, in page order.
   // Ordering for display is applied by `mergeDiscussionListItems` in
   // the tab (full re-sort of the entire loaded set).
-  const threads = (query.data?.pages ?? []).flatMap(page => page.threads);
+  // Memoized so identity changes only when page data changes (RQ
+  // structural sharing keeps `pages` stable across unrelated re-renders).
+  const pages = query.data?.pages;
+  const threads = useMemo(() => (pages ?? []).flatMap(page => page.threads), [pages]);
 
   // First page only — backend guarantees later pages return [].
   const conversation = query.data?.pages[0]?.conversation ?? [];

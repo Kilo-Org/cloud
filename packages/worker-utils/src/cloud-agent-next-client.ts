@@ -144,28 +144,58 @@ export type CloudAgentInterruptOutput = {
 
 /**
  * Valid terminal reasons for code review failures.
- * KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS / CodeReviewTerminalReason
- * in packages/db/src/schema-types.ts — both lists must contain the same
- * literal values. A mismatch will cause the orchestrator to send a reason
- * that normalizePayload rejects via its allowlist check.
+ *
+ * Exported as a runtime array so worker-side consumers can derive their
+ * validators from it instead of retyping the literals — see
+ * services/code-review-infra/src/types.ts, where a missing value used to be
+ * silently coerced to undefined by a `.catch(undefined)` zod enum.
+ *
+ * KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS in
+ * packages/db/src/schema-types.ts — both lists must contain the same literal
+ * values, and a mismatch makes the orchestrator send a reason the callback's
+ * allowlist rejects. apps/web asserts the two are equal (see
+ * apps/web/src/lib/code-reviews/terminal-reason-from-failure.test.ts).
  */
-export type CloudAgentTerminalReason =
-  | 'billing'
-  | 'model_not_found'
-  | 'github_installation_required'
-  | 'github_ip_allow_list'
-  | 'gitlab_project_access_required'
-  | 'byok_invalid_key'
-  | 'selected_model_unavailable'
-  | 'repeated_repository_clone_timeout'
-  | 'user_cancelled'
-  | 'superseded'
-  | 'interrupted'
-  | 'timeout'
-  | 'upstream_error'
-  | 'sandbox_error'
-  | 'workspace_capacity'
-  | 'unknown';
+export const CLOUD_AGENT_TERMINAL_REASONS = [
+  'billing',
+  'model_not_found',
+  'github_installation_required',
+  'github_ip_allow_list',
+  'gitlab_project_access_required',
+  'byok_invalid_key',
+  'selected_model_unavailable',
+  'repeated_repository_clone_timeout',
+  'user_cancelled',
+  'superseded',
+  'interrupted',
+  'timeout',
+  'upstream_error',
+  'sandbox_error',
+  'workspace_capacity',
+  'assistant_failed',
+  'assistant_rate_limited',
+  'assistant_rate_limited_byok',
+  'assistant_rate_limited_managed',
+  'assistant_unavailable',
+  'assistant_timeout',
+  'assistant_unauthorized',
+  'assistant_invalid_request',
+  'assistant_no_reply',
+  'wrapper_failed',
+  'runtime_startup_failed',
+  'sandbox_connection',
+  'delivery_failed',
+  'workspace_setup_failed',
+  'repository_clone_failed',
+  'repository_auth_failed',
+  'repository_checkout_failed',
+  'session_import_failed',
+  'setup_command_failed',
+  'container_shutdown',
+  'unknown',
+] as const;
+
+export type CloudAgentTerminalReason = (typeof CLOUD_AGENT_TERMINAL_REASONS)[number];
 
 export class CloudAgentNextError extends Error {
   readonly procedure: string;

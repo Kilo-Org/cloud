@@ -176,6 +176,11 @@ export const APP_BUILDER_DB_PROXY_AUTH_TOKEN = getEnvVariable('APP_BUILDER_DB_PR
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
+// Posts notifications from server-side Admin UI code to a fixed Slack channel.
+// Expected to be a Slack Incoming Webhook URL. Keep this server-only.
+export const SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL = getEnvVariable(
+  'SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL'
+);
 
 // Linear (bot integration)
 // @chat-adapter/linear 4.27 does not (yet) support encryption-at-rest via
@@ -253,6 +258,9 @@ export const AGENT_ENV_VARS_PUBLIC_KEY = getEnvVariable('AGENT_ENV_VARS_PUBLIC_K
 export const GASTOWN_SERVICE_URL =
   getEnvVariable('GASTOWN_SERVICE_URL') ||
   (process.env.NODE_ENV === 'production' ? 'https://gastown.kiloapps.io' : null);
+export const GASTOWN_BILLING_ANNOUNCEMENT_ENABLED =
+  process.env.NODE_ENV === 'development' ||
+  getEnvVariable('GASTOWN_BILLING_ANNOUNCEMENT_ENABLED') === 'true';
 export const GASTOWN_CF_ACCESS_CLIENT_ID = getEnvVariable('GASTOWN_SERVICE_CF_ACCESS_CLIENT_ID');
 export const GASTOWN_CF_ACCESS_CLIENT_SECRET = getEnvVariable(
   'GASTOWN_SERVICE_CF_ACCESS_CLIENT_SECRET'
@@ -273,6 +281,8 @@ export const CLOUDFLARE_TOWN_DO_NAMESPACE_ID = getEnvVariable('CLOUDFLARE_TOWN_D
 export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
   'CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID'
 );
+// Cloudflare Containers GraphQL Analytics (admin reconciliation). Point-of-use only; do not throw at module load.
+export const CLOUDFLARE_ANALYTICS_API_TOKEN = getEnvVariable('CLOUDFLARE_ANALYTICS_API_TOKEN');
 
 // KiloClaw Worker
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';

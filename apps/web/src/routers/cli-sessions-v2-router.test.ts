@@ -16,12 +16,38 @@ import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
 import { parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
+import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
+import { captureException } from '@sentry/nextjs';
 
 jest.mock('@/lib/config.server', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
   return {
     ...actual,
     SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',
+  };
+});
+
+// `after()` only works inside a Next request scope. Capture callbacks so rename
+// notify tests can flush them outside a request context.
+const afterCallbacks: Array<() => void | Promise<void>> = [];
+jest.mock('next/server', () => {
+  return {
+    ...(jest.requireActual('next/server') as Record<string, unknown>),
+    after: (fn: () => void | Promise<void>) => {
+      afterCallbacks.push(fn);
+    },
+  };
+});
+
+jest.mock('@/lib/cloud-agent/session-events', () => ({
+  notifyCliSessionRenamed: jest.fn().mockResolvedValue({ delivered: true }),
+}));
+
+jest.mock('@sentry/nextjs', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@sentry/nextjs');
+  return {
+    ...actual,
+    captureException: jest.fn(),
   };
 });
 
@@ -49,6 +75,16 @@ jest.mock('@/lib/session-ingest-client', () => {
   };
 });
 
+const mockedNotifyCliSessionRenamed = notifyCliSessionRenamed as jest.MockedFunction<
+  typeof notifyCliSessionRenamed
+>;
+const mockedCaptureException = captureException as jest.MockedFunction<typeof captureException>;
+
+async function flushAfterCallbacks(): Promise<void> {
+  const pending = afterCallbacks.splice(0);
+  await Promise.all(pending.map(fn => Promise.resolve(fn())));
+}
+
 const mockedFetchPullRequestForBranch =
   githubAdapter.fetchPullRequestForBranch as jest.MockedFunction<
     typeof githubAdapter.fetchPullRequestForBranch
@@ -60,6 +96,12 @@ let adminUser: User;
 let testOrganization: Organization;
 
 describe('cli-sessions-v2-router', () => {
+  beforeEach(() => {
+    afterCallbacks.length = 0;
+    mockedNotifyCliSessionRenamed.mockReset().mockResolvedValue({ delivered: true });
+    mockedCaptureException.mockClear();
+  });
+
   beforeAll(async () => {
     regularUser = await insertTestUser({
       google_user_email: 'cli-sessions-v2-user@example.com',
@@ -855,6 +897,36 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.title).toBe('renamed by current member');
+    });
+
+    it('rename always overwrites the title, whether it is still the creation placeholder or an existing (e.g. agent-generated) title', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // Session starts with title NULL (the creation placeholder) — rename must succeed.
+      const [beforeAnyTitle] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(beforeAnyTitle?.title).toBeNull();
+
+      const firstRename = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'agent-generated title',
+      });
+      expect(firstRename.title).toBe('agent-generated title');
+
+      // A subsequent user rename must overwrite an already non-null (agent-generated) title too.
+      const secondRename = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'user renamed title',
+      });
+      expect(secondRename.title).toBe('user renamed title');
+
+      const [persisted] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(persisted?.title).toBe('user renamed title');
     });
 
     it('rename rejects an organization session after its creator loses membership', async () => {
@@ -1845,6 +1917,91 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.results.map(session => session.session_id)).not.toContain(placeholderId);
       expect(result.total).toBe(0);
+    });
+  });
+
+  describe('rename CLI notify', () => {
+    const sessionId = 'ses_rename_notify_test_abc12';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cli',
+        title: 'original title',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('notifies session-ingest with the renamed sessionId, title, and user after success', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.rename({
+        session_id: sessionId,
+        title: 'web renamed title',
+      });
+
+      expect(result).toEqual({ title: 'web renamed title' });
+      expect(mockedNotifyCliSessionRenamed).not.toHaveBeenCalled();
+
+      await flushAfterCallbacks();
+
+      expect(mockedNotifyCliSessionRenamed).toHaveBeenCalledTimes(1);
+      expect(mockedNotifyCliSessionRenamed).toHaveBeenCalledWith({
+        sessionId,
+        title: 'web renamed title',
+        userId: regularUser.id,
+      });
+    });
+
+    it('still returns the renamed title when the CLI notify helper fails', async () => {
+      const notifyError = new Error('ingest unavailable');
+      mockedNotifyCliSessionRenamed.mockRejectedValue(notifyError);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.rename({
+        session_id: sessionId,
+        title: 'still renamed',
+      });
+
+      expect(result).toEqual({ title: 'still renamed' });
+
+      await flushAfterCallbacks();
+
+      expect(mockedNotifyCliSessionRenamed).toHaveBeenCalledWith({
+        sessionId,
+        title: 'still renamed',
+        userId: regularUser.id,
+      });
+      expect(mockedCaptureException).toHaveBeenCalledWith(
+        notifyError,
+        expect.objectContaining({
+          tags: { source: 'cli-sessions-v2-router', endpoint: 'rename-notify' },
+          extra: { sessionId },
+        })
+      );
+
+      const [persisted] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(persisted?.title).toBe('still renamed');
+    });
+
+    it('does not notify when the session is not found', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.rename({
+          session_id: 'ses_does_not_exist_zzzzzz',
+          title: 'nope',
+        })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+      await flushAfterCallbacks();
+      expect(mockedNotifyCliSessionRenamed).not.toHaveBeenCalled();
     });
   });
 });

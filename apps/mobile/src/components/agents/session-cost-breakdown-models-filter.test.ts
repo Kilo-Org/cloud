@@ -12,7 +12,7 @@ import {
   type Part,
   type StepFinishPart,
   type StoredMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 /**
  * R8 / AC8 — Models section display filter.
@@ -128,29 +128,37 @@ describe('getVisibleSessionCostModels / getModelsSectionCount', () => {
     expect(visible.map(m => m.modelID)).toEqual(['anthropic/claude-sonnet-4', 'gpt-4o']);
   });
 
-  it('derives Models (N) from filtered rows + residual, never unfiltered length', () => {
+  it('derives Models (N) from filtered rows + residuals, never unfiltered length', () => {
     const autoOnly = [modelRow({ providerID: 'kilo', modelID: 'kilo-auto/efficient' })];
     // Auto-only, no residual → section hidden (count 0)
-    expect(getModelsSectionCount(autoOnly, 0)).toBe(0);
-    // Auto-only + residual → count is residual only (1), not 2
-    expect(getModelsSectionCount(autoOnly, 0.02)).toBe(1);
+    expect(getModelsSectionCount(autoOnly, 0, 0)).toBe(0);
+    // Auto-only + subagent residual → count is residual only (1), not 2
+    expect(getModelsSectionCount(autoOnly, 0.02, 0)).toBe(1);
+    // Auto-only + older activity residual → count is residual only (1)
+    expect(getModelsSectionCount(autoOnly, 0, 0.03)).toBe(1);
+    // Auto-only + both residuals → 2
+    expect(getModelsSectionCount(autoOnly, 0.02, 0.03)).toBe(2);
 
     const mixed = [
       modelRow({ providerID: 'kilo', modelID: 'kilo-auto/efficient' }),
       modelRow({ providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' }),
     ];
-    // Filtered list (1) + residual → 2, not unfiltered 2 + residual = 3
-    expect(getModelsSectionCount(mixed, 0.02)).toBe(2);
+    // Filtered list (1) + subagent residual → 2, not unfiltered 2 + residual = 3
+    expect(getModelsSectionCount(mixed, 0.02, 0)).toBe(2);
     // Filtered list only → 1
-    expect(getModelsSectionCount(mixed, 0)).toBe(1);
+    expect(getModelsSectionCount(mixed, 0, 0)).toBe(1);
+    // Filtered list (1) + both residuals → 3
+    expect(getModelsSectionCount(mixed, 0.02, 0.01)).toBe(3);
   });
 
-  it('returns zero when there are no models and no residual', () => {
-    expect(getModelsSectionCount([], 0)).toBe(0);
+  it('returns zero when there are no models and no residuals', () => {
+    expect(getModelsSectionCount([], 0, 0)).toBe(0);
   });
 
   it('counts residual alone when models list is empty', () => {
-    expect(getModelsSectionCount([], 0.05)).toBe(1);
+    expect(getModelsSectionCount([], 0.05, 0)).toBe(1);
+    expect(getModelsSectionCount([], 0, 0.04)).toBe(1);
+    expect(getModelsSectionCount([], 0.05, 0.04)).toBe(2);
   });
 });
 

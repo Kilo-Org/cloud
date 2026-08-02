@@ -102,6 +102,30 @@ export const MayorStatusOutput = z.object({
     .nullable(),
 });
 
+export const BillingStatusOutput = z.object({
+  enabled: z.boolean(),
+  enforcing: z.boolean(),
+  state: z.enum([
+    'idle',
+    'starting',
+    'running',
+    'warning',
+    'stopping',
+    'blocked',
+    'paused',
+    'degraded',
+  ]),
+  runPolicy: z.enum(['automatic', 'paused_by_user']),
+  payer: z.object({ type: z.enum(['user', 'org']), id: z.string() }).optional(),
+  remaining: z.number().optional(),
+  minimumRequired: z.number().optional(),
+  estimatedHourlyCharge: z.number().optional(),
+  estimatedRunCharge: z.number().optional(),
+  runUsageSeconds: z.number().optional(),
+  intervalStartedAt: z.number().optional(),
+  lastReportedAt: z.number().optional(),
+});
+
 // StreamTicket
 export const StreamTicketOutput = z.object({
   url: z.string(),
@@ -184,6 +208,7 @@ export const RpcAgentOutput = rpcSafe(AgentOutput);
 export const RpcBeadEventOutput = rpcSafe(BeadEventOutput);
 export const RpcMayorSendResultOutput = rpcSafe(MayorSendResultOutput);
 export const RpcMayorStatusOutput = rpcSafe(MayorStatusOutput);
+export const RpcBillingStatusOutput = rpcSafe(BillingStatusOutput);
 export const RpcStreamTicketOutput = rpcSafe(StreamTicketOutput);
 export const RpcPtySessionOutput = rpcSafe(PtySessionOutput);
 export const RpcConvoyOutput = rpcSafe(ConvoyOutput);
@@ -224,6 +249,7 @@ const AlarmStatusOutput = z.object({
       message: z.string(),
     })
   ),
+  billing: BillingStatusOutput,
 });
 export const RpcAlarmStatusOutput = rpcSafe(AlarmStatusOutput);
 export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);

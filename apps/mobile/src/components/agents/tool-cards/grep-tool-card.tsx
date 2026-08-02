@@ -1,8 +1,9 @@
 import { FileSearch } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
 
@@ -14,6 +15,7 @@ function countOutputLines(output: string): number {
 }
 
 export function GrepToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const textSelectable = useTranscriptTextSelectable();
   const input = part.state.input;
   const pattern = typeof input.pattern === 'string' ? input.pattern : '';
   const include = typeof input.include === 'string' ? input.include : undefined;
@@ -41,7 +43,7 @@ export function GrepToolCard({ part }: Readonly<{ part: ToolPart }>) {
         <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
       ) : null}
       {error ? (
-        <Text selectable className="text-xs text-destructive">
+        <Text selectable={textSelectable} className="text-xs text-destructive">
           {error}
         </Text>
       ) : null}

@@ -71,9 +71,25 @@ import {
   WorkspaceFilesystemPreparationError,
 } from '../../workspace-errors.js';
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgroup-env.js';
+import {
+  buildSandboxBillingInput,
+  configureSandboxBillingInput,
+  isSandboxContainerRunning,
+  type SandboxBillingInput,
+} from '../../container-usage-context.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
+
+/**
+ * Outcome of a wrapper stop inspection, as reported by the `wrapper_stop_inspection` log.
+ *
+ * Extends `WrapperObservation` with `absent-no-container`: absence established from
+ * container state rather than by inspecting, so the log can distinguish a confirmed-empty
+ * container from one we booted in order to look. Not a `WrapperObservation` status,
+ * because nothing was observed.
+ */
+type StopInspection = WrapperObservation | { status: 'absent-no-container' };
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
@@ -155,6 +171,7 @@ function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string)
 
 export type CloudflareAgentSandboxDependencies = {
   resolveSandbox?: (sandboxId: SandboxId, options?: { sleepAfter?: number }) => SandboxInstance;
+  configureBilling?: (sandbox: SandboxInstance, input: SandboxBillingInput) => Promise<void>;
   sessionService?: SessionService;
   stopObservedWrappers?: typeof stopObservedWrappers;
   sleep?: (ms: number) => Promise<void>;
@@ -170,6 +187,10 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   private readonly stopObserved: typeof stopObservedWrappers;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly stopObservationDelaysMs: number[];
+  private readonly configureBilling: (
+    sandbox: SandboxInstance,
+    input: SandboxBillingInput
+  ) => Promise<void>;
   private sandboxIdPromise?: Promise<SandboxId>;
 
   constructor(
@@ -192,6 +213,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.stopObservationDelaysMs =
       dependencies.stopObservationDelaysMs ?? DEFAULT_STOP_OBSERVATION_DELAYS_MS;
+    this.configureBilling = dependencies.configureBilling ?? configureSandboxBillingInput;
   }
 
   private resolveSandboxId(): Promise<SandboxId> {
@@ -205,7 +227,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
             this.metadata.identity.sessionId,
             this.metadata.identity.botId,
             {
-              createdOnPlatform: this.metadata.identity.createdOnPlatform,
+              createdOnPlatform: this.metadata.identity.billingOrigin,
             }
           );
     }
@@ -213,7 +235,16 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   }
 
   private async getSandbox(options?: { sleepAfter?: number }): Promise<SandboxInstance> {
-    return this.resolveSandbox(await this.resolveSandboxId(), options);
+    const sandboxId = await this.resolveSandboxId();
+    const sandbox = this.resolveSandbox(sandboxId, options);
+    void this.configureBilling(sandbox, buildSandboxBillingInput(this.metadata, sandboxId)).catch(
+      error => {
+        logger
+          .withFields({ error: error instanceof Error ? error.message : String(error) })
+          .warn('Container usage shadow configuration deferred');
+      }
+    );
+    return sandbox;
   }
 
   private async workspaceHasGit(sandbox: SandboxInstance, workspacePath: string): Promise<boolean> {
@@ -731,7 +762,39 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     reason: WrapperStopReason;
   }): Promise<StopWrappersResult> {
     const sandbox = await this.getSandbox();
-    const initial = await this.observeTarget(request.target);
+
+    // Inspecting is a container fetch, so it boots a sleeping container. A wrapper is a
+    // process, and a process cannot outlive its container (activity expiry SIGTERMs the
+    // whole container), so a stopped container cannot be hiding a leaked wrapper.
+    //
+    // Scoped to idle-timeout: that sweep already established via DO state that no wrapper
+    // runtime or pending work remains, and it is the path that was waking cold containers
+    // for nothing. Every other stop reason keeps inspecting, which preserves the leaked
+    // wrapper recovery those paths were built for.
+    const skipsInspection =
+      request.reason === 'idle-timeout' && (await isSandboxContainerRunning(sandbox)) === false;
+    const initial: StopInspection = skipsInspection
+      ? { status: 'absent-no-container' }
+      : await this.observeTarget(request.target);
+
+    // Single emission for every outcome. `wrapper_stop_inspection` is how container wake
+    // behaviour is measured, so the field set is defined once here rather than per branch.
+    logger
+      .withTags({
+        logTag: 'wrapper_stop_inspection',
+        sessionId: this.metadata.identity.sessionId,
+        sandboxId: await this.resolveSandboxId(),
+      })
+      .withFields({
+        reason: request.reason,
+        attemptId: request.attemptId,
+        target: request.target.kind,
+        observation: initial.status,
+        observedWrapperCount: initial.status === 'present' ? initial.observed.length : 0,
+      })
+      .info('Wrapper stop inspection completed');
+
+    if (initial.status === 'absent-no-container') return { status: 'absent' };
     if (initial.status !== 'present') return initial;
 
     try {

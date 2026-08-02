@@ -1,10 +1,15 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
-import { type Href, useRouter } from 'expo-router';
+import {
+  type CloudStatus,
+  type KiloSessionId,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
+import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useKeepAwake } from 'expo-keep-awake';
+import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -24,10 +29,7 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
-import {
-  SessionContextCostFallback,
-  SessionContextMetrics,
-} from '@/components/agents/session-context-metrics';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
@@ -62,13 +64,15 @@ import { useSessionDetailRename } from '@/components/agents/use-session-detail-r
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
+import {
+  type ChildSessionSheetMountState,
+  closeChildSessionSheet,
+  openChildSessionSheet,
+  releaseChildSessionSheet,
+} from '@/components/agents/child-session-sheet-state';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
-import {
-  SessionPlatformIcon,
-  sessionPlatformIconKind,
-} from '@/components/agents/session-platform-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
@@ -82,6 +86,7 @@ import {
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -92,8 +97,6 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { platformLabel } from '@/lib/platform-label';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -121,11 +124,18 @@ export function SessionDetailContent({
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
-  const colors = useThemeColors();
-  const [childSession, setChildSession] = useState<{
-    sessionId: KiloSessionId;
-    title: string;
-  }>();
+  const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
+    sheet: null,
+    visible: false,
+  });
+  const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearChildSheetReleaseTimeout = useCallback(() => {
+    if (childSheetReleaseTimeoutRef.current !== null) {
+      clearTimeout(childSheetReleaseTimeoutRef.current);
+      childSheetReleaseTimeoutRef.current = null;
+    }
+  }, []);
 
   const messages = useAtomValue(manager.atoms.messagesList);
   const isLoading = useAtomValue(manager.atoms.isLoading);
@@ -134,6 +144,7 @@ export function SessionDetailContent({
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
+  const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
@@ -175,6 +186,8 @@ export function SessionDetailContent({
   const {
     isAnswering,
     isRespondingToPermission,
+    questionSubmissionError,
+    permissionSubmissionError,
     handleAnswerQuestion,
     handleRejectQuestion,
     handleRespondToPermission,
@@ -232,21 +245,6 @@ export function SessionDetailContent({
         (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
     };
   }, [contextInfo, sessionModels.options]);
-  const headerRight = contextInfo ? (
-    <SessionContextMetrics
-      info={contextInfo}
-      totalCostMicrodollars={totalMicrodollars}
-      onPress={() => {
-        setOpenContextSheetIdentity({
-          sessionId,
-          providerID: contextInfo.providerID,
-          modelID: contextInfo.modelID,
-        });
-      }}
-    />
-  ) : (
-    <SessionContextCostFallback totalCostMicrodollars={totalMicrodollars} />
-  );
   const sheetMountState = getContextSheetMountState(
     contextInfo,
     openContextSheetIdentity,
@@ -301,6 +299,13 @@ export function SessionDetailContent({
     viewTrackedRef.current = sessionId;
     captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
   }, [fetchedData, sessionId, analyticsSurface, openedVia]);
+
+  useEffect(
+    () => () => {
+      clearChildSheetReleaseTimeout();
+    },
+    [clearChildSheetReleaseTimeout]
+  );
 
   useEffect(() => {
     void manager.switchSession(sessionId);
@@ -357,11 +362,33 @@ export function SessionDetailContent({
 
   const handleOpenChildSession = useCallback(
     (childSessionId: KiloSessionId, childTitle: string) => {
-      setChildSession({ sessionId: childSessionId, title: childTitle });
+      clearChildSheetReleaseTimeout();
+      setChildSessionSheet(current =>
+        openChildSessionSheet(current, { sessionId: childSessionId, title: childTitle })
+      );
       void manager.hydrateChildSession(childSessionId);
     },
-    [manager]
+    [manager, clearChildSheetReleaseTimeout]
   );
+
+  const CHILD_SHEET_RELEASE_DELAY_MS = 350;
+
+  /** Releases the sheet identity via the native onDismiss path (iOS) or the fallback timer. */
+  const handleChildSheetDismiss = useCallback(() => {
+    clearChildSheetReleaseTimeout();
+    setChildSessionSheet(current => releaseChildSessionSheet(current));
+  }, [clearChildSheetReleaseTimeout]);
+
+  const handleCloseChildSession = useCallback(() => {
+    clearChildSheetReleaseTimeout();
+    setChildSessionSheet(closeChildSessionSheet);
+    if (Platform.OS !== 'ios') {
+      childSheetReleaseTimeoutRef.current = setTimeout(() => {
+        childSheetReleaseTimeoutRef.current = null;
+        setChildSessionSheet(current => releaseChildSessionSheet(current));
+      }, CHILD_SHEET_RELEASE_DELAY_MS);
+    }
+  }, [clearChildSheetReleaseTimeout]);
 
   const transcript = useMemo(
     () => mergeSessionTranscript(messages, preparationAttempts),
@@ -496,21 +523,53 @@ export function SessionDetailContent({
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
-  const platform = isSessionLoaded ? (fetchedData.createdOnPlatform ?? null) : null;
-  const platformKind = sessionPlatformIconKind(platform);
-  const leadingAccessory =
-    platform != null && platformKind != null ? (
-      <View
-        accessibilityRole="image"
-        accessibilityLabel={platformLabel(platform)}
-        testID={`platform-icon-${platformKind}`}
-      >
-        <SessionPlatformIcon platform={platform} size={14} color={colors.mutedForeground} />
-      </View>
-    ) : null;
+  const headerRight = (
+    <SessionContextMetrics
+      info={contextInfo}
+      totalCostMicrodollars={totalMicrodollars}
+      hasMessages={messages.length > 0}
+      loading={shouldShowLoading}
+      onPress={
+        contextInfo
+          ? () => {
+              setOpenContextSheetIdentity({
+                sessionId,
+                providerID: contextInfo.providerID,
+                modelID: contextInfo.modelID,
+              });
+            }
+          : undefined
+      }
+    />
+  );
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+
+  // When a blocking question/permission card dismisses, hand screen-reader
+  // focus back to the transcript so the user does not get stranded on a
+  // node that no longer exists. We track the previous blocking kind and
+  // only fire on the non-none → none transition (i.e. the user satisfied
+  // the card), not on the very first mount.
+  const transcriptRef = useRef<RNText | null>(null);
+  const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
+  useEffect(() => {
+    const wasBlocking = previousBlockingInteractionRef.current !== 'none';
+    const isBlocking = blockingInteraction !== 'none';
+    previousBlockingInteractionRef.current = blockingInteraction;
+    if (!wasBlocking || isBlocking) {
+      return undefined;
+    }
+    if (moveA11yFocus(transcriptRef)) {
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      moveA11yFocus(transcriptRef);
+    }, 50);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [blockingInteraction]);
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
   const isComposerDisabled =
@@ -657,12 +716,17 @@ export function SessionDetailContent({
     [manager, router]
   );
 
+  const isFocused = useIsFocused();
+  // Focus bounds the awake window to the visible working UI; a backgrounded
+  // or covered screen must not hold the OS idle timer.
+  const keepScreenAwake =
+    isFocused && agentStatus.type !== 'disconnected' && (isStreaming || pendingMessages.size > 0);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={rename.title}
         headerRight={headerRight}
-        leadingAccessory={leadingAccessory}
         {...(rename.isTitleInteractive
           ? {
               onTitlePress: rename.openModal,
@@ -670,6 +734,7 @@ export function SessionDetailContent({
             }
           : {})}
       />
+      {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
       {!isConnected && <ConnectivityBanner />}
 
@@ -716,21 +781,25 @@ export function SessionDetailContent({
         }}
       />
 
-      {childSession ? (
+      {childSessionSheet.sheet ? (
         <ChildSessionSheet
-          sessionId={childSession.sessionId}
-          title={childSession.title}
+          visible={childSessionSheet.visible}
+          sessionId={childSessionSheet.sheet.sessionId}
+          title={childSessionSheet.sheet.title}
           getChildMessages={getChildMessages}
-          hydrationState={getChildSessionHydrationState(childSession.sessionId)}
-          isStreaming={getChildSessionStreaming(messages, childSession.sessionId)}
+          hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+          isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
           renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={handleOpenChildSession}
           onRetry={() => {
-            void manager.hydrateChildSession(childSession.sessionId);
+            const openSheet = childSessionSheet.sheet;
+            if (!openSheet) {
+              return;
+            }
+            void manager.hydrateChildSession(openSheet.sessionId);
           }}
-          onClose={() => {
-            setChildSession(undefined);
-          }}
+          onClose={handleCloseChildSession}
+          onDismiss={handleChildSheetDismiss}
         />
       ) : null}
 
@@ -749,7 +818,16 @@ export function SessionDetailContent({
   function renderKeyboardBody() {
     return (
       <>
-        <View className="flex-1">{renderContent()}</View>
+        <View className="flex-1">
+          <Text
+            ref={transcriptRef}
+            accessible
+            accessibilityLabel="Session transcript"
+            pointerEvents="none"
+            className="absolute inset-0 opacity-0"
+          />
+          {renderContent()}
+        </View>
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
@@ -770,6 +848,7 @@ export function SessionDetailContent({
 
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
+            key={activeQuestion.requestId}
             questions={activeQuestion.questions}
             onAnswer={answers => {
               void handleAnswerQuestion(answers);
@@ -778,11 +857,14 @@ export function SessionDetailContent({
               void handleRejectQuestion();
             }}
             isSubmitting={isAnswering}
+            requestId={activeQuestion.requestId}
+            submissionError={questionSubmissionError}
           />
         ) : null}
 
         {blockingInteraction === 'permission' && activePermission ? (
           <PermissionCard
+            key={activePermission.requestId}
             permission={activePermission.permission}
             patterns={activePermission.patterns}
             metadata={activePermission.metadata}
@@ -790,6 +872,8 @@ export function SessionDetailContent({
               void handleRespondToPermission(response);
             }}
             isSubmitting={isRespondingToPermission}
+            requestId={activePermission.requestId}
+            submissionError={permissionSubmissionError}
           />
         ) : null}
 
@@ -893,6 +977,13 @@ export function SessionDetailContent({
       />
     );
   }
+}
+
+function ActiveSessionKeepAwake({ sessionId }: Readonly<{ sessionId: KiloSessionId }>) {
+  // Scoped tag keeps stacked session screens independent so deactivating one
+  // does not release the wake lock another visible session still needs.
+  useKeepAwake(`session-${sessionId}`);
+  return null;
 }
 
 // Mirrors MessageBubble's bubble geometry (px-4 py-1/py-2 wrapper,

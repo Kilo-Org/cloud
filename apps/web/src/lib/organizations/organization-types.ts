@@ -315,6 +315,7 @@ const OpenRouterModelSchema = z.object({
     input_cache_write: z.string().optional(),
     web_search: z.string().optional(),
     internal_reasoning: z.string().optional(),
+    discount: z.number().optional(),
   }),
   context_length: z.number(),
   per_request_limits: z.record(z.string(), z.unknown()).nullable().optional(),

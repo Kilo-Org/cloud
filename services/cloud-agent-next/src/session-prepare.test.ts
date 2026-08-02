@@ -285,6 +285,7 @@ describe('prepareSession endpoint', () => {
     recordInitialAdmissionMock.mockResolvedValue(undefined);
     recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
+    organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership-123' }]);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
   });
 
@@ -452,6 +453,10 @@ describe('prepareSession endpoint', () => {
   });
 
   it('registers full lazy-prep metadata in one DO call', async () => {
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'isolated',
+      sandboxId: 'crv-abcdef',
+    });
     const doStub = createMockDOStub();
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const caller = appRouter.createCaller(
@@ -499,6 +504,7 @@ describe('prepareSession endpoint', () => {
           orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
           botId: undefined,
           createdOnPlatform: 'code-review',
+          billingOrigin: 'code-review',
         },
         auth: {
           kiloSessionId: 'cli-session-abc123',
@@ -542,13 +548,31 @@ describe('prepareSession endpoint', () => {
           target: { url: 'https://example.com/callback' },
         },
         workspace: {
-          sandboxId: 'sb-test-123',
+          sandboxId: 'crv-abcdef',
           sandboxProvider: 'cloudflare',
           shallow: true,
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         },
       })
     );
+    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects organization attribution when the internal caller user is not a member', async () => {
+    organizationMembershipLimitMock.mockResolvedValueOnce([]);
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Attempt unrelated organization attribution',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('retains split legacy preparation as registration-only', async () => {
@@ -774,11 +798,12 @@ describe('prepareSession endpoint', () => {
     expect(overrideStore.get).toHaveBeenCalledWith(`shared-sandbox-route:${routeKey}`);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
+        identity: expect.objectContaining({ billingOrigin: 'cloud-agent' }),
         workspace: {
           sandboxId: failoverSandboxId,
           sandboxProvider: 'cloudflare',
           shallow: undefined,
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
           sandboxRoute: {
             kind: 'shared',
             routeKey,
@@ -793,14 +818,37 @@ describe('prepareSession endpoint', () => {
     );
   });
 
+  it('does not let public createdOnPlatform select the Code Review sandbox class', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.start({
+      message: { prompt: 'Attempt to select a reserved class' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      profile: { id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
+      options: { createdOnPlatform: 'code-review' },
+    });
+
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      'test-user-123',
+      expect.any(String),
+      undefined,
+      expect.objectContaining({ createdOnPlatform: undefined })
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ billingOrigin: 'cloud-agent' }),
+      })
+    );
+  });
+
   it('creates auto-initiated devcontainer sessions with grouped DIND sandbox intent', async () => {
     generateSandboxRoutingTargetMock.mockResolvedValueOnce({
       kind: 'isolated',
       sandboxId: 'dind-abcdef',
-    });
-    selectSandboxForNewSessionMock.mockResolvedValueOnce({
-      sandboxId: 'dind-abcdef',
-      provider: 'cloudflare',
     });
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
@@ -825,23 +873,19 @@ describe('prepareSession endpoint', () => {
         createdOnPlatform: undefined,
       }
     );
-    expect(selectSandboxForNewSessionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        env: expect.any(Object),
-        orgId: undefined,
-        userId: 'test-user-123',
-        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        botId: undefined,
-        devcontainer: true,
-      })
-    );
+    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: {
           sandboxId: 'dind-abcdef',
           sandboxProvider: 'cloudflare',
           shallow: false,
-          credentialContainment: { github: false, gitlab: false, kilocode: false },
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
           devcontainerRequested: true,
         },
       })
@@ -877,7 +921,7 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         }),
       })
     );
@@ -903,7 +947,12 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, kilocode: false },
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
         }),
       })
     );
@@ -927,7 +976,7 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, kilocode: true },
+          credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: true },
         }),
       })
     );
@@ -954,7 +1003,12 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, kilocode: false },
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
         }),
       })
     );
@@ -979,7 +1033,7 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         }),
       })
     );
@@ -1333,7 +1387,7 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         }),
       })
     );
@@ -1354,7 +1408,7 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: true, kilocode: false },
+          credentialContainment: { github: false, gitlab: true, bitbucket: false, kilocode: false },
         }),
       })
     );
@@ -1379,7 +1433,12 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, kilocode: false },
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
         }),
       })
     );

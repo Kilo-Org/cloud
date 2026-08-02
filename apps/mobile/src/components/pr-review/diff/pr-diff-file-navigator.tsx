@@ -194,7 +194,7 @@ export function PrDiffFileNavigator({
               placeholder="Filter files by path"
               placeholderTextColor={colors.mutedForeground}
               accessibilityLabel="Filter files by path"
-              className="flex-1 text-sm leading-5 text-foreground"
+              className="flex-1 text-sm leading-[normal] text-foreground"
             />
           </View>
           {[0, 1, 2, 3, 4].map(index => (
@@ -242,7 +242,7 @@ export function PrDiffFileNavigator({
             searchRef.current = value;
             setSearchVersion(version => version + 1);
           }}
-          className="flex-1 text-sm leading-5 text-foreground"
+          className="flex-1 text-sm leading-[normal] text-foreground"
           returnKeyType="search"
           autoCorrect={false}
           autoCapitalize="none"

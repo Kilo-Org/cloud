@@ -2,19 +2,19 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
-import { ATTACHMENT_MAX_BYTES } from '@kilocode/kilo-chat';
 import { type AddFileInput, useAttachmentQueue } from '@kilocode/kilo-chat-hooks';
 
 import {
-  addFilesWithinAttachmentCapacity,
-  buildAttachmentLimitToast,
   buildAttachmentSizeRejectionToast,
+  buildAttachmentUnreadableToast,
   getAttachmentActionSheetConfig,
-  MESSAGE_ATTACHMENT_MAX_COUNT,
+  type MessageAttachment,
+  MOBILE_ATTACHMENT_MAX_BYTES,
+  selectAllowedAttachments,
 } from './message-attachment-state';
 import {
+  materializeAttachment,
   pickCameraImage,
-  type PickedAttachment,
   pickFiles,
   pickLibraryImages,
 } from './message-attachment-picker';
@@ -44,42 +44,53 @@ export function MessageInputWithAttachmentQueue({
 
   const queue = useAttachmentQueue(client, conversationId, {
     performUpload: mobilePerformUpload,
-    maxBytes: ATTACHMENT_MAX_BYTES,
+    maxBytes: MOBILE_ATTACHMENT_MAX_BYTES,
     onSizeRejected,
   });
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
 
-  const addFiles = useCallback(
-    (picked: PickedAttachment[]) => {
-      const capacity = Math.max(MESSAGE_ATTACHMENT_MAX_COUNT - queue.rows.length, 0);
-      addFilesWithinAttachmentCapacity({
-        inputs: picked,
-        capacity,
-        addFile: (item: PickedAttachment) => queue.addFile(item.input),
-        onAcceptedFile: (item, tempId) => {
-          if (tempId) {
-            localUrisRef.current.set(tempId, item.localUri);
-          }
-        },
-        onLimitExceeded: () => {
-          toast.error(buildAttachmentLimitToast());
-        },
-      });
-    },
-    [queue]
-  );
-
   const pickFromSource = useCallback(
     async (source: 'camera' | 'library' | 'files') => {
       try {
-        const inputs = await pickAttachmentsFromSource(source);
-        addFiles(inputs);
+        const selected = await pickAttachmentsFromSource(source);
+        if (selected.length === 0) {
+          return;
+        }
+
+        // Gate on size and capacity before any bytes are read: materializing an
+        // oversized file is what runs the device out of memory.
+        const { accepted, toast: rejectionToast } = selectAllowedAttachments({
+          existingCount: queue.rows.length,
+          selected,
+        });
+        if (rejectionToast) {
+          toast.error(rejectionToast);
+        }
+
+        // Sequential on purpose: concurrent materialize multiplies peak memory by
+        // the selection size. eslint no-await-in-loop wants Promise.all; refuse.
+        for (const attachment of accepted) {
+          // Per-file, so one unreadable file in a multi-select does not discard the
+          // rest. Same message as the gate's unreadable rejection: from the user's
+          // side "we could not read this file" is the same fact whether the size
+          // stat or the read itself failed.
+          try {
+            // eslint-disable-next-line no-await-in-loop -- sequential materialize bounds peak memory
+            const picked = await materializeAttachment(attachment);
+            const tempId = queue.addFile(picked.input);
+            if (tempId) {
+              localUrisRef.current.set(tempId, picked.localUri);
+            }
+          } catch {
+            toast.error(buildAttachmentUnreadableToast(attachment.filename));
+          }
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Failed to attach file');
       }
     },
-    [addFiles]
+    [queue]
   );
 
   const openPicker = useCallback(() => {
@@ -130,7 +141,7 @@ export function MessageInputWithAttachmentQueue({
 // eslint-disable-next-line typescript-eslint/promise-function-async -- thin pass-through; making it async only to satisfy this rule conflicts with `require-await`.
 function pickAttachmentsFromSource(
   source: 'camera' | 'library' | 'files'
-): Promise<PickedAttachment[]> {
+): Promise<MessageAttachment[]> {
   if (source === 'camera') {
     return pickCameraImage();
   }

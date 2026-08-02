@@ -33,6 +33,31 @@ const conversationIdPrefix = 'conversation-';
 const defaultConversationTitlePrefix = 'Conversation';
 const maxTitleLength = 36;
 
+/** Legacy seeded assistant greeting; stripped on load and reused as the transcript empty-state hint. */
+export const LEGACY_CONVERSATION_GREETING = 'Pick a tab and ask Kilo to inspect it.';
+
+const stripLegacyLeadingGreeting = (events: AgentConversationEvent[]): AgentConversationEvent[] => {
+  const [first] = events;
+
+  if (
+    first !== undefined &&
+    first.type === 'message' &&
+    first.role === 'assistant' &&
+    first.text === LEGACY_CONVERSATION_GREETING
+  ) {
+    return events.slice(1);
+  }
+
+  return events;
+};
+
+const withStrippedLegacyGreeting = (
+  conversation: StoredAgentConversation
+): StoredAgentConversation => ({
+  ...conversation,
+  events: stripLegacyLeadingGreeting(conversation.events),
+});
+
 const getConversationNumber = (id: string): number => {
   if (!id.startsWith(conversationIdPrefix)) {
     return 0;
@@ -150,7 +175,9 @@ export const getOpenStoredConversations = (
 export const getSortedStoredConversationHistory = (
   store: StoredAgentConversationStore
 ): StoredAgentConversation[] =>
-  store.conversations.toSorted((first, second) => second.updatedAt.localeCompare(first.updatedAt));
+  store.conversations
+    .filter(conversation => !isStoredConversationEmpty(conversation))
+    .toSorted((first, second) => second.updatedAt.localeCompare(first.updatedAt));
 
 export const isStoredConversationOpen = (
   store: StoredAgentConversationStore,
@@ -259,15 +286,23 @@ export const closeStoredConversationTab = (
     return store;
   }
 
+  const closedConversation = store.conversations.find(
+    conversation => conversation.id === conversationId
+  );
   const openConversationIds = getOpenConversationIds(store).filter(
     currentId => currentId !== conversationId
   );
+  const conversations =
+    closedConversation !== undefined && isStoredConversationEmpty(closedConversation)
+      ? store.conversations.filter(conversation => conversation.id !== conversationId)
+      : store.conversations;
   const nextStore = {
     ...store,
     activeConversationId:
       store.activeConversationId === conversationId
         ? (openConversationIds[0] ?? '')
         : store.activeConversationId,
+    conversations,
     openConversationIds,
   };
 
@@ -368,23 +403,34 @@ export const normalizeStoredConversations = ({
   readonly store?: StoredAgentConversationStore | undefined;
 } = {}): StoredAgentConversationStore => {
   if (store !== undefined && store.conversations.length > 0) {
-    const conversations = store.conversations.map(conversation => ({
-      ...conversation,
-      updatedAt: conversation.updatedAt ?? nowIso(),
-    }));
-    const conversationIds = new Set(conversations.map(conversation => conversation.id));
+    const strippedConversations = store.conversations.map(conversation =>
+      withStrippedLegacyGreeting({
+        ...conversation,
+        updatedAt: conversation.updatedAt ?? nowIso(),
+      })
+    );
+    const conversationIds = new Set(strippedConversations.map(conversation => conversation.id));
     const openConversationIds =
       store.openConversationIds.length === 0
-        ? conversations.map(conversation => conversation.id)
+        ? strippedConversations.map(conversation => conversation.id)
         : store.openConversationIds.filter(conversationId => conversationIds.has(conversationId));
-    const hasActiveConversation = openConversationIds.includes(store.activeConversationId);
+    const openIdSet = new Set(openConversationIds);
+    // Drop empty conversations that are not open (legacy greeting-only rows, closed empties).
+    const conversations = strippedConversations.filter(
+      conversation => openIdSet.has(conversation.id) || !isStoredConversationEmpty(conversation)
+    );
+    const retainedIds = new Set(conversations.map(conversation => conversation.id));
+    const retainedOpenIds = openConversationIds.filter(conversationId =>
+      retainedIds.has(conversationId)
+    );
+    const hasActiveConversation = retainedOpenIds.includes(store.activeConversationId);
 
     return ensureOpenConversation({
       activeConversationId: hasActiveConversation
         ? store.activeConversationId
-        : (openConversationIds[0] ?? conversations[0]?.id ?? ''),
+        : (retainedOpenIds[0] ?? conversations[0]?.id ?? ''),
       conversations,
-      openConversationIds,
+      openConversationIds: retainedOpenIds,
     });
   }
 
@@ -395,7 +441,7 @@ export const normalizeStoredConversations = ({
       activeConversationId: conversationId,
       conversations: [
         {
-          events: legacyEvents,
+          events: stripLegacyLeadingGreeting(legacyEvents),
           id: conversationId,
           title: createConversationTitle(1),
           updatedAt: nowIso(),
@@ -405,7 +451,7 @@ export const normalizeStoredConversations = ({
     };
   }
 
-  return createDefaultStoredConversations(defaultEvents);
+  return createDefaultStoredConversations(stripLegacyLeadingGreeting(defaultEvents));
 };
 
 export const getStoredConversationTitle = (conversation: StoredAgentConversation): string => {

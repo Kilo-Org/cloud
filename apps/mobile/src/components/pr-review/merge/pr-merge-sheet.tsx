@@ -27,6 +27,7 @@ import {
   useMergePullRequestMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { applyMergeSuccessEffects } from '@/lib/pr-review/merge/merge-success-effects';
 import {
   defaultMergeMethodOptionFor,
   mergeMethodOptionsFor,
@@ -71,8 +72,6 @@ type MergePullRequestInput = {
   commitMessage?: string;
   deleteBranch: boolean;
   expectedHeadSha: string;
-  headRef: string;
-  isCrossRepo: boolean;
 };
 
 type AutoMergeInput = {
@@ -91,7 +90,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     repoName,
     number,
     headSha,
-    headRef,
     isCrossRepo,
     prNodeId,
     title,
@@ -196,8 +194,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       commitMessage: messageRef.current.trim().length > 0 ? messageRef.current.trim() : undefined,
       deleteBranch: showDeleteBranchToggle ? deleteBranch : false,
       expectedHeadSha: headSha,
-      headRef,
-      isCrossRepo,
     };
   }
 
@@ -226,18 +222,32 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     setInlineError(null);
     setInlineErrorKind(null);
     try {
+      let celebrate = false;
       // eslint-disable-next-line typescript-eslint/prefer-ternary -- awaits inside branches can't be a ternary expression
       if (mode === 'merge') {
-        await mergeMutation.mutateAsync(buildMergeInput());
+        // P0-B-08: only resolved here when `merged: true` (the hook's
+        // `assertMergeResult` throws on `merged: false` so a "not
+        // mergeable" reply is treated as a retryable mutation error,
+        // NOT a success). The pure helper decides whether the post-merge
+        // step (branch delete) is a partial success that needs a
+        // persistent banner on the PR review screen, then the sheet
+        // celebrates in BOTH clean and partial cases. The `incomplete`
+        // gate never reaches here because `mutateAsync` would have
+        // rejected.
+        const result = await mergeMutation.mutateAsync(buildMergeInput());
+        ({ celebrate } = applyMergeSuccessEffects(result, ref));
       } else {
         await enableAutoMergeMutation.mutateAsync(buildAutoMergeInput());
+        celebrate = true;
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await onRefetch();
-      // Dismiss exactly this merge route; `onDismiss` (router.back) leaves the
-      // refreshed PR review screen visible. Do NOT also call router.back()
-      // here or it would pop the review screen too.
-      onDismiss();
+      if (celebrate) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await onRefetch();
+        // Dismiss exactly this merge route; `onDismiss` (router.back) leaves the
+        // refreshed PR review screen visible. Do NOT also call router.back()
+        // here or it would pop the review screen too.
+        onDismiss();
+      }
     } catch {
       // The effect above classifies the mutation error into inlineError;
       // swallow here to avoid an unhandled promise rejection.

@@ -555,9 +555,21 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
 
   async function keepSandboxAlive(): Promise<void> {
     try {
-      if (canUseSandboxRuntime && !(await canUseSandboxRuntime())) return;
+      // Both guards below skip renewal silently, which is indistinguishable in logs from
+      // a renewal that succeeded. Name the guard so a stalled sleep timer is diagnosable.
+      if (canUseSandboxRuntime && !(await canUseSandboxRuntime())) {
+        logger
+          .withFields({ sessionId: getSessionIdForLogs(), skipped: 'sandbox-runtime-unavailable' })
+          .debug('AgentRuntime skipped sandbox sleep timer reset');
+        return;
+      }
       const metadata = await getMetadata();
-      if (!metadata) return;
+      if (!metadata) {
+        logger
+          .withFields({ sessionId: getSessionIdForLogs(), skipped: 'metadata-missing' })
+          .debug('AgentRuntime skipped sandbox sleep timer reset');
+        return;
+      }
       await resolveAgentSandbox(metadata).keepAlive();
     } catch (error) {
       logger

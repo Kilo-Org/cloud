@@ -367,6 +367,58 @@ describe('buildReviewThreadsResult', () => {
     expect(result.threads[0]?.comments).toHaveLength(120);
   });
 
+  it('maps diffHunk through; empty string and absent become null', () => {
+    const withHunk = buildReviewThreadsResult({
+      page: 1,
+      hasNextPage: false,
+      endCursor: null,
+      conversation: [],
+      threads: [
+        {
+          id: 'thread-hunk',
+          isResolved: false,
+          isOutdated: false,
+          diffHunk: '@@ -1,3 +1,4 @@\n line',
+          comments: [],
+        },
+      ],
+    });
+    expect(withHunk.threads[0]?.diffHunk).toBe('@@ -1,3 +1,4 @@\n line');
+
+    const emptyHunk = buildReviewThreadsResult({
+      page: 1,
+      hasNextPage: false,
+      endCursor: null,
+      conversation: [],
+      threads: [
+        {
+          id: 'thread-empty-hunk',
+          isResolved: false,
+          isOutdated: false,
+          diffHunk: '',
+          comments: [],
+        },
+      ],
+    });
+    expect(emptyHunk.threads[0]?.diffHunk).toBeNull();
+
+    const absentHunk = buildReviewThreadsResult({
+      page: 1,
+      hasNextPage: false,
+      endCursor: null,
+      conversation: [],
+      threads: [
+        {
+          id: 'thread-no-hunk',
+          isResolved: false,
+          isOutdated: false,
+          comments: [],
+        },
+      ],
+    });
+    expect(absentHunk.threads[0]?.diffHunk).toBeNull();
+  });
+
   it('maps conversation comments through the same DTO shape as thread comments', () => {
     const result = buildReviewThreadsResult({
       page: 1,

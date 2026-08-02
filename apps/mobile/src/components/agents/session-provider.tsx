@@ -1,6 +1,6 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { createStore, Provider as JotaiProvider } from 'jotai';
-import { type SessionManager } from 'cloud-agent-sdk';
+import { type SessionManager } from '@kilocode/cloud-agent-sdk';
 import { createMobileAgentSessionManager } from '@/components/agents/mobile-session-manager';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 

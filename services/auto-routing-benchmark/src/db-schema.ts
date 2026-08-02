@@ -1,6 +1,18 @@
 import { sql } from 'drizzle-orm';
-import { integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { BenchmarkKind, BenchmarkRunStatus } from '@kilocode/auto-routing-contracts';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
+import type {
+  BenchmarkKind,
+  BenchmarkProfileStatus,
+  BenchmarkRunStatus,
+} from '@kilocode/auto-routing-contracts';
 
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
 // via wrangler d1 migrations apply.
@@ -66,6 +78,10 @@ export const benchmarkRuns = sqliteTable(
     // dataset, grading, or CLI/image pinning re-benchmark instead of pairing
     // current serving config with measurements taken under different conditions.
     engine_identity: text('engine_identity').notNull().default(''),
+    // 'platform' (default): publishes the default routing table / classifier winner.
+    // 'profile': measures exact Pool entries for the global Benchmark-profile
+    // registry and never replaces the platform artifact.
+    purpose: text('purpose').notNull().default('platform'),
   },
   table => [
     // At most one running run per kind — the atomic backstop for the
@@ -82,11 +98,15 @@ export const runModels = sqliteTable(
   {
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    // Application code converts '' ↔ null at the edges.
+    variant: text('variant').notNull().default(''),
     // enqueued=false means the model was skipped (had prior results).
     enqueued: integer('enqueued', { mode: 'boolean' }).notNull(),
+    // Legacy mirror of the platform effort key; kept for rollback/provenance.
     reasoning_effort: text('reasoning_effort'),
   },
-  table => [primaryKey({ columns: [table.run_id, table.model] })]
+  table => [primaryKey({ columns: [table.run_id, table.model, table.variant] })]
 );
 
 export const modelSummaries = sqliteTable(
@@ -94,6 +114,8 @@ export const modelSummaries = sqliteTable(
   {
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
     route_key: text('route_key').notNull(),
     accuracy: real('accuracy').notNull(),
     avg_cost_usd: real('avg_cost_usd'),
@@ -106,7 +128,7 @@ export const modelSummaries = sqliteTable(
     // carried=true rows are prior-run summaries copied in at startRun for skipped models.
     carried: integer('carried', { mode: 'boolean' }).notNull().default(false),
   },
-  table => [primaryKey({ columns: [table.run_id, table.model, table.route_key] })]
+  table => [primaryKey({ columns: [table.run_id, table.model, table.variant, table.route_key] })]
 );
 
 export const caseResults = sqliteTable(
@@ -114,6 +136,8 @@ export const caseResults = sqliteTable(
   {
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
     case_id: text('case_id').notNull(),
     route_key: text('route_key'),
     score: real('score').notNull(),
@@ -128,14 +152,16 @@ export const caseResults = sqliteTable(
     output_prefix: text('output_prefix'),
     event_count: integer('event_count'),
     last_event_types: text('last_event_types'),
-    // Repetition index (0-based); together with run_id/model/case_id forms the PK.
+    // Repetition index (0-based); together with run_id/model/variant/case_id forms the PK.
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
   // (count/fetch by run); no separate run_id index is needed.
-  table => [primaryKey({ columns: [table.run_id, table.model, table.case_id, table.rep] })]
+  table => [
+    primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),
+  ]
 );
 
 export const routingTables = sqliteTable('routing_tables', {
@@ -161,7 +187,65 @@ export const routingTableCandidates = sqliteTable(
     // cost signal, so every published candidate has one).
     avg_cost_usd: real('avg_cost_usd').notNull(),
     meets_threshold: integer('meets_threshold', { mode: 'boolean' }).notNull(),
+    // Legacy effort key; platform table JSON still reads this column.
     reasoning_effort: text('reasoning_effort'),
+    // Exact-pair identity mirror ('' = null). Keeps rows self-describing; no PK change.
+    variant: text('variant').notNull().default(''),
   },
   table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
+);
+
+/**
+ * Global Benchmark-profile registry: one current row per exact Pool entry per
+ * engine identity + repetitions. Old-engine rows remain as history; currency
+ * is decided by matching the live decider engine identity and repetitions.
+ */
+export const benchmarkProfiles = sqliteTable(
+  'benchmark_profiles',
+  {
+    model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    status: text('status').$type<BenchmarkProfileStatus>().notNull(),
+    // Provenance of the run that measured / is measuring this profile.
+    run_id: text('run_id'),
+    failure_reason: text('failure_reason'),
+    requested_at: text('requested_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+    completed_at: text('completed_at'),
+  },
+  table => [
+    primaryKey({
+      columns: [table.model, table.variant, table.engine_identity, table.repetitions],
+    }),
+  ]
+);
+
+/**
+ * Rolling owner admission ledger for the 24h profile request quota. One row
+ * per charged admission (new under current engine, or explicit failed retry).
+ * Stale engine-drift re-admissions are free and do not insert here.
+ */
+export const profileRequestEvents = sqliteTable(
+  'profile_request_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    owner_type: text('owner_type').notNull(),
+    owner_id: text('owner_id').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    admitted_at: text('admitted_at').notNull(),
+  },
+  table => [
+    // Lookup window: count an owner's admissions in the preceding 24 hours.
+    index('IDX_profile_request_events_owner_admitted').on(
+      table.owner_type,
+      table.owner_id,
+      table.admitted_at
+    ),
+  ]
 );

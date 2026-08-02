@@ -51,12 +51,20 @@ export type ValidatedStoreKiloPassPurchase = {
   rawPayload: Record<string, unknown>;
 };
 
-export type CompleteStoreKiloPassPurchaseResult = {
-  subscriptionId: string;
-  tier: KiloPassTier;
-  cadence: KiloPassCadence;
-  alreadyProcessed: boolean;
-};
+export type CompleteStoreKiloPassPurchaseResult =
+  | {
+      subscriptionId: string;
+      tier: KiloPassTier;
+      cadence: KiloPassCadence;
+      alreadyProcessed: true;
+    }
+  | {
+      subscriptionId: string;
+      tier: KiloPassTier;
+      cadence: KiloPassCadence;
+      alreadyProcessed: false;
+      purchaseKind: 'initial' | 'renewal' | 'upgrade';
+    };
 
 function getIssuanceSource(
   paymentProvider: ValidatedStoreKiloPassPurchase['paymentProvider']
@@ -660,11 +668,26 @@ export async function completeStoreKiloPassPurchase(params: {
       },
     });
 
+    // purchaseKind labeling (analytics-only; not on the tRPC output schema):
+    // - Resubscribe on an existing provider subscription row → renewal (any non-first
+    //   transaction on the subscription).
+    // - Upgrade landing after the previous period ended → renewal; the event's tier
+    //   property carries the new tier, so no information is lost.
+    // - "Subscription row exists but no prior purchase row" is structurally impossible
+    //   for App Store (subscription + purchase insert in the same transaction), so
+    //   renewal always means a real prior transaction.
+    const purchaseKind = isAppStoreSamePeriodUpgrade
+      ? ('upgrade' as const)
+      : existingProviderSubscription != null
+        ? ('renewal' as const)
+        : ('initial' as const);
+
     return {
       subscriptionId,
       tier: purchase.tier,
       cadence: purchase.cadence,
       alreadyProcessed: false,
+      purchaseKind,
     };
   };
 

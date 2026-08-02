@@ -2,7 +2,7 @@
   "name": "kilo-extension",
   "description": "Side-panel AI chat agent. Use open-weight or frontier models.",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "dev": "wxt --port 3001",

@@ -59,10 +59,40 @@ function createMockWs(tags: string[] = [], attachment?: unknown): MockWS {
 // Mock DurableObjectState (this.ctx)
 // ---------------------------------------------------------------------------
 
+/** In-memory Map-backed KV fake for ctx.storage (put/get/delete/list). */
+function makeStorageFake() {
+  const store = new Map<string, unknown>();
+  return {
+    store,
+    put: vi.fn(async (key: string, value: unknown) => {
+      store.set(key, value);
+    }),
+    get: vi.fn(async <T = unknown>(key: string): Promise<T | undefined> => {
+      return store.get(key) as T | undefined;
+    }),
+    delete: vi.fn(async (key: string) => {
+      store.delete(key);
+    }),
+    list: vi.fn(async <T = unknown>(opts?: { prefix?: string }): Promise<Map<string, T>> => {
+      const result = new Map<string, T>();
+      const prefix = opts?.prefix ?? '';
+      for (const [key, value] of store) {
+        if (key.startsWith(prefix)) {
+          result.set(key, value as T);
+        }
+      }
+      return result;
+    }),
+    setAlarm: vi.fn(),
+  };
+}
+
 function createMockCtx() {
   const sockets: MockWS[] = [];
+  const storage = makeStorageFake();
   return {
     sockets,
+    storage,
     addSocket(ws: MockWS) {
       sockets.push(ws);
     },
@@ -84,13 +114,24 @@ function createMockCtx() {
         getTags(ws: MockWS) {
           return ws._tags;
         },
-        storage: {
-          setAlarm: vi.fn(),
-        },
-        waitUntil: vi.fn(),
+        storage,
+        // Auto-run waitUntil work so delayed readyPush / rename catch-up settle in tests.
+        waitUntil: vi.fn((p: Promise<unknown>) => {
+          void Promise.resolve(p).catch(() => undefined);
+        }),
       };
     },
   };
+}
+
+/** Drain microtasks so waitUntil-scheduled async IIFEs settle. */
+async function flushAsync(): Promise<void> {
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 0);
+  });
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 0);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -3045,6 +3086,171 @@ describe('UserConnectionDO', () => {
 
       expect(parseSent(webWs)).toEqual({ type: 'response', id: 'cmd-1', result });
     });
+
+    it('resolves exit_cli successfully when heartbeat drops the session', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Exit's own effect: CLI heartbeat no longer lists the session.
+      sendHeartbeat(doInstance, cliWs, []);
+
+      expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        result: {},
+      });
+      expect(
+        allSent(webWs).some(
+          m =>
+            m.type === 'response' &&
+            m.id === 'cmd-1' &&
+            isRecord(m.error) &&
+            m.error.code === 'SESSION_OWNER_CHANGED'
+        )
+      ).toBe(false);
+
+      // CLI's late ACK must not produce a second cmd-1 response.
+      const responsesBeforeLateAck = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'cmd-1'
+      ).length;
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: {} });
+      expect(allSent(webWs).filter(m => m.type === 'response' && m.id === 'cmd-1')).toHaveLength(
+        responsesBeforeLateAck
+      );
+    });
+
+    it('resolves exit_cli successfully when the owning socket closes', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      webWs.send.mockClear();
+
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        result: {},
+      });
+    });
+
+    it.each(['list_models', 'send_message'] as const)(
+      'still fails %s with SESSION_OWNER_CHANGED when heartbeat drops the session',
+      command => {
+        const { doInstance, mockCtx } = setup();
+        const cliWs = addCliSocket(mockCtx, 'cli-1');
+        const webWs = addWebSocket(mockCtx, 'web-1');
+
+        sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+        cliWs.send.mockClear();
+        webWs.send.mockClear();
+        sendCommand(doInstance, webWs, {
+          id: 'cmd-1',
+          command,
+          sessionId: 's1',
+          connectionId: 'cli-1',
+        });
+        webWs.send.mockClear();
+
+        sendHeartbeat(doInstance, cliWs, []);
+
+        expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+          type: 'response',
+          id: 'cmd-1',
+          error: {
+            source: 'relay',
+            code: 'SESSION_OWNER_CHANGED',
+            message: 'Session owner changed',
+          },
+        });
+      }
+    );
+
+    it('still fails exit_cli with SESSION_OWNER_CHANGED on genuine takeover', () => {
+      const { doInstance, mockCtx } = setup();
+      const firstOwner = addCliSocket(mockCtx, 'cli-1');
+      const nextOwner = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, firstOwner, [makeSession('s1')]);
+      sendHeartbeat(doInstance, nextOwner, []);
+      firstOwner.send.mockClear();
+      webWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      webWs.send.mockClear();
+
+      sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+
+      expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+    });
+
+    it('still fails exit_cli with SESSION_OWNER_CHANGED when socket is replaced by reconnect', () => {
+      const { doInstance, mockCtx } = setup();
+      const firstCli = connectCliSocket(doInstance, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, firstCli, [makeSession('s1')]);
+      firstCli.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      webWs.send.mockClear();
+
+      connectCliSocket(doInstance, 'cli-1');
+
+      expect(firstCli.close).toHaveBeenCalledWith(1000, 'replaced by reconnect');
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -3531,6 +3737,44 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
+    it('includes capabilities when the CLI attachment advertises them', () => {
+      const { doInstance, mockCtx } = setup();
+      // Hibernated attachment carries capabilities — same source
+      // getConnectedInstances already uses for instance/version.
+      const cliWs = createMockWs(['cli'], {
+        role: 'cli',
+        connectionId: 'cli-cap',
+        sessions: [],
+        instance: { name: 'laptop-cap', projectName: 'kilo' },
+        capabilities: { attachments: true },
+      });
+      mockCtx.addSocket(cliWs);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([
+        {
+          connectionId: 'cli-cap',
+          name: 'laptop-cap',
+          projectName: 'kilo',
+          capabilities: { attachments: true },
+        },
+      ]);
+    });
+
+    it('omits capabilities when the CLI attachment has none (legacy CLI)', () => {
+      const { doInstance, mockCtx } = setup();
+      addCliSocket(mockCtx, 'cli-legacy-cap', [], {
+        name: 'laptop-legacy',
+        projectName: 'kilo',
+      });
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([
+        { connectionId: 'cli-legacy-cap', name: 'laptop-legacy', projectName: 'kilo' },
+      ]);
+      expect(instances[0]).not.toHaveProperty('capabilities');
+    });
+
     it('persists `instance` in the WS attachment across heartbeats', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
@@ -3753,10 +3997,10 @@ describe('UserConnectionDO', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Session-ready push claim
+  // Session-ready push (delayed, Decision 9)
   // -------------------------------------------------------------------------
 
-  describe('session-ready push claim', () => {
+  describe('session-ready delayed push', () => {
     function setupWithIngestDO() {
       const mockCtx = createMockCtx();
       const ctx = mockCtx.build();
@@ -3766,7 +4010,7 @@ describe('UserConnectionDO', () => {
         resetAttentionStatusOnCliDisconnect: sessionIngestMocks.resetAttentionStatusOnCliDisconnect,
       });
       const doInstance = new UserConnectionDO(ctx as never, {} as never);
-      return { doInstance, mockCtx, claimSessionReadyPush };
+      return { doInstance, mockCtx, ctx, claimSessionReadyPush };
     }
 
     function addCliSocketForUser(
@@ -3780,40 +4024,385 @@ describe('UserConnectionDO', () => {
       return ws;
     }
 
-    it('claims the push the first time a parentless session appears in a heartbeat', () => {
-      const { doInstance, mockCtx, claimSessionReadyPush } = setupWithIngestDO();
+    it('writes a pending readyPush entry on first sight and does not claim immediately', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
       const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
 
       sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
+      await flushAsync();
 
-      expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
-      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main', 'Test');
+      expect(claimSessionReadyPush).not.toHaveBeenCalled();
+      const entry = ctx.storage.store.get('readyPush:ses_main') as {
+        kiloUserId: string;
+        title: string;
+        fireAt: number;
+        attempts: number;
+      };
+      expect(entry).toMatchObject({
+        kiloUserId: 'usr_1',
+        title: 'Test',
+        fireAt: now + 5_000,
+        attempts: 0,
+      });
 
-      // Subsequent heartbeats for the same session must not re-claim.
+      // Subsequent heartbeats for the same session must not re-schedule.
       sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
-      expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
+      await flushAsync();
+      expect(ctx.storage.put).toHaveBeenCalledTimes(1);
     });
 
-    it('never claims for subagent sessions', () => {
-      const { doInstance, mockCtx, claimSessionReadyPush } = setupWithIngestDO();
+    it('reconnect first-sight does not reset a pending readyPush fireAt or attempts', async () => {
+      const { doInstance, mockCtx, ctx } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_reconnect')]);
+      await flushAsync();
+
+      const originalFireAt = now + 5_000;
+      // Simulate a prior retry so attempts is non-zero.
+      await ctx.storage.put('readyPush:ses_reconnect', {
+        kiloUserId: 'usr_1',
+        title: 'Test',
+        fireAt: originalFireAt,
+        attempts: 2,
+      });
+      const internal = doInstance as unknown as { readyPushFireAt: Map<string, number> };
+      internal.readyPushFireAt.set('ses_reconnect', originalFireAt);
+
+      // Disconnect clears sessionOwners; reconnect is a new "first sight".
+      await disconnectCli(doInstance, cliWs);
+      expect(internal.readyPushFireAt.get('ses_reconnect')).toBe(originalFireAt);
+
+      const later = now + 2_000;
+      vi.spyOn(Date, 'now').mockReturnValue(later);
+      ctx.storage.put.mockClear();
+
+      const cliWs2 = addCliSocketForUser(mockCtx, 'cli-2', 'usr_1');
+      sendHeartbeat(doInstance, cliWs2, [makeSession('ses_reconnect')]);
+      await flushAsync();
+
+      const entry = ctx.storage.store.get('readyPush:ses_reconnect') as {
+        fireAt: number;
+        attempts: number;
+      };
+      expect(entry.fireAt).toBe(originalFireAt);
+      expect(entry.attempts).toBe(2);
+      // Must not replace the pending entry with a fresh fireAt/attempts:0 put.
+      expect(ctx.storage.put).not.toHaveBeenCalled();
+    });
+
+    it('never schedules for subagent sessions', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
       const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
 
       sendHeartbeat(doInstance, cliWs, [
         makeSession('ses_main'),
         makeSession('ses_sub', 'busy', 'Sub', 'ses_main'),
       ]);
+      await flushAsync();
 
-      expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
-      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main', 'Test');
+      expect(ctx.storage.store.has('readyPush:ses_main')).toBe(true);
+      expect(ctx.storage.store.has('readyPush:ses_sub')).toBe(false);
+      expect(claimSessionReadyPush).not.toHaveBeenCalled();
     });
 
-    it('does not claim on sockets without a kiloUserId (legacy attachment)', () => {
-      const { doInstance, mockCtx, claimSessionReadyPush } = setupWithIngestDO();
+    it('does not schedule on sockets without a kiloUserId (legacy attachment)', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
+      await flushAsync();
 
+      expect(ctx.storage.store.size).toBe(0);
       expect(claimSessionReadyPush).not.toHaveBeenCalled();
+    });
+
+    it('arms the alarm for a readyPush even with no heartbeat candidates', async () => {
+      const { doInstance, mockCtx, ctx } = setupWithIngestDO();
+      // No CLI sockets — only a pending readyPush in KV, rebuilt via one-shot.
+      const fireAt = Date.now() + 5_000;
+      await ctx.storage.put('readyPush:ses_orphan', {
+        kiloUserId: 'usr_1',
+        title: 'Orphan',
+        fireAt,
+        attempts: 0,
+      });
+
+      // Trigger scheduleNextAlarm via a zero-session heartbeat on a fresh CLI,
+      // then disconnect so lastHeartbeatAt is cleared… simpler: call schedule
+      // through a heartbeat that does not add readyPush (legacy, no kiloUserId),
+      // with empty lastHeartbeat — actually ensureState + getActiveSessions
+      // doesn't schedule. Use notifySessionRenamed path which calls ensureState
+      // only. Direct approach: seed mirror by listing via a first schedule kick.
+      // Connecting a CLI and immediately closing leaves empty lastHeartbeat after
+      // disconnect; instead invoke alarm() which calls scheduleNextAlarm at end.
+      ctx.storage.setAlarm.mockClear();
+      // Force a schedule by going through a heartbeat that schedules readyPush
+      // then clear lastHeartbeat by disconnecting — still has readyPush mirror.
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_arm')]);
+      await flushAsync();
+      // Disconnect removes lastHeartbeatAt for this connection
+      await disconnectCli(doInstance, cliWs);
+      ctx.storage.setAlarm.mockClear();
+
+      // Re-arm: scheduleNextAlarm is private; kick via alarm() which ends with it.
+      // After disconnect, lastHeartbeatAt is empty and pendingCommands empty;
+      // readyPush mirror still holds ses_arm.
+      await doInstance.alarm();
+      expect(ctx.storage.setAlarm).toHaveBeenCalled();
+      const armedAt = ctx.storage.setAlarm.mock.calls.at(-1)?.[0] as number;
+      // fireAt is now+5s; after alarm() now is still the mocked now, so arms at fireAt
+      expect(armedAt).toBe(now + 5_000);
+    });
+
+    it('arms immediately for overdue readyPush entries (never filtered by fireAt > now)', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      await ctx.storage.put('readyPush:ses_overdue', {
+        kiloUserId: 'usr_1',
+        title: 'Old',
+        fireAt: now - 1_000,
+        attempts: 0,
+      });
+      // Seed mirror via first-sight path, then replace with overdue
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_overdue', 'idle', 'Old')]);
+      await flushAsync();
+      // Overwrite with overdue fireAt and mirror
+      await ctx.storage.put('readyPush:ses_overdue', {
+        kiloUserId: 'usr_1',
+        title: 'Old',
+        fireAt: now - 1_000,
+        attempts: 0,
+      });
+      // Access private mirror to set overdue fireAt for scheduling
+      const internal = doInstance as unknown as {
+        readyPushFireAt: Map<string, number>;
+      };
+      internal.readyPushFireAt.set('ses_overdue', now - 1_000);
+
+      ctx.storage.setAlarm.mockClear();
+      claimSessionReadyPush.mockClear();
+      await doInstance.alarm();
+
+      expect(claimSessionReadyPush).toHaveBeenCalled();
+      // After fire, entry deleted; remaining schedule may or may not arm
+    });
+
+    it('one-shot mirror rebuild sets flag only after successful refresh', async () => {
+      const { doInstance, mockCtx, ctx } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      await ctx.storage.put('readyPush:ses_rebuild', {
+        kiloUserId: 'usr_1',
+        title: 'Rebuild',
+        fireAt: now + 2_000,
+        attempts: 0,
+      });
+
+      const internal = doInstance as unknown as {
+        readyPushFireAt: Map<string, number>;
+        readyPushRebuilt: boolean;
+        scheduleNextAlarm: (now: number) => void;
+      };
+      expect(internal.readyPushFireAt.size).toBe(0);
+      expect(internal.readyPushRebuilt).toBe(false);
+
+      // Kick schedule with empty mirror → async rebuild
+      const cliWs = addCliSocket(mockCtx, 'cli-legacy'); // no kiloUserId → no new readyPush
+      sendHeartbeat(doInstance, cliWs, []);
+      await flushAsync();
+
+      expect(internal.readyPushRebuilt).toBe(true);
+      expect(internal.readyPushFireAt.get('ses_rebuild')).toBe(now + 2_000);
+      expect(ctx.storage.setAlarm).toHaveBeenCalled();
+
+      // Failed list leaves flag false
+      internal.readyPushFireAt.clear();
+      internal.readyPushRebuilt = false;
+      ctx.storage.list.mockRejectedValueOnce(new Error('kv down'));
+      sendHeartbeat(doInstance, cliWs, []);
+      await flushAsync();
+      expect(internal.readyPushRebuilt).toBe(false);
+    });
+
+    it('alarm passes changed heartbeat title when connectionSessions diverged, else undefined', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      const internal = doInstance as unknown as { readyPushFireAt: Map<string, number> };
+
+      // Establish ownership for both sessions first (first-sight schedules entries).
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('ses_t', 'idle', 'Stored'),
+        makeSession('ses_same', 'idle', 'Same'),
+      ]);
+      await flushAsync();
+
+      // Diverged title for ses_t; matching title for ses_same. Force both overdue.
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('ses_t', 'idle', 'Generated'),
+        makeSession('ses_same', 'idle', 'Same'),
+      ]);
+      await ctx.storage.put('readyPush:ses_t', {
+        kiloUserId: 'usr_1',
+        title: 'Stored',
+        fireAt: now - 1,
+        attempts: 0,
+      });
+      await ctx.storage.put('readyPush:ses_same', {
+        kiloUserId: 'usr_1',
+        title: 'Same',
+        fireAt: now - 1,
+        attempts: 0,
+      });
+      internal.readyPushFireAt.set('ses_t', now - 1);
+      internal.readyPushFireAt.set('ses_same', now - 1);
+
+      claimSessionReadyPush.mockClear();
+      await doInstance.alarm();
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_t', 'Generated');
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_same', undefined);
+    });
+
+    it('claim-then-delete: RPC rejection keeps the entry; drops after 3 attempts', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_retry')]);
+      await flushAsync();
+
+      const internal = doInstance as unknown as { readyPushFireAt: Map<string, number> };
+      internal.readyPushFireAt.set('ses_retry', now - 1);
+      await ctx.storage.put('readyPush:ses_retry', {
+        kiloUserId: 'usr_1',
+        title: 'Test',
+        fireAt: now - 1,
+        attempts: 0,
+      });
+
+      claimSessionReadyPush.mockRejectedValueOnce(new Error('DO down'));
+      await doInstance.alarm();
+      const after1 = ctx.storage.store.get('readyPush:ses_retry') as {
+        attempts: number;
+        fireAt: number;
+      };
+      expect(after1.attempts).toBe(1);
+      // Retry must back off so attempts span real time (not fireAt already ≤ now).
+      expect(after1.fireAt).toBe(now + 5_000);
+      expect(internal.readyPushFireAt.get('ses_retry')).toBe(now + 5_000);
+
+      // Advance past backoff so attempt 2 is due.
+      vi.spyOn(Date, 'now').mockReturnValue(now + 5_000);
+      claimSessionReadyPush.mockRejectedValueOnce(new Error('DO down'));
+      await doInstance.alarm();
+      const after2 = ctx.storage.store.get('readyPush:ses_retry') as {
+        attempts: number;
+        fireAt: number;
+      };
+      expect(after2.attempts).toBe(2);
+      expect(after2.fireAt).toBe(now + 10_000);
+
+      vi.spyOn(Date, 'now').mockReturnValue(now + 10_000);
+      claimSessionReadyPush.mockRejectedValueOnce(new Error('DO down'));
+      await doInstance.alarm();
+      expect(ctx.storage.store.has('readyPush:ses_retry')).toBe(false);
+      expect(internal.readyPushFireAt.has('ses_retry')).toBe(false);
+    });
+
+    it('claim rejection re-arms at now+backoff, not now', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_backoff')]);
+      await flushAsync();
+
+      const internal = doInstance as unknown as { readyPushFireAt: Map<string, number> };
+      internal.readyPushFireAt.set('ses_backoff', now - 1);
+      await ctx.storage.put('readyPush:ses_backoff', {
+        kiloUserId: 'usr_1',
+        title: 'Test',
+        fireAt: now - 1,
+        attempts: 0,
+      });
+
+      claimSessionReadyPush.mockRejectedValueOnce(new Error('transport blip'));
+      await doInstance.alarm();
+
+      const entry = ctx.storage.store.get('readyPush:ses_backoff') as {
+        attempts: number;
+        fireAt: number;
+      };
+      expect(entry.attempts).toBe(1);
+      expect(entry.fireAt).toBe(now + 5_000);
+      expect(internal.readyPushFireAt.get('ses_backoff')).toBe(now + 5_000);
+
+      // Same instant must not exhaust further attempts.
+      claimSessionReadyPush.mockClear();
+      claimSessionReadyPush.mockRejectedValue(new Error('still down'));
+      await doInstance.alarm();
+      expect(claimSessionReadyPush).not.toHaveBeenCalled();
+      expect(
+        (ctx.storage.store.get('readyPush:ses_backoff') as { attempts: number }).attempts
+      ).toBe(1);
+    });
+
+    it('does not refire after a successful claim', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_ok')]);
+      await flushAsync();
+
+      const internal = doInstance as unknown as { readyPushFireAt: Map<string, number> };
+      internal.readyPushFireAt.set('ses_ok', now - 1);
+      await ctx.storage.put('readyPush:ses_ok', {
+        kiloUserId: 'usr_1',
+        title: 'Test',
+        fireAt: now - 1,
+        attempts: 0,
+      });
+
+      await doInstance.alarm();
+      expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
+      expect(ctx.storage.store.has('readyPush:ses_ok')).toBe(false);
+
+      claimSessionReadyPush.mockClear();
+      await doInstance.alarm();
+      expect(claimSessionReadyPush).not.toHaveBeenCalled();
+    });
+
+    it('KV is source of truth for alarm even without the mirror', async () => {
+      const { doInstance, mockCtx, ctx, claimSessionReadyPush } = setupWithIngestDO();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      // Ensure ensureState runs so DO is live
+      addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+      await ctx.storage.put('readyPush:ses_kv_only', {
+        kiloUserId: 'usr_1',
+        title: 'KV',
+        fireAt: now - 1,
+        attempts: 0,
+      });
+      // Mirror intentionally empty
+      const internal = doInstance as unknown as { readyPushFireAt: Map<string, number> };
+      internal.readyPushFireAt.clear();
+
+      await doInstance.alarm();
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_kv_only', undefined);
+      expect(ctx.storage.store.has('readyPush:ses_kv_only')).toBe(false);
     });
 
     it('stores the kiloUserId from the connection URL on the attachment', () => {
@@ -3841,6 +4430,142 @@ describe('UserConnectionDO', () => {
       );
 
       expect(server.deserializeAttachment()).toMatchObject({ role: 'cli', kiloUserId: 'usr_1' });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // notifySessionRenamed + rename catch-up (lazy KV per heartbeat)
+  // -------------------------------------------------------------------------
+
+  describe('notifySessionRenamed', () => {
+    it('delivers session.renamed to the owning CLI and always persists KV', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [makeSession('ses_r')]);
+      // Establish ownership via heartbeat
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_r')]);
+
+      const result = await doInstance.notifySessionRenamed('ses_r', 'Renamed Title');
+      expect(result).toEqual({ delivered: true });
+      expect(ctx.storage.store.get('rename:ses_r')).toMatchObject({ title: 'Renamed Title' });
+
+      const systemMsgs = allSent(cliWs).filter(
+        m => m.type === 'system' && m.event === 'session.renamed'
+      );
+      expect(systemMsgs).toHaveLength(1);
+      expect(systemMsgs[0].data).toEqual({ sessionId: 'ses_r', title: 'Renamed Title' });
+    });
+
+    it('returns delivered:false when no owner but still persists KV', async () => {
+      const { doInstance, ctx } = setup();
+      const result = await doInstance.notifySessionRenamed('ses_missing', 'Offline Rename');
+      expect(result).toEqual({ delivered: false });
+      expect(ctx.storage.store.get('rename:ses_missing')).toMatchObject({
+        title: 'Offline Rename',
+      });
+    });
+
+    it('re-emits session.renamed on heartbeat title mismatch; deletes on match', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_catch', 'idle', 'Old Title')]);
+
+      await doInstance.notifySessionRenamed('ses_catch', 'New Title');
+      cliWs.send.mockClear();
+
+      // Mismatch → re-emit
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_catch', 'idle', 'Old Title')]);
+      await flushAsync();
+      const reEmits = allSent(cliWs).filter(
+        m => m.type === 'system' && m.event === 'session.renamed'
+      );
+      expect(reEmits).toHaveLength(1);
+      expect(reEmits[0].data).toEqual({ sessionId: 'ses_catch', title: 'New Title' });
+      expect(ctx.storage.store.has('rename:ses_catch')).toBe(true);
+
+      // Match → delete entry
+      cliWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_catch', 'idle', 'New Title')]);
+      await flushAsync();
+      const afterMatch = allSent(cliWs).filter(
+        m => m.type === 'system' && m.event === 'session.renamed'
+      );
+      expect(afterMatch).toHaveLength(0);
+      expect(ctx.storage.store.has('rename:ses_catch')).toBe(false);
+    });
+
+    it('registers rename catch-up with waitUntil on heartbeat', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_wu')]);
+      await doInstance.notifySessionRenamed('ses_wu', 'Catch Up Title');
+
+      const waitUntil = ctx.waitUntil as ReturnType<typeof vi.fn>;
+      waitUntil.mockClear();
+      cliWs.send.mockClear();
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_wu', 'idle', 'Stale')]);
+      expect(waitUntil).toHaveBeenCalled();
+      const registered = waitUntil.mock.calls.map(c => c[0]);
+      expect(
+        registered.some(
+          p => p instanceof Promise || typeof (p as PromiseLike<unknown>)?.then === 'function'
+        )
+      ).toBe(true);
+
+      await flushAsync();
+      const reEmits = allSent(cliWs).filter(
+        m => m.type === 'system' && m.event === 'session.renamed'
+      );
+      expect(reEmits).toHaveLength(1);
+      expect(reEmits[0].data).toEqual({ sessionId: 'ses_wu', title: 'Catch Up Title' });
+    });
+
+    it('prunes rename entries older than TTL and does not re-emit them', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const now = 1_700_000_000_000;
+      const RENAME_ENTRY_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_stale', 'idle', 'Old')]);
+
+      await ctx.storage.put('rename:ses_stale', {
+        title: 'Never Applied',
+        at: now - RENAME_ENTRY_TTL_MS - 1,
+      });
+
+      cliWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_stale', 'idle', 'Old')]);
+      await flushAsync();
+
+      const reEmits = allSent(cliWs).filter(
+        m => m.type === 'system' && m.event === 'session.renamed'
+      );
+      expect(reEmits).toHaveLength(0);
+      expect(ctx.storage.store.has('rename:ses_stale')).toBe(false);
+    });
+
+    it('still re-emits a fresh rename entry within TTL', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_fresh', 'idle', 'Old')]);
+
+      await ctx.storage.put('rename:ses_fresh', {
+        title: 'Within TTL',
+        at: now - 60_000,
+      });
+
+      cliWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_fresh', 'idle', 'Old')]);
+      await flushAsync();
+
+      const reEmits = allSent(cliWs).filter(
+        m => m.type === 'system' && m.event === 'session.renamed'
+      );
+      expect(reEmits).toHaveLength(1);
+      expect(reEmits[0].data).toEqual({ sessionId: 'ses_fresh', title: 'Within TTL' });
+      expect(ctx.storage.store.has('rename:ses_fresh')).toBe(true);
     });
   });
 });

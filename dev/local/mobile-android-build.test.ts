@@ -14,6 +14,7 @@ import {
   validateAndroidBuildClaim,
   type AndroidBuildDeps,
 } from './mobile-android-build';
+import { hashRootNativeInputs } from './mobile-native-build';
 
 const PACKAGE_ID = 'com.kilocode.kiloapp';
 
@@ -75,6 +76,20 @@ test('Android fingerprint skips only Expo extra beyond defaults', () => {
   assert.deepEqual(options.platforms, ['android']);
   assert.equal(options.silent, true);
   assert.notEqual(options.sourceSkips, 0);
+  assert.deepEqual(
+    options.extraSources.map(source => ({
+      type: source.type,
+      id: source.id,
+      contents: source.contents,
+    })),
+    [
+      {
+        type: 'contents',
+        id: 'repoRootNativeInputs',
+        contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+      },
+    ]
+  );
 });
 
 test('Android compatibility key changes for every native toolchain dimension', () => {

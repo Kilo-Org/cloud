@@ -1,7 +1,12 @@
 /* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
+import {
+  dangerousToolNames,
+  mockKiloApi,
+  readSidePanelScrollState,
+  safeToolNames,
+} from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -16,6 +21,41 @@ import {
   releaseConversationStoreHydration,
   requireTwoOptionLabels,
 } from './tab-selection-e2e-helpers';
+
+test('fresh conversation shows the empty-state hint without a CTA button', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, { toolNames: safeToolNames });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    const conversation = sidePanel.getByLabel('Agent conversation');
+    const emptyHint = conversation.getByText('Pick a tab and ask Kilo to inspect it.');
+    await expect(emptyHint).toBeVisible();
+    const hintBox = await emptyHint.boundingBox();
+    expect(hintBox).not.toBeNull();
+    expect(hintBox?.height ?? 0).toBeGreaterThan(0);
+    expect(hintBox?.width ?? 0).toBeGreaterThan(0);
+    await expect(conversation.getByRole('button')).toHaveCount(0);
+
+    await sidePanel.getByLabel('Message agent').fill('First user message');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(conversation.getByText('First user message')).toBeVisible();
+    await expect(conversation.getByText('Pick a tab and ask Kilo to inspect it.')).toHaveCount(0);
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
 
 test('new conversation does not inherit the selected target tab', async () => {
   // R3: create samples the active tab fresh; it must not copy conv1's manual pick.
@@ -184,6 +224,7 @@ test('assistant messages render markdown', async () => {
           ],
         },
       ],
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

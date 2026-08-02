@@ -1,13 +1,15 @@
 import { Globe } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
 import { truncateText } from '../tool-card-utils';
 
 export function WebSearchToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const textSelectable = useTranscriptTextSelectable();
   const input = part.state.input;
   const query = typeof input.query === 'string' ? input.query : undefined;
   const url = typeof input.url === 'string' ? input.url : undefined;
@@ -28,7 +30,7 @@ export function WebSearchToolCard({ part }: Readonly<{ part: ToolPart }>) {
         <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
       ) : null}
       {error ? (
-        <Text selectable className="text-xs text-destructive">
+        <Text selectable={textSelectable} className="text-xs text-destructive">
           {error}
         </Text>
       ) : null}

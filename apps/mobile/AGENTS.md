@@ -4,12 +4,12 @@
 
 Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-specific code.
 
-- Backend, simulator, login, Maestro, remote CLI, logs, cleanup: follow [e2e/AGENTS.md](e2e/AGENTS.md). Start what you need yourself; never ask the user to start Metro or backend services.
-- Substantial mobile work: follow [.kilo/MOBILE_WORKFLOW.md](.kilo/MOBILE_WORKFLOW.md). Plans may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
+- Backend, simulator, login, Appium, remote CLI, logs, cleanup: follow [e2e/AGENTS.md](e2e/AGENTS.md). Start what you need yourself; never ask the user to start Metro or backend services.
+- Substantial mobile work may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
 
 ## Stack
 
-- Expo SDK 55, React Native 0.83, React 19, strict TypeScript (`tsgo`)
+- Expo SDK 57, React Native 0.86, React 19, strict TypeScript (`tsgo`)
 - NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
 - Expo Router routes in `src/app/`
 - oxlint and oxfmt
@@ -66,7 +66,8 @@ git diff --check
 ### Text inputs
 
 - iOS: never control text with `value` plus state. Store text in a ref via `onChangeText`, use state only for derived UI, read the ref on submit.
-- Use `defaultValue` only for initial content. Set an explicit Tailwind line height.
+- Use `defaultValue` only for initial content.
+- Single-line inputs: use `leading-[normal]`. A `lineHeight` above the font's natural one (which `text-sm`/`text-base` set on their own) makes iOS draw the placeholder lower than the typed text and clip it. Multi-line inputs keep an explicit `leading-*`.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules
@@ -78,6 +79,10 @@ git diff --check
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
 - Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
+
+## Design
+
+The app follows https://github.com/Kilo-Org/kilo-design/ in general, except where this file states otherwise.
 
 ## Debugging
 

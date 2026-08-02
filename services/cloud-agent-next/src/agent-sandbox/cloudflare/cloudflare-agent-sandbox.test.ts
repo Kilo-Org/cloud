@@ -254,6 +254,34 @@ describe('deriveSetupEnvironment', () => {
 });
 
 describe('CloudflareAgentSandbox', () => {
+  it('keeps default billing configuration when the sandbox resolver is injected', async () => {
+    const configureBilling = vi.fn().mockResolvedValue(undefined);
+    const renewActivityTimeout = vi.fn();
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({ configureBilling, renewActivityTimeout }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.keepAlive();
+
+    expect(configureBilling).toHaveBeenCalledOnce();
+    expect(renewActivityTimeout).toHaveBeenCalledOnce();
+  });
+
+  it('does not await shadow configuration before using an injected sandbox', async () => {
+    const configureBilling = vi.fn(() => new Promise<void>(() => undefined));
+    const renewActivityTimeout = vi.fn();
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ renewActivityTimeout }) as unknown as SandboxInstance,
+      configureBilling,
+    });
+
+    await expect(sandbox.keepAlive()).resolves.toBeUndefined();
+
+    expect(configureBilling).toHaveBeenCalledOnce();
+    expect(renewActivityTimeout).toHaveBeenCalledOnce();
+  });
+
   it('starts an ordinary bootstrap wrapper through the adapter', async () => {
     const bootstrapSession = {};
     const createSession = vi.fn().mockResolvedValue(bootstrapSession);
@@ -345,6 +373,7 @@ describe('CloudflareAgentSandbox', () => {
     const setOutboundHandler = vi.fn().mockResolvedValue(undefined);
     const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' });
     const createSession = vi.fn().mockResolvedValue(bootstrapSession);
+    const configureBilling = vi.fn().mockResolvedValue(undefined);
     const ensureBootstrapWrapper = vi
       .spyOn(WrapperClient, 'ensureBootstrapWrapper')
       .mockResolvedValueOnce({ client: {} as WrapperClient });
@@ -357,6 +386,7 @@ describe('CloudflareAgentSandbox', () => {
     const sandbox = new CloudflareAgentSandbox(env, sessionMetadata, {
       resolveSandbox: () =>
         ({ setOutboundHandler, exec, createSession }) as unknown as SandboxInstance,
+      configureBilling,
     });
 
     await sandbox.ensureWrapper(
@@ -364,6 +394,14 @@ describe('CloudflareAgentSandbox', () => {
     );
 
     expect(setOutboundHandler).toHaveBeenCalledWith('managedScm');
+    expect(configureBilling).toHaveBeenCalledWith(expect.anything(), {
+      sandboxId: 'usr-shared',
+      subject: { type: 'org', id: 'org_cloudflare' },
+      actor: { type: 'user', id: 'user_cloudflare' },
+    });
+    expect(configureBilling.mock.invocationCallOrder[0]).toBeLessThan(
+      setOutboundHandler.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
     expect(setOutboundHandler.mock.invocationCallOrder[0]).toBeLessThan(
       exec.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
@@ -1616,6 +1654,76 @@ describe('CloudflareAgentSandbox', () => {
         reason: 'readiness-failed',
       })
     ).resolves.toMatchObject({ status: 'still-present' });
+  });
+
+  it('confirms absence for an idle-timeout stop without waking a stopped container', async () => {
+    const listProcesses = vi.fn().mockResolvedValue([]);
+    const isContainerRunning = vi.fn().mockResolvedValue(false);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ listProcesses, isContainerRunning }) as unknown as SandboxInstance,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'session' },
+        attemptId: 'attempt_idle',
+        reason: 'idle-timeout',
+      })
+    ).resolves.toEqual({ status: 'absent' });
+    // The whole point: no container fetch, so a sleeping container stays asleep.
+    expect(listProcesses).not.toHaveBeenCalled();
+  });
+
+  it('still inspects an idle-timeout stop while the container is running', async () => {
+    const listProcesses = vi.fn().mockResolvedValue([]);
+    const isContainerRunning = vi.fn().mockResolvedValue(true);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ listProcesses, isContainerRunning }) as unknown as SandboxInstance,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'session' },
+        attemptId: 'attempt_idle_running',
+        reason: 'idle-timeout',
+      })
+    ).resolves.toEqual({ status: 'absent' });
+    expect(listProcesses).toHaveBeenCalled();
+  });
+
+  it('inspects a stopped container for stop reasons other than idle-timeout', async () => {
+    const listProcesses = vi.fn().mockResolvedValue([]);
+    const isContainerRunning = vi.fn().mockResolvedValue(false);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ listProcesses, isContainerRunning }) as unknown as SandboxInstance,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'session' },
+        attemptId: 'attempt_delete',
+        reason: 'session-delete',
+      })
+    ).resolves.toEqual({ status: 'absent' });
+    expect(listProcesses).toHaveBeenCalled();
+    expect(isContainerRunning).not.toHaveBeenCalled();
+  });
+
+  it('falls back to inspection when the sandbox cannot report container state', async () => {
+    const listProcesses = vi.fn().mockResolvedValue([]);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      // No isContainerRunning: an unknown state must not be treated as "stopped".
+      resolveSandbox: () => ({ listProcesses }) as unknown as SandboxInstance,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'session' },
+        attemptId: 'attempt_unknown',
+        reason: 'idle-timeout',
+      })
+    ).resolves.toEqual({ status: 'absent' });
+    expect(listProcesses).toHaveBeenCalled();
   });
 
   it('returns inspection-failed from stop when post-stop inspection cannot prove absence', async () => {

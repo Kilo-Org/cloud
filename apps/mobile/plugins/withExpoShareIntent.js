@@ -2,7 +2,7 @@ const fs = require('fs');
 const Module = require('module');
 const path = require('path');
 
-const { withFinalizedMod } = require('expo/config-plugins');
+const { withFinalizedMod, withXcodeProject } = require('expo/config-plugins');
 
 // expo-share-intent@6.1.1 requires @expo/plist without declaring it. Under pnpm's
 // isolated linker the nested plugin cannot resolve that package from its own
@@ -44,6 +44,52 @@ const withExpoShareIntentUpstream = loadUpstreamPlugin();
 const SHARE_EXTENSION_TARGET = 'ShareExtension';
 const SHARE_SHEET_DISPLAY_NAME = 'Kilo';
 
+// React Native's react_native_post_install writes CC/CXX/LD/LDPLUSPLUS pointing at
+// $(REACT_NATIVE_PATH)/scripts/xcode/ccache-*.sh at the *project* level whenever
+// ccache is installed on the builder (EAS images ship it) and apple.ccacheEnabled
+// is set. REACT_NATIVE_PATH expands through ${PODS_ROOT}, which CocoaPods only
+// defines for pod-integrated targets. ShareExtension links no pods, so PODS_ROOT
+// expanded empty and CC became /../../../../node_modules/... — "unable to spawn
+// process" killed the iOS build on EAS. Define PODS_ROOT the way CocoaPods would
+// so the inherited compiler wrapper path resolves.
+function withShareExtensionPodsRoot(config) {
+  return withXcodeProject(config, config => {
+    const project = config.modResults;
+    // The stored target name is quoted ('"ShareExtension"') and upstream's
+    // addTarget leaves no comment entry for pbxTargetByName to match, so
+    // compare raw names with quotes tolerated.
+    const unquote = value => (typeof value === 'string' ? value.replace(/^"|"$/g, '') : value);
+    const target = Object.values(project.pbxNativeTargetSection()).find(
+      entry => entry && unquote(entry.name) === SHARE_EXTENSION_TARGET
+    );
+    if (!target) {
+      throw new Error(
+        `Expected Xcode target "${SHARE_EXTENSION_TARGET}" so PODS_ROOT can be set, but it was not found`
+      );
+    }
+    const configurationList = project.pbxXCConfigurationList()[target.buildConfigurationList];
+    if (!configurationList) {
+      throw new Error(
+        `Expected build configuration list for Xcode target "${SHARE_EXTENSION_TARGET}", but it was not found`
+      );
+    }
+    const configurations = project.pbxXCBuildConfigurationSection();
+    for (const { value } of configurationList.buildConfigurations) {
+      const buildConfiguration = configurations[value];
+      if (
+        buildConfiguration &&
+        buildConfiguration.buildSettings &&
+        !buildConfiguration.buildSettings.PODS_ROOT
+      ) {
+        // Quoted: '(' and ')' are array delimiters in pbxproj syntax, so the
+        // xcode package's verbatim write would corrupt the project unquoted.
+        buildConfiguration.buildSettings.PODS_ROOT = '"$(SRCROOT)/Pods"';
+      }
+    }
+    return config;
+  });
+}
+
 function withKiloShareSheetDisplayName(config) {
   // finalized runs after dangerous mods that write ShareExtension-Info.plist.
   return withFinalizedMod(config, [
@@ -82,6 +128,11 @@ module.exports = function withExpoShareIntent(config, props = {}) {
     // Distinct from the main "Kilo" app target (see collision note above).
     iosShareExtensionName: SHARE_EXTENSION_TARGET,
   };
+  // withXcodeProject mods execute in reverse registration order (each mod runs
+  // its action, then delegates to the previously registered one). Register
+  // withShareExtensionPodsRoot first so it runs after upstream's target-creation
+  // mod, when the ShareExtension target exists.
+  config = withShareExtensionPodsRoot(config);
   config = withExpoShareIntentUpstream(config, parameters);
   config = withKiloShareSheetDisplayName(config);
   return config;

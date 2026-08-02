@@ -1,5 +1,4 @@
-import { useScrollToTop } from '@react-navigation/native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { Bot, Plus } from 'lucide-react-native';
 import {
   type ReactElement,
@@ -41,7 +40,7 @@ import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
-import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 type AgentSessionListContentProps = {
   sections: SessionSection[];
@@ -125,7 +124,13 @@ export function AgentSessionListContent({
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
-    () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS, fontScale) }),
+    () => ({
+      paddingBottom: getEffectiveTabBarHeight({
+        bottomInset: bottom,
+        platform: Platform.OS,
+        fontScale,
+      }),
+    }),
     [bottom, fontScale]
   );
 

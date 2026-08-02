@@ -46,7 +46,7 @@ export function SpendEvidenceCard({
     '90d': 'Last 90 days',
   }[range];
   const highest = evidence
-    .filter(point => point.coverage !== 'unavailable')
+    .filter(point => point.coverage !== 'unavailable' && point.variableUsd + point.scheduledUsd > 0)
     .reduce<(typeof evidence)[number] | undefined>((currentHighest, point) => {
       if (!currentHighest) return point;
       const currentTotal = currentHighest.variableUsd + currentHighest.scheduledUsd;
@@ -121,7 +121,7 @@ export function SpendEvidenceCard({
               >
                 <legend className="sr-only">{rangeLabel} spend by period</legend>
                 <div
-                  className="pointer-events-none absolute inset-x-0 top-7 h-44"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-44"
                   aria-hidden="true"
                 >
                   <ChartGridLine position="top-0" label={money(axisMax)} />
@@ -132,12 +132,15 @@ export function SpendEvidenceCard({
                   const pointTotal = point.variableUsd + point.scheduledUsd;
                   const totalHeight = spendBarHeightPercent(pointTotal, axisMax);
                   const scheduledShare = percentOf(point.scheduledUsd, pointTotal);
-                  const isPeak = highest !== undefined && point.periodStart === highest.periodStart;
                   const showTick = index % tickStride === 0 || index === evidence.length - 1;
                   const accessibilityLabel =
                     point.coverage === 'unavailable'
                       ? `${point.label}: spend data unavailable, ${point.coveredHours} of ${point.totalHours} hours covered`
-                      : `${point.label}: ${point.coverage === 'partial' ? 'at least ' : ''}${money(pointTotal)} total, ${money(point.variableUsd)} usage-based, ${money(point.scheduledUsd)} scheduled${point.coverage === 'partial' ? `, ${point.coveredHours} of ${point.totalHours} hours covered` : ''}`;
+                      : point.coverage === 'partial'
+                        ? `${point.label}: at least ${money(pointTotal)} total, ${money(point.variableUsd)} usage-based, ${money(point.scheduledUsd)} scheduled, ${point.coveredHours} of ${point.totalHours} hours covered`
+                        : pointTotal === 0
+                          ? `${point.label}: no spend`
+                          : `${point.label}: ${money(pointTotal)} total, ${money(point.variableUsd)} usage-based, ${money(point.scheduledUsd)} scheduled`;
                   return (
                     <Tooltip key={point.periodStart}>
                       <TooltipTrigger asChild>
@@ -152,13 +155,6 @@ export function SpendEvidenceCard({
                           onFocus={() => setActiveBarIndex(index)}
                           onKeyDown={event => handleBarKeyDown(event, index)}
                         >
-                          <span className="flex h-5 w-full items-end justify-center">
-                            {isPeak && point.coverage !== 'unavailable' && (
-                              <span className="type-label font-mono tabular-nums whitespace-nowrap">
-                                {money(pointTotal)}
-                              </span>
-                            )}
-                          </span>
                           <span className="flex h-44 w-full items-end">
                             <span
                               className={cn(
@@ -200,7 +196,14 @@ export function SpendEvidenceCard({
                       </TooltipTrigger>
                       <TooltipContent side="top" sideOffset={8} className="min-w-44 p-3">
                         <div className="type-label font-medium">{point.label}</div>
-                        {point.coverage !== 'unavailable' ? (
+                        {point.coverage === 'unavailable' ? (
+                          <p className="type-label text-muted-foreground mt-2">
+                            Spend data unavailable. Covered {point.coveredHours} of{' '}
+                            {point.totalHours} hours.
+                          </p>
+                        ) : point.coverage === 'complete' && pointTotal === 0 ? (
+                          <p className="type-label text-muted-foreground mt-2">No spend.</p>
+                        ) : (
                           <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 type-label">
                             <dt className="text-muted-foreground">
                               {point.coverage === 'partial' ? 'Known spend' : 'Total'}
@@ -228,11 +231,6 @@ export function SpendEvidenceCard({
                               </dt>
                             )}
                           </dl>
-                        ) : (
-                          <p className="type-label text-muted-foreground mt-2">
-                            Spend data unavailable. Covered {point.coveredHours} of{' '}
-                            {point.totalHours} hours.
-                          </p>
                         )}
                       </TooltipContent>
                     </Tooltip>

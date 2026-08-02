@@ -24,6 +24,7 @@ catalog:
   '@vitest/coverage-v8': 4.1.6
   '@vitest/ui': 4.1.6
   '@workos-inc/node': 8.13.0
+  appium: 3.6.0
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
   drizzle-orm: 0.45.2
@@ -36,13 +37,16 @@ catalog:
   typescript: 5.9.3
   ulid: 3.0.2
   vitest: 4.1.6
+  webdriverio: 9.30.0
   workers-tagged-logger: 1.0.0
-  wrangler: 4.98.0
+  wrangler: 4.112.0
   zod: 4.4.3
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  - appium
+  - webdriverio
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -117,12 +121,16 @@ packageExtensions:
   '@sentry/react-native':
     dependencies:
       '@expo/config-plugins': '*'
+      # SDK 57 (RN 0.86): metro is no longer in react-native's own dep tree, so
+      # @sentry/react-native/metro's vendored `require('metro/...')` has no
+      # resolution path. Pin the exact metro the SDK 57 graph already uses.
+      metro: 0.84.4
   expo-share-intent:
     dependencies:
       '@expo/plist': '*'
 patchedDependencies:
   expo-server-sdk: patches/expo-server-sdk.patch
-  react-native-appsflyer@6.17.9: patches/react-native-appsflyer@6.17.9.patch
+  react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'
@@ -154,3 +162,7 @@ allowBuilds:
   tree-sitter-bash: false
   geckodriver: true
   '@scarf/scarf': false
+  # appium's postinstall no-ops for project installs; tuntap and edgedriver are unused
+  appium: false
+  appium-ios-tuntap: false
+  edgedriver: false

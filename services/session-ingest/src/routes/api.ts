@@ -113,6 +113,7 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
           sessionCache.putValidated({
             sessionId: body.sessionId,
             organizationId: null,
+            cloudAgentSessionScopeId: null,
           }),
         'SessionAccessCacheDO.putValidated'
       );
@@ -206,8 +207,27 @@ api.delete('/session/:sessionId', async c => {
         eq(cli_sessions_v2.kilo_user_id, kiloUserId)
       )
     );
+  const deletionSessionScopeId = deletedRows.find(
+    row => row.session_id === parsed.data
+  )?.cloud_agent_session_scope_id;
 
   await db.transaction(async tx => {
+    if (deletionSessionScopeId) {
+      // Bootstrap and metadata mutations lock the session scope root before children.
+      // Match that order even when deleting a subtree rooted at a child.
+      await tx
+        .select({ sessionId: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            isNull(cli_sessions_v2.parent_session_id)
+          )
+        )
+        .limit(1)
+        .for('update');
+    }
     for (const sessionId of orderedSessionIds) {
       await tx
         .delete(cli_sessions_v2)
@@ -503,6 +523,125 @@ api.post('/session/:sessionId/unshare', async c => {
     );
 
   return c.json({ success: true }, 200);
+});
+
+// Duplicated from kilocode packages/opencode/src/session/session.ts:55-62
+// (isDefaultTitle). Keep in sync when the CLI default-title pattern changes.
+const DEFAULT_SESSION_TITLE_PATTERN =
+  /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+function isDefaultSessionTitle(title: string | null | undefined): boolean {
+  if (title == null) return true;
+  return DEFAULT_SESSION_TITLE_PATTERN.test(title);
+}
+
+const reportSessionTitleSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  generated: z.boolean(),
+});
+
+api.post('/session/:sessionId/rename-notify', async c => {
+  const rawSessionId = c.req.param('sessionId');
+  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  const bodyParse = z
+    .object({ title: z.string().trim().min(1) })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!bodyParse.success) {
+    return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
+  }
+
+  const kiloUserId = c.get('user_id');
+  const accessibleSession = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!accessibleSession) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+
+  const stub = getUserConnectionDO(c.env, { kiloUserId });
+  const { delivered } = await stub.notifySessionRenamed(parsed.data, bodyParse.data.title);
+  return c.json({ delivered }, 200);
+});
+
+api.post('/session/:sessionId/title', async c => {
+  const rawSessionId = c.req.param('sessionId');
+  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  const bodyParse = reportSessionTitleSchema.safeParse(await c.req.json().catch(() => null));
+  if (!bodyParse.success) {
+    return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
+  }
+
+  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  const kiloUserId = c.get('user_id');
+  const { title, generated } = bodyParse.data;
+
+  const existingRows = await db
+    .select()
+    .from(cli_sessions_v2)
+    .where(
+      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+    )
+    .limit(1);
+
+  const existing = existingRows[0];
+  if (!existing) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+
+  // generated: true applies only over NULL or default-pattern titles (Decision 8).
+  // generated: false is last-write-wins.
+  if (generated && !isDefaultSessionTitle(existing.title)) {
+    return c.json({ applied: false }, 200);
+  }
+
+  // Ownership filter shared by both paths. For generated writes, also CAS on the
+  // title observed at read time so a concurrent rename (or other non-default write)
+  // between select and update cannot be clobbered — Decision 8 must hold at write time.
+  const ownership = and(
+    eq(cli_sessions_v2.session_id, parsed.data),
+    eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+  );
+  const writeWhere = generated
+    ? and(
+        ownership,
+        existing.title == null
+          ? isNull(cli_sessions_v2.title)
+          : eq(cli_sessions_v2.title, existing.title)
+      )
+    : ownership;
+
+  // Preserve updated_at so title-only writes do not reorder activity lists
+  // (same as the web rename path).
+  const [updatedRow] = await db
+    .update(cli_sessions_v2)
+    .set({ title, updated_at: existing.updated_at })
+    .where(writeWhere)
+    .returning();
+
+  if (!updatedRow) {
+    // Generated CAS miss (intervening rename / non-default write) → refused, not 404.
+    if (generated) {
+      return c.json({ applied: false }, 200);
+    }
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+
+  const session = mapSessionEventRow(updatedRow);
+  notifyUserSessionEventFromContext(c, kiloUserId, {
+    type: 'session.updated',
+    data: { source: 'v2', session, changedAt: session.updatedAt },
+  });
+
+  return c.json({ title: session.title ?? title, applied: true }, 200);
 });
 
 api.get('/sessions/active', async c => {

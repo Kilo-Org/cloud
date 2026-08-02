@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { computeSessionMetrics } from '../dos/session-metrics';
+import {
+  computeRunningAssistantCostUsd,
+  computeSessionMetrics,
+  decideLivePersist,
+  type DecideLivePersistArgs,
+} from '../dos/session-metrics';
 
 function makeItem(item_type: string, data: Record<string, unknown>) {
   return { item_type, item_data: JSON.stringify(data) };
@@ -329,5 +334,246 @@ describe('computeSessionMetrics', () => {
     ];
     const result = computeSessionMetrics(items, 'completed');
     expect(result.timeToFirstResponseMs).toBe(0);
+  });
+});
+
+function assistantMessage(cost: number) {
+  return makeItem('message', {
+    role: 'assistant',
+    time: { created: 1000 },
+    tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+    cost,
+  });
+}
+
+describe('computeRunningAssistantCostUsd', () => {
+  it('sums assistant message costs in USD', () => {
+    const rows = [assistantMessage(0.05), assistantMessage(0.1)];
+    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.15);
+  });
+
+  it('ignores user messages', () => {
+    const rows = [
+      makeItem('message', { role: 'user', time: { created: 1000 } }),
+      assistantMessage(0.2),
+    ];
+    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.2);
+  });
+
+  it('skips malformed rows', () => {
+    const rows = [{ item_data: 'not json' }, { item_data: 'null' }, assistantMessage(0.07)];
+    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.07);
+  });
+
+  it("treats R2-offloaded '{}' as 0", () => {
+    expect(computeRunningAssistantCostUsd([{ item_data: '{}' }])).toBe(0);
+  });
+
+  it('clamps negative totals to 0', () => {
+    expect(computeRunningAssistantCostUsd([assistantMessage(-0.5)])).toBe(0);
+  });
+
+  it('converts to microdollars with the close-path formula (0.15 USD → 150_000)', () => {
+    const usd = computeRunningAssistantCostUsd([assistantMessage(0.15)]);
+    expect(Math.max(0, Math.round(usd * 1_000_000))).toBe(150_000);
+  });
+});
+
+function baseDecideArgs(overrides: Partial<DecideLivePersistArgs> = {}): DecideLivePersistArgs {
+  return {
+    nowMs: 100_000,
+    wroteActivityItem: false,
+    wroteAssistantMessageItem: false,
+    idleTransition: false,
+    lastActivityValueMs: 100_000,
+    lastActivityPersistedAtMs: null,
+    lastActivityPersistedValueMs: null,
+    currentCostMicrodollars: null,
+    lastCostPersistedAtMs: null,
+    lastCostPersistedMicrodollars: null,
+    ...overrides,
+  };
+}
+
+describe('decideLivePersist', () => {
+  it('no-ops when nothing was written and cost was not computed', () => {
+    expect(decideLivePersist(baseDecideArgs())).toEqual({
+      persistActivity: false,
+      persistCost: false,
+    });
+  });
+
+  it('persists activity on first activity write', () => {
+    expect(
+      decideLivePersist(baseDecideArgs({ wroteActivityItem: true, lastActivityValueMs: 50_000 }))
+    ).toEqual({ persistActivity: true, persistCost: false });
+  });
+
+  it('throttles activity within 15s', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          nowMs: 100_000,
+          wroteActivityItem: true,
+          lastActivityValueMs: 100_000,
+          lastActivityPersistedAtMs: 90_000,
+          lastActivityPersistedValueMs: 90_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('allows activity after 15s when value is newer', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          nowMs: 110_000,
+          wroteActivityItem: true,
+          lastActivityValueMs: 110_000,
+          lastActivityPersistedAtMs: 90_000,
+          lastActivityPersistedValueMs: 90_000,
+        })
+      )
+    ).toEqual({ persistActivity: true, persistCost: false });
+  });
+
+  it('blocks activity when candidate value is not newer (monotonic)', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          nowMs: 200_000,
+          wroteActivityItem: true,
+          lastActivityValueMs: 50_000,
+          lastActivityPersistedAtMs: 10_000,
+          lastActivityPersistedValueMs: 50_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('persists cost on first assistant message when cost differs', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          wroteAssistantMessageItem: true,
+          currentCostMicrodollars: 150_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: true });
+  });
+
+  it('throttles cost within 30s even with assistant message', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          nowMs: 100_000,
+          wroteAssistantMessageItem: true,
+          currentCostMicrodollars: 200_000,
+          lastCostPersistedAtMs: 80_000,
+          lastCostPersistedMicrodollars: 100_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('allows cost after 30s when value changed', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          nowMs: 120_000,
+          wroteAssistantMessageItem: true,
+          currentCostMicrodollars: 200_000,
+          lastCostPersistedAtMs: 80_000,
+          lastCostPersistedMicrodollars: 100_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: true });
+  });
+
+  it('skips cost when microdollars unchanged', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          wroteAssistantMessageItem: true,
+          currentCostMicrodollars: 100_000,
+          lastCostPersistedMicrodollars: 100_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('skips cost when recomputed value decreased (monotonic, matches SQL CASE)', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          wroteAssistantMessageItem: true,
+          currentCostMicrodollars: 50_000,
+          lastCostPersistedMicrodollars: 100_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('skips decreased cost even on idleTransition', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          idleTransition: true,
+          currentCostMicrodollars: 80_000,
+          lastCostPersistedMicrodollars: 100_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('persists cost 0 when never persisted before (null last → -1)', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          wroteAssistantMessageItem: true,
+          currentCostMicrodollars: 0,
+          lastCostPersistedMicrodollars: null,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: true });
+  });
+
+  it('forces cost on idleTransition without assistant message or throttle window', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          nowMs: 100_000,
+          idleTransition: true,
+          currentCostMicrodollars: 250_000,
+          lastCostPersistedAtMs: 99_000,
+          lastCostPersistedMicrodollars: 100_000,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: true });
+  });
+
+  it('does not persist cost when currentCostMicrodollars is null', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          wroteAssistantMessageItem: true,
+          idleTransition: true,
+          currentCostMicrodollars: null,
+        })
+      )
+    ).toEqual({ persistActivity: false, persistCost: false });
+  });
+
+  it('can fire both activity and cost in one decision', () => {
+    expect(
+      decideLivePersist(
+        baseDecideArgs({
+          wroteActivityItem: true,
+          wroteAssistantMessageItem: true,
+          lastActivityValueMs: 100_000,
+          currentCostMicrodollars: 50_000,
+        })
+      )
+    ).toEqual({ persistActivity: true, persistCost: true });
   });
 });

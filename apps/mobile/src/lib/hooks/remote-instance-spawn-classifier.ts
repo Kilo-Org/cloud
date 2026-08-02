@@ -1,4 +1,4 @@
-import { type KiloSessionId, type UserWebConnection } from 'cloud-agent-sdk';
+import { type KiloSessionId, type UserWebConnection } from '@kilocode/cloud-agent-sdk';
 // kilocode_change - K1/C2: these two runtime imports must come from their
 // narrow subpaths, not the `cloud-agent-sdk` barrel. The barrel's index.ts
 // also re-exports web-only transport code (`cloud-agent-connection.ts` ->
@@ -16,11 +16,17 @@ import { type KiloSessionId, type UserWebConnection } from 'cloud-agent-sdk';
 // syntax the Node vitest environment cannot parse. Splitting keeps this
 // file's pure functions testable "without a React renderer" (per the
 // accepted plan) while the hook itself stays UI-only and untested here.
-import { CommandDeliveredError, UserWebCommandError } from 'cloud-agent-sdk/user-web-connection';
 import {
+  CommandDeliveredError,
+  UserWebCommandError,
+} from '@kilocode/cloud-agent-sdk/user-web-connection';
+import {
+  type CreateRemoteSessionInput,
   createRemoteSessionOnConnection,
   parseCreateSessionResponse,
-} from 'cloud-agent-sdk/create-session';
+} from '@kilocode/cloud-agent-sdk/create-session';
+
+export type { CreateRemoteSessionInput };
 
 /**
  * Pure outcome classifier for the `create_session` reply (connection-scoped
@@ -127,6 +133,75 @@ export function classifyCreateSessionResult(
 }
 
 // ---------------------------------------------------------------------------
+// Screen → wire input
+// ---------------------------------------------------------------------------
+
+/**
+ * Map the new-session screen's picker strings into the SDK
+ * `CreateRemoteSessionInput` shape. Empty strings are omitted. Mobile model
+ * options are gateway models; `kilo` is their provider (same mapping
+ * `getRemoteModelFields` uses for legacy overrides).
+ */
+export function buildCreateRemoteSessionInput(fields: {
+  mode?: string;
+  model?: string;
+  variant?: string;
+  organizationId?: string | null;
+}): CreateRemoteSessionInput | undefined {
+  const input: CreateRemoteSessionInput = {};
+  if (fields.mode) {
+    input.agent = fields.mode;
+  }
+  if (fields.model) {
+    input.model = {
+      providerID: 'kilo',
+      modelID: fields.model,
+      ...(fields.variant ? { variant: fields.variant } : {}),
+    };
+  }
+  if (fields.organizationId) {
+    input.orgId = fields.organizationId;
+  }
+  return input.agent !== undefined || input.model !== undefined || input.orgId !== undefined
+    ? input
+    : undefined;
+}
+
+/**
+ * Resolve the spawn hook's org arg against live organization context.
+ *
+ *   - `explicit === undefined` (zero-arg / omitted) → inherit `context`
+ *   - `explicit === null` → personal; do not inherit context
+ *   - `explicit` string → that org
+ *
+ * Pure so the tri-state is unit-testable without a React renderer.
+ */
+export function resolveSpawnOrganizationId(
+  explicit: string | null | undefined,
+  context: string | null | undefined
+): string | null | undefined {
+  return explicit !== undefined ? explicit : context;
+}
+
+/**
+ * Merge an optional explicit org id (hook arg) into spawn opts when the
+ * caller did not already set `orgId`. Pure so hook defaulting is unit-testable
+ * without a React renderer.
+ */
+export function mergeSpawnOrganizationId(
+  opts: CreateRemoteSessionInput | undefined,
+  organizationId: string | null | undefined
+): CreateRemoteSessionInput | undefined {
+  if (opts?.orgId !== undefined) {
+    return opts;
+  }
+  if (!organizationId) {
+    return opts;
+  }
+  return { ...opts, orgId: organizationId };
+}
+
+// ---------------------------------------------------------------------------
 // Spawner
 // ---------------------------------------------------------------------------
 
@@ -145,7 +220,7 @@ export type CreateSessionSpawner = {
    * Attempt a `create_session` against the given CLI connection. Returns
    * the classified outcome — never throws.
    */
-  spawn: (connectionId: string) => Promise<CreateSessionOutcome>;
+  spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
 };
 
 function generateCreationKey(): string {
@@ -174,9 +249,9 @@ export function createSessionSpawner(
   const creationKey = generateCreationKey();
   return {
     creationKey,
-    async spawn(connectionId) {
+    async spawn(connectionId, opts) {
       try {
-        const raw = await createRemoteSessionOnConnection(connection, connectionId);
+        const raw = await createRemoteSessionOnConnection(connection, connectionId, opts);
         return classifyCreateSessionResult({ status: 'fulfilled', value: raw });
       } catch (error) {
         return classifyCreateSessionResult({ status: 'rejected', reason: error });

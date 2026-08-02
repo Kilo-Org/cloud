@@ -485,6 +485,7 @@ function BonusStreakContent({
     usageUsd: subscription.currentPeriodUsageUsd,
     bonusUsd: subscription.currentPeriodBonusCreditsUsd,
     isBonusUnlocked: subscription.isBonusUnlocked,
+    isBonusAvailableToUnlock: subscription.isBonusAvailableToUnlock,
   });
 
   const renewRows = computeRenewInfoRowModel({
@@ -637,13 +638,13 @@ function BonusStreakContent({
             Free bonus credits are not renewed while your subscription is paused; monthly credits
             resume when the subscription resumes.
           </div>
-        ) : (
+        ) : subscription.isBonusUnlocked || subscription.isBonusAvailableToUnlock ? (
           <div className="text-muted-foreground text-xs">
             Free bonus credits are earned after using the month&apos;s paid credits. Unused free
             bonus credits do not roll over
             {expiresAtLabel ? ` and will expire on ${expiresAtLabel}.` : '.'}
           </div>
-        )
+        ) : null
       ) : null}
     </div>
   );

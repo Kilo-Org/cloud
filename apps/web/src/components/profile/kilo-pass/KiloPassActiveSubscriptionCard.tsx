@@ -224,6 +224,7 @@ function UsageProgressOrBonusUnlocked() {
     usageUsd,
     bonusUsd,
     isBonusUnlocked: subscription.isBonusUnlocked,
+    isBonusAvailableToUnlock: subscription.isBonusAvailableToUnlock,
   });
   if (!model) return null;
 
@@ -377,6 +378,8 @@ function BottomClarification() {
       </div>
     );
   }
+
+  if (!subscription.isBonusUnlocked && !subscription.isBonusAvailableToUnlock) return null;
 
   return (
     <div className="text-muted-foreground text-xs">

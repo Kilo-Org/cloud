@@ -30,6 +30,7 @@ export type KiloPassActiveSubscriptionCardLogicSubscription = Pick<
   | 'currentPeriodUsageUsd'
   | 'currentPeriodBonusCreditsUsd'
   | 'isBonusUnlocked'
+  | 'isBonusAvailableToUnlock'
 >;
 
 export type RenewInfoRowModel =
@@ -236,6 +237,7 @@ export function computeUsageProgressModel(params: {
   usageUsd: number | null | undefined;
   bonusUsd: number | null | undefined;
   isBonusUnlocked: boolean | null | undefined;
+  isBonusAvailableToUnlock: boolean | null | undefined;
 }): UsageProgressModel | null {
   const baseUsd = params.baseUsd;
   const usageUsd = params.usageUsd ?? 0;
@@ -243,6 +245,7 @@ export function computeUsageProgressModel(params: {
 
   if (typeof baseUsd !== 'number' || baseUsd <= 0) return null;
   if (typeof bonusUsd !== 'number' || bonusUsd <= 0) return null;
+  if (!params.isBonusUnlocked && !params.isBonusAvailableToUnlock) return null;
 
   const totalAvailableUsd = baseUsd + bonusUsd;
   const nonNegativeUsageUsd = Math.max(0, usageUsd);

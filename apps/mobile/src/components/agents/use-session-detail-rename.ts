@@ -1,4 +1,4 @@
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';

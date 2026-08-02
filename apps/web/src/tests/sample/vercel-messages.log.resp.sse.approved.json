@@ -5,7 +5,7 @@
   "responseContent": "Hi there! 👋 How are you doing? Is there something I can help you with today?",
   "inference_provider": "bedrock",
   "finish_reason": "end_turn",
-  "upstream_id": null,
+  "upstream_id": "305d0d3d-1a2c-47fe-a99f-96f30082adbd",
   "latency": null,
   "moderation_latency": null,
   "generation_time": null,

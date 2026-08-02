@@ -1,5 +1,5 @@
-import { type ActiveSessionType, type SlashCommandInfo } from 'cloud-agent-sdk';
-import { type RemoteCommandState } from 'cloud-agent-sdk/remote-command-catalog';
+import { type ActiveSessionType, type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 
 /**
  * Local reserved /new command — surfaced only for remote sessions, never
@@ -19,9 +19,26 @@ export const LOCAL_EXIT_SLASH_COMMAND: SlashCommandInfo = {
   hints: [],
 };
 
+/**
+ * Local reserved /clear command — client-side transcript clear for remote
+ * sessions only. Never reaches the CLI; the SDK intercepts `command:'clear'`.
+ */
+export const LOCAL_CLEAR_SLASH_COMMAND: SlashCommandInfo = {
+  name: 'clear',
+  description: 'Clear the visible transcript',
+  hints: [],
+};
+
 const NEW_COMMAND_NAME = 'new';
 const EXIT_COMMAND_NAME = 'exit';
-const LOCAL_COMMAND_NAMES = new Set([NEW_COMMAND_NAME, EXIT_COMMAND_NAME, 'quit', 'q']);
+const CLEAR_COMMAND_NAME = 'clear';
+const LOCAL_COMMAND_NAMES = new Set([
+  NEW_COMMAND_NAME,
+  EXIT_COMMAND_NAME,
+  CLEAR_COMMAND_NAME,
+  'quit',
+  'q',
+]);
 const SLASH_PREFIX_PATTERN = /^\/[\w.-]*$/;
 const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
 
@@ -32,6 +49,9 @@ const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
  * dynamic command list for fail-closed upgrade handling. This set is the
  * explicit mobile promise: any new mobile-reserved slash commands must be
  * added here; do not refactor the SDK to assume this list.
+ *
+ * `/clear` is intentionally absent — it is purely client-side and must keep
+ * working on old CLIs (parsed before the upgrade-required short-circuit).
  */
 const RESERVED_UPGRADE_REQUIRED_COMMANDS = new Set([
   'compact',
@@ -67,9 +87,10 @@ const EXIT_CAPABILITY_UNAVAILABLE_MESSAGE = 'Update your CLI to exit the session
  *
  * - `cloud-agent` sessions use the live reported catalog verbatim — empty
  *   stays empty and the Cloud Agent defaults live in the worker, not here.
- * - `remote` sessions strip CLI-reported `new`, `exit`, `quit`, and `q`, then
- *   append the locally reserved `/new` and capability-gated local `/exit` when
- *   the live catalog advertises `canExitSession: true`.
+ * - `remote` sessions strip CLI-reported `new`, `exit`, `quit`, `q`, and
+ *   `clear`, then append the locally reserved `/new`, capability-gated local
+ *   `/exit` when the live catalog advertises `canExitSession: true`, and the
+ *   local `/clear` unconditionally (client-side, no capability gate).
  * - `read-only` and `null` (unresolved) sessions expose no commands.
  *
  * The `/exit` suggestion is gated on `canExitSession === true` rather than
@@ -97,6 +118,7 @@ export function createMobileSlashCommandList(
     ...remoteCommands,
     LOCAL_NEW_SLASH_COMMAND,
     ...(supportsExit ? [LOCAL_EXIT_SLASH_COMMAND] : []),
+    LOCAL_CLEAR_SLASH_COMMAND,
   ];
 }
 
@@ -132,12 +154,15 @@ function findCommand(commands: SlashCommandInfo[], name: string): SlashCommandIn
 /**
  * Classify a composer input into the action the composer should take.
  *
- * Order matters: the upgrade-required short-circuit runs before recognition so
- * that the reserved commands mobile promises to handle (`compact`, `new`, and `exit`)
- * are surfaced to the user when the remote CLI requires an upgrade, instead of
- * silently falling through as ordinary prompts. Unknown slash inputs (`/foo`)
- * still fall through to `prompt` so the user can send arbitrary text the CLI
- * may know about.
+ * Order matters:
+ * 1. Client-side `/clear` for remote sessions runs before the upgrade-required
+ *    short-circuit so it works on old CLIs (never reaches the wire).
+ * 2. The upgrade-required short-circuit then runs before recognition so that
+ *    the reserved commands mobile promises to handle (`compact`, `new`, and
+ *    `exit`) are surfaced when the remote CLI requires an upgrade, instead of
+ *    silently falling through as ordinary prompts. Unknown slash inputs
+ *    (`/foo`) still fall through to `prompt` so the user can send arbitrary
+ *    text the CLI may know about.
  *
  * The `/exit` interception is also capability-gated: the parser rejects the
  * exact-typed `/exit` with an upgrade-required upgrade message when the live
@@ -156,6 +181,17 @@ export function parseChatComposerSubmission(
   const match = SLASH_FULL_PATTERN.exec(trimmed);
   const commandName = match?.[1];
   const argumentsText = match?.[2]?.trim() ?? '';
+
+  // Client-side /clear — before upgrade-required so old CLIs still work.
+  if (commandName === CLEAR_COMMAND_NAME && context.sessionType === 'remote') {
+    if (context.hasAttachments) {
+      return { type: 'attachment-error' };
+    }
+    if (argumentsText.length > 0) {
+      return { type: 'argument-error', message: '/clear does not take arguments.' };
+    }
+    return { type: 'command', command: CLEAR_COMMAND_NAME, arguments: '' };
+  }
 
   if (
     context.sessionType === 'remote' &&

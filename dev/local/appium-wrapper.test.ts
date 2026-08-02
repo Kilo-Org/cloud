@@ -448,6 +448,7 @@ test('appium wrapper: stop_server returns failure when PID survives SIGKILL', ()
         ...process.env,
         PATH: binPath,
         KILO_APPIUM_LOCKED: '1',
+        KILO_APPIUM_HOME: root,
         TMPDIR: tmp,
       },
       timeout: 30000,
@@ -559,6 +560,16 @@ setInterval(() => {}, 1000);
     const actualPort = parseInt(fs.readFileSync(portFile, 'utf8').trim(), 10);
     assert.ok(actualPort >= 4730, `unexpected port: ${actualPort}`);
   } finally {
+    // Kill the stub appium process that ensure_server started; the kill
+    // stub in $PATH is a no-op, so stop_server cannot reap it.
+    const pidFile = path.join(stateDir, 'appium.pid');
+    if (fs.existsSync(pidFile)) {
+      try {
+        process.kill(parseInt(fs.readFileSync(pidFile, 'utf8').trim(), 10), 'SIGKILL');
+      } catch {
+        // process already dead
+      }
+    }
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

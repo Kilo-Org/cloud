@@ -3,6 +3,7 @@ import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
   type ImageStyle,
+  Pressable,
   Text,
   type TextStyle,
   View,
@@ -134,7 +135,33 @@ export class MarkdownRenderer extends Renderer {
     title?: string
   ): ReactNode {
     if (typeof children !== 'string' && children.length > 0 && containsMarkdownImage(children)) {
-      return children;
+      const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
+      const linkActionsEnabled = this.onLongPressLink !== undefined;
+
+      return createElement(
+        Pressable,
+        {
+          accessibilityRole: 'link',
+          accessibilityHint: LINK_ACCESSIBILITY_HINT,
+          accessibilityLabel,
+          accessibilityActions: getLinkAccessibilityActions(linkActionsEnabled),
+          key: this.getKey(),
+          onAccessibilityAction: (event: AccessibilityActionEvent) => {
+            if (event.nativeEvent.actionName === 'showLinkActions') {
+              this.onLongPressLink?.(href);
+            }
+          },
+          onLongPress: getLinkLongPressHandler(this.onLongPressLink, href),
+          onPress: () => {
+            const handled = this.onPressLink?.(href);
+            if (handled) {
+              return;
+            }
+            void openExternalUrl(href, { label: accessibilityLabel });
+          },
+        },
+        children
+      );
     }
     const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
     const linkActionsEnabled = this.onLongPressLink !== undefined;
@@ -208,7 +235,10 @@ export class MarkdownRenderer extends Renderer {
   }
 
   override html(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    const images = typeof text === 'string' ? parseHtmlImages(text) : [];
+    if (typeof text !== 'string') {
+      return this.textOrChildren(text, styles);
+    }
+    const images = parseHtmlImages(text);
     if (images.length === 0) {
       return this.textNode(text, styles);
     }

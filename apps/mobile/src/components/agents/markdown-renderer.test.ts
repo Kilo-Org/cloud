@@ -11,6 +11,7 @@ import { type MarkdownRenderer } from './markdown-renderer';
 const rnStub = {
   Text: 'Text',
   View: 'View',
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TouchableHighlight: 'TouchableHighlight',
   Image: 'Image',
@@ -175,7 +176,6 @@ describe('MarkdownRenderer key stability', () => {
     expect(el).not.toBeNull();
     expect(el?.type).toBe('Text');
   });
-
   it('image() returns MarkdownImage for https URI', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'https://a.com/1.png', { alt: 'alt text' });
@@ -189,13 +189,11 @@ describe('MarkdownRenderer key stability', () => {
       alt: 'alt text',
     });
   });
-
   it('image() returns MarkdownImage for http URI', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'http://a.com/1.png', { alt: 'alt text' });
     expect(el?.type).toBe('MarkdownImage');
   });
-
   it('image() returns MarkdownImage for data:image URI', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'data:image/png;base64,abc123', { alt: 'data image' });
@@ -206,42 +204,36 @@ describe('MarkdownRenderer key stability', () => {
     expect(el.type).toBe('MarkdownImage');
     expect(el.props).toMatchObject({ uri: 'data:image/png;base64,abc123' });
   });
-
   it('image() renders alt text for relative URL (no image node)', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, './relative.png', { alt: 'relative' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('relative');
   });
-
   it('image() renders alt text for file:// URL (no image node)', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'file:///tmp/img.png', { alt: 'local' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('local');
   });
-
   it('image() empty alt uses title for unsupported URL', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'file:///tmp/img.png', { alt: '', title: 'Photo' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('Photo');
   });
-
   it('image() empty alt uses title for supported URL', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'https://a.com/1.png', { alt: '', title: 'A Title' });
     expect(el?.type).toBe('MarkdownImage');
     expect((el as ReactElement<Record<string, unknown>>).props.alt).toBe('A Title');
   });
-
   it('image() missing alt uses title for unsupported URL', async () => {
     const renderer = await createRenderer();
     const el = imageEl(renderer, 'file:///tmp/img.png', { title: 'A Title' });
     expect(el?.type).toBe('Text');
     expect((el as ReactElement<Record<string, unknown>>).props.children).toBe('A Title');
   });
-
   it('does not wrap HTML images in Text', async () => {
     const renderer = await createRenderer();
     const single: ReactNode[] = [
@@ -277,7 +269,6 @@ describe('MarkdownRenderer key stability', () => {
     expect(element.type).toBe('Text');
     expect(element.props.children).toEqual(children);
   });
-
   it('does not wrap HTML images from inline formatting nodes', async () => {
     const renderer = await createRenderer();
     const children: ReactNode[] = [
@@ -285,16 +276,28 @@ describe('MarkdownRenderer key stability', () => {
       renderer.html('<img alt="a" src="https://x/a.png">'),
       renderer.text(' after'),
     ];
-
     for (const result of [
       renderer.heading(children),
       renderer.strong(children),
       renderer.em(children),
       renderer.del(children),
-      renderer.link(children, 'https://example.com'),
     ]) {
       expect(Array.isArray(result)).toBe(true);
       expect((result as ReactNode[])[1]).toMatchObject({ type: 'MarkdownImage' });
     }
+    // link() wraps image children in a Pressable with link behavior
+    const linkResult = renderer.link(children, 'https://example.com') as ReactElement<
+      Record<string, unknown>
+    >;
+    expect(linkResult.type).toBe('Pressable');
+    expect(linkResult.props.children).toEqual(children);
+    expect(linkResult.props.accessibilityRole).toBe('link');
+    expect(typeof linkResult.props.onPress).toBe('function');
+    // html() with non-string input delegates to textOrChildren
+    expect(renderer.html(children)).toMatchObject([
+      { type: 'Text' },
+      { type: 'MarkdownImage' },
+      { type: 'Text' },
+    ]);
   });
 });

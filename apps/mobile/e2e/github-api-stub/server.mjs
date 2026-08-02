@@ -309,7 +309,13 @@ function buildMixedFixture(idSuffix) {
         THUMBS_UP: { count: 1, viewerHasReacted: false },
       }),
       conversationComment(db(2003), 'erin', 'Conversation comment at T+3', 3, s),
-      conversationComment(db(2006), 'frank', `Conversation comment at T+6\n\n![comment image](${SAMPLE_IMAGE})`, 6, s),
+      conversationComment(
+        db(2006),
+        'frank',
+        `Conversation comment at T+6\n\n![comment image](${SAMPLE_IMAGE})`,
+        6,
+        s
+      ),
     ],
   };
 }

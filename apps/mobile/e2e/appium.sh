@@ -82,7 +82,9 @@ ensure_server() {
         # Adopt only when the recorded pid actually owns the listener — a
         # recycled pid plus a sibling's server on this port answers /status
         # while belonging to another device.
-        LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1)
+        # lsof exits 1 on no match; without || true, pipefail + set -e would
+        # kill the script here instead of reaching the fallback below.
+        LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
         if [ -n "$LISTENER" ] && [ "$LISTENER" = "$RECORDED_PID" ]; then
           return 0
         fi
@@ -111,7 +113,7 @@ ensure_server() {
       # one device's cleanup kill the other's server mid-flow.
       kill -0 "$(cat "$STATE_DIR/appium.pid")" 2>/dev/null || break
       if server_status; then
-        LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1)
+        LISTENER=$(lsof -ti "tcp:$APPIUM_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
         if [ -n "$LISTENER" ] && [ "$LISTENER" != "$(cat "$STATE_DIR/appium.pid")" ]; then
           echo "appium.sh: port $APPIUM_PORT is owned by pid $LISTENER, not ours; bumping" >&2
           break

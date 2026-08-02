@@ -49,7 +49,17 @@ port_free() { ! nc -z 127.0.0.1 "$1" 2>/dev/null; }
 # would otherwise pick the same free port, one node would lose the bind, and
 # both apps would silently share the winner's mutable fixture state.
 PORT_CLAIMS="${TMPDIR:-/tmp}/kilo-e2e-github-stub-ports"
-claim_port() { mkdir -p "$PORT_CLAIMS" && mkdir "$PORT_CLAIMS/$1" 2>/dev/null; }
+claim_port() {
+  mkdir -p "$PORT_CLAIMS"
+  if mkdir "$PORT_CLAIMS/$1" 2>/dev/null; then return 0; fi
+  # Self-heal an orphaned claim (a start killed inside the claim window):
+  # old enough that no live start can still own it, and nothing listening.
+  local m
+  m=$(stat -f %m "$PORT_CLAIMS/$1" 2>/dev/null || stat -c %Y "$PORT_CLAIMS/$1" 2>/dev/null || echo "$(date +%s)")
+  [ $(($(date +%s) - m)) -gt 120 ] && port_free "$1" || return 1
+  rmdir "$PORT_CLAIMS/$1" 2>/dev/null || true
+  mkdir "$PORT_CLAIMS/$1" 2>/dev/null
+}
 release_port() { [ -z "${STUB_PORT:-}" ] || rmdir "$PORT_CLAIMS/$STUB_PORT" 2>/dev/null || true; }
 
 remove_env_line() {
@@ -84,7 +94,11 @@ seed_token() {
     --data-urlencode "email=$EMAIL" \
     --data-urlencode "json=true") || seed_fail fake-login transport
   case $CODE in 2*|3*) ;; *) seed_fail fake-login "$CODE" ;; esac
-  GH_USER_ID="9$(date +%s | tail -c 6)$(printf '%05d' $$)$((RANDOM % 90 + 10))"
+  # Deterministic per account: the upsert's setWhere only updates a row whose
+  # github_user_id matches the input, so a fresh random id per call made
+  # every re-seed of an already-seeded account report success:false. The 9
+  # prefix plus 12 digits also cannot collide with a real GitHub user id.
+  GH_USER_ID="9$(printf '%s' "$EMAIL" | shasum -a 256 | tr -dc '0-9' | cut -c1-12)"
   SEED_BODY=$(mktemp "$STATE_DIR/seed.XXXXXX")
   CODE=$(curl -s -o "$SEED_BODY" -w '%{http_code}' -b "$JAR" -X POST "$BASE/api/trpc/githubApps.devSeedUserGithubToken" \
     -H 'content-type: application/json' \
@@ -116,9 +130,10 @@ case "${1:-}" in
     done
     [ -n "$STUB_PORT" ] || { echo "github-stub: no free port in 4790-4890" >&2; exit 1; }
     # The claim only has to cover the choose-to-bind window; once our server
-    # is bound the port itself blocks other pickers. The trap keeps an
-    # interrupted start from leaking the claim.
-    trap release_port EXIT
+    # is bound the port itself blocks other pickers. The traps keep an
+    # interrupted start from leaking the claim (EXIT alone misses untrapped
+    # signals); a SIGKILL orphan is reaped by claim_port's staleness check.
+    trap release_port EXIT INT TERM HUP
 
     mkdir -p "$STATE_DIR"
     tmux new-session -d -s "$SESSION" -c "$STATE_DIR" \

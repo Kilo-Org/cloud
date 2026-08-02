@@ -231,6 +231,17 @@ fi
 DEVICE="${1:?usage: record.sh <udid|serial> start|stop   or   record.sh frame <video> <ts> <out.png>}"
 shift
 
+# Serialize start/stop per device: unlocked, two concurrent starts can both
+# pass the already-recording check, launch two recorders, and lose one pid.
+if [ "${KILO_RECORD_LOCKED:-}" != "1" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+  mkdir -p "${TMPDIR:-/tmp}/kilo-record-locks"
+  exec "$REPO_ROOT/node_modules/.bin/tsx" "$REPO_ROOT/dev/local/process-lock.ts" \
+    --wait 120 "${TMPDIR:-/tmp}/kilo-record-locks/$DEVICE" -- \
+    env KILO_RECORD_LOCKED=1 "$0" "$DEVICE" "$@"
+fi
+
 STATE_DIR="${TMPDIR:-/tmp}/kilo-e2e-record/$DEVICE"
 STATE_FILE="$STATE_DIR/state"
 

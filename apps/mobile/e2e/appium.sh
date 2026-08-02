@@ -113,10 +113,10 @@ ensure_server() {
           rm -f "$STATE_DIR/appium.pid" "$STATE_DIR/server.port"
         else
           # Died or stopped answering mid-probe: clean up our own remains.
-          stop_server
+          stop_server || true
         fi
       else
-        stop_server
+        stop_server || true
       fi
     fi
   fi
@@ -167,7 +167,7 @@ ensure_server() {
       fi
       sleep 1
     done
-    stop_server
+    stop_server || true
     echo "appium.sh: server attempt on port $APPIUM_PORT failed; last log lines:" >&2
     tail -n 10 "$STATE_DIR/appium.log" >&2
   done

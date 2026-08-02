@@ -293,6 +293,12 @@ describe('MarkdownRenderer key stability', () => {
     expect(linkResult.props.children).toEqual(children);
     expect(linkResult.props.accessibilityRole).toBe('link');
     expect(typeof linkResult.props.onPress).toBe('function');
+    // Ancestors must not wrap the Pressable in native Text.
+    expect(Array.isArray(renderer.text([linkResult]))).toBe(true);
+    expect(Array.isArray(renderer.heading([linkResult]))).toBe(true);
+    expect(Array.isArray(renderer.strong([linkResult]))).toBe(true);
+    expect(Array.isArray(renderer.em([linkResult]))).toBe(true);
+    expect(Array.isArray(renderer.del([linkResult]))).toBe(true);
     // html() with non-string input delegates to textOrChildren
     expect(renderer.html(children)).toMatchObject([
       { type: 'Text' },

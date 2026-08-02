@@ -35,8 +35,19 @@ function containsMarkdownImage(nodes: ReactNode[]): boolean {
       if (containsMarkdownImage(node as ReactNode[])) {
         return true;
       }
-    } else if (isValidElement(node) && node.type === MarkdownImage) {
-      return true;
+    } else if (isValidElement(node)) {
+      if (node.type === MarkdownImage) {
+        return true;
+      }
+      const children = (node.props as { children?: ReactNode }).children;
+      if (children !== undefined) {
+        const list = Array.isArray(children)
+          ? (children as ReactNode[])
+          : ([children] as ReactNode[]);
+        if (containsMarkdownImage(list)) {
+          return true;
+        }
+      }
     }
   }
   return false;

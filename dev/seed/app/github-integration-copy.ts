@@ -32,9 +32,10 @@ function printUsage(): void {
   console.log('GitHub integration (e.g. cloud agents) run against the copy; when no valid');
   console.log('integration exists in the database, E2E requiring one is BLOCKED.');
   console.log('');
-  console.log('Caveats: the copy shares the donor token. GitHub refresh tokens are');
-  console.log("single-use, so whichever row refreshes first invalidates the other row's");
-  console.log('refresh token — re-run this copy when that happens.');
+  console.log('Caveats: the copy carries only the donor access token, validated live');
+  console.log('against GitHub before copying, and can never refresh (a refresh would');
+  console.log("rotate and kill the donor's refresh token). When the copied access token");
+  console.log('expires, run the copy again.');
   console.log('');
   console.log("The copy occupies the account's one token row, which the PR-review stub");
   console.log('(github-stub.sh) also needs. Use different accounts for the two, or');
@@ -155,26 +156,37 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   let source: (typeof candidates)[number] | undefined;
   let accessToken = '';
-  let refreshToken = '';
   for (const row of candidates) {
+    let candidateToken: string;
     try {
-      accessToken = decryptKeyedEnvelope(
+      candidateToken = decryptKeyedEnvelope(
         row.access_token_encrypted,
         TOKEN_SCHEME,
         { active: { keyId, privateKeyPem } },
         tokenAad(row.kilo_user_id, row.github_user_id, 'access')
       );
-      refreshToken = decryptKeyedEnvelope(
-        row.refresh_token_encrypted,
-        TOKEN_SCHEME,
-        { active: { keyId, privateKeyPem } },
-        tokenAad(row.kilo_user_id, row.github_user_id, 'refresh')
-      );
-      source = row;
-      break;
     } catch {
       // Encrypted under a retired key — not usable as a donor; try the next.
+      continue;
     }
+    // Database metadata cannot prove a token still works: a rotation or a
+    // GitHub-side revocation leaves the row looking fresh. Ask GitHub.
+    const probe = await fetch('https://api.github.com/user', {
+      headers: {
+        authorization: `Bearer ${candidateToken}`,
+        'user-agent': 'kilo-dev-seed-integration-copy',
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!probe.ok) {
+      console.log(
+        `  skipping donor ${row.github_login}: GitHub rejected its access token (${probe.status})`
+      );
+      continue;
+    }
+    accessToken = candidateToken;
+    source = row;
+    break;
   }
   if (!source) {
     throw new Error(
@@ -192,6 +204,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .replace(/[a-f]/g, '')
     .slice(0, 12)}`;
 
+  // The copy must never refresh: GitHub refresh tokens rotate on use, so a
+  // copy that refreshed would kill the donor's stored refresh token and turn
+  // the donor into a stale-looking-but-dead row for every later copy. The
+  // copy gets a dummy refresh token that is already expired — the service's
+  // expiry check stops any refresh attempt before it reaches GitHub. When
+  // the copied access token expires, run the copy again.
   const values = {
     kilo_user_id: target.id,
     github_app_type: 'standard' as const,
@@ -205,12 +223,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     ),
     access_token_expires_at: source.access_token_expires_at,
     refresh_token_encrypted: encryptKeyedEnvelope(
-      refreshToken,
+      'e2e-copy-never-refreshes',
       TOKEN_SCHEME,
       { keyId, publicKeyPem },
       tokenAad(target.id, syntheticGithubUserId, 'refresh')
     ),
-    refresh_token_expires_at: source.refresh_token_expires_at,
+    refresh_token_expires_at: new Date(Date.now() - 1000).toISOString(),
     revoked_at: null,
     revocation_reason: null,
   };
@@ -238,6 +256,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     targetEmail: toEmail,
     donorLogin: source.github_login,
     accessTokenExpiresAt: source.access_token_expires_at,
-    refreshTokenExpiresAt: source.refresh_token_expires_at,
+    refreshable: false,
   };
 }

@@ -42,7 +42,7 @@ A scenario that needs a real GitHub integration (for example cloud agents clonin
 pnpm dev:seed app:github-integration-copy <email>
 ```
 
-The command finds the newest valid integration, re-encrypts its tokens for the account, and reports the donor login and expiries. When it fails with "No valid GitHub integration found", the scenario cannot run. Report `VERIFICATION BLOCKED.` with that message. Never fake the integration, and never skip the scenario silently. The copy shares the donor's token; when the connection later shows as expired, run the copy again.
+The command finds the newest valid integration, validates its access token against GitHub, re-encrypts it for the account, and reports the donor login and expiry. When it fails with "No valid GitHub integration found", the scenario cannot run. Report `VERIFICATION BLOCKED.` with that message. Never fake the integration, and never skip the scenario silently. The copy carries only the donor's access token and can never refresh; when the connection shows as expired, run the copy again.
 
 An account holds one token row. The copy and the PR-review stub (`github-stub.sh`) both write it, so they must never share an account. Use one account for stub scenarios and a different account for integration scenarios. To take an account back for the stub, remove the copy first: `pnpm dev:seed app:github-integration-copy --remove <email>`.
 

@@ -13,6 +13,7 @@ import {
   normalizeAttachmentExtension,
   sanitizeAttachmentFilename,
 } from './validate';
+import { utf8ByteLength } from '../utf8-utils';
 
 describe('normalizeAttachmentExtension', () => {
   it('lowercases a known extension', () => {
@@ -99,8 +100,8 @@ describe('sanitizeAttachmentFilename', () => {
   it('truncates excess UTF-8 bytes to 255 and preserves the extension', () => {
     const long = `${'a'.repeat(500)}.txt`;
     const result = sanitizeAttachmentFilename(long);
-    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
-    expect(new TextEncoder().encode(result).length).toBe(255);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
+    expect(utf8ByteLength(result)).toBe(255);
     expect(result.endsWith('.txt')).toBe(true);
   });
 
@@ -114,9 +115,9 @@ describe('sanitizeAttachmentFilename', () => {
       /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(result);
     expect(hasUnpaired).toBe(false);
     // Byte count stays within the bound (each star is 4 UTF-8 bytes)
-    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
     // 63 stars × 4 bytes = 252 bytes; 64 × 4 = 256 > 255
-    expect(new TextEncoder().encode(result).length).toBe(252);
+    expect(utf8ByteLength(result)).toBe(252);
   });
 
   it('preserves the extension when truncating a multibyte filename', () => {
@@ -126,7 +127,7 @@ describe('sanitizeAttachmentFilename', () => {
     // Budget: 255 - 3 - 1 = 251 bytes for name → 251 / 9 = 27 full chars = 243 bytes
     const long = `${cjk.repeat(30)}.txt`;
     const result = sanitizeAttachmentFilename(long);
-    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
     expect(result.endsWith('.txt')).toBe(true);
   });
 
@@ -135,7 +136,7 @@ describe('sanitizeAttachmentFilename', () => {
     const rocket = '🚀';
     const long = `${rocket.repeat(100)}.pdf`;
     const result = sanitizeAttachmentFilename(long);
-    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
     expect(result.endsWith('.pdf')).toBe(true);
     // No unpaired surrogates
     const hasUnpaired =
@@ -147,9 +148,9 @@ describe('sanitizeAttachmentFilename', () => {
     // CJK-only filename, no dot → no extension to preserve
     const long = '日'.repeat(200);
     const result = sanitizeAttachmentFilename(long);
-    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
     // 85 × 3 = 255 bytes exactly
-    expect(new TextEncoder().encode(result).length).toBe(255);
+    expect(utf8ByteLength(result)).toBe(255);
     expect(result.includes('.')).toBe(false);
   });
 
@@ -161,11 +162,11 @@ describe('sanitizeAttachmentFilename', () => {
     const ext253 = 'a'.repeat(253);
     const long = `ñ.${ext253}`;
     const result = sanitizeAttachmentFilename(long);
-    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(255);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
     // Must not start with a dot
     expect(result.startsWith('.')).toBe(false);
     // The stem ñ (2 bytes) + dot (1 byte) + 252 'a' chars = 255 bytes
-    expect(new TextEncoder().encode(result).length).toBe(255);
+    expect(utf8ByteLength(result)).toBe(255);
     expect(result.startsWith('ñ.')).toBe(true);
   });
 
@@ -173,7 +174,7 @@ describe('sanitizeAttachmentFilename', () => {
     // 251 'a' + '.txt' = 251 + 1 + 3 = 255 bytes
     const long = `${'a'.repeat(300)}.txt`;
     const result = sanitizeAttachmentFilename(long);
-    expect(new TextEncoder().encode(result).length).toBe(255);
+    expect(utf8ByteLength(result)).toBe(255);
     expect(result).toBe(`${'a'.repeat(251)}.txt`);
   });
 

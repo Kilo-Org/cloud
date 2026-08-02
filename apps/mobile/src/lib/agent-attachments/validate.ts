@@ -9,35 +9,9 @@ import {
   type AgentAttachmentExtension,
   type AgentAttachmentMime,
 } from './constants';
+import { truncateUtf8, utf8ByteLength } from '../utf8-utils';
 
 const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>(['png', 'jpg', 'jpeg', 'webp', 'gif']);
-
-function utf8Length(s: string): number {
-  return new TextEncoder().encode(s).length;
-}
-
-/**
- * Truncate `s` to at most `maxBytes` UTF-8 bytes without splitting
- * Unicode characters. Iterates code points and keeps only complete
- * characters that fit within the byte budget.
- */
-function truncateToUtf8Bytes(s: string, maxBytes: number): string {
-  if (maxBytes <= 0) {
-    return '';
-  }
-  const encoder = new TextEncoder();
-  let out = '';
-  let byteCount = 0;
-  for (const c of s) {
-    const charBytes = encoder.encode(c).length;
-    if (byteCount + charBytes > maxBytes) {
-      break;
-    }
-    out += c;
-    byteCount += charBytes;
-  }
-  return out;
-}
 
 /**
  * Normalize a candidate's filename extension.
@@ -121,30 +95,30 @@ export function sanitizeAttachmentFilename(raw: string): string {
 
   // Truncate to the byte budget, preserving the extension when
   // truncation removes characters from the name part.
-  if (utf8Length(sanitized) > AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH) {
+  if (utf8ByteLength(sanitized) > AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH) {
     const dot = sanitized.lastIndexOf('.');
     if (dot > 0 && dot < sanitized.length - 1) {
       // Filename has a non-leading, non-trailing dot → extension present.
       const ext = sanitized.slice(dot + 1);
       const name = sanitized.slice(0, dot);
-      const extBytes = utf8Length(ext);
+      const extBytes = utf8ByteLength(ext);
       const dotByte = 1;
       const nameBudget = AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH - extBytes - dotByte;
       if (nameBudget > 0) {
-        const truncatedName = truncateToUtf8Bytes(name, nameBudget);
+        const truncatedName = truncateUtf8(name, nameBudget);
         // When no complete code point fits in the name budget, the
         // truncated name is empty. Emitting `.ext` alone would create a
         // leading-dot name — fall back to unadorned truncation instead.
         sanitized =
           truncatedName.length > 0
             ? `${truncatedName}.${ext}`
-            : truncateToUtf8Bytes(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+            : truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
       } else {
-        sanitized = truncateToUtf8Bytes(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+        sanitized = truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
       }
     } else {
       // No parsable extension — truncate the whole string.
-      sanitized = truncateToUtf8Bytes(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+      sanitized = truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
     }
   }
 

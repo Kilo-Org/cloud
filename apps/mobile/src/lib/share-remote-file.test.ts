@@ -7,6 +7,7 @@ import {
   shareRemoteFile,
   ShareRemoteFileError,
 } from '@/lib/share-remote-file';
+import { utf8ByteLength } from '@/lib/utf8-utils';
 
 const expoFileSystemMock = vi.hoisted(() => {
   const File = vi.fn(function FileMock() {
@@ -61,7 +62,7 @@ describe('getSafeCacheFilename', () => {
     const filename = `${'a'.repeat(508)}.pdf`;
     const cacheFilename = getSafeCacheFilename({ id, filename });
 
-    expect(new TextEncoder().encode(cacheFilename).byteLength).toBeLessThanOrEqual(255);
+    expect(utf8ByteLength(cacheFilename)).toBeLessThanOrEqual(255);
     expect(cacheFilename.startsWith(`${id}-`)).toBe(true);
     expect(cacheFilename.endsWith('.pdf')).toBe(true);
   });

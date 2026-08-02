@@ -9,6 +9,7 @@ This directory is the mobile E2E harness. The scripts do the mechanics; this run
 | `e2e/appium.sh <device> ...` | All Appium use: run flows, dump the hierarchy, manage the per-device server |
 | `e2e/record.sh <device> ...` | Segment screen recording and frame extraction |
 | `e2e/github-stub.sh start\|status\|stop` | Hermetic GitHub API stub for PR-review E2E: server, env line, token seed |
+| `e2e/github-installation.sh <email>` | Real GitHub App installation on an account, for cloud-agent scenarios |
 | `e2e/remote-cli.sh start\|prepare\|exec\|status\|stop` | Local kilo CLI as a remote session against this worktree's stack |
 | `e2e/preflight.sh` | Internal. `login.sh`/`logout.sh` run it; it proves services, device claim, and Metro provenance |
 | `e2e/flows/*.js` | Reusable flow modules; `e2e/wdio/` is their driver plumbing |
@@ -37,7 +38,26 @@ Node must be v24 (root `.nvmrc`). If dependencies or local env files are missing
 
 # Real GitHub integration (cloud agents and similar)
 
-A scenario that needs a real GitHub integration (for example cloud agents cloning or pushing) cannot use the stub. Copy a valid integration from the shared dev database onto the signed-in E2E account:
+A scenario that needs real GitHub cannot use the stub. Two independent rows exist; give the account the one the scenario needs.
+
+- The **installation** (`platform_integrations`) drives cloud agents: the repository list, the clone, and the push. Add it with `github-installation.sh`.
+- The **user token** (`user_github_app_tokens`) drives user-level GitHub calls, for example PR review against real GitHub. Add it with the integration copy.
+
+They are different rows, so one account can hold both.
+
+## Installation (cloud agents)
+
+```bash
+apps/mobile/e2e/github-installation.sh <email>
+```
+
+The script signs in as the account through fake-login and calls the dev-only `githubApps.devAddInstallation` mutation, which writes the integration and its repository list. It defaults to the shared dev installation `144771093` (account `iscekic`); pass another as `github-installation.sh <email> <installation-id> <account-login>`. Relaunch the app afterwards so the repository query refetches.
+
+Re-running is safe: the mutation upserts the same rows. Pass the exact sign-in email, because fake-login creates a missing account, so a typo adds a junk account instead of failing. The installation does not expire the way the copy below does. It always reads real `api.github.com`, even while the stub runs: `GITHUB_API_BASE_URL` changes only the PR-review client.
+
+## User token (real GitHub, not the stub)
+
+Copy a valid integration from the shared dev database onto the signed-in E2E account:
 
 ```bash
 pnpm dev:seed app:github-integration-copy <email>

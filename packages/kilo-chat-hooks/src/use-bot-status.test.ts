@@ -18,7 +18,12 @@ const testState = vi.hoisted(() => ({
   // tanstack query mocks
   queryData: new Map<string, unknown>(),
   invalidateCalls: [] as Array<{ queryKey: unknown }>,
-  queryCalls: [] as Array<{ queryKey: unknown; queryFn: () => Promise<unknown>; enabled: boolean }>,
+  queryCalls: [] as Array<{
+    queryKey: unknown;
+    queryFn: () => Promise<unknown>;
+    enabled: boolean;
+    refetchInterval?: number | false;
+  }>,
 }));
 
 /** Call before each simulated render to reset the slot cursor. */
@@ -62,7 +67,12 @@ vi.mock('@tanstack/react-query', () => ({
       testState.invalidateCalls.push(opts);
     },
   }),
-  useQuery: (opts: { queryKey: unknown; queryFn: () => Promise<unknown>; enabled: boolean }) => {
+  useQuery: (opts: {
+    queryKey: unknown;
+    queryFn: () => Promise<unknown>;
+    enabled: boolean;
+    refetchInterval?: number | false;
+  }) => {
     testState.queryCalls.push(opts);
     const key = JSON.stringify(opts.queryKey);
     return { data: testState.queryData.get(key) };

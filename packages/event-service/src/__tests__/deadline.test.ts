@@ -209,7 +209,7 @@ describe('Hermes AbortError resilience', () => {
   it('does not leak timer or listener when fn rejects generic AbortError after deadline', async () => {
     vi.useFakeTimers();
     try {
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
 
       const promise = withDeadline(100, signal => {
         return new Promise<never>((_resolve, reject) => {

@@ -6,4 +6,4 @@ Custom LLM models ([`custom-llm/`](./custom-llm)) and direct BYOK models ([`prov
 
 ## Unavailable models
 
-When a free Kilo-exclusive model is removed from the code base (not just disabled), add its public ID to `unavailableModelIds` in [`unavailable-models.ts`](./unavailable-models.ts) so stale clients get a generic unavailable-model error.
+When a model must be made unavailable (for example a free Kilo-exclusive model removed from the code base, or a region-restricted model), add its public ID to `unavailableModelIds` in [`unavailable-models.ts`](./unavailable-models.ts) so stale clients get a generic unavailable-model error.

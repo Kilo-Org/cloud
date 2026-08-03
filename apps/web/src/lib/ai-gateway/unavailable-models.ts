@@ -46,6 +46,7 @@ const unavailableModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
   'qwen/qwen3.7-plus:free',
+  'sakana/fugu-ultra', // this model is not available in the EU
   'upstage/solar-pro-3:free',
   'x-ai/grok-code-fast-1:optimized:free',
   'xiaomi/mimo-v2-omni:free',
@@ -61,10 +62,10 @@ export function isUnavailableModel(modelId: string): boolean {
   return unavailableModelIds.has(modelId);
 }
 
-const unavailableModelFamilies: ReadonlySet<string> = new Set(
+const unavailableFreeModelFamilies: ReadonlySet<string> = new Set(
   [...unavailableModelIds].map(normalizeModelId)
 );
 
-export function familyHasUnavailableModel(modelId: string): boolean {
-  return unavailableModelFamilies.has(normalizeModelId(modelId));
+export function familyHasUnavailableFreeModel(modelId: string): boolean {
+  return unavailableFreeModelFamilies.has(normalizeModelId(modelId));
 }

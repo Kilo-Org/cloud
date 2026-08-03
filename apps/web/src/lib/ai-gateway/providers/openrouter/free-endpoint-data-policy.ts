@@ -1,5 +1,8 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { familyHasUnavailableModel, isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
+import {
+  familyHasUnavailableFreeModel,
+  isUnavailableModel,
+} from '@/lib/ai-gateway/unavailable-models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
@@ -21,7 +24,7 @@ export function getOpenRouterFreeEndpoints(
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);
     for (const model of models) {
-      if (model.endpoint?.is_free && !familyHasUnavailableModel(model.slug)) {
+      if (model.endpoint?.is_free && !familyHasUnavailableFreeModel(model.slug)) {
         endpoints.push({ modelId: normalizeModelId(model.slug), providerId });
       }
     }

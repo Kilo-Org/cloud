@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, Calendar, Coins, Crown, ExternalLink, Loader2 } from 'lucide-react';
+import { AlertTriangle, Calendar, Coins, ExternalLink, Loader2 } from 'lucide-react';
+import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -251,7 +252,7 @@ export function KiloPassDetail() {
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5" />
+                <KiloPassIcon className="h-5 w-5" />
                 Bonus streak
                 <KiloPassBonusRampDialog
                   tier={subscription.tier}

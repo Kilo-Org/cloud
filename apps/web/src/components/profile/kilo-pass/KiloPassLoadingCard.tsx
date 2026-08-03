@@ -1,7 +1,6 @@
 'use client';
 
-import { Crown } from 'lucide-react';
-
+import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +12,7 @@ export function KiloPassLoadingCard() {
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="flex items-center gap-2">
             <span className="bg-muted/40 ring-border/60 grid h-9 w-9 place-items-center rounded-lg ring-1">
-              <Crown className="h-5 w-5" />
+              <KiloPassIcon className="h-5 w-5" />
             </span>
 
             <span className="leading-none">

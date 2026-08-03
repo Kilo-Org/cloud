@@ -19,6 +19,7 @@ import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider'
 const routerPush = vi.fn();
 const routerBack = vi.fn();
 const routerCanGoBack = vi.fn(() => true);
+const shareMock = vi.hoisted(() => vi.fn(() => ({ action: 'sharedAction' })));
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -46,19 +47,29 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
+  Share: { share: shareMock },
   View: 'View',
   Platform: { OS: 'ios' },
 }));
 
+let prQueryResult: { data: unknown; isLoading: boolean; isError: boolean; isFetching: boolean } = {
+  data: undefined,
+  isLoading: true,
+  isError: false,
+  isFetching: false,
+};
+
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: undefined, isLoading: true, isError: false, isFetching: false }),
+  useQuery: () => prQueryResult,
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
 vi.mock('lucide-react-native', () => ({
   Check: () => null,
+  Share: () => null,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -226,6 +237,78 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
     expect(routerPush).toHaveBeenCalledWith({
       pathname: '/(app)/pr-review/[owner]/[repo]/[number]/review-submit',
       params: { owner: 'octocat', repo: 'hello', number: 7 },
+    });
+  });
+});
+
+describe('PrReviewScreen share action', () => {
+  beforeEach(() => {
+    prQueryResult = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+    };
+    shareMock.mockClear();
+  });
+
+  it('renders the Share affordance in the header', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const shareButton = findElement({
+      node: element,
+      type: 'Pressable',
+      prop: 'accessibilityLabel',
+      value: 'Share pull request',
+    });
+    expect(shareButton).not.toBeNull();
+  });
+
+  it('shares the URL only when no PR data is loaded yet', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const shareButton = findElement({
+      node: element,
+      type: 'Pressable',
+      prop: 'accessibilityLabel',
+      value: 'Share pull request',
+    });
+    if (!shareButton) {
+      throw new Error('Share button not found');
+    }
+    const onPress = (shareButton.props as { onPress?: () => void }).onPress;
+    onPress?.();
+
+    expect(shareMock).toHaveBeenCalledTimes(1);
+    expect(shareMock).toHaveBeenCalledWith({
+      message: 'https://github.com/octocat/hello/pull/7',
+    });
+  });
+
+  it('shares the title and URL when the PR title is loaded', () => {
+    prQueryResult = {
+      data: { title: 'Fix the thing' },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const shareButton = findElement({
+      node: element,
+      type: 'Pressable',
+      prop: 'accessibilityLabel',
+      value: 'Share pull request',
+    });
+    if (!shareButton) {
+      throw new Error('Share button not found');
+    }
+    const onPress = (shareButton.props as { onPress?: () => void }).onPress;
+    onPress?.();
+
+    expect(shareMock).toHaveBeenCalledTimes(1);
+    expect(shareMock).toHaveBeenCalledWith({
+      message: 'Fix the thing\nhttps://github.com/octocat/hello/pull/7',
     });
   });
 });

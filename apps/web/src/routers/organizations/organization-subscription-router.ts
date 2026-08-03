@@ -9,6 +9,8 @@ import {
   KNOWN_SEAT_PRICE_IDS,
   getPlanForPriceId,
 } from '@/lib/stripe';
+import { scheduleOrganizationPassCapacity } from '@/lib/kilo-pass-org/service';
+import { getScheduledSeatDecrease } from '@/components/subscriptions/seats/scheduled-seat-decrease';
 import {
   getMostRecentSeatPurchase,
   getMostRecentEndedSeatPurchase,
@@ -32,6 +34,11 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { BillingCycleSchema } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
 import { client } from '@/lib/stripe-client';
+import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
+import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { getOrganizationKiloPassMetadata } from '@/lib/kilo-pass-org/stripe-metadata';
+import type { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,
@@ -52,6 +59,8 @@ const OrganizationSubscriptionResponseSchema = z.object({
   subscription: z.custom<Stripe.Subscription>().nullable(),
   seatsUsed: z.number(),
   totalSeats: z.number(),
+  nextSeatCount: z.number().int().nonnegative().nullable(),
+  nextSeatCountEffectiveAt: z.string().datetime().nullable(),
   paidSeatItemId: z.string().nullable(),
   latestSeatPurchaseStatus: z.custom<OrganizationSeatsPurchase['subscription_status']>().nullable(),
 });
@@ -112,6 +121,8 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           subscription: null,
           seatsUsed: usages.used,
           totalSeats: usages.total,
+          nextSeatCount: null,
+          nextSeatCountEffectiveAt: null,
           paidSeatItemId: null,
           latestSeatPurchaseStatus: null,
         };
@@ -132,11 +143,19 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
       const paidSeatItemId =
         subscription?.items.data.find(item => KNOWN_SEAT_PRICE_IDS.has(item.price.id))?.id ?? null;
+      const paidSeatItem = subscription?.items.data.find(item => item.id === paidSeatItemId);
+      const { nextSeatCount, nextSeatCountEffectiveAt } = getScheduledSeatDecrease({
+        currentSeatCount: usages.total,
+        providerSeatCount: paidSeatItem?.quantity ?? null,
+        currentPeriodEnd: paidSeatItem?.current_period_end ?? null,
+      });
 
       return {
         subscription,
         seatsUsed: usages.used,
         totalSeats: usages.total,
+        nextSeatCount,
+        nextSeatCountEffectiveAt,
         paidSeatItemId,
         latestSeatPurchaseStatus: latestPurchase.subscription_status,
       };
@@ -336,7 +355,15 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       }
 
       const purchase = latestPurchase;
-      return await handleUpdateSeatCount(purchase.subscription_stripe_id, newSeatCount, total);
+      const result = await handleUpdateSeatCount(
+        purchase.subscription_stripe_id,
+        newSeatCount,
+        total
+      );
+      if (result.success && newSeatCount < total) {
+        await scheduleOrganizationPassCapacity({ organizationId, paidSeatCount: newSeatCount });
+      }
+      return result;
     }),
 
   getCustomerPortalUrl: organizationBillingProcedure
@@ -472,10 +499,20 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         price: item.price.id,
         quantity: item.quantity ?? 1,
       }));
-      const phase2Items = subscription.items.data.map(item => ({
-        price: item.price.id === currentPriceId ? newPriceId : item.price.id,
-        quantity: item.quantity ?? 1,
-      }));
+      const orgPassMetadata = getOrganizationKiloPassMetadata(subscription.metadata);
+      const phase2Items = subscription.items.data.map(item => {
+        const price =
+          item.price.id === currentPriceId
+            ? newPriceId
+            : orgPassMetadata && !isSeatLineItem(item)
+              ? getStripePriceIdForKiloPass({
+                  tier: orgPassMetadata.tier as KiloPassTier,
+                  cadence:
+                    targetCycle === 'annual' ? KiloPassCadence.Yearly : KiloPassCadence.Monthly,
+                })
+              : item.price.id;
+        return { price, quantity: item.quantity ?? 1 };
+      });
 
       // Preserve subscription-level discounts (promotion codes, coupons).
       // Stripe schedule phases only inherit customer-level discounts by default.

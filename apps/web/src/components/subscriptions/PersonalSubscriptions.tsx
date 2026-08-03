@@ -1,10 +1,11 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Code2, Crown } from 'lucide-react';
+import { Code2 } from 'lucide-react';
 import { useState, useSyncExternalStore } from 'react';
 import { PageLayout } from '@/components/PageLayout';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
+import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTRPC } from '@/lib/trpc/utils';
 import { isCodingPlanTerminal, isKiloclawTerminal, isKiloPassTerminal } from './helpers';
@@ -112,7 +113,7 @@ export function PersonalSubscriptions({ codingPlansEnabled }: { codingPlansEnabl
             value="kilo-pass"
             className={subscriptionTabClassName}
           >
-            <Crown className="size-4" />
+            <KiloPassIcon className="size-4" />
             Kilo Pass
           </TabsTrigger>
           <TabsTrigger

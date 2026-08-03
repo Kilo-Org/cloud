@@ -104,6 +104,23 @@ type OrgMember = OrgWithMembers['members'][number];
 export type ActiveOrgMember = Extract<OrgMember, { status: 'active' }>;
 export type InvitedOrgMember = Extract<OrgMember, { status: 'invited' }>;
 
+/**
+ * Parent organization's Kilo Pass for Orgs summary. The API is restricted to
+ * the parent agreement owner (`organizationParentBillingProcedure` rejects
+ * child orgs and non-billing roles), so `enabled` must only be true when the
+ * user has a billing-capable role AND `withMembers` confirmed
+ * `parent_organization_id === null` — children must never fire this query.
+ */
+export function useOrgKiloPassSummary(organizationId: string | null, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloPass.summary.queryOptions(
+      { organizationId: organizationId ?? '' },
+      { enabled: enabled && organizationId != null }
+    )
+  );
+}
+
 export function useOrgUsageStats(organizationId: string | null) {
   const trpc = useTRPC();
   return useQuery(

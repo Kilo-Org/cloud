@@ -1,42 +1,54 @@
-import { useCallback } from 'react';
-import { toast } from 'sonner-native';
+import { type RefObject, useCallback, useRef } from 'react';
 
 import { useRemoteSpawnDispatch } from '@/components/agents/use-remote-spawn-dispatch';
+import { type AgentAttachment } from '@/lib/agent-attachments/agent-attachment-types';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
-import { SHARE_STAGED_SPAWN_NAVIGATION_CANCELLED_TOAST } from '@/lib/share-to-new-remote-session';
-import { useShareAwareRunOnChange } from '@/lib/use-share-aware-run-on-change';
-import { useShareStagedLatch } from '@/lib/use-share-staged-latch';
+import { buildComposerSharePayload } from '@/lib/share-submit-params';
 
 type InstancesRefetch = () => Promise<{
   data: { instances: InstancePickerInstance[] } | undefined;
 }>;
 
 type UseNewSessionShareRemoteArgs = {
-  shareId: string | undefined;
   organizationId: string | undefined;
   runOnInstance: InstancePickerInstance | null;
   setRunOnInstance: (next: InstancePickerInstance | null) => void;
   refetchInstances: InstancesRefetch;
   instanceList: InstancePickerInstance[];
+  /** Live composer draft owned by `useNewSessionCreator`. */
+  promptRef: RefObject<string>;
+  /** Live attachment list owned by `useAgentAttachmentUpload`. */
+  attachments: AgentAttachment[];
 };
 
 /**
- * Wires share-staged latch, remote spawn dispatch (with mid-spawn cancel),
- * and the share-aware Run-on change handler for the new-session screen.
+ * Wires remote spawn dispatch for the new-session screen and gives it a
+ * press-time snapshot of the composer, so a spawned CLI session receives the
+ * same text and files through the existing share prefill path.
  */
 export function useNewSessionShareRemote({
-  shareId,
   organizationId,
   runOnInstance,
   setRunOnInstance,
   refetchInstances,
   instanceList,
+  promptRef,
+  attachments,
 }: UseNewSessionShareRemoteArgs) {
-  const { isShareStaged, shouldCancelReadyNavigation } = useShareStagedLatch(shareId);
+  // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
+  // `share-gate-sheet.tsx:91` use, so the snapshot callback stays stable
+  // while always reading the current list.
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
 
-  const handleReadyNavigationCancelled = useCallback(() => {
-    toast.error(SHARE_STAGED_SPAWN_NAVIGATION_CANCELLED_TOAST);
-  }, []);
+  const getSubmitPayload = useCallback(
+    () =>
+      buildComposerSharePayload({
+        text: promptRef.current,
+        attachments: attachmentsRef.current,
+      }),
+    [promptRef]
+  );
 
   const remoteSpawn = useRemoteSpawnDispatch({
     organizationId,
@@ -44,16 +56,8 @@ export function useNewSessionShareRemote({
     setRunOnInstance,
     refetchInstances,
     instanceList,
-    shouldCancelReadyNavigation,
-    onReadyNavigationCancelled: handleReadyNavigationCancelled,
+    getSubmitPayload,
   });
 
-  const handleRunOnInstanceChange = useShareAwareRunOnChange({
-    shareId,
-    isShareStaged,
-    runOnInstance,
-    onChangeRunOnInstance: remoteSpawn.onChangeRunOnInstance,
-  });
-
-  return { remoteSpawn, handleRunOnInstanceChange };
+  return { remoteSpawn, handleRunOnInstanceChange: remoteSpawn.onChangeRunOnInstance };
 }

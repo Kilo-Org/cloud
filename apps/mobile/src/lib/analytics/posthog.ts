@@ -43,6 +43,7 @@ export const ORGANIZATION_MEMBER_INVITED_EVENT = 'organization_member_invited';
 export const KILO_PASS_PURCHASE_STARTED_EVENT = 'kilo_pass_purchase_started';
 export const KILO_PASS_PURCHASE_COMPLETED_EVENT = 'kilo_pass_purchase_completed';
 export const KILO_PASS_PURCHASE_FAILED_EVENT = 'kilo_pass_purchase_failed';
+export const APP_STARTUP_EVENT = 'app_startup';
 
 export type AnalyticsSurface = 'claw' | 'cloud-agent' | 'remote-session';
 

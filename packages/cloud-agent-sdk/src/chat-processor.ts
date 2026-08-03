@@ -19,7 +19,21 @@ type ChatProcessor = {
 };
 
 type ChatProcessorOptions = {
-  onImageAttachment?: ((partId: string, mime: string, dataUrl: string) => void) | undefined;
+  /**
+   * Optional sink for tool attachment bytes, called just before the chat
+   * processor strips completed tool part attachment data URLs for storage.
+   *
+   * - Images (any tool): emitted unchanged.
+   * - Non-images: emitted only when `part.tool === 'send_file'`.
+   *
+   * The callback receives the raw data URL exactly once per processor pass;
+   * consumers use it to persist bytes outside the in-memory store (e.g.
+   * mobile's file-system cache). Web never passes it, so web behaviour is
+   * unchanged. Sink failures are caught and must not interrupt processing.
+   */
+  onToolAttachment?:
+    | ((partId: string, attachment: { mime: string; filename?: string; dataUrl: string }) => void)
+    | undefined;
 };
 
 function hasTextField(part: { text?: string } | unknown): part is { text: string } {
@@ -32,20 +46,24 @@ function isSyntheticPart(part: unknown): boolean {
   );
 }
 
-function emitImageAttachmentsBeforeStrip(
+function emitToolAttachmentsBeforeStrip(
   part: Part,
-  onImageAttachment: NonNullable<ChatProcessorOptions['onImageAttachment']>
+  onToolAttachment: NonNullable<ChatProcessorOptions['onToolAttachment']>
 ): void {
   if (part.type !== 'tool') return;
   const toolPart = part;
   if (toolPart.state.status !== 'completed' || !toolPart.state.attachments) return;
 
   for (const attachment of toolPart.state.attachments) {
-    if (!attachment.mime.startsWith('image/') || attachment.url === '') {
-      continue;
-    }
+    const isImage = attachment.mime.startsWith('image/');
+    if (!isImage && toolPart.tool !== 'send_file') continue;
+    if (attachment.url === '') continue;
     try {
-      onImageAttachment(toolPart.id, attachment.mime, attachment.url);
+      onToolAttachment(toolPart.id, {
+        mime: attachment.mime,
+        ...(attachment.filename ? { filename: attachment.filename } : {}),
+        dataUrl: attachment.url,
+      });
     } catch {
       // Sink failures must not break chat processing.
     }
@@ -63,8 +81,8 @@ function createChatProcessor(
           sessionStorage.upsertMessage(event.info);
           break;
         case 'message.part.updated': {
-          if (options?.onImageAttachment) {
-            emitImageAttachmentsBeforeStrip(event.part, options.onImageAttachment);
+          if (options?.onToolAttachment) {
+            emitToolAttachmentsBeforeStrip(event.part, options.onToolAttachment);
           }
           const stripped = stripPartContentIfFile(event.part);
           if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {

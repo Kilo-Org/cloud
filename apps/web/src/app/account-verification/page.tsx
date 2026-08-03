@@ -6,6 +6,7 @@ import { AccountCreationScreen } from '@/components/auth/AccountCreationScreen';
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { getStytchStatus, handleSignupPromotion, type SignupSource } from '@/lib/stytch';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
+import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import { isOpenclawAdvisorCallback } from '@/lib/signup-source';
 import { isCreditCampaignCallback, lookupCampaignBySlug } from '@/lib/credit-campaigns';
@@ -62,7 +63,10 @@ export default async function AccountVerificationPage({ searchParams }: AppPageP
         if (isFirstValidation) {
           const campaign = await lookupCampaignBySlug(campaignMatch.slug);
           if (campaign) {
-            signupSource = { kind: 'credit-campaign', slug: campaignMatch.slug };
+            signupSource = {
+              kind: 'credit-campaign',
+              slug: campaignMatch.slug,
+            };
           }
         }
       }
@@ -74,7 +78,7 @@ export default async function AccountVerificationPage({ searchParams }: AppPageP
   if (stytchStatus !== null) {
     const hasUsableCallback = isValidCallback && !stripCreditCampaignCallback;
     const finalDestination = hasUsableCallback ? callbackStr : '/get-started';
-    redirect(maybeInterceptWithSurvey(user, finalDestination));
+    redirect(browserLandingPath(maybeInterceptWithSurvey(user, finalDestination)));
   }
 
   return (

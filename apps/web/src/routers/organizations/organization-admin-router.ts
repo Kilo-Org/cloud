@@ -7,7 +7,8 @@ import {
   organization_seats_purchases,
   credit_transactions,
   platform_integrations,
-  kilo_pass_subscriptions,
+  kilo_pass_org_agreements,
+  kilo_pass_org_term_versions,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import {
@@ -47,6 +48,11 @@ import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat
 import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import {
+  assertOrganizationHierarchyChangeAllowed,
+  KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
+} from '@/lib/kilo-pass-org/hierarchy-guard';
+import { clearAgreementPaymentReview } from '@/lib/kilo-pass-org/service';
 import {
   fetchExpiringTransactionsForOrganization,
   computeNextExpirationAmount,
@@ -149,6 +155,35 @@ const AdminOrganizationDetailsSchema = z.object({
       installation_count: z.number(),
     })
   ),
+});
+
+const ClearKiloPassPaymentReviewInputSchema = z.object({
+  organizationId: z.uuid(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+const AdminOrganizationKiloPassSummarySchema = z.object({
+  managedByOrganization: z.object({ id: z.uuid(), name: z.string() }),
+  agreement: z
+    .object({
+      state: z.enum(['pending_payment', 'active', 'cancel_at_period_end', 'ended']),
+      processingCondition: z.enum([
+        'ready',
+        'manual',
+        'blocked',
+        'overallocated',
+        'failed',
+        'suspended_for_review',
+      ]),
+      tier: z.enum(['tier_19', 'tier_49', 'tier_199']),
+      tierName: z.string().min(1),
+      cadence: z.enum(['monthly', 'yearly']),
+      purchasedPassCapacity: z.number().int().nonnegative(),
+      paidUntil: z.iso.datetime().nullable(),
+      providerSubscriptionId: z.string().nullable(),
+      providerSeatAddOnItemId: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 const OrganizationHierarchySummarySchema = z.object({
@@ -340,24 +375,44 @@ export const organizationAdminRouter = createTRPCRouter({
   }),
 
   setParent: adminProcedure.input(SetParentOrganizationInputSchema).mutation(async ({ input }) => {
-    await db.transaction(async tx => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
-      await validateParentOrganizationChange(input.organizationId, input.parentOrganizationId, tx);
+    try {
+      await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+        await validateParentOrganizationChange(
+          input.organizationId,
+          input.parentOrganizationId,
+          tx
+        );
 
-      await tx
-        .update(organizations)
-        .set(
+        await assertOrganizationHierarchyChangeAllowed(
+          tx,
+          input.organizationId,
           input.parentOrganizationId
-            ? {
-                parent_organization_id: input.parentOrganizationId,
-                require_seats: false,
-                free_trial_end_at: null,
-                settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
-              }
-            : { parent_organization_id: input.parentOrganizationId }
-        )
-        .where(eq(organizations.id, input.organizationId));
-    });
+        );
+
+        await tx
+          .update(organizations)
+          .set(
+            input.parentOrganizationId
+              ? {
+                  parent_organization_id: input.parentOrganizationId,
+                  require_seats: false,
+                  free_trial_end_at: null,
+                  settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
+                }
+              : { parent_organization_id: input.parentOrganizationId }
+          )
+          .where(eq(organizations.id, input.organizationId));
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
+        });
+      }
+      throw error;
+    }
 
     return successResult();
   }),
@@ -495,6 +550,95 @@ export const organizationAdminRouter = createTRPCRouter({
 
       return { ...organizationDetails[0], integrations };
     }),
+
+  getKiloPassSummary: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(AdminOrganizationKiloPassSummarySchema)
+    .query(async ({ input }) => {
+      const [organization] = await db
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+          parentOrganizationId: organizations.parent_organization_id,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, input.organizationId))
+        .limit(1);
+
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      const ownerOrganizationId = organization.parentOrganizationId ?? organization.id;
+      const [ownerOrganization, agreementRow] = await Promise.all([
+        db
+          .select({ id: organizations.id, name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, ownerOrganizationId))
+          .limit(1)
+          .then(rows => rows[0]),
+        db
+          .select({
+            agreement: kilo_pass_org_agreements,
+            tier: kilo_pass_org_term_versions.tier,
+          })
+          .from(kilo_pass_org_agreements)
+          .innerJoin(
+            kilo_pass_org_term_versions,
+            eq(kilo_pass_org_agreements.term_version_id, kilo_pass_org_term_versions.id)
+          )
+          .where(eq(kilo_pass_org_agreements.parent_organization_id, ownerOrganizationId))
+          .orderBy(
+            sql`CASE WHEN ${kilo_pass_org_agreements.state} = 'ended' THEN 1 ELSE 0 END`,
+            desc(kilo_pass_org_agreements.created_at)
+          )
+          .limit(1)
+          .then(rows => rows[0]),
+      ]);
+
+      if (!ownerOrganization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Parent organization not found' });
+      }
+
+      return {
+        managedByOrganization: ownerOrganization,
+        agreement: agreementRow
+          ? {
+              state: agreementRow.agreement.state,
+              processingCondition: agreementRow.agreement.processing_condition,
+              tier: agreementRow.tier,
+              tierName:
+                agreementRow.tier === 'tier_19'
+                  ? 'Starter'
+                  : agreementRow.tier === 'tier_49'
+                    ? 'Pro'
+                    : 'Expert',
+              cadence: agreementRow.agreement.cadence,
+              purchasedPassCapacity: agreementRow.agreement.purchased_pass_capacity,
+              paidUntil: agreementRow.agreement.paid_until
+                ? new Date(agreementRow.agreement.paid_until).toISOString()
+                : null,
+              providerSubscriptionId: agreementRow.agreement.provider_subscription_id,
+              providerSeatAddOnItemId: agreementRow.agreement.provider_seat_add_on_item_id,
+            }
+          : null,
+      };
+    }),
+
+  clearKiloPassPaymentReview: adminProcedure
+    .input(ClearKiloPassPaymentReviewInputSchema)
+    .output(
+      z.object({
+        processingCondition: z.enum(['ready', 'overallocated']),
+      })
+    )
+    .mutation(({ input, ctx }) =>
+      clearAgreementPaymentReview({
+        organizationId: input.organizationId,
+        actorUserId: ctx.user.id,
+        reason: input.reason,
+      })
+    ),
 
   getHierarchy: adminProcedure
     .input(OrganizationIdInputSchema)
@@ -935,7 +1079,21 @@ export const organizationAdminRouter = createTRPCRouter({
       }
     }
 
-    await markOrganizationAsDeleted(organizationId);
+    try {
+      await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+        await assertOrganizationHierarchyChangeAllowed(tx, organizationId);
+        await markOrganizationAsDeleted(organizationId, tx);
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
+        });
+      }
+      throw error;
+    }
 
     if (existingOrg.created_by_kilo_user_id) {
       void reportEvents({
@@ -1038,29 +1196,30 @@ export const organizationAdminRouter = createTRPCRouter({
           subscription_status: organization_seats_purchases.subscription_status,
           row_num:
             sql<number>`ROW_NUMBER() OVER (PARTITION BY ${organization_seats_purchases.organization_id} ORDER BY ${organization_seats_purchases.created_at} DESC)`.as(
-              'row_num'
+              'latest_subscription_row_num'
             ),
         })
         .from(organization_seats_purchases)
         .as('latest_subscriptions');
 
-      const organizationKiloPassTiers = db
+      const organizationKiloPassAgreements = db
         .select({
-          organization_id: organization_memberships.organization_id,
-          kilo_pass_tier: sql<string | null>`MIN(${kilo_pass_subscriptions.tier})`.as(
-            'kilo_pass_tier'
-          ),
+          organization_id: kilo_pass_org_agreements.parent_organization_id,
+          kilo_pass_tier: kilo_pass_org_term_versions.tier,
+          kilo_pass_state: kilo_pass_org_agreements.state,
+          row_num:
+            sql<number>`ROW_NUMBER() OVER (PARTITION BY ${kilo_pass_org_agreements.parent_organization_id} ORDER BY CASE WHEN ${kilo_pass_org_agreements.state} = 'ended' THEN 1 ELSE 0 END, ${kilo_pass_org_agreements.created_at} DESC)`.as(
+              'kilo_pass_agreement_row_num'
+            ),
         })
-        .from(organization_memberships)
+        .from(kilo_pass_org_agreements)
         .innerJoin(
-          kilo_pass_subscriptions,
-          eq(kilo_pass_subscriptions.kilo_user_id, organization_memberships.kilo_user_id)
+          kilo_pass_org_term_versions,
+          eq(kilo_pass_org_agreements.term_version_id, kilo_pass_org_term_versions.id)
         )
-        .where(eq(kilo_pass_subscriptions.status, 'active'))
-        .groupBy(organization_memberships.organization_id)
-        .as('organization_kilo_pass_tiers');
+        .as('organization_kilo_pass_agreements');
 
-      let orderCondition;
+      let orderCondition: SQL;
       const orderFunction = sortOrder === 'asc' ? asc : desc;
       // For sort keys that come from a derived/aggregate column or a joined
       // table, build an explicit drizzle expression. Plain organizations columns
@@ -1078,7 +1237,7 @@ export const organizationAdminRouter = createTRPCRouter({
       } else if (sortField === 'latest_stripe_status') {
         orderCondition = orderFunction(latestSubscriptions.subscription_status);
       } else if (sortField === 'kilo_pass_tier') {
-        orderCondition = orderFunction(organizationKiloPassTiers.kilo_pass_tier);
+        orderCondition = orderFunction(organizationKiloPassAgreements.kilo_pass_tier);
       } else {
         // 'name', 'plan', 'microdollars_used' all map to organizations columns.
         orderCondition = orderFunction(organizations[sortField]);
@@ -1120,8 +1279,13 @@ export const organizationAdminRouter = createTRPCRouter({
         ),
         latest_stripe_status: latestSubscriptions.subscription_status,
         kilo_pass_tier: sortsByKiloPassTier
-          ? organizationKiloPassTiers.kilo_pass_tier
+          ? organizationKiloPassAgreements.kilo_pass_tier
           : sql<string | null>`NULL`.as('kilo_pass_tier'),
+        kilo_pass_state: sortsByKiloPassTier
+          ? organizationKiloPassAgreements.kilo_pass_state
+          : sql<typeof kilo_pass_org_agreements.$inferSelect.state | null>`NULL`.as(
+              'kilo_pass_state'
+            ),
         kiloclaw_count:
           sql<number>`(SELECT COUNT(*) FROM kiloclaw_instances ki WHERE ki.organization_id = ${organizations.id} AND ki.destroyed_at IS NULL)::int`.as(
             'kiloclaw_count'
@@ -1181,8 +1345,11 @@ export const organizationAdminRouter = createTRPCRouter({
 
       const baseQuery = sortsByKiloPassTier
         ? baseQueryWithCommonJoins.leftJoin(
-            organizationKiloPassTiers,
-            eq(organizations.id, organizationKiloPassTiers.organization_id)
+            organizationKiloPassAgreements,
+            and(
+              eq(organizations.id, organizationKiloPassAgreements.organization_id),
+              eq(organizationKiloPassAgreements.row_num, 1)
+            )
           )
         : baseQueryWithCommonJoins;
 
@@ -1229,7 +1396,12 @@ export const organizationAdminRouter = createTRPCRouter({
           organizations.id,
           latestSubscriptions.amount_usd,
           latestSubscriptions.subscription_status,
-          ...(sortsByKiloPassTier ? [organizationKiloPassTiers.kilo_pass_tier] : [])
+          ...(sortsByKiloPassTier
+            ? [
+                organizationKiloPassAgreements.kilo_pass_tier,
+                organizationKiloPassAgreements.kilo_pass_state,
+              ]
+            : [])
         )
         .having(havingCondition)
         .orderBy(orderCondition)
@@ -1245,34 +1417,32 @@ export const organizationAdminRouter = createTRPCRouter({
               return filteredOrganizations;
             }
 
-            const tierRows = await db
+            const agreementRows = await db
               .select({
-                organization_id: organization_memberships.organization_id,
-                kilo_pass_tier: sql<string | null>`MIN(${kilo_pass_subscriptions.tier})`.as(
-                  'kilo_pass_tier'
-                ),
+                organization_id: organizationKiloPassAgreements.organization_id,
+                kilo_pass_tier: organizationKiloPassAgreements.kilo_pass_tier,
+                kilo_pass_state: organizationKiloPassAgreements.kilo_pass_state,
               })
-              .from(organization_memberships)
-              .innerJoin(
-                kilo_pass_subscriptions,
-                eq(kilo_pass_subscriptions.kilo_user_id, organization_memberships.kilo_user_id)
-              )
+              .from(organizationKiloPassAgreements)
               .where(
                 and(
-                  eq(kilo_pass_subscriptions.status, 'active'),
-                  inArray(organization_memberships.organization_id, organizationIds)
+                  eq(organizationKiloPassAgreements.row_num, 1),
+                  inArray(organizationKiloPassAgreements.organization_id, organizationIds)
                 )
-              )
-              .groupBy(organization_memberships.organization_id);
+              );
 
-            const kiloPassTierByOrganizationId = new Map(
-              tierRows.map(row => [row.organization_id, row.kilo_pass_tier])
+            const kiloPassByOrganizationId = new Map(
+              agreementRows.map(row => [row.organization_id, row])
             );
 
-            return filteredOrganizations.map(organization => ({
-              ...organization,
-              kilo_pass_tier: kiloPassTierByOrganizationId.get(organization.id) ?? null,
-            }));
+            return filteredOrganizations.map(organization => {
+              const agreement = kiloPassByOrganizationId.get(organization.id);
+              return {
+                ...organization,
+                kilo_pass_tier: agreement?.kilo_pass_tier ?? null,
+                kilo_pass_state: agreement?.kilo_pass_state ?? null,
+              };
+            });
           })();
 
       let totalOrganizationCount: number;

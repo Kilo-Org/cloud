@@ -17,7 +17,6 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
-import { OPENROUTER_GPT56_PROMO_MODEL_IDS } from '@/lib/ai-gateway/providers/openai';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -157,25 +156,6 @@ describe('formatName', () => {
       pricing: { prompt: '0.00001', completion: '0' },
     });
     expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model ($$$$)');
-  });
-
-  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('does not show the disabled promo for %s', modelId => {
-    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
-    const model = buildModel({
-      id: modelId,
-      created: recentlyCreated,
-      expiration_date: '2026-07-01',
-      pricing: { prompt: '0.00001', completion: '0', discount: 0.5 },
-    });
-    expect(formatName(model, 0)).toBe('Test Model ($$$$)');
-  });
-
-  it('does not show the disabled promo percentage from endpoint metadata', () => {
-    const model = buildModel({
-      id: OPENROUTER_GPT56_PROMO_MODEL_IDS[0],
-      pricing: { prompt: '0.00001', completion: '0', discount: 0.375 },
-    });
-    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
   });
 });
 

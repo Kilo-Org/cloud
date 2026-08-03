@@ -13,13 +13,13 @@ import {
 } from './message-input-content-state';
 import {
   MESSAGE_INPUT_FONT_SIZE,
-  MESSAGE_INPUT_HORIZONTAL_PADDING,
   MESSAGE_INPUT_LINE_HEIGHT,
   MESSAGE_INPUT_MAX_HEIGHT,
   MESSAGE_INPUT_MIN_HEIGHT,
   MESSAGE_INPUT_VERTICAL_INSET,
   resolveMessageInputBottomPadding,
   resolveMessageInputShouldScroll,
+  resolveMessageInputTextContentWidth,
 } from './message-input-layout';
 import {
   type CommonProps,
@@ -109,7 +109,7 @@ export function MessageInputContent({
     minHeight: MESSAGE_INPUT_MIN_HEIGHT,
     maxHeight: MESSAGE_INPUT_MAX_HEIGHT,
     verticalPadding: MESSAGE_INPUT_VERTICAL_INSET,
-    textContentWidth: inputWidth - MESSAGE_INPUT_HORIZONTAL_PADDING,
+    textContentWidth: resolveMessageInputTextContentWidth(inputWidth),
     fontSize: MESSAGE_INPUT_FONT_SIZE,
     lineHeight: MESSAGE_INPUT_LINE_HEIGHT,
     initialText,
@@ -239,7 +239,7 @@ export function MessageInputContent({
   }
 
   function handleInputLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
+    const nextWidth = Math.max(Math.floor(event.nativeEvent.layout.width), 0);
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 

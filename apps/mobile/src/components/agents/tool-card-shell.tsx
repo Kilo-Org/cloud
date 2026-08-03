@@ -13,7 +13,8 @@ import Animated, {
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { getToolImageAttachments } from './tool-card-attachments';
+import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
+import { ToolCardFileAttachments } from './tool-card-file-attachments';
 import { ToolCardImageAttachments } from './tool-card-image-attachments';
 
 type ToolCardShellProps = {
@@ -41,7 +42,8 @@ export function ToolCardShell({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const colors = useThemeColors();
   const imageAttachments = part ? getToolImageAttachments(part) : [];
-  const hasContent = Boolean(children) || imageAttachments.length > 0;
+  const fileAttachments = part ? getToolFileAttachments(part) : [];
+  const hasContent = Boolean(children) || imageAttachments.length > 0 || fileAttachments.length > 0;
 
   const rotation = useSharedValue(defaultExpanded ? 180 : 0);
 
@@ -104,6 +106,7 @@ export function ToolCardShell({
           className="gap-2 border-t border-border px-3 py-2"
         >
           {imageAttachments.length > 0 && part ? <ToolCardImageAttachments part={part} /> : null}
+          {fileAttachments.length > 0 && part ? <ToolCardFileAttachments part={part} /> : null}
           {children}
         </Animated.View>
       ) : null}

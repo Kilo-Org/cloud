@@ -92,13 +92,15 @@ type CloudAgentSessionConfig = {
     state: Extract<MessageDeliveryState, { status: 'failed' }>
   ) => void;
   /**
-   * Optional sink for image attachment bytes, called just before the chat
-   * processor strips a completed tool part's image data URLs for storage.
+   * Optional sink for tool attachment bytes, called just before the chat
+   * processor strips a completed tool part's attachment data URLs for storage.
    * Receives the raw data URL exactly once per processor pass; consumers use
    * it to persist bytes outside the in-memory store (e.g. mobile's
    * file-system cache). Web never passes it, so web behaviour is unchanged.
    */
-  onImageAttachment?: (partId: string, mime: string, dataUrl: string) => void;
+  onToolAttachment?:
+    | ((partId: string, attachment: { mime: string; filename?: string; dataUrl: string }) => void)
+    | undefined;
 };
 
 type CloudAgentSessionSendInput = {
@@ -211,7 +213,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   const storage = config.storage ?? createMemoryStorage();
 
   const chatProcessor = createChatProcessor(storage, {
-    onImageAttachment: config.onImageAttachment,
+    onToolAttachment: config.onToolAttachment,
   });
 
   const serviceState = createServiceState({

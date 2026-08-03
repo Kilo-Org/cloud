@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -76,11 +77,12 @@ describe('applySharePrefill', () => {
     __resetSharePayloadStoreForTests();
   });
 
-  it('no-ops when take returns null (already consumed or unknown id)', async () => {
+  it('clears the route params when take returns null (already consumed or unknown id)', async () => {
     const { input, calls: nativeCalls } = makeInput();
     const { onChangeText, calls: changeCalls } = makeChange();
     const addCandidatesCalls: AgentAttachmentCandidate[][] = [];
     const clearCalls: number[] = [];
+    const deliveredCalls: number[] = [];
 
     await applySharePrefill({
       shareId: 'missing',
@@ -94,12 +96,16 @@ describe('applySharePrefill', () => {
       clearShareIdParam: () => {
         clearCalls.push(1);
       },
+      onDelivered: () => {
+        deliveredCalls.push(1);
+      },
     });
 
     expect(nativeCalls).toEqual([]);
     expect(changeCalls).toEqual([]);
     expect(addCandidatesCalls).toEqual([]);
-    expect(clearCalls).toEqual([]);
+    expect(deliveredCalls).toEqual([]);
+    expect(clearCalls).toEqual([1]);
   });
 
   it('no-ops when shareId is empty or undefined', async () => {
@@ -229,6 +235,97 @@ describe('applySharePrefill', () => {
       },
     });
     expect(changeCalls).toEqual([]);
+  });
+
+  it('with files, calls onDelivered after addCandidates and before clearShareIdParam', async () => {
+    const id = putSharePayload({
+      text: 'shared body',
+      files: [{ name: 'a.png', uri: 'file:///a.png' }],
+      failedFiles: [],
+    });
+    const order: string[] = [];
+    const addCandidates = async (): Promise<void> => {
+      order.push('files-start');
+      // Resolve on a later microtask so a wrong order actually fails.
+      await Promise.resolve();
+      order.push('files-done');
+    };
+
+    await applySharePrefill({
+      shareId: id,
+      input: null,
+      maxLength: 4000,
+      onChangeText: () => {
+        order.push('text');
+      },
+      addCandidates,
+      clearShareIdParam: () => {
+        order.push('clear');
+      },
+      onDelivered: () => {
+        order.push('delivered');
+      },
+    });
+
+    expect(order).toEqual(['text', 'files-start', 'files-done', 'delivered', 'clear']);
+  });
+
+  it('fires onDelivered for a text-only payload before clearShareIdParam', async () => {
+    const id = putSharePayload({ text: 'text only', files: [], failedFiles: [] });
+    const order: string[] = [];
+
+    await applySharePrefill({
+      shareId: id,
+      input: null,
+      maxLength: 4000,
+      onChangeText: () => {
+        order.push('text');
+      },
+      addCandidates: resolveImmediately,
+      clearShareIdParam: () => {
+        order.push('clear');
+      },
+      onDelivered: () => {
+        order.push('delivered');
+      },
+    });
+
+    expect(order).toEqual(['text', 'delivered', 'clear']);
+  });
+
+  it('fires neither onDelivered nor clearShareIdParam when shareId is undefined or empty', async () => {
+    const deliveredCalls: number[] = [];
+    const clearCalls: number[] = [];
+
+    await applySharePrefill({
+      shareId: undefined,
+      input: null,
+      maxLength: 4000,
+      onChangeText: noopChange,
+      addCandidates: resolveImmediately,
+      clearShareIdParam: () => {
+        clearCalls.push(1);
+      },
+      onDelivered: () => {
+        deliveredCalls.push(1);
+      },
+    });
+    await applySharePrefill({
+      shareId: '',
+      input: null,
+      maxLength: 4000,
+      onChangeText: noopChange,
+      addCandidates: resolveImmediately,
+      clearShareIdParam: () => {
+        clearCalls.push(1);
+      },
+      onDelivered: () => {
+        deliveredCalls.push(1);
+      },
+    });
+
+    expect(deliveredCalls).toEqual([]);
+    expect(clearCalls).toEqual([]);
   });
 
   it('clears the route param after a successful prefill', async () => {

@@ -3182,7 +3182,7 @@ describe('createSessionManager', () => {
   // -------------------------------------------------------------------------
 
   describe('activeQuestion / activePermission', () => {
-    it('onQuestionAsked sets activeQuestion', async () => {
+    it('onQuestionAsked queues asks and keeps the oldest active', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -3205,10 +3205,12 @@ describe('createSessionManager', () => {
 
       const questions2 = [{ question: 'Pick a shape', header: 'Shape', options: [] }];
       mockSessionCallbacks.onQuestionAsked?.('req-2', questions2);
+      // Head stays the oldest (req-1), not overwritten by req-2.
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
-        requestId: 'req-2',
-        questions: questions2,
+        requestId: 'req-1',
+        questions,
       });
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(2);
     });
 
     it('onQuestionResolved clears activeQuestion', async () => {
@@ -3224,7 +3226,7 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
     });
 
-    it('onPermissionAsked sets activePermission', async () => {
+    it('onPermissionAsked queues asks and keeps the oldest active', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -3241,13 +3243,15 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onPermissionAsked?.('req-2', 'bash', ['**'], { command: 'rm' }, [
         'write',
       ]);
+      // Head stays the oldest (req-1), not overwritten by req-2.
       expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
-        requestId: 'req-2',
-        permission: 'bash',
-        patterns: ['**'],
-        metadata: { command: 'rm' },
-        always: ['write'],
+        requestId: 'req-1',
+        permission: 'write',
+        patterns: ['*.ts'],
+        metadata: {},
+        always: [],
       });
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(2);
     });
 
     it('onPermissionResolved clears activePermission', async () => {
@@ -3260,6 +3264,151 @@ describe('createSessionManager', () => {
 
       mockSessionCallbacks.onPermissionResolved?.('req-1');
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+    });
+
+    it('onPermissionResolved advances head to the next entry', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onPermissionAsked?.('req-1', 'write', ['*.ts'], {}, []);
+      mockSessionCallbacks.onPermissionAsked?.('req-2', 'bash', ['**'], { command: 'rm' }, [
+        'write',
+      ]);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(2);
+
+      mockSessionCallbacks.onPermissionResolved?.('req-1');
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
+        requestId: 'req-2',
+        permission: 'bash',
+        patterns: ['**'],
+        metadata: { command: 'rm' },
+        always: ['write'],
+      });
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
+    });
+
+    it('onPermissionResolved with unknown id preserves the queue', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onPermissionAsked?.('req-1', 'write', [], {}, []);
+      mockSessionCallbacks.onPermissionResolved?.('req-unknown');
+
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
+        requestId: 'req-1',
+        permission: 'write',
+        patterns: [],
+        metadata: {},
+        always: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
+    });
+
+    it('a repeat onPermissionAsked with the same id keeps length 1 and replaces the payload', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onPermissionAsked?.('req-1', 'write', ['*.ts'], {}, []);
+      mockSessionCallbacks.onPermissionAsked?.(
+        'req-1',
+        'edit',
+        ['**/*.js'],
+        { reason: 'changed' },
+        ['read']
+      );
+
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
+        requestId: 'req-1',
+        permission: 'edit',
+        patterns: ['**/*.js'],
+        metadata: { reason: 'changed' },
+        always: ['read'],
+      });
+    });
+
+    it('onQuestionResolved advances head to the next entry', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const q1 = [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ];
+      const q2 = [
+        {
+          question: 'Pick a shape',
+          header: 'Shape',
+          options: [{ label: 'Circle', description: '' }],
+        },
+      ];
+      mockSessionCallbacks.onQuestionAsked?.('req-1', q1);
+      mockSessionCallbacks.onQuestionAsked?.('req-2', q2);
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(2);
+
+      mockSessionCallbacks.onQuestionResolved?.('req-1');
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
+        requestId: 'req-2',
+        questions: q2,
+      });
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+    });
+
+    it('onQuestionResolved with unknown id preserves the queue', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const q1 = [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ];
+      mockSessionCallbacks.onQuestionAsked?.('req-1', q1);
+      mockSessionCallbacks.onQuestionResolved?.('req-unknown');
+
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
+        requestId: 'req-1',
+        questions: q1,
+      });
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+    });
+
+    it('a repeat onQuestionAsked with the same id keeps length 1 and replaces the payload', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const q1 = [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ];
+      const q2 = [
+        {
+          question: 'Pick a shape',
+          header: 'Shape',
+          options: [{ label: 'Circle', description: '' }],
+        },
+      ];
+      mockSessionCallbacks.onQuestionAsked?.('req-1', q1);
+      mockSessionCallbacks.onQuestionAsked?.('req-1', q2);
+
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
+        requestId: 'req-1',
+        questions: q2,
+      });
+    });
+
+    it('onQuestionAsked with undefined questions leaves the queue empty', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onQuestionAsked?.('req-1', undefined);
+
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(0);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
     });
 
     it('onSuggestionAsked sets activeSuggestion with callId', async () => {
@@ -3309,7 +3458,7 @@ describe('createSessionManager', () => {
       expect(mockSession.dismissSuggestion).toHaveBeenCalledWith({ requestId: 'sug-2' });
     });
 
-    it('destroy clears activeQuestion and activePermission', async () => {
+    it('destroy clears activeQuestion, activePermission, pendingQuestions, and pendingPermissions', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -3320,14 +3469,18 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onPermissionAsked?.('req-p', 'write', [], {}, []);
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).not.toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).not.toBeNull();
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
 
       mgr.destroy();
 
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(0);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(0);
     });
 
-    it('switchSession clears activeQuestion and activePermission', async () => {
+    it('switchSession clears activeQuestion, activePermission, pendingQuestions, and pendingPermissions', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -3338,11 +3491,15 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onPermissionAsked?.('req-p', 'write', [], {}, []);
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).not.toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).not.toBeNull();
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
 
       await mgr.switchSession(kiloId('ses-2'));
 
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(0);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(0);
     });
 
     it('switchSession clears availableCommands immediately', async () => {

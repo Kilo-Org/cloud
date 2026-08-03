@@ -1,13 +1,11 @@
 export function shouldShowGitHubIntegrationPrompt({
   isLoadingRepos,
   integrationInstalled,
-  repositoryCount,
 }: {
   isLoadingRepos: boolean;
   integrationInstalled: boolean | undefined;
-  repositoryCount?: number;
 }): boolean {
-  return !isLoadingRepos && (integrationInstalled === false || repositoryCount === 0);
+  return !isLoadingRepos && integrationInstalled === false;
 }
 
 export function getGitHubIntegrationUrl(webBaseUrl: string, organizationId?: string): string {

@@ -31,7 +31,7 @@ import {
 } from '@/lib/ai-gateway/transcriptions/transcription-request';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 
-export const maxDuration = 1800;
+export const maxDuration = 800;
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 

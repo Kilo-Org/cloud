@@ -34,7 +34,7 @@ const OTHER_IDS = [
   '88888888-8888-4888-8888-888888888888',
   '99999999-9999-4999-8999-999999999999',
 ] as const;
-const MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_SIZE_BYTES = 20 * 1024 * 1024;
 
 let extractAndUploadAttachments: typeof ExtractAndUploadAttachments;
 let mockSend: jest.Mock<(command: unknown) => Promise<unknown>>;

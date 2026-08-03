@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { ExternalLink, RefreshCw } from 'lucide-react-native';
 
@@ -6,20 +7,18 @@ import { Text } from '@/components/ui/text';
 import { QueryError } from '@/components/query-error';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { shouldShowRepositoryError } from './new-session-repository-state';
+import { type RepositorySectionView } from './new-session-repository-state';
 
 type RepositoryItem = { fullName: string; isPrivate: boolean };
 
 type NewSessionRepositorySectionProps = {
   disabled: boolean;
-  isError: boolean;
-  isLoading: boolean;
-  isRefetching: boolean;
+  view: RepositorySectionView;
+  isRetrying: boolean;
   onChange: (value: string) => void;
   onOpenGitHubIntegration: () => void;
-  onRefetch: () => void;
+  onRefreshRepos: () => void;
   repositories: RepositoryItem[];
-  showGitHubIntegrationPrompt: boolean;
   value: string;
 };
 
@@ -30,74 +29,154 @@ type NewSessionRepositorySectionProps = {
  */
 export function NewSessionRepositorySection({
   disabled,
-  isError,
-  isLoading,
-  isRefetching,
+  view,
+  isRetrying,
   onChange,
   onOpenGitHubIntegration,
-  onRefetch,
+  onRefreshRepos,
   repositories,
-  showGitHubIntegrationPrompt,
   value,
 }: Readonly<NewSessionRepositorySectionProps>) {
   const colors = useThemeColors();
-  const showError = shouldShowRepositoryError({
-    isError,
-    repositoryCount: repositories.length,
-  });
 
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">Repository</Text>
-      {showError ? (
-        <QueryError
-          placement="top"
-          variant="server"
-          title="Couldn't load repositories"
-          message="Check your connection and try again."
-          onRetry={onRefetch}
-          isRetrying={isRefetching}
-        />
-      ) : (
-        <>
+      {renderBody()}
+    </View>
+  );
+
+  function renderBody(): ReactNode {
+    switch (view) {
+      case 'error': {
+        return (
+          <QueryError
+            placement="top"
+            variant="server"
+            title="Couldn't load repositories"
+            message="Check your connection and try again."
+            onRetry={onRefreshRepos}
+            isRetrying={isRetrying}
+          />
+        );
+      }
+
+      case 'connect': {
+        return (
+          <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+            <View className="gap-1">
+              <Text className="text-sm font-semibold text-foreground">Connect GitHub</Text>
+              <Text variant="muted">
+                Connect GitHub in your browser, then return here to pick a repository.
+              </Text>
+            </View>
+            <View className="flex-row gap-2">
+              <Button variant="outline" className="flex-1" onPress={onOpenGitHubIntegration}>
+                <ExternalLink size={16} color={colors.foreground} />
+                <Text>Open GitHub</Text>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onPress={onRefreshRepos}
+                disabled={isRetrying}
+                accessibilityLabel="Refresh repositories"
+              >
+                {isRetrying ? (
+                  <ActivityIndicator size="small" color={colors.foreground} />
+                ) : (
+                  <RefreshCw size={16} color={colors.foreground} />
+                )}
+              </Button>
+            </View>
+          </View>
+        );
+      }
+
+      case 'connect-fallback': {
+        return (
+          <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+            <View className="gap-1">
+              <Text className="text-sm font-semibold text-foreground">
+                We can't see your GitHub connection yet
+              </Text>
+              <Text variant="muted">
+                If you installed or configured the Kilo GitHub App, check again — or make sure it
+                was installed for this account/organization.
+              </Text>
+            </View>
+            <View className="flex-row gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onPress={onRefreshRepos}
+                disabled={isRetrying}
+              >
+                {isRetrying ? (
+                  <ActivityIndicator size="small" color={colors.foreground} />
+                ) : (
+                  <RefreshCw size={16} color={colors.foreground} />
+                )}
+                <Text>Check again</Text>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onPress={onOpenGitHubIntegration}
+                accessibilityLabel="Open GitHub"
+              >
+                <ExternalLink size={16} color={colors.foreground} />
+              </Button>
+            </View>
+          </View>
+        );
+      }
+
+      case 'connected-empty': {
+        return (
+          <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+            <View className="gap-1">
+              <Text className="text-sm font-semibold text-foreground">GitHub connected</Text>
+              <Text variant="muted">
+                No repositories visible. Check repository access for the Kilo GitHub App, then
+                refresh.
+              </Text>
+            </View>
+            <View className="flex-row gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onPress={onRefreshRepos}
+                disabled={isRetrying}
+                accessibilityLabel="Refresh repositories"
+              >
+                {isRetrying ? (
+                  <ActivityIndicator size="small" color={colors.foreground} />
+                ) : (
+                  <RefreshCw size={16} color={colors.foreground} />
+                )}
+              </Button>
+            </View>
+          </View>
+        );
+      }
+
+      case 'loading':
+      case 'repos': {
+        return (
           <RepoSelector
             value={value}
             repositories={repositories}
-            isLoading={isLoading}
+            isLoading={view === 'loading'}
             onChange={onChange}
             disabled={disabled}
           />
-          {showGitHubIntegrationPrompt ? (
-            <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
-              <View className="gap-1">
-                <Text className="text-sm font-semibold text-foreground">Connect GitHub</Text>
-                <Text variant="muted">
-                  Connect GitHub in your browser, then return here to pick a repository.
-                </Text>
-              </View>
-              <View className="flex-row gap-2">
-                <Button variant="outline" className="flex-1" onPress={onOpenGitHubIntegration}>
-                  <ExternalLink size={16} color={colors.foreground} />
-                  <Text>Open GitHub</Text>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onPress={onRefetch}
-                  disabled={isRefetching}
-                  accessibilityLabel="Refresh repositories"
-                >
-                  {isRefetching ? (
-                    <ActivityIndicator size="small" color={colors.foreground} />
-                  ) : (
-                    <RefreshCw size={16} color={colors.foreground} />
-                  )}
-                </Button>
-              </View>
-            </View>
-          ) : null}
-        </>
-      )}
-    </View>
-  );
+        );
+      }
+
+      default: {
+        return null;
+      }
+    }
+  }
 }

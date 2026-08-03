@@ -36,7 +36,7 @@ export async function GET(
         ...storedModel,
         endpoints: storedModel.endpoints.map(endpoint => {
           if (!endpoint.pricing) return endpoint;
-          const displayPricing = getModelDisplayPricing(storedModel.id, endpoint.pricing);
+          const displayPricing = getModelDisplayPricing(endpoint.pricing);
           return {
             ...endpoint,
             pricing: applyCustomPricingToPricing(

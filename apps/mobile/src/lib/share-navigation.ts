@@ -18,6 +18,17 @@ export function takePendingShareNavigation(): PendingShareNavigation | null {
   return pendingQueue.shift() ?? null;
 }
 
+/** Append the share delivery params to a route path. */
+export function appendShareParams(
+  base: string,
+  shareId: ShareId,
+  options: { autoSend?: boolean } = {}
+): string {
+  const separator = base.includes('?') ? '&' : '?';
+  const autoSend = options.autoSend === true ? '&autoSend=1' : '';
+  return `${base}${separator}shareId=${encodeURIComponent(shareId)}${autoSend}`;
+}
+
 /** Parse the destination params a focused delivery must set from a pending href. */
 export function parseShareHrefParams(href: string): { organizationId: string | undefined } {
   const queryStart = href.indexOf('?');

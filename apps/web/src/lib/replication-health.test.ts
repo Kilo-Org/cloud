@@ -27,7 +27,11 @@ function walSenderRow(overrides: Record<string, unknown> = {}) {
     client_addr: '18.153.166.51/32',
     state: 'streaming',
     sync_state: 'async',
+    sent_lag_bytes: '0',
+    flush_lag_bytes: '0',
     replay_lag_bytes: '0',
+    write_lag_seconds: 0.002,
+    flush_lag_seconds: 0.002,
     replay_lag_seconds: 0.002,
     ...overrides,
   };
@@ -50,6 +54,8 @@ function okProbe(name: string): ReplicaHealth {
     status: 'ok',
     in_recovery: true,
     replay_lsn: '2008/2F522000',
+    receive_lsn: '2008/2F522000',
+    receive_replay_gap_bytes: '0',
     last_xact_replay_timestamp: '2026-07-30 09:39:06+00',
     replay_delay_seconds: 0.1,
     error: null,
@@ -87,6 +93,8 @@ describe('classifyReplicaRow', () => {
       classifyReplicaRow({
         in_recovery: false,
         replay_lsn: null,
+        receive_lsn: null,
+        receive_replay_gap_bytes: null,
         last_xact_replay_timestamp: null,
         replay_delay_seconds: 0,
       })
@@ -98,6 +106,8 @@ describe('classifyReplicaRow', () => {
       classifyReplicaRow({
         in_recovery: true,
         replay_lsn: '1/1',
+        receive_lsn: '1/1',
+        receive_replay_gap_bytes: '0',
         last_xact_replay_timestamp: '2026-07-22 10:41:00+00',
         replay_delay_seconds: REPLICA_LAG_ALERT_SECONDS + 1,
       })
@@ -109,6 +119,8 @@ describe('classifyReplicaRow', () => {
       classifyReplicaRow({
         in_recovery: true,
         replay_lsn: '1/1',
+        receive_lsn: '1/1',
+        receive_replay_gap_bytes: '0',
         last_xact_replay_timestamp: '2026-07-30 00:00:00+00',
         replay_delay_seconds: 0.2,
       })
@@ -195,6 +207,8 @@ describe('collectReplicationHealth', () => {
         status: 'unreachable',
         in_recovery: null,
         replay_lsn: null,
+        receive_lsn: null,
+        receive_replay_gap_bytes: null,
         last_xact_replay_timestamp: null,
         replay_delay_seconds: null,
         error: 'connection timeout',

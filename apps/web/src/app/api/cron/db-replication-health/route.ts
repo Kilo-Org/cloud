@@ -13,6 +13,10 @@ import { collectReplicationHealth } from '@/lib/replication-health';
  * metric has a documented history of returning no data, and — like the primary's
  * `pg_stat_replication` — cannot see a replica whose walreceiver has died. The
  * per-replica probe is the authoritative signal.
+ *
+ * Runs every minute (see `vercel.json`). The us-west replica loses ~1-3 minutes
+ * of replay a few times a day; at the previous 5-minute cadence each episode was
+ * caught by roughly a single sample, so its onset and duration were unmeasurable.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -26,6 +30,19 @@ export async function GET(request: Request) {
   for (const replica of report.replicas) {
     console.log(
       JSON.stringify({ type: 'db_replication_health', ...replica, timestamp: report.timestamp })
+    );
+  }
+  // The primary's view of each replica. Only the replica probe can see a replica
+  // that stopped streaming, but only the primary can attribute lag to getting the
+  // WAL there (write/flush) versus applying it (replay), which is what the
+  // per-replica probe cannot distinguish on its own.
+  for (const walSender of report.walSenders) {
+    console.log(
+      JSON.stringify({
+        type: 'db_replication_wal_sender',
+        ...walSender,
+        timestamp: report.timestamp,
+      })
     );
   }
   for (const slot of report.slots) {

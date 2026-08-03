@@ -89,6 +89,18 @@ export type ReplicaHealth = {
   status: ReplicaHealthStatus;
   in_recovery: boolean | null;
   replay_lsn: string | null;
+  /**
+   * How far the WAL *receiver* has got, versus `replay_lsn` (how far replay has
+   * got). Together these split lag into its two possible causes: a large
+   * `receive_replay_gap_bytes` means the WAL arrived and replay is the
+   * bottleneck, while a gap near zero alongside a high `replay_delay_seconds`
+   * means the WAL has not arrived yet, i.e. the bottleneck is transport.
+   *
+   * Null when the replica has no walreceiver running at all (which is itself a
+   * distinct failure: it is streaming nothing).
+   */
+  receive_lsn: string | null;
+  receive_replay_gap_bytes: string | null;
   last_xact_replay_timestamp: string | null;
   replay_delay_seconds: number | null;
   error: string | null;
@@ -97,17 +109,34 @@ export type ReplicaHealth = {
 type ReplicaProbeRow = {
   in_recovery: boolean;
   replay_lsn: string | null;
+  receive_lsn: string | null;
+  receive_replay_gap_bytes: string | null;
   last_xact_replay_timestamp: string | null;
   replay_delay_seconds: number | null;
 };
 
-/** Currently-connected walsender, as seen on the primary. */
+/**
+ * Currently-connected walsender, as seen on the primary.
+ *
+ * The three read replicas all connect with `application_name = 'main'`, so
+ * `client_addr` is the only way to tell them apart.
+ *
+ * `write`/`flush`/`replay` are reported separately for the same reason the
+ * replica probe reports receive and replay separately: write and flush lag
+ * cover getting the WAL to the standby's disk, replay lag covers applying it.
+ * A spike in all three points at the link; a spike in replay alone points at
+ * the standby.
+ */
 export type WalSender = {
   application_name: string | null;
   client_addr: string | null;
   state: string | null;
   sync_state: string | null;
+  sent_lag_bytes: string;
+  flush_lag_bytes: string;
   replay_lag_bytes: string;
+  write_lag_seconds: number | null;
+  flush_lag_seconds: number | null;
   replay_lag_seconds: number | null;
 };
 
@@ -176,6 +205,9 @@ export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth
       SELECT
         pg_is_in_recovery() AS in_recovery,
         pg_last_wal_replay_lsn()::text AS replay_lsn,
+        pg_last_wal_receive_lsn()::text AS receive_lsn,
+        pg_wal_lsn_diff(pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn())::text
+          AS receive_replay_gap_bytes,
         pg_last_xact_replay_timestamp()::text AS last_xact_replay_timestamp,
         EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))::double precision
           AS replay_delay_seconds
@@ -188,6 +220,8 @@ export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth
         status: 'unreachable',
         in_recovery: null,
         replay_lsn: null,
+        receive_lsn: null,
+        receive_replay_gap_bytes: null,
         last_xact_replay_timestamp: null,
         replay_delay_seconds: null,
         error: 'probe returned no rows',
@@ -199,6 +233,8 @@ export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth
       status: classifyReplicaRow(row),
       in_recovery: row.in_recovery,
       replay_lsn: row.replay_lsn,
+      receive_lsn: row.receive_lsn,
+      receive_replay_gap_bytes: row.receive_replay_gap_bytes,
       last_xact_replay_timestamp: row.last_xact_replay_timestamp,
       replay_delay_seconds: row.replay_delay_seconds,
       error: null,
@@ -209,6 +245,8 @@ export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth
       status: 'unreachable',
       in_recovery: null,
       replay_lsn: null,
+      receive_lsn: null,
+      receive_replay_gap_bytes: null,
       last_xact_replay_timestamp: null,
       replay_delay_seconds: null,
       error: errorMessage(error),
@@ -225,7 +263,11 @@ async function getWalSenders(): Promise<WalSender[]> {
       client_addr::text AS client_addr,
       state,
       sync_state,
+      COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn), 0)::text AS sent_lag_bytes,
+      COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), flush_lsn), 0)::text AS flush_lag_bytes,
       COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn), 0)::text AS replay_lag_bytes,
+      EXTRACT(EPOCH FROM write_lag)::double precision AS write_lag_seconds,
+      EXTRACT(EPOCH FROM flush_lag)::double precision AS flush_lag_seconds,
       EXTRACT(EPOCH FROM replay_lag)::double precision AS replay_lag_seconds
     FROM pg_stat_replication
     ORDER BY application_name, client_addr
@@ -291,6 +333,8 @@ export async function collectReplicationHealth(options?: {
             status: 'unreachable',
             in_recovery: null,
             replay_lsn: null,
+            receive_lsn: null,
+            receive_replay_gap_bytes: null,
             last_xact_replay_timestamp: null,
             replay_delay_seconds: null,
             error: errorMessage(error),

@@ -77,6 +77,8 @@ describe('GET /api/cron/db-replication-health', () => {
             status: 'lagging',
             in_recovery: true,
             replay_lsn: '1EE6/65035140',
+            receive_lsn: '1EE6/65035140',
+            receive_replay_gap_bytes: '0',
             last_xact_replay_timestamp: '2026-07-22 10:41:00+00',
             replay_delay_seconds: 691200,
             error: null,
@@ -91,6 +93,43 @@ describe('GET /api/cron/db-replication-health', () => {
     expect(body.healthy).toBe(false);
     expect(body.problems).toEqual([expect.stringContaining('replica us-west: lagging')]);
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits one walsender line per replica so lag can be split into transport vs replay', async () => {
+    mockCollect.mockResolvedValue(
+      report({
+        walSenders: [
+          {
+            application_name: 'main',
+            client_addr: '54.153.89.218/32',
+            state: 'streaming',
+            sync_state: 'async',
+            sent_lag_bytes: '0',
+            flush_lag_bytes: '690368',
+            replay_lag_bytes: '135858008',
+            write_lag_seconds: 0.15,
+            flush_lag_seconds: 0.15,
+            replay_lag_seconds: 199,
+          },
+        ],
+      })
+    );
+
+    await GET(createRequest({ authorization: 'Bearer cron-secret' }));
+
+    const logged = jest
+      .mocked(console.log)
+      .mock.calls.map(([line]) => JSON.parse(String(line)))
+      .filter(entry => entry.type === 'db_replication_wal_sender');
+
+    expect(logged).toEqual([
+      expect.objectContaining({
+        client_addr: '54.153.89.218/32',
+        flush_lag_seconds: 0.15,
+        replay_lag_seconds: 199,
+        timestamp: '2026-07-30T09:39:06.000Z',
+      }),
+    ]);
   });
 
   it('alerts when a slot is at risk', async () => {

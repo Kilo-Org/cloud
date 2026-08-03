@@ -35,6 +35,35 @@ export async function createSeedStripeCustomer(params: {
   });
 }
 
+export async function createSeedSeatSubscription(params: {
+  stripeCustomerId: string;
+  priceId: string;
+  seatCount: number;
+  kiloUserId: string;
+  organizationId: string;
+}): Promise<Stripe.Subscription> {
+  const stripe = getSeedStripeClient();
+  const paymentMethod = await stripe.paymentMethods.attach('pm_card_visa', {
+    customer: params.stripeCustomerId,
+  });
+  await stripe.customers.update(params.stripeCustomerId, {
+    invoice_settings: { default_payment_method: paymentMethod.id },
+  });
+  return stripe.subscriptions.create({
+    customer: params.stripeCustomerId,
+    items: [{ price: params.priceId, quantity: params.seatCount }],
+    default_payment_method: paymentMethod.id,
+    metadata: {
+      type: 'seats',
+      kiloUserId: params.kiloUserId,
+      organizationId: params.organizationId,
+      seats: String(params.seatCount),
+      planType: 'teams',
+      source: 'dev-seed',
+    },
+  });
+}
+
 export async function deleteSeedStripeCustomer(stripeCustomerId: string): Promise<void> {
   try {
     await getSeedStripeClient().customers.del(stripeCustomerId);

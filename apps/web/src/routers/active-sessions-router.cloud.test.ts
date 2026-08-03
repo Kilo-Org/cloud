@@ -699,4 +699,72 @@ describe('active-sessions-router.list cloud merge', () => {
 
     expect(result.sessions.map(s => s.id)).toEqual([hbId, cloudId]);
   });
+
+  it('enriches totalCostMicrodollars on cloud rows when DB value is present', async () => {
+    const sessionId = nextId('cloud-cost');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'busy',
+      run: { terminalAt: null },
+    });
+
+    // Set total_cost_microdollars after seeding (seed helper doesn't take it).
+    await db
+      .update(cli_sessions_v2)
+      .set({ total_cost_microdollars: 8_500_000 })
+      .where(eq(cli_sessions_v2.session_id, sessionId));
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]?.totalCostMicrodollars).toBe(8_500_000);
+  });
+
+  it('omits totalCostMicrodollars on cloud rows when DB value is null', async () => {
+    const sessionId = nextId('cloud-cost-null');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'busy',
+      run: { terminalAt: null },
+    });
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).not.toHaveProperty('totalCostMicrodollars');
+  });
+
+  it('passes zero totalCostMicrodollars on cloud row wire', async () => {
+    const sessionId = nextId('cloud-cost-zero');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'busy',
+      run: { terminalAt: null },
+    });
+
+    await db
+      .update(cli_sessions_v2)
+      .set({ total_cost_microdollars: 0 })
+      .where(eq(cli_sessions_v2.session_id, sessionId));
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]?.totalCostMicrodollars).toBe(0);
+  });
 });

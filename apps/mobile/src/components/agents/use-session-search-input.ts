@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type TextInput } from 'react-native';
 
+import { selectAwaitingCommit } from '@/components/agents/session-list-search-busy';
 import {
   createDefaultSearchTimer,
   createSessionSearchController,
@@ -14,6 +15,8 @@ type UseSessionSearchInputResult = {
   searchInputRef: React.RefObject<TextInput | null>;
   /** Whether the search TextInput currently has non-empty text. */
   hasText: boolean;
+  /** True while typed text is ahead of the committed (debounced) query. */
+  awaitingCommit: boolean;
   /** Call on every `onChangeText` from the search TextInput. */
   handleSearchInputChange: (text: string) => void;
   /** In-field X: imperatively clear the typed text, blur, and drop the query. */
@@ -32,6 +35,21 @@ type UseSessionSearchInputResult = {
  */
 export function useSessionSearchInput(): UseSessionSearchInputResult {
   const [searchQuery, setSearchQuery] = useState('');
+  // Stale-closure guard: the ref is read by handleSearchInputChange so
+  // selectAwaitingCommit always sees the latest committed query without
+  // adding searchQuery as a useCallback dependency.
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+
+  // Latest raw typed text lives in a ref — never triggers a render by
+  // itself. Only the boolean awaitingCommit state drives the busy
+  // indicator.
+  const lastTypedRef = useRef('');
+
+  // Boolean state whose setter returns its previous value while it stays
+  // true, so extra keystrokes before the debounce commits are free of
+  // SectionList re-renders.
+  const [awaitingCommit, setAwaitingCommit] = useState(false);
 
   // Search debounce + clear semantics live in a pure controller so the
   // 300ms timing and the two clear paths (search-only vs. broad) can be
@@ -40,7 +58,13 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   const searchControllerRef = useRef<SessionSearchController | null>(null);
   searchControllerRef.current ??= createSessionSearchController({
     timer: createDefaultSearchTimer(),
-    commitSearchQuery: setSearchQuery,
+    commitSearchQuery: (query: string) => {
+      setSearchQuery(query);
+      // When the debounce commits, sync awaitingCommit so the busy
+      // indicator disappears. Clear paths also hit this wrapper (they
+      // call commitSearchQuery('') → setAwaitingCommit(false)).
+      setAwaitingCommit(false);
+    },
   });
   const searchController = searchControllerRef.current;
 
@@ -56,6 +80,8 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   // filters — the broad empty-state clear still owns that.
   const handleClearSearchOnly = useCallback(() => {
     searchController.clearSearchOnly();
+    lastTypedRef.current = '';
+    setAwaitingCommit(false);
   }, [searchController]);
 
   // The search TextInput lives above the pinned "Active now" tray (so it's
@@ -65,8 +91,22 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
 
   const handleSearchInputChange = useCallback(
     (text: string) => {
-      setHasText(text.length > 0);
+      const hasTextNow = text.length > 0;
+      setHasText(hasTextNow);
+      lastTypedRef.current = text;
       handleSearchChange(text);
+
+      // Only trigger a render when awaitingCommit transitions.
+      // The functional updater returns prev when it already equals
+      // shouldAwait so React skips the rerender. Both true→false
+      // (backspace to match committed query before debounce fires)
+      // and false→true (first typed char) are allowed transitions.
+      const shouldAwait = selectAwaitingCommit({
+        hasText: hasTextNow,
+        lastTyped: text,
+        searchQuery: searchQueryRef.current,
+      });
+      setAwaitingCommit(prev => (prev === shouldAwait ? prev : shouldAwait));
     },
     [handleSearchChange]
   );
@@ -87,6 +127,8 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   const clearSearchInput = useCallback(() => {
     searchInputRef.current?.clear();
     setHasText(false);
+    lastTypedRef.current = '';
+    setAwaitingCommit(false);
   }, []);
 
   useEffect(
@@ -100,6 +142,7 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
     searchQuery,
     searchInputRef,
     hasText,
+    awaitingCommit,
     handleSearchInputChange,
     handleClearSearchInput,
     clearSearchInput,

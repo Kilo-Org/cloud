@@ -5,7 +5,7 @@ jest.mock('@/lib/constants', () => ({
 }));
 
 jest.mock('@/lib/user/server', () => ({
-  getProfileRedirectPath: jest.fn(async () => '/users/profile'),
+  getProfileRedirectPath: jest.fn(async () => '/profile'),
   getUserFromAuth: jest.fn(),
 }));
 
@@ -47,7 +47,7 @@ import {
   recordImpactAffiliateTouch,
   recordImpactReferralTouch,
 } from '@/lib/impact/referral';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth, getProfileRedirectPath } from '@/lib/user/server';
 import { GET } from './route';
 
 const mockGetAffiliateAttribution = jest.mocked(getAffiliateAttribution);
@@ -59,6 +59,7 @@ const mockQueueImpactAdvocateParticipantRegistration = jest.mocked(
   queueImpactAdvocateParticipantRegistration
 );
 const mockRecordImpactAffiliateTouch = jest.mocked(recordImpactAffiliateTouch);
+const mockGetProfileRedirectPath = jest.mocked(getProfileRedirectPath);
 const mockRecordImpactReferralTouch = jest.mocked(recordImpactReferralTouch);
 
 describe('GET /users/after-sign-in', () => {
@@ -158,7 +159,9 @@ describe('GET /users/after-sign-in', () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('http://localhost:3000/users/profile');
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/users/continue?to=%2Fprofile'
+    );
     expect(mockRecordAffiliateAttributionAndQueueParentEvent).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith(
       '[after-sign-in] failed to persist affiliate attribution',
@@ -168,5 +171,98 @@ describe('GET /users/after-sign-in', () => {
       })
     );
     consoleError.mockRestore();
+  });
+
+  it('routes default landing through the interstitial', async () => {
+    const response = await GET(new NextRequest('http://localhost:3000/users/after-sign-in'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/users/continue?to=%2Fprofile'
+    );
+  });
+
+  it('routes callbackPath=/claw through the interstitial', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/users/after-sign-in?callbackPath=%2Fclaw')
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/users/continue?to=%2Fclaw'
+    );
+  });
+
+  it('routes callbackPath=/cloud/sessions through the interstitial', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/users/after-sign-in?callbackPath=%2Fcloud%2Fsessions')
+    );
+
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get('location') ?? '');
+    expect(location.pathname).toBe('/users/continue');
+    expect(location.searchParams.get('to')).toBe('/cloud/sessions');
+  });
+
+  it('does not route single-org /organizations/<id> through the interstitial', async () => {
+    mockGetProfileRedirectPath.mockResolvedValueOnce('/organizations/org-1');
+
+    const response = await GET(new NextRequest('http://localhost:3000/users/after-sign-in'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost:3000/organizations/org-1');
+  });
+
+  it('does not route /account-verification through the interstitial', async () => {
+    mockGetUserFromAuth.mockResolvedValueOnce({
+      user: {
+        id: 'user-after-sign-in',
+        google_user_email: 'after-sign-in@example.com',
+        blocked_reason: null,
+        has_validation_stytch: null,
+      },
+    } as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const response = await GET(new NextRequest('http://localhost:3000/users/after-sign-in'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost:3000/account-verification');
+  });
+
+  it('does not route /sign-in-to-editor through the interstitial', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/users/after-sign-in?source=code-oss')
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost:3000/sign-in-to-editor');
+  });
+
+  it('does not route /account-blocked through the interstitial', async () => {
+    mockGetUserFromAuth.mockResolvedValueOnce({
+      user: {
+        id: 'user-after-sign-in',
+        google_user_email: 'after-sign-in@example.com',
+        blocked_reason: 'payment',
+        has_validation_stytch: true,
+      },
+    } as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const response = await GET(new NextRequest('http://localhost:3000/users/after-sign-in'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost:3000/account-blocked');
+  });
+
+  it('does not route unauthenticated /users/sign_in through the interstitial', async () => {
+    mockGetUserFromAuth.mockResolvedValueOnce({ user: null } as Awaited<
+      ReturnType<typeof getUserFromAuth>
+    >);
+
+    const response = await GET(new NextRequest('http://localhost:3000/users/after-sign-in'));
+
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get('location') ?? '');
+    expect(location.pathname).toBe('/users/sign_in');
   });
 });

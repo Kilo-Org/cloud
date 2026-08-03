@@ -286,7 +286,19 @@ describe('organization Kilo Pass Stripe adapter', () => {
     update.mockResolvedValue({
       ...subscription(),
       latest_invoice: {
+        status: 'open',
         confirmation_secret: { type: 'payment_intent', client_secret: 'pi_secret_1' },
+        payments: {
+          data: [
+            {
+              status: 'open',
+              payment: {
+                type: 'payment_intent',
+                payment_intent: { status: 'requires_action' },
+              },
+            },
+          ],
+        },
       } as unknown as Stripe.Invoice,
     });
     const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
@@ -304,8 +316,47 @@ describe('organization Kilo Pass Stripe adapter', () => {
       expect.objectContaining({
         payment_behavior: 'allow_incomplete',
         proration_behavior: 'always_invoice',
+        expand: [
+          'latest_invoice.confirmation_secret',
+          'latest_invoice.payments.data.payment.payment_intent',
+        ],
       })
     );
+  });
+
+  test('does not request a browser action after a hard payment decline', async () => {
+    retrieve.mockResolvedValue(
+      subscription({ items: { ...subscription().items, data: [subscription().items.data[0]!] } })
+    );
+    createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1', created: true });
+    update.mockResolvedValue({
+      ...subscription(),
+      latest_invoice: {
+        status: 'open',
+        confirmation_secret: { type: 'payment_intent', client_secret: 'pi_secret_1' },
+        payments: {
+          data: [
+            {
+              status: 'open',
+              payment: {
+                type: 'payment_intent',
+                payment_intent: { status: 'requires_payment_method' },
+              },
+            },
+          ],
+        },
+      } as unknown as Stripe.Invoice,
+    });
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).resolves.toEqual({ kind: 'pending' });
   });
 
   test('refuses checkout when the seat subscription already has a pass add-on', async () => {
@@ -748,6 +799,13 @@ describe('organization Kilo Pass Stripe adapter', () => {
         endPendingOrganizationKiloPassForTerminalInvoice({
           status,
           parent: { subscription_details: { subscription: 'sub_1' } },
+          lines: {
+            data: [
+              {
+                parent: { subscription_item_details: { subscription_item: 'si_pass' } },
+              },
+            ],
+          },
         } as unknown as Stripe.Invoice)
       ).resolves.toBe(true);
 
@@ -758,6 +816,35 @@ describe('organization Kilo Pass Stripe adapter', () => {
       expect(updateSet).toHaveBeenCalledWith({ state: 'ended' });
     }
   );
+
+  test('ignores a terminal seat-only invoice while the pass invoice is pending', async () => {
+    select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          orderBy: () => ({ limit: async () => [dbAgreement({ state: 'pending_payment' })] }),
+        }),
+      }),
+    });
+    const { endPendingOrganizationKiloPassForTerminalInvoice } = await import('./stripe-adapter');
+
+    await expect(
+      endPendingOrganizationKiloPassForTerminalInvoice({
+        status: 'void',
+        parent: { subscription_details: { subscription: 'sub_1' } },
+        lines: {
+          data: [
+            {
+              parent: { subscription_item_details: { subscription_item: 'si_seat' } },
+            },
+          ],
+        },
+      } as unknown as Stripe.Invoice)
+    ).resolves.toBe(false);
+
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(updateDb).not.toHaveBeenCalled();
+  });
 
   test('keeps a pending agreement pending until its recognized invoice is paid', async () => {
     select.mockReturnValue({

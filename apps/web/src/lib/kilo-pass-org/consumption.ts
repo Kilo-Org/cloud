@@ -12,7 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import { KiloPassOrgBonusMode, KiloPassOrgIssuanceKind } from '@kilocode/db/schema-types';
 import type { DrizzleTransaction } from '@/lib/drizzle';
-import { and, eq, gt, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import {
   mutateOrganizationUsage,
   type OrganizationUsageMutationResult,
@@ -60,35 +60,45 @@ export async function recordOrganizationConsumption(
     return { recorded: false, organizationUsage: noAlert };
   }
 
-  const [relevantAgreement] = await tx
+  const [parentAgreement] = await tx
     .select({ id: kilo_pass_org_agreements.id })
     .from(kilo_pass_org_agreements)
-    .leftJoin(
-      kilo_pass_org_allocation_plans,
-      eq(kilo_pass_org_allocation_plans.agreement_id, kilo_pass_org_agreements.id)
-    )
-    .leftJoin(
-      kilo_pass_org_allocation_plan_rows,
-      eq(kilo_pass_org_allocation_plan_rows.allocation_plan_id, kilo_pass_org_allocation_plans.id)
-    )
     .where(
       and(
-        ne(kilo_pass_org_agreements.state, 'ended'),
-        or(
-          eq(kilo_pass_org_agreements.parent_organization_id, input.organizationId),
+        eq(kilo_pass_org_agreements.parent_organization_id, input.organizationId),
+        ne(kilo_pass_org_agreements.state, 'ended')
+      )
+    )
+    .limit(1);
+  const [childAgreement] = parentAgreement
+    ? []
+    : await tx
+        .select({ id: kilo_pass_org_agreements.id })
+        .from(kilo_pass_org_allocation_plan_rows)
+        .innerJoin(
+          kilo_pass_org_allocation_plans,
+          eq(
+            kilo_pass_org_allocation_plans.id,
+            kilo_pass_org_allocation_plan_rows.allocation_plan_id
+          )
+        )
+        .innerJoin(
+          kilo_pass_org_agreements,
+          eq(kilo_pass_org_agreements.id, kilo_pass_org_allocation_plans.agreement_id)
+        )
+        .where(
           and(
             eq(
               kilo_pass_org_allocation_plan_rows.allocation_container_organization_id,
               input.organizationId
             ),
-            gt(kilo_pass_org_allocation_plan_rows.pass_capacity, 0)
+            gt(kilo_pass_org_allocation_plan_rows.pass_capacity, 0),
+            ne(kilo_pass_org_agreements.state, 'ended')
           )
         )
-      )
-    )
-    .limit(1);
+        .limit(1);
 
-  if (!relevantAgreement) {
+  if (!parentAgreement && !childAgreement) {
     return {
       recorded: true,
       organizationUsage: await mutateOrganizationUsage(tx, {

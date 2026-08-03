@@ -2976,6 +2976,9 @@ export const kilo_pass_org_allocation_plan_rows = pgTable(
       table.allocation_plan_id,
       table.allocation_container_organization_id
     ),
+    index('IDX_kilo_pass_org_allocation_plan_rows_positive_container')
+      .on(table.allocation_container_organization_id)
+      .where(sql`${table.pass_capacity} > 0`),
     check(
       'kilo_pass_org_allocation_plan_rows_capacity_non_negative_check',
       sql`${table.pass_capacity} >= 0`

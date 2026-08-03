@@ -137,7 +137,10 @@ export async function createOrganizationKiloPassCheckout(input: {
       tier: input.tier,
       cadence,
     },
-    expand: ['latest_invoice.confirmation_secret'],
+    expand: [
+      'latest_invoice.confirmation_secret',
+      'latest_invoice.payments.data.payment.payment_intent',
+    ],
   });
   const passItem = organizationPassItem(updated);
   await bindProviderSeatAddOnItem({
@@ -145,12 +148,15 @@ export async function createOrganizationKiloPassCheckout(input: {
     providerSeatAddOnItemId: passItem.id,
   });
   const invoice = typeof updated.latest_invoice === 'object' ? updated.latest_invoice : null;
-  if (invoice?.confirmation_secret?.client_secret) {
-    return { kind: 'payment_action', clientSecret: invoice.confirmation_secret.client_secret };
-  }
   if (invoice?.status === 'paid' || invoice?.amount_due === 0) {
     await handleOrganizationKiloPassInvoicePaid({ invoice });
     return { kind: 'completed' };
+  }
+  const paymentIntent = invoice?.payments?.data
+    .map(payment => payment.payment.payment_intent)
+    .find(reference => typeof reference === 'object');
+  if (paymentIntent?.status === 'requires_action' && invoice?.confirmation_secret?.client_secret) {
+    return { kind: 'payment_action', clientSecret: invoice.confirmation_secret.client_secret };
   }
   return { kind: 'pending' };
 }
@@ -502,6 +508,9 @@ export async function endPendingOrganizationKiloPassForTerminalInvoice(invoice: 
     .orderBy(desc(kilo_pass_org_agreements.created_at))
     .limit(1);
   if (!agreement) return false;
+  if (!invoiceLineForSubscriptionItem(invoice, agreement.provider_seat_add_on_item_id ?? '')) {
+    return false;
+  }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const passItem = subscription.items.data.find(

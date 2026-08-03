@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from '@jest/globals';
 import {
   credit_transactions,
   kilo_pass_org_agreements,
+  kilo_pass_org_allocation_plan_rows,
   kilo_pass_org_audit_records,
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_qualifying_spend_events,
@@ -105,6 +106,99 @@ describe('organization Pass consumption', () => {
       .from(organizations)
       .where(eq(organizations.id, organization.id));
     expect(updated.microdollarsUsed).toBe(100);
+  });
+
+  it('records qualifying debits for a positively allocated child', async () => {
+    const owner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createOrganization(`kpo-child-parent-${crypto.randomUUID()}`, owner.id);
+    const child = await createOrganization(
+      `kpo-positive-child-${crypto.randomUUID()}`,
+      childOwner.id
+    );
+    organizationIds.push(parent.id, child.id);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: activeWindow.start,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [{ organizationId: child.id, passCapacity: 1 }],
+    });
+
+    await db.transaction(tx =>
+      recordOrganizationConsumption(tx, {
+        organizationId: child.id,
+        kiloUserId: childOwner.id,
+        amountMicrodollars: 100,
+        occurredAt: '2027-07-15T12:00:00.000Z',
+        source: 'ai-gateway',
+        sourceId: `positive-child-${child.id}`,
+      })
+    );
+
+    const credits = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.organization_id, child.id));
+    expect(credits).toEqual([
+      expect.objectContaining({
+        amount_microdollars: -100,
+        credit_category: `kpo:consumption:ai-gateway:positive-child-${child.id}`,
+      }),
+    ]);
+  });
+
+  it('does not record qualifying debits for a child whose only allocation is zero', async () => {
+    const owner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createOrganization(`kpo-zero-parent-${crypto.randomUUID()}`, owner.id);
+    const child = await createOrganization(`kpo-zero-child-${crypto.randomUUID()}`, childOwner.id);
+    organizationIds.push(parent.id, child.id);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    const agreement = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: activeWindow.start,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [{ organizationId: child.id, passCapacity: 0 }],
+    });
+    const [planRow] = await db
+      .select()
+      .from(kilo_pass_org_allocation_plan_rows)
+      .where(eq(kilo_pass_org_allocation_plan_rows.allocation_container_organization_id, child.id));
+    expect(planRow?.pass_capacity).toBe(0);
+
+    await db.transaction(tx =>
+      recordOrganizationConsumption(tx, {
+        organizationId: child.id,
+        kiloUserId: childOwner.id,
+        amountMicrodollars: 100,
+        occurredAt: '2027-07-15T12:00:00.000Z',
+        source: 'ai-gateway',
+        sourceId: `zero-child-${agreement.agreementId}`,
+      })
+    );
+
+    const credits = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.organization_id, child.id));
+    expect(credits).toHaveLength(0);
   });
 
   it('records a concurrent source debit once and unlocks bonus exactly at its threshold', async () => {

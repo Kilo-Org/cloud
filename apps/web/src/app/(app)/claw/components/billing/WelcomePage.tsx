@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Check, ChevronRight, Crown, Server, TriangleAlert, Wallet } from 'lucide-react';
+import { Check, ChevronRight, Server, TriangleAlert, Wallet } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
@@ -695,7 +696,7 @@ export function WelcomePage() {
             {/* Section 1: Kilo Pass (Recommended) */}
             <div className={cn('rounded-xl border p-6 transition-all', 'border-border bg-card')}>
               <div className="mb-3 flex items-center gap-2.5">
-                <Crown className="h-5 w-5 text-amber-400" />
+                <KiloPassIcon className="h-5 w-5 text-amber-400" />
                 <h3 className="flex-1 text-base font-semibold">Activate with Kilo Pass</h3>
                 <Badge
                   variant="secondary"

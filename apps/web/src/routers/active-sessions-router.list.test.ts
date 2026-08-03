@@ -663,5 +663,113 @@ describe('active-sessions-router.list', () => {
         orgSelectSpy.mockRestore();
       }
     });
+
+    it('enriches totalCostMicrodollars when DB value is present', async () => {
+      const sessionId = 'ses_active_cost_enriched_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cli',
+        total_cost_microdollars: 12_000_000,
+      });
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: sessionId,
+          status: 'running',
+          title: 'cost test',
+          connectionId: 'conn-cost',
+        },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.activeSessions.list();
+
+        expect(result.sessions).toHaveLength(1);
+        expect(result.sessions[0]?.totalCostMicrodollars).toBe(12_000_000);
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      }
+    });
+
+    it('omits totalCostMicrodollars when DB value is null', async () => {
+      const sessionId = 'ses_active_cost_null_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cli',
+        total_cost_microdollars: null,
+      });
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: sessionId,
+          status: 'running',
+          title: 'cost null test',
+          connectionId: 'conn-cost-null',
+        },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.activeSessions.list();
+
+        expect(result.sessions).toHaveLength(1);
+        expect(result.sessions[0]).not.toHaveProperty('totalCostMicrodollars');
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      }
+    });
+
+    it('passes zero totalCostMicrodollars on the wire', async () => {
+      const sessionId = 'ses_active_cost_zero_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cli',
+        total_cost_microdollars: 0,
+      });
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: sessionId,
+          status: 'running',
+          title: 'cost zero test',
+          connectionId: 'conn-cost-zero',
+        },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.activeSessions.list();
+
+        expect(result.sessions).toHaveLength(1);
+        expect(result.sessions[0]?.totalCostMicrodollars).toBe(0);
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      }
+    });
+
+    it('omits totalCostMicrodollars for unmatched heartbeat rows', async () => {
+      const sessionId = 'ses_active_cost_unmatched_1234';
+
+      fetchSpy = mockWorkerSessions([
+        {
+          id: sessionId,
+          status: 'running',
+          title: 'no db row',
+          connectionId: 'conn-no-db',
+        },
+      ]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions).toHaveLength(1);
+      expect(result.sessions[0]?.organizationId).toBeNull();
+      // Unenriched rows never carry totalCostMicrodollars — the key is absent.
+      expect(result.sessions[0]).not.toHaveProperty('totalCostMicrodollars');
+    });
   });
 });

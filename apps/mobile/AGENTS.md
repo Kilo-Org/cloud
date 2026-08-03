@@ -4,7 +4,7 @@
 
 Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-specific code.
 
-- Backend, simulator, login, Appium, remote CLI, logs, cleanup: follow [e2e/AGENTS.md](e2e/AGENTS.md). Start what you need yourself; never ask the user to start Metro or backend services.
+- Start the backend and Metro yourself; never ask the user to start them.
 - Substantial mobile work may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
 
 ## Stack

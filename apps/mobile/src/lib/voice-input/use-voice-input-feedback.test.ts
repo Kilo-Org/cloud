@@ -13,6 +13,11 @@ vi.mock('expo-haptics', () => ({
   impactAsync: hapticsMock.impactAsync,
 }));
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'en-US' }] }));
+vi.mock('expo-speech-recognition', () => ({
+  ExpoSpeechRecognitionModule: {
+    getSupportedLocales: vi.fn().mockResolvedValue({ locales: [], installedLocales: [] }),
+  },
+}));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 vi.mock('react-native', () => ({
   AccessibilityInfo: accessibilityMock,

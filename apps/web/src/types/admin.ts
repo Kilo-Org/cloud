@@ -50,6 +50,9 @@ export const AdminOrganizationSchema = OrganizationSchema.extend({
   subscription_amount_usd: z.number().nullable(),
   latest_stripe_status: z.string().nullable(),
   kilo_pass_tier: z.string().nullable(),
+  kilo_pass_state: z
+    .enum(['pending_payment', 'active', 'cancel_at_period_end', 'ended'])
+    .nullable(),
   kiloclaw_count: z.number(),
   has_github_integration: z.boolean(),
   has_gitlab_integration: z.boolean(),

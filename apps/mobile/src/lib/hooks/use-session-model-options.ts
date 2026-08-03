@@ -26,6 +26,7 @@ export type SessionModelOption = {
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
+  pricing?: { prompt?: string; completion?: string };
   contextWindow?: number;
   provider?: { id: string; name: string };
   modelRef?: ModelRef;

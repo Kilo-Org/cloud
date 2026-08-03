@@ -1,4 +1,4 @@
-import { eq, desc, and, isNull, gt, notExists } from 'drizzle-orm';
+import { eq, desc, and, isNull, gt, notExists, or, notLike } from 'drizzle-orm';
 import { db, readDb, sql } from './drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import { credit_transactions, kilo_pass_issuance_items, kilocode_users } from '@kilocode/db/schema';
@@ -87,7 +87,15 @@ export async function getCreditTransactionsForOrganization(organizationId: Organ
       check_category_uniqueness: credit_transactions.check_category_uniqueness,
     })
     .from(credit_transactions)
-    .where(eq(credit_transactions.organization_id, organizationId))
+    .where(
+      and(
+        eq(credit_transactions.organization_id, organizationId),
+        or(
+          isNull(credit_transactions.credit_category),
+          notLike(credit_transactions.credit_category, 'kpo:consumption:%')
+        )
+      )
+    )
     .orderBy(desc(credit_transactions.created_at))
     .limit(100);
 }
@@ -113,7 +121,15 @@ export async function getAdminCreditTransactionsForOrganization(
     })
     .from(credit_transactions)
     .leftJoin(kilocode_users, eq(credit_transactions.created_by_kilo_user_id, kilocode_users.id))
-    .where(eq(credit_transactions.organization_id, organizationId))
+    .where(
+      and(
+        eq(credit_transactions.organization_id, organizationId),
+        or(
+          isNull(credit_transactions.credit_category),
+          notLike(credit_transactions.credit_category, 'kpo:consumption:%')
+        )
+      )
+    )
     .orderBy(desc(credit_transactions.created_at))
     .limit(100);
 

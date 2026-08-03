@@ -16,7 +16,8 @@ export function DetailPageHeader({
   backHref: string;
   backLabel: string;
   title: string;
-  status: string;
+  /** Omit to intentionally render the header without a status badge. */
+  status?: string;
   icon?: ReactNode;
   actions?: ReactNode;
 }) {
@@ -33,7 +34,7 @@ export function DetailPageHeader({
           ) : null}
           <div className="flex min-w-0 flex-col items-start gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
             <h1 className="text-2xl font-bold md:text-3xl">{title}</h1>
-            <SubscriptionStatusBadge status={status} />
+            {status ? <SubscriptionStatusBadge status={status} /> : null}
           </div>
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}

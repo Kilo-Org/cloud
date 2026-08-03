@@ -19,7 +19,7 @@ set -euo pipefail
 # not — this is the check that catches a controller/runtime plugin-path skew),
 # and runs a full grype CVE scan of the image (base OS + Go + npm, unfiltered).
 #
-# Run the credentialed live smoke (openclaw-upgrade-smoke.sh) next; this script
+# Run the credentialed live smoke (upgrade/smoke.sh) next; this script
 # prints exactly what that still covers.
 #
 # Env:
@@ -27,7 +27,7 @@ set -euo pipefail
 #   BUILD   build the candidate image first (default true; set false to reuse IMAGE)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 REPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
 IMAGE="${IMAGE:-kiloclaw:openclaw-upgrade-candidate}"
 BUILD="${BUILD:-true}"
@@ -240,9 +240,58 @@ timeout_patch=$(docker run --rm "$IMAGE" sh -c \
   'F=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist/provider-models.js; grep -c "DISCOVERY_TIMEOUT_MS = 60e3" "$F"' 2>/dev/null || echo 0)
 check "model-discovery timeout patch applied (60e3)" "1" "$timeout_patch"
 
+# Scan the WHOLE dist by content, not one filename-globbed file. OpenClaw ships
+# several `channel-target-*.js` chunks and only one carries the pattern; picking
+# by name + `head -1` follows directory read order, which silently selected the
+# wrong file on 2026.7.1 while the Dockerfile's negative-only guard still passed.
+# Assert both directions: the patched form is present, and no unpatched form
+# survives anywhere in dist.
 action_patch=$(docker run --rm "$IMAGE" sh -c \
-  'OC=/usr/local/lib/node_modules/openclaw/dist; F=$(find $OC -name "channel-target-*.js" | head -1); grep -c "MESSAGE_ACTION_TARGET_MODE\[action\] ?? \"none\"" "$F"' 2>/dev/null || echo 0)
-check "actionRequiresTarget patch applied" "1" "$action_patch"
+  'OC=/usr/local/lib/node_modules/openclaw/dist
+   new=$(grep -rl "MESSAGE_ACTION_TARGET_MODE\[action\] ?? \"none\"" "$OC" --include="*.js" | wc -l | tr -d " ")
+   old=$(grep -rl "MESSAGE_ACTION_TARGET_MODE\[action\] !== \"none\"" "$OC" --include="*.js" | wc -l | tr -d " ")
+   if [ "$new" -ge 1 ] && [ "$old" -eq 0 ]; then echo ok; else echo "patched=$new unpatched=$old"; fi' 2>/dev/null || echo failed)
+check "actionRequiresTarget patch applied (whole dist, by content)" "ok" "$action_patch"
+
+# The check above proves the patched TEXT is present. It does not prove the
+# patched CODE behaves correctly — a future bundle could carry the string while
+# the surrounding logic changed, and the whole point of this patch is a runtime
+# behaviour. So import the shipped module and call the real function.
+#
+# The bug: an action id absent from MESSAGE_ACTION_TARGET_MODE yields `undefined`,
+# and `undefined !== "none"` is true, so every plugin-declared action id outside
+# the core map was reported as needing a delivery target and the runner threw
+# `Action <id> requires a target.` The patch defaults the lookup to "none".
+#
+# Assert BOTH directions, because a patch that simply made the function always
+# return false would satisfy the synthetic case while breaking real delivery:
+#   - a synthetic (unmapped) id must NOT require a target
+#   - core mapped ids must still require one, and an explicit "none" must not
+#
+# The module is located by CONTENT (not filename) and its export is resolved from
+# the export list, so this survives both bundle re-hashing and minified-name churn.
+action_behaviour=$(docker run --rm "$IMAGE" sh -c '
+  set -e
+  OC=/usr/local/lib/node_modules/openclaw/dist
+  F=$(grep -rl "MESSAGE_ACTION_TARGET_MODE\[action\] ?? \"none\"" "$OC" --include="*.js" | head -1)
+  [ -n "$F" ] || { echo "module-not-found"; exit 0; }
+  # Resolve the minified export alias for actionRequiresTarget from `export{...}`.
+  ALIAS=$(grep -oE "[A-Za-z_$][A-Za-z0-9_$]* as [A-Za-z_$][A-Za-z0-9_$]*" "$F" \
+          | grep "^actionRequiresTarget as " | head -1 | sed "s/.* as //")
+  [ -n "$ALIAS" ] || { echo "export-not-found"; exit 0; }
+  cat > /tmp/action-target-probe.mjs <<EOF
+import { $ALIAS as actionRequiresTarget } from "$F";
+const unmapped = actionRequiresTarget("kiloclaw-smoke-unmapped-action");
+const mapped   = actionRequiresTarget("send");
+const none     = actionRequiresTarget("typing");
+if (unmapped !== false) { console.log("unmapped-requires-target"); }
+else if (mapped !== true) { console.log("mapped-lost-target"); }
+else if (none !== false) { console.log("none-mode-broken"); }
+else { console.log("ok"); }
+EOF
+  node /tmp/action-target-probe.mjs
+' 2>/dev/null || echo failed)
+check "actionRequiresTarget behaviour (unmapped id needs no target)" "ok" "$action_behaviour"
 
 # ── Externalized kilocode provider pin alignment ─────────────────────────────
 # The kilocode provider was externalized from openclaw core (openclaw #93470) and
@@ -302,7 +351,8 @@ validate_fixture "validator still rejects a malformed config (self-check)" \
 #
 # So assert the packaged conditions are exactly the set the controller mirrors.
 # A new or reworded condition fails here, on the bump PR, rather than silently
-# leaving the mirror incomplete. Verified identical on 2026.6.11 and 2026.7.2.
+# leaving the mirror incomplete. Verified identical on 2026.6.11, 2026.7.1, and
+# 2026.7.2.
 #
 # Matches on the throw SITES (`throw new Error("hooks.…"`) rather than on the
 # wording of each message. Matching wording would silently pass when upstream
@@ -435,7 +485,7 @@ freshly released OpenClaw, which is why nothing here runs in CI):
 
   export KILOCODE_API_KEY=<key on an account with credits>   # not your personal key
   export KILOCODE_ORGANIZATION_ID=<org id>             # required to spend ORG credits
-  bash services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
+  bash services/kiloclaw/scripts/tests/upgrade/smoke.sh
 
 That covers what CI cannot without a credential:
   - persisted-root upgrade boot (baseline -> candidate on the same /root)

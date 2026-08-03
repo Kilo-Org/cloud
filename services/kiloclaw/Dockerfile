@@ -3,10 +3,20 @@ ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 # Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
 # pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
-# Last bumped 2026-07-02 to refresh chromium, gh, 1password-cli, and base apt
-# security updates (CVE hardening). Note: much of the chromium CVE volume has no
-# fixed version available, so it is not fully clearable by a version bump.
-ARG APT_CACHE_BUST=2026-07-02
+# Last bumped 2026-07-31 to refresh chromium, gh, 1password-cli, and base apt
+# security updates (CVE hardening). Measured against the 2026-07-02 layer, this
+# picks up chromium/chromium-common 150.0.7871.124 -> 150.0.7871.181 (17
+# Critical/High each) and libexpat1 2.7.1-2 -> 2.8.2-1~deb13u1 (4).
+#
+# Note: much of the chromium CVE volume has no fixed version available, so it is
+# not fully clearable by a version bump — 117 Critical/High per chromium package
+# currently have no upstream fix. Chromium cannot simply be dropped either: it
+# backs OpenClaw's browser tool (see controller/src/config-writer.ts).
+#
+# 1password-cli is NOT improved by this bump: 2.35.0 -> 2.38.1 is still built
+# with go1.25.7, so its 28 Go-stdlib Critical/High findings persist until
+# 1Password ships a build on go1.25.10+. Do not re-investigate that each cycle.
+ARG APT_CACHE_BUST=2026-07-31
 
 FROM debian:trixie-slim AS runtime
 
@@ -69,7 +79,18 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # NOTE: the KiloCode provider was externalized from openclaw core into the standalone
 # @openclaw/kilocode-provider package (openclaw #93470, 2026.6.9); it is installed
 # alongside openclaw and its provider-models bundle is a single non-hashed file.
-RUN npm install -g pnpm openclaw@2026.6.11 @openclaw/kilocode-provider@2026.6.11 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
+# Patch: actionRequiresTarget treats an action id that is absent from OpenClaw's
+# MESSAGE_ACTION_TARGET_MODE map as needing a delivery target, because the raw
+# lookup yields undefined and `undefined !== "none"` is true. That makes the
+# runner throw `Action <id> requires a target.` for any plugin-declared action id
+# outside the core map. Default the lookup to "none" instead, matching what
+# OpenClaw itself already does for the same map in applyTargetToParams.
+# Locate the chunk by CONTENT, never by filename: OpenClaw ships more than one
+# `channel-target-*.js` (a `channel-target-prefix-*.js` appeared in 2026.6.9),
+# so a name glob plus `head -1` depends on directory read order and silently
+# patched the wrong file on 2026.7.1. Patch every file carrying the pattern and
+# assert positively afterwards, so a no-op can never pass as applied.
+RUN npm install -g pnpm openclaw@2026.7.1 @openclaw/kilocode-provider@2026.7.1 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && KP_DIST=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist \
     && PM_FILE="$KP_DIST/provider-models.js" \
@@ -81,11 +102,14 @@ RUN npm install -g pnpm openclaw@2026.6.11 @openclaw/kilocode-provider@2026.6.11
     && if [ "$AFTER" -ne 1 ]; then echo "ERROR: KiloCode sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
     && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$PM_FILE" 2>/dev/null; then echo "ERROR: old KiloCode 5e3 value still present after patch" >&2; exit 1; fi \
     && echo "OK: patched KiloCode DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
-    && CT_FILE=$(find "$OC_DIST" -name 'channel-target-*.js' | head -1) \
-    && if [ -z "$CT_FILE" ]; then echo "ERROR: channel-target-*.js not found in openclaw dist" >&2; exit 1; fi \
-    && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
-    && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
-    && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
+    && CT_FILES=$(grep -rl 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$OC_DIST" --include='*.js' || true) \
+    && if [ -z "$CT_FILES" ]; then echo "ERROR: actionRequiresTarget pattern not found in openclaw dist - openclaw may have changed" >&2; exit 1; fi \
+    && CT_BEFORE=$(echo "$CT_FILES" | wc -l | tr -d ' ') \
+    && echo "$CT_FILES" | xargs sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' \
+    && if grep -rq 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$OC_DIST" --include='*.js'; then echo "ERROR: actionRequiresTarget patch failed - old form still present" >&2; exit 1; fi \
+    && CT_AFTER=$(grep -rl 'MESSAGE_ACTION_TARGET_MODE\[action\] ?? "none"' "$OC_DIST" --include='*.js' | wc -l | tr -d ' ') \
+    && if [ "$CT_AFTER" -ne "$CT_BEFORE" ]; then echo "ERROR: actionRequiresTarget patch failed - patched $CT_AFTER of $CT_BEFORE files" >&2; exit 1; fi \
+    && echo "OK: patched actionRequiresTarget in $CT_BEFORE file(s): $(echo "$CT_FILES" | xargs -n1 basename | tr '\n' ' ')" \
     && openclaw --version \
     && npm cache clean --force
 
@@ -102,7 +126,7 @@ RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
 # load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
-# 2026.6.11's resolveExternalBundledRuntimeDepsInstallRoot().
+# 2026.7.1's resolveExternalBundledRuntimeDepsInstallRoot().
 RUN cd /usr/local/lib/node_modules/openclaw \
     && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
     && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
@@ -138,9 +162,15 @@ RUN ARCH="$(dpkg --print-architecture)" \
 #   so user-installed tools persist across restarts and are included in snapshots.
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
+# gogcli ships PREBUILT binaries, so its Go stdlib is whatever upstream built it
+# with — unlike the `go install` tools below, which this image compiles with
+# GO_VERSION above. v0.31.1 was built with go1.26.2 and carried 17 Critical/High
+# stdlib findings; v0.34.1 is built with go1.26.5, which clears them. When
+# bumping GO_VERSION for CVE hygiene, check this pin too: it does not follow.
 RUN ARCH="$(dpkg --print-architecture)" \
-    && curl -fsSL "https://github.com/openclaw/gogcli/releases/download/v0.31.1/gogcli_0.31.1_linux_${ARCH}.tar.gz" \
+    && curl -fsSL "https://github.com/openclaw/gogcli/releases/download/v0.34.1/gogcli_0.34.1_linux_${ARCH}.tar.gz" \
        | tar xz -C /usr/local/bin gog \
+    && /usr/local/bin/gog --version \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
     && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.4.3 \
     && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.3 \
@@ -263,8 +293,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-07-01-v73-openclaw-2026.6.11-kilocode-provider
-RUN echo "18"
+# Build cache bust: 2026-07-24-v74-openclaw-2026.7.1-kilocode-provider
+RUN echo "19"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

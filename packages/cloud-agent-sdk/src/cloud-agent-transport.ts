@@ -199,6 +199,13 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
         onEvent: raw => {
+          // Drop replayed duplicates: positive IDs at or below the cursor
+          // are redundant — the sink saw them on the first delivery.
+          // eventId 0 (synthetic sentinel) is always delivered.
+          if (raw.eventId > 0 && lastEventId !== null && raw.eventId <= lastEventId) {
+            return;
+          }
+
           if (raw.eventId > 0) {
             lastEventId = raw.eventId;
           }

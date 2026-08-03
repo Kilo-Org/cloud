@@ -855,4 +855,290 @@ describe('EventServiceClient', () => {
       }
     });
   });
+
+  describe('onResync and sequence gap detection', () => {
+    function eventWithSeq(seq: number, event = 'message.created') {
+      return { type: 'event', context: 'room:1', event, payload: { id: seq }, seq };
+    }
+
+    function eventWithoutSeq(event = 'message.created') {
+      return { type: 'event', context: 'room:1', event, payload: {} };
+    }
+
+    it('in-order events emit no resync', async () => {
+      const client = makeClient();
+      await client.connect();
+
+      const resyncCalls: number[] = [];
+      client.onResync(() => resyncCalls.push(1));
+
+      const received: unknown[] = [];
+      client.on('message.created', (_, payload) => received.push(payload));
+
+      lastMockWs.triggerMessage(eventWithSeq(1));
+      lastMockWs.triggerMessage(eventWithSeq(2));
+      lastMockWs.triggerMessage(eventWithSeq(3));
+
+      expect(resyncCalls).toHaveLength(0);
+      expect(received).toHaveLength(3);
+    });
+
+    it('a gap emits exactly one resync and delivers the triggering event', async () => {
+      const client = makeClient();
+      await client.connect();
+
+      const resyncCalls: number[] = [];
+      client.onResync(() => resyncCalls.push(1));
+
+      const received: unknown[] = [];
+      client.on('message.created', (_, payload) => received.push(payload));
+
+      // Establish baseline: seq 1, 2, 3
+      lastMockWs.triggerMessage(eventWithSeq(1));
+      lastMockWs.triggerMessage(eventWithSeq(2));
+      lastMockWs.triggerMessage(eventWithSeq(3));
+      expect(resyncCalls).toHaveLength(0);
+      expect(received).toHaveLength(3);
+
+      // Gap: seq 10 arrives instead of expected seq 4
+      lastMockWs.triggerMessage(eventWithSeq(10));
+      expect(resyncCalls).toHaveLength(1); // one resync
+      expect(received).toHaveLength(4); // gap event still delivered
+      expect(received[3]).toEqual({ id: 10 });
+
+      // Back to in-order: seq 11
+      lastMockWs.triggerMessage(eventWithSeq(11));
+      expect(resyncCalls).toHaveLength(1); // no additional resync
+      expect(received).toHaveLength(5);
+    });
+
+    it('multiple gaps each trigger their own resync', async () => {
+      const client = makeClient();
+      await client.connect();
+
+      const resyncCalls: number[] = [];
+      client.onResync(() => resyncCalls.push(1));
+
+      const received: unknown[] = [];
+      client.on('message.created', (_, payload) => received.push(payload));
+
+      lastMockWs.triggerMessage(eventWithSeq(1));
+      expect(resyncCalls).toHaveLength(0);
+
+      // First gap
+      lastMockWs.triggerMessage(eventWithSeq(5));
+      expect(resyncCalls).toHaveLength(1);
+
+      // Second gap
+      lastMockWs.triggerMessage(eventWithSeq(20));
+      expect(resyncCalls).toHaveLength(2);
+
+      expect(received).toHaveLength(3);
+    });
+
+    it('events without seq do not trigger gap logic', async () => {
+      const client = makeClient();
+      await client.connect();
+
+      const resyncCalls: number[] = [];
+      client.onResync(() => resyncCalls.push(1));
+
+      const received: unknown[] = [];
+      client.on('message.created', (_, payload) => received.push(payload));
+
+      // Old-server traffic without seq
+      lastMockWs.triggerMessage(eventWithoutSeq());
+      lastMockWs.triggerMessage(eventWithoutSeq());
+      lastMockWs.triggerMessage(eventWithoutSeq());
+
+      expect(resyncCalls).toHaveLength(0);
+      expect(received).toHaveLength(3);
+
+      // Then a seq-bearing event still works correctly
+      lastMockWs.triggerMessage(eventWithSeq(5));
+      expect(resyncCalls).toHaveLength(1); // 5 > 0 + 1, so gap detected
+      expect(received).toHaveLength(4);
+    });
+
+    it('duplicate seq does not trigger resync', async () => {
+      const client = makeClient();
+      await client.connect();
+
+      const resyncCalls: number[] = [];
+      client.onResync(() => resyncCalls.push(1));
+
+      const received: unknown[] = [];
+      client.on('message.created', (_, payload) => received.push(payload));
+
+      lastMockWs.triggerMessage(eventWithSeq(1));
+      lastMockWs.triggerMessage(eventWithSeq(2));
+      lastMockWs.triggerMessage(eventWithSeq(3));
+      expect(resyncCalls).toHaveLength(0);
+
+      // Duplicate: seq 2 again (already seen)
+      lastMockWs.triggerMessage(eventWithSeq(2));
+      expect(resyncCalls).toHaveLength(0); // no resync for duplicate
+      expect(received).toHaveLength(4); // event still delivered
+    });
+
+    it('reconnect invokes resync handlers', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        const resyncCalls: number[] = [];
+        client.onResync(() => resyncCalls.push(1));
+
+        await client.connect();
+        // First connect — resync does NOT fire (not a reconnect)
+        expect(resyncCalls).toHaveLength(0);
+
+        // Drop and reconnect
+        lastMockWs.triggerClose();
+        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(allMockWs).toHaveLength(2);
+        expect(resyncCalls).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('resync unsubscribe stops further firings', async () => {
+      const client = makeClient();
+      await client.connect();
+
+      const resyncCalls: number[] = [];
+      const off = client.onResync(() => resyncCalls.push(1));
+
+      // First event (no gap)
+      lastMockWs.triggerMessage(eventWithSeq(1));
+
+      // Gap triggers resync
+      lastMockWs.triggerMessage(eventWithSeq(10));
+      expect(resyncCalls).toHaveLength(1);
+
+      off();
+
+      // Another gap — no resync
+      lastMockWs.triggerMessage(eventWithSeq(20));
+      expect(resyncCalls).toHaveLength(1);
+    });
+
+    it('onReconnect and onResync are independent', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        const reconnectCalls: number[] = [];
+        const resyncCalls: number[] = [];
+
+        client.onReconnect(() => reconnectCalls.push(1));
+        client.onResync(() => resyncCalls.push(1));
+
+        await client.connect();
+        expect(reconnectCalls).toHaveLength(0);
+        expect(resyncCalls).toHaveLength(0);
+
+        // Gap triggers resync but not reconnect
+        lastMockWs.triggerMessage(eventWithSeq(1));
+        lastMockWs.triggerMessage(eventWithSeq(10));
+        expect(reconnectCalls).toHaveLength(0);
+        expect(resyncCalls).toHaveLength(1);
+
+        // Reconnect triggers both
+        lastMockWs.triggerClose();
+        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(allMockWs).toHaveLength(2);
+        expect(reconnectCalls).toHaveLength(1);
+        expect(resyncCalls).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('sequence state resets per socket so same seq on new socket is fine', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        const resyncCalls: number[] = [];
+        client.onResync(() => resyncCalls.push(1));
+
+        await client.connect();
+
+        // First socket: receive events
+        lastMockWs.triggerMessage(eventWithSeq(1));
+        lastMockWs.triggerMessage(eventWithSeq(2));
+        expect(resyncCalls).toHaveLength(0);
+
+        // Reconnect: sequence state reset
+        lastMockWs.triggerClose();
+        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(0);
+
+        // resync from reconnect: 1 call
+        expect(resyncCalls).toHaveLength(1);
+
+        // New socket starts fresh — seq 1 is not a gap
+        allMockWs[1]!.triggerMessage(eventWithSeq(1));
+        allMockWs[1]!.triggerMessage(eventWithSeq(2));
+        expect(resyncCalls).toHaveLength(1); // no additional gap resync
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('sends ack during ping interval', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        await client.connect();
+        // Clear pings from connect open + subscribe
+        lastMockWs.sent = [];
+
+        // Send events with seq to populate highestAckedSeq
+        lastMockWs.triggerMessage(eventWithSeq(1));
+        lastMockWs.triggerMessage(eventWithSeq(5));
+
+        // Advance past one ping interval (15s)
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        const messages = lastMockWs.sent.map(s => {
+          if (s === 'ping') return s;
+          return JSON.parse(s) as unknown;
+        });
+
+        expect(messages).toContain('ping');
+        expect(messages).toContainEqual({ type: 'ack', seq: 5 });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not send ack before any seq-bearing event', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        await client.connect();
+        // Clear pings from connect open + subscribe
+        lastMockWs.sent = [];
+
+        // No seq events — highestAckedSeq stays at -1
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        const messages = lastMockWs.sent.map(s => {
+          if (s === 'ping') return s;
+          return JSON.parse(s) as unknown;
+        });
+
+        expect(messages).toContain('ping');
+        expect(
+          messages.filter(m => typeof m === 'object' && (m as { type?: string }).type === 'ack')
+        ).toHaveLength(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

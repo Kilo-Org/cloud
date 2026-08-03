@@ -89,6 +89,14 @@ export class EventServiceClient {
   private hasConnectedBefore = false;
   private reconnectHandlers = new Set<() => void>();
   private connectedHandlers = new Set<() => void>();
+  private resyncHandlers = new Set<() => void>();
+  // Per-socket sequence state. The server emits seq starting at 1.
+  // Initialize to 0 so the first in-order seq:1 event does not trigger
+  // a gap (1 > 0 + 1 is false).
+  private lastKnownSeq = 0;
+  // Highest acknowledged seq; sent as an { type: 'ack' } message during the
+  // regular ping interval, not for every event.
+  private highestAckedSeq = -1;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null;
   private abortHandshake: ((err: Error) => void) | null = null;
@@ -207,9 +215,15 @@ export class EventServiceClient {
         this.hasConnectedBefore = true;
         this.reconnectAttempts = 0;
         this.authRecoveryAttempts = 0;
+        // Reset per-socket sequence state on every new WebSocket.
+        this.lastKnownSeq = 0;
+        this.highestAckedSeq = -1;
         this.resubscribeContexts();
         if (isReconnect) {
           for (const handler of this.reconnectHandlers) {
+            handler();
+          }
+          for (const handler of this.resyncHandlers) {
             handler();
           }
         }
@@ -344,6 +358,21 @@ export class EventServiceClient {
     };
   }
 
+  /**
+   * Registers a handler that fires when the connection state may be stale:
+   * on every reconnect and on every detected sequence-number gap in server
+   * events. Consumers use this to refetch or invalidate caches that may
+   * have missed events while the socket was disconnected or out of sync.
+   *
+   * Returns an unsubscribe function. Calling it removes the handler.
+   */
+  onResync(handler: () => void): () => void {
+    this.resyncHandlers.add(handler);
+    return () => {
+      this.resyncHandlers.delete(handler);
+    };
+  }
+
   on(event: string, handler: (context: string, payload: unknown) => void): () => void {
     let handlers = this.eventHandlers.get(event);
     if (!handlers) {
@@ -378,6 +407,23 @@ export class EventServiceClient {
     if (!result.success) return;
     const message = result.data;
 
+    // Sequence gap detection: fire resync once when a seq skips ahead of
+    // the expected next value, then continue from the received seq. Events
+    // without seq are passed through unchanged (old-server compatibility).
+    if (message.seq !== undefined) {
+      if (message.seq > this.lastKnownSeq + 1) {
+        for (const handler of this.resyncHandlers) {
+          handler();
+        }
+      }
+      if (message.seq > this.lastKnownSeq) {
+        this.lastKnownSeq = message.seq;
+      }
+      if (message.seq > this.highestAckedSeq) {
+        this.highestAckedSeq = message.seq;
+      }
+    }
+
     if (message.type === 'event') {
       const handlers = this.eventHandlers.get(message.event);
       if (handlers) {
@@ -401,6 +447,13 @@ export class EventServiceClient {
     this.pingTimer = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send('ping');
+        if (this.highestAckedSeq >= 0) {
+          const ack = {
+            type: 'ack',
+            seq: this.highestAckedSeq,
+          } satisfies ClientMessage;
+          this.send(ack);
+        }
       }
     }, 15000);
   }

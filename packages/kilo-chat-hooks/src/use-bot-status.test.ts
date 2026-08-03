@@ -91,16 +91,16 @@ function record(overrides: Partial<BotStatusRecord> = {}): BotStatusRecord {
 }
 
 function makeClients({ connected = false } = {}) {
-  const capturedOnConnected: Array<() => void> = [];
+  const capturedOnResync: Array<() => void> = [];
   const capturedBotStatus: Array<(ctx: string, ev: BotStatusEvent) => void> = [];
 
   const eventClient = {
-    onConnected: vi.fn((handler: () => void) => {
-      capturedOnConnected.push(handler);
+    onResync: vi.fn((handler: () => void) => {
+      capturedOnResync.push(handler);
       if (connected) handler();
       return () => {
-        const i = capturedOnConnected.indexOf(handler);
-        if (i >= 0) capturedOnConnected.splice(i, 1);
+        const i = capturedOnResync.indexOf(handler);
+        if (i >= 0) capturedOnResync.splice(i, 1);
       };
     }),
   };
@@ -123,7 +123,7 @@ function makeClients({ connected = false } = {}) {
   return {
     eventClient: eventClient as unknown as EventServiceClient,
     kiloChatClient: kiloChatClient as unknown as KiloChatClient,
-    fireConnected: () => capturedOnConnected.forEach(h => h()),
+    fireResync: () => capturedOnResync.forEach(h => h()),
     fireBotStatus: (ev: BotStatusEvent) => capturedBotStatus.forEach(h => h('ctx', ev)),
     mockRequestBotStatus,
   };
@@ -331,15 +331,15 @@ describe('useBotStatus', () => {
     expect(testState.queryData.get(key)).toBe(existing);
   });
 
-  it('reconnect triggers invalidateQueries for the sandbox', () => {
-    const { eventClient, kiloChatClient, fireConnected } = makeClients({ connected: false });
+  it('resync triggers invalidateQueries for the sandbox', () => {
+    const { eventClient, kiloChatClient, fireResync } = makeClients({ connected: false });
 
     beginRender();
     useBotStatus(kiloChatClient, eventClient, 'sb-1');
 
     expect(testState.invalidateCalls).toHaveLength(0);
 
-    fireConnected();
+    fireResync();
 
     expect(testState.invalidateCalls).toHaveLength(1);
     expect(testState.invalidateCalls[0]?.queryKey).toEqual(botStatusKey('sb-1'));

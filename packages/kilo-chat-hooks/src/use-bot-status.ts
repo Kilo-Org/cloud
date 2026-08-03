@@ -32,9 +32,9 @@ export function useBotStatus(
 ): BotStatusRecord | null {
   const queryClient = useQueryClient();
 
-  // On reconnect, refetch to catch up on anything we missed while disconnected.
+  // On resync (reconnect or sequence gap), refetch to catch up on missed events.
   useEffect(() => {
-    return eventClient.onConnected(() => {
+    return eventClient.onResync(() => {
       if (sandboxId) {
         void queryClient.invalidateQueries({ queryKey: botStatusKey(sandboxId) });
       }

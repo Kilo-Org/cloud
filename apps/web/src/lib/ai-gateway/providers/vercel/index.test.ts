@@ -1,5 +1,6 @@
-import { describe, it, expect } from '@jest/globals';
+import { afterAll, beforeAll, describe, it, expect } from '@jest/globals';
 import {
+  applyVercelSettings,
   convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
@@ -8,6 +9,56 @@ import {
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+
+describe('applyVercelSettings', () => {
+  const originalPoolsideFreeApiKey = process.env.POOLSIDE_FREE_API_KEY;
+
+  beforeAll(() => {
+    process.env.POOLSIDE_FREE_API_KEY = 'poolside-free-api-key';
+  });
+
+  afterAll(() => {
+    if (originalPoolsideFreeApiKey === undefined) {
+      delete process.env.POOLSIDE_FREE_API_KEY;
+    } else {
+      process.env.POOLSIDE_FREE_API_KEY = originalPoolsideFreeApiKey;
+    }
+  });
+
+  it('uses the Poolside free API key for Laguna when the user has no BYOK', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'poolside/laguna-s-2.1:free',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('poolside/laguna-s-2.1:free', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      poolside: [{ apiKey: 'poolside-free-api-key' }],
+    });
+  });
+
+  it('keeps user BYOK authoritative for Laguna', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'poolside/laguna-s-2.1:free',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('poolside/laguna-s-2.1:free', request, [
+      { providerId: 'openai', decryptedAPIKey: 'user-api-key' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      openai: [{ apiKey: 'user-api-key' }],
+    });
+  });
+});
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {

@@ -27,6 +27,9 @@ import {
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { getEnvVariable } from '@/lib/dotenvx';
+
+const POOLSIDE_FREE_MODEL_ID = 'poolside/laguna-s-2.1:free';
 
 type VercelRoutingPercentages = {
   paid: number;
@@ -265,10 +268,13 @@ export async function applyVercelSettings(
     const vercelInferenceProviders = requestToMutate.body.provider?.ignore?.length
       ? await getCachedVercelInferenceProviderIdsForModel(vercelModelId)
       : null;
-    requestToMutate.body.providerOptions = convertProviderOptions(
-      requestToMutate,
-      vercelInferenceProviders
-    );
+    const providerOptions = convertProviderOptions(requestToMutate, vercelInferenceProviders);
+    if (requestedModel === POOLSIDE_FREE_MODEL_ID && providerOptions.gateway) {
+      providerOptions.gateway.byok = {
+        poolside: [{ apiKey: getEnvVariable('POOLSIDE_FREE_API_KEY') }],
+      };
+    }
+    requestToMutate.body.providerOptions = providerOptions;
   }
 
   if (requestToMutate.body.providerOptions) {

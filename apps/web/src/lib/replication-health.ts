@@ -96,8 +96,19 @@ export type ReplicaHealth = {
    * bottleneck, while a gap near zero alongside a high `replay_delay_seconds`
    * means the WAL has not arrived yet, i.e. the bottleneck is transport.
    *
-   * Null when the replica has no walreceiver running at all (which is itself a
-   * distinct failure: it is streaming nothing).
+   * Compare across samples, never in isolation. `pg_last_wal_receive_lsn()` is
+   * null only while streaming has not started in the current recovery session;
+   * a walreceiver that *dies* does not null it, it freezes it at the last LSN
+   * received. So the dead-walreceiver failure this module exists to catch shows
+   * up as a large and roughly constant gap — which in any single sample is
+   * indistinguishable from a slow replay. A `receive_lsn` that does not advance
+   * between samples is the signature.
+   *
+   * A negative gap is legitimate: a replica recovering from the WAL archive
+   * replays past the position streaming reached.
+   *
+   * Both fields come from one snapshot of the LSN functions, so they are always
+   * consistent with each other and with `replay_lsn` (see `probeReplica`).
    */
   receive_lsn: string | null;
   receive_replay_gap_bytes: string | null;
@@ -201,16 +212,31 @@ export async function probeReplica(target: ReplicaTarget): Promise<ReplicaHealth
     // process, so attach a no-op like the long-lived pools in lib/drizzle.ts do.
     client.pool.on('error', () => {});
 
+    // Every one of these LSN functions is volatile and reads live shared memory,
+    // so each call site is evaluated independently: calling them once per output
+    // column would let `receive_replay_gap_bytes` disagree with the `receive_lsn`
+    // and `replay_lsn` logged beside it, and could even report a negative gap
+    // from replay advancing mid-row. Reading them once in a subquery and
+    // deriving the outputs from those columns keeps the row self-consistent —
+    // Postgres will not flatten a subquery whose target list is volatile, so the
+    // values really are reused rather than re-read.
     const { rows } = await client.db.execute<ReplicaProbeRow>(sql`
       SELECT
-        pg_is_in_recovery() AS in_recovery,
-        pg_last_wal_replay_lsn()::text AS replay_lsn,
-        pg_last_wal_receive_lsn()::text AS receive_lsn,
-        pg_wal_lsn_diff(pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn())::text
+        snapshot.in_recovery,
+        snapshot.replay_lsn::text AS replay_lsn,
+        snapshot.receive_lsn::text AS receive_lsn,
+        pg_wal_lsn_diff(snapshot.receive_lsn, snapshot.replay_lsn)::text
           AS receive_replay_gap_bytes,
-        pg_last_xact_replay_timestamp()::text AS last_xact_replay_timestamp,
-        EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))::double precision
+        snapshot.last_xact_replay_timestamp::text AS last_xact_replay_timestamp,
+        EXTRACT(EPOCH FROM (now() - snapshot.last_xact_replay_timestamp))::double precision
           AS replay_delay_seconds
+      FROM (
+        SELECT
+          pg_is_in_recovery() AS in_recovery,
+          pg_last_wal_replay_lsn() AS replay_lsn,
+          pg_last_wal_receive_lsn() AS receive_lsn,
+          pg_last_xact_replay_timestamp() AS last_xact_replay_timestamp
+      ) AS snapshot
     `);
 
     const row = rows[0];

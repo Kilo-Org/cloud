@@ -234,6 +234,7 @@ export const codingPlansRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Coding Plan usage is unavailable.',
+          cause: error,
         });
       }
     }),

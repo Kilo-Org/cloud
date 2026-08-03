@@ -37,8 +37,8 @@ export class CodingPlanUsageEligibilityError extends Error {
 }
 
 export class CodingPlanUsageUnavailableError extends Error {
-  constructor() {
-    super('Coding Plan usage is unavailable.');
+  constructor(options?: { cause?: unknown }) {
+    super('Coding Plan usage is unavailable.', options);
     this.name = 'CodingPlanUsageUnavailableError';
   }
 }
@@ -97,7 +97,7 @@ export async function getCodingPlanUsageResponse(userId: string, subscription: U
       providerId: plan.providerId,
       name: error instanceof Error ? error.name : typeof error,
     });
-    throw new CodingPlanUsageUnavailableError();
+    throw new CodingPlanUsageUnavailableError({ cause: error });
   });
 
   return {

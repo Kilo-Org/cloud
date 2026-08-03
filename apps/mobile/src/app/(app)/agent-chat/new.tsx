@@ -11,6 +11,7 @@ import {
   useNewSessionModelState,
 } from '@/components/agents/new-session-model-provider';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
+import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session-prefill';
 import { ScreenHeader } from '@/components/screen-header';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -44,7 +45,6 @@ function NewSessionScreenBody() {
   }>();
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
 
-  const [selectedRepo, setSelectedRepo] = useState('');
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +72,13 @@ function NewSessionScreenBody() {
     openGitHubIntegration: openGitHub,
     refreshReposForceFresh,
   } = useNewSessionRepos({ organizationId });
+
+  const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
+    repositories,
+    reposSettled: view === 'repos' && repositories.length > 0,
+    models,
+    modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
+  });
 
   // Keep the inline selector and picker list in sync.
   const {

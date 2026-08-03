@@ -10,6 +10,8 @@ import {
 } from 'react';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { resolvePrefillModel } from '@/components/agents/new-session-prefill';
+import { useNewSessionPrefill } from '@/components/agents/use-new-session-prefill';
 import { RemoteSpawnInheritanceProvider } from '@/components/agents/use-remote-spawn-dispatch';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
@@ -42,16 +44,18 @@ export function NewSessionModelProvider({
   organizationId,
   children,
 }: Readonly<NewSessionModelProviderProps>) {
-  const [mode, setMode] = useState<AgentMode>('code');
+  const prefill = useNewSessionPrefill();
+  const [mode, setMode] = useState<AgentMode>(prefill.mode);
   const [model, setModel] = useState('');
   const [variant, setVariant] = useState('');
   const { models } = useAvailableModels(organizationId);
   const autoSelected = useAutoSelectModel(models, organizationId);
   const hasAppliedAutoSelection = useRef(false);
-  if (!hasAppliedAutoSelection.current && autoSelected.model && !model) {
+  const initialSelection = resolvePrefillModel(models, prefill) ?? autoSelected;
+  if (!hasAppliedAutoSelection.current && initialSelection.model && !model) {
     hasAppliedAutoSelection.current = true;
-    setModel(autoSelected.model);
-    setVariant(autoSelected.variant);
+    setModel(initialSelection.model);
+    setVariant(initialSelection.variant);
   }
   const state = useMemo(
     () => ({ mode, setMode, model, setModel, variant, setVariant }),

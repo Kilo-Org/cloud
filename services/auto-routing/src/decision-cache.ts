@@ -91,6 +91,9 @@ const StickyDecisionSchema = z.object({
   // Taxonomy route the model was decided on, for route-change telemetry.
   // Nullable/defaulted so entries written before the field existed parse.
   routeKey: z.string().min(1).nullish().default(null),
+  // Exact catalog variant the model was decided with. Null for legacy
+  // model-only sticky records and for candidates without a variant.
+  variant: z.string().min(1).nullish().default(null),
 });
 export type StickyDecision = z.infer<typeof StickyDecisionSchema>;
 
@@ -134,11 +137,13 @@ export async function putStickyDecision(
   env: DecisionCacheEnv,
   conversationKey: string,
   model: string,
+  variant: string | null,
   routeKey: string
 ): Promise<void> {
   try {
     await cacheStub(env, conversationKey).putEntry(STICKY_DECISION_KEY, {
       model,
+      variant,
       routeKey,
     } satisfies StickyDecision);
   } catch {

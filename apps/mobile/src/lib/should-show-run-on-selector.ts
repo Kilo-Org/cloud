@@ -1,18 +1,19 @@
 /**
- * Whether personal-only remote CLI surfaces should show (the new-agent
- * "Run on" selector, and the share gate's connected-CLI spawn rows).
+ * Whether the "Run on" selector (new-agent screen) and the share gate's
+ * connected-CLI instances query should show.
  *
- * Org-scoped flows are Cloud-Agent only by design: a remote `kilo remote`
- * instance spawns a personal CLI session that mobile's data model can only
- * surface on personal routes. Offering a personal-instance picker inside an
- * org flow would create sessions invisible in the org's context, so the
- * affordance is hidden entirely — this is not a feature state, it's an
- * absent-by-design UI branch.
+ * Org contexts support CLI instances: org attribution travels with the
+ * create (`orgId` on `create_session`), so a remote spawn from an org
+ * flow is owner-scoped and visible on that org's routes. Personal and
+ * org flows both show the selector.
  *
  * Accepts both absent forms so one predicate covers both call sites:
  * - new-session route param: `string | undefined` (`undefined` = personal)
  * - share gate `useOrganization()`: `string | null` (`null` = personal)
+ *
+ * The `organizationId` argument is retained for call-site compatibility;
+ * it no longer gates visibility.
  */
-export function shouldShowRunOnSelector(organizationId: string | null | undefined): boolean {
-  return organizationId == null;
+export function shouldShowRunOnSelector(_organizationId: string | null | undefined): boolean {
+  return true;
 }

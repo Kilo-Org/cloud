@@ -80,6 +80,10 @@ git diff --check
 - Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
 
+## Design
+
+The app follows https://github.com/Kilo-Org/kilo-design/ in general, except where this file states otherwise.
+
 ## Debugging
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.

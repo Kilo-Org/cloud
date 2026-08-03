@@ -1,10 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  createElement,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
+  buildCreateRemoteSessionInput,
+  type CreateRemoteSessionInput,
   type CreateSessionOutcome,
   type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
@@ -26,8 +38,38 @@ type InstancesRefetch = () => Promise<{
   data: { instances: InstancePickerInstance[] } | undefined;
 }>;
 
+type RemoteSpawnInheritance = {
+  mode?: string;
+  model?: string;
+  variant?: string;
+};
+
+const RemoteSpawnInheritanceContext = createContext<RemoteSpawnInheritance>({});
+
+/**
+ * Supplies the new-session screen's current mode/model/variant to
+ * `useRemoteSpawnDispatch` without requiring the sibling-owned
+ * `use-new-session-share-remote` wrapper to forward those fields.
+ */
+export function RemoteSpawnInheritanceProvider({
+  mode,
+  model,
+  variant,
+  children,
+}: RemoteSpawnInheritance & { children: ReactNode }) {
+  const value = useMemo(() => ({ mode, model, variant }), [mode, model, variant]);
+  return createElement(RemoteSpawnInheritanceContext.Provider, { value }, children);
+}
+
 type UseRemoteSpawnDispatchArgs = {
   organizationId: string | undefined;
+  /**
+   * Optional override for inheritance fields. When omitted, values come from
+   * the nearest `RemoteSpawnInheritanceProvider` (the new-session screen).
+   */
+  mode?: string;
+  model?: string;
+  variant?: string;
   runOnInstance: InstancePickerInstance | null;
   setRunOnInstance: (next: InstancePickerInstance | null) => void;
   /**
@@ -99,6 +141,9 @@ type UseRemoteSpawnDispatchResult = {
  */
 export function useRemoteSpawnDispatch({
   organizationId,
+  mode: modeArg,
+  model: modelArg,
+  variant: variantArg,
   runOnInstance,
   setRunOnInstance,
   refetchInstances,
@@ -107,10 +152,18 @@ export function useRemoteSpawnDispatch({
   onReadyNavigationCancelled,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
+  const inheritance = useContext(RemoteSpawnInheritanceContext);
+  const mode = modeArg ?? inheritance.mode;
+  const model = modelArg ?? inheritance.model;
+  const variant = variantArg ?? inheritance.variant;
+  // Route param is frozen at navigation: missing param means personal, not
+  // "inherit live context". `?? null` so undefined does not fall through to
+  // `useOrganization()` after a later org switch (share-gate keeps zero-arg
+  // inherit by calling `useRemoteInstanceSpawn()` with no arg).
   const remoteSpawn: {
     status: RemoteInstanceSpawnStatus;
-    spawn: (connectionId: string) => Promise<CreateSessionOutcome>;
-  } = useRemoteInstanceSpawn();
+    spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
+  } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
 
   // kilocode_change - `onStart`'s async tail (spawn + refetch + classify)
@@ -129,21 +182,39 @@ export function useRemoteSpawnDispatch({
 
   // Same lifetime concern as runOnInstanceRef: the cancel predicate and
   // cancelled callback must be read at ready-time, not captured from the
-  // render that started the spawn.
+  // render that started the spawn. Mode/model/variant likewise — spawn
+  // should use the values at press time, but the ref keeps them current
+  // if the parent re-renders mid-flight before spawn is invoked.
   const shouldCancelReadyNavigationRef = useRef(shouldCancelReadyNavigation);
   const onReadyNavigationCancelledRef = useRef(onReadyNavigationCancelled);
+  const spawnFieldsRef = useRef({ mode, model, variant, organizationId });
   useEffect(() => {
     shouldCancelReadyNavigationRef.current = shouldCancelReadyNavigation;
     onReadyNavigationCancelledRef.current = onReadyNavigationCancelled;
-  }, [shouldCancelReadyNavigation, onReadyNavigationCancelled]);
+    spawnFieldsRef.current = { mode, model, variant, organizationId };
+  }, [
+    shouldCancelReadyNavigation,
+    onReadyNavigationCancelled,
+    mode,
+    model,
+    variant,
+    organizationId,
+  ]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
       return;
     }
     const selectedConnectionId = runOnInstance.connectionId;
+    const fields = spawnFieldsRef.current;
+    const createInput = buildCreateRemoteSessionInput({
+      mode: fields.mode,
+      model: fields.model,
+      variant: fields.variant,
+      organizationId: fields.organizationId,
+    });
     void (async () => {
-      const outcome = await remoteSpawn.spawn(selectedConnectionId);
+      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput);
       if (outcome.status === 'ready') {
         if (shouldCancelReadyNavigationRef.current?.() === true) {
           // Cancel contract: toast via callback, then leave the user on the

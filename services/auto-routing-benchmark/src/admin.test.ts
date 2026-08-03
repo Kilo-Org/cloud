@@ -9,6 +9,7 @@ import {
 import { app } from './index';
 import { computeEngineIdentity } from './run';
 import type * as DbModule from './db';
+import type * as ProfilesModule from './profiles';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 
 function makeSummary(model: string): BenchmarkModelSummary {
@@ -91,12 +92,27 @@ vi.mock('./db', async importOriginal => {
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
+    listStaleRunningDeciderRunIds: vi.fn(),
+    listPendingCurrentProfiles: vi.fn(),
+    markProfilesFailedForRun: vi.fn(),
+    markProfilesRunningForRun: vi.fn(),
+    markProfilesReadyForRun: vi.fn(),
     getRunningRun: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
   };
 });
 
+vi.mock('./profiles', async importOriginal => {
+  const actual = await importOriginal<typeof ProfilesModule>();
+  return {
+    ...actual,
+    registerProfiles: vi.fn(),
+    lookupProfileStatuses: vi.fn(),
+  };
+});
+
 import {
+  exactPairKey,
   getConfigRows,
   getClassifierWinner,
   getLatestRoutingTable,
@@ -104,10 +120,13 @@ import {
   getRunningRun,
   existsNewerCompletedRun,
   insertRun,
+  listPendingCurrentProfiles,
   listRuns,
+  listStaleRunningDeciderRunIds,
   markStaleRunsFailed,
   replaceConfig,
 } from './db';
+import { lookupProfileStatuses, ProfileQuotaExceededError, registerProfiles } from './profiles';
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn();
@@ -173,8 +192,12 @@ beforeEach(() => {
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
+  vi.mocked(listStaleRunningDeciderRunIds).mockResolvedValue([]);
+  vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
+  vi.mocked(registerProfiles).mockReset();
+  vi.mocked(lookupProfileStatuses).mockReset();
   queueSendBatch.mockResolvedValue(undefined);
 });
 
@@ -394,6 +417,7 @@ describe('POST /admin/runs', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: 1000,
       engine_identity: 'v1:deadbeef',
+      purpose: 'platform',
     });
 
     const res = await authedPost('/admin/runs', { kind: 'classifier' });
@@ -480,10 +504,11 @@ describe('POST /admin/runs', () => {
     vi.mocked(getLatestSummariesByModel).mockResolvedValue(
       new Map([
         [
-          'vendor/a',
+          exactPairKey('vendor/a', null),
           {
             engineIdentity: computeEngineIdentity('decider'),
             repetitions: 1,
+            variant: null,
             reasoningEffort: null,
             summaries: [makeSummary('vendor/a')],
           },
@@ -504,15 +529,16 @@ describe('POST /admin/runs', () => {
       config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
       deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
     });
-    // Prior result was measured at reasoning_effort 'high'; current config runs
-    // it at null, so the carry is invalidated and the model is re-enqueued.
+    // Prior result was measured at variant 'high'; current config runs it at
+    // null, so the carry is invalidated and the model is re-enqueued.
     vi.mocked(getLatestSummariesByModel).mockResolvedValue(
       new Map([
         [
-          'vendor/a',
+          exactPairKey('vendor/a', 'high'),
           {
             engineIdentity: computeEngineIdentity('decider'),
             repetitions: 1,
+            variant: 'high',
             reasoningEffort: 'high',
             summaries: [makeSummary('vendor/a')],
           },
@@ -524,6 +550,69 @@ describe('POST /admin/runs', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
     expect(body.skippedModels).toEqual([]);
+    expect(body.enqueuedModels).toBe(1);
+  });
+
+  it('does not carry a prior summary when only the variant differs', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
+      deciderModels: [{ model: 'vendor/a', reasoning_effort: 'high' }],
+    });
+    // Same model/engine/reps but prior was measured at a different variant.
+    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
+      new Map([
+        [
+          exactPairKey('vendor/a', 'low'),
+          {
+            engineIdentity: computeEngineIdentity('decider'),
+            repetitions: 1,
+            variant: 'low',
+            reasoningEffort: 'low',
+            summaries: [makeSummary('vendor/a')],
+          },
+        ],
+      ])
+    );
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
+    expect(body.skippedModels).toEqual([]);
+    expect(body.enqueuedModels).toBe(1);
+  });
+
+  it('carries a prior summary when the exact pair matches (legacy effort key)', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
+      // vendor/b has no prior → stays enqueued so we do not hit the all-carried
+      // finalize path (which needs a real D1 client in unit tests).
+      deciderModels: [
+        { model: 'vendor/a', reasoning_effort: 'high' },
+        { model: 'vendor/b', reasoning_effort: null },
+      ],
+    });
+    // Legacy rows store variant from reasoning_effort; exact pair high matches.
+    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
+      new Map([
+        [
+          exactPairKey('vendor/a', 'high'),
+          {
+            engineIdentity: computeEngineIdentity('decider'),
+            repetitions: 1,
+            variant: 'high',
+            reasoningEffort: 'high',
+            summaries: [makeSummary('vendor/a')],
+          },
+        ],
+      ])
+    );
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
+    expect(body.skippedModels).toEqual(['vendor/a']);
     expect(body.enqueuedModels).toBe(1);
   });
 
@@ -682,5 +771,116 @@ describe('GET /admin/classifier-winner', () => {
     const res = await authedGet('/admin/classifier-winner');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ winner });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /admin/profiles/register + /admin/profiles/status
+// ---------------------------------------------------------------------------
+
+describe('POST /admin/profiles/register', () => {
+  it('returns 400 when benchmark config is not set', async () => {
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b', variant: null }],
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('benchmark config not set'),
+    });
+    expect(registerProfiles).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for malformed body', async () => {
+    // Validation fails before the handler reads config — do not queue a
+    // mockResolvedValueOnce here or it will leak into later tests.
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [],
+    });
+    expect(res.status).toBe(400);
+    expect(registerProfiles).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 with statuses on successful admission', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(registerProfiles).mockResolvedValueOnce({
+      statuses: [
+        { entry: { model: 'a/b', variant: null }, status: 'pending', failureReason: null },
+      ],
+    });
+
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'a/b', variant: null }],
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      statuses: [
+        { entry: { model: 'a/b', variant: null }, status: 'pending', failureReason: null },
+      ],
+    });
+    expect(registerProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ deciderRepetitions: 1 }),
+      expect.objectContaining({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries: [{ model: 'a/b', variant: null }],
+        retryEntries: [{ model: 'a/b', variant: null }],
+      })
+    );
+  });
+
+  it('returns 429 with retryAt when quota is exceeded', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(registerProfiles).mockRejectedValueOnce(
+      new ProfileQuotaExceededError({
+        error:
+          'Profile benchmark request limit reached. New benchmarks can be requested after 2026-07-29T12:00:00.000Z.',
+        retryAt: '2026-07-29T12:00:00.000Z',
+      })
+    );
+
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'org',
+      ownerId: 'o1',
+      entries: [{ model: 'a/b', variant: 'xhigh' }],
+    });
+    expect(res.status).toBe(429);
+    await expect(res.json()).resolves.toEqual({
+      error:
+        'Profile benchmark request limit reached. New benchmarks can be requested after 2026-07-29T12:00:00.000Z.',
+      retryAt: '2026-07-29T12:00:00.000Z',
+    });
+  });
+});
+
+describe('POST /admin/profiles/status', () => {
+  it('returns 400 when benchmark config is not set', async () => {
+    const res = await authedPost('/admin/profiles/status', {
+      entries: [{ model: 'a/b', variant: null }],
+    });
+    expect(res.status).toBe(400);
+    expect(lookupProfileStatuses).not.toHaveBeenCalled();
+  });
+
+  it('returns current statuses', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({
+      statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
+    });
+
+    const res = await authedPost('/admin/profiles/status', {
+      entries: [{ model: 'a/b', variant: null }],
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
+    });
   });
 });

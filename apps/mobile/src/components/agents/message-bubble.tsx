@@ -7,6 +7,7 @@ import { Bubble } from '@/components/ui/bubble';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
@@ -84,12 +85,14 @@ export function MessageBubble({
       <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
         <View className="items-end gap-1">
           <Bubble side="user">
-            {textContent ? (
-              <ChatMarkdownText value={textContent} variant="user" selectable={false} />
-            ) : null}
-            {fileParts.map(part => (
-              <FilePartRenderer key={part.id} part={part} />
-            ))}
+            <InMessageBubbleContext.Provider value>
+              {textContent ? (
+                <ChatMarkdownText value={textContent} variant="user" selectable={false} />
+              ) : null}
+              {fileParts.map(part => (
+                <FilePartRenderer key={part.id} part={part} />
+              ))}
+            </InMessageBubbleContext.Provider>
           </Bubble>
           {showQueuedBadge ? (
             <Animated.View
@@ -126,18 +129,20 @@ export function MessageBubble({
 
   return (
     <Pressable className="px-4 py-2" onLongPress={handleLongPress} accessible={a11y.accessible}>
-      <View className="gap-2">
-        {message.parts.map(part => (
-          <PartRenderer
-            key={part.id}
-            part={part}
-            isStreaming={isStreaming}
-            getChildMessages={getChildMessages}
-            defaultReasoningExpanded={defaultReasoningExpanded}
-            onOpenChildSession={onOpenChildSession}
-          />
-        ))}
-      </View>
+      <InMessageBubbleContext.Provider value>
+        <View className="gap-2">
+          {message.parts.map(part => (
+            <PartRenderer
+              key={part.id}
+              part={part}
+              isStreaming={isStreaming}
+              getChildMessages={getChildMessages}
+              defaultReasoningExpanded={defaultReasoningExpanded}
+              onOpenChildSession={onOpenChildSession}
+            />
+          ))}
+        </View>
+      </InMessageBubbleContext.Provider>
       {a11y.accessibilityActions.length > 0 ? (
         <View
           accessible

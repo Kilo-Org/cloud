@@ -14,7 +14,12 @@ import {
 } from './schemas';
 import type { SlashCommandInfo } from './schemas';
 import type { RemoteModelState } from './remote-model-catalog';
-import type { TransportFactory, TransportSendInput, TransportSink } from './transport';
+import type {
+  CreateRemoteSessionInput,
+  TransportFactory,
+  TransportSendInput,
+  TransportSink,
+} from './transport';
 import type {
   KiloSessionId,
   SessionSnapshot,
@@ -22,10 +27,32 @@ import type {
   SessionSnapshotPageOutcome,
 } from './types';
 import {
+  CommandDeliveredError,
   UserWebCommandError,
   type UserWebCliEvent,
   type UserWebConnection,
 } from './user-web-connection';
+
+/** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
+const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
+
+/**
+ * Build `create_session` wire data: always `protocolVersion: 1`, plus any
+ * defined inheritance fields (Decision 5 shape).
+ */
+function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
+  protocolVersion: 1;
+  agent?: string;
+  model?: { providerID: string; modelID: string; variant?: string };
+  orgId?: string;
+} {
+  return {
+    protocolVersion: 1,
+    ...(input?.agent !== undefined ? { agent: input.agent } : {}),
+    ...(input?.model !== undefined ? { model: input.model } : {}),
+    ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
+  };
+}
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
@@ -825,14 +852,34 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // owner, so duplicate retry calls collapse safely.
         if (ownerConnectionId) discoverCommands(ownerConnectionId);
       },
-      createSession: async () => {
+      createSession: async (input?: CreateRemoteSessionInput) => {
         // `create_session` is session-scoped: it must include the current Kilo
         // sessionId so the CLI can select the workspace, and it must be fenced
         // to the owner we currently trust. Reuse `sendCommand` so the owner is
         // snapshotted before the await and SESSION_OWNER_CHANGED is handled.
-        // Never auto-retry — a transient network failure is a hard reject so
-        // the caller can surface a retryable error.
-        const result = await sendCommand('create_session', { protocolVersion: 1 });
+        // Extended fields degrade via a single bare retry on the exact
+        // old-CLI delivered error; other failures are hard rejects.
+        const wireData = buildCreateSessionWireData(input);
+        const hasExtendedFields =
+          wireData.agent !== undefined ||
+          wireData.model !== undefined ||
+          wireData.orgId !== undefined;
+        let result: unknown;
+        try {
+          result = await sendCommand('create_session', wireData);
+        } catch (error) {
+          // Only bare-retry when extended fields made the original wire differ
+          // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
+          if (
+            hasExtendedFields &&
+            error instanceof CommandDeliveredError &&
+            error.message === INVALID_CREATE_SESSION_COMMAND
+          ) {
+            result = await sendCommand('create_session', { protocolVersion: 1 });
+          } else {
+            throw error;
+          }
+        }
         const parsed = parseCreateSessionResponse(result);
         if (!parsed.ok) {
           throw new Error('Invalid create_session response');

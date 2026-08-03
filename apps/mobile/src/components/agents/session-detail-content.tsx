@@ -22,6 +22,7 @@ import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
+import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
@@ -116,6 +117,8 @@ const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
   preparing: 'Setting up environment...',
   finalizing: 'Wrapping up...',
 };
+
+const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 export function SessionDetailContent({
   sessionId,
@@ -395,6 +398,21 @@ export function SessionDetailContent({
     [messages, preparationAttempts]
   );
 
+  // Render-phase state adjustment: hold queued ids across queue → dequeue
+  // transitions while streaming so the badge row never unmounts and bubble
+  // height stays stable. Stream end releases every hold in one uniform commit.
+  const [heldQueuedIds, setHeldQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const [prevSessionId, setPrevSessionId] = useState(sessionId);
+  if (prevSessionId !== sessionId) {
+    setPrevSessionId(sessionId);
+    setHeldQueuedIds(EMPTY_IDS);
+  } else {
+    const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
+    if (next !== heldQueuedIds) {
+      setHeldQueuedIds(next);
+    }
+  }
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
@@ -416,6 +434,7 @@ export function SessionDetailContent({
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
           onLongPressDetails={setDetailsMessage}
+          holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
         />
       );
     },
@@ -426,6 +445,7 @@ export function SessionDetailContent({
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
+      heldQueuedIds,
     ]
   );
 

@@ -137,6 +137,78 @@ export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: 
 }
 
 /**
+ * Compose the visible `meta` string for an active-session row by folding an
+ * optional cost segment in front of the relative timestamp. All four quadrants:
+ *   - both → `$cost · timeMeta`
+ *   - cost only → `cost`
+ *   - time only → `timeMeta`
+ *   - neither → `undefined`
+ *
+ * Used in `RemoteSessionRow` where `timeMeta` comes from `remoteMeta()` (may
+ * return `undefined` when no timestamp exists — bare-live dot).
+ */
+export function composeActiveSessionVisibleMeta(
+  cost: string | null,
+  timeMeta: string | undefined
+): string | undefined {
+  if (cost && timeMeta) {
+    return `${cost} · ${timeMeta}`;
+  }
+  if (cost) {
+    return cost;
+  }
+  if (timeMeta) {
+    return timeMeta;
+  }
+  return undefined;
+}
+
+/**
+ * Compose the spoken `meta` string for an active-session row's accessibility
+ * label. All four quadrants:
+ *   - both → `cost <costSpoken>, <timeSpoken>`
+ *   - cost only → `cost <costSpoken>`
+ *   - time only → `timeSpoken`
+ *   - neither → `null`
+ *
+ * The `cost` param is the `formatSpokenCost` phrase (e.g. `"12 cents"`), never
+ * the visible `"$"` string, matching the convention in
+ * `composeStoredSessionSpokenMeta`.
+ */
+export function composeActiveSessionSpokenMeta(
+  cost: string | null,
+  timeSpoken: string | null
+): string | null {
+  if (cost && timeSpoken) {
+    return `cost ${cost}, ${timeSpoken}`;
+  }
+  if (cost) {
+    return `cost ${cost}`;
+  }
+  if (timeSpoken) {
+    return timeSpoken;
+  }
+  return null;
+}
+
+/**
+ * Selector for the spoken meta of a remote session row. When `needsInput`
+ * is true, spoken cost/time are suppressed entirely (`null`) — the spoken
+ * label announces "needs input" instead via `sessionRowAccessibilityLabel`.
+ * Otherwise delegates to `composeActiveSessionSpokenMeta`.
+ */
+export function selectRemoteRowSpokenMeta(params: {
+  needsInput: boolean;
+  costSpoken: string | null;
+  timeSpoken: string | null;
+}): string | null {
+  if (params.needsInput) {
+    return null;
+  }
+  return composeActiveSessionSpokenMeta(params.costSpoken, params.timeSpoken);
+}
+
+/**
  * Pinned-tray label for an active session. Reuses `platformLabel` when the
  * origin is known, otherwise falls back to 'LIVE'. An undefined, empty, or
  * 'unknown' origin is treated as unknown and returns 'LIVE' rather than a

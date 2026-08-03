@@ -238,10 +238,10 @@ describe('classifyVoiceInputError', () => {
     });
   });
 
-  it('maps language-not-supported to a non-retryable unavailable feedback', () => {
+  it('maps language-not-supported to non-retryable feedback that keeps voice input available', () => {
     expect(classifyVoiceInputError('language-not-supported')).toEqual({
       action: 'none',
-      availability: 'unavailable',
+      availability: 'available',
       message: "Voice input isn't available for this device language.",
       retryable: false,
     });

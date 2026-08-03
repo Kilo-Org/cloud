@@ -135,9 +135,16 @@ function EntitlementsRow({
       </TableCell>
       <TableCell>
         {organization.kilo_pass_tier ? (
-          <span className="text-sm font-medium capitalize">
-            {organization.kilo_pass_tier.replace(/_/g, ' ')}
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">
+              {organization.kilo_pass_tier.replace('tier_', '$')}
+            </span>
+            {organization.kilo_pass_state ? (
+              <span className="text-muted-foreground text-xs capitalize">
+                {organization.kilo_pass_state.replace(/_/g, ' ')}
+              </span>
+            ) : null}
+          </div>
         ) : (
           <span className="text-muted-foreground text-sm">—</span>
         )}

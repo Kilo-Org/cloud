@@ -69,6 +69,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'stepfun',
   'streamlake',
   'switchpoint',
+  'tencent',
   'together',
   'upstage',
   'venice',

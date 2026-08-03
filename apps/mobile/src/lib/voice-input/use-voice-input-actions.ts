@@ -1,6 +1,5 @@
 import { AccessibilityInfo, Alert, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { getLocales } from 'expo-localization';
 import { toast } from 'sonner-native';
 
 import {
@@ -11,7 +10,7 @@ import {
   resolveVoiceInputFeedbackPresentation,
   shouldAnnounceListeningTransition,
 } from './voice-input-feedback';
-import { resolveVoiceInputLanguageTag } from './voice-input-language';
+import { resolveVoiceInputStartLanguageTag } from './voice-input-language';
 import {
   shouldAbortVoiceInput,
   type VoiceInputFeedback,
@@ -119,7 +118,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
 
     const startOptions: VoiceInputStartOptions = {
       baseDraft: getDraft(),
-      languageTag: resolveVoiceInputLanguageTag(getLocales()),
+      languageTag: await resolveVoiceInputStartLanguageTag(),
       onDraftChange: getOnDraftChange(),
       onFeedback: showFeedback,
       owner,

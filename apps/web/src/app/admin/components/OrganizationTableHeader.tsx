@@ -44,7 +44,7 @@ export function OrganizationTableHeader({
           </TableHead>
           <TableHead>
             <SortableButton field="kilo_pass_tier" sortConfig={sortConfig} onSort={onSort}>
-              Kilo Pass
+              Org Kilo Pass
             </SortableButton>
           </TableHead>
           {showStripeStatus && (

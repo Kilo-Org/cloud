@@ -153,6 +153,7 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   return {
     dateGroups,
     isPending: query.isPending,
+    isFetching: query.isFetching,
     isError: query.isError,
     refetch: query.refetch,
   };

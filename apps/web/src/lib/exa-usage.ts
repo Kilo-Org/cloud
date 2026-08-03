@@ -2,10 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import {
-  mutateOrganizationUsage,
-  scheduleOrganizationLowBalanceAlert,
-} from '@/lib/organizations/organization-usage';
+import { scheduleOrganizationLowBalanceAlert } from '@/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
 import {
@@ -15,6 +12,7 @@ import {
 } from '@kilocode/db/cost-insights-rollups';
 import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { getExaCostInsightFeatureKey } from '@/lib/exa-paths';
+import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
 
 export type ExaMonthlyUsageResult = {
   /** Total spend in microdollars for the current month. */
@@ -122,6 +120,7 @@ export async function recordExaUsage(params: {
       organizationId,
       occurredAt,
       costMicrodollars,
+      sourceId,
     });
 
     await captureCostInsightSpend(tx, {
@@ -219,16 +218,20 @@ async function deductFromBalance(
     organizationId: string | undefined;
     occurredAt: string;
     costMicrodollars: number;
+    sourceId: string;
   }
 ): Promise<OrganizationUsageMutationResult | null> {
-  const { userId, organizationId, occurredAt, costMicrodollars } = params;
+  const { userId, organizationId, occurredAt, costMicrodollars, sourceId } = params;
   if (organizationId) {
-    return mutateOrganizationUsage(tx, {
-      kilo_user_id: userId,
-      organization_id: organizationId,
-      cost: costMicrodollars,
-      created_at: occurredAt,
+    const result = await recordOrganizationConsumption(tx, {
+      organizationId,
+      kiloUserId: userId,
+      amountMicrodollars: costMicrodollars,
+      occurredAt,
+      source: 'exa',
+      sourceId,
     });
+    return result.organizationUsage;
   }
 
   await tx

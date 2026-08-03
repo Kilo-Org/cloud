@@ -239,19 +239,20 @@ export function UpgradeTrialDialog({
           {/* Credit Options */}
           <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
             <h3 className="mb-3 text-center text-sm font-semibold text-white">
-              Credits are not included with your subscription. Use what works best for your team no
-              matter what plan you choose.
+              Credits are not included with seat subscriptions. Choose the credit setup that fits
+              your team.
             </h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {/* Kilo Pass */}
               <div className="rounded-md border border-gray-600 bg-gray-900/50 p-3">
-                <h4 className="text-sm font-medium text-white">Kilo Pass</h4>
+                <h4 className="text-sm font-medium text-white">Kilo Pass for Organizations</h4>
                 <p className="mt-1 text-xs text-gray-400">
-                  Credit subscription with bonus credits.{' '}
+                  Monthly Credits and bonus Credits for every paid seat.{' '}
                   <a
                     href="https://kilo.ai/features/kilo-pass"
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label="Learn more about Kilo Pass for Organizations"
                     className="text-blue-400 hover:underline"
                   >
                     Learn more
@@ -268,6 +269,7 @@ export function UpgradeTrialDialog({
                     href="https://app.kilo.ai/credits"
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label="Learn more about pay-as-you-go Credits"
                     className="text-blue-400 hover:underline"
                   >
                     Learn more
@@ -284,6 +286,7 @@ export function UpgradeTrialDialog({
                     href="https://kilo.ai/docs/getting-started/byok"
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label="Learn more about Bring Your Own Key"
                     className="text-blue-400 hover:underline"
                   >
                     Learn more

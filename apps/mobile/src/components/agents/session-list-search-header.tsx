@@ -10,7 +10,7 @@ type SessionListSearchHeaderProps = {
   /** Drives the in-field X's visibility. Derived from `onChangeText` by the
    * parent so the TextInput itself stays uncontrolled (iOS TextInput rules). */
   hasText: boolean;
-  isSearchPending: boolean;
+  showSearchBusy: boolean;
   showInlineError: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
@@ -19,7 +19,7 @@ type SessionListSearchHeaderProps = {
 export function SessionListSearchHeader({
   inputRef,
   hasText,
-  isSearchPending,
+  showSearchBusy,
   showInlineError,
   onChangeText,
   onClearSearch,
@@ -51,7 +51,7 @@ export function SessionListSearchHeader({
           </Pressable>
         ) : null}
       </View>
-      {isSearchPending ? (
+      {showSearchBusy ? (
         <View className="mx-[22px] mb-[14px] flex-row items-center gap-2">
           <ActivityIndicator size="small" color={colors.mutedForeground} />
           <Text variant="muted" className="text-xs">

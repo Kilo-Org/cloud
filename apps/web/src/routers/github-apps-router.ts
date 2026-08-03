@@ -317,7 +317,7 @@ export const githubAppsRouter = createTRPCRouter({
       });
     }
 
-    await upsertPlatformIntegrationForOwner(owner, {
+    const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
       platform: 'github',
       integrationType: 'app',
       platformInstallationId: installationId,
@@ -328,6 +328,13 @@ export const githubAppsRouter = createTRPCRouter({
       repositoryAccess: installationDetails.repository_selection,
       installedAt: installationDetails.created_at,
     });
+
+    if (!upsertResult.ok) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'This GitHub installation is already claimed by another account.',
+      });
+    }
 
     const repositories = await fetchGitHubRepositories(installationId, appType);
     await updateRepositoriesForIntegration(integration.id, repositories);
@@ -372,7 +379,7 @@ export const githubAppsRouter = createTRPCRouter({
 
       const owner = resolveOwner(ctx, input.organizationId);
 
-      await upsertPlatformIntegrationForOwner(owner, {
+      const devUpsertResult = await upsertPlatformIntegrationForOwner(owner, {
         platform: 'github',
         integrationType: 'app',
         platformInstallationId: input.installationId,
@@ -384,6 +391,13 @@ export const githubAppsRouter = createTRPCRouter({
         installedAt: installationDetails.created_at,
         githubAppType: appType,
       });
+
+      if (!devUpsertResult.ok) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This GitHub installation is already claimed by another account.',
+        });
+      }
 
       const integration = await getIntegrationForOwner(owner, 'github');
       if (integration) {

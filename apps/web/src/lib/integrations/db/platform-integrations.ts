@@ -550,10 +550,18 @@ export async function unsuspendIntegrationForOwner(owner: Owner, platform: strin
     .where(and(ownershipCondition, eq(platform_integrations.platform, platform)));
 }
 
+export type UpsertPlatformIntegrationResult =
+  | { ok: true }
+  | { ok: false; reason: 'claimed_by_other_owner' };
+
 /**
- * Owner-aware upsert for platform integrations
- * Supports both user and organization ownership
- * Uses atomic INSERT ... ON CONFLICT DO UPDATE to prevent race conditions
+ * Owner-aware upsert for platform integrations.
+ * Supports both user and organization ownership.
+ *
+ * For GitHub installations, the function prevents cross-owner theft:
+ * an insert targeting the global unique index uses `onConflictDoNothing`,
+ * and a blocked insert re-reads the owner before any update. Ownership
+ * columns are never set in conflict-update targets or SET clauses.
  */
 export async function upsertPlatformIntegrationForOwner(
   owner: Owner,
@@ -570,14 +578,95 @@ export async function upsertPlatformIntegrationForOwner(
     installedAt?: string;
     githubAppType?: GitHubAppType;
   }
-) {
-  // Build ownership condition based on owner type
+): Promise<UpsertPlatformIntegrationResult> {
+  const appType = data.githubAppType ?? 'standard';
+
+  // Build values object used for both insert paths.
+  const values = {
+    owned_by_user_id: owner.type === 'user' ? owner.id : null,
+    owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+    platform: data.platform,
+    integration_type: data.integrationType,
+    platform_installation_id: data.platformInstallationId,
+    platform_account_id: data.platformAccountId || null,
+    platform_account_login: data.platformAccountLogin || null,
+    permissions: (data.permissions as IntegrationPermissions) ?? null,
+    scopes: data.scopes || null,
+    repository_access: data.repositoryAccess,
+    integration_status: INTEGRATION_STATUS.ACTIVE,
+    repositories: data.repositories || null,
+    installed_at: data.installedAt || new Date().toISOString(),
+    github_app_type: appType,
+  };
+
+  // GitHub installations use a conflict-safe two-step pattern.
+  // Step 1: try insert with onConflictDoNothing on the global unique index.
+  // Step 2: if the insert was blocked, re-read the row and determine
+  // whether this is a same-owner refresh or a cross-owner claim.
+  if (data.platform === 'github') {
+    const inserted = await db
+      .insert(platform_integrations)
+      .values(values)
+      .onConflictDoNothing()
+      .returning({ id: platform_integrations.id });
+
+    if (inserted.length > 0) {
+      return { ok: true };
+    }
+
+    // Insert was blocked — another row claims this installation.
+    const existing = await findIntegrationByInstallationId('github', data.platformInstallationId);
+
+    if (!existing) {
+      // The blocked insert produced no row and we cannot find the
+      // existing row. This is an edge case from a concurrent delete.
+      // Retry the insert: this time without onConflictDoNothing so
+      // the DB enforces uniqueness (or the call throws).
+      await db.insert(platform_integrations).values(values);
+      return { ok: true };
+    }
+
+    // Compare owners by type and id — a matching id with a different
+    // owner type must not refresh another owner's integration.
+    const sameOwner =
+      (owner.type === 'user' &&
+        existing.owned_by_user_id === owner.id &&
+        existing.owned_by_organization_id === null) ||
+      (owner.type === 'org' &&
+        existing.owned_by_organization_id === owner.id &&
+        existing.owned_by_user_id === null);
+
+    if (sameOwner) {
+      // Same-owner refresh: update by primary key.
+      await db
+        .update(platform_integrations)
+        .set({
+          platform_account_id: values.platform_account_id,
+          platform_account_login: values.platform_account_login,
+          permissions: values.permissions,
+          scopes: values.scopes,
+          repository_access: values.repository_access,
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          repositories: values.repositories,
+          github_app_type: appType,
+          auth_invalid_at: null,
+          auth_invalid_reason: null,
+          updated_at: new Date().toISOString(),
+        })
+        .where(eq(platform_integrations.id, existing.id));
+      return { ok: true };
+    }
+
+    // Cross-owner claim: refused.
+    return { ok: false, reason: 'claimed_by_other_owner' };
+  }
+
+  // Non-GitHub platforms use the existing per-owner pattern.
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)
       : eq(platform_integrations.owned_by_organization_id, owner.id);
 
-  // Check if integration exists
   const [existing] = await db
     .select()
     .from(platform_integrations)
@@ -591,42 +680,27 @@ export async function upsertPlatformIntegrationForOwner(
     .limit(1);
 
   if (existing) {
-    // Update existing integration
     await db
       .update(platform_integrations)
       .set({
-        platform_account_id: data.platformAccountId || null,
-        platform_account_login: data.platformAccountLogin || null,
-        permissions: (data.permissions as IntegrationPermissions) ?? null,
-        scopes: data.scopes || null,
-        repository_access: data.repositoryAccess,
+        platform_account_id: values.platform_account_id,
+        platform_account_login: values.platform_account_login,
+        permissions: values.permissions,
+        scopes: values.scopes,
+        repository_access: values.repository_access,
         integration_status: INTEGRATION_STATUS.ACTIVE,
-        repositories: data.repositories || null,
-        github_app_type: data.githubAppType || existing.github_app_type,
+        repositories: values.repositories,
+        github_app_type: appType,
         auth_invalid_at: null,
         auth_invalid_reason: null,
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, existing.id));
   } else {
-    // Insert new integration
-    await db.insert(platform_integrations).values({
-      owned_by_user_id: owner.type === 'user' ? owner.id : null,
-      owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-      platform: data.platform,
-      integration_type: data.integrationType,
-      platform_installation_id: data.platformInstallationId,
-      platform_account_id: data.platformAccountId || null,
-      platform_account_login: data.platformAccountLogin || null,
-      permissions: (data.permissions as IntegrationPermissions) ?? null,
-      scopes: data.scopes || null,
-      repository_access: data.repositoryAccess,
-      integration_status: INTEGRATION_STATUS.ACTIVE,
-      repositories: data.repositories || null,
-      installed_at: data.installedAt || new Date().toISOString(),
-      github_app_type: data.githubAppType || 'standard',
-    });
+    await db.insert(platform_integrations).values(values);
   }
+
+  return { ok: true };
 }
 
 /**

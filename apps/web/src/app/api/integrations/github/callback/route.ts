@@ -7,6 +7,7 @@ import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/ada
 import {
   getGitHubAppTypeForOrganization,
   getGitHubAppCredentials,
+  assertUserAdministersInstallation,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
@@ -353,7 +354,8 @@ async function handleCoreInstallFlow(params: {
 
       if (code) {
         try {
-          githubRequester = await exchangeGitHubOAuthCode(code, githubAppType);
+          const githubUser = await exchangeGitHubOAuthCode(code, githubAppType);
+          githubRequester = { id: githubUser.id, login: githubUser.login };
 
           console.log('GitHub user fetched', {
             github_user_id: githubRequester.id,
@@ -430,6 +432,56 @@ async function handleCoreInstallFlow(params: {
     return NextResponse.redirect(
       new URL(appendQueryParam(redirectPath, 'error=missing_installation_id'), APP_URL)
     );
+  }
+
+  // Admin proof — report mode. The GitHub App does not yet request OAuth
+  // authorization during installation. When `code` is present we verify
+  // administration and log the outcome; when absent we log and proceed.
+  // A follow-up commit will hard-require `code` after the App setting is
+  // enabled in the GitHub App dashboard.
+  if (setupAction === 'install' || setupAction === 'update') {
+    const code = searchParams.get('code');
+
+    if (code) {
+      try {
+        const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
+        const isAdmin = await assertUserAdministersInstallation({
+          accessToken: exchangeResult.accessToken,
+          installationId,
+        });
+
+        if (isAdmin) {
+          console.log('[github_admin_proof:pass]', {
+            github_user_id: exchangeResult.id,
+            github_user_login: exchangeResult.login,
+            installation_id: installationId,
+          });
+        } else {
+          console.log('[github_admin_proof:fail_non_admin]', {
+            github_user_id: exchangeResult.id,
+            github_user_login: exchangeResult.login,
+            installation_id: installationId,
+          });
+        }
+      } catch (error) {
+        console.error('[github_admin_proof:error]', {
+          installation_id: installationId,
+          error: (error as Error).message,
+        });
+        captureException(error, {
+          tags: {
+            endpoint: 'github/callback',
+            source: 'github_admin_proof',
+          },
+          extra: { installationId },
+        });
+      }
+    } else {
+      console.log('[github_admin_proof:code_absent]', {
+        installation_id: installationId,
+        setup_action: setupAction,
+      });
+    }
   }
 
   // Fetch installation details from GitHub
@@ -518,7 +570,7 @@ async function handleCoreInstallFlow(params: {
     const accountLogin =
       'login' in account ? account.login : 'slug' in account ? account.slug : accountId;
 
-    await upsertPlatformIntegrationForOwner(owner, {
+    const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
       platform: 'github',
       integrationType: 'app',
       platformInstallationId: installationId,
@@ -533,6 +585,12 @@ async function handleCoreInstallFlow(params: {
         : new Date().toISOString(),
       githubAppType,
     });
+
+    if (!upsertResult.ok) {
+      return NextResponse.redirect(
+        new URL(appendQueryParam(redirectPath, 'error=installation_already_claimed'), APP_URL)
+      );
+    }
   }
 
   // Redirect to success page

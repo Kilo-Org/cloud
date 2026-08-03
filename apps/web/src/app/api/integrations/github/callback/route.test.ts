@@ -15,6 +15,7 @@ import {
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
 import type { StateAdapter } from 'chat';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
@@ -50,6 +51,7 @@ jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
     appName: 'KiloConnect',
     webhookSecret: 'webhook-secret',
   })),
+  assertUserAdministersInstallation: jest.fn(async () => true),
 }));
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
@@ -58,7 +60,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   createPendingIntegration: jest.fn(),
   findIntegrationByInstallationId: jest.fn(),
   findPendingInstallationByRequesterId: jest.fn(),
-  upsertPlatformIntegrationForOwner: jest.fn(),
+  upsertPlatformIntegrationForOwner: jest.fn(async () => ({ ok: true })),
 }));
 jest.mock('@/lib/organizations/organizations', () => ({
   isOrganizationMember: jest.fn(),
@@ -90,6 +92,7 @@ const mockedUpsertPlatformIntegrationForOwner = jest.mocked(upsertPlatformIntegr
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 const mockedConsumeInstallState = jest.mocked(consumeInstallState);
 const mockedGetEnvVariable = jest.mocked(getEnvVariable);
+const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
@@ -584,5 +587,175 @@ describe('GET /api/integrations/github/callback legacy flag gating', () => {
     expect(response.status).toBe(307);
     expectRedirectLocation(response, `/integrations/github?success=installed`);
     expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/integrations/github/callback admin proof (report mode)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: USER_ID,
+        google_user_email: 'mobile-e2e@example.com',
+        google_user_name: 'Mobile E2E',
+      },
+      authFailedResponse: null,
+    } as never);
+    mockedVerifyGitHubBotLinkState.mockReturnValue(null);
+    mockedConsumeInstallState.mockResolvedValue(null);
+    mockedGetEnvVariable.mockReturnValue('true');
+    mockedCreateAppAuth.mockReturnValue(
+      jest.fn(async () => ({ token: 'github-app-token' })) as never
+    );
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => ({
+              data: {
+                account: { id: 12_345, login: 'securexg' },
+                created_at: '2026-07-09T19:00:00.000Z',
+                events: ['issues'],
+                permissions: { contents: 'write' },
+                repository_selection: 'all',
+              },
+            })),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+    mockedAssertUserAdministersInstallation.mockResolvedValue(true);
+    mockedExchangeGitHubOAuthCode.mockResolvedValue({
+      id: GITHUB_USER_ID,
+      login: 'octocat',
+      accessToken: 'ghu_test-token',
+    });
+  });
+
+  test('completes an install when code is absent (report mode)', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?success=installed`);
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+    // Admin proof was not run.
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+    expect(mockedAssertUserAdministersInstallation).not.toHaveBeenCalled();
+  });
+
+  test('completes an install when code is present and user is admin (report mode)', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?success=installed`);
+    expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
+    expect(mockedAssertUserAdministersInstallation).toHaveBeenCalledWith({
+      accessToken: 'ghu_test-token',
+      installationId: INSTALLATION_ID,
+    });
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+  });
+
+  test('still completes install when admin check returns false (report mode does not block non-admin)', async () => {
+    mockedAssertUserAdministersInstallation.mockResolvedValue(false);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
+      ) as never
+    );
+
+    // Report mode: non-admin is logged but the install proceeds.
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?success=installed`);
+    expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalled();
+    expect(mockedAssertUserAdministersInstallation).toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+  });
+
+  test('still completes install when code exchange fails (report mode)', async () => {
+    mockedExchangeGitHubOAuthCode.mockRejectedValue(new Error('Token exchange failed'));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
+      ) as never
+    );
+
+    // API failure in admin proof does not block the install.
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?success=installed`);
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+  });
+
+  test('redirects with installation_already_claimed when upsert detects cross-owner claim', async () => {
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({
+      ok: false,
+      reason: 'claimed_by_other_owner',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_already_claimed`);
+  });
+
+  test('logs distinct messages for code-absent vs non-admin (report mode distinguishes)', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    // Case 1: code absent — should log code_absent.
+    const { GET } = await import('./route');
+    await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+      ) as never
+    );
+
+    const codeAbsentLogs = logSpy.mock.calls.filter(
+      (call: unknown[]) =>
+        typeof call[0] === 'string' && (call[0] as string).includes('[github_admin_proof')
+    );
+    expect(codeAbsentLogs.length).toBeGreaterThan(0);
+    expect(codeAbsentLogs[0][0]).toContain('code_absent');
+    expect(codeAbsentLogs[0][0]).not.toContain('fail_non_admin');
+
+    logSpy.mockClear();
+
+    // Case 2: code present but non-admin — should log fail_non_admin.
+    mockedAssertUserAdministersInstallation.mockResolvedValue(false);
+    await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
+      ) as never
+    );
+
+    const nonAdminLogs = logSpy.mock.calls.filter(
+      (call: unknown[]) =>
+        typeof call[0] === 'string' && (call[0] as string).includes('[github_admin_proof')
+    );
+    expect(nonAdminLogs.length).toBeGreaterThan(0);
+    expect(nonAdminLogs[0][0]).toContain('fail_non_admin');
+    expect(nonAdminLogs[0][0]).not.toContain('code_absent');
+
+    logSpy.mockRestore();
   });
 });

@@ -18,7 +18,6 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useUser } from '@/hooks/useUser';
 import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -229,6 +228,20 @@ export function GitHubIntegrationDetails({
         description: `You already have a pending GitHub installation in another organization. Please complete or cancel that installation first.`,
         duration: 8000,
       });
+    } else if (error === 'not_installation_admin') {
+      toast.error(
+        'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
+        { duration: 8000 }
+      );
+    } else if (error === 'installation_already_claimed') {
+      toast.error(
+        'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
+        { duration: 8000 }
+      );
+    } else if (error === 'github_authorization_required') {
+      toast.error('GitHub did not return an authorization. Start the connection again.', {
+        duration: 8000,
+      });
     } else if (error === 'already_connected_to_another_account') {
       toast.error('This GitHub identity is already connected to another Kilo account.');
     } else if (error === 'disconnect_existing_identity_first') {
@@ -237,8 +250,6 @@ export function GitHubIntegrationDetails({
       toast.error(`GitHub connection failed: ${error}`);
     }
   }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
-
-  const { data: user } = useUser();
 
   const handleModelChange = (modelSlug: string) => {
     setSelectedModel(modelSlug);

@@ -1429,6 +1429,13 @@
       "when": 1785784924237,
       "tag": "0203_unknown_magus",
       "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1785787945927,
+      "tag": "0204_fantastic_loa",
+      "breakpoints": true
     }
   ]
 }

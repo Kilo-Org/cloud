@@ -87,7 +87,7 @@ describe('githubAppsRouter.refreshInstallation', () => {
       created_at: '2026-01-01T00:00:00.000Z',
     });
     mockFetchGitHubRepositories.mockResolvedValue([]);
-    mockUpsertPlatformIntegrationForOwner.mockResolvedValue(undefined);
+    mockUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
     mockUpdateRepositoriesForIntegration.mockResolvedValue(undefined);
   });
 

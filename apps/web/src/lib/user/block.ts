@@ -1,6 +1,11 @@
 import { randomUUID } from 'crypto';
-import { and, eq, isNull } from 'drizzle-orm';
-import { kilocode_users } from '@kilocode/db/schema';
+import { and, eq, isNull, or, inArray } from 'drizzle-orm';
+import {
+  kilocode_users,
+  device_auth_requests,
+  device_sessions,
+  device_refresh_tokens,
+} from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
 export type BlockUserParams = {
@@ -21,20 +26,76 @@ export type BlockUserParams = {
  * overwritten — the original block reason is preserved and callers can rely on
  * the return value to detect the unblocked->blocked transition.
  *
+ * Also in the same transaction:
+ * - Denies every pending or approved device auth request for this user.
+ * - Revokes every non-revoked device session for this user.
+ * - Deletes every unconsumed device refresh token owned by those sessions.
+ *
  * @returns `true` if this call transitioned the user from unblocked to blocked,
  * `false` if the user was already blocked (or does not exist).
  */
 export async function blockUser(params: BlockUserParams): Promise<boolean> {
-  const executor = params.dbOrTx ?? db;
-  const rows = await executor
-    .update(kilocode_users)
-    .set({
-      blocked_reason: params.reason,
-      blocked_at: new Date().toISOString(),
-      blocked_by_kilo_user_id: params.blockedByKiloUserId ?? null,
-      api_token_pepper: randomUUID(),
-    })
-    .where(and(eq(kilocode_users.id, params.kiloUserId), isNull(kilocode_users.blocked_reason)))
-    .returning({ id: kilocode_users.id });
-  return rows.length > 0;
+  const executor = params.dbOrTx;
+
+  async function run(tx: typeof db | DrizzleTransaction): Promise<boolean> {
+    const rows = await tx
+      .update(kilocode_users)
+      .set({
+        blocked_reason: params.reason,
+        blocked_at: new Date().toISOString(),
+        blocked_by_kilo_user_id: params.blockedByKiloUserId ?? null,
+        api_token_pepper: randomUUID(),
+      })
+      .where(and(eq(kilocode_users.id, params.kiloUserId), isNull(kilocode_users.blocked_reason)))
+      .returning({ id: kilocode_users.id });
+
+    if (rows.length === 0) return false;
+
+    const now = new Date().toISOString();
+
+    // Deny every pending or approved device auth request for this user.
+    await tx
+      .update(device_auth_requests)
+      .set({ status: 'denied' })
+      .where(
+        and(
+          eq(device_auth_requests.kilo_user_id, params.kiloUserId),
+          or(
+            eq(device_auth_requests.status, 'pending'),
+            eq(device_auth_requests.status, 'approved')
+          )
+        )
+      );
+
+    // Revoke every non-revoked device session for this user.
+    await tx
+      .update(device_sessions)
+      .set({ revoked_at: now, revoked_reason: 'user_blocked' })
+      .where(
+        and(eq(device_sessions.kilo_user_id, params.kiloUserId), isNull(device_sessions.revoked_at))
+      );
+
+    // Delete every unconsumed device refresh token owned by those sessions.
+    await tx
+      .delete(device_refresh_tokens)
+      .where(
+        and(
+          inArray(
+            device_refresh_tokens.device_session_id,
+            tx
+              .select({ id: device_sessions.id })
+              .from(device_sessions)
+              .where(eq(device_sessions.kilo_user_id, params.kiloUserId))
+          ),
+          isNull(device_refresh_tokens.consumed_at)
+        )
+      );
+
+    return true;
+  }
+
+  if (executor) {
+    return run(executor);
+  }
+  return db.transaction(tx => run(tx));
 }

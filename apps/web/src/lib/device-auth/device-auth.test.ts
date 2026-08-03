@@ -311,6 +311,26 @@ describe('Device Auth', () => {
       expect(result.refreshToken).toBeUndefined();
       expect(result.expiresIn).toBeUndefined();
     });
+
+    test('returns denied for a blocked user (new path)', async () => {
+      const { code, deviceCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(code, testUserId);
+
+      // Block the user
+      await db
+        .update(kilocode_users)
+        .set({ blocked_reason: 'test block', blocked_at: new Date().toISOString() })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const result = await consumeDeviceAuthByDeviceCode(deviceCode);
+
+      expect(result.status).toBe('denied');
+      expect(result.token).toBeUndefined();
+
+      // Verify the request is durably denied, not consumed.
+      const request = await getDeviceAuthRequest(code);
+      expect(request?.status).toBe('denied');
+    });
   });
 
   describe('pollDeviceAuthRequest (legacy)', () => {
@@ -393,6 +413,26 @@ describe('Device Auth', () => {
       // After consume, the second sequential poll returns expired.
       expect(second.status).toBe('expired');
       expect(second.token).toBeUndefined();
+    });
+
+    test('returns denied for a blocked user (legacy path)', async () => {
+      const { code } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(code, testUserId);
+
+      // Block the user
+      await db
+        .update(kilocode_users)
+        .set({ blocked_reason: 'test block', blocked_at: new Date().toISOString() })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const result = await pollDeviceAuthRequest(code);
+
+      expect(result.status).toBe('denied');
+      expect(result.token).toBeUndefined();
+
+      // Verify the request is durably denied, not consumed.
+      const request = await getDeviceAuthRequest(code);
+      expect(request?.status).toBe('denied');
     });
   });
 

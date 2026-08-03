@@ -235,6 +235,14 @@ export async function consumeDeviceAuthByDeviceCode(
     throw new Error('User not found');
   }
 
+  if (user.blocked_reason) {
+    await db
+      .update(device_auth_requests)
+      .set({ status: 'denied' })
+      .where(eq(device_auth_requests.code, consumed.code));
+    return { status: 'denied' };
+  }
+
   const token = options?.supportsRefresh
     ? undefined
     : generateApiToken(user, { deviceAuthRequestCode: consumed.code });
@@ -306,6 +314,14 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
 
     if (!user) {
       throw new Error('User not found');
+    }
+
+    if (user.blocked_reason) {
+      await db
+        .update(device_auth_requests)
+        .set({ status: 'denied' })
+        .where(eq(device_auth_requests.code, code));
+      return { status: 'denied' };
     }
 
     const token = generateApiToken(user, {

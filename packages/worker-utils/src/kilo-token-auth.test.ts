@@ -2,14 +2,17 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { clearSecretCacheForTest } from './cached-secret';
 import { signKiloToken } from './kilo-token';
-import { verifyKiloBearerAgainstCurrentPepper } from './kilo-token-auth';
+import { verifyKiloBearerAgainstCurrentPepper, type KiloUserPepperResult } from './kilo-token-auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
-const currentPepperByUserId = new Map<string, string | null>();
+const userResultByUserId = new Map<string, KiloUserPepperResult>();
 
-async function getUserPepper(_connectionString: string, userId: string) {
-  return currentPepperByUserId.has(userId) ? currentPepperByUserId.get(userId) : undefined;
+async function getUserPepper(
+  _connectionString: string,
+  userId: string
+): Promise<KiloUserPepperResult | null | undefined> {
+  return userResultByUserId.has(userId) ? userResultByUserId.get(userId)! : undefined;
 }
 
 async function signToken(params: {
@@ -39,8 +42,8 @@ function verifyToken(token: string | null) {
 describe('verifyKiloBearerAgainstCurrentPepper', () => {
   beforeEach(() => {
     clearSecretCacheForTest();
-    currentPepperByUserId.clear();
-    currentPepperByUserId.set('user-xyz-789', 'pepper-current');
+    userResultByUserId.clear();
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
   });
 
   it('accepts a token with the current user pepper', async () => {
@@ -56,7 +59,7 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
   });
 
   it('rejects tokens for missing users', async () => {
-    currentPepperByUserId.clear();
+    userResultByUserId.clear();
     const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
 
     await expect(verifyToken(token)).resolves.toBeNull();
@@ -66,5 +69,33 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     const { token } = await signToken({ pepper: 'pepper-stale', tokenSource: 'kilo-chat' });
 
     await expect(verifyToken(token)).resolves.toBeNull();
+  });
+
+  it('rejects tokens for blocked users (pepper matches, but blocked_reason is set)', async () => {
+    userResultByUserId.set('user-xyz-789', {
+      pepper: 'pepper-current',
+      blockedReason: 'manual block',
+    });
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(verifyToken(token)).resolves.toBeNull();
+  });
+
+  it('rejects tokens for blocked users even when the stored pepper is null', async () => {
+    userResultByUserId.set('user-xyz-789', {
+      pepper: null,
+      blockedReason: 'soft-deleted at 2026-01-01T00:00:00.000Z',
+    });
+    const { token } = await signToken({ pepper: null, tokenSource: 'kilo-chat' });
+
+    await expect(verifyToken(token)).resolves.toBeNull();
+  });
+
+  it('accepts tokens when blockedReason is null and pepper matches', async () => {
+    // Explicitly confirm null blockedReason + matching pepper passes.
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
   });
 });

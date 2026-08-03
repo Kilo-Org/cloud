@@ -51,6 +51,7 @@ export function processResponsesApiUsage(
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats
 ): JustTheCostsUsageStats {
+  // OpenAI-style input_tokens already includes cached and cache-write tokens.
   const inputTokens = usage?.input_tokens ?? 0;
   const outputTokens = usage?.output_tokens ?? 0;
   const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;

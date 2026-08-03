@@ -79,6 +79,11 @@ export const CLIInboundMessageSchema = z.discriminatedUnion('type', [
     command: z.string(),
     sessionId: z.string().optional(),
     data: z.unknown().optional(),
+    // Stable intent id forwarded from the web wire. The CLI does not
+    // interpret it; it is echoed back on the response for the DO's
+    // durable dedupe to match against the stored entry. Absent when the
+    // web client did not supply one.
+    mutationId: z.string().optional(),
   }),
   z.object({
     type: z.literal('system'),
@@ -108,6 +113,11 @@ export const WebOutboundMessageSchema = z.discriminatedUnion('type', [
     connectionId: z.string().optional(),
     command: z.string(),
     data: z.unknown().optional(),
+    // Stable client-side intent id. When present, the DO uses it as the
+    // correlation id so a retry with the same mutationId runs the command
+    // once for the full TTL window (D8 dedupe). Absent on older clients;
+    // the DO falls back to crypto.randomUUID() per D5.
+    mutationId: z.string().optional(),
   }),
   z.object({
     type: z.literal('ping'),

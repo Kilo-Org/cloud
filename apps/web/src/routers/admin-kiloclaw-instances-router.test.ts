@@ -2876,6 +2876,63 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         );
       expect(appliedTarget.status).toBe('applied');
     });
+
+    it('still notifies a target claimed by the apply pass but resolved as non-applied', async () => {
+      // Race window: the DO's apply pass can claim a target (pending ->
+      // running) moments before this cancel transaction runs. The
+      // cancel's own UPDATE only touches 'pending' rows, so a 'running'
+      // target is untouched here and resolves later via a completely
+      // separate outcome (e.g. skipped:pinned) that has nothing to do
+      // with this cancel. The notification gate must still fire for it
+      // — the user never got the announced change.
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      await db
+        .update(kiloclaw_scheduled_action_notifications)
+        .set({ status: 'sent', sent_at: new Date().toISOString() })
+        .where(eq(kiloclaw_scheduled_action_notifications.kind, 'notice'));
+
+      // Simulate the apply pass having claimed the target, then resolved
+      // it for a reason unrelated to any cancel (e.g. version pin).
+      await db
+        .update(kiloclaw_scheduled_action_targets)
+        .set({ status: 'skipped', skip_reason: 'pinned' })
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+
+      await caller.admin.kiloclawInstances.cancelScheduledAction({ id: created.id });
+
+      const cancellationRows = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(
+          and(
+            eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id),
+            eq(kiloclaw_scheduled_action_notifications.kind, 'cancelled')
+          )
+        );
+
+      expect(cancellationRows.length).toBeGreaterThan(0);
+
+      // The pre-existing skip is not clobbered by cancel.
+      const [target] = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(target.status).toBe('skipped');
+      expect(target.skip_reason).toBe('pinned');
+    });
   });
 
   describe('cancelScheduledActionTarget', () => {

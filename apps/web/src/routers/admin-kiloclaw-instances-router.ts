@@ -3043,12 +3043,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             )
           );
 
-        // Capture the target rows this cancel actually took away from
-        // the user. Everything else under this parent has already
-        // resolved (applied / failed / previously skipped) and must NOT
-        // be told "your upgrade was cancelled" — see the notification
-        // scoping below.
-        const cancelledTargets = await tx
+        await tx
           .update(kiloclaw_scheduled_action_targets)
           .set({
             status: 'skipped',
@@ -3059,8 +3054,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               eq(kiloclaw_scheduled_action_targets.scheduled_action_id, input.id),
               eq(kiloclaw_scheduled_action_targets.status, 'pending')
             )
-          )
-          .returning({ id: kiloclaw_scheduled_action_targets.id });
+          );
 
         // Queue cancellation notifications for (target, channel) pairs
         // that already had a 'notice' row in 'sent' status. If the
@@ -3068,40 +3062,50 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // cancellation either. ON CONFLICT DO NOTHING keeps repeat
         // cancels idempotent.
         //
-        // Scoped to the targets this cancel just moved pending →
-        // skipped, NOT to every target under the parent. A fleet-wide
-        // action routinely has targets that already applied (or failed)
-        // by the time an admin cancels the remainder; telling those
-        // users their upgrade was cancelled is factually wrong — their
-        // instance is already on the new version. The dispatch side
-        // can't filter this out either: selectDueNotifications lets
+        // Gated on `t.status <> 'applied'`, not on this cancel's own
+        // skip_reason='cancelled' write. A target claimed by the DO's
+        // apply pass (pending → running) moments before this cancel
+        // transaction runs is untouched by the UPDATE above — it's
+        // still 'running' here and resolves later via
+        // recordScheduledActionTargetOutcome with an outcome/skip_reason
+        // that has nothing to do with this cancel (applied, or
+        // skipped:pinned, skipped:pin_changed_in_flight, or failed).
+        // Scoping on the literal string 'cancelled' would silently drop
+        // the notification for every one of those non-applied outcomes
+        // even though the user never got the announced change. `status
+        // <> 'applied'` is the actual invariant we care about — "did
+        // this target get the change we told the user about" — and it
+        // stays correct regardless of which code path produced the
+        // terminal status. It also still excludes rows that legitimately
+        // applied before this cancel landed. The dispatch side can't
+        // filter this out either: selectDueNotifications lets
         // kind='cancelled' rows through with no target-status gate (by
         // design — a cancellation must not be blocked by parent/target
         // state), so the scoping has to happen here at insert time.
+        // Mirrored in services/kiloclaw/src/scheduled/scheduled-action-notices.ts
+        // markSent — keep both in sync if this invariant changes.
         //
         // The race between this cancel and an in-flight 'sending'
         // notice is closed in the sweep's markSent: when markSent
         // moves a row from 'sending' to 'sent' AND the parent action
         // is already in 'cancelled', it inserts a cancellation row in
-        // the same step. That makes the cancellation creation
-        // contingent on the notice actually reaching the user; a
-        // dispatch failure leaves no orphan cancellation pending.
-        if (cancelledTargets.length > 0) {
-          const cancelledTargetIds = sql.join(
-            cancelledTargets.map(t => sql`${t.id}`),
-            sql`, `
-          );
-          await tx.execute(sql`
-            INSERT INTO kiloclaw_scheduled_action_notifications
-              (target_id, channel, kind, status)
-            SELECT n.target_id, n.channel, 'cancelled', 'pending'
-            FROM kiloclaw_scheduled_action_notifications n
-            WHERE n.target_id IN (${cancelledTargetIds})
-              AND n.kind = 'notice'
-              AND n.status = 'sent'
-            ON CONFLICT (target_id, kind, channel) DO NOTHING
-          `);
-        }
+        // the same step (subject to the same status <> 'applied' gate).
+        // That makes the cancellation creation contingent on the notice
+        // actually reaching the user; a dispatch failure leaves no
+        // orphan cancellation pending.
+        await tx.execute(sql`
+          INSERT INTO kiloclaw_scheduled_action_notifications
+            (target_id, channel, kind, status)
+          SELECT n.target_id, n.channel, 'cancelled', 'pending'
+          FROM kiloclaw_scheduled_action_notifications n
+          INNER JOIN kiloclaw_scheduled_action_targets t
+            ON t.id = n.target_id
+          WHERE t.scheduled_action_id = ${input.id}
+            AND n.kind = 'notice'
+            AND n.status = 'sent'
+            AND t.status <> 'applied'
+          ON CONFLICT (target_id, kind, channel) DO NOTHING
+        `);
 
         // Void any pending notice rows so the sweep doesn't deliver a
         // notice for a now-cancelled action. The sweep's selectDue

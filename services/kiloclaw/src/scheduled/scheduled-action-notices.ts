@@ -635,14 +635,18 @@ async function markSent(db: WorkerDb, row: DueNotificationRow): Promise<void> {
   //      creation to a successful markSent means a dispatch failure
   //      leaves no orphan cancellation; the cancellation row only
   //      exists when the user actually received the original notice.
-  //      The target-status gate mirrors the cancel mutation's scoping:
-  //      only a target the cancel actually took away (skipped with
-  //      skip_reason='cancelled') gets told it was cancelled. A target
-  //      that applied in the window between claim and markSent is
-  //      already on the new version, so a cancellation notice would be
-  //      wrong. Safe to read here: markSent only reaches this branch
-  //      once the cancel transaction has committed, and that
-  //      transaction resolves pending targets before committing.
+  //      The target-status gate mirrors the cancel mutation's scoping
+  //      (apps/web/src/routers/admin-kiloclaw-instances-router.ts,
+  //      cancelScheduledAction): `status <> 'applied'`, not a literal
+  //      skip_reason='cancelled' check. A target the apply pass claimed
+  //      (pending -> running) can resolve to skipped:pinned,
+  //      skipped:pin_changed_in_flight, or failed with no relation to
+  //      this cancel at all — none of those write skip_reason='cancelled',
+  //      so gating on that literal would silently drop the notification
+  //      for a user who never got the announced change. `status <>
+  //      'applied'` is the real invariant: only a target that actually
+  //      received the change is excluded. Keep both call sites in sync
+  //      if this invariant changes.
   // ON CONFLICT keeps the insert idempotent against a separate cancel
   // transaction that already queued the cancellation from a 'sent' row.
   await db.execute(sql`
@@ -661,8 +665,7 @@ async function markSent(db: WorkerDb, row: DueNotificationRow): Promise<void> {
     INNER JOIN kiloclaw_scheduled_actions a ON a.id = t.scheduled_action_id
     WHERE f.kind = 'notice'
       AND a.status = 'cancelled'
-      AND t.status = 'skipped'
-      AND t.skip_reason = 'cancelled'
+      AND t.status <> 'applied'
     ON CONFLICT (target_id, kind, channel) DO NOTHING
   `);
 }

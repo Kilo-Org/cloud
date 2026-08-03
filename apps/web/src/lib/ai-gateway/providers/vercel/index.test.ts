@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, it, expect } from '@jest/globals';
+import { afterAll, beforeEach, describe, it, expect } from '@jest/globals';
 import {
   applyVercelSettings,
   convertProviderOptions,
@@ -13,7 +13,7 @@ import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types
 describe('applyVercelSettings', () => {
   const originalPoolsideFreeApiKey = process.env.POOLSIDE_FREE_API_KEY;
 
-  beforeAll(() => {
+  beforeEach(() => {
     process.env.POOLSIDE_FREE_API_KEY = 'poolside-free-api-key';
   });
 
@@ -39,6 +39,21 @@ describe('applyVercelSettings', () => {
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       poolside: [{ apiKey: 'poolside-free-api-key' }],
     });
+  });
+
+  it('does not configure Poolside BYOK when the free API key is unset', async () => {
+    delete process.env.POOLSIDE_FREE_API_KEY;
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'poolside/laguna-s-2.1:free',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('poolside/laguna-s-2.1:free', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
   });
 
   it('keeps user BYOK authoritative for Laguna', async () => {

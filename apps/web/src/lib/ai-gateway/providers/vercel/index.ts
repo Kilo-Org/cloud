@@ -270,9 +270,12 @@ export async function applyVercelSettings(
       : null;
     const providerOptions = convertProviderOptions(requestToMutate, vercelInferenceProviders);
     if (requestedModel === POOLSIDE_FREE_MODEL_ID && providerOptions.gateway) {
-      providerOptions.gateway.byok = {
-        poolside: [{ apiKey: getEnvVariable('POOLSIDE_FREE_API_KEY') }],
-      };
+      const apiKey = getEnvVariable('POOLSIDE_FREE_API_KEY');
+      if (apiKey) {
+        providerOptions.gateway.byok = {
+          poolside: [{ apiKey }],
+        };
+      }
     }
     requestToMutate.body.providerOptions = providerOptions;
   }

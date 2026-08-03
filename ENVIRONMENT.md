@@ -74,6 +74,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Social OAuth Clients
 
+- `ANACONDA_CLIENT_ID` - Anaconda OAuth app client ID. `[PUBLIC]`
+- `ANACONDA_CLIENT_SECRET` - Anaconda OAuth app client secret. `[SECRET]`
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`

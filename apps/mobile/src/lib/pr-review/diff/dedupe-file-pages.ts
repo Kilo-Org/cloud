@@ -13,3 +13,16 @@ export function dedupeFilesByPath<T extends { readonly path: string }>(files: re
   }
   return result;
 }
+
+/** Flatten infinite-query pages into a single deduped file list (first occurrence wins). */
+export function flattenFilePages<T extends { readonly path: string }>(
+  pages: readonly { readonly files: readonly T[] }[] | undefined
+): T[] {
+  const all: T[] = [];
+  for (const page of pages ?? []) {
+    for (const file of page.files) {
+      all.push(file);
+    }
+  }
+  return dedupeFilesByPath(all);
+}

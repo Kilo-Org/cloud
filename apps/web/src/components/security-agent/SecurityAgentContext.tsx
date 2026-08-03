@@ -14,6 +14,7 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityRemediationAdmissionRejectionReason } from '@kilocode/worker-utils/security-remediation-policy';
 import { getSecurityCommandFailureMessage } from '@kilocode/app-shared/security-agent';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
+import type { DependabotAlertsAvailability } from '@/lib/security-agent/core/types';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
 import { getRemediationUnavailableCopy } from './remediation-unavailable-copy';
@@ -76,8 +77,20 @@ type SecurityAgentContextValue = {
   refetchConfig: () => Promise<unknown>;
 
   // Repositories
-  allRepositories: Array<{ id: number; fullName: string; name: string; private: boolean }>;
-  filteredRepositories: Array<{ id: number; fullName: string; name: string; private: boolean }>;
+  allRepositories: Array<{
+    id: number;
+    fullName: string;
+    name: string;
+    private: boolean;
+    dependabotAlerts: DependabotAlertsAvailability;
+  }>;
+  filteredRepositories: Array<{
+    id: number;
+    fullName: string;
+    name: string;
+    private: boolean;
+    dependabotAlerts: DependabotAlertsAvailability;
+  }>;
 
   // Mutation handlers
   trackUiInteraction: (interaction: SecurityAgentUiInteraction) => void;

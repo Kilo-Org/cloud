@@ -17,6 +17,7 @@ import type { Env } from './types.js';
 import {
   assertSandboxBillingAllocation,
   parseSandboxBillingInput,
+  SANDBOX_CAPACITIES,
   SANDBOX_USAGE_SKUS,
   type SandboxBillingInput,
   type SandboxClassName,
@@ -376,6 +377,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     input: SandboxBillingInput,
     trigger: ContainerStartTrigger
   ): Promise<void> {
+    const capacity = SANDBOX_CAPACITIES[this.sandboxClassName];
     const previousStartEpochMs =
       (await this.ctx.storage.get<number>(LAST_START_EPOCH_STORAGE_KEY)) ?? -1;
     const startEpochMs = Math.max(Date.now(), previousStartEpochMs + 1);
@@ -391,6 +393,9 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       metadata: {
         container_class: this.sandboxClassName,
         durable_object_id: this.ctx.id.toString(),
+        vcpu: String(capacity.vcpu),
+        memory_mib: String(capacity.memoryMiB),
+        disk_mb: String(capacity.diskMB),
         ...(input.metadata?.origin ? { origin: input.metadata.origin } : {}),
       },
       startEpochMs,

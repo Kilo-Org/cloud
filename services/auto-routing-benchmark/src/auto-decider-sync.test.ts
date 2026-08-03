@@ -12,6 +12,11 @@ vi.mock('./db', async importOriginal => {
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
+    listStaleRunningDeciderRunIds: vi.fn(),
+    listPendingCurrentProfiles: vi.fn(),
+    markProfilesFailedForRun: vi.fn(),
+    markProfilesRunningForRun: vi.fn(),
+    markProfilesReadyForRun: vi.fn(),
   };
 });
 
@@ -20,6 +25,8 @@ import {
   getLatestSummariesByModel,
   getRunningRun,
   insertRun,
+  listPendingCurrentProfiles,
+  listStaleRunningDeciderRunIds,
   markStaleRunsFailed,
   replaceAutoDeciderModels,
 } from './db';
@@ -85,6 +92,8 @@ describe('syncAutoDeciderModels', () => {
     });
     vi.mocked(replaceAutoDeciderModels).mockResolvedValue(undefined);
     vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
+    vi.mocked(listStaleRunningDeciderRunIds).mockResolvedValue([]);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
     vi.mocked(getRunningRun).mockResolvedValue(undefined);
     vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
     vi.mocked(insertRun).mockResolvedValue(undefined);
@@ -129,6 +138,7 @@ describe('syncAutoDeciderModels', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       engine_identity: 'v1:test',
+      purpose: 'platform',
     });
 
     const result = await syncAutoDeciderModels(env, { fetchImpl });
@@ -142,5 +152,95 @@ describe('syncAutoDeciderModels', () => {
       activeRunId: 'decider-active',
     });
     expect(insertRun).not.toHaveBeenCalled();
+  });
+
+  it('drains stranded pending profiles when the slot is free and no model change', async () => {
+    // No effective model change after sync.
+    fetchImpl.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          candidates: [{ id: 'auto/existing', avgAttemptCostUsd: 18 }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.mocked(getConfigRows).mockResolvedValue({
+      config,
+      classifierModels: ['classifier/model'],
+      deciderModels: [{ model: 'manual/model', reasoning_effort: null }],
+      autoDeciderModels: [
+        {
+          model: 'auto/existing',
+          reasoning_effort: 'high',
+          avg_attempt_cost_usd: 18,
+          synced_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+      excludedAutoDeciderModels: [],
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'stranded/m', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const result = await syncAutoDeciderModels(env, { fetchImpl });
+
+    expect(result.startedRun).toBe(false);
+    expect(result.profileDrainRunId).toMatch(/^profile-/);
+    expect(insertRun).toHaveBeenCalledOnce();
+    expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('profile');
+  });
+
+  it('platform start claims free slot over pending profiles when models changed', async () => {
+    // Free slot + pending profiles + changed models → PLATFORM run starts;
+    // no profile drain this cycle (terminal transition drains later).
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'pending/m', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const result = await syncAutoDeciderModels(env, { fetchImpl });
+
+    expect(result.startedRun).toBe(true);
+    expect(result.runId).toBeTruthy();
+    expect(result.profileDrainRunId).toBeNull();
+    expect(insertRun).toHaveBeenCalledOnce();
+    expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('platform');
+    // Drain must not have claimed pending entries this cycle.
+    expect(listPendingCurrentProfiles).not.toHaveBeenCalled();
+  });
+
+  it('occupied slot skips without draining pending profiles', async () => {
+    vi.mocked(getRunningRun).mockResolvedValue({
+      id: 'decider-active',
+      kind: 'decider',
+      status: 'running',
+      started_at: '2026-06-01T00:00:00.000Z',
+      completed_at: null,
+      error: null,
+      min_accuracy: 0.7,
+      switch_cost_factor: 3,
+      best_accuracy_switch_threshold: 0.05,
+      max_concurrency: 100,
+      benchmark_user_id: 'user-123',
+      benchmark_org_id: null,
+      repetitions: 1,
+      classifier_max_p95_latency_ms: null,
+      engine_identity: 'v1:test',
+      purpose: 'platform',
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'pending/m', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const result = await syncAutoDeciderModels(env, { fetchImpl });
+
+    expect(result).toMatchObject({
+      startedRun: false,
+      skippedReason: 'active-run',
+      activeRunId: 'decider-active',
+      profileDrainRunId: null,
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+    // Slot occupied → leave pending rows untouched (no drain attempt).
+    expect(listPendingCurrentProfiles).not.toHaveBeenCalled();
   });
 });

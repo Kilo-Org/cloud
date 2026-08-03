@@ -10,8 +10,15 @@ jest.mock('@/lib/stripe-client', () => ({
     },
     invoices: {
       retrieve: jest.fn(),
+      pay: jest.fn(),
     },
   },
+}));
+
+jest.mock('@/lib/kilo-pass-org/stripe-adapter', () => ({
+  handleOrganizationKiloPassInvoicePaid: jest.fn().mockResolvedValue(true),
+  handleOrganizationKiloPassPaymentAdverseForInvoice: jest.fn(),
+  handleOrganizationKiloPassSubscriptionEvent: jest.fn(),
 }));
 
 // Mock organization-seats to avoid DB calls
@@ -22,10 +29,14 @@ jest.mock('@/lib/organizations/organization-seats', () => ({
 import { handleUpdateSeatCount, KNOWN_SEAT_PRICE_IDS } from './stripe';
 import { client } from '@/lib/stripe-client';
 import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@/lib/config.server';
+import { handleOrganizationKiloPassInvoicePaid } from '@/lib/kilo-pass-org/stripe-adapter';
 
 // Get references to the mocked functions after import
 const mockSubscriptionsRetrieve = client.subscriptions.retrieve as jest.Mock;
 const mockSubscriptionsUpdate = client.subscriptions.update as jest.Mock;
+const mockInvoicesPay = client.invoices.pay as jest.Mock;
+const mockHandleOrganizationKiloPassInvoicePaid =
+  handleOrganizationKiloPassInvoicePaid as jest.Mock;
 
 describe('handleUpdateSeatCount with 3DS', () => {
   const mockSubscriptionId = 'sub_test_123';
@@ -197,6 +208,73 @@ describe('handleUpdateSeatCount with 3DS', () => {
       }),
       expect.any(Object)
     );
+  });
+
+  it('eagerly reconciles a paid organization Kilo Pass seat increase', async () => {
+    const paidInvoice = {
+      id: 'inv_paid_increase',
+      status: 'paid',
+      parent: { subscription_details: { subscription: mockSubscriptionId } },
+      lines: { data: [] },
+    };
+    const mockSubscription = {
+      id: mockSubscriptionId,
+      metadata: { type: 'kilo-pass-org' },
+      items: {
+        data: [
+          { id: mockItemId, quantity: 6, price: { id: 'price_test_seat' } },
+          { id: 'si_kilo_pass', quantity: 6, price: { id: 'price_kilo_pass' } },
+        ],
+      },
+      latest_invoice: 'inv_previous',
+    };
+
+    mockSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+    mockSubscriptionsUpdate.mockResolvedValue({
+      ...mockSubscription,
+      items: {
+        data: [
+          { id: mockItemId, quantity: 10, price: { id: 'price_test_seat' } },
+          { id: 'si_kilo_pass', quantity: 10, price: { id: 'price_kilo_pass' } },
+        ],
+      },
+      latest_invoice: { id: paidInvoice.id, status: 'open' },
+    });
+    mockInvoicesPay.mockResolvedValue(paidInvoice);
+
+    await expect(handleUpdateSeatCount(mockSubscriptionId, 10, 6)).resolves.toEqual(
+      expect.objectContaining({ success: true })
+    );
+
+    expect(mockHandleOrganizationKiloPassInvoicePaid).toHaveBeenCalledWith({
+      invoice: paidInvoice,
+      paidSeatCount: 10,
+    });
+  });
+
+  it('does not eagerly reconcile an organization Kilo Pass seat decrease', async () => {
+    const mockSubscription = {
+      id: mockSubscriptionId,
+      metadata: { type: 'kilo-pass-org' },
+      items: {
+        data: [
+          { id: mockItemId, quantity: 10, price: { id: 'price_test_seat' } },
+          { id: 'si_kilo_pass', quantity: 10, price: { id: 'price_kilo_pass' } },
+        ],
+      },
+      latest_invoice: 'inv_previous',
+    };
+    mockSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+    mockSubscriptionsUpdate.mockResolvedValue({
+      ...mockSubscription,
+      latest_invoice: { id: 'inv_previous', status: 'paid' },
+    });
+
+    await expect(handleUpdateSeatCount(mockSubscriptionId, 6, 10)).resolves.toEqual(
+      expect.objectContaining({ success: true })
+    );
+
+    expect(mockHandleOrganizationKiloPassInvoicePaid).not.toHaveBeenCalled();
   });
 
   it('ignores non-seat add-ons when preserving free seat items', async () => {

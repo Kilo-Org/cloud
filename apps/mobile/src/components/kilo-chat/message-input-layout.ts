@@ -42,6 +42,18 @@ export function resolveMessageInputHeight(contentHeight: number): number {
   return Math.min(Math.max(paddedHeight, MESSAGE_INPUT_MIN_HEIGHT), MESSAGE_INPUT_MAX_HEIGHT);
 }
 
+/**
+ * Width of the real text area inside the message input.
+ *
+ * The measured wrapper is borderless, but the TextInput itself carries both the
+ * 1px border and `px-3`, so both come off. See the composer equivalent in
+ * `agents/chat-composer-input-height.ts` for why an over-wide measurement
+ * clips a wrapped word with scrolling still disabled.
+ */
+export function resolveMessageInputTextContentWidth(inputWidth: number): number {
+  return inputWidth - MESSAGE_INPUT_HORIZONTAL_PADDING - MESSAGE_INPUT_BORDER_WIDTH * 2;
+}
+
 export function resolveMessageInputBottomPadding({
   bottomSafeAreaInset = 0,
   platform,

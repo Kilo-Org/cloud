@@ -68,6 +68,7 @@ type UsageSummaryRequest = {
   start: string;
   end: string;
 };
+type UsageReconciliationRequest = UsageSummaryRequest & { intervalIds: string[] };
 
 function formatTimestamp(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—';
@@ -85,6 +86,8 @@ function assertNever(value: never): never {
 
 function reconciliationStatusLabel(status: ReconciliationStatus): string {
   switch (status) {
+    case 'compared':
+      return 'Compared';
     case 'missing_from_cloudflare':
       return 'Missing from Cloudflare';
     case 'ambiguous_application':
@@ -99,6 +102,8 @@ function reconciliationStatusLabel(status: ReconciliationStatus): string {
 
 function reconciliationStatusVariant(status: ReconciliationStatus) {
   switch (status) {
+    case 'compared':
+      return 'new' as const;
     case 'missing_from_cloudflare':
       return 'destructive' as const;
     case 'ambiguous_application':
@@ -111,9 +116,9 @@ function reconciliationStatusVariant(status: ReconciliationStatus) {
   return assertNever(status);
 }
 
-function sameSummaryRequest(
-  first: UsageSummaryRequest | null | undefined,
-  second: UsageSummaryRequest | null | undefined
+function sameReconciliationRequest(
+  first: UsageReconciliationRequest | null | undefined,
+  second: UsageReconciliationRequest | null | undefined
 ): boolean {
   return (
     first !== null &&
@@ -123,13 +128,24 @@ function sameSummaryRequest(
     first.subjectType === second.subjectType &&
     first.subjectId === second.subjectId &&
     first.start === second.start &&
-    first.end === second.end
+    first.end === second.end &&
+    first.intervalIds.length === second.intervalIds.length &&
+    first.intervalIds.every((intervalId, index) => intervalId === second.intervalIds[index])
   );
 }
 
 function formatProvisionedCapacity(memoryBytes: number | null, diskBytes: number | null) {
   if (memoryBytes === null || diskBytes === null) return null;
   return `${formatProviderNumber(memoryBytes / 1024 ** 3)} GiB memory · ${formatProviderNumber(diskBytes / 1_000_000_000)} GB disk`;
+}
+
+function formatVariance(seconds: number | null, percent: number | null): string {
+  if (seconds === null) return 'Variance unavailable';
+  const secondsSign = seconds > 0 ? '+' : '';
+  if (percent === null)
+    return `${secondsSign}${formatProviderNumber(seconds)}s (no meter baseline)`;
+  const percentSign = percent > 0 ? '+' : '';
+  return `${secondsSign}${formatProviderNumber(seconds)}s (${percentSign}${formatProviderNumber(percent)}%)`;
 }
 
 function toDateTimeLocalValue(value: Date): string {
@@ -307,9 +323,10 @@ export default function UsageRecordsContent() {
     closeReason: submitted.closeReason,
     skuId: submitted.skuId,
     cursor,
-    limit: submitted.kind === 'recent' ? 10 : 25,
+    limit: submitted.kind === 'recent' ? 10 : 15,
   };
   const results = useQuery(trpc.admin.cloudBillingSkus.searchUsageIntervals.queryOptions(input));
+  const rows = results.data?.items ?? [];
   const summary = useQuery({
     ...trpc.admin.cloudBillingSkus.getUsageSummary.queryOptions(
       summaryRequest ?? {
@@ -326,11 +343,17 @@ export default function UsageRecordsContent() {
     trpc.admin.cloudBillingSkus.reconcileUsageWithCloudflare.mutationOptions()
   );
   const resetReconciliation = reconciliation.reset;
-  const reconciliationMatchesSummary = sameSummaryRequest(reconciliation.variables, summaryRequest);
+  const reconciliationRequest =
+    summaryRequest && results.isSuccess && rows.length > 0
+      ? { ...summaryRequest, intervalIds: rows.map(row => row.id) }
+      : null;
+  const reconciliationMatchesScope = sameReconciliationRequest(
+    reconciliation.variables,
+    reconciliationRequest
+  );
   const reconciliationErrorCode = reconciliation.error?.data?.code;
   const reconciliationCanRetry =
     reconciliationErrorCode !== 'BAD_REQUEST' && reconciliationErrorCode !== 'PRECONDITION_FAILED';
-  const rows = results.data?.items ?? [];
 
   const resetResultNavigation = () => {
     setCursor(undefined);
@@ -598,7 +621,8 @@ export default function UsageRecordsContent() {
                       aria-describedby={
                         summaryInputError ? 'usage-summary-window-error' : undefined
                       }
-                      className="w-full sm:w-[9.5rem]"
+                      className="w-full cursor-pointer sm:w-52 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                      onClick={event => event.currentTarget.showPicker?.()}
                       onChange={event => setSummaryStart(event.target.value)}
                     />
                     <Input
@@ -610,7 +634,8 @@ export default function UsageRecordsContent() {
                       aria-describedby={
                         summaryInputError ? 'usage-summary-window-error' : undefined
                       }
-                      className="w-full sm:w-[9.5rem]"
+                      className="w-full cursor-pointer sm:w-52 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                      onClick={event => event.currentTarget.showPicker?.()}
                       onChange={event => setSummaryEnd(event.target.value)}
                     />
                   </div>
@@ -740,25 +765,27 @@ export default function UsageRecordsContent() {
                   <div className="max-w-2xl space-y-1">
                     <h3 className="font-medium type-body">Cloudflare reconciliation</h3>
                     <p className="text-muted-foreground type-label">
-                      Query Cloudflare only for physical instance IDs recorded for this applied
-                      subject and window. This is shadow validation and does not change usage or
+                      Query Cloudflare only for physical instance IDs in the usage records currently
+                      displayed below. This is shadow validation and does not change usage or
                       billing.
                     </p>
                   </div>
                   <Button
                     type="button"
                     className="w-full sm:w-auto sm:shrink-0"
-                    disabled={reconciliation.isPending}
-                    onClick={() => reconciliation.mutate(summaryRequest)}
+                    disabled={reconciliation.isPending || !reconciliationRequest}
+                    onClick={() => {
+                      if (reconciliationRequest) reconciliation.mutate(reconciliationRequest);
+                    }}
                   >
                     <Cloud className="size-4" />
                     {reconciliation.isPending
                       ? 'Reconciling with Cloudflare...'
-                      : 'Reconcile with Cloudflare'}
+                      : 'Reconcile displayed records'}
                   </Button>
                 </div>
 
-                {reconciliationMatchesSummary && reconciliation.isError && (
+                {reconciliationMatchesScope && reconciliation.isError && (
                   <Alert variant="destructive">
                     <AlertTitle>Cloudflare reconciliation could not be completed</AlertTitle>
                     <AlertDescription className="space-y-3">
@@ -769,7 +796,9 @@ export default function UsageRecordsContent() {
                           variant="outline"
                           size="sm"
                           disabled={reconciliation.isPending}
-                          onClick={() => reconciliation.mutate(summaryRequest)}
+                          onClick={() => {
+                            if (reconciliationRequest) reconciliation.mutate(reconciliationRequest);
+                          }}
                         >
                           Retry reconciliation
                         </Button>
@@ -778,7 +807,7 @@ export default function UsageRecordsContent() {
                   </Alert>
                 )}
 
-                {reconciliationMatchesSummary && reconciliation.isSuccess && (
+                {reconciliationMatchesScope && reconciliation.isSuccess && (
                   <div className="space-y-4" aria-live="polite">
                     {reconciliation.data.rows.length === 0 ? (
                       <p className="text-muted-foreground type-body">
@@ -788,8 +817,7 @@ export default function UsageRecordsContent() {
                     ) : (
                       <>
                         <p className="text-muted-foreground type-label">
-                          {reconciliation.data.comparison.description} Provider CPU is shown only as
-                          a diagnostic.
+                          {reconciliation.data.comparison.description}
                         </p>
 
                         <dl className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2">
@@ -802,14 +830,15 @@ export default function UsageRecordsContent() {
                             </dd>
                           </div>
                           <div className="bg-surface-inset p-3">
-                            <dt className="text-muted-foreground type-label">Instances queried</dt>
+                            <dt className="text-muted-foreground type-label">Runs queried</dt>
                             <dd className="mt-1 tabular-nums type-code">
-                              {reconciliation.data.totals.queriedCloudflareInstances.toLocaleString()}
+                              {reconciliation.data.totals.queriedCloudflareRuns.toLocaleString()}
                             </dd>
                           </div>
                         </dl>
 
                         <p className="text-muted-foreground type-label">
+                          {reconciliation.data.counts.compared} compared ·{' '}
                           {reconciliation.data.counts.missing} missing ·{' '}
                           {reconciliation.data.counts.ambiguous} ambiguous ·{' '}
                           {reconciliation.data.counts.partial} partial ·{' '}
@@ -840,17 +869,15 @@ export default function UsageRecordsContent() {
                                 <TableHead>Instance</TableHead>
                                 <TableHead>Application / service</TableHead>
                                 <TableHead>SKU(s)</TableHead>
-                                <TableHead>Meter accepted</TableHead>
-                                <TableHead>Provider allocation equivalents</TableHead>
-                                <TableHead>Provider CPU</TableHead>
+                                <TableHead>Meter run</TableHead>
+                                <TableHead>Cloudflare memory / disk</TableHead>
+                                <TableHead>Cloudflare CPU (diagnostic)</TableHead>
                                 <TableHead>Status</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {reconciliation.data.rows.map(row => (
-                                <TableRow
-                                  key={`${row.providerInstanceId ?? 'unmapped'}:${row.meterInstanceIds.join(',')}:${row.services.join(',')}`}
-                                >
+                                <TableRow key={row.intervalIds.join(',')}>
                                   <TableCell>
                                     <code className="block max-w-56 break-all type-code">
                                       {row.instanceId}
@@ -883,16 +910,36 @@ export default function UsageRecordsContent() {
                                     </code>
                                   </TableCell>
                                   <TableCell className="tabular-nums type-code">
-                                    {row.meterAcceptedSeconds.toLocaleString()}s
+                                    <span className="block">
+                                      {row.meterAcceptedSeconds.toLocaleString()}s accepted
+                                    </span>
+                                    <span className="block text-muted-foreground type-label">
+                                      {formatTimestamp(row.meterStartedAt)}
+                                    </span>
+                                    <span className="block text-muted-foreground type-label">
+                                      to {formatTimestamp(row.meterEndedAt)}
+                                    </span>
                                   </TableCell>
                                   <TableCell className="tabular-nums type-code">
                                     <span className="block">
                                       Memory {formatProviderNumber(row.providerMemorySeconds)}
                                       {row.providerMemorySeconds === null ? '' : 's'}
                                     </span>
-                                    <span className="block text-muted-foreground">
+                                    <span className="block text-muted-foreground type-label">
+                                      {formatVariance(
+                                        row.providerMemoryDifferenceSeconds,
+                                        row.providerMemoryDifferencePercent
+                                      )}
+                                    </span>
+                                    <span className="mt-1 block">
                                       Disk {formatProviderNumber(row.providerDiskSeconds)}
                                       {row.providerDiskSeconds === null ? '' : 's'}
+                                    </span>
+                                    <span className="block text-muted-foreground type-label">
+                                      {formatVariance(
+                                        row.providerDiskDifferenceSeconds,
+                                        row.providerDiskDifferencePercent
+                                      )}
                                     </span>
                                   </TableCell>
                                   <TableCell className="tabular-nums type-code">
@@ -969,14 +1016,13 @@ export default function UsageRecordsContent() {
                             <CollapsibleContent className="mt-3 space-y-3">
                               {reconciliation.data.provider.rawResponses.map((raw, index) => (
                                 <section
-                                  key={`${raw.dataset}:${raw.windowIndex}:${raw.batchIndex}:${index}`}
+                                  key={`${raw.dataset}:${raw.batchIndex}:${index}`}
                                   className="space-y-2"
                                 >
                                   <h4 className="text-muted-foreground type-label">
-                                    {raw.dataset} · window {raw.windowIndex + 1} · batch{' '}
-                                    {raw.batchIndex + 1}
-                                    {raw.window
-                                      ? ` · ${formatTimestamp(raw.window.start)} to ${formatTimestamp(raw.window.end)}`
+                                    {raw.dataset}
+                                    {raw.queries.length > 0
+                                      ? ` · batch ${raw.batchIndex} · ${raw.queries.length} window${raw.queries.length === 1 ? '' : 's'}`
                                       : ''}
                                   </h4>
                                   <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface-inset p-4 whitespace-pre type-code">

@@ -1,21 +1,51 @@
 import * as z from 'zod';
-import { RoutingTableSchema } from './routing-table';
+import {
+  CustomRoutingTableSchema,
+  EfficientModelPoolSchema,
+  PoolEntrySchema,
+  poolEntryKey,
+  RoutingTableSchema,
+} from './routing-table';
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 
 export { ReasoningEffortSchema } from './reasoning';
 export type { ReasoningEffort } from './reasoning';
 
+// Matches AutoRoutingModeOwnerTypeSchema in index.ts. Declared here (not
+// imported) to avoid a circular package-root dependency.
+const BenchmarkProfileOwnerTypeSchema = z.enum(['user', 'org']);
+
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
 
-export const BenchmarkDeciderModelSchema = z.object({
-  id: z.string().trim().min(1),
-  // Passed to the kilo CLI as --variant during the benchmark and carried into
-  // the routing table so serving uses the same effort the model was graded
-  // with. Null for models without (or not using) configurable reasoning.
-  reasoningEffort: ReasoningEffortSchema.nullable().default(null),
-});
+/**
+ * Decider model identity for a benchmark run. Platform/admin config still
+ * selects one legacy `reasoningEffort` per model. Profile runs (and exact
+ * Pool-entry identity) use canonical `variant`. Both non-null is malformed —
+ * same both-set rule as RankedCandidate / decisions.
+ */
+export const BenchmarkDeciderModelSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    // Canonical catalog variant key. Optional so platform admin config (effort
+    // only) still parses. Prefer this over reasoningEffort for new writers.
+    variant: z.string().trim().min(1).nullable().optional(),
+    // Passed to the kilo CLI as --variant during the benchmark and carried into
+    // the platform routing table so serving uses the same effort the model was
+    // graded with. Null for models without (or not using) configurable
+    // reasoning. Legacy; prefer `variant` when present.
+    reasoningEffort: ReasoningEffortSchema.nullable().default(null),
+  })
+  .superRefine((model, ctx) => {
+    if (model.variant != null && model.reasoningEffort != null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['variant'],
+        message: 'Decider model must not set both variant and reasoningEffort; emit variant only',
+      });
+    }
+  });
 export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
 export const AUTO_DECIDER_DEFAULT_MIN_COST_USD = 15;
@@ -155,6 +185,9 @@ export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;
 
 export const BenchmarkModelSummarySchema = z.object({
   model: z.string(),
+  // Exact-pair identity for summary rows. Optional so already-persisted run
+  // payloads and old admin-UI responses still parse. Null = default/no variant.
+  variant: z.string().trim().min(1).nullable().optional(),
   // '*' for classifier runs, otherwise "<taskType>/<subtaskType>".
   routeKey: z.union([TaxonomyRouteKeySchema, z.literal('*')]),
   accuracy: z.number(),
@@ -220,3 +253,80 @@ export const ClassifierWinnerResponseSchema = z.object({
   winner: ClassifierWinnerSchema.nullable(),
 });
 export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSchema>;
+
+// --- Benchmark profile registry (global per Pool entry + engine) ---
+
+/**
+ * Wire status for a Benchmark profile. Presentation maps pending/running to
+ * "Benchmarking"; "Unavailable" is a web-derived state and never a wire status.
+ */
+export const BenchmarkProfileStatusSchema = z.enum(['pending', 'running', 'ready', 'failed']);
+export type BenchmarkProfileStatus = z.infer<typeof BenchmarkProfileStatusSchema>;
+
+/** Bounded failure text stored on failed profile rows. */
+export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
+
+export const BenchmarkProfileEntryStatusSchema = z.object({
+  entry: PoolEntrySchema,
+  status: BenchmarkProfileStatusSchema,
+  failureReason: z.string().max(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH).nullable().optional(),
+});
+export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntryStatusSchema>;
+
+export const RegisterBenchmarkProfilesRequestSchema = z
+  .object({
+    ownerType: BenchmarkProfileOwnerTypeSchema,
+    ownerId: z.string().trim().min(1),
+    entries: EfficientModelPoolSchema,
+    // Subset of `entries` the owner explicitly retries after a terminal failure.
+    // Absent/empty means no explicit retries (failed current profiles are reported
+    // without re-admission).
+    retryEntries: z.array(PoolEntrySchema).optional(),
+  })
+  .superRefine((request, ctx) => {
+    if (!request.retryEntries || request.retryEntries.length === 0) return;
+    const entryKeys = new Set(request.entries.map(poolEntryKey));
+    request.retryEntries.forEach((entry, index) => {
+      const key = poolEntryKey(entry);
+      if (!entryKeys.has(key)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['retryEntries', index],
+          message: `retryEntry must appear in entries: ${key}`,
+        });
+      }
+    });
+  });
+export type RegisterBenchmarkProfilesRequest = z.infer<
+  typeof RegisterBenchmarkProfilesRequestSchema
+>;
+
+export const BenchmarkProfileStatusesRequestSchema = z.object({
+  entries: EfficientModelPoolSchema,
+});
+export type BenchmarkProfileStatusesRequest = z.infer<typeof BenchmarkProfileStatusesRequestSchema>;
+
+export const BenchmarkProfileStatusesResponseSchema = z.object({
+  statuses: z.array(BenchmarkProfileEntryStatusSchema),
+});
+export type BenchmarkProfileStatusesResponse = z.infer<
+  typeof BenchmarkProfileStatusesResponseSchema
+>;
+
+/** 429 body when an owner exceeds the rolling 24h profile admission limit. */
+export const BenchmarkProfileQuotaErrorSchema = z.object({
+  error: z.string(),
+  // ISO timestamp when the owner may request new benchmarks again.
+  retryAt: z.string(),
+});
+export type BenchmarkProfileQuotaError = z.infer<typeof BenchmarkProfileQuotaErrorSchema>;
+
+export const CustomRoutingTableRequestSchema = z.object({
+  entries: EfficientModelPoolSchema,
+});
+export type CustomRoutingTableRequest = z.infer<typeof CustomRoutingTableRequestSchema>;
+
+export const CustomRoutingTableResponseSchema = z.object({
+  table: CustomRoutingTableSchema.nullable(),
+});
+export type CustomRoutingTableResponse = z.infer<typeof CustomRoutingTableResponseSchema>;

@@ -8,13 +8,18 @@ import { confirmRemoteSessionExit } from '@/components/agents/remote-session-exi
  */
 export type ExecutableChatComposerSubmission = Extract<
   ChatComposerParseResult,
-  { type: 'command' } | { type: 'create-session' } | { type: 'exit-session' } | { type: 'prompt' }
+  | { type: 'command' }
+  | { type: 'create-session' }
+  | { type: 'exit-session' }
+  | { type: 'restart-session' }
+  | { type: 'prompt' }
 >;
 
 type ChatComposerSubmissionHandlers = {
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
   onExitSession: (onAccepted: () => void) => Promise<void>;
+  onRestartSession: () => Promise<boolean>;
   confirmExitSession: () => Promise<boolean>;
   onSendPrompt: (prompt: string) => Promise<void>;
 };
@@ -64,6 +69,16 @@ export async function executeChatComposerSubmission(
         cleanup.dismiss();
       });
     });
+    return;
+  }
+
+  if (submission.type === 'restart-session') {
+    const accepted = await handlers.onRestartSession();
+    if (!accepted) {
+      throw new Error('Restart session rejected');
+    }
+    cleanup.clearDraft();
+    cleanup.dismiss();
     return;
   }
 

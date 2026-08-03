@@ -106,8 +106,9 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { logExceptInTest } from '@/lib/utils.server';
+import { readDb } from '@/lib/drizzle';
 
-export const maxDuration = 1800;
+export const maxDuration = 800;
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const balanceAndSettingsPromise = authPromise.then(res =>
     res.user
-      ? getBalanceAndOrgSettings(res.organizationId, res.user)
+      ? getBalanceAndOrgSettings(res.organizationId, res.user, readDb)
       : { balance: 0, settings: undefined, plan: undefined }
   );
   const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(
@@ -621,7 +622,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // previously blocking/quarantine decision wait for a fresh abuse-service result.
   const shouldBlockOnClassify = isRulesEngineBlockingAction(cachedRulesEngineAction);
 
-  // Large responses may run longer than the 1800s serverless function timeout.
+  // Large responses may run longer than the 800s serverless function timeout.
   const requestMaxTokens = getMaxTokens(requestBodyParsed);
   if (requestMaxTokens && requestMaxTokens > MAX_TOKENS_LIMIT) {
     console.warn(`SECURITY: Max tokens limit exceeded: ${user.id}`, {

@@ -956,7 +956,7 @@ export const errorShapeSchema = z
       .optional(),
     shape: z
       .object({
-        code: z.string().optional(),
+        code: z.union([z.string(), z.number()]).optional(),
         data: z
           .object({
             httpStatus: z.number().optional(),

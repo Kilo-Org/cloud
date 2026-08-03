@@ -6,12 +6,15 @@ import type {
   RankedCandidate,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
+import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
+import type { PoolEntry } from '@kilocode/auto-routing-contracts';
+import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
-import { and, count, desc, eq, gt, inArray, lt, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, lt, ne, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
   benchmarkConfig,
+  benchmarkProfiles,
   benchmarkRuns,
   caseResults,
   configAutoDeciderExclusions,
@@ -24,7 +27,11 @@ import {
   runModels,
 } from './db-schema';
 import { pickClassifierWinner } from './winner';
-import { parsePersistedReasoningEffort } from './reasoning-effort';
+import {
+  parsePersistedReasoningEffort,
+  variantFromStorage,
+  variantToStorage,
+} from './reasoning-effort';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -34,13 +41,13 @@ export type ConfigAutoDeciderModelRow = typeof configAutoDeciderModels.$inferSel
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
 // D1 rejects statements with too many bound variables. A model summary insert
-// binds 12 values per row, so 8 rows keeps each INSERT below the 100-variable
-// ceiling while still batching the delete plus inserts together.
-const MODEL_SUMMARY_INSERT_BATCH_SIZE = 8;
+// binds 13 values per row (including variant), so 7 rows keeps each INSERT
+// below the 100-variable ceiling while still batching the delete plus inserts.
+const MODEL_SUMMARY_INSERT_BATCH_SIZE = 7;
 
-// Routing table candidates bind 8 values per row. Keep each INSERT comfortably
-// under D1's 100-variable ceiling; publishing is infrequent, so smaller
-// statements are preferable to risking a skipped routing-table update.
+// Routing table candidates bind 9 values per row (including variant). Keep each
+// INSERT comfortably under D1's 100-variable ceiling; publishing is infrequent,
+// so smaller statements are preferable to risking a skipped routing-table update.
 const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
 
 // ---------------------------------------------------------------------------
@@ -50,6 +57,7 @@ const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
 export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
   return {
     model: row.model,
+    variant: variantFromStorage(row.variant),
     routeKey: row.route_key as BenchmarkModelSummary['routeKey'],
     accuracy: row.accuracy,
     avgCostUsd: row.avg_cost_usd,
@@ -59,6 +67,19 @@ export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
     cases: row.cases,
     errors: row.errors,
     timeouts: row.timeouts,
+  };
+}
+
+/**
+ * Summary row with provenance run identity. Used by custom-table assembly so
+ * candidates are bound to the measuring run, not collapsed across runs.
+ */
+export type BenchmarkModelSummaryWithRun = BenchmarkModelSummary & { runId: string };
+
+export function mapSummaryRowWithRun(row: ModelSummaryRow): BenchmarkModelSummaryWithRun {
+  return {
+    ...mapSummaryRow(row),
+    runId: row.run_id,
   };
 }
 
@@ -173,6 +194,9 @@ export async function replaceAutoDeciderModels(
 // Runs
 // ---------------------------------------------------------------------------
 
+/** Run purpose: platform publishes default artifacts; profile updates the registry only. */
+export type BenchmarkRunPurpose = 'platform' | 'profile';
+
 export async function insertRun(
   db: D1Database,
   run: {
@@ -188,6 +212,7 @@ export async function insertRun(
     repetitions: number;
     classifier_max_p95_latency_ms: number | null;
     engine_identity: string;
+    purpose?: BenchmarkRunPurpose;
   },
   models: RunModelRow[],
   carriedSummaries: BenchmarkModelSummary[]
@@ -207,6 +232,7 @@ export async function insertRun(
     repetitions: run.repetitions,
     classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
     engine_identity: run.engine_identity,
+    purpose: run.purpose ?? 'platform',
   });
 
   if (models.length === 0 && carriedSummaries.length === 0) {
@@ -227,6 +253,7 @@ export async function insertRun(
         summaryChunk.map(s => ({
           run_id: run.id,
           model: s.model,
+          variant: variantToStorage(s.variant),
           route_key: s.routeKey,
           accuracy: s.accuracy,
           avg_cost_usd: s.avgCostUsd,
@@ -267,7 +294,13 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
     .insert(caseResults)
     .values(row)
     .onConflictDoUpdate({
-      target: [caseResults.run_id, caseResults.model, caseResults.case_id, caseResults.rep],
+      target: [
+        caseResults.run_id,
+        caseResults.model,
+        caseResults.variant,
+        caseResults.case_id,
+        caseResults.rep,
+      ],
       set: {
         route_key: row.route_key,
         score: row.score,
@@ -301,9 +334,17 @@ export async function getCaseResults(db: D1Database, runId: string): Promise<Cas
 
 export async function getExistingCaseResultIds(
   db: D1Database,
-  params: { runId: string; model: string; rep: number; caseIds: string[] }
+  params: {
+    runId: string;
+    model: string;
+    /** Application null form; stored as '' at the D1 boundary. */
+    variant?: string | null;
+    rep: number;
+    caseIds: string[];
+  }
 ): Promise<Set<string>> {
   if (params.caseIds.length === 0) return new Set();
+  const storedVariant = variantToStorage(params.variant);
   const rows = await drizzle(db)
     .select({ case_id: caseResults.case_id })
     .from(caseResults)
@@ -311,6 +352,7 @@ export async function getExistingCaseResultIds(
       and(
         eq(caseResults.run_id, params.runId),
         eq(caseResults.model, params.model),
+        eq(caseResults.variant, storedVariant),
         eq(caseResults.rep, params.rep),
         inArray(caseResults.case_id, params.caseIds)
       )
@@ -346,6 +388,7 @@ export async function replaceModelSummaries(
         summaryChunk.map(s => ({
           run_id: runId,
           model: s.model,
+          variant: variantToStorage(s.variant),
           route_key: s.routeKey,
           accuracy: s.accuracy,
           avg_cost_usd: s.avgCostUsd,
@@ -467,24 +510,253 @@ export async function markRunFailed(db: D1Database, runId: string, error: string
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
 }
 
+function boundProfileFailureReason(reason: string): string {
+  if (reason.length <= BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH) return reason;
+  return reason.slice(0, BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH);
+}
+
+/**
+ * Mark Benchmark-profile rows claimed by this run as running. Only touches rows
+ * still pending (or already running for this run_id) under the exact PK — never
+ * clobbers ready/failed or a different run's claim.
+ */
+export async function markProfilesRunningForRun(
+  db: D1Database,
+  runId: string,
+  entries: readonly PoolEntry[],
+  current: { engineIdentity: string; repetitions: number },
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  if (entries.length === 0) return;
+  const orm = drizzle(db);
+  for (const entry of entries) {
+    await orm
+      .update(benchmarkProfiles)
+      .set({
+        status: 'running',
+        run_id: runId,
+        failure_reason: null,
+        updated_at: nowIso,
+        completed_at: null,
+      })
+      .where(
+        and(
+          eq(benchmarkProfiles.model, entry.model),
+          eq(benchmarkProfiles.variant, variantToStorage(entry.variant)),
+          eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+          eq(benchmarkProfiles.repetitions, current.repetitions),
+          or(
+            eq(benchmarkProfiles.status, 'pending'),
+            and(eq(benchmarkProfiles.status, 'running'), eq(benchmarkProfiles.run_id, runId))
+          )
+        )
+      );
+  }
+}
+
+/**
+ * Production UPDATE for ready transition. Exported for honest SQLite tests of
+ * the run_id + status='running' no-clobber guard.
+ */
+export function markProfilesReadyForRunStatement(
+  orm: ReturnType<typeof drizzle>,
+  runId: string,
+  nowIso: string
+) {
+  return orm
+    .update(benchmarkProfiles)
+    .set({
+      status: 'ready',
+      failure_reason: null,
+      updated_at: nowIso,
+      completed_at: nowIso,
+    })
+    .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
+}
+
+/**
+ * Transition profiles claimed by this run to ready. Only rows still pointing at
+ * this run_id and still running are updated — never a newer pending/ready row.
+ */
+export async function markProfilesReadyForRun(
+  db: D1Database,
+  runId: string,
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  await markProfilesReadyForRunStatement(drizzle(db), runId, nowIso);
+}
+
+/**
+ * Production UPDATE for failed transition. Exported for honest SQLite tests of
+ * the run_id + status='running' no-clobber guard.
+ */
+export function markProfilesFailedForRunStatement(
+  orm: ReturnType<typeof drizzle>,
+  runId: string,
+  failureReason: string,
+  nowIso: string
+) {
+  return orm
+    .update(benchmarkProfiles)
+    .set({
+      status: 'failed',
+      failure_reason: boundProfileFailureReason(failureReason),
+      updated_at: nowIso,
+      completed_at: nowIso,
+    })
+    .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
+}
+
+/**
+ * Transition profiles claimed by this run to failed with a bounded reason.
+ * Only rows still pointing at this run_id and still running are updated.
+ */
+export async function markProfilesFailedForRun(
+  db: D1Database,
+  runId: string,
+  failureReason: string,
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  await markProfilesFailedForRunStatement(drizzle(db), runId, failureReason, nowIso);
+}
+
+/**
+ * Pending current-engine profile rows, oldest request first. Used by the single
+ * decider-slot drain to claim the next batch.
+ */
+export async function listPendingCurrentProfiles(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number }
+): Promise<Array<{ model: string; variant: string; requested_at: string }>> {
+  return drizzle(db)
+    .select({
+      model: benchmarkProfiles.model,
+      variant: benchmarkProfiles.variant,
+      requested_at: benchmarkProfiles.requested_at,
+    })
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        eq(benchmarkProfiles.status, 'pending'),
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions)
+      )
+    )
+    .orderBy(
+      asc(benchmarkProfiles.requested_at),
+      asc(benchmarkProfiles.model),
+      asc(benchmarkProfiles.variant)
+    );
+}
+
+/**
+ * Ready current-engine profiles for the given exact pairs (for custom table assembly).
+ */
+export async function listReadyCurrentProfilesForEntries(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number },
+  entries: readonly PoolEntry[]
+): Promise<Array<{ model: string; variant: string; run_id: string | null }>> {
+  if (entries.length === 0) return [];
+  const models = [...new Set(entries.map(e => e.model))];
+  const rows = await drizzle(db)
+    .select({
+      model: benchmarkProfiles.model,
+      variant: benchmarkProfiles.variant,
+      run_id: benchmarkProfiles.run_id,
+      engine_identity: benchmarkProfiles.engine_identity,
+      repetitions: benchmarkProfiles.repetitions,
+      status: benchmarkProfiles.status,
+    })
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        inArray(benchmarkProfiles.model, models),
+        eq(benchmarkProfiles.status, 'ready'),
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions)
+      )
+    );
+  const wanted = new Set(entries.map(e => exactPairKey(e.model, e.variant)));
+  return rows
+    .filter(row => wanted.has(exactPairKey(row.model, variantFromStorage(row.variant))))
+    .map(row => ({
+      model: row.model,
+      variant: row.variant,
+      run_id: row.run_id,
+    }));
+}
+
+/**
+ * Load model_summaries for the given run ids (custom table assembly).
+ * Each row carries its provenance `runId` so assembly can bind candidates to
+ * the measuring run for each ready entry (no cross-run leakage).
+ */
+export async function getSummariesForRuns(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<BenchmarkModelSummaryWithRun[]> {
+  if (runIds.length === 0) return [];
+  const rows = await drizzle(db)
+    .select()
+    .from(modelSummaries)
+    .where(inArray(modelSummaries.run_id, [...runIds]));
+  return rows.map(mapSummaryRowWithRun);
+}
+
+/**
+ * Running decider run ids older than the stale threshold (for profile fail-over
+ * after the bulk stale sweep).
+ */
+export async function listStaleRunningDeciderRunIds(
+  db: D1Database,
+  olderThanIso: string
+): Promise<string[]> {
+  const rows = await drizzle(db)
+    .select({ id: benchmarkRuns.id })
+    .from(benchmarkRuns)
+    .where(
+      and(
+        eq(benchmarkRuns.kind, 'decider'),
+        eq(benchmarkRuns.status, 'running'),
+        lt(benchmarkRuns.started_at, olderThanIso)
+      )
+    );
+  return rows.map(r => r.id);
+}
+
 // ---------------------------------------------------------------------------
 // Latest summaries per model (for skip logic and classifier winner)
 // ---------------------------------------------------------------------------
 
-// What the most recent completed run measured for a model, plus the
-// benchmark identity it was measured under. startRun carries these summaries
-// into a new run only when the identity (engine + repetitions + the model's
-// reasoning_effort) still matches; otherwise the model is re-benchmarked.
+// What the most recent completed run measured for an exact Pool entry, plus
+// the benchmark identity it was measured under. startRun carries these
+// summaries into a new run only when the identity (engine + repetitions +
+// exact variant) still matches; otherwise the entry is re-benchmarked.
 export type PriorModelResult = {
   engineIdentity: string;
   repetitions: number;
+  /** Canonical variant (null = default). Prefer this for carry matching. */
+  variant: string | null;
+  /**
+   * Legacy effort mirror from run_models. Still exposed so older callers and
+   * legacy-row tests can inspect it; carry matching uses `variant`.
+   */
   reasoningEffort: string | null;
   summaries: BenchmarkModelSummary[];
 };
 
-// Latest summaries per model for a benchmark kind: for each model, all routes
-// from the most recent COMPLETED run that included it (mixing routes across
-// runs would pair incomparable numbers).
+/**
+ * Canonical map key for an exact (model, variant) pair. Uses the shared
+ * poolEntryKey contract helper so keys stay collision-safe.
+ */
+export function exactPairKey(model: string, variant: string | null | undefined): string {
+  return poolEntryKey({ model, variant: variant ?? null });
+}
+
+// Latest summaries per exact Pool entry for a benchmark kind: for each
+// (model, variant), all routes from the most recent COMPLETED run that
+// included that pair (mixing routes across runs would pair incomparable numbers).
 export async function getLatestSummariesByModel(
   db: D1Database,
   kind: BenchmarkKind
@@ -493,6 +765,7 @@ export async function getLatestSummariesByModel(
     .select({
       run_id: modelSummaries.run_id,
       model: modelSummaries.model,
+      variant: modelSummaries.variant,
       route_key: modelSummaries.route_key,
       accuracy: modelSummaries.accuracy,
       avg_cost_usd: modelSummaries.avg_cost_usd,
@@ -511,31 +784,41 @@ export async function getLatestSummariesByModel(
     .innerJoin(benchmarkRuns, eq(benchmarkRuns.id, modelSummaries.run_id))
     .leftJoin(
       runModels,
-      and(eq(runModels.run_id, modelSummaries.run_id), eq(runModels.model, modelSummaries.model))
+      and(
+        eq(runModels.run_id, modelSummaries.run_id),
+        eq(runModels.model, modelSummaries.model),
+        eq(runModels.variant, modelSummaries.variant)
+      )
     )
     .where(and(eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'completed')))
     .orderBy(desc(benchmarkRuns.started_at));
 
-  const latestRunByModel = new Map<string, string>();
+  const latestRunByPair = new Map<string, string>();
   for (const row of results) {
-    if (!latestRunByModel.has(row.model)) latestRunByModel.set(row.model, row.run_id);
+    const pairKey = exactPairKey(row.model, variantFromStorage(row.variant));
+    if (!latestRunByPair.has(pairKey)) latestRunByPair.set(pairKey, row.run_id);
   }
-  const byModel = new Map<string, PriorModelResult>();
+  const byPair = new Map<string, PriorModelResult>();
   for (const row of results) {
-    if (latestRunByModel.get(row.model) !== row.run_id) continue;
-    const existing = byModel.get(row.model);
+    const appVariant = variantFromStorage(row.variant);
+    const pairKey = exactPairKey(row.model, appVariant);
+    if (latestRunByPair.get(pairKey) !== row.run_id) continue;
+    const existing = byPair.get(pairKey);
     if (existing) {
       existing.summaries.push(mapSummaryRow(row));
     } else {
-      byModel.set(row.model, {
+      byPair.set(pairKey, {
         engineIdentity: row.engine_identity,
         repetitions: row.repetitions,
-        reasoningEffort: row.reasoning_effort,
+        variant: appVariant,
+        // Prefer the summary/run_models variant; fall back to legacy effort for
+        // rows migrated before variant was written independently.
+        reasoningEffort: row.reasoning_effort ?? appVariant,
         summaries: [mapSummaryRow(row)],
       });
     }
   }
-  return byModel;
+  return byPair;
 }
 
 // ---------------------------------------------------------------------------
@@ -562,6 +845,11 @@ export function routingTableToRows(
   const candidateRows: RoutingTableCandidateRow[] = [];
   for (const [routeKey, candidates] of Object.entries(table.routes)) {
     candidates.forEach((c, rank) => {
+      // Platform tables emit reasoningEffort only; mirror that effort key into
+      // the self-describing variant column ('' when null). Custom sparse tables
+      // (later slice) will emit variant and leave reasoning_effort null.
+      const effortKey = c.reasoningEffort ?? null;
+      const variantKey = c.variant ?? effortKey;
       candidateRows.push({
         run_id: table.version,
         route_key: routeKey,
@@ -570,7 +858,8 @@ export function routingTableToRows(
         accuracy: c.accuracy,
         avg_cost_usd: c.avgCostUsd,
         meets_threshold: c.meetsThreshold,
-        reasoning_effort: c.reasoningEffort ?? null,
+        reasoning_effort: effortKey,
+        variant: variantToStorage(variantKey),
       });
     });
   }
@@ -589,6 +878,8 @@ export function rowsToRoutingTable(
   });
   for (const row of sorted) {
     routeMap[row.route_key] ??= [];
+    // Platform artifact compatibility: keep reading reasoning_effort exactly
+    // as today so published JSON shape stays effort-based during rolling deploys.
     routeMap[row.route_key].push({
       model: row.model,
       accuracy: row.accuracy,

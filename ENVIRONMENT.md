@@ -255,6 +255,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SLACK_CLIENT_ID` - Slack OAuth app client ID. [PUBLIC]
 - `SLACK_CLIENT_SECRET` - Slack OAuth app client secret. `[SECRET]`
 - `SLACK_SIGNING_SECRET` - Slack request signing secret for webhooks. `[SECRET]`
+- `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook used by server-side Admin UI code to send events, summaries, reminders, and actions. `[SECRET]`
 - `SLACK_USER_FEEDBACK_WEBHOOK_URL` - Slack incoming webhook for user feedback. [SERVER]
 - `SLACK_DEPLOY_THREAT_WEBHOOK_URL` - Slack incoming webhook for deploy threat alerts. [SERVER]
 
@@ -363,6 +364,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 - `VITE_POSTHOG_API_KEY` - PostHog public project API key baked into extension builds; read in `apps/extension/src/shared/analytics.ts`; absent → analytics disabled. [PUBLIC]
 - `VITE_KILO_API_BASE_URL` - Selects the Kilo API base URL at build time; read in `apps/extension/src/shared/auth.ts`. [PUBLIC]
+- `VITE_CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production Cloud Agent endpoint otherwise. [PUBLIC]
+- `VITE_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production session ingest endpoint otherwise. [PUBLIC]
 
 ## Mobile
 

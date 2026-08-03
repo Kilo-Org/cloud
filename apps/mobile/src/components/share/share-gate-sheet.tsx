@@ -20,7 +20,7 @@ import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
-import { setPendingShareNavigation } from '@/lib/share-navigation';
+import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-payload';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { useTRPC } from '@/lib/trpc';
@@ -40,11 +40,6 @@ import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
 import { SharePayloadPreview } from './share-payload-preview';
 import { type SharePayloadValidation, validateSharePayload } from './share-payload-validation';
-
-function appendShareId(base: string, shareId: ShareId): string {
-  const separator = base.includes('?') ? '&' : '?';
-  return `${base}${separator}shareId=${encodeURIComponent(shareId)}`;
-}
 
 type ShareGateSheetProps = {
   shareId: string | undefined;
@@ -224,7 +219,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       return;
     }
     const base = getNewAgentSessionPath(organizationId);
-    commit(appendShareId(base, shareId));
+    commit(appendShareParams(base, shareId));
   }, [commit, isSpawning, organizationId, shareId]);
 
   const commitEnabled = isShareCommitEnabled({ orgLoaded, validation });
@@ -250,7 +245,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       }
       const org = row.organization_id ?? undefined;
       const base = getAgentSessionPath(row.session_id, org) as string;
-      commit(appendShareId(base, shareId));
+      commit(appendShareParams(base, shareId));
     },
     [attachmentsCapableBySessionId, commit, isSpawning, payload, shareId, validation]
   );
@@ -294,7 +289,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
             ) {
               return;
             }
-            commit(appendShareId(getSpawnedAgentSessionPath(action.sessionID) as string, shareId));
+            commit(
+              appendShareParams(getSpawnedAgentSessionPath(action.sessionID) as string, shareId)
+            );
             return;
           }
 

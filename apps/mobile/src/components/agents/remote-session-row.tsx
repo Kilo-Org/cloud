@@ -17,13 +17,17 @@ import {
 } from '@/lib/session-attention';
 import {
   activeSessionMetaTimestamp,
+  composeActiveSessionVisibleMeta,
+  formatSessionTotalCost,
   remoteMeta,
   remoteSessionEyebrowLabel,
+  selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { type RowVariant } from './session-row';
 import { copySessionId, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import {
+  formatSpokenCost,
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
@@ -68,7 +72,13 @@ export function RemoteSessionRow({
   // so the label omits it. Otherwise announce the same timestamp as
   // `remoteMeta` (prefer lastActivityAt, fall back to updatedAt).
   const metaTimestamp = activeSessionMetaTimestamp(session);
-  const spokenMeta = !needsInput && metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
+  const costSpoken = formatSpokenCost(session.totalCostMicrodollars);
+  const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
+  const spokenMeta = selectRemoteRowSpokenMeta({
+    needsInput,
+    costSpoken,
+    timeSpoken,
+  });
 
   const { iconKind: platformIconKind, spokenPlatform } = selectRowPlatformPresentation({
     platform: session.createdOnPlatform,
@@ -125,7 +135,10 @@ export function RemoteSessionRow({
           agentLabel={agentLabel}
           title={title}
           subtitle={session.gitBranch ?? null}
-          meta={remoteMeta(session)}
+          meta={composeActiveSessionVisibleMeta(
+            formatSessionTotalCost(session.totalCostMicrodollars),
+            remoteMeta(session)
+          )}
           live
           needsInput={needsInput}
           metaWhileLive

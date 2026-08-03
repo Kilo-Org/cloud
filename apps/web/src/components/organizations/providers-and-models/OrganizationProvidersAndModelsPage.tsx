@@ -96,6 +96,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
   const currentRole = (isKiloAdmin ? 'owner' : assumedRole) ?? role;
   const canEdit = isKiloAdmin || currentRole === 'owner';
+  // Auto routing card: owners, billing managers, and platform admins may edit.
+  // Do not widen page-level canEdit (provider allow-list stays owner/admin only).
+  const canEditAutoRouting =
+    isKiloAdmin || currentRole === 'owner' || currentRole === 'billing_manager';
 
   const updateOrganizationSettings = useUpdateOrganizationSettings();
 
@@ -462,7 +466,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           showBackButton={false}
         />
 
-        <AutoRoutingModeCard organizationId={organizationId} readonly={!canEdit} />
+        <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
 
         <Tabs defaultValue="models">
           <TabsList className="w-fit">

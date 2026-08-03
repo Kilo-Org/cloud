@@ -20,7 +20,7 @@ export {
 export type { RemoteCommandCatalogV1 } from './schemas';
 
 export type RemoteCommandParseResult =
-  | { ok: true; commands: SlashCommandInfo[]; canExitSession?: boolean }
+  | { ok: true; commands: SlashCommandInfo[]; canExitSession?: boolean | undefined }
   | { ok: false; reason: 'invalid' };
 
 /**
@@ -49,8 +49,8 @@ export type RemoteCommandState = {
   ownerConnectionId: string | null;
   refresh: 'idle' | 'loading' | 'error' | 'upgrade-required';
   commands: SlashCommandInfo[];
-  canExitSession?: boolean;
-  message?: string;
+  canExitSession?: boolean | undefined;
+  message?: string | undefined;
 };
 
 /**

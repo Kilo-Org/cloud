@@ -11,11 +11,11 @@ type WebSocketConstructorWithHeaders = {
 export type ConnectionLifecycleHooks = {
   /** Subscribe to visibility changes. `onResume` fires when the tab becomes
    *  visible; `onHidden` fires when it becomes hidden. Returns a cleanup fn. */
-  onVisibilityChange?: (onResume: () => void, onHidden: () => void) => () => void;
+  onVisibilityChange?: ((onResume: () => void, onHidden: () => void) => () => void) | undefined;
   /** Called when BFCache restore is detected (pageshow event with persisted=true) */
-  onPageshow?: (handler: (e: { persisted: boolean }) => void) => () => void;
+  onPageshow?: ((handler: (e: { persisted: boolean }) => void) => () => void) | undefined;
   /** Called when the browser comes back online */
-  onOnline?: (handler: () => void) => () => void;
+  onOnline?: ((handler: () => void) => () => void) | undefined;
 };
 
 export type BaseConnectionConfig<T = unknown> = {
@@ -26,23 +26,23 @@ export type BaseConnectionConfig<T = unknown> = {
   onEvent: (payload: T) => void;
   onConnected: () => void;
   onDisconnected: () => void;
-  onReconnected?: () => void;
-  onUnexpectedDisconnect?: () => void;
-  onReplacingConnection?: () => void;
-  onError?: (message: string) => void;
-  isAuthFailure?: (event: CloseEvent) => boolean;
-  refreshAuth?: () => Promise<void>;
-  shouldRefreshAuthBeforeConnect?: () => boolean;
-  onOpen?: (ws: WebSocket) => void;
-  websocketHeaders?: WebSocketHeaders;
+  onReconnected?: (() => void) | undefined;
+  onUnexpectedDisconnect?: (() => void) | undefined;
+  onReplacingConnection?: (() => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
+  isAuthFailure?: ((event: CloseEvent) => boolean) | undefined;
+  refreshAuth?: (() => Promise<void>) | undefined;
+  shouldRefreshAuthBeforeConnect?: (() => boolean) | undefined;
+  onOpen?: ((ws: WebSocket) => void) | undefined;
+  websocketHeaders?: WebSocketHeaders | undefined;
   /** How long to wait for a server message (e.g. heartbeat) on tab resume before
    *  treating the connection as stale. Should exceed the server's heartbeat interval. */
-  stalenessTimeoutMs?: number;
+  stalenessTimeoutMs?: number | undefined;
   /** Optional lifecycle hooks for browser-specific reconnection behavior.
    *  If not provided, no automatic reconnection on lifecycle events occurs.
    *  For browser usage, use `createBrowserLifecycleHooks()`.
    *  For CLI usage, omit this or provide custom hooks. */
-  lifecycleHooks?: ConnectionLifecycleHooks;
+  lifecycleHooks?: ConnectionLifecycleHooks | undefined;
 };
 
 export type Connection = {

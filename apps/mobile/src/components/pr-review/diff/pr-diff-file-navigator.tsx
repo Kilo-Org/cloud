@@ -79,7 +79,7 @@ export function PrDiffFileNavigator({
   const [searchVersion, setSearchVersion] = useState(0);
   const inputRef = useRef<TextInput | null>(null);
 
-  const { query, firstPageErrorState } = usePrReviewFileListQuery({
+  const { query, files, firstPageErrorState } = usePrReviewFileListQuery({
     owner,
     repo,
     number,
@@ -100,16 +100,6 @@ export function PrDiffFileNavigator({
       void runRef.current();
     }
   }, [query.isFetching, query.hasNextPage, fetchAll.isRunning, fetchAll.error]);
-
-  const files = useMemo(() => {
-    const all: PrReviewFile[] = [];
-    for (const page of query.data?.pages ?? []) {
-      for (const f of page.files) {
-        all.push(f);
-      }
-    }
-    return all;
-  }, [query.data]);
 
   const filtered = useMemo(
     () => filterFiles(files, searchRef.current),

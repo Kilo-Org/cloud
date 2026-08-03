@@ -30,3 +30,22 @@ test('serializes async work on the same lock', async () => {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('throws when the lock is held and no wait timeout is given', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-process-lock-'));
+  const lockPath = path.join(root, 'lock');
+  try {
+    await withProcessLockAsync(lockPath, 'test lock', async () => {
+      let contentionError: Error | undefined;
+      try {
+        await withProcessLockAsync(lockPath, 'test lock', async () => {});
+      } catch (error) {
+        contentionError = error instanceof Error ? error : new Error(String(error));
+      }
+      assert.ok(contentionError, 'contending lock acquisition must fail');
+      assert.match(contentionError.message, /locked by another live process/);
+    });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

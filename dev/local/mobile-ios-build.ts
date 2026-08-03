@@ -1183,6 +1183,10 @@ async function main(): Promise<void> {
     const worktreeRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
       encoding: 'utf8',
     }).trim();
+    // Machine-global directory of simulator claim records. The E2E harness in
+    // the kilo-workflow repo writes them; this build only reads them to prove
+    // the target device belongs to this worktree. Treat the record shape as a
+    // contract owned there, not here.
     const claimRoot = path.join(os.tmpdir(), 'kilo-mobile-simulator-claims');
     await runBuild(parsed.udid, {
       env,

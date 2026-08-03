@@ -85,7 +85,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       import('@/app/api/gateway/v1/audio/transcriptions/route'),
     ]);
 
-    expect(routes.map(route => route.maxDuration)).toEqual([1800, 1800, 1800, 1800]);
+    expect(routes.map(route => route.maxDuration)).toEqual([800, 800, 800, 800]);
   });
 
   it('proxies transcription requests to OpenRouter', async () => {

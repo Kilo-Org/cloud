@@ -10,6 +10,7 @@ import { OrganizationAdminCreditGrant } from './OrganizationAdminCreditGrant';
 import { OrganizationAdminCreditNullify } from './OrganizationAdminCreditNullify';
 import { OrganizationAdminCreatedBy } from './OrganizationAdminCreatedBy';
 import { OrganizationAdminHierarchyManagement } from './OrganizationAdminHierarchyManagement';
+import { OrganizationAdminKiloPass } from './OrganizationAdminKiloPass';
 import { OrganizationWorkOSCard } from './OrganizationWorkOSCard';
 import { OrganizationAdminWebhooks } from './OrganizationAdminWebhooks';
 import { OrganizationAdminIntegrations } from './OrganizationAdminIntegrations';
@@ -69,6 +70,7 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
               </div>
               <div className="space-y-8 lg:col-span-2">
                 <SeatUsageCard organizationId={organizationId} />
+                <OrganizationAdminKiloPass organizationId={organizationId} />
                 <OrganizationAdminMembers organizationId={organizationId} showAdminLinks />
               </div>
               <div className="lg:col-span-2">

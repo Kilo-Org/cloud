@@ -1,9 +1,11 @@
 'use client';
 
+// React must be in scope for the classic JSX runtime used by the jest transform.
+import React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowRight, ExternalLink, Minus, Plus, Users } from 'lucide-react';
+import { ArrowRight, CalendarClock, ExternalLink, Loader2, Minus, Plus, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +36,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const [billingCycleDialogOpen, setBillingCycleDialogOpen] = useState(false);
   const [seatCount, setSeatCount] = useState('1');
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [isUpdatingSeats, setIsUpdatingSeats] = useState(false);
   const [isCancelingSubscription, setIsCancelingSubscription] = useState(false);
   const [isCancelingCycleChange, setIsCancelingCycleChange] = useState(false);
 
@@ -48,6 +51,12 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
   );
   const billingQuery = useQuery(
     trpc.organizations.subscription.getBillingHistory.queryOptions(
+      { organizationId },
+      { enabled: !!organizationId }
+    )
+  );
+  const kiloPassQuery = useQuery(
+    trpc.organizations.kiloPass.summary.queryOptions(
       { organizationId },
       { enabled: !!organizationId }
     )
@@ -80,6 +89,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
       queryClient.invalidateQueries({
         queryKey: trpc.organizations.subscription.getBillingHistory.queryKey({ organizationId }),
       }),
+      queryClient.invalidateQueries({ queryKey: trpc.organizations.kiloPass.pathKey() }),
     ]);
   }
 
@@ -160,6 +170,9 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
     0
   );
   const hasPendingCycleChange = subscription.schedule != null;
+  const hasKiloPass =
+    kiloPassQuery.data?.commercialState === 'active' ||
+    kiloPassQuery.data?.commercialState === 'cancel_at_period_end';
 
   return (
     <div className="space-y-6">
@@ -214,6 +227,14 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
               indicatorClassName="bg-linear-to-r from-amber-500 to-amber-300"
             />
           </div>
+
+          {subscriptionQuery.data?.nextSeatCount != null ? (
+            <ScheduledSeatCountNotice
+              currentSeatCount={subscriptionQuery.data.totalSeats}
+              nextSeatCount={subscriptionQuery.data.nextSeatCount}
+              effectiveAt={subscriptionQuery.data.nextSeatCountEffectiveAt}
+            />
+          ) : null}
 
           {hasPendingCycleChange ? (
             <Card className="border-blue-500/30 bg-blue-500/5">
@@ -325,8 +346,13 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
         </CardContent>
       </Card>
 
-      <Dialog open={seatDialogOpen} onOpenChange={setSeatDialogOpen}>
-        <DialogContent className="sm:max-w-sm">
+      <Dialog
+        open={seatDialogOpen}
+        onOpenChange={open => {
+          if (!isUpdatingSeats) setSeatDialogOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm" showCloseButton={!isUpdatingSeats}>
           <DialogHeader>
             <DialogTitle>Change seat count</DialogTitle>
           </DialogHeader>
@@ -335,7 +361,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
               variant="outline"
               size="icon"
               onClick={() => setSeatCount(String(Math.max(1, Number(seatCount) - 1)))}
-              disabled={Number(seatCount) <= 1}
+              disabled={isUpdatingSeats || Number(seatCount) <= 1}
             >
               <Minus className="h-4 w-4" />
             </Button>
@@ -344,11 +370,13 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
               value={seatCount}
               onChange={event => setSeatCount(event.target.value)}
               inputMode="numeric"
+              disabled={isUpdatingSeats}
             />
             <Button
               variant="outline"
               size="icon"
               onClick={() => setSeatCount(String(Number(seatCount) + 1))}
+              disabled={isUpdatingSeats}
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -356,14 +384,16 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
           <SeatCountChangeMessage
             currentSeats={subscriptionQuery.data?.totalSeats ?? 0}
             newSeats={Number(seatCount)}
+            hasKiloPass={hasKiloPass}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSeatDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
+            <SeatUpdateActions
+              isUpdating={isUpdatingSeats}
+              onCancel={() => setSeatDialogOpen(false)}
+              onSave={() =>
                 void (async () => {
+                  if (isUpdatingSeats) return;
+                  setIsUpdatingSeats(true);
                   try {
                     await trpcClient.organizations.subscription.updateSeatCount.mutate({
                       organizationId,
@@ -376,12 +406,12 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
                     toast.error(
                       error instanceof Error ? error.message : 'Failed to update seat count'
                     );
+                  } finally {
+                    setIsUpdatingSeats(false);
                   }
                 })()
               }
-            >
-              Save
-            </Button>
+            />
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -429,29 +459,103 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
   );
 }
 
-function SeatCountChangeMessage({
+export function ScheduledSeatCountNotice({
+  currentSeatCount,
+  nextSeatCount,
+  effectiveAt,
+}: {
+  currentSeatCount: number;
+  nextSeatCount: number;
+  effectiveAt: string | null;
+}) {
+  return (
+    <div className="flex gap-3 rounded-xl border border-status-warning/30 bg-status-warning/10 p-4">
+      <CalendarClock className="mt-0.5 size-4 shrink-0 text-status-warning" aria-hidden />
+      <div className="space-y-1">
+        <p className="type-label text-foreground">Seat count scheduled to decrease</p>
+        <p className="type-body text-muted-foreground">
+          Your seat count will change from {currentSeatCount} to {nextSeatCount}
+          {effectiveAt
+            ? ` on ${formatDateLabel(effectiveAt, 'your next renewal')}`
+            : ' at your next renewal'}
+          . You can continue using all {currentSeatCount} seats until then.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function SeatUpdateActions({
+  isUpdating,
+  onCancel,
+  onSave,
+}: {
+  isUpdating: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <>
+      <Button variant="outline" onClick={onCancel} disabled={isUpdating}>
+        Cancel
+      </Button>
+      <Button disabled={isUpdating} aria-busy={isUpdating} onClick={onSave}>
+        {isUpdating ? (
+          <>
+            <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />
+            Updating seats
+          </>
+        ) : (
+          'Save'
+        )}
+      </Button>
+    </>
+  );
+}
+
+export function SeatCountChangeMessage({
   currentSeats,
   newSeats,
+  hasKiloPass = false,
 }: {
   currentSeats: number;
   newSeats: number;
+  hasKiloPass?: boolean;
 }) {
   if (isNaN(newSeats) || newSeats === currentSeats) return null;
 
   if (newSeats > currentSeats) {
+    const addedSeats = newSeats - currentSeats;
     return (
-      <p className="text-muted-foreground text-sm">
-        Adding {newSeats - currentSeats} seat{newSeats - currentSeats === 1 ? '' : 's'}. You will be
-        billed a prorated amount immediately.
-      </p>
+      <div className="space-y-2 text-sm text-muted-foreground">
+        <p>
+          Adding {addedSeats} seat{addedSeats === 1 ? '' : 's'}. You will be billed a prorated
+          amount immediately.
+        </p>
+        {hasKiloPass ? (
+          <p>
+            This also adds {addedSeats} Kilo Pass subscription{addedSeats === 1 ? '' : 's'} and
+            increases Kilo Pass billing.
+          </p>
+        ) : null}
+      </div>
     );
   }
 
+  const removedSeats = currentSeats - newSeats;
   return (
-    <p className="text-muted-foreground text-sm">
-      Removing {currentSeats - newSeats} seat{currentSeats - newSeats === 1 ? '' : 's'}. This will
-      take effect at the start of your next billing cycle.
-    </p>
+    <div className="space-y-2 text-sm text-muted-foreground">
+      <p>
+        Removing {removedSeats} seat{removedSeats === 1 ? '' : 's'}. This will take effect at the
+        start of your next billing cycle.
+      </p>
+      {hasKiloPass ? (
+        <p>
+          This also removes {removedSeats} Kilo Pass subscription{removedSeats === 1 ? '' : 's'} at
+          the next renewal.
+        </p>
+      ) : null}
+    </div>
   );
 }
 

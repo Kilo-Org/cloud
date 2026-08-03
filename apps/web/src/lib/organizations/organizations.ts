@@ -1006,8 +1006,11 @@ export async function setOrganizationRecommendationsDigestEnabled(
   return row?.settings ?? {};
 }
 
-export async function markOrganizationAsDeleted(organizationId: Organization['id']): Promise<void> {
-  await db
+export async function markOrganizationAsDeleted(
+  organizationId: Organization['id'],
+  txn?: DrizzleTransaction
+): Promise<void> {
+  await (txn ?? db)
     .update(organizations)
     .set({ ...auto_deleted_at })
     .where(eq(organizations.id, organizationId));

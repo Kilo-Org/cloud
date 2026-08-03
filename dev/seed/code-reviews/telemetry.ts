@@ -11,7 +11,7 @@ import { eq, inArray, or } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
-import { createSeedStripeCustomer } from '../lib/stripe';
+import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
 import type { SeedResult } from '../index';
 
 const MINUTE_MS = 60_000;
@@ -604,16 +604,25 @@ async function ensureSeedUsers(db: ReturnType<typeof getSeedDb>): Promise<void> 
       kiloUserId: user.id,
     });
 
-    await db.insert(kilocode_users).values({
-      id: user.id,
-      google_user_email: user.email,
-      google_user_name: user.name,
-      google_user_image_url: `https://example.com/${encodeURIComponent(user.id)}.png`,
-      stripe_customer_id: stripeCustomer.id,
-      normalized_email: normalizeSeedEmail(user.email),
-      has_validation_stytch: true,
-      customer_source: 'dev-seed',
-    });
+    try {
+      await db.insert(kilocode_users).values({
+        id: user.id,
+        google_user_email: user.email,
+        google_user_name: user.name,
+        google_user_image_url: `https://example.com/${encodeURIComponent(user.id)}.png`,
+        stripe_customer_id: stripeCustomer.id,
+        normalized_email: normalizeSeedEmail(user.email),
+        has_validation_stytch: true,
+        customer_source: 'dev-seed',
+      });
+    } catch (error) {
+      // The insert failed after the Stripe customer already existed. Nothing
+      // will reference it again (the next run's existence check is keyed on
+      // the user id, which was never written), so drop it rather than leave an
+      // orphan in the test-mode account.
+      await deleteSeedStripeCustomer(stripeCustomer.id);
+      throw error;
+    }
   }
 }
 

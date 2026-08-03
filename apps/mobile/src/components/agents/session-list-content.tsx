@@ -21,6 +21,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
+import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
 import {
   selectSessionListBodyModel,
   type SessionListBodyModel,
@@ -123,6 +124,7 @@ export function AgentSessionListContent({
   const { fontScale } = useWindowDimensions();
   const { deleteSession, renameSession } = useSessionMutations();
   const [refreshing, setRefreshing] = useState(false);
+  const [renderErrorResetKey, setRenderErrorResetKey] = useState(0);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it. The FAB adds its
@@ -227,6 +229,11 @@ export function AgentSessionListContent({
     })();
   }, [refetch]);
 
+  const handleRenderErrorRetry = useCallback(() => {
+    setRenderErrorResetKey(previous => previous + 1);
+    onRetry();
+  }, [onRetry]);
+
   const renderItem = useCallback(
     ({ item }: { item: StoredSession }) => (
       <StoredSessionRow
@@ -326,29 +333,38 @@ export function AgentSessionListContent({
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-      <SectionList<StoredSession, SessionSection>
-        ref={listRef}
-        key={sortBy}
-        sections={sections}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        keyExtractor={keyExtractor}
-        extraData={attentionFocusRevision}
-        ListHeaderComponent={activeNowSection}
-        ListEmptyComponent={emptyComponent}
-        ListFooterComponent={
-          isFetchingNextPage ? (
-            <View className="py-4">
-              <ActivityIndicator color={colors.mutedForeground} />
-            </View>
-          ) : null
+      <MessageErrorBoundary
+        resetKey={renderErrorResetKey}
+        fallback={
+          <View className="flex-1 items-center justify-center" style={tabBarOnlyClearanceStyle}>
+            <QueryError message="Could not show sessions" onRetry={handleRenderErrorRetry} />
+          </View>
         }
-        contentContainerStyle={tabBarClearanceStyle}
-        keyboardDismissMode="on-drag"
-        onEndReached={onEndReached}
-        onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      />
+      >
+        <SectionList<StoredSession, SessionSection>
+          ref={listRef}
+          key={sortBy}
+          sections={sections}
+          renderItem={renderItem}
+          renderSectionHeader={renderSectionHeader}
+          keyExtractor={keyExtractor}
+          extraData={attentionFocusRevision}
+          ListHeaderComponent={activeNowSection}
+          ListEmptyComponent={emptyComponent}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View className="py-4">
+                <ActivityIndicator color={colors.mutedForeground} />
+              </View>
+            ) : null
+          }
+          contentContainerStyle={tabBarClearanceStyle}
+          keyboardDismissMode="on-drag"
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.5}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        />
+      </MessageErrorBoundary>
     </Animated.View>
   );
 }

@@ -9,6 +9,8 @@ import { normalizeEmail } from '@/lib/utils';
 
 const SIGN_IN_CODE_EXPIRY_MINUTES = 10;
 const SIGN_IN_CODE_MAX_ATTEMPTS = 5;
+// Reservations expire on their own after two minutes — no cleanup job is needed.
+const SIGN_IN_CODE_RESERVATION_MINUTES = 2;
 
 function hashSignInCode(email: string, code: string): string {
   return createHmac('sha256', NEXTAUTH_SECRET).update(`${email}:${code}`).digest('hex');
@@ -132,21 +134,22 @@ export async function createSignInCode(email: string): Promise<string> {
   return code;
 }
 
+export type ReserveSignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts' | 'in_progress';
 export type VerifySignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts';
 
 /**
- * Verify and consume an email sign-in code atomically, scoped by email.
+ * Reserve a sign-in code for settlement. Does not consume the code.
+ * A live reservation blocks concurrent callers, who receive 'in_progress'.
+ * A failed settlement must call releaseSignInCode so the code stays usable.
  *
- * Attempt limiting is checked BEFORE the hash comparison: once the live
- * code for an email has recorded 5+ failed attempts, this returns
- * 'too_many_attempts' even for the correct code. A mismatch increments
- * attempts on the email's unconsumed row(s) and returns 'invalid'; so does
- * an expired, already-consumed, or nonexistent code.
+ * Returns 'ok' when the code is reserved, 'invalid' for a wrong/expired/consumed
+ * code, 'too_many_attempts' when the attempt budget is exhausted, and
+ * 'in_progress' when another caller already holds the reservation.
  */
-export async function verifyAndConsumeSignInCode(
+export async function reserveSignInCode(
   email: string,
   code: string
-): Promise<VerifySignInCodeResult> {
+): Promise<ReserveSignInCodeResult> {
   const normalizedEmail = normalizeEmail(email);
 
   const [row] = await db
@@ -172,13 +175,11 @@ export async function verifyAndConsumeSignInCode(
 
   const token_hash = hashSignInCode(normalizedEmail, code);
   if (row.token_hash === token_hash) {
-    // attempts < MAX is re-checked here atomically: the early read above is
-    // only a fast path, and two concurrent wrong guesses can race it past
-    // the budget. This predicate guarantees an over-budget code can never
-    // consume regardless of racing increments.
-    const consumed = await db
+    const reserved = await db
       .update(magic_link_tokens)
-      .set({ consumed_at: sql`NOW()` })
+      .set({
+        reserved_until: sql`NOW() + interval '${sql.raw(String(SIGN_IN_CODE_RESERVATION_MINUTES))} minutes'`,
+      })
       .where(
         and(
           eq(magic_link_tokens.token_hash, token_hash),
@@ -186,17 +187,21 @@ export async function verifyAndConsumeSignInCode(
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
           sql`${magic_link_tokens.expires_at} > NOW()`,
-          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
+          sql`(${magic_link_tokens.reserved_until} IS NULL OR ${magic_link_tokens.reserved_until} < NOW())`
         )
       )
       .returning();
 
-    if (consumed[0]) {
+    if (reserved[0]) {
       return 'ok';
     }
 
     const [current] = await db
-      .select({ attempts: magic_link_tokens.attempts })
+      .select({
+        attempts: magic_link_tokens.attempts,
+        reserved_until: magic_link_tokens.reserved_until,
+      })
       .from(magic_link_tokens)
       .where(
         and(
@@ -207,9 +212,17 @@ export async function verifyAndConsumeSignInCode(
         )
       )
       .limit(1);
-    return current && current.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS
-      ? 'too_many_attempts'
-      : 'invalid';
+
+    if (!current) {
+      return 'invalid';
+    }
+    if (current.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
+      return 'too_many_attempts';
+    }
+    if (current.reserved_until && new Date(current.reserved_until) > new Date()) {
+      return 'in_progress';
+    }
+    return 'invalid';
   }
 
   await db
@@ -225,6 +238,109 @@ export async function verifyAndConsumeSignInCode(
     );
 
   return 'invalid';
+}
+
+/**
+ * Commit a reserved sign-in code by setting consumed_at.
+ * Must be called only after a successful settlement.
+ * The reservation must still be live (reserved_until > NOW()).
+ *
+ * Returns true when the code was committed, false when the reservation
+ * lapsed or the row was already consumed.
+ */
+export async function commitSignInCode(email: string, code: string): Promise<boolean> {
+  const normalizedEmail = normalizeEmail(email);
+  const token_hash = hashSignInCode(normalizedEmail, code);
+
+  const committed = await db
+    .update(magic_link_tokens)
+    .set({ consumed_at: sql`NOW()`, reserved_until: null })
+    .where(
+      and(
+        eq(magic_link_tokens.token_hash, token_hash),
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at),
+        sql`${magic_link_tokens.reserved_until} > NOW()`
+      )
+    )
+    .returning();
+
+  return committed.length > 0;
+}
+
+/**
+ * Release a reserved sign-in code without consuming it or incrementing attempts.
+ * A settlement failure is not a wrong guess — it must not cost the user an attempt.
+ */
+export async function releaseSignInCode(email: string, code: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  const token_hash = hashSignInCode(normalizedEmail, code);
+
+  await db
+    .update(magic_link_tokens)
+    .set({ reserved_until: null })
+    .where(
+      and(
+        eq(magic_link_tokens.token_hash, token_hash),
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at)
+      )
+    );
+}
+
+/**
+ * Consume a sign-in code unconditionally, regardless of reservation status.
+ * Used when the reservation lapsed between settlement and commit — the user
+ * is legitimately settled and this prevents a second settlement with the same code.
+ */
+export async function consumeSignInCode(email: string, code: string): Promise<boolean> {
+  const normalizedEmail = normalizeEmail(email);
+  const token_hash = hashSignInCode(normalizedEmail, code);
+
+  const consumed = await db
+    .update(magic_link_tokens)
+    .set({ consumed_at: sql`NOW()`, reserved_until: null })
+    .where(
+      and(
+        eq(magic_link_tokens.token_hash, token_hash),
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at)
+      )
+    )
+    .returning();
+
+  return consumed.length > 0;
+}
+
+/**
+ * Verify and consume an email sign-in code atomically, scoped by email.
+ *
+ * This is a thin compatibility wrapper that reserves then immediately commits.
+ * Callers that perform a settlement (createOrUpdateUser) between verification
+ * and consumption must use reserveSignInCode / commitSignInCode / releaseSignInCode
+ * directly instead.
+ */
+export async function verifyAndConsumeSignInCode(
+  email: string,
+  code: string
+): Promise<VerifySignInCodeResult> {
+  const result = await reserveSignInCode(email, code);
+  if (result !== 'ok') {
+    // Map 'in_progress' to 'invalid' — the wrapper has no settlement phase
+    // so a reservation conflict is a bug, not a retryable state.
+    return result === 'in_progress' ? 'invalid' : result;
+  }
+  const committed = await commitSignInCode(email, code);
+  if (!committed) {
+    // Reservation expired between reserve and commit — release so the code
+    // stays usable and the user can retry.
+    await releaseSignInCode(email, code);
+    return 'invalid';
+  }
+  return 'ok';
 }
 
 export async function deleteSignInCode(email: string, code: string): Promise<void> {

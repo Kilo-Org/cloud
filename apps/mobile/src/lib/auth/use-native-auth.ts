@@ -22,6 +22,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   BLOCKED: 'This account has been blocked. Please contact support.',
   'SIGNUP-RATE-LIMITED': 'Too many attempts. Please try again later.',
   INVALID_CODE: 'That code is incorrect. Please try again.',
+  CODE_IN_PROGRESS: 'Your code is being processed. Wait a moment and try again.',
   TOO_MANY_ATTEMPTS: 'Too many attempts. Please request a new code.',
   INVALID_TOKEN: 'Sign-in failed. Please try again.',
   INVALID_EMAIL: 'Unable to deliver email to this address. Please use a different email.',

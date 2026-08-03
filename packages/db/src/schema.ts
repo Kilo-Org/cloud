@@ -5245,6 +5245,7 @@ export const magic_link_tokens = pgTable(
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     attempts: integer().default(0).notNull(),
+    reserved_until: timestamp({ withTimezone: true, mode: 'string' }),
     purpose: text().default('magic_link').notNull().$type<'magic_link' | 'sign_in_code'>(),
   },
   table => [

@@ -1,0 +1,1 @@
+ALTER TABLE "magic_link_tokens" ADD COLUMN "reserved_until" timestamp with time zone;

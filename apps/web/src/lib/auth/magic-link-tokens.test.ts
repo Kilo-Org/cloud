@@ -2,8 +2,12 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
   createMagicLinkToken,
   createSignInCode,
+  consumeSignInCode,
+  commitSignInCode,
   deleteSignInCode,
   getMagicLinkUrl,
+  releaseSignInCode,
+  reserveSignInCode,
   verifyAndConsumeMagicLinkToken,
   verifyAndConsumeSignInCode,
 } from './magic-link-tokens';
@@ -319,6 +323,243 @@ describe('Magic Link Tokens', () => {
     it('returns invalid when there is no code for the email', async () => {
       const result = await verifyAndConsumeSignInCode(testEmail, '123456');
       expect(result).toBe('invalid');
+    });
+  });
+
+  describe('reserveSignInCode / commitSignInCode / releaseSignInCode', () => {
+    it('reserves a code without consuming it', async () => {
+      const code = await createSignInCode(testEmail);
+
+      const result = await reserveSignInCode(testEmail, code);
+      expect(result).toBe('ok');
+
+      const [row] = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(row?.consumed_at).toBeNull();
+      expect(row?.reserved_until).not.toBeNull();
+    });
+
+    it('commits a reserved code', async () => {
+      const code = await createSignInCode(testEmail);
+      const reserveResult = await reserveSignInCode(testEmail, code);
+      expect(reserveResult).toBe('ok');
+
+      const committed = await commitSignInCode(testEmail, code);
+      expect(committed).toBe(true);
+
+      const [row] = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(row?.consumed_at).not.toBeNull();
+    });
+
+    it('releases a reserved code without incrementing attempts', async () => {
+      const code = await createSignInCode(testEmail);
+      await reserveSignInCode(testEmail, code);
+
+      // Verify a wrong guess does NOT increment attempts
+      const [before] = await db
+        .select({ attempts: magic_link_tokens.attempts })
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(before?.attempts).toBe(0);
+
+      await releaseSignInCode(testEmail, code);
+
+      const [after] = await db
+        .select({
+          attempts: magic_link_tokens.attempts,
+          reserved_until: magic_link_tokens.reserved_until,
+        })
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(after?.attempts).toBe(0);
+      expect(after?.reserved_until).toBeNull();
+    });
+
+    it('released code remains usable (failed settlement does not cost attempts)', async () => {
+      const code = await createSignInCode(testEmail);
+      await reserveSignInCode(testEmail, code);
+      await releaseSignInCode(testEmail, code);
+
+      // Code should be usable again
+      const result = await reserveSignInCode(testEmail, code);
+      expect(result).toBe('ok');
+
+      // And should not have any attempts consumed
+      const [row] = await db
+        .select({ attempts: magic_link_tokens.attempts })
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(row?.attempts).toBe(0);
+    });
+
+    it('blocks a second reservation on the same code with in_progress', async () => {
+      const code = await createSignInCode(testEmail);
+
+      const first = await reserveSignInCode(testEmail, code);
+      expect(first).toBe('ok');
+
+      const second = await reserveSignInCode(testEmail, code);
+      expect(second).toBe('in_progress');
+
+      // The code remains unconsumed
+      const [row] = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(row?.consumed_at).toBeNull();
+    });
+
+    it('two concurrent reservations yield exactly one ok', async () => {
+      const code = await createSignInCode(testEmail);
+
+      const results = await Promise.all([
+        reserveSignInCode(testEmail, code),
+        reserveSignInCode(testEmail, code),
+      ]);
+      const sorted = results.toSorted();
+      expect(sorted).toEqual(['in_progress', 'ok']);
+    });
+
+    it('reservation becomes usable after expiry', async () => {
+      const code = await createSignInCode(testEmail);
+
+      await reserveSignInCode(testEmail, code);
+
+      // Force the reservation to expire
+      await db
+        .update(magic_link_tokens)
+        .set({ reserved_until: new Date(Date.now() - 60_000).toISOString() })
+        .where(eq(magic_link_tokens.email, testEmail));
+
+      const result = await reserveSignInCode(testEmail, code);
+      expect(result).toBe('ok');
+    });
+
+    it('commitSignInCode fails after reservation expires', async () => {
+      const code = await createSignInCode(testEmail);
+      await reserveSignInCode(testEmail, code);
+
+      // Force the reservation to expire
+      await db
+        .update(magic_link_tokens)
+        .set({ reserved_until: new Date(Date.now() - 60_000).toISOString() })
+        .where(eq(magic_link_tokens.email, testEmail));
+
+      const committed = await commitSignInCode(testEmail, code);
+      expect(committed).toBe(false);
+
+      // Code should still be unconsumed
+      const [row] = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(row?.consumed_at).toBeNull();
+    });
+
+    it('consumeSignInCode works without a reservation', async () => {
+      const code = await createSignInCode(testEmail);
+      await reserveSignInCode(testEmail, code);
+
+      // Force the reservation to expire
+      await db
+        .update(magic_link_tokens)
+        .set({ reserved_until: new Date(Date.now() - 60_000).toISOString() })
+        .where(eq(magic_link_tokens.email, testEmail));
+
+      // consumeSignInCode should still work without a live reservation
+      const consumed = await consumeSignInCode(testEmail, code);
+      expect(consumed).toBe(true);
+
+      const [row] = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(row?.consumed_at).not.toBeNull();
+    });
+
+    it('consumeSignInCode prevents a second consume', async () => {
+      const code = await createSignInCode(testEmail);
+      await reserveSignInCode(testEmail, code);
+
+      const first = await consumeSignInCode(testEmail, code);
+      expect(first).toBe(true);
+
+      const second = await consumeSignInCode(testEmail, code);
+      expect(second).toBe(false);
+    });
+  });
+
+  describe('reservation lapse — one account, one session', () => {
+    it('with the same code, two sequential settle-attempts produce one consumed code', async () => {
+      const code = await createSignInCode(testEmail);
+
+      // First: reserve, then consume unconditionally (simulating a lapse)
+      const firstReserve = await reserveSignInCode(testEmail, code);
+      expect(firstReserve).toBe('ok');
+
+      await consumeSignInCode(testEmail, code);
+
+      // Second attempt: code should be consumed, so reserve returns 'invalid'
+      const secondReserve = await reserveSignInCode(testEmail, code);
+      expect(secondReserve).toBe('invalid');
+    });
+
+    it('settles once, consumes after a lapse, and creates one session across two attempts', async () => {
+      const code = await createSignInCode(testEmail);
+      const settledAccounts: string[] = [];
+      const issuedSessions: string[] = [];
+
+      // 1. Reserve the code.
+      const reserve = await reserveSignInCode(testEmail, code);
+      expect(reserve).toBe('ok');
+
+      // Settlement is idempotent for an existing account. Model the completed
+      // settlement before the reservation lapses, as the native route does.
+      settledAccounts.push(testEmail);
+
+      // 2. Force the reservation to expire (simulate mid-settlement timeout).
+      await db
+        .update(magic_link_tokens)
+        .set({ reserved_until: new Date(Date.now() - 60_000).toISOString() })
+        .where(eq(magic_link_tokens.email, testEmail));
+
+      // 3. Commit fails because the reservation has lapsed.
+      const committed = await commitSignInCode(testEmail, code);
+      expect(committed).toBe(false);
+
+      // Code must still be unconsumed (commit does not touch consumed_at on failure).
+      const [afterCommit] = await db
+        .select({ consumed_at: magic_link_tokens.consumed_at })
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(afterCommit?.consumed_at).toBeNull();
+
+      // 4. Consume unconditionally — the user is legitimately settled.
+      const consumed = await consumeSignInCode(testEmail, code);
+      expect(consumed).toBe(true);
+      issuedSessions.push(testEmail);
+
+      // Code is now marked as consumed.
+      const [afterConsume] = await db
+        .select({ consumed_at: magic_link_tokens.consumed_at })
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(afterConsume?.consumed_at).not.toBeNull();
+
+      // 5. A second attempt cannot settle or issue another session.
+      const secondReserve = await reserveSignInCode(testEmail, code);
+      expect(secondReserve).toBe('invalid');
+
+      // The consumed code must not be re-usable.
+      const secondConsume = await consumeSignInCode(testEmail, code);
+      expect(secondConsume).toBe(false);
+      expect(settledAccounts).toEqual([testEmail]);
+      expect(issuedSessions).toEqual([testEmail]);
     });
   });
 

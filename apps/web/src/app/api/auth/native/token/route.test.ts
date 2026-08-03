@@ -4,7 +4,12 @@ import {
   verifyNativeGoogleIdToken,
   NativeIdTokenError,
 } from '@/lib/auth/native-id-tokens';
-import { verifyAndConsumeSignInCode } from '@/lib/auth/magic-link-tokens';
+import {
+  reserveSignInCode,
+  commitSignInCode,
+  releaseSignInCode,
+  consumeSignInCode,
+} from '@/lib/auth/magic-link-tokens';
 import {
   createOrUpdateUser,
   findUserById,
@@ -39,7 +44,10 @@ import { captureMessage } from '@sentry/nextjs';
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
-const mockVerifyAndConsumeSignInCode = jest.mocked(verifyAndConsumeSignInCode);
+const mockReserveSignInCode = jest.mocked(reserveSignInCode);
+const mockCommitSignInCode = jest.mocked(commitSignInCode);
+const mockReleaseSignInCode = jest.mocked(releaseSignInCode);
+const mockConsumeSignInCode = jest.mocked(consumeSignInCode);
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockFindUserById = jest.mocked(findUserById);
 const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
@@ -81,6 +89,10 @@ describe('POST /api/auth/native/token', () => {
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
     mockFindUserIdByAuthProvider.mockResolvedValue(null);
     mockCheckNativeAdmission.mockReturnValue({ ok: true });
+    mockReserveSignInCode.mockResolvedValue('ok');
+    mockCommitSignInCode.mockResolvedValue(true);
+    mockReleaseSignInCode.mockResolvedValue(undefined);
+    mockConsumeSignInCode.mockResolvedValue(true);
   });
 
   describe('apple', () => {
@@ -320,9 +332,7 @@ describe('POST /api/auth/native/token', () => {
   });
 
   describe('email', () => {
-    it('verifies the code before createOrUpdateUser, builds args mirroring createEmailAccountInfo, autoLink=true', async () => {
-      mockVerifyAndConsumeSignInCode.mockResolvedValue('ok');
-
+    it('reserves, settles, commits, and mints a token', async () => {
       const response = await POST(
         createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
       );
@@ -330,10 +340,8 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ token: 'minted-jwt' });
-      expect(mockVerifyAndConsumeSignInCode).toHaveBeenCalledWith(
-        'emailuser@example.com',
-        '123456'
-      );
+      expect(mockReserveSignInCode).toHaveBeenCalledWith('emailuser@example.com', '123456');
+      expect(mockCommitSignInCode).toHaveBeenCalledWith('emailuser@example.com', '123456');
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           google_user_email: 'emailuser@example.com',
@@ -347,10 +355,11 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers)
       );
       expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith('emailuser@example.com');
+      expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
     });
 
     it('rechecks domain eligibility when redeeming an issued code', async () => {
-      mockVerifyAndConsumeSignInCode.mockResolvedValue('ok');
       mockCheckDomainSignInEligibility.mockResolvedValue({
         ok: false,
         status: 403,
@@ -367,12 +376,11 @@ describe('POST /api/auth/native/token', () => {
         error: 'SSO_ERROR',
         ssoOrganizationId: 'workos-organization-id',
       });
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
 
     it('lowercases the client-supplied email before building args (does not trust client casing)', async () => {
-      mockVerifyAndConsumeSignInCode.mockResolvedValue('ok');
-
       await POST(
         createRequest({ provider: 'email', email: 'EmailUser@Example.com', code: '123456' })
       );
@@ -391,7 +399,7 @@ describe('POST /api/auth/native/token', () => {
     });
 
     it('returns 401 INVALID_CODE when the code is invalid, without calling createOrUpdateUser', async () => {
-      mockVerifyAndConsumeSignInCode.mockResolvedValue('invalid');
+      mockReserveSignInCode.mockResolvedValue('invalid');
 
       const response = await POST(
         createRequest({ provider: 'email', email: 'emailuser@example.com', code: '000000' })
@@ -404,7 +412,7 @@ describe('POST /api/auth/native/token', () => {
     });
 
     it('returns 429 TOO_MANY_ATTEMPTS when the attempt budget is exhausted', async () => {
-      mockVerifyAndConsumeSignInCode.mockResolvedValue('too_many_attempts');
+      mockReserveSignInCode.mockResolvedValue('too_many_attempts');
 
       const response = await POST(
         createRequest({ provider: 'email', email: 'emailuser@example.com', code: '000000' })
@@ -414,6 +422,187 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(429);
       expect(data).toEqual({ error: 'TOO_MANY_ATTEMPTS' });
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('returns 425 CODE_IN_PROGRESS when another request holds the reservation', async () => {
+      mockReserveSignInCode.mockResolvedValue('in_progress');
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(425);
+      expect(data).toEqual({ error: 'CODE_IN_PROGRESS' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('releases the reservation when createOrUpdateUser fails', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'BLOCKED' } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+    });
+
+    it('releases the code on DIFFERENT-OAUTH settlement failure so retry succeeds', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: false,
+        error: 'DIFFERENT-OAUTH',
+      } as never);
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'different-oauth@example.com',
+          code: '123456',
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'DIFFERENT-OAUTH' });
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The code was released, not consumed — no commit or consume occurred.
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+    });
+
+    it('retry after DIFFERENT-OAUTH release reserves and settles the same code', async () => {
+      // First call: DIFFERENT-OAUTH triggers release. The second call must
+      // re-reserve the same code and settle successfully, proving the release.
+      mockCreateOrUpdateUser
+        .mockResolvedValueOnce({
+          success: false,
+          error: 'DIFFERENT-OAUTH',
+        } as never)
+        // Second call falls back to the beforeEach success default.
+        .mockResolvedValueOnce({
+          success: true,
+          user: fakeUser,
+          isNew: false,
+        } as never);
+
+      const email = 'retry-oauth@example.com';
+      const code = '654321';
+
+      // First attempt: DIFFERENT-OAUTH → release.
+      const first = await POST(createRequest({ provider: 'email', email, code }));
+      expect(first.status).toBe(403);
+      expect(await first.json()).toEqual({ error: 'DIFFERENT-OAUTH' });
+      expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code);
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+
+      // Second attempt: code was released, re-reserve succeeds, settle works.
+      const second = await POST(createRequest({ provider: 'email', email, code }));
+      expect(second.status).toBe(200);
+      expect(await second.json()).toEqual({ token: 'minted-jwt' });
+
+      // One account minted across both attempts.
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(2);
+      expect(mockGenerateApiToken).toHaveBeenCalledTimes(1);
+      expect(mockCommitSignInCode).toHaveBeenCalledTimes(1);
+      expect(mockCommitSignInCode).toHaveBeenCalledWith(email, code);
+      // releaseSignInCode was only called once (on the first failure).
+      expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases the reservation on an unexpected error', async () => {
+      mockCreateOrUpdateUser.mockRejectedValue(new Error('DB crash'));
+
+      await expect(
+        POST(createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' }))
+      ).rejects.toThrow('DB crash');
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+    });
+
+    it('unconditionally consumes the code when the reservation lapsed mid-settlement', async () => {
+      mockCommitSignInCode.mockResolvedValue(false);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockConsumeSignInCode).toHaveBeenCalledWith('emailuser@example.com', '123456');
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_code_reservation_lapsed');
+    });
+
+    it('returns 401 INVALID_CODE when lapse-consume fails (another request already consumed the code)', async () => {
+      mockCommitSignInCode.mockResolvedValue(false);
+      mockConsumeSignInCode.mockResolvedValue(false);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_CODE' });
+      // No credentials must be issued when consumeSignInCode fails.
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+    });
+
+    it('reservation-lapse full-flow produces one account and one device session', async () => {
+      mockCommitSignInCode.mockResolvedValue(false);
+      mockConsumeSignInCode.mockResolvedValue(true);
+      mockCreateDeviceSession.mockResolvedValue('session-lapse-1');
+      mockIssueSessionCredentials.mockResolvedValue({
+        token: 'short-jwt',
+        refreshToken: 'refresh-xyz',
+        expiresIn: 3600,
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'lapse@example.com',
+          code: '123456',
+          supportsRefresh: true,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        token: 'short-jwt',
+        refreshToken: 'refresh-xyz',
+        expiresIn: 3600,
+      });
+
+      // One account, one session, no legacy token.
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(mockCreateDeviceSession).toHaveBeenCalledTimes(1);
+      expect(mockIssueSessionCredentials).toHaveBeenCalledTimes(1);
+      expect(mockConsumeSignInCode).toHaveBeenCalledWith('lapse@example.com', '123456');
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_code_reservation_lapsed');
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+    });
+
+    it('concurrent submissions produce exactly one settlement and one credential', async () => {
+      // First call gets the reservation; second gets IN_PROGRESS.
+      mockReserveSignInCode.mockResolvedValueOnce('ok').mockResolvedValueOnce('in_progress');
+      mockCommitSignInCode.mockResolvedValue(true);
+
+      const req = (code: string) =>
+        createRequest({
+          provider: 'email',
+          email: 'concurrent@example.com',
+          code,
+        });
+
+      const [resA, resB] = await Promise.all([POST(req('654321')), POST(req('654321'))]);
+
+      const [statusA, statusB] = [resA.status, resB.status].toSorted();
+      expect([statusA, statusB]).toEqual([200, 425]);
+
+      // Only one createOrUpdateUser and one credential.
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(mockGenerateApiToken).toHaveBeenCalledTimes(1);
     });
   });
 

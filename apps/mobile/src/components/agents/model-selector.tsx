@@ -18,6 +18,7 @@ import {
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { modelPickerCostLabel } from '@/lib/model-cost';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type ModelPickerSelection,
@@ -229,6 +230,7 @@ export function ModelPickerOptionRow({
   const free = option.showGatewayMetadata && isFreeModelOption(option);
   const byok = option.showGatewayMetadata && hasUserByokAvailable(option);
   const collectsData = option.showGatewayMetadata && mayTrainOnYourPrompts(option);
+  const costLabel = modelPickerCostLabel(option);
   const accessibilityLabel = [
     option.provider?.name,
     option.name,
@@ -236,6 +238,7 @@ export function ModelPickerOptionRow({
     byok ? BYOK_MODEL_LABEL : undefined,
     free && !byok ? FREE_MODEL_FREE_LABEL : undefined,
     collectsData ? FREE_MODEL_DATA_LABEL : undefined,
+    costLabel ?? undefined,
     option.unavailable ? 'unavailable' : undefined,
     selected ? 'selected' : undefined,
   ]
@@ -269,6 +272,7 @@ export function ModelPickerOptionRow({
               {option.modelRef ? `Model ${option.displayId}` : option.displayId}
             </Text>
           ) : null}
+          {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
           {option.unavailable ? (
             <Text className="mt-1 text-xs text-muted-foreground">Unavailable</Text>
           ) : null}

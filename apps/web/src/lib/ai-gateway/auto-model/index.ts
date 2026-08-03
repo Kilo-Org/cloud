@@ -149,17 +149,23 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   opencode_settings: undefined,
 };
 
+// INVARIANT: kilo-auto/small metadata must stay the lowest common denominator
+// of every model it can resolve to (google/gemma-4-26b-a4b-it with balance,
+// otherwise the kilo-auto/free rotation). ling-3.0-flash and laguna-s-2.1 are
+// text-only, so supports_images must stay false; max_completion_tokens is
+// bounded by gemma's 16384. Re-check all resolution targets before raising
+// any of these values.
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   id: 'kilo-auto/small',
   name: 'Auto Small',
   description: 'Automatically routes your request to a small model.',
   context_length: 262144,
-  max_completion_tokens: 32768,
+  max_completion_tokens: 16384,
   prompt_price: '0.00000005',
   completion_price: '0.0000004',
   input_cache_read_price: '0.000000005',
   input_cache_write_price: undefined,
-  supports_images: true,
+  supports_images: false,
   supports_pdf: false,
   opencode_settings: undefined,
 };

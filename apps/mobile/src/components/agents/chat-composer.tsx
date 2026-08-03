@@ -97,6 +97,7 @@ type ChatComposerProps = {
   ) => void | Promise<void>;
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
+  onRestartSession: () => Promise<boolean>;
   onExitSession: (
     onAccepted: () => void,
     lock: { current: boolean },
@@ -131,6 +132,7 @@ export function ChatComposer({
   onSend,
   onSendCommand,
   onCreateSession,
+  onRestartSession,
   onExitSession,
   onStop,
   disabled = false,
@@ -524,6 +526,7 @@ export function ChatComposer({
         {
           onSendCommand,
           onCreateSession,
+          onRestartSession,
           onExitSession: async onAccepted => {
             await onExitSession(onAccepted, submissionLockRef, voiceInput.settleBeforeSubmit);
           },

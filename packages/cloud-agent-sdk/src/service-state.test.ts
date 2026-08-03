@@ -1969,4 +1969,289 @@ describe('createServiceState', () => {
       expect(state.getPendingMessages().has('child-m1')).toBe(false);
     });
   });
+
+  describe('blocking-request queue', () => {
+    describe('permission queue', () => {
+      it('two asks preserve the oldest as head', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-2',
+          permission: 'bash',
+          patterns: ['**'],
+          metadata: { command: 'rm' },
+          always: [],
+        });
+
+        expect(state.getPermission()).toEqual({
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+      });
+
+      it('resolving the head reveals the next entry', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-2',
+          permission: 'bash',
+          patterns: ['**'],
+          metadata: { command: 'rm' },
+          always: [],
+        });
+        state.process({ type: 'permission.replied', requestId: 'perm-1' });
+
+        expect(state.getPermission()).toEqual({
+          requestId: 'perm-2',
+          permission: 'bash',
+          patterns: ['**'],
+          metadata: { command: 'rm' },
+          always: [],
+        });
+      });
+
+      it('resolving the last entry leaves the queue empty', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+        state.process({ type: 'permission.replied', requestId: 'perm-1' });
+
+        expect(state.getPermission()).toBeNull();
+      });
+
+      it('an unknown resolve preserves the queue', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+        state.process({ type: 'permission.replied', requestId: 'perm-unknown' });
+
+        expect(state.getPermission()).toEqual({
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+      });
+
+      it('a repeat ask with the same requestId replaces the payload', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-1',
+          permission: 'edit',
+          patterns: ['**/*.js'],
+          metadata: { reason: 'changed' },
+          always: ['read'],
+        });
+
+        expect(state.getPermission()).toEqual({
+          requestId: 'perm-1',
+          permission: 'edit',
+          patterns: ['**/*.js'],
+          metadata: { reason: 'changed' },
+          always: ['read'],
+        });
+
+        // Resolving once leaves the queue empty — no duplicate was queued.
+        state.process({ type: 'permission.replied', requestId: 'perm-1' });
+        expect(state.getPermission()).toBeNull();
+      });
+    });
+
+    describe('question queue', () => {
+      const q1: QuestionInfo[] = [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ];
+      const q2: QuestionInfo[] = [
+        {
+          question: 'Pick a shape',
+          header: 'Shape',
+          options: [{ label: 'Circle', description: '' }],
+        },
+      ];
+
+      it('two asks preserve the oldest as head', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'question.asked', requestId: 'q-1', questions: q1 });
+        state.process({ type: 'question.asked', requestId: 'q-2', questions: q2 });
+
+        expect(state.getQuestion()).toEqual({ requestId: 'q-1', questions: q1 });
+      });
+
+      it('resolving the head reveals the next entry', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'question.asked', requestId: 'q-1', questions: q1 });
+        state.process({ type: 'question.asked', requestId: 'q-2', questions: q2 });
+        state.process({ type: 'question.replied', requestId: 'q-1' });
+
+        expect(state.getQuestion()).toEqual({ requestId: 'q-2', questions: q2 });
+      });
+
+      it('resolving the last entry leaves the queue empty', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'question.asked', requestId: 'q-1', questions: q1 });
+        state.process({ type: 'question.replied', requestId: 'q-1' });
+
+        expect(state.getQuestion()).toBeNull();
+      });
+
+      it('an unknown resolve preserves the queue', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'question.asked', requestId: 'q-1', questions: q1 });
+        state.process({ type: 'question.replied', requestId: 'q-unknown' });
+
+        expect(state.getQuestion()).toEqual({ requestId: 'q-1', questions: q1 });
+      });
+
+      it('a repeat ask with the same requestId replaces the payload', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'question.asked', requestId: 'q-1', questions: q1 });
+        state.process({ type: 'question.asked', requestId: 'q-1', questions: q2 });
+
+        expect(state.getQuestion()).toEqual({ requestId: 'q-1', questions: q2 });
+
+        state.process({ type: 'question.replied', requestId: 'q-1' });
+        expect(state.getQuestion()).toBeNull();
+      });
+    });
+
+    describe('connected bulk-clear', () => {
+      it('clears all pending permissions and fires one resolve per held id', () => {
+        const onPermissionResolved = jest.fn();
+        const state = createServiceState(makeConfig({ onPermissionResolved }));
+
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-2',
+          permission: 'bash',
+          patterns: ['**'],
+          metadata: {},
+          always: [],
+        });
+
+        state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+        expect(state.getPermission()).toBeNull();
+        expect(onPermissionResolved).toHaveBeenCalledTimes(2);
+        expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+        expect(onPermissionResolved).toHaveBeenCalledWith('perm-2');
+      });
+
+      it('clears all pending questions and fires one resolve per held id', () => {
+        const onQuestionResolved = jest.fn();
+        const state = createServiceState(makeConfig({ onQuestionResolved }));
+        const qs: QuestionInfo[] = [{ question: 'Q?', header: 'Q', options: [] }];
+
+        state.process({ type: 'question.asked', requestId: 'q-1', questions: qs });
+        state.process({ type: 'question.asked', requestId: 'q-2', questions: qs });
+
+        state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+        expect(state.getQuestion()).toBeNull();
+        expect(onQuestionResolved).toHaveBeenCalledTimes(2);
+        expect(onQuestionResolved).toHaveBeenCalledWith('q-1');
+        expect(onQuestionResolved).toHaveBeenCalledWith('q-2');
+      });
+    });
+
+    describe('snapshot head-only', () => {
+      it('snapshot.question returns the head when two entries are pending', () => {
+        const state = createServiceState(makeConfig());
+        const qs: QuestionInfo[] = [{ question: 'First?', header: 'Q', options: [] }];
+        const qs2: QuestionInfo[] = [{ question: 'Second?', header: 'Q', options: [] }];
+
+        state.process({ type: 'question.asked', requestId: 'q-1', questions: qs });
+        state.process({ type: 'question.asked', requestId: 'q-2', questions: qs2 });
+
+        expect(state.snapshot().question).toEqual({ requestId: 'q-1', questions: qs });
+      });
+
+      it('snapshot.permission returns the head when two entries are pending', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+        state.process({
+          type: 'permission.asked',
+          requestId: 'perm-2',
+          permission: 'bash',
+          patterns: ['**'],
+          metadata: {},
+          always: [],
+        });
+
+        expect(state.snapshot().permission).toEqual({
+          requestId: 'perm-1',
+          permission: 'write',
+          patterns: ['*.ts'],
+          metadata: {},
+          always: [],
+        });
+      });
+    });
+  });
 });

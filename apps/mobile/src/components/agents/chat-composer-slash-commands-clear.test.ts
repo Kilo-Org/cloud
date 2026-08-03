@@ -4,6 +4,7 @@ import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 
 import {
+  createMobileSlashCommandList,
   LOCAL_CLEAR_SLASH_COMMAND,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
@@ -21,18 +22,44 @@ function remoteState(overrides: Partial<RemoteCommandState> = {}): RemoteCommand
   };
 }
 
-describe('parseChatComposerSubmission — /clear (client-side, remote only)', () => {
-  it('parses exact /clear to a clear command for remote sessions', () => {
+describe('parseChatComposerSubmission — /clear (capability-gated restart)', () => {
+  it('routes /clear to restart-session when canExitSession is true', () => {
     expect(
-      parseChatComposerSubmission('/clear', [...SAMPLE_COMMANDS, LOCAL_CLEAR_SLASH_COMMAND], {
+      parseChatComposerSubmission('/clear', [], {
         hasAttachments: false,
         sessionType: 'remote',
-        remoteCommandState: remoteState(),
+        remoteCommandState: remoteState({ canExitSession: true }),
       })
-    ).toEqual({ type: 'command', command: 'clear', arguments: '' });
+    ).toEqual({ type: 'restart-session' });
   });
 
-  it('still parses /clear under upgrade-required (client-side, no CLI capability)', () => {
+  it('returns upgrade-required when canExitSession is absent (old CLI)', () => {
+    expect(
+      parseChatComposerSubmission('/clear', [], {
+        hasAttachments: false,
+        sessionType: 'remote',
+        remoteCommandState: remoteState({ canExitSession: undefined }),
+      })
+    ).toEqual({
+      type: 'upgrade-required',
+      message: 'Update your CLI to restart the session.',
+    });
+  });
+
+  it('returns upgrade-required when canExitSession is false', () => {
+    expect(
+      parseChatComposerSubmission('/clear', [], {
+        hasAttachments: false,
+        sessionType: 'remote',
+        remoteCommandState: remoteState({ canExitSession: false }),
+      })
+    ).toEqual({
+      type: 'upgrade-required',
+      message: 'Update your CLI to restart the session.',
+    });
+  });
+
+  it('returns upgrade-required with the CLI message when refresh is upgrade-required', () => {
     expect(
       parseChatComposerSubmission('/clear', [], {
         hasAttachments: false,
@@ -43,30 +70,30 @@ describe('parseChatComposerSubmission — /clear (client-side, remote only)', ()
           message: 'Please upgrade your CLI',
         }),
       })
-    ).toEqual({ type: 'command', command: 'clear', arguments: '' });
+    ).toEqual({ type: 'upgrade-required', message: 'Please upgrade your CLI' });
   });
 
-  it('rejects attachments for /clear', () => {
+  it('rejects /clear with arguments', () => {
     expect(
-      parseChatComposerSubmission('/clear', [...SAMPLE_COMMANDS, LOCAL_CLEAR_SLASH_COMMAND], {
-        hasAttachments: true,
-        sessionType: 'remote',
-        remoteCommandState: remoteState(),
-      })
-    ).toEqual({ type: 'attachment-error' });
-  });
-
-  it('rejects /clear with any argument text', () => {
-    expect(
-      parseChatComposerSubmission('/clear extra', [...SAMPLE_COMMANDS, LOCAL_CLEAR_SLASH_COMMAND], {
+      parseChatComposerSubmission('/clear extra', [], {
         hasAttachments: false,
         sessionType: 'remote',
-        remoteCommandState: remoteState(),
+        remoteCommandState: remoteState({ canExitSession: true }),
       })
     ).toEqual({ type: 'argument-error', message: '/clear does not take arguments.' });
   });
 
-  it('keeps /clear as a prompt for cloud-agent sessions when not in the catalog', () => {
+  it('rejects /clear with attachments', () => {
+    expect(
+      parseChatComposerSubmission('/clear', [], {
+        hasAttachments: true,
+        sessionType: 'remote',
+        remoteCommandState: remoteState({ canExitSession: true }),
+      })
+    ).toEqual({ type: 'attachment-error' });
+  });
+
+  it('still falls through to prompt for non-remote sessions', () => {
     expect(
       parseChatComposerSubmission('/clear', SAMPLE_COMMANDS, {
         hasAttachments: false,
@@ -74,5 +101,32 @@ describe('parseChatComposerSubmission — /clear (client-side, remote only)', ()
         remoteCommandState: null,
       })
     ).toEqual({ type: 'prompt', prompt: '/clear' });
+  });
+});
+
+describe('createMobileSlashCommandList — /clear capability gate', () => {
+  it('includes clear only when canExitSession is true', () => {
+    const list = createMobileSlashCommandList(
+      'remote',
+      [],
+      remoteState({ commands: [], canExitSession: true })
+    );
+    const names = list.map(command => command.name);
+    expect(names).toContain('clear');
+    expect(names).toContain('exit');
+    expect(names).toContain('new');
+  });
+
+  it('omits clear when canExitSession is absent', () => {
+    const list = createMobileSlashCommandList(
+      'remote',
+      [],
+      remoteState({ commands: [], canExitSession: undefined })
+    );
+    expect(list.map(command => command.name)).not.toContain('clear');
+  });
+
+  it('has the updated description', () => {
+    expect(LOCAL_CLEAR_SLASH_COMMAND.description).toBe('End this session and start a new one');
   });
 });

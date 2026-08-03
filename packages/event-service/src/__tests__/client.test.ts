@@ -572,6 +572,65 @@ describe('EventServiceClient', () => {
     }
   });
 
+  it('concurrent connects leave one open socket and no orphan delivery', async () => {
+    const client = makeClient();
+
+    const received: unknown[] = [];
+    client.on('test.event', (_, payload) => received.push(payload));
+
+    // Start the first connect. It will create a socket inside connectOnce
+    // after getToken + fetchConnectionTicket, then wait for the open event.
+    const p1 = client.connect();
+
+    // Drain all pending microtasks so the first connect runs past the
+    // generation guard, creates its WebSocket, and the open event fires.
+    // Without this delay, a second connect() call synchronously bumps
+    // this.generation and the first connect bails before socket creation.
+    await new Promise<void>(r => setTimeout(r, 0));
+    expect(allMockWs.length).toBe(1);
+
+    // Start the second connect. connectOnce() closes the first socket
+    // (line 154) before fetching a new ticket, producing an actual orphan.
+    const p2 = client.connect();
+
+    const [r1, r2] = await Promise.allSettled([p1, p2]);
+
+    // Both must resolve.
+    expect(r1.status).toBe('fulfilled');
+    expect(r2.status).toBe('fulfilled');
+
+    // Exactly one socket stays open — the last one created.
+    const connectedCount = allMockWs.filter(ws => ws.readyState === 1).length;
+    expect(connectedCount).toBe(1);
+
+    // All earlier sockets are closed.
+    const closedCount = allMockWs.filter(ws => ws.readyState === 3).length;
+    expect(closedCount).toBe(allMockWs.length - 1);
+
+    // The live socket delivers events.
+    const liveWs = allMockWs.find(ws => ws.readyState === 1)!;
+    liveWs.triggerMessage({
+      type: 'event',
+      context: 'room:1',
+      event: 'test.event',
+      payload: 'live',
+    });
+    expect(received).toEqual(['live']);
+
+    // Orphan sockets cannot call handlers.
+    received.length = 0;
+    const stale = allMockWs.filter(ws => ws.readyState === 3);
+    for (const ws of stale) {
+      ws.triggerMessage({
+        type: 'event',
+        context: 'room:1',
+        event: 'test.event',
+        payload: 'orphan',
+      });
+    }
+    expect(received).toHaveLength(0);
+  });
+
   it('exports HandshakeTimeoutError', () => {
     // Sanity check on the public error type.
     const err = new HandshakeTimeoutError();

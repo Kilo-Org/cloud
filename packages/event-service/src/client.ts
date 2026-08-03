@@ -75,6 +75,7 @@ export class EventServiceClient {
 
   private ws: WebSocket | null = null;
   private connected = false;
+  private generation = 0;
   private eventHandlers = new Map<string, Set<(context: string, payload: unknown) => void>>();
   // Refcounted so multiple consumers can independently subscribe to and
   // unsubscribe from the same context without trampling each other. The wire
@@ -99,6 +100,7 @@ export class EventServiceClient {
   }
 
   async connect(): Promise<void> {
+    this.generation++;
     this.destroyed = false;
     this.reconnectAttempts = 0;
     this.authRecoveryAttempts = 0;
@@ -146,6 +148,8 @@ export class EventServiceClient {
   }
 
   private async connectOnce(): Promise<void> {
+    const gen = this.generation;
+
     // Close any existing socket to avoid leaking connections.
     if (this.ws) {
       const oldWs = this.ws;
@@ -154,12 +158,12 @@ export class EventServiceClient {
     }
 
     const token = await this.getToken();
-    if (this.destroyed) return;
+    if (gen !== this.generation || this.destroyed) return;
     const ticket = await fetchConnectionTicket(this.url, token);
     // disconnect() may have run while we were awaiting the token. Bail before
     // creating the socket so we don't leak a WebSocket + ping timer past
     // provider unmount (e.g. sign-out, navigation, strict-mode remount).
-    if (this.destroyed) return;
+    if (gen !== this.generation || this.destroyed) return;
 
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(connectUrlFor(this.url, ticket), [WEBSOCKET_PROTOCOL]);
@@ -197,6 +201,7 @@ export class EventServiceClient {
       }, HANDSHAKE_TIMEOUT_MS);
 
       ws.addEventListener('open', () => {
+        if (this.ws !== ws) return;
         const isReconnect = this.hasConnectedBefore;
         this.connected = true;
         this.hasConnectedBefore = true;
@@ -216,6 +221,7 @@ export class EventServiceClient {
       });
 
       ws.addEventListener('message', (event: MessageEvent) => {
+        if (this.ws !== ws) return;
         this.handleMessage(event.data as string);
       });
 
@@ -250,6 +256,7 @@ export class EventServiceClient {
   }
 
   disconnect(): void {
+    this.generation++;
     this.destroyed = true;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
@@ -422,6 +429,7 @@ export class EventServiceClient {
     this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
+      this.generation++;
       this.connectOnce().catch(err => {
         void this.handleReconnectFailure(err);
       });

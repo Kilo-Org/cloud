@@ -47,6 +47,32 @@ const TOKENS_256K = 256 * 1024;
 
 export const QWEN37_MAX_MODEL_ID = 'qwen/qwen3.7-max';
 export const QWEN37_PLUS_MODEL_ID = 'qwen/qwen3.7-plus';
+export const QWEN38_MAX_MODEL_ID = 'qwen/qwen-3.8-max';
+
+export const qwen38_max_model: KiloExclusiveModel = {
+  public_id: QWEN38_MAX_MODEL_ID,
+  display_name: 'Qwen: Qwen 3.8 Max',
+  description:
+    'Qwen 3.8 Max is a 2.4-trillion-parameter mixture-of-experts model for long-horizon coding, professional work, and visual document analysis.',
+  context_length: 1_000_000,
+  max_completion_tokens: 128_000,
+  status: 'public',
+  flags: ['reasoning', 'vision'],
+  gateway: 'vercel',
+  internal_id: 'alibaba/qwen3.8-max',
+  pricing: [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 2,
+        completion_per_million: 6,
+        input_cache_read_per_million: 0.25,
+        input_cache_write_per_million: 2.5,
+      },
+    },
+  ],
+  inference_provider_restriction: ['alibaba'],
+};
 
 export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   public_id: 'stealth/qwen3.6-plus',
@@ -91,7 +117,10 @@ export function isQwenModel(model: string) {
 
 export function isQwenExplicitCacheModel(model: string) {
   return (
-    (model.includes('qwen3.7') || model.includes('qwen3.6')) &&
+    (model.includes('qwen-3.8') ||
+      model.includes('qwen3.8') ||
+      model.includes('qwen3.7') ||
+      model.includes('qwen3.6')) &&
     (model.includes('max') || model.includes('plus'))
   );
 }

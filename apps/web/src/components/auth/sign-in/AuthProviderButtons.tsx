@@ -1,6 +1,7 @@
 import { SignInButton } from '@/components/auth/SigninButton';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import { getProviderById, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
+import styles from './AuthProviderButtons.module.css';
 
 type AuthProviderButtonsProps = {
   providers?: readonly AuthProviderId[];
@@ -29,6 +30,7 @@ export function AuthProviderButtons({
             key={providerId}
             onClick={() => onProviderClick(providerId)}
             disabled={disabled}
+            className={providerId === 'anaconda' ? styles.anacondaButton : undefined}
           >
             {provider.icon}
             {label}

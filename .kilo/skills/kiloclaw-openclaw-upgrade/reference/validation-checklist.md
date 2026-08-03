@@ -28,9 +28,9 @@ iterating, then allow push hooks or the relevant release process to run broader 
 pnpm install --lockfile-only
 pnpm install --frozen-lockfile
 pnpm format
-bash -n services/kiloclaw/scripts/tests/smoke-helpers.sh
-bash -n services/kiloclaw/scripts/tests/smoke-live-provider.sh
-bash -n services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
+bash -n services/kiloclaw/scripts/tests/lib/helpers.sh
+bash -n services/kiloclaw/scripts/tests/single-image/live-provider.sh
+bash -n services/kiloclaw/scripts/tests/upgrade/smoke.sh
 git diff --check
 bun run script/check-md-table-padding.ts
 pnpm --filter @kiloclaw/kilo-chat test

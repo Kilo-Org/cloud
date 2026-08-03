@@ -20,14 +20,14 @@ export type ConnectionConfig = {
   onEvent: (event: CloudAgentEvent) => void;
   onConnected: () => void;
   onDisconnected: () => void;
-  onUnexpectedDisconnect?: () => void;
-  onReconnected?: () => void;
-  onError?: (error: StreamError) => void;
-  onRefreshTicket?: () => Promise<CloudAgentStreamTicketResult>;
-  heartbeatTimeoutMs?: number;
-  reconnectDelayMs?: number;
-  lifecycleHooks?: ConnectionLifecycleHooks;
-  websocketHeaders?: WebSocketHeaders;
+  onUnexpectedDisconnect?: (() => void) | undefined;
+  onReconnected?: (() => void) | undefined;
+  onError?: ((error: StreamError) => void) | undefined;
+  onRefreshTicket?: (() => Promise<CloudAgentStreamTicketResult>) | undefined;
+  heartbeatTimeoutMs?: number | undefined;
+  reconnectDelayMs?: number | undefined;
+  lifecycleHooks?: ConnectionLifecycleHooks | undefined;
+  websocketHeaders?: WebSocketHeaders | undefined;
 };
 
 export type { Connection };

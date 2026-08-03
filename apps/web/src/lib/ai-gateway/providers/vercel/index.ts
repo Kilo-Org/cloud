@@ -27,7 +27,6 @@ import {
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import { isOpenRouterGpt56PromoModel } from '@/lib/ai-gateway/providers/openai';
 
 type VercelRoutingPercentages = {
   paid: number;
@@ -97,13 +96,6 @@ export async function shouldRouteToVercel(
 ) {
   // BYOK in the Vercel AI Gateway was not working for Laguna models.
   if (requestedModel.includes('laguna')) {
-    return false;
-  }
-
-  if (isOpenRouterGpt56PromoModel(requestedModel)) {
-    console.debug(
-      `[shouldRouteToVercel] routing ${requestedModel} to OpenRouter for the GPT-5.6 promotion`
-    );
     return false;
   }
 

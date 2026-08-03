@@ -45,11 +45,12 @@ export function assistantMessage(id: string): StoredMessage {
 
 export async function renderBubble(
   message: StoredMessage,
-  deliveryState?: MessageDeliveryState
+  deliveryState?: MessageDeliveryState,
+  holdQueuedSlot?: boolean
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');
   // eslint-disable-next-line new-cap
-  return MessageBubble({ message, deliveryState });
+  return MessageBubble({ message, deliveryState, holdQueuedSlot });
 }
 
 export function findText(node: unknown, predicate: (text: string) => boolean): boolean {
@@ -71,24 +72,6 @@ export function findText(node: unknown, predicate: (text: string) => boolean): b
   }
   if (children && typeof children === 'object') {
     return findText(children, predicate);
-  }
-  return false;
-}
-
-export function hasAnimatedBadge(node: unknown): boolean {
-  if (node == null || typeof node !== 'object') {
-    return false;
-  }
-  const element = node as { type?: unknown; props?: Record<string, unknown> };
-  if (element.type === 'Animated.View') {
-    return true;
-  }
-  const children = element.props?.children;
-  if (Array.isArray(children)) {
-    return children.some(child => hasAnimatedBadge(child));
-  }
-  if (children && typeof children === 'object') {
-    return hasAnimatedBadge(children);
   }
   return false;
 }

@@ -1,7 +1,6 @@
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from 'lucide-react-native';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { Bubble } from '@/components/ui/bubble';
 import { Text } from '@/components/ui/text';
@@ -28,6 +27,12 @@ type MessageBubbleProps = {
   deliveryState?: MessageDeliveryState;
   /** Opens the message-details sheet; long-press never triggers the copy ActionSheet. */
   onLongPressDetails?: (message: StoredMessage) => void;
+  /**
+   * When true, the badge row stays mounted for layout stability even after the
+   * message has dequeued (during streaming). Visible badge is gated on
+   * deliveryState !== 'queued'; the hidden slot retains the same height.
+   */
+  holdQueuedSlot?: boolean;
 };
 
 export function MessageBubble({
@@ -39,6 +44,7 @@ export function MessageBubble({
   onOpenChildSession,
   deliveryState,
   onLongPressDetails,
+  holdQueuedSlot,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
@@ -73,12 +79,16 @@ export function MessageBubble({
   }
 
   if (isUser) {
+    // Composer, queued-message synthesis, and slash commands emit exactly one
+    // human-authored text part, so the separator separates it from synthesized
+    // attachment notices.
     const textContent = message.parts
       .filter(isTextPart)
       .map(p => p.text)
-      .join('');
+      .join('\n\n');
     const fileParts = message.parts.filter(isFilePart);
-    const showQueuedBadge = deliveryState?.status === 'queued';
+    const isQueued = deliveryState?.status === 'queued';
+    const hasBadgeSlot = isQueued || holdQueuedSlot;
     const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: true, canCopy: true });
 
     return (
@@ -94,17 +104,23 @@ export function MessageBubble({
               ))}
             </InMessageBubbleContext.Provider>
           </Bubble>
-          {showQueuedBadge ? (
-            <Animated.View
-              entering={FadeIn.duration(150)}
-              exiting={FadeOut.duration(120)}
-              accessibilityRole="text"
-              accessibilityLabel="Message queued"
-              className="flex-row items-center gap-1 self-end pr-1"
+          {hasBadgeSlot ? (
+            <View
+              accessibilityRole={isQueued ? 'text' : undefined}
+              accessibilityLabel={isQueued ? 'Message queued' : undefined}
+              accessible={isQueued}
+              {...(!isQueued
+                ? {
+                    accessibilityElementsHidden: true as const,
+                    importantForAccessibility: 'no-hide-descendants' as const,
+                  }
+                : {})}
+              pointerEvents={isQueued ? 'auto' : 'none'}
+              className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
             >
               <Clock size={12} color={colors.mutedForeground} />
               <Text className="text-xs text-muted-foreground">Queued</Text>
-            </Animated.View>
+            </View>
           ) : null}
         </View>
         {a11y.accessibilityActions.length > 0 ? (

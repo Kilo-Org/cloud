@@ -16,6 +16,7 @@ export type AuthErrorType =
 
 export const hosted_domain_specials = {
   non_workspace_google_account: '@@personal@@',
+  anaconda: '@@anaconda@@',
   apple: '@@apple@@',
   github: '@@github@@',
   gitlab: '@@gitlab@@',

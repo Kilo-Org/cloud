@@ -74,6 +74,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Social OAuth Clients
 
+- `ANACONDA_CLIENT_ID` - Anaconda OAuth app client ID. `[PUBLIC]`
+- `ANACONDA_CLIENT_SECRET` - Anaconda OAuth app client secret. `[SECRET]`
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`
@@ -364,6 +366,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 - `VITE_POSTHOG_API_KEY` - PostHog public project API key baked into extension builds; read in `apps/extension/src/shared/analytics.ts`; absent → analytics disabled. [PUBLIC]
 - `VITE_KILO_API_BASE_URL` - Selects the Kilo API base URL at build time; read in `apps/extension/src/shared/auth.ts`. [PUBLIC]
+- `VITE_CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production Cloud Agent endpoint otherwise. [PUBLIC]
+- `VITE_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production session ingest endpoint otherwise. [PUBLIC]
 
 ## Mobile
 

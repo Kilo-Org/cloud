@@ -25,6 +25,7 @@ import {
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
+import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { isOpenclawAdvisorCallback } from '@/lib/signup-source';
 import { isCreditCampaignCallback, lookupCampaignBySlug } from '@/lib/credit-campaigns';
 
@@ -281,7 +282,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.redirect(new URL(responsePath, APP_URL));
+  const response = NextResponse.redirect(new URL(browserLandingPath(responsePath), APP_URL));
 
   // Only set the marker after we've confirmed a user is present and the
   // cookie-based attribution path has been processed (recorded or skipped

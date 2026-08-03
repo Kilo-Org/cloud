@@ -24,7 +24,13 @@ try {
 } catch {}
 const stdin = fs.readFileSync(0, 'utf8');
 fs.appendFileSync(process.env.FAKE_OP_LOG, JSON.stringify({ args, stdin, templateInput }) + '\\n');
-if (args[0] === 'item' && args[1] === 'list') {
+if (args[0] === 'account' && args[1] === 'list') {
+  process.stdout.write(JSON.stringify([
+    { url: 'kilocode.1password.com', account_uuid: 'kilocode-account-id' }
+  ]));
+} else if (args[0] === 'vault' && args[1] === 'get') {
+  process.stdout.write(JSON.stringify({ id: 'vault-id' }));
+} else if (args[0] === 'item' && args[1] === 'list') {
   const items = process.env.FAKE_OP_EXISTING
     ? [{ id: 'existing-id', title: 'TEST_SECRET' }]
     : [];
@@ -71,7 +77,11 @@ async function captureOpInvocations(existing: boolean): Promise<Invocation[]> {
   else delete process.env.FAKE_OP_EXISTING;
 
   try {
-    await setVaultValue('vault-id', 'TEST_SECRET', 'secret-value');
+    await setVaultValue(
+      { accountId: 'account-id', vaultId: 'vault-id' },
+      'TEST_SECRET',
+      'secret-value'
+    );
     return readFileSync(logFile, 'utf8')
       .trim()
       .split('\n')
@@ -97,6 +107,8 @@ void test('setVaultValue creates an item from a template without sending the sec
     '--template=/dev/fd/3',
     '--vault',
     'vault-id',
+    '--account',
+    'account-id',
     '--format=json',
   ]);
   assert.equal(create.stdin, '');
@@ -116,12 +128,47 @@ void test('setVaultValue updates an item from a template without sending the sec
     '--template=/dev/fd/3',
     '--vault',
     'vault-id',
+    '--account',
+    'account-id',
     '--format=json',
   ]);
   assert.equal(edit.stdin, '');
   const item = JSON.parse(edit.templateInput) as { title?: string; fields?: unknown[] };
   assert.equal(item.title, 'TEST_SECRET');
   assert.ok(item.fields?.some(field => JSON.stringify(field).includes('secret-value')));
+});
+
+void test('resolveVault selects the kilocode account before resolving the vault', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-op-test-'));
+  const logFile = path.join(directory, 'op.jsonl');
+  writeFileSync(path.join(directory, 'op'), FAKE_OP, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  const originalLog = process.env.FAKE_OP_LOG;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+  process.env.FAKE_OP_LOG = logFile;
+
+  try {
+    assert.deepEqual(resolveVault(), { accountId: 'kilocode-account-id', vaultId: 'vault-id' });
+    const invocations = readFileSync(logFile, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as Invocation);
+    assert.deepEqual(invocations[0]?.args, ['account', 'list', '--format=json']);
+    assert.deepEqual(invocations[1]?.args, [
+      'vault',
+      'get',
+      'Kilo Web ENV Production',
+      '--account',
+      'kilocode-account-id',
+      '--format=json',
+    ]);
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    if (originalLog === undefined) delete process.env.FAKE_OP_LOG;
+    else process.env.FAKE_OP_LOG = originalLog;
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 void test(
@@ -140,7 +187,10 @@ void test(
           error.message.includes('brew install 1password-cli') &&
           error.message.includes('/cli/get-started') &&
           error.message.includes('op signin') &&
-          error.message.includes('op vault get "Kilo Web ENV Production" --format=json')
+          error.message.includes('op account list --format=json') &&
+          error.message.includes(
+            'op vault get "Kilo Web ENV Production" --account kilocode.1password.com --format=json'
+          )
       );
     } finally {
       if (originalPath === undefined) delete process.env.PATH;
@@ -211,7 +261,10 @@ void test(
           error.message.includes('brew install 1password-cli') &&
           error.message.includes('/cli/get-started') &&
           error.message.includes('op signin') &&
-          error.message.includes('op vault get "Kilo Web ENV Production" --format=json') &&
+          error.message.includes('op account list --format=json') &&
+          error.message.includes(
+            'op vault get "Kilo Web ENV Production" --account kilocode.1password.com --format=json'
+          ) &&
           error.message.includes('not currently signed in')
       );
     } finally {

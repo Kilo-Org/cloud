@@ -16,12 +16,19 @@ import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
+import {
+  appendNewSessionPrefill,
+  buildContinuePrefillParams,
+} from '@/components/agents/new-session-prefill';
+import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
+import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
+import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
@@ -110,6 +117,8 @@ type SessionDetailContentProps = {
   openedVia?: 'push' | 'app';
   /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
   shareId?: string;
+  /** Auto-send flag from remote spawn; the composer fires once after share delivery completes. */
+  autoSend?: boolean;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -117,10 +126,13 @@ const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
   finalizing: 'Wrapping up...',
 };
 
+const EMPTY_IDS: ReadonlySet<string> = new Set();
+
 export function SessionDetailContent({
   sessionId,
   openedVia = 'app',
   shareId,
+  autoSend,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -152,6 +164,8 @@ export function SessionDetailContent({
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
+  const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
     fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
@@ -395,6 +409,21 @@ export function SessionDetailContent({
     [messages, preparationAttempts]
   );
 
+  // Render-phase state adjustment: hold queued ids across queue → dequeue
+  // transitions while streaming so the badge row never unmounts and bubble
+  // height stays stable. Stream end releases every hold in one uniform commit.
+  const [heldQueuedIds, setHeldQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const [prevSessionId, setPrevSessionId] = useState(sessionId);
+  if (prevSessionId !== sessionId) {
+    setPrevSessionId(sessionId);
+    setHeldQueuedIds(EMPTY_IDS);
+  } else {
+    const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
+    if (next !== heldQueuedIds) {
+      setHeldQueuedIds(next);
+    }
+  }
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
@@ -416,6 +445,7 @@ export function SessionDetailContent({
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
           onLongPressDetails={setDetailsMessage}
+          holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
         />
       );
     },
@@ -426,6 +456,7 @@ export function SessionDetailContent({
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
+      heldQueuedIds,
     ]
   );
 
@@ -545,6 +576,9 @@ export function SessionDetailContent({
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+  // One number for both kinds: the user must see every waiting request, not
+  // only the ones of the kind currently on screen.
+  const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
 
   // When a blocking question/permission card dismisses, hand screen-reader
   // focus back to the transcript so the user does not get stranded on a
@@ -699,6 +733,19 @@ export function SessionDetailContent({
     return result.success;
   }, [manager, router, organizationId]);
 
+  const handleRestartSession = useCallback(async () => {
+    const result = await restartAgentSession({
+      create: manager.createRemoteSession.bind(manager),
+      exit: manager.exitRemoteSession.bind(manager),
+      router,
+      organizationId,
+      onError: message => {
+        toast.error(message);
+      },
+    });
+    return result.success;
+  }, [manager, router, organizationId]);
+
   const handleExitSession = useCallback(
     async (
       onAccepted: () => void,
@@ -715,6 +762,17 @@ export function SessionDetailContent({
     },
     [manager, router]
   );
+
+  const handleContinueInNewSession = useCallback(() => {
+    const base = getNewAgentSessionPath(organizationId ?? null);
+    const params = buildContinuePrefillParams({
+      gitUrl: fetchedData?.gitUrl,
+      mode: currentMode,
+      model: currentModel,
+      variant: currentVariant,
+    });
+    router.push(appendNewSessionPrefill(base, params) as Href);
+  }, [organizationId, fetchedData?.gitUrl, currentMode, currentModel, currentVariant, router]);
 
   const isFocused = useIsFocused();
   // Focus bounds the awake window to the visible working UI; a backgrounded
@@ -859,6 +917,7 @@ export function SessionDetailContent({
             isSubmitting={isAnswering}
             requestId={activeQuestion.requestId}
             submissionError={questionSubmissionError}
+            pendingCount={blockingRequestCount}
           />
         ) : null}
 
@@ -874,14 +933,23 @@ export function SessionDetailContent({
             isSubmitting={isRespondingToPermission}
             requestId={activePermission.requestId}
             submissionError={permissionSubmissionError}
+            pendingCount={blockingRequestCount}
           />
         ) : null}
 
         {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
-          <View className="border-t border-border bg-secondary px-4 py-3">
+          <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
               This is a read-only session
             </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              accessibilityLabel="Continue in a new session"
+              onPress={handleContinueInNewSession}
+            >
+              <Text>Continue in a new session</Text>
+            </Button>
           </View>
         ) : null}
 
@@ -899,6 +967,7 @@ export function SessionDetailContent({
                 onSend={handleSend}
                 onSendCommand={handleSendCommand}
                 onCreateSession={handleCreateSession}
+                onRestartSession={handleRestartSession}
                 onExitSession={handleExitSession}
                 onStop={handleStop}
                 disabled={isComposerDisabled}
@@ -916,6 +985,7 @@ export function SessionDetailContent({
                 commands={availableCommands}
                 commandState={remoteCommandState}
                 shareId={shareId}
+                autoSend={autoSend}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

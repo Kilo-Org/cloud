@@ -42,7 +42,7 @@ export type { NormalizedEvent, ChatEvent, ServiceEvent } from './normalizer';
 export { reduce } from './reducer';
 
 export { createChatProcessor } from './chat-processor';
-export type { ChatProcessor } from './chat-processor';
+export type { ChatProcessor, ChatProcessorOptions } from './chat-processor';
 
 export { configureCloudAgentSdkRuntime } from './runtime';
 export type { CloudAgentSdkRuntimeOverrides } from './runtime';

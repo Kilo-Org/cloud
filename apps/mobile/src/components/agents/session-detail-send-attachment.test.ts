@@ -22,7 +22,7 @@ describe('buildRemoteAttachmentPartsWithRetryableFeedback', () => {
       {
         type: 'file',
         mime: 'text/plain',
-        filename: 'server-name.txt',
+        filename: 'original-name.txt',
         url: 'https://r2.example.com/signed.txt',
       },
     ];

@@ -29,8 +29,9 @@ type CreateRemoteSessionInput = {
  * Ready-to-render file part for a remote-CLI `send_message` call. Distinct
  * from the cloud-only `attachments` field on {@link TransportSendInput}:
  * the remote CLI fetches these from the `url` and classifies them by
- * their `filename` (which MUST be the server-issued `<uuid>.<ext>`) and
- * `mime` (which the caller derives from the validated extension).
+ * their `mime` (which the caller derives from the validated extension).
+ * `filename` is the original picker filename, NOT the server-issued
+ * R2 key — the CLI uses it for display and file-system materialization.
  *
  * Deliberately the minimum the CLI needs: `id` / `sessionID` / `messageID`
  * are not part of the send payload because the CLI assigns them when it
@@ -46,7 +47,7 @@ type RemoteAttachmentPart = {
 type CloudAgentStreamTicket = {
   ticket: string;
   /** Unix timestamp in seconds when the ticket expires. */
-  expiresAt?: number;
+  expiresAt?: number | undefined;
 };
 
 type CloudAgentStreamTicketResult = string | CloudAgentStreamTicket;
@@ -96,10 +97,10 @@ type CloudAgentSendPayload = CloudAgentPromptPayload | SendCommandPayload;
 
 type TransportSendInput = {
   payload: TransportSendPayload;
-  messageId?: string;
-  attachments?: CloudAgentAttachments;
-  images?: Images;
-  remoteModelOverride?: RemoteModelOverride;
+  messageId?: string | undefined;
+  attachments?: CloudAgentAttachments | undefined;
+  images?: Images | undefined;
+  remoteModelOverride?: RemoteModelOverride | undefined;
   /**
    * Ready file parts to append to the remote CLI's `send_message` `parts`
    * array (after the text part). Distinct from the cloud-only `attachments`
@@ -108,7 +109,7 @@ type TransportSendInput = {
    * heartbeat). Transports that don't support the path (cloud-agent, read-
    * only, non-capable remote) ignore it.
    */
-  attachmentParts?: RemoteAttachmentPart[];
+  attachmentParts?: RemoteAttachmentPart[] | undefined;
 };
 
 /** Lifecycle interface for a transport. */

@@ -212,7 +212,7 @@ describe('applyFreeEndpointDataPolicy', () => {
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
   });
 
-  test('ignores forbidden OpenRouter and exclusive free models', () => {
+  test('ignores unavailable OpenRouter and exclusive free models', () => {
     const freeVariant = offering('openai/gpt-oss-20b', true);
     const model = offering('openai/gpt-oss-20b');
     const providerModelData = [{ provider: { slug: 'darkbloom' }, models: [freeVariant, model] }];

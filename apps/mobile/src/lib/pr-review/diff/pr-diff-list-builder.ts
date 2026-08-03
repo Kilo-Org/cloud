@@ -197,53 +197,45 @@ function pushExpandedFileItems(
   }
 }
 
-function pushPaginationState(
-  items: ListItem[],
+function buildPaginationStateItem(
   state: PaginationRowItem['state'],
   args: BuildItemsArgs
-): void {
-  items.push({
+): PaginationRowItem {
+  return {
     kind: 'pagination-row',
     key: 'pagination-row',
     state,
     loadedFiles: args.isLoading ? 0 : args.fetchToCompletionLoaded,
     totalFiles: args.totalFiles,
-  });
+  };
 }
 
-function pushPaginationItem(items: ListItem[], args: BuildItemsArgs): void {
+function buildPaginationItem(args: BuildItemsArgs): PaginationRowItem {
   if (args.isLoading) {
-    pushPaginationState(items, 'loading', args);
-    return;
+    return buildPaginationStateItem('loading', args);
   }
   if (args.hasNextPage) {
     if (args.laterPageError && !args.isFetchingNextPage && !args.fetchToCompletionRunning) {
-      pushPaginationState(items, 'error', args);
-      return;
+      return buildPaginationStateItem('error', args);
     }
     if (args.fetchToCompletionLoaded >= PR_REVIEW_MAX_LISTED_FILES) {
-      pushPaginationState(items, 'all-loaded', args);
-      return;
+      return buildPaginationStateItem('all-loaded', args);
     }
     if (args.fetchToCompletionRunning) {
-      pushPaginationState(items, 'fetch-to-completion', args);
-      return;
+      return buildPaginationStateItem('fetch-to-completion', args);
     }
     if (args.isFetchingNextPage) {
-      pushPaginationState(items, 'loading', args);
-      return;
+      return buildPaginationStateItem('loading', args);
     }
-    pushPaginationState(items, 'no-pages', args);
-    return;
+    return buildPaginationStateItem('no-pages', args);
   }
   if (args.isFetchingNextPage) {
-    pushPaginationState(items, 'loading', args);
-    return;
+    return buildPaginationStateItem('loading', args);
   }
-  pushPaginationState(items, 'all-loaded', args);
+  return buildPaginationStateItem('all-loaded', args);
 }
 
-export function buildItems(args: BuildItemsArgs): ListItem[] {
+export function buildFileItems(args: BuildItemsArgs): ListItem[] {
   const items: ListItem[] = [];
 
   if (shouldShowTruncationBanner(args.changedFiles)) {
@@ -269,6 +261,13 @@ export function buildItems(args: BuildItemsArgs): ListItem[] {
     }
   }
 
-  pushPaginationItem(items, args);
+  return items;
+}
+
+export { buildPaginationItem };
+
+export function buildItems(args: BuildItemsArgs): ListItem[] {
+  const items = buildFileItems(args);
+  items.push(buildPaginationItem(args));
   return items;
 }

@@ -15,6 +15,7 @@ import { Text } from '@/components/ui/text';
 import {
   applyBlockingCardAppearance,
   type BlockingCardSubmissionError,
+  formatBlockingCardTitle,
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
@@ -53,6 +54,11 @@ type QuestionCardProps = {
    * this via the shared blocking-card-state FSM.
    */
   submissionError?: BlockingCardSubmissionError | null;
+  /**
+   * Total number of pending blocking requests (questions + permissions).
+   * The card title receives a position hint when more than one request waits.
+   */
+  pendingCount?: number;
 };
 
 export function QuestionCard({
@@ -62,6 +68,7 @@ export function QuestionCard({
   isSubmitting = false,
   requestId,
   submissionError = null,
+  pendingCount = 1,
 }: Readonly<QuestionCardProps>) {
   const colors = useThemeColors();
   const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
@@ -182,18 +189,14 @@ export function QuestionCard({
   }
 
   const allQuestionsAnswered = buildAnswers().every(answer => answer.length > 0);
+  const title = formatBlockingCardTitle('Agent needs input', pendingCount);
   const isInert = presentation.state === 'non-retryable';
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
-        <Text
-          ref={titleRef}
-          accessible
-          accessibilityLabel="Agent needs input"
-          className="text-sm font-medium"
-        >
-          Agent needs input
+        <Text ref={titleRef} accessible accessibilityLabel={title} className="text-sm font-medium">
+          {title}
         </Text>
         <Text className="mt-1 text-xs text-muted-foreground">
           {presentation.protocolExplanation}

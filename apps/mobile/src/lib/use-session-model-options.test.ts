@@ -447,6 +447,34 @@ describe('buildSessionModelOptions', () => {
     expect(result.selectedValue).toBe(cliOption?.id);
     expect(result.selectedVariant).toBe('high');
   });
+
+  it('carries gateway ModelOption pricing through to SessionModelOption', () => {
+    const pricing = { prompt: '0.00000175', completion: '0.000014' };
+    const result = buildSessionModelOptions({
+      activeSessionType: 'cloud-agent',
+      remoteModelState: {
+        ownerConnectionId: null,
+        protocol: 'unknown',
+        refresh: 'idle',
+      },
+      observedModel: null,
+      remoteModelOverride: null,
+      gatewayModels: [
+        {
+          id: 'gateway/priced',
+          name: 'Priced Model',
+          variants: [],
+          isPreferred: true,
+          pricing,
+        },
+      ],
+      gatewayModelsLoading: false,
+      organizationId: 'org-1',
+    });
+
+    expect(result.options).toHaveLength(1);
+    expect(result.options[0]?.pricing).toEqual(pricing);
+  });
 });
 
 describe('buildSessionModelOptions capacity projection', () => {

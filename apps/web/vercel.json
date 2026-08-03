@@ -25,6 +25,14 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/kilo-pass-org-bonus-repair",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/kilo-pass-org-issuance",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/kilo-pass-store-subscription-reconcile",
       "schedule": "*/15 * * * *"
     },
@@ -66,7 +74,7 @@
     },
     {
       "path": "/api/cron/db-replication-health",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/dispatch-affiliate-events",

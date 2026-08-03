@@ -36,6 +36,9 @@ async function getAllowedModelIdsForOrg(
   const response = await getAvailableModelsForOrganization(organizationId, {
     type: 'member',
     kiloUserId,
+    // Callers reach this after `ensureOrganizationAccess`, which also admits Kilo
+    // admins and parent-organization owners without a membership row.
+    allowNonMember: true,
   });
   if (!response) {
     return new Set();

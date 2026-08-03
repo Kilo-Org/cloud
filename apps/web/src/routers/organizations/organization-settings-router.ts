@@ -323,6 +323,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
       const result = await getAvailableModelsForOrganization(organizationId, {
         type: 'member',
         kiloUserId: ctx.user.id,
+        // `ensureOrganizationAccess` also admits Kilo admins and parent-organization
+        // owners, who hold no membership row and belong to no group; they resolve
+        // against organization-level policy instead of being rejected.
+        allowNonMember: true,
       });
       if (!result) {
         throw new TRPCError({

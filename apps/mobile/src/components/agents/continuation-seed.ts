@@ -110,6 +110,29 @@ export type ContinuationDestination =
   | { kind: 'cloud-agent'; repo: string; model: string; variant: string }
   | { kind: 'remote'; instance: InstancePickerInstance };
 
+/**
+ * Validate a stored model against the current gateway catalog.
+ *
+ * Returns the original model + variant when present and valid. Returns empty
+ * strings when the model is absent or the variant is not in its variant list,
+ * so the caller can omit the model override and let the remote CLI use its
+ * default.
+ */
+export function resolveContinueRemoteModel(
+  model: string,
+  variant: string,
+  catalog: { id: string; variants: string[] }[]
+): { model: string; variant: string } {
+  const found = catalog.find(m => m.id === model);
+  if (!found) {
+    return { model: '', variant: '' };
+  }
+  if (variant && !found.variants.includes(variant)) {
+    return { model: '', variant: '' };
+  }
+  return { model, variant };
+}
+
 export function resolveContinuationDestinations(args: {
   gitUrl: string | null | undefined;
   mode: string;

@@ -12,6 +12,7 @@ import {
   buildContinuationSeed,
   type ContinuationDestination,
   resolveContinuationDestinations,
+  resolveContinueRemoteModel,
 } from '@/components/agents/continuation-seed';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import {
@@ -111,12 +112,13 @@ export function useContinueSession(args: {
           }
           return;
         }
+        const remoteModel = resolveContinueRemoteModel(fields.model, fields.variant, args.models);
         const outcome = await spawn(
           dest.instance.connectionId,
           buildCreateRemoteSessionInput({
             mode: fields.mode,
-            model: fields.model,
-            variant: fields.variant,
+            model: remoteModel.model,
+            variant: remoteModel.variant,
             organizationId: args.organizationId,
           })
         );
@@ -141,7 +143,7 @@ export function useContinueSession(args: {
         setIsContinuing(false);
       }
     },
-    [args.organizationId, router, runCloudCreate, spawn]
+    [args.organizationId, args.models, router, runCloudCreate, spawn]
   );
 
   const fallback = useCallback(

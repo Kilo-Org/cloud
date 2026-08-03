@@ -12,17 +12,19 @@ export async function POST(request: Request) {
   const userAgent = headersList.get('user-agent') || undefined;
   const ipAddress = headersList.get('x-forwarded-for') || undefined;
 
-  const { code, expiresAt } = await createDeviceAuthRequest({
+  const { code, userCode, deviceCode, expiresAt } = await createDeviceAuthRequest({
     userAgent,
     ipAddress,
   });
 
-  const verificationUrl = buildDeviceAuthVerificationUrl(APP_URL, code, {
+  const verificationUrl = buildDeviceAuthVerificationUrl(APP_URL, userCode, {
     app: getDeviceAuthAppModeFromRequestUrl(request.url),
   });
 
   return NextResponse.json({
     code,
+    user_code: userCode,
+    device_code: deviceCode,
     verificationUrl,
     expiresIn: Math.floor((expiresAt.getTime() - Date.now()) / 1000),
   });

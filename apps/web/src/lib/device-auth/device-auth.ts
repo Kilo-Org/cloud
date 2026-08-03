@@ -1,19 +1,19 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
 import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
-import { eq, and, lt, sql } from 'drizzle-orm';
+import { eq, and, lt, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
-import { randomInt } from 'node:crypto';
+import { randomInt, createHash, randomBytes } from 'node:crypto';
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
 const MAX_PENDING_REQUESTS_PER_IP = 5;
 
 /**
- * Generate a random device authorization code
- * Uses only unambiguous characters for better UX
+ * Generate a random human-readable device authorization code.
+ * Uses only unambiguous characters for better UX.
  */
-export function generateDeviceCode(): string {
+export function generateUserCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < CODE_LENGTH; i++) {
@@ -23,13 +23,33 @@ export function generateDeviceCode(): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
+/** @deprecated — ponytail: remove after all shipped clients migrate to userCode/deviceCode split */
+export const generateDeviceCode = generateUserCode;
+
 /**
- * Create a new device authorization request
+ * Generate a high-entropy device secret for polling.
+ * 256-bit random value encoded as base64url.
+ */
+export function generateDeviceSecret(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/**
+ * Hash a device secret with SHA-256.
+ * The secret is already high-entropy, so a plain digest is sufficient.
+ */
+export function hashDeviceSecret(secret: string): string {
+  return createHash('sha256').update(secret).digest('hex');
+}
+
+/**
+ * Create a new device authorization request.
+ * Writes both the legacy code and new user_code/device_code_hash.
  */
 export async function createDeviceAuthRequest(params: {
   userAgent?: string;
   ipAddress?: string;
-}): Promise<{ code: string; expiresAt: Date }> {
+}): Promise<{ code: string; userCode: string; deviceCode: string; expiresAt: Date }> {
   const { userAgent, ipAddress } = params;
 
   // Validate IP address on Production
@@ -54,22 +74,26 @@ export async function createDeviceAuthRequest(params: {
     }
   }
 
-  const code = generateDeviceCode();
+  const userCode = generateUserCode();
+  const deviceSecret = generateDeviceSecret();
+  const deviceCodeHash = hashDeviceSecret(deviceSecret);
   const expiresAt = new Date(Date.now() + CODE_EXPIRATION_MINUTES * 60 * 1000);
 
   await db.insert(device_auth_requests).values({
-    code,
+    code: userCode,
+    user_code: userCode,
+    device_code_hash: deviceCodeHash,
     status: 'pending',
     expires_at: expiresAt.toISOString(),
     user_agent: userAgent,
     ip_address: ipAddress,
   });
 
-  return { code, expiresAt };
+  return { code: userCode, userCode, deviceCode: deviceSecret, expiresAt };
 }
 
 /**
- * Get device auth request by code
+ * Get device auth request by code (legacy path).
  */
 export async function getDeviceAuthRequest(code: string) {
   const [request] = await db
@@ -82,7 +106,7 @@ export async function getDeviceAuthRequest(code: string) {
 }
 
 /**
- * Check if a device auth request has expired
+ * Check if a device auth request has expired.
  */
 export function isDeviceAuthRequestExpired(request: {
   expires_at: string;
@@ -92,7 +116,7 @@ export function isDeviceAuthRequestExpired(request: {
 }
 
 /**
- * Approve a device authorization request
+ * Approve a device authorization request.
  */
 export async function approveDeviceAuthRequest(code: string, userId: string): Promise<void> {
   const request = await getDeviceAuthRequest(code);
@@ -124,7 +148,7 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
 }
 
 /**
- * Deny a device authorization request
+ * Deny a device authorization request.
  */
 export async function denyDeviceAuthRequest(code: string): Promise<void> {
   const request = await getDeviceAuthRequest(code);
@@ -144,8 +168,83 @@ export async function denyDeviceAuthRequest(code: string): Promise<void> {
 }
 
 /**
- * Poll for device authorization status and return token if approved
- * Implements single-use token enforcement
+ * Atomically consume an approved request by device code.
+ * Returns the appropriate status and mints a token only once per row.
+ */
+export async function consumeDeviceAuthByDeviceCode(
+  deviceCode: string,
+  options?: { supportsRefresh?: boolean }
+): Promise<{
+  status: 'pending' | 'approved' | 'denied' | 'expired' | 'consumed';
+  token?: string;
+  userId?: string;
+  userEmail?: string;
+}> {
+  const deviceCodeHash = hashDeviceSecret(deviceCode);
+  const now = new Date().toISOString();
+
+  // Atomic consume — UPDATE … RETURNING guarantees at most one caller succeeds.
+  const [consumed] = await db
+    .update(device_auth_requests)
+    .set({ status: 'consumed', consumed_at: now })
+    .where(
+      and(
+        eq(device_auth_requests.device_code_hash, deviceCodeHash),
+        eq(device_auth_requests.status, 'approved'),
+        gt(device_auth_requests.expires_at, now),
+        isNull(device_auth_requests.consumed_at)
+      )
+    )
+    .returning();
+
+  if (!consumed) {
+    // Look up current status for the same hash.
+    const [row] = await db
+      .select({
+        status: device_auth_requests.status,
+        expires_at: device_auth_requests.expires_at,
+      })
+      .from(device_auth_requests)
+      .where(eq(device_auth_requests.device_code_hash, deviceCodeHash))
+      .limit(1);
+
+    if (!row) return { status: 'expired' };
+
+    if (row.status === 'expired' || new Date(row.expires_at) < new Date()) {
+      return { status: 'expired' };
+    }
+
+    return { status: row.status as 'pending' | 'denied' | 'consumed' };
+  }
+
+  // Only reachable after a successful atomic consume.
+  if (!consumed.kilo_user_id) {
+    throw new Error('Approved request has no user');
+  }
+
+  const [user] = await db
+    .select()
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, consumed.kilo_user_id))
+    .limit(1);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const token = generateApiToken(user, { deviceAuthRequestCode: consumed.code });
+
+  return {
+    status: 'approved',
+    token,
+    userId: user.id,
+    userEmail: user.google_user_email,
+  };
+}
+
+/**
+ * Poll for device authorization status and return token if approved.
+ * Legacy path — uses atomic consume to prevent double-spend.
  */
 export async function pollDeviceAuthRequest(code: string): Promise<{
   status: 'pending' | 'approved' | 'denied' | 'expired';
@@ -153,7 +252,58 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
   userId?: string;
   userEmail?: string;
 }> {
-  const request = await getDeviceAuthRequest(code);
+  const now = new Date().toISOString();
+
+  // Atomic consume — UPDATE … RETURNING guarantees at most one caller succeeds.
+  const [consumed] = await db
+    .update(device_auth_requests)
+    .set({ status: 'consumed', consumed_at: now })
+    .where(
+      and(
+        eq(device_auth_requests.code, code),
+        eq(device_auth_requests.status, 'approved'),
+        isNotNull(device_auth_requests.kilo_user_id),
+        gt(device_auth_requests.expires_at, now),
+        isNull(device_auth_requests.consumed_at)
+      )
+    )
+    .returning();
+
+  if (consumed) {
+    // Only reachable after a successful atomic consume.
+    const kiloUserId = consumed.kilo_user_id;
+    if (!kiloUserId) {
+      throw new Error('Approved request has no user');
+    }
+
+    const [user] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, kiloUserId))
+      .limit(1);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const token = generateApiToken(user, {
+      deviceAuthRequestCode: consumed.code,
+    });
+
+    return {
+      status: 'approved',
+      token,
+      userId: user.id,
+      userEmail: user.google_user_email,
+    };
+  }
+
+  // Fall through: not consumed, look up current status.
+  const [request] = await db
+    .select()
+    .from(device_auth_requests)
+    .where(eq(device_auth_requests.code, code))
+    .limit(1);
 
   // Normalize response: return 'expired' for non-existent codes to prevent enumeration
   if (!request) {
@@ -171,43 +321,17 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
     return { status: 'expired' };
   }
 
-  // Return status for non-approved requests
-  if (request.status !== 'approved' || !request.kilo_user_id) {
-    return { status: request.status as 'pending' | 'denied' };
+  // Return status for non-approved requests (or already-consumed)
+  if (request.status === 'consumed') {
+    return { status: 'expired' };
   }
 
-  // For approved requests, fetch user and generate token
-  const [user] = await db
-    .select()
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, request.kilo_user_id))
-    .limit(1);
-
-  if (!user) {
-    throw new Error('User not found');
-  }
-
-  const token = generateApiToken(user, { deviceAuthRequestCode: code });
-
-  // Mark as consumed to enforce single-use
-  await db
-    .update(device_auth_requests)
-    .set({
-      status: 'expired',
-    })
-    .where(eq(device_auth_requests.code, code));
-
-  return {
-    status: 'approved',
-    token,
-    userId: user.id,
-    userEmail: user.google_user_email,
-  };
+  return { status: request.status as 'pending' | 'denied' };
 }
 
 /**
- * Clean up expired device auth requests
- * Should be called periodically (e.g., via cron job)
+ * Clean up expired device auth requests.
+ * Should be called periodically (e.g., via cron job).
  */
 export async function cleanupExpiredDeviceAuthRequests(): Promise<number> {
   const result = await db

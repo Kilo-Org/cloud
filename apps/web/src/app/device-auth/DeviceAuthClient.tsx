@@ -17,6 +17,7 @@ import {
 
 type DeviceAuthClientProps = {
   code: string;
+  viewerToken: string;
   isAppMode: boolean;
   user: {
     name: string;
@@ -45,7 +46,7 @@ function getUserInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function DeviceAuthClient({ code, isAppMode, user }: DeviceAuthClientProps) {
+export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceAuthClientProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'denied' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -95,6 +96,9 @@ export function DeviceAuthClient({ code, isAppMode, user }: DeviceAuthClientProp
       // Deny: DELETE to /api/device-auth/codes/:code
       const response = await fetch(`/api/device-auth/codes/${code}`, {
         method: 'DELETE',
+        headers: {
+          'x-device-auth-viewer-token': viewerToken,
+        },
       });
 
       if (!response.ok) {

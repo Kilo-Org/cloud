@@ -6390,11 +6390,14 @@ export const device_auth_requests = pgTable(
       onDelete: 'cascade',
     }),
     status: text()
-      .$type<'pending' | 'approved' | 'denied' | 'expired'>()
+      .$type<'pending' | 'approved' | 'denied' | 'expired' | 'consumed'>()
       .notNull()
       .default('pending'),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     approved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    user_code: text(),
+    device_code_hash: text(),
     user_agent: text(),
     ip_address: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -6408,6 +6411,12 @@ export const device_auth_requests = pgTable(
     index('IDX_device_auth_requests_status').on(table.status),
     index('IDX_device_auth_requests_expires_at').on(table.expires_at),
     index('IDX_device_auth_requests_kilo_user_id').on(table.kilo_user_id),
+    uniqueIndex('UQ_device_auth_requests_device_code_hash')
+      .on(table.device_code_hash)
+      .where(sql`${table.device_code_hash} IS NOT NULL`),
+    index('IDX_device_auth_requests_user_code')
+      .on(table.user_code)
+      .where(sql`${table.user_code} IS NOT NULL`),
   ]
 );
 

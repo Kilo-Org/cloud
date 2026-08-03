@@ -167,7 +167,7 @@ async function main(): Promise<void> {
   try {
     console.log('Checking Vercel and 1Password access...');
     const contexts = resolveVercelContexts(tempDirectory);
-    const vaultId = sensitive ? resolveVault() : undefined;
+    const vault = sensitive ? resolveVault() : undefined;
     const values = await collectValues(options);
     const defaults = await collectDefaults(repoRoot, options.name);
     if (defaults.size === 0) warnAboutMissingTrackedDefault(options.name);
@@ -202,9 +202,9 @@ async function main(): Promise<void> {
         setVariable(context, environment, options.name, values[environment], sensitive);
       }
     }
-    if (vaultId) {
+    if (vault) {
       console.log('Updating 1Password Production copy...');
-      await setVaultValue(vaultId, options.name, values.production);
+      await setVaultValue(vault, options.name, values.production);
     }
 
     console.log('\nDone. Rerun the same command if a provider failed partway through.');

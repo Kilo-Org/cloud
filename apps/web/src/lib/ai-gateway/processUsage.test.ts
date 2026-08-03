@@ -1231,6 +1231,57 @@ describe('logMicrodollarUsage', () => {
     expect(repairRows).toEqual([{ usage_date: '2025-08-15' }, { usage_date: '2025-08-16' }]);
   });
 
+  test('applies negative organization corrections to balance and member daily usage', async () => {
+    const user = await insertTestUser({
+      id: 'test-org-negative-correction-user',
+      microdollars_used: 0,
+      google_user_email: 'org-negative-correction@example.com',
+    });
+    const organization = await createTestOrganization(
+      'Negative correction organization',
+      user.id,
+      10_000
+    );
+    const { core, metadata } = await defineMicrodollarUsage();
+
+    await insertUsageRecord(
+      {
+        ...core,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        cost: 500,
+      },
+      metadata
+    );
+    const { core: correctionCore, metadata: correctionMetadata } = await defineMicrodollarUsage();
+    await insertUsageRecord(
+      {
+        ...correctionCore,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        cost: -200,
+      },
+      correctionMetadata
+    );
+
+    const [correctedOrganization] = await db
+      .select({
+        microdollarsUsed: organizations.microdollars_used,
+        microdollarsBalance: organizations.microdollars_balance,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organization.id));
+    expect(correctedOrganization).toMatchObject({
+      microdollarsUsed: 300,
+      microdollarsBalance: 9_700,
+    });
+    const [memberUsage] = await db
+      .select({ microdollarUsage: organization_user_usage.microdollar_usage })
+      .from(organization_user_usage)
+      .where(eq(organization_user_usage.organization_id, organization.id));
+    expect(memberUsage?.microdollarUsage).toBe(300);
+  });
+
   test('insertUsageRecord skips microdollar_usage_daily for zero-cost rows', async () => {
     const user = await insertTestUser({
       id: 'test-daily-zero-cost-user',

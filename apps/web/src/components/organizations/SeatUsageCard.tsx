@@ -6,7 +6,10 @@ import { Users } from 'lucide-react';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { ErrorCard } from '../ErrorCard';
 import { LoadingCard } from '../LoadingCard';
-import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
+import {
+  useIsKiloAdmin,
+  useUserOrganizationRole,
+} from '@/components/organizations/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { SeatsUsageProgress } from './SeatsUsageProgress';
 import {
@@ -21,6 +24,7 @@ type Props = {
 
 export function SeatUsageCard({ organizationId }: Props) {
   const currentUserRole = useUserOrganizationRole();
+  const isKiloAdmin = useIsKiloAdmin();
 
   const {
     data: org,
@@ -84,7 +88,7 @@ export function SeatUsageCard({ organizationId }: Props) {
             <Users className="h-4 w-4" />
             <CardTitle>Seat Usage</CardTitle>
           </div>
-          {canManageOrganizationBilling(currentUserRole) && (
+          {canManageOrganizationBilling(currentUserRole) && !isKiloAdmin && (
             <Button asChild variant="outline" size="sm">
               <Link href={`/organizations/${organizationId}/subscriptions/seats`}>
                 Manage Subscription

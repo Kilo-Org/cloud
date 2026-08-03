@@ -43,7 +43,7 @@ describe('mapModelIdToVercel', () => {
 
   describe('hardcoded OpenRouter → Vercel mapping', () => {
     it.each([
-      ['deepseek/deepseek-v4-flash-latest', 'deepseek/deepseek-v4-flash'],
+      ['deepseek/deepseek-v4-flash-latest', 'deepseek/deepseek-v4-flash-0731'],
       ['mistralai/codestral-2508', 'mistral/codestral'],
       ['mistralai/devstral-2512', 'mistral/devstral-2'],
       ['mistralai/mistral-embed-2312', 'mistral/mistral-embed'],

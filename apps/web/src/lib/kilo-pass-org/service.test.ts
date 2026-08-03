@@ -14,6 +14,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { monthlyWindowFromOriginalAnchor } from './calculations';
 import {
   activatePaidAgreement,
   createParentSupplement,
@@ -776,9 +777,12 @@ describe('Kilo Pass organization agreement service', () => {
   });
 
   it('reclaims a blocked original window after seat capacity reconciliation and issues it once', async () => {
+    const now = new Date();
+    const anchor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const retryWindowStart = nextIssuanceBoundary(anchor, now);
     const retryWindow = {
-      start: new Date('2027-07-01T00:00:00.000Z'),
-      end: new Date('2027-08-01T00:00:00.000Z'),
+      start: retryWindowStart,
+      end: monthlyWindowFromOriginalAnchor(anchor, 2).start,
     };
     const owner = await insertTestUser();
     const childOwner = await insertTestUser();
@@ -804,7 +808,7 @@ describe('Kilo Pass organization agreement service', () => {
       agreementId: pending.agreementId,
       recipientUserId: owner.id,
       paidFrom: retryWindow.start,
-      paidUntil: new Date('2027-09-01T00:00:00.000Z'),
+      paidUntil: monthlyWindowFromOriginalAnchor(anchor, 3).start,
       paidSeatCount: 2,
       firstWindow: retryWindow,
       isBridge: false,
@@ -816,8 +820,8 @@ describe('Kilo Pass organization agreement service', () => {
       allocations: [{ childOrganizationId: child.id, passCount: 2 }],
     });
     const augustWindow = {
-      start: new Date('2027-08-01T00:00:00.000Z'),
-      end: new Date('2027-09-01T00:00:00.000Z'),
+      start: retryWindow.end,
+      end: monthlyWindowFromOriginalAnchor(anchor, 3).start,
     };
     const blocked = await activatePaidAgreement({
       agreementId: pending.agreementId,
@@ -839,7 +843,9 @@ describe('Kilo Pass organization agreement service', () => {
         )
       );
     expect(blockedRun?.state).toBe('blocked');
-    expect(new Date(blockedRun?.window_start ?? 0).toISOString()).toBe('2027-08-01T00:00:00.000Z');
+    expect(new Date(blockedRun?.window_start ?? 0).toISOString()).toBe(
+      augustWindow.start.toISOString()
+    );
     expect(blockedRun?.attempt_count).toBe(0);
     if (!blockedRun) throw new Error('blocked processing run was not created');
 
@@ -849,11 +855,9 @@ describe('Kilo Pass organization agreement service', () => {
       expectedPlanVersion: 2,
       allocations: [{ childOrganizationId: child.id, passCount: 1 }],
     });
-    const recovered = await runOrganizationPassIssuanceCron(
-      db,
-      new Date('2027-08-02T00:00:00.000Z')
-    );
-    const replay = await runOrganizationPassIssuanceCron(db, new Date('2027-08-02T00:00:00.000Z'));
+    const cronNow = new Date(augustWindow.start.getTime() + 24 * 60 * 60 * 1000);
+    const recovered = await runOrganizationPassIssuanceCron(db, cronNow);
+    const replay = await runOrganizationPassIssuanceCron(db, cronNow);
     expect(recovered).toMatchObject({ issued: 1, blocked: 0 });
     expect(replay).toMatchObject({ issued: 0, blocked: 0 });
     const [recoveredRun] = await db

@@ -10,7 +10,10 @@ import {
 import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { db } from '@/lib/drizzle';
 import { client as stripe } from '@/lib/stripe-client';
-import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import {
+  getKnownStripePriceIdsForKiloPass,
+  getStripePriceIdForKiloPass,
+} from '@/lib/kilo-pass/stripe-price-ids.server';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import {
   activatePaidAgreement,
@@ -137,10 +140,7 @@ export async function createOrganizationKiloPassCheckout(input: {
       tier: input.tier,
       cadence,
     },
-    expand: [
-      'latest_invoice.confirmation_secret',
-      'latest_invoice.payments.data.payment.payment_intent',
-    ],
+    expand: ['latest_invoice.confirmation_secret'],
   });
   const passItem = organizationPassItem(updated);
   await bindProviderSeatAddOnItem({
@@ -152,7 +152,23 @@ export async function createOrganizationKiloPassCheckout(input: {
     await handleOrganizationKiloPassInvoicePaid({ invoice });
     return { kind: 'completed' };
   }
-  const paymentIntent = invoice?.payments?.data
+  let openPayments: Stripe.ApiList<Stripe.InvoicePayment> | null = null;
+  if (invoice) {
+    try {
+      openPayments = await stripe.invoicePayments.list({
+        invoice: invoice.id,
+        status: 'open',
+        payment: { type: 'payment_intent' },
+        expand: ['data.payment.payment_intent'],
+        limit: 10,
+      });
+    } catch {
+      // The agreement and add-on are already durable. Webhook/poll reconciliation
+      // remains authoritative if the follow-up provider read is unavailable.
+      return { kind: 'pending' };
+    }
+  }
+  const paymentIntent = openPayments?.data
     .map(payment => payment.payment.payment_intent)
     .find(reference => typeof reference === 'object');
   if (paymentIntent?.status === 'requires_action' && invoice?.confirmation_secret?.client_secret) {
@@ -165,6 +181,14 @@ function invoiceLineForSubscriptionItem(invoice: Stripe.Invoice, itemId: string)
   return (invoice.lines?.data ?? []).find(
     line => line.parent?.subscription_item_details?.subscription_item === itemId
   );
+}
+
+function invoiceLineForKnownKiloPassPrice(invoice: Stripe.Invoice) {
+  const knownPriceIds = new Set(getKnownStripePriceIdsForKiloPass());
+  return (invoice.lines?.data ?? []).find(line => {
+    const priceId = line.pricing?.price_details?.price;
+    return priceId !== undefined && knownPriceIds.has(priceId);
+  });
 }
 
 function linePeriod(line: Stripe.InvoiceLineItem) {
@@ -508,14 +532,21 @@ export async function endPendingOrganizationKiloPassForTerminalInvoice(invoice: 
     .orderBy(desc(kilo_pass_org_agreements.created_at))
     .limit(1);
   if (!agreement) return false;
-  if (!invoiceLineForSubscriptionItem(invoice, agreement.provider_seat_add_on_item_id ?? '')) {
+  const isUnbound = agreement.provider_seat_add_on_item_id?.startsWith('pending:') === true;
+  const unboundPassLine = isUnbound ? invoiceLineForKnownKiloPassPrice(invoice) : undefined;
+  if (
+    isUnbound
+      ? !unboundPassLine
+      : !invoiceLineForSubscriptionItem(invoice, agreement.provider_seat_add_on_item_id ?? '')
+  ) {
     return false;
   }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const passItem = subscription.items.data.find(
-    item => item.id === agreement.provider_seat_add_on_item_id
-  );
+  const unboundPassPriceId = unboundPassLine?.pricing?.price_details?.price;
+  const passItem = isUnbound
+    ? subscription.items.data.find(item => item.price.id === unboundPassPriceId)
+    : subscription.items.data.find(item => item.id === agreement.provider_seat_add_on_item_id);
   if (passItem) {
     await stripe.subscriptions.update(subscriptionId, {
       proration_behavior: 'none',

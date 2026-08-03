@@ -10,6 +10,10 @@ const update =
 const scheduleCreate = jest.fn<(input: unknown) => Promise<{ id: string }>>();
 const scheduleUpdate = jest.fn<(id: string, input: unknown) => Promise<unknown>>();
 const scheduleRetrieve = jest.fn<(id: string) => Promise<Stripe.SubscriptionSchedule>>();
+const invoicePaymentsList =
+  jest.fn<
+    (params: Stripe.InvoicePaymentListParams) => Promise<Stripe.ApiList<Stripe.InvoicePayment>>
+  >();
 const select = jest.fn();
 const updateDb = jest.fn();
 const updateSet = jest.fn();
@@ -22,6 +26,7 @@ const bindProviderSeatAddOnItem = jest.fn();
 jest.mock('@/lib/stripe-client', () => ({
   client: {
     subscriptions: { retrieve, update },
+    invoicePayments: { list: invoicePaymentsList },
     subscriptionSchedules: {
       create: scheduleCreate,
       update: scheduleUpdate,
@@ -43,6 +48,7 @@ jest.mock('./service', () => ({
   suspendAgreementForPaymentReview: jest.fn(),
 }));
 jest.mock('@/lib/kilo-pass/stripe-price-ids.server', () => ({
+  getKnownStripePriceIdsForKiloPass: () => ['price_pass'],
   getStripePriceIdForKiloPass: () => 'price_pass',
 }));
 jest.mock('@/lib/organizations/stripe-seat-line-items', () => ({
@@ -110,6 +116,12 @@ describe('organization Kilo Pass Stripe adapter', () => {
     });
     updateSet.mockReturnValue({ where: async () => undefined });
     updateDb.mockReturnValue({ set: updateSet });
+    invoicePaymentsList.mockResolvedValue({
+      object: 'list',
+      data: [],
+      has_more: false,
+      url: '/v1/invoice_payments',
+    });
   });
 
   test('derives paid capacity and bridge issuance window from immutable invoice lines', async () => {
@@ -286,20 +298,24 @@ describe('organization Kilo Pass Stripe adapter', () => {
     update.mockResolvedValue({
       ...subscription(),
       latest_invoice: {
+        id: 'in_action',
         status: 'open',
         confirmation_secret: { type: 'payment_intent', client_secret: 'pi_secret_1' },
-        payments: {
-          data: [
-            {
-              status: 'open',
-              payment: {
-                type: 'payment_intent',
-                payment_intent: { status: 'requires_action' },
-              },
-            },
-          ],
-        },
       } as unknown as Stripe.Invoice,
+    });
+    invoicePaymentsList.mockResolvedValue({
+      object: 'list',
+      data: [
+        {
+          status: 'open',
+          payment: {
+            type: 'payment_intent',
+            payment_intent: { status: 'requires_action' },
+          },
+        } as unknown as Stripe.InvoicePayment,
+      ],
+      has_more: false,
+      url: '/v1/invoice_payments',
     });
     const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
 
@@ -316,12 +332,16 @@ describe('organization Kilo Pass Stripe adapter', () => {
       expect.objectContaining({
         payment_behavior: 'allow_incomplete',
         proration_behavior: 'always_invoice',
-        expand: [
-          'latest_invoice.confirmation_secret',
-          'latest_invoice.payments.data.payment.payment_intent',
-        ],
+        expand: ['latest_invoice.confirmation_secret'],
       })
     );
+    expect(invoicePaymentsList).toHaveBeenCalledWith({
+      invoice: 'in_action',
+      status: 'open',
+      payment: { type: 'payment_intent' },
+      expand: ['data.payment.payment_intent'],
+      limit: 10,
+    });
   });
 
   test('does not request a browser action after a hard payment decline', async () => {
@@ -332,21 +352,51 @@ describe('organization Kilo Pass Stripe adapter', () => {
     update.mockResolvedValue({
       ...subscription(),
       latest_invoice: {
+        id: 'in_declined',
         status: 'open',
         confirmation_secret: { type: 'payment_intent', client_secret: 'pi_secret_1' },
-        payments: {
-          data: [
-            {
-              status: 'open',
-              payment: {
-                type: 'payment_intent',
-                payment_intent: { status: 'requires_payment_method' },
-              },
-            },
-          ],
-        },
       } as unknown as Stripe.Invoice,
     });
+    invoicePaymentsList.mockResolvedValue({
+      object: 'list',
+      data: [
+        {
+          status: 'open',
+          payment: {
+            type: 'payment_intent',
+            payment_intent: { status: 'requires_payment_method' },
+          },
+        } as unknown as Stripe.InvoicePayment,
+      ],
+      has_more: false,
+      url: '/v1/invoice_payments',
+    });
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).resolves.toEqual({ kind: 'pending' });
+  });
+
+  test('keeps checkout pending when invoice payment lookup is unavailable', async () => {
+    retrieve.mockResolvedValue(
+      subscription({ items: { ...subscription().items, data: [subscription().items.data[0]!] } })
+    );
+    createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1', created: true });
+    update.mockResolvedValue({
+      ...subscription(),
+      latest_invoice: {
+        id: 'in_lookup_failure',
+        status: 'open',
+        confirmation_secret: { type: 'payment_intent', client_secret: 'pi_secret_1' },
+      } as unknown as Stripe.Invoice,
+    });
+    invoicePaymentsList.mockRejectedValue(new Error('provider unavailable'));
     const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
 
     await expect(
@@ -816,6 +866,82 @@ describe('organization Kilo Pass Stripe adapter', () => {
       expect(updateSet).toHaveBeenCalledWith({ state: 'ended' });
     }
   );
+
+  test('ends an unbound pending agreement for a terminal Kilo Pass-priced invoice', async () => {
+    select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          orderBy: () => ({
+            limit: async () => [
+              dbAgreement({
+                state: 'pending_payment',
+                provider_seat_add_on_item_id: 'pending:sub_1',
+              }),
+            ],
+          }),
+        }),
+      }),
+    });
+    retrieve.mockResolvedValue(subscription());
+    update.mockResolvedValue(subscription());
+    const { endPendingOrganizationKiloPassForTerminalInvoice } = await import('./stripe-adapter');
+
+    await expect(
+      endPendingOrganizationKiloPassForTerminalInvoice({
+        status: 'void',
+        parent: { subscription_details: { subscription: 'sub_1' } },
+        lines: {
+          data: [
+            {
+              pricing: { price_details: { price: 'price_pass', product: 'prod_pass' } },
+            },
+          ],
+        },
+      } as unknown as Stripe.Invoice)
+    ).resolves.toBe(true);
+
+    expect(update).toHaveBeenCalledWith('sub_1', {
+      proration_behavior: 'none',
+      items: [{ id: 'si_pass', deleted: true }],
+    });
+    expect(updateSet).toHaveBeenCalledWith({ state: 'ended' });
+  });
+
+  test('ignores a seat-only terminal invoice for an unbound pending agreement', async () => {
+    select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          orderBy: () => ({
+            limit: async () => [
+              dbAgreement({
+                state: 'pending_payment',
+                provider_seat_add_on_item_id: 'pending:sub_1',
+              }),
+            ],
+          }),
+        }),
+      }),
+    });
+    const { endPendingOrganizationKiloPassForTerminalInvoice } = await import('./stripe-adapter');
+
+    await expect(
+      endPendingOrganizationKiloPassForTerminalInvoice({
+        status: 'void',
+        parent: { subscription_details: { subscription: 'sub_1' } },
+        lines: {
+          data: [
+            {
+              pricing: { price_details: { price: 'price_seat', product: 'prod_seat' } },
+            },
+          ],
+        },
+      } as unknown as Stripe.Invoice)
+    ).resolves.toBe(false);
+
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(updateDb).not.toHaveBeenCalled();
+  });
 
   test('ignores a terminal seat-only invoice while the pass invoice is pending', async () => {
     select.mockReturnValue({

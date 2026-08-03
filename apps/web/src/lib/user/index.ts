@@ -836,7 +836,7 @@ async function assertNoLiveSubscriptionsForSoftDelete(
     );
   }
 
-  // Block soft-delete for any live KiloClaw subscription. This includes
+  // Block soft-delete for any current live KiloClaw subscription. This includes
   // trialing — the user may have a running Fly instance, and deleting the
   // row without destroying the instance would orphan it.
   const liveClawSubscriptions = await executor
@@ -848,6 +848,7 @@ async function assertNoLiveSubscriptionsForSoftDelete(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing'])
       )
     );
@@ -874,7 +875,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *
  * Preconditions (will throw SoftDeletePreconditionError if violated):
  * - User must not have an active, non-cancelling Kilo Pass subscription
- * - User must not have a live KiloClaw subscription (active, past_due, unpaid, or trialing)
+ * - User must not have a current live KiloClaw subscription (active, past_due, unpaid, or trialing)
  *
  * What is kept:
  * - The kilocode_users row (anonymized)

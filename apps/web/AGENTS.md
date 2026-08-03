@@ -2,7 +2,9 @@
 
 ## UI Work
 
-When editing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — use the `/kilo-design` skill.
+When editing or reviewing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — load the `kilo-design-cloud` skill, synced from `Kilo-Org/kilo-design` into `.agents/skills/`. Never load it for non-UI work.
+
+For `apps/web`, that skill replaces the root `DESIGN.md`. Its `src/tokens.cloud.ts` references are upstream design artifacts tracked by VVV-130, not files expected in this repository; until adoption lands, use the current Cloud semantic tokens and components.
 
 ## Web Environment Variables
 

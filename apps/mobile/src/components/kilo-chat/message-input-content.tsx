@@ -6,20 +6,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
-import { resolveMessageInputAppStateTransition } from './message-input-app-state';
+import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import {
   editableAttachmentToPreviewRow,
   resolveMessageInputSendDisabled,
 } from './message-input-content-state';
 import {
   MESSAGE_INPUT_FONT_SIZE,
-  MESSAGE_INPUT_HORIZONTAL_PADDING,
   MESSAGE_INPUT_LINE_HEIGHT,
   MESSAGE_INPUT_MAX_HEIGHT,
   MESSAGE_INPUT_MIN_HEIGHT,
   MESSAGE_INPUT_VERTICAL_INSET,
   resolveMessageInputBottomPadding,
   resolveMessageInputShouldScroll,
+  resolveMessageInputTextContentWidth,
 } from './message-input-layout';
 import {
   type CommonProps,
@@ -109,7 +109,7 @@ export function MessageInputContent({
     minHeight: MESSAGE_INPUT_MIN_HEIGHT,
     maxHeight: MESSAGE_INPUT_MAX_HEIGHT,
     verticalPadding: MESSAGE_INPUT_VERTICAL_INSET,
-    textContentWidth: inputWidth - MESSAGE_INPUT_HORIZONTAL_PADDING,
+    textContentWidth: resolveMessageInputTextContentWidth(inputWidth),
     fontSize: MESSAGE_INPUT_FONT_SIZE,
     lineHeight: MESSAGE_INPUT_LINE_HEIGHT,
     initialText,
@@ -239,7 +239,7 @@ export function MessageInputContent({
   }
 
   function handleInputLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
+    const nextWidth = Math.max(Math.floor(event.nativeEvent.layout.width), 0);
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 

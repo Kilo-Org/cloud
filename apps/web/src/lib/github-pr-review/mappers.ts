@@ -279,6 +279,7 @@ export type GraphQlReviewThreadInput = {
   originalLine?: number | null;
   originalStartLine?: number | null;
   diffSide?: 'LEFT' | 'RIGHT' | null;
+  diffHunk?: string | null;
   comments: GraphQlReviewCommentInput[];
 };
 
@@ -331,6 +332,7 @@ export function buildReviewThreadsResult(args: {
       originalLine: t.originalLine ?? null,
       originalStartLine: t.originalStartLine ?? null,
       diffSide,
+      diffHunk: t.diffHunk || null,
       comments: t.comments.map(mapReviewComment),
     };
   });

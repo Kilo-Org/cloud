@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type Stripe from 'stripe';
 import { useTRPC } from '@/lib/trpc/utils';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
@@ -12,6 +13,7 @@ import {
   isWarningStatus,
 } from '@/components/subscriptions/helpers';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import { capitalize } from '@/lib/utils';
 import { SeatsSubscribeCard } from './SeatsSubscribeCard';
 
 function getSeatPrice(
@@ -31,10 +33,12 @@ export function SeatsGroup({
   organizationId,
   organizationPlan,
   showTerminal,
+  addOn,
 }: {
   organizationId: string;
   organizationPlan: OrganizationPlan;
   showTerminal: boolean;
+  addOn: ReactNode;
 }) {
   const trpc = useTRPC();
   const query = useQuery(
@@ -49,46 +53,55 @@ export function SeatsGroup({
   const isVisible = subscription && (!isSeatsTerminal(status) || showTerminal);
   const paidSeatItemId = query.data?.paidSeatItemId ?? null;
   const paidSeatItem = subscription?.items.data.find(item => item.id === paidSeatItemId) ?? null;
+  const planName = `${capitalize(organizationPlan)} Seats`;
 
   return (
     <SubscriptionGroup
-      title="Teams / Enterprise Seats"
-      description="Manage seats and renewal details for this organization."
+      title={planName}
+      description="Manage seats, renewal details, and add-ons for this organization."
       headerIcon={<Users className="h-5 w-5" />}
-      isLoading={query.isLoading}
-      isError={query.isError}
-      error={query.error}
-      onRetry={() => void query.refetch()}
     >
-      {isVisible && subscription ? (
-        <SubscriptionCard
-          icon={<Users className="h-5 w-5" />}
-          title="Teams / Enterprise Seats"
-          subtitle={`${query.data?.seatsUsed ?? 0} of ${query.data?.totalSeats ?? 0} seats in use`}
-          status={subscription.status}
-          price={getSeatPrice(subscription, paidSeatItem)}
-          billingDate={formatDateLabel(
-            paidSeatItem?.current_period_end
-              ? new Date(paidSeatItem.current_period_end * 1000).toISOString()
-              : null,
-            '—'
+      <div className="space-y-6">
+        <SubscriptionGroup
+          title={planName}
+          unframed
+          isLoading={query.isLoading}
+          isError={query.isError}
+          error={query.error}
+          onRetry={() => void query.refetch()}
+        >
+          {isVisible && subscription ? (
+            <SubscriptionCard
+              icon={<Users className="h-5 w-5" />}
+              title={planName}
+              subtitle={`${query.data?.seatsUsed ?? 0} of ${query.data?.totalSeats ?? 0} seats in use`}
+              status={subscription.status}
+              price={getSeatPrice(subscription, paidSeatItem)}
+              billingDate={formatDateLabel(
+                paidSeatItem?.current_period_end
+                  ? new Date(paidSeatItem.current_period_end * 1000).toISOString()
+                  : null,
+                '—'
+              )}
+              paymentMethod="Stripe"
+              href={`/organizations/${organizationId}/subscriptions/seats`}
+              isTerminal={isSeatsTerminal(subscription.status)}
+              warningTone={
+                isWarningStatus(subscription.status) || subscription.cancel_at_period_end
+                  ? 'warning'
+                  : undefined
+              }
+            />
+          ) : (
+            <SeatsSubscribeCard
+              key={organizationId}
+              organizationId={organizationId}
+              currentPlan={organizationPlan}
+            />
           )}
-          paymentMethod="Stripe"
-          href={`/organizations/${organizationId}/subscriptions/seats`}
-          isTerminal={isSeatsTerminal(subscription.status)}
-          warningTone={
-            isWarningStatus(subscription.status) || subscription.cancel_at_period_end
-              ? 'warning'
-              : undefined
-          }
-        />
-      ) : (
-        <SeatsSubscribeCard
-          key={organizationId}
-          organizationId={organizationId}
-          currentPlan={organizationPlan}
-        />
-      )}
+        </SubscriptionGroup>
+        {addOn}
+      </div>
     </SubscriptionGroup>
   );
 }

@@ -16,6 +16,7 @@ import { DECIDER_CASES } from './datasets/decider-cases';
 import type { RunModelRow } from './db';
 import {
   countCaseResults,
+  exactPairKey,
   existsNewerCompletedRun,
   getCaseResults,
   getExistingCaseResultIds,
@@ -24,12 +25,18 @@ import {
   getRunWithModels,
   getSummaries,
   insertRun,
+  listPendingCurrentProfiles,
+  listStaleRunningDeciderRunIds,
+  markProfilesFailedForRun,
+  markProfilesReadyForRun,
+  markProfilesRunningForRun,
   markRunCompleted,
   markRunFailed,
   markStaleRunsFailed,
   replaceModelSummaries,
   saveRoutingTable,
   upsertCaseResult,
+  type BenchmarkRunPurpose,
   type CaseResultRow,
   type PriorModelResult,
 } from './db';
@@ -42,13 +49,27 @@ import {
   runDeciderCaseViaCli,
   warmUpCliContainer,
 } from './cli-runner';
-import { parsePersistedReasoningEffort } from './reasoning-effort';
+import {
+  parsePersistedReasoningEffort,
+  variantFromReasoningEffort,
+  variantFromStorage,
+  variantToStorage,
+} from './reasoning-effort';
 import { pickClassifierWinner } from './winner';
+
+/** One exact Pool entry identity used throughout a decider/classifier run. */
+export type RunModelEntry = {
+  model: string;
+  /** Canonical variant; null = default/no variant. */
+  variant: string | null;
+};
 
 export type BenchmarkJobMessage = {
   runId: string;
   kind: BenchmarkKind;
   model: string;
+  /** Exact-pair identity. Optional for backward-compatible old queue messages. */
+  variant?: string | null;
   // The case ids this message is responsible for, plus the chunk index. Decider
   // chunks are split across shard lanes; each lane has one stable container.
   caseIds?: string[];
@@ -63,6 +84,7 @@ export const BenchmarkJobMessageSchema = z.object({
   runId: z.string().min(1),
   kind: z.enum(['classifier', 'decider']),
   model: z.string().min(1),
+  variant: z.string().trim().min(1).nullable().optional(),
   caseIds: z.array(z.string().min(1)).optional(),
   chunk: z.number().int().min(0).optional(),
   shard: z.number().int().min(0).optional(),
@@ -128,13 +150,40 @@ async function enqueueRunMessages(
     try {
       await env.BENCH_QUEUE.sendBatch(messages.slice(i, i + QUEUE_SEND_BATCH_LIMIT));
     } catch (error) {
-      await markRunFailed(
-        env.BENCH_DB,
-        runId,
-        `enqueue failed after ${i} of ${messages.length} messages: ${formatError(error).error}`
-      ).catch(() => {});
+      const reason = `enqueue failed after ${i} of ${messages.length} messages: ${formatError(error).error}`;
+      await failRunAndDrain(env, runId, reason).catch(() => {});
       throw error;
     }
+  }
+}
+
+/**
+ * Mark a running run failed, transition any profile rows it claimed, and attempt
+ * to drain the oldest pending profile batch into the freed single decider slot.
+ */
+export async function failRunAndDrain(env: Env, runId: string, error: string): Promise<void> {
+  await markRunFailed(env.BENCH_DB, runId, error);
+  try {
+    await markProfilesFailedForRun(env.BENCH_DB, runId, error);
+  } catch (profileError) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_profile_fail_transition_error',
+        runId,
+        ...formatError(profileError),
+      })
+    );
+  }
+  try {
+    await drainPendingProfileBatch(env);
+  } catch (drainError) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_error',
+        afterRunId: runId,
+        ...formatError(drainError),
+      })
+    );
   }
 }
 
@@ -144,8 +193,44 @@ const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 // exhausted / dead-lettered). Called both before starting a run and when
 // listing runs, so a wedged run is recovered without depending on a new run
 // being started (the UI disables Start while a run shows 'running').
-export async function sweepStaleRuns(db: D1Database): Promise<void> {
-  await markStaleRunsFailed(db, new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString());
+// Also fails Benchmark-profile rows claimed by those stale runs so they do
+// not stay stuck in `running`. Drain is separate (needs Env for startRun).
+export async function sweepStaleRuns(db: D1Database): Promise<string[]> {
+  const olderThanIso = new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString();
+  // Capture ids before the bulk status flip so profile claims can be failed.
+  const staleIds = await listStaleRunningDeciderRunIds(db, olderThanIso).catch(
+    () => [] as string[]
+  );
+  await markStaleRunsFailed(db, olderThanIso);
+  for (const runId of staleIds) {
+    await markProfilesFailedForRun(db, runId, 'timed out').catch(() => {});
+  }
+  return staleIds;
+}
+
+/**
+ * Sweep stale runs and attempt the pending-profile drain. Used by the
+ * scheduled handler so a failed final queue message or platform run cannot
+ * strand pending profile work. Never throws for drain/slot contention.
+ */
+export async function sweepStaleRunsAndDrain(env: Env): Promise<{
+  staleRunIds: string[];
+  drained: { runId: string; entryCount: number } | null;
+}> {
+  const staleRunIds = await sweepStaleRuns(env.BENCH_DB);
+  let drained: { runId: string; entryCount: number } | null = null;
+  try {
+    drained = await drainPendingProfileBatch(env);
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_error',
+        afterSweep: true,
+        ...formatError(error),
+      })
+    );
+  }
+  return { staleRunIds, drained };
 }
 
 // Bump when grading logic, the CLI invocation/variant handling, the container
@@ -182,26 +267,32 @@ export function computeEngineIdentity(kind: BenchmarkKind): string {
   return `v${BENCHMARK_ENGINE_VERSION}:${fnv1aHex(JSON.stringify(datasetSignature))}`;
 }
 
+function normalizeRunModelEntries(models: readonly (string | RunModelEntry)[]): RunModelEntry[] {
+  return models.map(entry => (typeof entry === 'string' ? { model: entry, variant: null } : entry));
+}
+
 /** Pure helper: produces the initial sendBatch bodies for a decider run.
- * Extracted for unit-testability; the shape is models × reps messages. Later
+ * Extracted for unit-testability; the shape is entries × reps messages. Later
  * chunks are chained by processDeciderJob after the previous chunk completes.
+ * Accepts model id strings or exact `{ model, variant }` entries.
  */
 export function buildDeciderMessages(
   runId: string,
   kind: BenchmarkKind,
-  modelIds: string[],
+  models: readonly (string | RunModelEntry)[],
   repetitions: number,
   chunks: readonly (readonly { id: string }[])[],
   maxLiveContainers: number = DECIDER_CONTAINER_INSTANCE_CAP
 ): { body: BenchmarkJobMessage }[] {
+  const entries = normalizeRunModelEntries(models);
   const shardCount = computeDeciderShardCount({
-    modelCount: modelIds.length,
+    modelCount: entries.length,
     repetitions,
     chunkCount: chunks.length,
     maxLiveContainers,
   });
   if (shardCount === 0) return [];
-  return modelIds.flatMap(model =>
+  return entries.flatMap(entry =>
     Array.from({ length: repetitions }, (_, rep) =>
       Array.from({ length: shardCount }, (_, shard) => {
         const chunkCases = chunks[shard];
@@ -211,7 +302,8 @@ export function buildDeciderMessages(
             body: {
               runId,
               kind,
-              model,
+              model: entry.model,
+              variant: entry.variant,
               chunk: shard,
               shard,
               shardCount,
@@ -226,24 +318,29 @@ export function buildDeciderMessages(
 }
 
 export function getDeciderContainerInstanceName(
-  message: Pick<BenchmarkJobMessage, 'runId' | 'model' | 'rep' | 'chunk' | 'shard'>
+  message: Pick<BenchmarkJobMessage, 'runId' | 'model' | 'variant' | 'rep' | 'chunk' | 'shard'>
 ): string {
-  return `${message.runId}:${message.model}:${message.rep ?? 0}:${message.shard ?? 0}`;
+  // Include variant so two variants of one model in one run get distinct lanes.
+  // Empty string for null keeps names stable and filesystem/DO-name safe.
+  const variantPart = variantToStorage(message.variant);
+  return `${message.runId}:${message.model}:${variantPart}:${message.rep ?? 0}:${message.shard ?? 0}`;
 }
 
 export function buildClassifierMessages(
   runId: string,
-  modelIds: string[],
+  models: readonly (string | RunModelEntry)[],
   repetitions: number,
   chunks: readonly (readonly { id: string }[])[]
 ): { body: BenchmarkJobMessage }[] {
-  return modelIds.flatMap(model =>
+  const entries = normalizeRunModelEntries(models);
+  return entries.flatMap(entry =>
     Array.from({ length: repetitions }, (_, rep) =>
       chunks.map((chunkCases, chunk) => ({
         body: {
           runId,
           kind: 'classifier',
-          model,
+          model: entry.model,
+          variant: entry.variant,
           chunk,
           rep,
           caseIds: chunkCases.map(c => c.id),
@@ -275,7 +372,7 @@ export class BenchmarkRunConfigError extends Error {
   }
 }
 
-function validateDeciderContainerBudget({
+export function validateDeciderContainerBudget({
   modelCount,
   repetitions,
   maxLiveContainers,
@@ -292,11 +389,34 @@ function validateDeciderContainerBudget({
   );
 }
 
+export type StartRunOptions = {
+  force?: boolean;
+  /**
+   * 'platform' (default): publish the default routing table / classifier winner.
+   * 'profile': measure an explicit Pool-entry snapshot for the global registry;
+   * never publishes platform artifacts.
+   */
+  purpose?: BenchmarkRunPurpose;
+  /**
+   * Explicit decider entry snapshot for profile runs. Required when
+   * purpose === 'profile'. Ignored for platform runs (entries come from config).
+   */
+  entries?: readonly RunModelEntry[];
+};
+
 export async function startRun(
   env: Env,
   kind: BenchmarkKind,
-  options: { force?: boolean } = {}
+  options: StartRunOptions = {}
 ): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
+  const purpose: BenchmarkRunPurpose = options.purpose ?? 'platform';
+  if (purpose === 'profile' && kind !== 'decider') {
+    throw new BenchmarkRunConfigError('profile runs must be decider kind');
+  }
+  if (purpose === 'profile' && (!options.entries || options.entries.length === 0)) {
+    throw new BenchmarkRunConfigError('profile runs require a non-empty entries snapshot');
+  }
+
   // Stale-run sweeper: fail dead 'running' runs first so a wedged run can't
   // block new ones and the admin panel shows the truth.
   await sweepStaleRuns(env.BENCH_DB);
@@ -309,63 +429,88 @@ export async function startRun(
   // One active run per kind. The unique partial index is the atomic backstop;
   // this pre-check turns the common case (a run already going) into a clean
   // RunAlreadyActiveError instead of an insert-constraint failure.
+  // Platform and profile share this single decider slot.
   const activeRun = await getRunningRun(env.BENCH_DB, kind);
   if (activeRun) {
     throw new RunAlreadyActiveError(kind, activeRun.id);
   }
   const repetitions =
     kind === 'classifier' ? config.classifierRepetitions : config.deciderRepetitions;
-  const models =
-    kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
+
+  // Platform: config maps reasoningEffort → stored variant. Profile: explicit
+  // snapshot (may include two variants of one model).
+  const profileEntries = options.entries;
+  const modelEntries: RunModelEntry[] =
+    purpose === 'profile' && profileEntries
+      ? normalizeRunModelEntries(profileEntries)
+      : kind === 'classifier'
+        ? config.classifierModels.map(model => ({ model, variant: null }))
+        : config.deciderModels.map(m => ({
+            model: m.id,
+            variant:
+              m.variant !== undefined
+                ? (m.variant ?? null)
+                : variantFromReasoningEffort(m.reasoningEffort ?? null),
+          }));
 
   const engineIdentity = computeEngineIdentity(kind);
-  const reasoningEffortFor = (modelId: string): string | null =>
-    kind === 'classifier'
-      ? null
-      : (config.deciderModels.find(m => m.id === modelId)?.reasoningEffort ?? null);
 
-  // Models with prior results are skipped (their latest summaries are carried
-  // into this run's aggregate) unless the admin forces a full re-run. A prior
-  // result is only carried when it was measured under the SAME benchmark
-  // identity — engine identity (dataset + grading/CLI version), repetitions,
-  // and the model's reasoning_effort — so a config/dataset change re-benchmarks
-  // the model instead of pairing current serving config with stale numbers.
-  const priorByModel = options.force
-    ? new Map<string, PriorModelResult>()
-    : await getLatestSummariesByModel(env.BENCH_DB, kind);
-  const isCarryable = (modelId: string): boolean => {
-    const prior = priorByModel.get(modelId);
+  // Exact entries with prior results are skipped (their latest summaries are
+  // carried into this run's aggregate) unless the admin forces a full re-run.
+  // A prior result is only carried when it was measured under the SAME
+  // benchmark identity — engine identity (dataset + grading/CLI version),
+  // repetitions, AND exact variant — so a config/dataset/variant change
+  // re-benchmarks instead of pairing current serving config with stale numbers.
+  // Profile runs always re-measure the snapshot (no carry) so registry
+  // provenance points at a run that actually graded these entries.
+  const priorByPair =
+    options.force || purpose === 'profile'
+      ? new Map<string, PriorModelResult>()
+      : await getLatestSummariesByModel(env.BENCH_DB, kind);
+  const isCarryable = (entry: RunModelEntry): boolean => {
+    const prior = priorByPair.get(exactPairKey(entry.model, entry.variant));
     return (
       prior !== undefined &&
       prior.engineIdentity === engineIdentity &&
       prior.repetitions === repetitions &&
-      (prior.reasoningEffort ?? null) === reasoningEffortFor(modelId)
+      (prior.variant ?? null) === (entry.variant ?? null)
     );
   };
-  const enqueuedModelIds = models.filter(m => !isCarryable(m));
-  const skippedModels = models.filter(m => isCarryable(m));
-  const carriedSummaries = skippedModels.flatMap(m => priorByModel.get(m)?.summaries ?? []);
+  const enqueuedEntries = modelEntries.filter(e => !isCarryable(e));
+  const skippedEntries = modelEntries.filter(e => isCarryable(e));
+  const skippedModels = skippedEntries.map(e => e.model);
+  const carriedSummaries = skippedEntries.flatMap(
+    e => priorByPair.get(exactPairKey(e.model, e.variant))?.summaries ?? []
+  );
 
   const benchmarkIdentity = resolveBenchmarkIdentity(config);
 
   const maxLiveDeciderContainers = Math.min(config.maxConcurrency, DECIDER_CONTAINER_INSTANCE_CAP);
   if (kind === 'decider') {
     validateDeciderContainerBudget({
-      modelCount: enqueuedModelIds.length,
+      modelCount: enqueuedEntries.length,
       repetitions,
       maxLiveContainers: maxLiveDeciderContainers,
     });
   }
 
   const startedAt = new Date().toISOString();
-  const runId = `${kind}-${startedAt.replace(/[:.]/g, '-')}`;
+  // Distinguish profile run ids so ops logs and D1 rows are easy to filter.
+  const runId =
+    purpose === 'profile'
+      ? `profile-${startedAt.replace(/[:.]/g, '-')}`
+      : `${kind}-${startedAt.replace(/[:.]/g, '-')}`;
 
-  // Build run_models rows for ALL models of this run's kind.
-  const runModelRows: RunModelRow[] = models.map(modelId => ({
+  // Build run_models rows for ALL exact entries of this run.
+  // Platform runs write variant AND keep reasoning_effort as a legacy mirror.
+  // Profile runs write variant only (reasoning_effort null).
+  const enqueuedPairKeys = new Set(enqueuedEntries.map(e => exactPairKey(e.model, e.variant)));
+  const runModelRows: RunModelRow[] = modelEntries.map(entry => ({
     run_id: runId,
-    model: modelId,
-    enqueued: enqueuedModelIds.includes(modelId),
-    reasoning_effort: reasoningEffortFor(modelId),
+    model: entry.model,
+    variant: variantToStorage(entry.variant),
+    enqueued: enqueuedPairKeys.has(exactPairKey(entry.model, entry.variant)),
+    reasoning_effort: purpose === 'profile' ? null : entry.variant,
   }));
 
   try {
@@ -385,6 +530,7 @@ export async function startRun(
         classifier_max_p95_latency_ms:
           kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
         engine_identity: engineIdentity,
+        purpose,
       },
       runModelRows,
       carriedSummaries
@@ -400,17 +546,37 @@ export async function startRun(
     throw error;
   }
 
+  if (purpose === 'profile') {
+    try {
+      await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
+        engineIdentity,
+        repetitions,
+      });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'benchmark_profile_running_transition_error',
+          runId,
+          ...formatError(error),
+        })
+      );
+      await failRunAndDrain(env, runId, formatError(error).error);
+      throw error;
+    }
+  }
+
   console.log(
     JSON.stringify({
       event: 'benchmark_run_started',
       runId,
       kind,
-      enqueuedModels: enqueuedModelIds,
+      purpose,
+      enqueuedModels: enqueuedEntries.map(e => e.model),
       skippedModels,
     })
   );
 
-  if (enqueuedModelIds.length === 0) {
+  if (enqueuedEntries.length === 0) {
     // Everything already has results: complete immediately and republish the
     // aggregate so config-only changes (model removed, threshold tweaked)
     // take effect without re-running any model. The state mirrors the rows
@@ -426,15 +592,16 @@ export async function startRun(
       repetitions,
       classifierMaxP95LatencyMs: kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
       startedAt,
+      purpose,
     });
     return { runId, enqueuedModels: 0, skippedModels };
   }
 
   if (kind === 'classifier') {
     const chunks = chunkArray(CLASSIFIER_CASES, CLASSIFIER_CHUNK_SIZE);
-    const messages = buildClassifierMessages(runId, enqueuedModelIds, repetitions, chunks);
+    const messages = buildClassifierMessages(runId, enqueuedEntries, repetitions, chunks);
     await enqueueRunMessages(env, runId, messages);
-    return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
+    return { runId, enqueuedModels: enqueuedEntries.length, skippedModels };
   }
 
   // Decider: seed as many shard lanes as fit under the live-container cap. Each
@@ -444,13 +611,100 @@ export async function startRun(
   const messages = buildDeciderMessages(
     runId,
     kind,
-    enqueuedModelIds,
+    enqueuedEntries,
     repetitions,
     chunks,
     maxLiveDeciderContainers
   );
   await enqueueRunMessages(env, runId, messages);
-  return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
+  return { runId, enqueuedModels: enqueuedEntries.length, skippedModels };
+}
+
+/**
+ * After any decider run reaches a terminal state, claim the oldest pending
+ * profile batch that fits the container budget and start a profile run.
+ * No-ops when the decider slot is occupied or there is no pending work.
+ * Returns the started run id, or null.
+ */
+export async function drainPendingProfileBatch(
+  env: Env
+): Promise<{ runId: string; entryCount: number } | null> {
+  const config = await getBenchmarkConfig(env.BENCH_DB);
+  if (!config) return null;
+
+  const active = await getRunningRun(env.BENCH_DB, 'decider');
+  if (active) {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_skipped_slot_occupied',
+        activeRunId: active.id,
+      })
+    );
+    return null;
+  }
+
+  const engineIdentity = computeEngineIdentity('decider');
+  const repetitions = config.deciderRepetitions;
+  const pending = await listPendingCurrentProfiles(env.BENCH_DB, {
+    engineIdentity,
+    repetitions,
+  });
+  if (pending.length === 0) return null;
+
+  // Oldest-first (query already ordered by requested_at). Cap by container budget:
+  // modelCount * repetitions <= maxLiveContainers.
+  const maxLive = Math.min(config.maxConcurrency, DECIDER_CONTAINER_INSTANCE_CAP);
+  const maxEntries = Math.max(1, Math.floor(maxLive / Math.max(1, repetitions)));
+  const batch = pending.slice(0, maxEntries);
+  const entries: RunModelEntry[] = batch.map(row => ({
+    model: row.model,
+    variant: variantFromStorage(row.variant),
+  }));
+
+  try {
+    validateDeciderContainerBudget({
+      modelCount: entries.length,
+      repetitions,
+      maxLiveContainers: maxLive,
+    });
+  } catch (error) {
+    // Even a single entry can exceed the budget when repetitions are huge;
+    // leave pending and log — scheduled sweep will retry after config fix.
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_budget_exceeded',
+        entryCount: entries.length,
+        repetitions,
+        maxLive,
+        ...formatError(error),
+      })
+    );
+    return null;
+  }
+
+  try {
+    const result = await startRun(env, 'decider', { purpose: 'profile', entries });
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_profile_drain_started',
+        runId: result.runId,
+        entryCount: entries.length,
+        models: entries.map(e => e.model),
+      })
+    );
+    return { runId: result.runId, entryCount: entries.length };
+  } catch (error) {
+    if (error instanceof RunAlreadyActiveError) {
+      console.log(
+        JSON.stringify({
+          event: 'benchmark_profile_drain_skipped_slot_occupied',
+          activeRunId: error.activeRunId,
+        })
+      );
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
@@ -491,6 +745,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
     const expandedItems = CLASSIFIER_CASES.filter(benchCase => caseIds.has(benchCase.id)).map(
       benchCase => ({ benchCase, rep })
     );
+    const classifierVariant = variantToStorage(message.variant);
     await runCasesWithConcurrency(
       expandedItems,
       state.maxConcurrency,
@@ -504,6 +759,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
           await upsertCaseResult(env.BENCH_DB, {
             run_id: message.runId,
             model: message.model,
+            variant: classifierVariant,
             case_id: benchCase.id,
             route_key: null,
             score,
@@ -548,6 +804,7 @@ type RunState = {
   repetitions: number;
   classifierMaxP95LatencyMs: number | null;
   startedAt: string;
+  purpose: BenchmarkRunPurpose;
 };
 
 async function getRunState(env: Env, runId: string): Promise<RunState> {
@@ -566,6 +823,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     repetitions: run.repetitions,
     classifierMaxP95LatencyMs: run.classifier_max_p95_latency_ms,
     startedAt: run.started_at,
+    purpose: run.purpose === 'profile' ? 'profile' : 'platform',
   };
 }
 
@@ -604,19 +862,54 @@ async function processDeciderJob(
   const chunk = message.chunk ?? 0;
   const shard = message.shard ?? 0;
   const shardCount = message.shardCount ?? 1;
-  const instanceName = getDeciderContainerInstanceName(message);
+
+  // Resolve the run-snapshot row for this message's exact pair.
+  // - Explicit message.variant (including null): require exact (model, variant).
+  //   A missing pair is corrupt — throw so the queue retries then dead-letters;
+  //   never grade with a CLI variant taken from a non-matching row.
+  // - Legacy pre-deploy messages (variant undefined): model-only fallback only
+  //   when the snapshot has exactly one row for that model; otherwise throw.
+  const modelRowsForModel = state.models.filter(m => m.model === message.model);
+  let modelRow: RunModelRow;
+  if (message.variant !== undefined) {
+    const messageVariant = message.variant ?? null;
+    const exact = modelRowsForModel.find(m => variantFromStorage(m.variant) === messageVariant);
+    if (!exact) {
+      throw new Error(
+        `run ${message.runId} has no snapshot row for model ${message.model} variant ${JSON.stringify(messageVariant)}`
+      );
+    }
+    modelRow = exact;
+  } else {
+    const sole = modelRowsForModel.length === 1 ? modelRowsForModel[0] : undefined;
+    if (!sole) {
+      throw new Error(
+        `run ${message.runId}: legacy decider message for model ${message.model} requires exactly one snapshot row, found ${modelRowsForModel.length}`
+      );
+    }
+    modelRow = sole;
+  }
+  const entryVariant =
+    message.variant !== undefined
+      ? (message.variant ?? null)
+      : variantFromStorage(modelRow.variant);
+  const storedVariant = variantToStorage(entryVariant);
+  // Canonical variant passed to the CLI — derived only from the resolved pair.
+  const cliVariant = entryVariant ?? modelRow.reasoning_effort ?? null;
+
+  const instanceName = getDeciderContainerInstanceName({
+    ...message,
+    variant: entryVariant,
+  });
 
   const existingCaseIds = await getExistingCaseResultIds(env.BENCH_DB, {
     runId: message.runId,
     model: message.model,
+    variant: entryVariant,
     rep,
     caseIds: cases.map(c => c.id),
   });
   const casesToRun = cases.filter(c => !existingCaseIds.has(c.id));
-
-  // Reasoning effort comes from the run snapshot (run_models row), not live config.
-  const modelRow = state.models.find(m => m.model === message.model);
-  const reasoningEffort = modelRow?.reasoning_effort ?? null;
 
   if (casesToRun.length > 0) {
     // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
@@ -655,7 +948,7 @@ async function processDeciderJob(
           kiloToken,
           kiloApiUrl: env.KILO_CLI_API_URL,
           orgId: state.benchmarkOrgId,
-          reasoningEffort,
+          variant: cliVariant,
         });
         // The CLI occasionally ends a session with no assistant text at all
         // (transient empty completion: a lone step_finish with cost 0). Mirror
@@ -670,7 +963,7 @@ async function processDeciderJob(
             kiloToken,
             kiloApiUrl: env.KILO_CLI_API_URL,
             orgId: state.benchmarkOrgId,
-            reasoningEffort,
+            variant: cliVariant,
           });
           retry.costUsd =
             retry.costUsd === null && result.costUsd === null
@@ -685,6 +978,7 @@ async function processDeciderJob(
         await upsertCaseResult(env.BENCH_DB, {
           run_id: message.runId,
           model: message.model,
+          variant: storedVariant,
           case_id: benchCase.id,
           route_key: taxonomyRouteKey(benchCase),
           score: succeeded ? 1 : 0,
@@ -704,7 +998,14 @@ async function processDeciderJob(
         if (isRetryableContainerAvailabilityError(error)) throw error;
         await upsertCaseResult(
           env.BENCH_DB,
-          failedRow(message, benchCase.id, taxonomyRouteKey(benchCase), startedAt, error, rep)
+          failedRow(
+            { ...message, variant: entryVariant },
+            benchCase.id,
+            taxonomyRouteKey(benchCase),
+            startedAt,
+            error,
+            rep
+          )
         );
       }
     });
@@ -712,7 +1013,7 @@ async function processDeciderJob(
 
   const hasNextChunk = await enqueueNextDeciderChunkIfNeeded(
     env,
-    message,
+    { ...message, variant: entryVariant },
     rep,
     chunk,
     shard,
@@ -749,6 +1050,7 @@ async function enqueueNextDeciderChunkIfNeeded(
   const existingNextCaseIds = await getExistingCaseResultIds(env.BENCH_DB, {
     runId: message.runId,
     model: message.model,
+    variant: message.variant ?? null,
     rep,
     caseIds: nextCaseIds,
   });
@@ -760,6 +1062,7 @@ async function enqueueNextDeciderChunkIfNeeded(
         runId: message.runId,
         kind: 'decider',
         model: message.model,
+        variant: message.variant ?? null,
         chunk: nextChunkIndex,
         shard,
         shardCount,
@@ -814,6 +1117,7 @@ function failedRow(
   return {
     run_id: message.runId,
     model: message.model,
+    variant: variantToStorage(message.variant),
     case_id: caseId,
     route_key: routeKey,
     score: 0,
@@ -869,6 +1173,42 @@ async function finalizeRunIfComplete(
   await replaceModelSummaries(env.BENCH_DB, runId, freshSummaries);
   await markRunCompleted(env.BENCH_DB, runId);
 
+  // Profile runs update the registry only — never publish platform artifacts,
+  // never touch the classifier winner, never clear platform KV keys.
+  if (state.purpose === 'profile') {
+    try {
+      await markProfilesReadyForRun(env.BENCH_DB, runId);
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_profile_ready_transition_error',
+          runId,
+          ...formatError(error),
+        })
+      );
+    }
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_profile_run_completed',
+        runId,
+        kind,
+        purpose: state.purpose,
+      })
+    );
+    try {
+      await drainPendingProfileBatch(env);
+    } catch (drainError) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_profile_drain_error',
+          afterRunId: runId,
+          ...formatError(drainError),
+        })
+      );
+    }
+    return;
+  }
+
   // Read back all summaries (fresh + carried) for publishing.
   const allSummaries = await getSummaries(env.BENCH_DB, runId);
 
@@ -907,10 +1247,15 @@ async function finalizeRunIfComplete(
     const generatedAt = new Date().toISOString();
     try {
       // Built from the run's own model snapshot, not live config, so a mid-run
-      // admin edit can't skew the published table.
+      // admin edit can't skew the published table. Platform tables still emit
+      // reasoningEffort (sourced from the run snapshot's effort key) — not
+      // variant — so the published artifact shape stays unchanged for rolling
+      // deploys of old auto-routing workers.
       const deciderModels: BenchmarkDeciderModel[] = state.models.map(m => ({
         id: m.model,
-        reasoningEffort: parsePersistedReasoningEffort(m.reasoning_effort),
+        reasoningEffort: parsePersistedReasoningEffort(
+          m.reasoning_effort ?? variantFromStorage(m.variant)
+        ),
       }));
       const table = buildRoutingTable({
         runId,
@@ -943,18 +1288,35 @@ async function finalizeRunIfComplete(
       event: 'benchmark_run_completed',
       runId,
       kind,
+      purpose: state.purpose,
       summaries: allSummaries,
     })
   );
+
+  // Free the single decider slot into the oldest pending profile batch.
+  if (kind === 'decider') {
+    try {
+      await drainPendingProfileBatch(env);
+    } catch (drainError) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_profile_drain_error',
+          afterRunId: runId,
+          ...formatError(drainError),
+        })
+      );
+    }
+  }
 }
 
 export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): BenchmarkModelSummary[] {
-  // Group by "model route-key" using a plain reduce so this works in all runtimes.
-  // Classifier rows use '*' because classification has no decider taxonomy route.
+  // Group by (model, variant, routeKey). Classifier rows use '*' because
+  // classification has no decider taxonomy route. variant '' → null on emit.
   const groups = new Map<string, CaseResultRow[]>();
   for (const row of rows) {
     const routeKey = kind === 'classifier' ? '*' : (row.route_key ?? '*');
-    const key = `${row.model}\0${routeKey}`;
+    const storedVariant = row.variant ?? '';
+    const key = `${row.model}\0${storedVariant}\0${routeKey}`;
     const existing = groups.get(key);
     if (existing) {
       existing.push(row);
@@ -964,7 +1326,7 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
   }
 
   return [...groups.entries()].map(([key, group]) => {
-    const [model, routeKey] = key.split('\0');
+    const [model, storedVariant, routeKey] = key.split('\0');
     const latencies = group.map(r => r.latency_ms).toSorted((a, b) => a - b);
     const costs = group.filter(r => r.cost_usd !== null);
     const p95LatencyMs =
@@ -974,6 +1336,7 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
         : null;
     return {
       model,
+      variant: variantFromStorage(storedVariant),
       routeKey: routeKey as BenchmarkModelSummary['routeKey'],
       accuracy: Number((group.reduce((a, r) => a + r.score, 0) / group.length).toFixed(4)),
       avgCostUsd: costs.length

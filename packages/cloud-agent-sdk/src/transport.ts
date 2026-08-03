@@ -11,11 +11,27 @@ import type { CloudAgentSessionId, KiloSessionId } from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
 /**
+ * Optional inheritance fields for `create_session` wire data (Decision 5).
+ * Defined once and reused at every hop: manager → session → transport →
+ * connection-scoped spawn helper.
+ */
+type CreateRemoteSessionInput = {
+  agent?: string;
+  model?: {
+    providerID: string;
+    modelID: string;
+    variant?: string;
+  };
+  orgId?: string;
+};
+
+/**
  * Ready-to-render file part for a remote-CLI `send_message` call. Distinct
  * from the cloud-only `attachments` field on {@link TransportSendInput}:
  * the remote CLI fetches these from the `url` and classifies them by
- * their `filename` (which MUST be the server-issued `<uuid>.<ext>`) and
- * `mime` (which the caller derives from the validated extension).
+ * their `mime` (which the caller derives from the validated extension).
+ * `filename` is the original picker filename, NOT the server-issued
+ * R2 key — the CLI uses it for display and file-system materialization.
  *
  * Deliberately the minimum the CLI needs: `id` / `sessionID` / `messageID`
  * are not part of the send payload because the CLI assigns them when it
@@ -31,7 +47,7 @@ type RemoteAttachmentPart = {
 type CloudAgentStreamTicket = {
   ticket: string;
   /** Unix timestamp in seconds when the ticket expires. */
-  expiresAt?: number;
+  expiresAt?: number | undefined;
 };
 
 type CloudAgentStreamTicketResult = string | CloudAgentStreamTicket;
@@ -81,10 +97,10 @@ type CloudAgentSendPayload = CloudAgentPromptPayload | SendCommandPayload;
 
 type TransportSendInput = {
   payload: TransportSendPayload;
-  messageId?: string;
-  attachments?: CloudAgentAttachments;
-  images?: Images;
-  remoteModelOverride?: RemoteModelOverride;
+  messageId?: string | undefined;
+  attachments?: CloudAgentAttachments | undefined;
+  images?: Images | undefined;
+  remoteModelOverride?: RemoteModelOverride | undefined;
   /**
    * Ready file parts to append to the remote CLI's `send_message` `parts`
    * array (after the text part). Distinct from the cloud-only `attachments`
@@ -93,7 +109,7 @@ type TransportSendInput = {
    * heartbeat). Transports that don't support the path (cloud-agent, read-
    * only, non-capable remote) ignore it.
    */
-  attachmentParts?: RemoteAttachmentPart[];
+  attachmentParts?: RemoteAttachmentPart[] | undefined;
 };
 
 /** Lifecycle interface for a transport. */
@@ -112,12 +128,13 @@ type Transport = {
    * Ask the currently connected CLI owner to create a new remote session and
    * return its branded `KiloSessionId`. Session-scoped: the current Kilo
    * sessionId is sent so the CLI can select the workspace, and an expected owner
-   * connectionId fences the request to the active CLI. Implementations must not
-   * auto-retry: a network failure is a hard reject so the caller can surface a
-   * retryable error. The caller does NOT switch the active session as a side
-   * effect.
+   * connectionId fences the request to the active CLI. Optional inheritance
+   * fields ride `protocolVersion: 1`; on a delivered `invalid create_session
+   * command` the transport retries once with bare `{protocolVersion: 1}`
+   * (old-CLI degradation). Other failures are hard rejects. The caller does
+   * NOT switch the active session as a side effect.
    */
-  createSession?: () => Promise<KiloSessionId>;
+  createSession?: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitSession?: () => Promise<void>;
   interrupt?: () => Promise<unknown>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
@@ -168,6 +185,7 @@ export type {
   CloudAgentSendPayload,
   CloudAgentStreamTicket,
   CloudAgentStreamTicketResult,
+  CreateRemoteSessionInput,
   RemoteAttachmentPart,
   TransportFactory,
   TransportSink,

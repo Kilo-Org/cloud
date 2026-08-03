@@ -36,7 +36,8 @@ function getSessionName(): string {
 function sessionExists(sessionName?: string): boolean {
   const name = sessionName ?? getSessionName();
   try {
-    execSync(`tmux has-session -t ${name}`, { stdio: 'ignore' });
+    // `=` forces an exact match; a bare -t prefix-matches sibling sessions.
+    execSync(`tmux has-session -t '=${name}'`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -116,7 +117,7 @@ function setSessionEnvironment(sessionName: string, env: Record<string, string>)
 
 function killSession(sessionName: string): void {
   try {
-    execSync(`tmux kill-session -t ${sessionName}`, { stdio: 'ignore' });
+    execSync(`tmux kill-session -t '=${sessionName}'`, { stdio: 'ignore' });
   } catch {
     // Session doesn't exist — that's fine
   }
@@ -455,6 +456,16 @@ function captureServicePane(sessionName: string, serviceName: string, historyLin
   );
 }
 
+function pipeServicePane(sessionName: string, serviceName: string, command: string): void {
+  const pane = findServicePane(sessionName, serviceName);
+  if (!pane) throw new Error(`Service ${serviceName} is not running in ${sessionName}`);
+  execFileSync(
+    'tmux',
+    ['pipe-pane', '-t', `${sessionName}:${pane.windowIndex}.${pane.paneIndex}`, command],
+    { stdio: 'ignore' }
+  );
+}
+
 function isPaneRunningCommand(sessionName: string, pane: PaneInfo): boolean {
   try {
     const command = execSync(
@@ -590,6 +601,7 @@ export {
   countPanes,
   findServicePane,
   captureServicePane,
+  pipeServicePane,
   isPaneRunningCommand,
   paneHasRunningChild,
   selectPane,

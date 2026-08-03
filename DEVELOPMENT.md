@@ -232,7 +232,8 @@ Run the root test script to confirm everything is working:
 pnpm test
 ```
 
-This runs the web tests and web environment tests. They should pass against the local PostgreSQL database.
+This runs the web, web environment, and local development-tool tests. They
+should pass against the local PostgreSQL database.
 
 ## Common Development Commands
 
@@ -241,7 +242,7 @@ This runs the web tests and web environment tests. They should pass against the 
 | `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
-| `pnpm test` | Run web tests and web environment tests |
+| `pnpm test` | Run web, web environment, and local development-tool tests |
 | `pnpm typecheck` | Run the TypeScript type checker |
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Format all supported files with oxfmt |

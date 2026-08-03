@@ -7,22 +7,24 @@ const closeMock = vi.hoisted(() => vi.fn());
 vi.mock('@sentry/react-native', () => ({ close: closeMock }));
 
 describe('sentryOptionsForConsent', () => {
-  it('disables replay, screenshots, and view-hierarchy when consent is declined', () => {
+  it('disables replay, screenshots, view-hierarchy, and tracing when consent is declined', () => {
     expect(sentryOptionsForConsent(false)).toEqual({
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,
+      tracesSampleRate: 0,
       attachScreenshot: false,
       attachViewHierarchy: false,
     });
   });
 
-  it('enables replay, screenshots, and view-hierarchy when consent is accepted', () => {
+  it('enables replay, screenshots, view-hierarchy, and tracing when consent is accepted', () => {
     const options = sentryOptionsForConsent(true);
 
     expect(options.attachScreenshot).toBe(true);
     expect(options.attachViewHierarchy).toBe(true);
     expect(options.replaysSessionSampleRate).toBeGreaterThan(0);
     expect(options.replaysOnErrorSampleRate).toBeGreaterThan(0);
+    expect(options.tracesSampleRate).toBeGreaterThan(0);
   });
 });
 

@@ -8,6 +8,7 @@ import { Writable } from 'node:stream';
 export const PROJECTS = ['kilocode-app', 'kilocode-global-app'] as const;
 export const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
 export const VAULT = 'Kilo Web ENV Production';
+const ONE_PASSWORD_ACCOUNT_URL = 'kilocode.1password.com';
 const VERCEL_PACKAGE = 'vercel@53.3.1';
 const VERCEL_COMMAND = `pnpm dlx ${VERCEL_PACKAGE}`;
 const ONE_PASSWORD_CLI_DOCS = 'https://www.1password.dev/cli/get-started';
@@ -19,6 +20,10 @@ export type VercelContext = {
   project: Project;
   orgId: string;
   cwd: string;
+};
+export type OnePasswordContext = {
+  accountId: string;
+  vaultId: string;
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -62,7 +67,7 @@ function missingCommandMessage(command: string, args: string[]): string | undefi
     return [
       '1Password CLI (`op`) is not installed or is not on PATH.',
       ...onePasswordInstallInstructions(),
-      `Verify access with \`op vault get "${VAULT}" --format=json\`.`,
+      `Verify access with \`op account list --format=json\`, then \`op vault get "${VAULT}" --account ${ONE_PASSWORD_ACCOUNT_URL} --format=json\`.`,
     ].join('\n');
   }
 
@@ -171,7 +176,7 @@ function onePasswordAccessError(error: unknown): Error {
     [
       `Could not verify 1Password access to the ${VAULT} vault.`,
       ...onePasswordInstallInstructions(),
-      `Verify access with \`op vault get "${VAULT}" --format=json\`.`,
+      `Verify access with \`op account list --format=json\`, then \`op vault get "${VAULT}" --account ${ONE_PASSWORD_ACCOUNT_URL} --format=json\`.`,
       'If verification says the vault is missing or forbidden, ask for access to that vault.',
       details ? `1Password reported:\n${details}` : undefined,
     ]
@@ -235,11 +240,31 @@ function assertSecureTemplateSupported(): void {
   }
 }
 
-export function resolveVault(): string {
+export function resolveVault(): OnePasswordContext {
   assertSecureTemplateSupported();
+  let accounts: JsonRecord[];
+  try {
+    accounts = records(JSON.parse(run('op', ['account', 'list', '--format=json'])) as unknown);
+  } catch (error) {
+    if (error instanceof MissingCommandError) throw error;
+    throw onePasswordAccessError(error);
+  }
+  const account = accounts.find(
+    account => stringValue(account, 'url') === ONE_PASSWORD_ACCOUNT_URL
+  );
+  const accountId = account ? stringValue(account, 'account_uuid') : undefined;
+  if (!accountId) {
+    throw onePasswordAccessError(
+      new Error(`Could not find the 1Password account ${ONE_PASSWORD_ACCOUNT_URL}.`)
+    );
+  }
+
   let vault: JsonRecord;
   try {
-    vault = parseJson(run('op', ['vault', 'get', VAULT, '--format=json']), 'Resolve vault');
+    vault = parseJson(
+      run('op', ['vault', 'get', VAULT, '--account', accountId, '--format=json']),
+      'Resolve vault'
+    );
   } catch (error) {
     if (error instanceof MissingCommandError) throw error;
     throw onePasswordAccessError(error);
@@ -248,7 +273,7 @@ export function resolveVault(): string {
   if (!vaultId) {
     throw onePasswordAccessError(new Error(`Could not resolve 1Password vault ${VAULT}.`));
   }
-  return vaultId;
+  return { accountId, vaultId };
 }
 
 function runOpWithTemplate(args: string[], template: string): Promise<string> {
@@ -312,9 +337,17 @@ function runOpWithTemplate(args: string[], template: string): Promise<string> {
   });
 }
 
-function findVaultItem(vaultId: string, name: string): JsonRecord | undefined {
+function findVaultItem(context: OnePasswordContext, name: string): JsonRecord | undefined {
   const items = JSON.parse(
-    run('op', ['item', 'list', '--vault', vaultId, '--format=json'])
+    run('op', [
+      'item',
+      'list',
+      '--vault',
+      context.vaultId,
+      '--account',
+      context.accountId,
+      '--format=json',
+    ])
   ) as unknown;
   const matches = records(items).filter(item => item.title === name);
   if (matches.length > 1) throw new Error(`More than one 1Password item is named ${name}.`);
@@ -350,9 +383,13 @@ function setAuditNote(item: JsonRecord, note: string): void {
   notes.value = preserved ? `${preserved}\n${note}` : note;
 }
 
-export async function setVaultValue(vaultId: string, name: string, value: string): Promise<void> {
+export async function setVaultValue(
+  context: OnePasswordContext,
+  name: string,
+  value: string
+): Promise<void> {
   const note = auditNote();
-  const existing = findVaultItem(vaultId, name);
+  const existing = findVaultItem(context, name);
   if (!existing) {
     const item = {
       title: name,
@@ -377,7 +414,16 @@ export async function setVaultValue(vaultId: string, name: string, value: string
     };
     const created = parseJson(
       await runOpWithTemplate(
-        ['item', 'create', '--template=/dev/fd/3', '--vault', vaultId, '--format=json'],
+        [
+          'item',
+          'create',
+          '--template=/dev/fd/3',
+          '--vault',
+          context.vaultId,
+          '--account',
+          context.accountId,
+          '--format=json',
+        ],
         JSON.stringify(item)
       ),
       `Create ${name}`
@@ -393,7 +439,16 @@ export async function setVaultValue(vaultId: string, name: string, value: string
   const id = stringValue(existing, 'id');
   if (!id) throw new Error(`1Password item ${name} has no ID.`);
   const item = parseJson(
-    run('op', ['item', 'get', id, '--vault', vaultId, '--format=json']),
+    run('op', [
+      'item',
+      'get',
+      id,
+      '--vault',
+      context.vaultId,
+      '--account',
+      context.accountId,
+      '--format=json',
+    ]),
     `Read ${name}`
   );
   const password = records(item.fields).find(field => field.id === 'password');
@@ -408,7 +463,17 @@ export async function setVaultValue(vaultId: string, name: string, value: string
   );
   const updated = parseJson(
     await runOpWithTemplate(
-      ['item', 'edit', id, '--template=/dev/fd/3', '--vault', vaultId, '--format=json'],
+      [
+        'item',
+        'edit',
+        id,
+        '--template=/dev/fd/3',
+        '--vault',
+        context.vaultId,
+        '--account',
+        context.accountId,
+        '--format=json',
+      ],
       JSON.stringify(item)
     ),
     `Update ${name}`

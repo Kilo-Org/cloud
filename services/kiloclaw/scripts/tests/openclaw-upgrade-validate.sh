@@ -12,8 +12,9 @@ set -uo pipefail
 #
 #   Phase 2  credentialed live smoke — builds the before/after images, performs
 #            the persisted-root upgrade (boots baseline, then candidate on the
-#            same /root), and runs every assertion incl. a real Auto Free gateway
-#            turn. Needs a dedicated free-model Kilo API key.
+#            same /root), then asserts the candidate BOTH as an upgraded instance
+#            and on a fresh root, each with a real gateway turn on a paid route.
+#            Needs a Kilo API key on an account with credits.
 #
 # OpenClaw is never built or run in CI (it is a security-sensitive upstream), so
 # this is the gate a human runs locally before marking the bump PR ready.
@@ -22,8 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Shared credential lookup so preflight decides "is a key available?" exactly the
-# way smoke-live-provider.sh does (active provider's token, not any occurrence).
-source "$SCRIPT_DIR/provider-creds.sh"
+# way single-image/live-provider.sh does (active provider's token, not any occurrence).
+source "$SCRIPT_DIR/lib/provider-creds.sh"
 
 hr() { printf -- '----------------------------------------------------------------------\n'; }
 section() { echo; hr; echo "$1"; hr; }
@@ -118,7 +119,7 @@ else
 fi
 
 # Credential for Phase 2: env var, or the ACTIVE provider's token in the Kilo CLI
-# config (matching smoke-live-provider.sh — a stale/inactive-provider token does
+# config (matching single-image/live-provider.sh — a stale/inactive-provider token does
 # not count, so preflight never schedules Phase 2 for creds the smoke would reject).
 HAVE_KEY=0
 if [ -n "${KILOCODE_API_KEY:-}" ]; then
@@ -150,8 +151,12 @@ elif [ "$IS_BUMP" -eq 1 ]; then
   echo "  • Phase 2 — credentialed live smoke: WILL BE SKIPPED (no Kilo API key is set)"
   echo
   echo "Phase 2 (the live smoke) is half the coverage and needs a Kilo API key."
-  echo "For the full validation, set a dedicated free-model key and re-run:"
+  echo "For the full validation, set a key on an account WITH CREDITS and re-run:"
   echo "    export KILOCODE_API_KEY=<key>   # from https://app.kilo.ai/profile (bottom)"
+  echo "    export KILOCODE_ORGANIZATION_ID=<org id>   # REQUIRED to spend ORG credits;"
+  echo "                                               # a personal token alone spends only"
+  echo "                                               # personal credits and the live turn"
+  echo "                                               # then fails with a misleading error"
   echo "    bash $0"
   ask_continue_keyless_or_stop
 
@@ -187,7 +192,7 @@ fi
 
 # ── Phase 1: keyless verification ────────────────────────────────────────────
 section "Phase 1/2 — keyless verification (build, patches, config, CVE scan)"
-bash "$SCRIPT_DIR/openclaw-upgrade-image-checks.sh" 2>&1 | tee "$PHASE1_LOG"
+bash "$SCRIPT_DIR/upgrade/image-checks.sh" 2>&1 | tee "$PHASE1_LOG"
 if [ "${PIPESTATUS[0]}" -eq 0 ]; then
   VERIFY_RESULT="passed"
   echo
@@ -224,7 +229,7 @@ else
   # smoke run when before/after pin the same version (mechanics mode).
   ALLOW_DIRTY_CHECKOUT="${ALLOW_DIRTY_CHECKOUT:-true}" \
     ALLOW_SAME_OPENCLAW_VERSION="$SMOKE_SAME_VERSION" \
-    bash "$SCRIPT_DIR/openclaw-upgrade-smoke.sh" 2>&1 | tee "$PHASE2_LOG"
+    bash "$SCRIPT_DIR/upgrade/smoke.sh" 2>&1 | tee "$PHASE2_LOG"
   if [ "${PIPESTATUS[0]}" -eq 0 ]; then
     if [ "$PHASE2_MODE" = "mechanics" ]; then
       SMOKE_RESULT="passed (mechanics only)"

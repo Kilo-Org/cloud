@@ -4,11 +4,13 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
 import { truncateText } from '../tool-card-utils';
 
 export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const textSelectable = useTranscriptTextSelectable();
   const input = part.state.input;
   const command = typeof input.command === 'string' ? input.command : '';
   const description = typeof input.description === 'string' ? input.description : undefined;
@@ -26,7 +28,10 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
         <View className="gap-2">
           {command.length > 0 ? (
             <View className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-900">
-              <Text selectable className="font-mono text-xs leading-4 text-foreground">
+              <Text
+                selectable={textSelectable}
+                className="font-mono text-xs leading-4 text-foreground"
+              >
                 $ {command}
               </Text>
             </View>
@@ -39,7 +44,7 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
             />
           ) : null}
           {error ? (
-            <Text selectable className="text-xs text-destructive">
+            <Text selectable={textSelectable} className="text-xs text-destructive">
               {error}
             </Text>
           ) : null}

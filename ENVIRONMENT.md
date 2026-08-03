@@ -74,6 +74,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Social OAuth Clients
 
+- `ANACONDA_CLIENT_ID` - Anaconda OAuth app client ID. `[PUBLIC]`
+- `ANACONDA_CLIENT_SECRET` - Anaconda OAuth app client secret. `[SECRET]`
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`
@@ -255,6 +257,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SLACK_CLIENT_ID` - Slack OAuth app client ID. [PUBLIC]
 - `SLACK_CLIENT_SECRET` - Slack OAuth app client secret. `[SECRET]`
 - `SLACK_SIGNING_SECRET` - Slack request signing secret for webhooks. `[SECRET]`
+- `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook used by server-side Admin UI code to send events, summaries, reminders, and actions. `[SECRET]`
 - `SLACK_USER_FEEDBACK_WEBHOOK_URL` - Slack incoming webhook for user feedback. [SERVER]
 - `SLACK_DEPLOY_THREAT_WEBHOOK_URL` - Slack incoming webhook for deploy threat alerts. [SERVER]
 
@@ -278,6 +281,10 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
 - `IMPACT_ADVOCATE_WIDGET_ID` - Impact.com Advocate widget ID. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
+### Cloudflare Analytics
+
+- `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `apps/web/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]
+- `CLOUDFLARE_ANALYTICS_API_TOKEN` - Cloudflare API token with **Account Analytics: Read** only, used by the web app to query `containersUsageAdaptiveGroups` for on-demand admin reconciliation; used in `apps/web/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. Optional at process start — missing values surface as actionable errors at point of use. `[SECRET]`
 
 ### R2 / Object Storage
 
@@ -359,6 +366,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 - `VITE_POSTHOG_API_KEY` - PostHog public project API key baked into extension builds; read in `apps/extension/src/shared/analytics.ts`; absent → analytics disabled. [PUBLIC]
 - `VITE_KILO_API_BASE_URL` - Selects the Kilo API base URL at build time; read in `apps/extension/src/shared/auth.ts`. [PUBLIC]
+- `VITE_CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production Cloud Agent endpoint otherwise. [PUBLIC]
+- `VITE_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production session ingest endpoint otherwise. [PUBLIC]
 
 ## Mobile
 

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react-native';
 import { Alert, Platform, View } from 'react-native';
 import { toast } from 'sonner-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
 import { ActionTile } from '@/components/profile-action-tile';
@@ -228,8 +228,11 @@ export function ProfileScreen() {
 
         {/* Linked accounts — hide the whole section when there are no linked
             providers (and we're not loading/erroring) so the header never dangles. */}
+        {/* No layout animation on this section: siblings above mount/resize
+            asynchronously; LinearTransition would animate this container's
+            position lag as a visible header overlap. Opacity fades are safe. */}
         {(isLoading || providersError || (data?.providers.length ?? 0) > 0) && (
-          <Animated.View className="mt-6 gap-3" layout={LinearTransition}>
+          <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               Linked accounts
             </Text>
@@ -268,7 +271,7 @@ export function ProfileScreen() {
                 </Animated.View>
               );
             })}
-          </Animated.View>
+          </View>
         )}
 
         {/* Appearance */}

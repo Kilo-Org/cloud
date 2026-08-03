@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { decidePrLinkPaste } from './pr-link-paste';
+import {
+  decidePrLinkPaste,
+  PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY,
+  PR_LINK_TOAST_INVALID_COPY,
+  selectPrLinkClearButtonVisible,
+} from './pr-link-paste';
 
 describe('decidePrLinkPaste', () => {
   it('returns empty for null, undefined, blank, and whitespace-only clipboard', () => {
@@ -39,5 +44,22 @@ describe('decidePrLinkPaste', () => {
       kind: 'non-url-text',
       text: 'https://gitlab.com/o/r/pull/1',
     });
+  });
+});
+
+describe('selectPrLinkClearButtonVisible', () => {
+  it('is present when the field has content', () => {
+    expect(selectPrLinkClearButtonVisible({ hasInput: true })).toBe(true);
+  });
+
+  it('is absent when the field is empty', () => {
+    expect(selectPrLinkClearButtonVisible({ hasInput: false })).toBe(false);
+  });
+});
+
+describe('PR link toast copy', () => {
+  it('exports the pinned toast copy strings', () => {
+    expect(PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY).toBe('Clipboard is empty');
+    expect(PR_LINK_TOAST_INVALID_COPY).toBe('Not a GitHub pull request link');
   });
 });

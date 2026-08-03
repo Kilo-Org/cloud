@@ -5,6 +5,12 @@ import { type Purchase } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  captureEvent,
+  KILO_PASS_PURCHASE_COMPLETED_EVENT,
+  KILO_PASS_PURCHASE_FAILED_EVENT,
+  KILO_PASS_PURCHASE_STARTED_EVENT,
+} from '@/lib/analytics/posthog';
+import {
   createAppStoreKiloPassPurchaseActions,
   resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
@@ -900,6 +906,34 @@ describe('StoreKiloPassPurchaseProvider', () => {
     expect(releasedValue.isPending).toBe(false);
     await releasedValue.purchase(product);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('emits started and failed client events but not purchase_completed', async () => {
+    const provider = renderStoreKiloPassPurchaseProvider();
+    const initialValue = provider.render();
+
+    const completedSpy = vi.fn();
+    await initialValue.purchase(product, {
+      onCompleted: () => {
+        completedSpy();
+      },
+    });
+    expect(captureEvent).toHaveBeenCalledWith(KILO_PASS_PURCHASE_STARTED_EVENT);
+
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+
+    // Anchor: proves the completion callback (where the client capture used to
+    // live) actually ran, so the negative assertion below is not vacuous.
+    expect(completedSpy).toHaveBeenCalledTimes(1);
+    expect(captureEvent).not.toHaveBeenCalledWith(KILO_PASS_PURCHASE_COMPLETED_EVENT);
+
+    const afterSuccess = provider.render();
+    await afterSuccess.purchase(product);
+    mockedIap.handlers?.onPurchaseError(new Error('StoreKit failed'));
+
+    expect(captureEvent).toHaveBeenCalledWith(KILO_PASS_PURCHASE_FAILED_EVENT);
+    expect(captureEvent).not.toHaveBeenCalledWith(KILO_PASS_PURCHASE_COMPLETED_EVENT);
   });
 
   it('toasts a purchase error when no screen owns inline feedback', async () => {

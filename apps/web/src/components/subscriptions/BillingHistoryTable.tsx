@@ -66,20 +66,22 @@ export function BillingHistoryTable({
           variant === 'credits' && 'hidden sm:block'
         )}
       >
-        <Table>
+        <Table className={variant === 'stripe' ? 'table-fixed' : undefined}>
           <TableHeader className="bg-muted/20">
             <TableRow className="hover:bg-transparent">
               <TableHead className={headerCellClassName}>Date</TableHead>
               {variant === 'stripe' ? (
-                <TableHead className={cn(headerCellClassName, 'text-right')}>Amount</TableHead>
+                <TableHead className={cn(headerCellClassName, 'w-32 text-right')}>Amount</TableHead>
               ) : (
                 <TableHead className={headerCellClassName}>Description</TableHead>
               )}
-              <TableHead className={cn(headerCellClassName, variant === 'credits' && 'text-right')}>
+              <TableHead
+                className={cn(headerCellClassName, variant === 'stripe' ? 'w-28' : 'text-right')}
+              >
                 {variant === 'stripe' ? 'Status' : 'Amount'}
               </TableHead>
               {variant === 'stripe' ? (
-                <TableHead className={headerCellClassName}>Invoice</TableHead>
+                <TableHead className={cn(headerCellClassName, 'w-24')}>Invoice</TableHead>
               ) : null}
             </TableRow>
           </TableHeader>

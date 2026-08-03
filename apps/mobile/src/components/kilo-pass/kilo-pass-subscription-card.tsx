@@ -2,11 +2,11 @@ import { beginRefundRequestIOS, showManageSubscriptionsIOS } from 'expo-iap';
 import { type Href, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Linking, Platform, Pressable, View } from 'react-native';
-import { ShieldCheck } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { Text } from '@/components/ui/text';
+import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -148,7 +148,7 @@ export function KiloPassSubscriptionCard() {
         >
           <View className="flex-row items-center gap-3">
             <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">
-              <ShieldCheck size={19} color={colors.primary} />
+              <KiloPassIcon size={19} color={colors.primary} />
             </View>
             <View className="flex-1">
               <Text className="font-semibold">{contentState.title}</Text>
@@ -165,7 +165,7 @@ export function KiloPassSubscriptionCard() {
         <View className="rounded-lg border border-border bg-card p-3">
           <View className="flex-row items-center gap-3">
             <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">
-              <ShieldCheck size={19} color={colors.primary} />
+              <KiloPassIcon size={19} color={colors.primary} />
             </View>
             <View className="flex-1">
               <Text className="font-semibold">{contentState.state.title}</Text>
@@ -191,7 +191,7 @@ export function KiloPassSubscriptionCard() {
         >
           <View className="flex-row items-center gap-3">
             <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">
-              <ShieldCheck size={19} color={colors.primary} />
+              <KiloPassIcon size={19} color={colors.primary} />
             </View>
             <View className="flex-1">
               <Text className="font-semibold">{contentState.state.title}</Text>

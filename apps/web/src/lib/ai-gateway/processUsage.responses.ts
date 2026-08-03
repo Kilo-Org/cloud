@@ -51,9 +51,11 @@ export function processResponsesApiUsage(
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats
 ): JustTheCostsUsageStats {
+  // OpenAI-style input_tokens already includes cached and cache-write tokens.
   const inputTokens = usage?.input_tokens ?? 0;
   const outputTokens = usage?.output_tokens ?? 0;
   const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+  const cacheWriteTokens = usage?.input_tokens_details?.cache_write_tokens ?? 0;
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {
@@ -62,7 +64,7 @@ export function processResponsesApiUsage(
       coreProps,
       'responses_sse_processing'
     );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens: 0, cost_mUsd, is_byok };
+    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
   }
 
   // Vercel path: cost is in provider_metadata.gateway
@@ -73,7 +75,7 @@ export function processResponsesApiUsage(
       inputTokens,
       outputTokens,
       cacheHitTokens,
-      cacheWriteTokens: 0,
+      cacheWriteTokens,
       cost_mUsd,
       is_byok: extractVercelIsByok(vercelGateway),
     };
@@ -84,7 +86,7 @@ export function processResponsesApiUsage(
     inputTokens,
     outputTokens,
     cacheHitTokens,
-    cacheWriteTokens: 0,
+    cacheWriteTokens,
     cost_mUsd: 0,
     is_byok: null,
   };

@@ -58,10 +58,18 @@ export async function runDeciderCaseViaCli(
     kiloToken: string;
     kiloApiUrl: string;
     orgId?: string | null;
+    /**
+     * Canonical catalog variant passed as the container body's `variant`
+     * field (unchanged body shape). Accepts the legacy `reasoningEffort`
+     * alias so existing call sites keep working.
+     */
+    variant?: string | null;
+    /** @deprecated Prefer `variant`. Same value; kept for call-site compatibility. */
     reasoningEffort?: string | null;
   }
 ): Promise<CliRunResult> {
-  const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId, reasoningEffort } = params;
+  const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId } = params;
+  const variant = params.variant !== undefined ? params.variant : (params.reasoningEffort ?? null);
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(instanceName));
   const prompt = `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
 
@@ -77,7 +85,7 @@ export async function runDeciderCaseViaCli(
         kiloApiUrl,
         orgId: orgId ?? null,
         timeoutMs: DECIDER_CLI_TIMEOUT_MS,
-        variant: reasoningEffort ?? null,
+        variant: variant ?? null,
       }),
     })
   );

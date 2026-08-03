@@ -34,7 +34,7 @@ describe('processResponsesApiUsage', () => {
       input_tokens: 50,
       output_tokens: 100,
       total_tokens: 150,
-      input_tokens_details: { cached_tokens: 10 },
+      input_tokens_details: { cached_tokens: 10, cache_write_tokens: 0 },
       output_tokens_details: { reasoning_tokens: 0 },
       cost: 0.001,
       is_byok: false,
@@ -56,7 +56,7 @@ describe('processResponsesApiUsage', () => {
       input_tokens: 50,
       output_tokens: 100,
       total_tokens: 150,
-      input_tokens_details: { cached_tokens: 0 },
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
       output_tokens_details: { reasoning_tokens: 0 },
       cost: 0.001,
       is_byok: true,
@@ -69,24 +69,26 @@ describe('processResponsesApiUsage', () => {
     expect(result.is_byok).toBe(true);
   });
 
-  test('correctly processes Vercel usage with marketCost', () => {
+  test('correctly processes Vercel usage with cache writes included in input tokens', () => {
     const usage = {
-      input_tokens: 2425,
-      output_tokens: 5,
-      total_tokens: 2430,
-      input_tokens_details: { cached_tokens: 0 },
+      input_tokens: 15377,
+      output_tokens: 6,
+      total_tokens: 15383,
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 15374 },
       output_tokens_details: { reasoning_tokens: 0 },
     };
     const providerMetadata = {
-      gateway: { routing: { finalProvider: 'openai' }, cost: '0', marketCost: '0.0061375' },
+      gateway: { routing: { finalProvider: 'openai' }, cost: '0', marketCost: '0.0962825' },
     };
 
     const result = processResponsesApiUsage(usage, providerMetadata, coreProps);
 
-    expect(result.cost_mUsd).toBe(6138); // toMicrodollars(0.0061375)
+    expect(result.cost_mUsd).toBe(96283); // toMicrodollars(0.0962825)
     expect(result.is_byok).toBeNull();
-    expect(result.inputTokens).toBe(2425);
-    expect(result.outputTokens).toBe(5);
+    expect(result.inputTokens).toBe(15377);
+    expect(result.outputTokens).toBe(6);
+    expect(result.cacheWriteTokens).toBe(15374);
+    expect(result.inputTokens - result.cacheWriteTokens).toBe(3);
   });
 
   test('returns zero cost when no usage or metadata is provided', () => {
@@ -103,7 +105,7 @@ describe('processResponsesApiUsage', () => {
       input_tokens: 10,
       output_tokens: 5,
       total_tokens: 15,
-      input_tokens_details: { cached_tokens: 0 },
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
       output_tokens_details: { reasoning_tokens: 0 },
     };
     const providerMetadata = {

@@ -34,7 +34,11 @@ import {
   createAppleStoreServerApiClient,
   createAppleStoreSignedDataVerifier,
 } from './apple-store-sdk';
-import { completeStoreKiloPassPurchase } from './store-subscription-completion';
+import {
+  completeStoreKiloPassPurchase,
+  type CompleteStoreKiloPassPurchaseResult,
+} from './store-subscription-completion';
+import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { dayjs } from './dayjs';
 
@@ -722,8 +726,9 @@ export async function processAppStoreKiloPassNotification(params: {
         );
       }
     } else {
+      let completionResult: CompleteStoreKiloPassPurchaseResult | null = null;
       await db.transaction(async tx => {
-        await completeStoreKiloPassPurchase({ dbOrTx: tx, user, purchase });
+        completionResult = await completeStoreKiloPassPurchase({ dbOrTx: tx, user, purchase });
         await appendKiloPassAuditLog(tx, {
           action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
           result: KiloPassAuditLogResult.Success,
@@ -743,6 +748,23 @@ export async function processAppStoreKiloPassNotification(params: {
             )
           );
       });
+      // Post-commit only — never capture inside the transaction.
+      const trackedResult = completionResult as CompleteStoreKiloPassPurchaseResult | null;
+      if (trackedResult && !trackedResult.alreadyProcessed) {
+        await runAfterResponse(async () => {
+          trackKiloPassPurchaseCompleted({
+            channel: 'app_store',
+            distinctId: user.google_user_email,
+            userId: user.id,
+            tier: trackedResult.tier,
+            cadence: trackedResult.cadence,
+            purchaseKind: trackedResult.purchaseKind,
+            providerTransactionId: purchase.providerTransactionId,
+            productId: purchase.productId,
+            environment: purchase.environment,
+          });
+        });
+      }
       return { processed: true };
     }
   }

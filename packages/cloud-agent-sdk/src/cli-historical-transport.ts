@@ -18,7 +18,7 @@ type CliHistoricalTransportConfig = {
    * the paginated endpoint yet. `fetchSnapshotPage` takes precedence when
    * both are provided.
    */
-  fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware initial snapshot fetch. When provided, the historical
    * transport uses it for the initial bounded read (newest 50) so the
@@ -31,8 +31,8 @@ type CliHistoricalTransportConfig = {
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome | null>;
   /** Called after a successful initial bounded page read. */
-  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
-  onError?: (message: string) => void;
+  onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
 };
 
 function createCliHistoricalTransport(config: CliHistoricalTransportConfig): TransportFactory {

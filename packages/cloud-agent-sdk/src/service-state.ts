@@ -25,42 +25,40 @@ import type {
 type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
-  onError?: (message: string) => void;
-  onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
-  onQuestionResolved?: (requestId: string) => void;
-  onPermissionAsked?: (
-    requestId: string,
-    permission?: string,
-    patterns?: string[],
-    metadata?: Record<string, unknown>,
-    always?: string[]
-  ) => void;
-  onPermissionResolved?: (requestId: string) => void;
+  onError?: ((message: string) => void) | undefined;
+  onQuestionAsked?: ((requestId: string, questions?: QuestionInfo[]) => void) | undefined;
+  onQuestionResolved?: ((requestId: string) => void) | undefined;
+  onPermissionAsked?:
+    | ((
+        requestId: string,
+        permission?: string,
+        patterns?: string[],
+        metadata?: Record<string, unknown>,
+        always?: string[]
+      ) => void)
+    | undefined;
+  onPermissionResolved?: ((requestId: string) => void) | undefined;
   /** Fired when a `suggest` tool asks the user to pick an action. */
-  onSuggestionAsked?: (
-    requestId: string,
-    text: string,
-    actions: SuggestionAction[],
-    callId?: string
-  ) => void;
+  onSuggestionAsked?:
+    | ((requestId: string, text: string, actions: SuggestionAction[], callId?: string) => void)
+    | undefined;
   /** Fired when a suggestion is resolved (accepted or dismissed). */
-  onSuggestionResolved?: (requestId: string) => void;
-  onBranchChanged?: (branch: string) => void;
-  onSessionCreated?: (info: SessionInfo) => void;
-  onSessionUpdated?: (info: SessionInfo) => void;
+  onSuggestionResolved?: ((requestId: string) => void) | undefined;
+  onBranchChanged?: ((branch: string) => void) | undefined;
+  onSessionCreated?: ((info: SessionInfo) => void) | undefined;
+  onSessionUpdated?: ((info: SessionInfo) => void) | undefined;
   /** Fired when async preparation completes (preparing step === 'ready'). */
-  onPreparationReady?: () => void;
+  onPreparationReady?: (() => void) | undefined;
   /** Fired when async preparation fails (preparing step === 'failed'). */
-  onPreparationFailed?: (message: string) => void;
+  onPreparationFailed?: ((message: string) => void) | undefined;
   /** Fired when the server acknowledges a user message was queued. */
-  onMessageQueued?: (messageId: string) => void;
+  onMessageQueued?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message's execution terminates in 'completed'. */
-  onMessageCompleted?: (messageId: string) => void;
+  onMessageCompleted?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message fails delivery or its execution fails. */
-  onMessageFailed?: (
-    messageId: string,
-    state: Extract<MessageDeliveryState, { status: 'failed' }>
-  ) => void;
+  onMessageFailed?:
+    | ((messageId: string, state: Extract<MessageDeliveryState, { status: 'failed' }>) => void)
+    | undefined;
 };
 
 type ServiceState = {
@@ -90,6 +88,23 @@ type ServiceState = {
 const INITIAL_ACTIVITY: SessionActivity = { type: 'connecting' };
 const IDLE_STATUS: AgentStatus = { type: 'idle' };
 
+/**
+ * FIFO upsert. A repeat of the same requestId replaces the entry in place —
+ * the wrapper replays pending requests after a snapshot, and a replay must
+ * not enqueue a duplicate card. A new requestId goes to the back, so the
+ * oldest pending request is always the head.
+ */
+function upsertByRequestId<T extends { requestId: string }>(
+  list: readonly T[],
+  next: T
+): readonly T[] {
+  const index = list.findIndex(entry => entry.requestId === next.requestId);
+  if (index === -1) return [...list, next];
+  const copy = [...list];
+  copy[index] = next;
+  return copy;
+}
+
 function createServiceState(config: ServiceStateConfig): ServiceState {
   let activity: SessionActivity = INITIAL_ACTIVITY;
   let status: AgentStatus = IDLE_STATUS;
@@ -97,8 +112,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let setupLog: string[] = [];
   let preparationAttempts: PreparationAttempt[] = [];
   let sessionInfo: SessionInfo | null = null;
-  let question: QuestionState | null = null;
-  let permission: PermissionState | null = null;
+  let questions: readonly QuestionState[] = [];
+  let permissions: readonly PermissionState[] = [];
   let suggestion: SuggestionState | null = null;
   const pendingMessages = new Map<string, MessageDeliveryState>();
   let disconnectedSource: 'transport' | 'wrapper' | null = null;
@@ -237,16 +252,17 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   function processQuestionAsked(event: Extract<ServiceEvent, { type: 'question.asked' }>): void {
-    question = {
+    const payload = event.questions;
+    questions = upsertByRequestId(questions, {
       requestId: event.requestId,
-      questions: event.questions,
-    };
-    config.onQuestionAsked?.(event.requestId, event.questions);
+      questions: payload,
+    });
+    config.onQuestionAsked?.(event.requestId, payload);
     notify();
   }
 
   function processQuestionResolved(requestId: string): void {
-    question = null;
+    questions = questions.filter(entry => entry.requestId !== requestId);
     config.onQuestionResolved?.(requestId);
     notify();
   }
@@ -258,13 +274,19 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     metadata: Record<string, unknown>,
     always: string[]
   ): void {
-    permission = { requestId, permission: permissionType, patterns, metadata, always };
+    permissions = upsertByRequestId(permissions, {
+      requestId,
+      permission: permissionType,
+      patterns,
+      metadata,
+      always,
+    });
     config.onPermissionAsked?.(requestId, permissionType, patterns, metadata, always);
     notify();
   }
 
   function processPermissionResolved(requestId: string): void {
-    permission = null;
+    permissions = permissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionResolved?.(requestId);
     notify();
   }
@@ -551,7 +573,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       status: 'failed',
       error: event.error,
       reason: event.reason,
-      attempts: event.attempts,
+      ...(event.attempts !== undefined ? { attempts: event.attempts } : {}),
     };
     pendingMessages.delete(event.messageId);
     if (event.reason === 'interrupted') {
@@ -627,22 +649,16 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     // Clear question/permission — if still pending on the server the wrapper
     // replays them as separate question.asked / permission.asked events
-    // immediately after the snapshot, so they'll be re-set.
-    // Fire resolve callbacks first so consumers (e.g. dock atoms) also clear.
-    if (question) {
-      const { requestId } = question;
-      question = null;
-      config.onQuestionResolved?.(requestId);
-    } else {
-      question = null;
-    }
-    if (permission) {
-      const { requestId } = permission;
-      permission = null;
-      config.onPermissionResolved?.(requestId);
-    } else {
-      permission = null;
-    }
+    // immediately after the snapshot, so they will be re-added. Fire resolve
+    // callbacks first so consumers (e.g. dock atoms) also clear.
+    const clearedQuestions = questions;
+    questions = [];
+    for (const entry of clearedQuestions) config.onQuestionResolved?.(entry.requestId);
+    const clearedPermissions = permissions;
+    permissions = [];
+    for (const entry of clearedPermissions) config.onPermissionResolved?.(entry.requestId);
+
+    // Clear suggestion
     if (suggestion) {
       const { requestId } = suggestion;
       suggestion = null;
@@ -759,8 +775,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getCloudStatus: () => cloudStatus,
     getSetupLog: () => setupLog,
     getPreparationAttempts: () => preparationAttempts,
-    getQuestion: () => question,
-    getPermission: () => permission,
+    getQuestion: () => questions[0] ?? null,
+    getPermission: () => permissions[0] ?? null,
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
@@ -772,8 +788,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       setupLog,
       preparationAttempts,
       sessionInfo,
-      question,
-      permission,
+      question: questions[0] ?? null,
+      permission: permissions[0] ?? null,
       suggestion,
       pendingMessages,
     }),
@@ -807,8 +823,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       setupLog = [];
       preparationAttempts = [];
       sessionInfo = null;
-      question = null;
-      permission = null;
+      questions = [];
+      permissions = [];
       suggestion = null;
       pendingMessages.clear();
       terminated = false;

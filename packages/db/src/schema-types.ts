@@ -99,6 +99,65 @@ export enum KiloPassScheduledChangeStatus {
   Canceled = 'canceled',
 }
 
+// --- Kilo Pass for Organizations enums ---
+
+export const KiloPassOrgAgreementState = {
+  PendingPayment: 'pending_payment',
+  Active: 'active',
+  CancelAtPeriodEnd: 'cancel_at_period_end',
+  Ended: 'ended',
+} as const;
+
+export type KiloPassOrgAgreementState =
+  (typeof KiloPassOrgAgreementState)[keyof typeof KiloPassOrgAgreementState];
+
+export const KiloPassOrgProcessingCondition = {
+  Ready: 'ready',
+  Manual: 'manual',
+  Blocked: 'blocked',
+  Overallocated: 'overallocated',
+  Failed: 'failed',
+  SuspendedForReview: 'suspended_for_review',
+} as const;
+
+export type KiloPassOrgProcessingCondition =
+  (typeof KiloPassOrgProcessingCondition)[keyof typeof KiloPassOrgProcessingCondition];
+
+export const KiloPassOrgPurchaseChannel = {
+  SelfServe: 'self_serve',
+  Manual: 'manual',
+} as const;
+
+export type KiloPassOrgPurchaseChannel =
+  (typeof KiloPassOrgPurchaseChannel)[keyof typeof KiloPassOrgPurchaseChannel];
+
+export const KiloPassOrgProcessingRunState = {
+  Pending: 'pending',
+  Running: 'running',
+  Succeeded: 'succeeded',
+  Blocked: 'blocked',
+  Failed: 'failed',
+} as const;
+
+export type KiloPassOrgProcessingRunState =
+  (typeof KiloPassOrgProcessingRunState)[keyof typeof KiloPassOrgProcessingRunState];
+
+export const KiloPassOrgBonusMode = {
+  AfterBase: 'after_base',
+  Upfront: 'upfront',
+} as const;
+
+export type KiloPassOrgBonusMode = (typeof KiloPassOrgBonusMode)[keyof typeof KiloPassOrgBonusMode];
+
+export const KiloPassOrgIssuanceKind = {
+  Regular: 'regular',
+  Bridge: 'bridge',
+  Supplement: 'supplement',
+} as const;
+
+export type KiloPassOrgIssuanceKind =
+  (typeof KiloPassOrgIssuanceKind)[keyof typeof KiloPassOrgIssuanceKind];
+
 // --- Feedback consts ---
 
 export const FeedbackFor = {
@@ -1044,6 +1103,7 @@ export type AuthProviderId =
   | 'apple'
   | 'email'
   | 'google'
+  | 'anaconda'
   | 'github'
   | 'gitlab'
   | 'linkedin'

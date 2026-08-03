@@ -67,12 +67,14 @@ export type ProcessedMessage = {
 /** Minimal session metadata — only the fields the SDK actually reads. */
 export type SessionInfo = {
   id: string;
-  parentID?: string;
-  model?: {
-    providerID: string;
-    id: string;
-    variant?: string;
-  };
+  parentID?: string | undefined;
+  model?:
+    | {
+        providerID: string;
+        id: string;
+        variant?: string | undefined;
+      }
+    | undefined;
 };
 
 export type SessionPhase =
@@ -105,14 +107,14 @@ export type AgentStatus =
 
 /** Cloud infrastructure status — independent from agent activity. */
 export type CloudStatus =
-  | { type: 'preparing'; step?: string; message?: string }
+  | { type: 'preparing'; step?: string | undefined; message?: string | undefined }
   | { type: 'ready' }
-  | { type: 'finalizing'; step?: string; message?: string }
+  | { type: 'finalizing'; step?: string | undefined; message?: string | undefined }
   | { type: 'error'; message: string };
 
 export type QuestionState = {
   requestId: string;
-  questions?: QuestionInfo[];
+  questions?: QuestionInfo[] | undefined;
 };
 
 export type PermissionState = {
@@ -125,7 +127,7 @@ export type PermissionState = {
 
 export type SuggestionAction = {
   label: string;
-  description?: string;
+  description?: string | undefined;
   prompt: string;
 };
 
@@ -134,7 +136,7 @@ export type SuggestionState = {
   text: string;
   actions: SuggestionAction[];
   /** Tool call ID that emitted this suggestion, when available. */
-  callId?: string;
+  callId?: string | undefined;
 };
 
 /**
@@ -144,12 +146,12 @@ export type SuggestionState = {
  */
 export type SlashCommandInfo = {
   name: string;
-  description?: string;
-  agent?: string;
-  model?: string;
-  source?: 'command' | 'mcp' | 'skill';
+  description?: string | undefined;
+  agent?: string | undefined;
+  model?: string | undefined;
+  source?: 'command' | 'mcp' | 'skill' | undefined;
   hints: string[];
-  subtask?: boolean;
+  subtask?: boolean | undefined;
 };
 
 /** Per-user-message delivery state, tracked via server-emitted cloud.message.* events. */
@@ -159,7 +161,7 @@ export type MessageDeliveryState =
       status: 'failed';
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
-      attempts?: number;
+      attempts?: number | undefined;
     };
 
 export type PreparationAttemptStatus = 'running' | 'completed' | 'failed';
@@ -173,16 +175,16 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
-  completedAt?: number;
+  completedAt?: number | undefined;
   revision: number;
-  latestDetail?: string;
-  safeError?: string;
-  command?: string;
-  commandIndex?: number;
-  commandCount?: number;
-  outputTail?: string;
-  outputTruncated?: boolean;
-  exitCode?: number;
+  latestDetail?: string | undefined;
+  safeError?: string | undefined;
+  command?: string | undefined;
+  commandIndex?: number | undefined;
+  commandCount?: number | undefined;
+  outputTail?: string | undefined;
+  outputTruncated?: boolean | undefined;
+  exitCode?: number | undefined;
 };
 
 export type PreparationAttempt = {
@@ -190,8 +192,8 @@ export type PreparationAttempt = {
   triggerMessageId: string;
   status: PreparationAttemptStatus;
   startedAt: number;
-  completedAt?: number;
-  safeError?: string;
+  completedAt?: number | undefined;
+  safeError?: string | undefined;
   revision: number;
   steps: PreparationStepSnapshot[];
 };

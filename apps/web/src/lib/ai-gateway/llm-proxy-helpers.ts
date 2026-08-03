@@ -302,10 +302,10 @@ export function modelNotAllowedResponse() {
   );
 }
 
-export function forbiddenFreeModelResponse() {
-  const error = `The free period of this model ended. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
+export function unavailableModelResponse() {
+  const error = 'The requested model is currently unavailable. Please choose a different model.';
   return NextResponse.json(
-    { error, error_type: ProxyErrorType.discontinued_free_model, message: error },
+    { error, error_type: ProxyErrorType.unavailable_model, message: error },
     { status: 404 }
   );
 }

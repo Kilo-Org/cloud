@@ -261,13 +261,14 @@ export function SeatsSubscribeCard({
 
           <div className="mt-3 grid gap-2.5 md:grid-cols-3">
             <div className="border-border/40 bg-background/35 rounded-xl border p-3">
-              <h4 className="text-sm font-medium text-white/90">Kilo Pass</h4>
+              <h4 className="text-sm font-medium text-white/90">Kilo Pass for Organizations</h4>
               <p className="text-muted-foreground/90 mt-1 text-xs leading-5">
-                Credit subscription with bonus credits.{' '}
+                Monthly Credits and bonus Credits for every paid seat.{' '}
                 <a
                   href="https://kilo.ai/features/kilo-pass"
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="Learn more about Kilo Pass for Organizations"
                   className="text-blue-400/90 hover:text-blue-300 hover:underline"
                 >
                   Learn more
@@ -281,6 +282,7 @@ export function SeatsSubscribeCard({
                 Purchase credits as needed. Only pay for what you use with no commitments.{' '}
                 <Link
                   href="/credits"
+                  aria-label="Learn more about pay-as-you-go Credits"
                   className="text-blue-400/90 hover:text-blue-300 hover:underline"
                 >
                   Learn more
@@ -292,7 +294,11 @@ export function SeatsSubscribeCard({
               <h4 className="text-sm font-medium text-white/90">Bring Your Own Key</h4>
               <p className="text-muted-foreground/90 mt-1 text-xs leading-5">
                 Use API keys from your existing AI provider accounts.{' '}
-                <Link href="/byok" className="text-blue-400/90 hover:text-blue-300 hover:underline">
+                <Link
+                  href="/byok"
+                  aria-label="Learn more about Bring Your Own Key"
+                  className="text-blue-400/90 hover:text-blue-300 hover:underline"
+                >
                   Learn more
                 </Link>
               </p>

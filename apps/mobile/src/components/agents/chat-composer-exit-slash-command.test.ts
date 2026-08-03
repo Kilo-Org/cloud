@@ -5,6 +5,7 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 
 import {
   createMobileSlashCommandList,
+  LOCAL_CLEAR_SLASH_COMMAND,
   LOCAL_EXIT_SLASH_COMMAND,
   LOCAL_NEW_SLASH_COMMAND,
   parseChatComposerSubmission,
@@ -30,13 +31,19 @@ describe('remote /exit command list — capability gate', () => {
     const commands = [COMPACT, LOCAL_NEW_SLASH_COMMAND, EXIT, QUIT, Q];
     const list = createMobileSlashCommandList('remote', commands, remoteState({ commands }));
 
-    expect(list).toEqual([COMPACT, LOCAL_NEW_SLASH_COMMAND, LOCAL_EXIT_SLASH_COMMAND]);
+    expect(list).toEqual([
+      COMPACT,
+      LOCAL_NEW_SLASH_COMMAND,
+      LOCAL_EXIT_SLASH_COMMAND,
+      LOCAL_CLEAR_SLASH_COMMAND,
+    ]);
     expect(list.filter(command => command.name === 'new')).toHaveLength(1);
     expect(list.filter(command => command.name === 'exit')).toHaveLength(1);
+    expect(list.filter(command => command.name === 'clear')).toHaveLength(1);
     expect(list.some(command => command.name === 'quit' || command.name === 'q')).toBe(false);
   });
 
-  it('omits local /exit when canExitSession is undefined (old CLI)', () => {
+  it('omits local /exit and /clear when canExitSession is undefined (old CLI)', () => {
     const list = createMobileSlashCommandList(
       'remote',
       [COMPACT, EXIT],
@@ -44,9 +51,10 @@ describe('remote /exit command list — capability gate', () => {
     );
     expect(list).toEqual([COMPACT, LOCAL_NEW_SLASH_COMMAND]);
     expect(list.some(command => command.name === 'exit')).toBe(false);
+    expect(list.some(command => command.name === 'clear')).toBe(false);
   });
 
-  it('omits local /exit when canExitSession is false (CLI explicitly opts out)', () => {
+  it('omits local /exit and /clear when canExitSession is false (CLI explicitly opts out)', () => {
     const list = createMobileSlashCommandList(
       'remote',
       [COMPACT, EXIT],
@@ -54,9 +62,10 @@ describe('remote /exit command list — capability gate', () => {
     );
     expect(list).toEqual([COMPACT, LOCAL_NEW_SLASH_COMMAND]);
     expect(list.some(command => command.name === 'exit')).toBe(false);
+    expect(list.some(command => command.name === 'clear')).toBe(false);
   });
 
-  it('omits /exit when the live catalog advertises canonical exit but omits canExitSession', () => {
+  it('omits /exit and /clear when the live catalog advertises canonical exit but omits canExitSession', () => {
     const list = createMobileSlashCommandList(
       'remote',
       [COMPACT, EXIT],
@@ -64,6 +73,7 @@ describe('remote /exit command list — capability gate', () => {
     );
     expect(list.map(command => command.name)).toEqual(['compact', 'new']);
     expect(list.some(command => command.name === 'exit')).toBe(false);
+    expect(list.some(command => command.name === 'clear')).toBe(false);
   });
 
   it('keeps /exit available under an upgrade-required refresh when canExitSession is true', () => {
@@ -73,7 +83,7 @@ describe('remote /exit command list — capability gate', () => {
         [],
         remoteState({ commands: [EXIT], refresh: 'upgrade-required', message: 'Please upgrade' })
       )
-    ).toEqual([LOCAL_NEW_SLASH_COMMAND, LOCAL_EXIT_SLASH_COMMAND]);
+    ).toEqual([LOCAL_NEW_SLASH_COMMAND, LOCAL_EXIT_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND]);
   });
 });
 

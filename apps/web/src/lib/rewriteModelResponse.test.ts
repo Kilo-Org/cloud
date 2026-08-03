@@ -9,6 +9,7 @@ import {
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import { logExceptInTest } from '@/lib/utils.server';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -19,10 +20,17 @@ jest.mock('@/lib/ai-gateway/request-logging-opt-ins', () => ({
   isDynamicallyOptedIntoRequestLogging: jest.fn(async () => false),
 }));
 
+jest.mock('@/lib/utils.server', () => ({
+  ...(jest.requireActual('@/lib/utils.server') as Record<string, unknown>),
+  logExceptInTest: jest.fn(),
+}));
+
 const mockedOptIn = jest.mocked(isDynamicallyOptedIntoRequestLogging);
+const mockedLog = jest.mocked(logExceptInTest);
 
 beforeEach(() => {
   mockedOptIn.mockClear();
+  mockedLog.mockClear();
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -37,6 +45,22 @@ function sseResponse(body: string, status = 200): Response {
     status,
     headers: { 'content-type': 'text/event-stream' },
   });
+}
+
+function hangingSseResponse(body: string): { response: Response; cancel: jest.Mock } {
+  const encoder = new TextEncoder();
+  const cancel = jest.fn();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(body));
+    },
+    cancel,
+  });
+
+  return {
+    response: new Response(stream, { headers: { 'content-type': 'text/event-stream' } }),
+    cancel,
+  };
 }
 
 function failingResponse(contentType: string, errorName: string, initialBody?: string): Response {
@@ -113,7 +137,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     });
   });
 
-  test('includes the vercel request id in the JSON read error', async () => {
+  test('includes the vercel request id only in the JSON read error message', async () => {
     const result = await rewrite(
       failingResponse('application/json', 'ResponseAborted'),
       true,
@@ -124,15 +148,14 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({
       error:
-        'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)',
       error_type: 'upstream_disconnect',
       message:
-        'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)',
-      vercel_request_id: 'iad1::iad1::request-id',
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)',
     });
   });
 
-  test('includes the vercel request id in the emitted stream error event', async () => {
+  test('includes the vercel request id only in the stream error message', async () => {
     const result = await rewrite(
       failingResponse('text/event-stream', 'ResponseAborted'),
       true,
@@ -140,14 +163,14 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       'iad1::iad1::request-id'
     );
     const events = dataObjects(await readOutputStream(result)) as {
-      error: { message: string; vercel_request_id?: string };
+      error: { message: string };
     }[];
 
     expect(events).toHaveLength(1);
     expect(events[0].error.message).toBe(
-      'The upstream provider disconnected while sending the response. (request id: iad1::iad1::request-id)'
+      'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out. (request id: iad1::iad1::request-id)'
     );
-    expect(events[0].error.vercel_request_id).toBe('iad1::iad1::request-id');
+    expect(events[0].error).not.toHaveProperty('vercel_request_id');
   });
 
   test('omits the request id suffix when no vercel request id is available', async () => {
@@ -158,13 +181,12 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       null
     );
     const events = dataObjects(await readOutputStream(result)) as {
-      error: { message: string; vercel_request_id?: string };
+      error: { message: string };
     }[];
 
     expect(events[0].error.message).toBe(
-      'The upstream provider disconnected while sending the response.'
+      'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.'
     );
-    expect(events[0].error.vercel_request_id).toBeUndefined();
   });
 });
 
@@ -300,6 +322,52 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect('role' in chunk.choices[0].delta).toBe(false);
       expect(chunk.choices[0].delta.content).toBe('hi');
       expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('does not treat a null error field as terminal', async () => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-chat","error":null,"choices":[]}\n\n' +
+          'data: {"id":"gen-chat","choices":[{"delta":{"content":"still streaming"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const sse = await readOutputStream(result);
+
+      expect(sse).toContain('still streaming');
+      expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('cancels upstream and closes immediately after [DONE]', async () => {
+      const capture = makeCapture();
+      const body =
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n' +
+        'data: [DONE]\n\n' +
+        'data: {"id":"ignored","model":"upstream-model","choices":[]}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewriteModelResponse_ChatCompletions(
+        upstream,
+        true,
+        capture,
+        'iad1::terminal-request'
+      );
+      const sse = await readOutputStream(result);
+
+      expect(dataObjects(sse)).toEqual([{ id: 'gen-chat', model: 'upstream-model', choices: [] }]);
+      expect(dataPayloads(sse)).toContain('[DONE]');
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind: 'chat_completions',
+          eventType: '[DONE]',
+          generationId: 'gen-chat',
+          vercelRequestId: 'iad1::terminal-request',
+        }
+      );
     });
 
     test('adds an empty choices array and strips cost on usage-only chunks', async () => {
@@ -464,6 +532,49 @@ describe('rewriteModelResponse_Messages', () => {
 
     expect(dataPayloads(sse)).not.toContain('[DONE]');
   });
+
+  test('cancels upstream and closes immediately after message_stop', async () => {
+    const capture = makeCapture();
+    const body =
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n' +
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":10},"delta":{}}\n\n';
+    const { response: upstream, cancel } = hangingSseResponse(body);
+
+    const result = await rewriteModelResponse_Messages(upstream, true, capture, null);
+    const sse = await readOutputStream(result);
+
+    expect(dataObjects(sse)).toEqual([{ type: 'message_stop' }]);
+    expect(dataPayloads(sse)).not.toContain('[DONE]');
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setBody).toHaveBeenCalledWith(body);
+    expect(capture.setReadError).not.toHaveBeenCalled();
+    expect(mockedLog).toHaveBeenCalledWith(
+      '[rewriteModelResponse] received terminal stream event',
+      {
+        kind: 'messages',
+        eventType: 'message_stop',
+        generationId: '<none>',
+        vercelRequestId: '<none>',
+      }
+    );
+  });
+
+  test('cancels upstream and closes immediately after a compatible [DONE] sentinel', async () => {
+    const capture = makeCapture();
+    const body =
+      'data: [DONE]\n\n' +
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":10},"delta":{}}\n\n';
+    const { response: upstream, cancel } = hangingSseResponse(body);
+
+    const result = await rewriteModelResponse_Messages(upstream, true, capture, null);
+    const sse = await readOutputStream(result);
+
+    expect(dataObjects(sse)).toEqual([]);
+    expect(dataPayloads(sse)).toEqual(['[DONE]']);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(capture.setBody).toHaveBeenCalledWith(body);
+    expect(capture.setReadError).not.toHaveBeenCalled();
+  });
 });
 
 describe('rewriteModelResponse_Responses', () => {
@@ -526,7 +637,7 @@ describe('rewriteModelResponse_Responses', () => {
     expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
   });
 
-  test('strips the nested response usage in stream events and emits [DONE]', async () => {
+  test('strips nested response usage and closes after the completed event', async () => {
     const upstream = sseResponse(
       'event: response.completed\n' +
         'data: {"type":"response.completed","response":{"model":"upstream-model","usage":{"cost":0.5,"is_byok":true,"prompt_tokens":3,"completion_tokens":1,"total_tokens":4,"prompt_tokens_details":{"cached_tokens":1}}}}\n\n' +
@@ -552,9 +663,91 @@ describe('rewriteModelResponse_Responses', () => {
     expect(event.response.usage.is_byok).toBeUndefined();
     expect(event.response.usage.prompt_tokens_details.cached_tokens).toBe(1);
     expect(sse).toContain('event: response.completed');
-    expect(dataPayloads(sse)).toContain('[DONE]');
+    expect(dataPayloads(sse)).not.toContain('[DONE]');
   });
+
+  test.each(['response.completed', 'response.incomplete', 'response.failed'])(
+    'forwards %s, cancels upstream, and closes without waiting for EOF',
+    async type => {
+      const capture = makeCapture();
+      const body =
+        `event: ${type}\ndata: ${JSON.stringify({ type })}\n\n` +
+        'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"ignored"}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewriteModelResponse_Responses(upstream, true, capture, null);
+      const sse = await readOutputStream(result);
+
+      expect(dataObjects(sse)).toEqual([{ type }]);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind: 'responses',
+          eventType: type,
+          generationId: '<none>',
+          vercelRequestId: '<none>',
+        }
+      );
+    }
+  );
 });
+
+describe.each([
+  [
+    'Chat Completions',
+    'chat_completions',
+    rewriteModelResponse_ChatCompletions,
+    'data: {"id":"gen-chat","choices":[]}\n\n',
+    'data: {"error":{"code":429,"message":"rate limited"}}\n\n',
+    'gen-chat',
+  ],
+  [
+    'Messages',
+    'messages',
+    rewriteModelResponse_Messages,
+    'event: message_start\ndata: {"type":"message_start","message":{"id":"gen-message","usage":{"input_tokens":1,"output_tokens":0}}}\n\n',
+    'event: error\ndata: {"type":"error","error":{"type":"api_error","message":"rate limited"}}\n\n',
+    'gen-message',
+  ],
+  [
+    'Responses',
+    'responses',
+    rewriteModelResponse_Responses,
+    'event: response.created\ndata: {"type":"response.created","response":{"id":"gen-response"}}\n\n',
+    'event: error\ndata: {"type":"error","error":{"type":"server_error","message":"rate limited"}}\n\n',
+    'gen-response',
+  ],
+] as const)(
+  '%s terminal stream errors',
+  (_name, kind, rewrite, initialEvent, errorEvent, generationId) => {
+    test('logs the error event and closes without waiting for EOF', async () => {
+      const capture = makeCapture();
+      const body = initialEvent + errorEvent + 'data: {"ignored":true}\n\n';
+      const { response: upstream, cancel } = hangingSseResponse(body);
+
+      const result = await rewrite(upstream, true, capture, 'iad1::error-request');
+      const sse = await readOutputStream(result);
+
+      expect(sse).toContain('rate limited');
+      expect(sse).not.toContain('ignored');
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(capture.setBody).toHaveBeenCalledWith(body);
+      expect(capture.setReadError).not.toHaveBeenCalled();
+      expect(mockedLog).toHaveBeenCalledWith(
+        '[rewriteModelResponse] received terminal stream event',
+        {
+          kind,
+          eventType: 'error',
+          generationId,
+          vercelRequestId: 'iad1::error-request',
+        }
+      );
+    });
+  }
+);
 
 function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingParams {
   return {
@@ -787,7 +980,25 @@ describe('request log capture', () => {
     const reader = result.body?.getReader();
     await reader?.cancel();
 
-    expect(capture.setReadError).toHaveBeenCalled();
+    expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined);
     expect(capture.setBody).not.toHaveBeenCalled();
   });
+
+  test.each(rewriters)(
+    '%s: records the chunks received before the response stream is cancelled',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
+      const receivedChunks = 'data: {"id":"gen-1","choices":[]}\n\n';
+      const { response: upstream } = hangingSseResponse(receivedChunks);
+
+      const result = await rewrite(upstream, true, capture, null);
+      const reader = result.body?.getReader();
+      await reader?.read();
+      await reader?.cancel();
+
+      expect(capture.setReadError).toHaveBeenCalledTimes(1);
+      expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), receivedChunks);
+      expect(capture.setBody).not.toHaveBeenCalled();
+    }
+  );
 });

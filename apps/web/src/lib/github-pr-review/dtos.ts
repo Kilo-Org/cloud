@@ -143,6 +143,7 @@ export const GitHubPrReviewReviewThreadSchema = z
     originalLine: z.number().int().nullable(),
     originalStartLine: z.number().int().nullable(),
     diffSide: z.enum(['LEFT', 'RIGHT']).nullable(),
+    diffHunk: z.string().nullable(),
     comments: z.array(GitHubPrReviewReviewCommentSchema),
   })
   .strict();

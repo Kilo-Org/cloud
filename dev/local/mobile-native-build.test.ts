@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { withNativeBuildSemaphore } from './mobile-native-build';
+import { hashRootNativeInputs, withNativeBuildSemaphore } from './mobile-native-build';
 
 test('serializes native producers across different platform builds', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-native-build-'));
@@ -173,6 +173,39 @@ test('publishes owner metadata before exposing the canonical native lock', async
     fs.linkSync = originalLinkSync;
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+function writeRootNativeInputs(root: string): void {
+  fs.mkdirSync(path.join(root, 'patches'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'pnpm-workspace.yaml'), 'packages:\n  - apps/*\n');
+  fs.writeFileSync(path.join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n');
+  fs.writeFileSync(path.join(root, 'patches', 'react-native.patch'), 'original patch');
+}
+
+test('root native inputs hash is stable when nothing changes', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-root-inputs-'));
+  writeRootNativeInputs(root);
+  assert.equal(hashRootNativeInputs(root), hashRootNativeInputs(root));
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('root native inputs hash changes with patch, workspace, and lockfile edits', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-root-inputs-'));
+  writeRootNativeInputs(root);
+  const seen = [hashRootNativeInputs(root)];
+  const mutations: (() => void)[] = [
+    () => fs.writeFileSync(path.join(root, 'patches', 'react-native.patch'), 'edited patch'),
+    () => fs.writeFileSync(path.join(root, 'patches', 'expo-server-sdk.patch'), 'new patch'),
+    () => fs.writeFileSync(path.join(root, 'pnpm-workspace.yaml'), 'packages:\n  - services/*\n'),
+    () => fs.writeFileSync(path.join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 10\n'),
+  ];
+  for (const mutate of mutations) {
+    mutate();
+    const next = hashRootNativeInputs(root);
+    assert.equal(seen.includes(next), false);
+    seen.push(next);
+  }
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('enforces the wait timeout before reclaiming an incomplete lock', async () => {

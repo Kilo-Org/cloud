@@ -1,8 +1,0 @@
-# mobile: iOS 26 + Maestro quirks under extreme load (load avg 45+)
-
-Observed on iOS 26.5 sim + Maestro 2.7.0 with several sibling verifiers sharing the host (2026-07-28). Related: `mobile-maestro-ios-driver-timeout-stale-xcodebuild.md` (driver wedge + reboot fix, including the no-xcodebuild variant).
-
-1. **Failed/killed Maestro flows leave the app at SpringBoard.** After a flow ends abnormally (assert failure / kill), the next hierarchy dump shows the home screen. Recovery: tap the `Kilo` home icon (never `launchApp`) and re-wait for a known screen element. A relaunched app returns to its previous route.
-2. **iOS 26 software keyboard has no `space` a11y label.** `assertVisible: 'space'` fails even with the keyboard fully up. Verify keyboard-up via `return`, `delete`, `numbers`, or letter keys instead. The hardware-keyboard plist fix (`mobile-ios-simulator-e2e-limitations.md`) survives `simctl shutdown/boot`.
-3. **RN Modal a11y tree intermittently collapses to keyboard-only under load.** With a native Modal visibly open and focused, the XCTest hierarchy can show only keyboard keys + status bar; `Cancel`/`Save` taps by text fail. Working fallback: extract the buttons' `bounds` from an earlier same-screen hierarchy dump and `tapOn: { point: "x,y" }` (points, verified consistent with screenshot scale). Text input still works: the modal auto-focuses the field on open, so `eraseText`/`inputText` need no element tap.
-4. **Maestro text assertions are full-string, not substring.** `assertVisible: 'Context'` fails against a header titled `Context usage` — assert the full visible string (or a regex), never a fragment. A failed assert of this kind is a flow bug, not a product regression.

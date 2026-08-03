@@ -3870,6 +3870,46 @@ describe('User', () => {
       expect(retainedLogs[0].organization_id).toBe(orgId);
     });
 
+    it('should allow soft-delete when a transferred past-due KiloClaw predecessor has a canceled current successor', async () => {
+      const user = await insertTestUser();
+      const successorId = randomUUID();
+      await db.insert(kiloclaw_subscriptions).values({
+        id: successorId,
+        user_id: user.id,
+        plan: 'standard',
+        status: 'canceled',
+      });
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        plan: 'standard',
+        status: 'past_due',
+        transferred_to_subscription_id: successorId,
+      });
+
+      await expect(assertUserCanBeSoftDeleted(user.id)).resolves.toBeUndefined();
+      await expect(softDeleteUser(user.id)).resolves.toBeUndefined();
+
+      const softDeleted = await findUserById(user.id);
+      expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
+    });
+
+    it('should throw SoftDeletePreconditionError for a current past-due KiloClaw subscription', async () => {
+      const user = await insertTestUser();
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        plan: 'standard',
+        status: 'past_due',
+        transferred_to_subscription_id: null,
+      });
+
+      await expect(assertUserCanBeSoftDeleted(user.id)).rejects.toThrow(
+        SoftDeletePreconditionError
+      );
+      await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
+      const userAfter = await findUserById(user.id);
+      expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
     it('should throw SoftDeletePreconditionError for active KiloClaw subscription', async () => {
       const user = await insertTestUser();
       await db.insert(kiloclaw_subscriptions).values({

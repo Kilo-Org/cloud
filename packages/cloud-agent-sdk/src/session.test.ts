@@ -516,6 +516,39 @@ describe('remote session create and retry commands', () => {
     session.destroy();
   });
 
+  it('createRemoteSession forwards optional inheritance input to the transport', async () => {
+    const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
+
+    session.connect();
+    await Promise.resolve();
+    emitOwner(systemListener(), kiloId('ses-remote'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockResolvedValue({ protocolVersion: 1, sessionID: REMOTE_CREATED_SESSION_ID });
+
+    await session.createRemoteSession({
+      agent: 'architect',
+      model: { providerID: 'kilo', modelID: 'kilo-auto' },
+      orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    });
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      kiloId('ses-remote'),
+      'create_session',
+      {
+        protocolVersion: 1,
+        agent: 'architect',
+        model: { providerID: 'kilo', modelID: 'kilo-auto' },
+        orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      },
+      'owner'
+    );
+    session.destroy();
+  });
+
   it('createRemoteSession propagates an actionable UserWebCommandError', async () => {
     const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
 

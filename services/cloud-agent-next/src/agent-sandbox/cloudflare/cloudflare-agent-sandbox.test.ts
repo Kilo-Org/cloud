@@ -1656,6 +1656,76 @@ describe('CloudflareAgentSandbox', () => {
     ).resolves.toMatchObject({ status: 'still-present' });
   });
 
+  it('confirms absence for an idle-timeout stop without waking a stopped container', async () => {
+    const listProcesses = vi.fn().mockResolvedValue([]);
+    const isContainerRunning = vi.fn().mockResolvedValue(false);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ listProcesses, isContainerRunning }) as unknown as SandboxInstance,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'session' },
+        attemptId: 'attempt_idle',
+        reason: 'idle-timeout',
+      })
+    ).resolves.toEqual({ status: 'absent' });
+    // The whole point: no container fetch, so a sleeping container stays asleep.
+    expect(listProcesses).not.toHaveBeenCalled();
+  });
+
+  it('still inspects an idle-timeout stop while the container is running', async () => {
+    const listProcesses = vi.fn().mockResolvedValue([]);
+    const isContainerRunning = vi.fn().mockResolvedValue(true);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ listProcesses, isContainerRunning }) as unknown as SandboxInstance,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'session' },
+        attemptId: 'attempt_idle_running',
+        reason: 'idle-timeout',
+      })
+    ).resolves.toEqual({ status: 'absent' });
+    expect(listProcesses).toHaveBeenCalled();
+  });
+
+  it('inspects a stopped container for stop reasons other than idle-timeout', async () => {
+    const listProcesses = vi.fn().mockResolvedValue([]);
+    const isContainerRunning = vi.fn().mockResolvedValue(false);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ listProcesses, isContainerRunning }) as unknown as SandboxInstance,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'session' },
+        attemptId: 'attempt_delete',
+        reason: 'session-delete',
+      })
+    ).resolves.toEqual({ status: 'absent' });
+    expect(listProcesses).toHaveBeenCalled();
+    expect(isContainerRunning).not.toHaveBeenCalled();
+  });
+
+  it('falls back to inspection when the sandbox cannot report container state', async () => {
+    const listProcesses = vi.fn().mockResolvedValue([]);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      // No isContainerRunning: an unknown state must not be treated as "stopped".
+      resolveSandbox: () => ({ listProcesses }) as unknown as SandboxInstance,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'session' },
+        attemptId: 'attempt_unknown',
+        reason: 'idle-timeout',
+      })
+    ).resolves.toEqual({ status: 'absent' });
+    expect(listProcesses).toHaveBeenCalled();
+  });
+
   it('returns inspection-failed from stop when post-stop inspection cannot prove absence', async () => {
     const listProcesses = vi
       .fn()

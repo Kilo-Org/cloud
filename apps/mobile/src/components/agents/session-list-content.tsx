@@ -42,6 +42,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
+export const FAB_SIZE = 56;
+export const FAB_MARGIN = 16;
+
 type AgentSessionListContentProps = {
   sections: SessionSection[];
   hasAnySessions: boolean;
@@ -122,8 +125,26 @@ export function AgentSessionListContent({
   const [refreshing, setRefreshing] = useState(false);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
-  // must clear it or the last rows are stuck underneath it.
+  // must clear it or the last rows are stuck underneath it. The FAB adds its
+  // own inset so the last row scrolls clear of the button too.
   const tabBarClearanceStyle = useMemo(
+    () => ({
+      paddingBottom:
+        getEffectiveTabBarHeight({
+          bottomInset: bottom,
+          platform: Platform.OS,
+          fontScale,
+        }) +
+        FAB_SIZE +
+        FAB_MARGIN,
+    }),
+    [bottom, fontScale]
+  );
+
+  // Tab-bar-only clearance for the full-screen error and first-use empty
+  // containers — the FAB is hidden in those states so they must not include
+  // the FAB inset.
+  const tabBarOnlyClearanceStyle = useMemo(
     () => ({
       paddingBottom: getEffectiveTabBarHeight({
         bottomInset: bottom,
@@ -244,7 +265,7 @@ export function AgentSessionListContent({
       <Animated.View
         entering={FadeIn.duration(200)}
         className="flex-1 items-center justify-center"
-        style={tabBarClearanceStyle}
+        style={tabBarOnlyClearanceStyle}
       >
         <QueryError message="Could not load sessions" onRetry={onRetry} />
       </Animated.View>
@@ -261,7 +282,7 @@ export function AgentSessionListContent({
       <Animated.View
         entering={FadeIn.duration(200)}
         className="flex-1 items-center justify-center"
-        style={tabBarClearanceStyle}
+        style={tabBarOnlyClearanceStyle}
       >
         <EmptyState
           icon={Bot}

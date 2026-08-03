@@ -3,6 +3,7 @@ import 'server-only';
 import type Stripe from 'stripe';
 
 import { getKnownStripePriceIdsForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { getOrganizationKiloPassMetadata } from '@/lib/kilo-pass-org/stripe-metadata';
 
 function getInvoiceLinePriceIds(invoice: Stripe.Invoice): string[] {
   const ids: string[] = [];
@@ -28,4 +29,9 @@ export function invoiceLooksLikeKiloPassByPriceId(invoice: Stripe.Invoice): bool
   const knownIdSet = new Set(knownIds);
 
   return invoiceLinePriceIds.some(id => knownIdSet.has(id));
+}
+
+/** Organization Pass metadata wins because it intentionally reuses personal Pass prices. */
+export function invoiceLooksLikeOrganizationKiloPass(invoice: Stripe.Invoice): boolean {
+  return getOrganizationKiloPassMetadata(invoice.parent?.subscription_details?.metadata) !== null;
 }

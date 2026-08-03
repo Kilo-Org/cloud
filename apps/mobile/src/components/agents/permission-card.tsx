@@ -7,6 +7,7 @@ import { Text } from '@/components/ui/text';
 import {
   applyBlockingCardAppearance,
   type BlockingCardSubmissionError,
+  formatBlockingCardTitle,
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
@@ -31,6 +32,11 @@ type PermissionCardProps = {
    * the shared blocking-card-state FSM.
    */
   submissionError?: BlockingCardSubmissionError | null;
+  /**
+   * Total number of pending blocking requests (questions + permissions).
+   * The card title receives a position hint when more than one request waits.
+   */
+  pendingCount?: number;
 };
 
 export function PermissionCard({
@@ -41,6 +47,7 @@ export function PermissionCard({
   isSubmitting = false,
   requestId,
   submissionError = null,
+  pendingCount = 1,
 }: Readonly<PermissionCardProps>) {
   const colors = useThemeColors();
   const [activeResponse, setActiveResponse] = useState<'once' | 'always' | 'reject' | null>(null);
@@ -81,18 +88,14 @@ export function PermissionCard({
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
 
+  const title = formatBlockingCardTitle('Permission required', pendingCount);
   const isInert = presentation.state === 'non-retryable';
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
-        <Text
-          ref={titleRef}
-          accessible
-          accessibilityLabel="Permission required"
-          className="text-sm font-medium"
-        >
-          Permission required
+        <Text ref={titleRef} accessible accessibilityLabel={title} className="text-sm font-medium">
+          {title}
         </Text>
         <Text className="mt-1 text-xs text-muted-foreground">
           {presentation.protocolExplanation}

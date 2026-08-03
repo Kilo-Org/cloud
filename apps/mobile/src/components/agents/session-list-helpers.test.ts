@@ -5,6 +5,9 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
+  activeSessionMetaTimestamp,
+  composeActiveSessionSpokenMeta,
+  composeActiveSessionVisibleMeta,
   excludeActiveFromGroups,
   expandPlatformFilter,
   formatMeta,
@@ -14,6 +17,7 @@ import {
   remoteSessionEyebrowLabel,
   repoNameFromGitUrl,
   selectPinnedActiveSessions,
+  selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
@@ -352,6 +356,27 @@ describe('remoteAgentLabel', () => {
   });
 });
 
+describe('activeSessionMetaTimestamp', () => {
+  it('prefers lastActivityAt over updatedAt', () => {
+    expect(
+      activeSessionMetaTimestamp({
+        lastActivityAt: '2024-06-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      })
+    ).toBe('2024-06-01T00:00:00.000Z');
+  });
+
+  it('falls back to updatedAt when lastActivityAt is absent', () => {
+    expect(activeSessionMetaTimestamp({ updatedAt: '2024-01-01T00:00:00.000Z' })).toBe(
+      '2024-01-01T00:00:00.000Z'
+    );
+  });
+
+  it('returns undefined when neither timestamp is present', () => {
+    expect(activeSessionMetaTimestamp({})).toBeUndefined();
+  });
+});
+
 describe('remoteMeta', () => {
   it('returns the same relative-time string as formatMeta when updatedAt is present', () => {
     const updatedAt = '2024-01-01T00:00:00.000Z';
@@ -359,16 +384,33 @@ describe('remoteMeta', () => {
     expect(remoteMeta({ updatedAt })).toBe(timeAgo(parseTimestamp(updatedAt)).toUpperCase());
   });
 
-  it('returns undefined when updatedAt is absent (never idle/busy/retry status words)', () => {
+  it('prefers lastActivityAt over updatedAt', () => {
+    const lastActivityAt = '2024-06-01T00:00:00.000Z';
+    const updatedAt = '2024-01-01T00:00:00.000Z';
+    expect(remoteMeta({ lastActivityAt, updatedAt })).toBe(formatMeta(lastActivityAt));
+  });
+
+  it('falls back to updatedAt when lastActivityAt is absent', () => {
+    const updatedAt = '2024-01-01T00:00:00.000Z';
+    expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
+  });
+
+  it('returns undefined when neither timestamp is present (never idle/busy/retry status words)', () => {
     // Former fallback uppercased session.status into the timestamp slot
     // (BUSY/IDLE/RETRY). Status is no longer a parameter; assert undefined
     // for each status that used to leak, plus a row with no status field.
     // Extra `status` fields stay on the object so a regression that re-reads
     // `.status` would still see them — remoteMeta must ignore them.
-    const idleRow: { updatedAt?: string; status?: string } = { status: 'idle' };
-    const busyRow: { updatedAt?: string; status?: string } = { status: 'busy' };
-    const retryRow: { updatedAt?: string; status?: string } = { status: 'retry' };
-    const noStatusRow: { updatedAt?: string } = {};
+    const idleRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'idle',
+    };
+    const busyRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'busy',
+    };
+    const retryRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'retry',
+    };
+    const noStatusRow: { updatedAt?: string; lastActivityAt?: string } = {};
     expect(remoteMeta(idleRow)).toBeUndefined();
     expect(remoteMeta(busyRow)).toBeUndefined();
     expect(remoteMeta(retryRow)).toBeUndefined();
@@ -582,5 +624,98 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
         createdOnPlatform: 'cli',
       })
     ).toBe('MY-REPO');
+  });
+});
+
+describe('composeActiveSessionVisibleMeta', () => {
+  it('both cost and time → "$cost · timeMeta"', () => {
+    expect(composeActiveSessionVisibleMeta('$0.12', '5M AGO')).toBe('$0.12 · 5M AGO');
+  });
+
+  it('cost only → cost', () => {
+    expect(composeActiveSessionVisibleMeta('$3.50', undefined)).toBe('$3.50');
+  });
+
+  it('time only → timeMeta', () => {
+    expect(composeActiveSessionVisibleMeta(null, '1H AGO')).toBe('1H AGO');
+  });
+
+  it('neither → undefined', () => {
+    expect(composeActiveSessionVisibleMeta(null, undefined)).toBeUndefined();
+  });
+
+  it('null cost with empty time → undefined', () => {
+    expect(composeActiveSessionVisibleMeta(null, '')).toBeUndefined();
+  });
+});
+
+describe('composeActiveSessionSpokenMeta', () => {
+  it('both cost and time → "cost <cost>, <time>"', () => {
+    expect(composeActiveSessionSpokenMeta('12 cents', '5 minutes ago')).toBe(
+      'cost 12 cents, 5 minutes ago'
+    );
+  });
+
+  it('cost only → "cost <cost>"', () => {
+    expect(composeActiveSessionSpokenMeta('3 dollars', null)).toBe('cost 3 dollars');
+  });
+
+  it('time only → timeSpoken', () => {
+    expect(composeActiveSessionSpokenMeta(null, '1 hour ago')).toBe('1 hour ago');
+  });
+
+  it('neither → null', () => {
+    expect(composeActiveSessionSpokenMeta(null, null)).toBeNull();
+  });
+});
+
+describe('selectRemoteRowSpokenMeta', () => {
+  const costSpoken = '12 cents';
+  const timeSpoken = '5 minutes ago';
+
+  it('needsInput + cost + time → null', () => {
+    expect(selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken })).toBeNull();
+  });
+
+  it('needsInput + cost only → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken: null })
+    ).toBeNull();
+  });
+
+  it('needsInput + time only → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken })
+    ).toBeNull();
+  });
+
+  it('needsInput + neither → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken: null })
+    ).toBeNull();
+  });
+
+  it('cost + time → combined spoken form', () => {
+    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken })).toBe(
+      'cost 12 cents, 5 minutes ago'
+    );
+  });
+
+  it('cost only → spoken cost alone', () => {
+    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken: null })).toBe(
+      'cost 12 cents'
+    );
+  });
+
+  it('time only → spoken time alone', () => {
+    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken })).toBe(
+      '5 minutes ago'
+    );
+  });
+
+  it('neither → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken: null })
+    ).toBeNull();
   });
 });

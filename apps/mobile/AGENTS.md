@@ -4,8 +4,8 @@
 
 Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-specific code.
 
-- Backend, simulator, login, Maestro, remote CLI, logs, cleanup: follow [e2e/AGENTS.md](e2e/AGENTS.md). Start what you need yourself; never ask the user to start Metro or backend services.
-- Substantial mobile work: follow the kilo workflow in [.kilo_workflow/WORKFLOW.md](../../.kilo_workflow/WORKFLOW.md). Plans may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
+- Start the backend and Metro yourself; never ask the user to start them.
+- Substantial mobile work may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
 
 ## Stack
 
@@ -79,6 +79,10 @@ git diff --check
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
 - Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
+
+## Design
+
+The app follows https://github.com/Kilo-Org/kilo-design/ in general, except where this file states otherwise.
 
 ## Debugging
 

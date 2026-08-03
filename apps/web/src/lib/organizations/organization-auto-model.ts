@@ -11,7 +11,7 @@ import {
   getDirectByokModel,
 } from '@/lib/ai-gateway/providers/direct-byok';
 import { getBYOKforOrganization } from '@/lib/ai-gateway/byok';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { readDb, type DrizzleTransaction } from '@/lib/drizzle';
 import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
@@ -87,7 +87,7 @@ export async function validateOrganizationAutoTarget(
   targetModelId: string,
   options: {
     apiKind?: 'chat_completions' | 'responses' | 'messages';
-    dbClient?: typeof db | DrizzleTransaction;
+    dbClient?: typeof readDb | DrizzleTransaction;
   } = {}
 ): Promise<OrganizationAutoTargetValidationResult> {
   const rawModelId = targetModelId.trim().toLowerCase();
@@ -117,7 +117,7 @@ export async function validateOrganizationAutoTarget(
 
   const directByokTarget = await getDirectByokModel(rawModelId);
   if (directByokTarget.provider && directByokTarget.model) {
-    const byok = await getBYOKforOrganization(options.dbClient ?? db, organization.id, [
+    const byok = await getBYOKforOrganization(options.dbClient ?? readDb, organization.id, [
       directByokTarget.provider.id,
     ]);
     if (!byok || byok.length === 0) {

@@ -15,18 +15,17 @@ import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { parseGitHubPrUrl } from '@/lib/github-pr-url';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
-import {
-  PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY,
-  PR_LINK_HELPER_INVALID_COPY,
-  type PrLinkHelperMessage,
-  selectPrLinkClearButtonVisible,
-  selectPrLinkHelperSlotState,
-} from '@/lib/pr-review/pr-link-helper-slot';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
-import { decidePrLinkPaste } from '@/lib/pr-review/pr-link-paste';
+import {
+  decidePrLinkPaste,
+  PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY,
+  PR_LINK_TOAST_INVALID_COPY,
+  selectPrLinkClearButtonVisible,
+} from '@/lib/pr-review/pr-link-paste';
 import { getRecentPrs, type RecentPr, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
 const URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
@@ -36,17 +35,16 @@ export function PrReviewEntryScreen() {
   const colors = useThemeColors();
   // Uncontrolled iOS input — keep the raw text in a ref so the submit
   // handler reads the latest value without re-rendering on every
-  // keystroke. State is only for derived UI (whether there's any text,
-  // active helper message). The TextInput component ref is for focus()
-  // and setNativeProps on programmatic paste.
+  // keystroke. State is only for derived UI (whether there's any text).
+  // The TextInput component ref is for focus() and setNativeProps on
+  // programmatic paste.
   const inputRef = useRef<TextInput>(null);
   const inputValueRef = useRef<string>('');
   // FIFO of values written via setNativeProps. Matching onChangeText values
-  // are treated as programmatic echoes (do not clear helpers / clobber ref).
+  // are treated as programmatic echoes (do not clobber ref).
   // Order-agnostic membership so double-taps and delayed native echoes work.
   const pendingProgrammaticTextsRef = useRef<string[]>([]);
   const [hasInput, setHasInput] = useState(false);
-  const [helperMessage, setHelperMessage] = useState<PrLinkHelperMessage | null>(null);
   const [recent, setRecent] = useState<RecentPr[] | null>(null);
 
   useFocusEffect(
@@ -78,10 +76,9 @@ export function PrReviewEntryScreen() {
     const raw = inputValueRef.current;
     const parsed = parseGitHubPrUrl(raw.trim());
     if (!parsed) {
-      setHelperMessage('invalid');
+      announcingToast.error(PR_LINK_TOAST_INVALID_COPY);
       return;
     }
-    setHelperMessage(null);
     // Title is backfilled on first successful load (S5).
     await upsertRecentPr({
       owner: parsed.owner,
@@ -97,16 +94,15 @@ export function PrReviewEntryScreen() {
     const clipboard = await Clipboard.getStringAsync();
     const decision = decidePrLinkPaste(clipboard);
     if (decision.kind === 'empty') {
-      setHelperMessage('clipboard-empty');
+      announcingToast.error(PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY);
       return;
     }
     // Replace entire field (never append-at-cursor): native field + ref + hasInput.
     applyFieldText(decision.text);
     if (decision.kind === 'non-url-text') {
-      setHelperMessage('invalid');
+      announcingToast.error(PR_LINK_TOAST_INVALID_COPY);
       return;
     }
-    setHelperMessage(null);
     await handleSubmit();
   };
 
@@ -122,22 +118,7 @@ export function PrReviewEntryScreen() {
     router.push(getPrReviewPath(entry.owner, entry.repo, entry.number));
   };
 
-  const slotState = selectPrLinkHelperSlotState({
-    message: helperMessage,
-  });
   const showClearButton = selectPrLinkClearButtonVisible({ hasInput });
-  const isInvalid = helperMessage === 'invalid';
-
-  let helperContent: ReactNode = null;
-  if (slotState === 'invalid') {
-    helperContent = <Text className="text-sm text-destructive">{PR_LINK_HELPER_INVALID_COPY}</Text>;
-  } else if (slotState === 'clipboard-empty') {
-    helperContent = (
-      <Text variant="muted" className="text-sm">
-        {PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY}
-      </Text>
-    );
-  }
 
   let recentsBody: ReactNode = null;
   if (recent === null) {
@@ -205,7 +186,11 @@ export function PrReviewEntryScreen() {
           </View>
           <View className="gap-3">
             <View className="flex-row items-center gap-2">
-              <View className="min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card">
+              <View
+                className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
+                testID="pr-link-input-row"
+                collapsable={false}
+              >
                 <TextInput
                   ref={inputRef}
                   defaultValue=""
@@ -226,22 +211,11 @@ export function PrReviewEntryScreen() {
                     if (decision.kind === 'echo') {
                       // Echo of setNativeProps: inputValueRef already holds the
                       // intentional value from applyFieldText — do not clobber it
-                      // with a delayed/stale echo, and do not clear helpers.
+                      // with a delayed/stale echo.
                       return;
                     }
                     inputValueRef.current = value;
                     setHasInput(value.length > 0);
-                    // Any real edit clears transient helper messages (invalid /
-                    // clipboard-empty). Last-set message is replaced by null.
-                    if (helperMessage !== null) {
-                      setHelperMessage(null);
-                    }
-                  }}
-                  onFocus={() => {
-                    // clipboard-empty clears on input focus; invalid stays until edit.
-                    if (helperMessage === 'clipboard-empty') {
-                      setHelperMessage(null);
-                    }
                   }}
                   // leading-[normal] so no lineHeight reaches the style: an explicit lineHeight
                   // makes iOS draw the placeholder lower than the typed text (see AGENTS.md).
@@ -288,9 +262,8 @@ export function PrReviewEntryScreen() {
                 <ClipboardIcon size={18} color={colors.mutedForeground} />
               </Pressable>
             </View>
-            {helperContent}
             <Button
-              disabled={!hasInput || isInvalid}
+              disabled={!hasInput}
               onPress={() => {
                 void handleSubmit();
               }}

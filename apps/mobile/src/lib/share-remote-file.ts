@@ -2,10 +2,9 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
+import { truncateUtf8, utf8ByteLength } from './utf8-utils';
+
 const MAX_CACHE_FILENAME_BYTES = 255;
-const ONE_BYTE_CODE_POINT_MAX = 127;
-const TWO_BYTE_CODE_POINT_MAX = 2047;
-const THREE_BYTE_CODE_POINT_MAX = 65_535;
 
 export type ShareRemoteFileReason = 'sharing-unavailable' | 'download-failed';
 
@@ -60,13 +59,19 @@ async function materializeRemoteFile({
   }
 }
 
-export async function shareLocalFile(localUri: string): Promise<void> {
+export async function shareLocalFile(
+  localUri: string,
+  options?: { mimeType?: string }
+): Promise<void> {
   const available = await Sharing.isAvailableAsync();
   if (!available) {
     throw new ShareRemoteFileError('sharing-unavailable');
   }
 
-  await Sharing.shareAsync(localUri);
+  await Sharing.shareAsync(
+    localUri,
+    options?.mimeType ? { mimeType: options.mimeType } : undefined
+  );
 }
 
 export async function shareMaterializedRemoteFile(
@@ -144,43 +149,4 @@ function getExtension(filename: string): string {
   }
 
   return filename.slice(extensionStart);
-}
-
-function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (const character of value) {
-    bytes += utf8CodePointByteLength(character);
-  }
-  return bytes;
-}
-
-function truncateUtf8(value: string, maxBytes: number): string {
-  let bytes = 0;
-  let result = '';
-
-  for (const character of value) {
-    const characterBytes = utf8CodePointByteLength(character);
-    if (bytes + characterBytes > maxBytes) {
-      break;
-    }
-
-    bytes += characterBytes;
-    result += character;
-  }
-
-  return result;
-}
-
-function utf8CodePointByteLength(character: string): number {
-  const codePoint = character.codePointAt(0) ?? 0;
-  if (codePoint <= ONE_BYTE_CODE_POINT_MAX) {
-    return 1;
-  }
-  if (codePoint <= TWO_BYTE_CODE_POINT_MAX) {
-    return 2;
-  }
-  if (codePoint <= THREE_BYTE_CODE_POINT_MAX) {
-    return 3;
-  }
-  return 4;
 }

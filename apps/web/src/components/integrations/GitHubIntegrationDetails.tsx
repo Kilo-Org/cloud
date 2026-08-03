@@ -180,6 +180,8 @@ export function GitHubIntegrationDetails({
     })
   );
 
+  const mintInstallState = useMutation(trpc.githubApps.mintInstallState.mutationOptions());
+
   // Initialize selected model from installation data
   useEffect(() => {
     if (installationData?.installation?.modelSlug) {
@@ -261,14 +263,23 @@ export function GitHubIntegrationDetails({
     );
   };
 
-  const handleInstall = () => {
-    const state = organizationId ? `org_${organizationId}` : `user_${user?.id}`;
-    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(state, appReturnPath))}`;
-    if (appReturnPath) {
-      window.open(installUrl, '_blank', 'noopener,noreferrer');
-      return;
+  const handleInstall = async () => {
+    try {
+      const result = await mintInstallState.mutateAsync({
+        organizationId: organizationId ?? undefined,
+        returnTo: appReturnPath ?? undefined,
+      });
+      const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(result.token))}`;
+      if (appReturnPath) {
+        window.open(installUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      window.location.href = installUrl;
+    } catch (err) {
+      toast.error('Failed to start GitHub installation', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
     }
-    window.location.href = installUrl;
   };
 
   const handleConnectIdentity = () => {
@@ -437,10 +448,11 @@ export function GitHubIntegrationDetails({
           <Button
             onClick={handleInstall}
             disabled={
-              pendingCheck?.hasPending && pendingCheck.pendingOrganizationId !== organizationId
+              mintInstallState.isPending ||
+              (pendingCheck?.hasPending && pendingCheck.pendingOrganizationId !== organizationId)
             }
           >
-            Open GitHub setup
+            {mintInstallState.isPending ? 'Starting installation...' : 'Open GitHub setup'}
             <ExternalLink className="size-4" />
           </Button>
           <p className="type-label mt-3 text-muted-foreground">
@@ -652,9 +664,16 @@ export function GitHubIntegrationDetails({
                       </AlertDescription>
                     </Alert>
                   ) : (
-                    <Button onClick={handleInstall} size="lg" className="w-full">
+                    <Button
+                      onClick={handleInstall}
+                      size="lg"
+                      className="w-full"
+                      disabled={mintInstallState.isPending}
+                    >
                       <GitBranch className="mr-2 h-4 w-4" />
-                      Install Kilo GitHub App
+                      {mintInstallState.isPending
+                        ? 'Starting installation...'
+                        : 'Install Kilo GitHub App'}
                     </Button>
                   )}
                 </>

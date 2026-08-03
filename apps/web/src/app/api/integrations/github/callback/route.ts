@@ -28,6 +28,9 @@ import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
+import { consumeInstallState } from '@/lib/integrations/github/install-state';
+import type { GitHubInstallState } from '@kilocode/db/schema';
+import { getEnvVariable } from '@/lib/dotenvx';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
@@ -116,8 +119,6 @@ export async function GET(request: NextRequest) {
     // 1. Verify user authentication
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
-      // If user is not authenticated (e.g., GitHub admin approving installation),
-      // redirect to homepage instead of showing "Unauthorized"
       return NextResponse.redirect(new URL('/', APP_URL));
     }
 
@@ -127,276 +128,58 @@ export async function GET(request: NextRequest) {
     const setupAction = searchParams.get('setup_action');
     const rawState = searchParams.get('state');
 
-    // 3. Bot-link callback hand-off — runs BEFORE owner parsing because
-    // bot-link state values do not start with `org_`/`user_` and have a
-    // different signature (verifyGitHubBotLinkState).
-    if (rawState && !rawState.startsWith('org_') && !rawState.startsWith('user_')) {
-      const botLinkState = verifyGitHubBotLinkState(rawState);
-      if (botLinkState) {
-        return await handleGitHubBotLinkCallback(request, user);
+    // 3. Legacy plaintext branch — starts with org_ or user_ prefix.
+    // Legacy states are never bot-link or database-minted tokens.
+    // They are accepted only when the GITHUB_LEGACY_INSTALL_STATE flag is enabled.
+    if (rawState && (rawState.startsWith('org_') || rawState.startsWith('user_'))) {
+      const legacyEnabled = (getEnvVariable('GITHUB_LEGACY_INSTALL_STATE') ?? 'true') !== 'false';
+
+      if (legacyEnabled) {
+        // ponytail: the legacy branch is deleted once the legacy-state counter
+        // reports zero for 30 consecutive days.
+        captureMessage('GitHub callback using legacy plaintext install state', {
+          level: 'info',
+          tags: { endpoint: 'github/callback', source: 'legacy_install_state' },
+          extra: { rawState, installationId },
+        });
+        return await handleLegacyInstallFlow(request, user, rawState, installationId, setupAction);
       }
-    }
 
-    // 4. Parse owner from state (with optional |return=<path> suffix)
-    const { ownerToken, returnTo } = parseStateReturn(rawState);
-    let owner: Owner;
-    let ownerId: string;
-
-    if (ownerToken.startsWith('org_')) {
-      ownerId = ownerToken.slice(4);
-      owner = { type: 'org', id: ownerId };
-    } else if (ownerToken.startsWith('user_')) {
-      ownerId = ownerToken.slice(5);
-      owner = { type: 'user', id: ownerId };
-    } else {
-      captureMessage('GitHub callback missing or invalid owner in state', {
+      // Legacy flag disabled: refuse the legacy state.
+      captureMessage('GitHub callback with legacy state refused (flag disabled)', {
         level: 'warning',
-        tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-        extra: { installationId, rawState, allParams: Object.fromEntries(searchParams.entries()) },
+        tags: { endpoint: 'github/callback', source: 'legacy_install_state_disabled' },
+        extra: { rawState, installationId },
       });
       return NextResponse.redirect(new URL('/', APP_URL));
     }
 
-    // 4. Verify user has access to the owner
-    if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
-    } else {
-      // For user-owned integrations, verify it's the same user
-      if (user.id !== owner.id) {
-        return NextResponse.redirect(new URL('/', APP_URL));
+    // 4. Bot-link callback hand-off. Bot-link state tokens use a signed format,
+    // not prefix-based. Try bot-link first to avoid consuming an install token
+    // that happens to match the bot-link format.
+    if (rawState) {
+      const botLinkState = verifyGitHubBotLinkState(rawState);
+      if (botLinkState) {
+        return await handleGitHubBotLinkCallback(request, user);
+      }
+
+      // 5. New database-backed install state — atomically consume the token.
+      const installRow = await consumeInstallState(rawState);
+      if (installRow) {
+        return await handleNewInstallFlow(request, user, installRow, installationId, setupAction);
       }
     }
 
-    const integrationPath =
-      owner.type === 'org'
-        ? `/organizations/${owner.id}/integrations/github`
-        : `/integrations/github`;
-    const redirectPath = returnTo || integrationPath;
-
-    // 5. Determine which GitHub App to use based on organization settings
-    const appType = await getGitHubAppTypeForOrganization(owner.type === 'org' ? owner.id : null);
-    const credentials = getGitHubAppCredentials(appType);
-
-    // Handle uninstall/suspend actions
-    if (setupAction === 'delete' || setupAction === 'suspend') {
-      console.log(`GitHub App ${setupAction} action detected, skipping installation fetch`);
-
-      return NextResponse.redirect(
-        new URL(appendQueryParam(redirectPath, `github_action=${setupAction}`), APP_URL)
-      );
-    }
-
-    // Handle pending approval - store requester info for webhook matching
-    if (setupAction === 'request') {
-      const code = searchParams.get('code');
-
-      try {
-        let githubRequester: { id: string; login: string } | undefined;
-
-        // Exchange OAuth code for GitHub user identity
-        if (code) {
-          try {
-            githubRequester = await exchangeGitHubOAuthCode(code, appType);
-
-            console.log('GitHub user fetched', {
-              github_user_id: githubRequester.id,
-              github_user_login: githubRequester.login,
-            });
-          } catch (error) {
-            console.error('Error fetching GitHub user:', error);
-            captureException(error);
-            // Continue without GitHub user info
-          }
-        }
-
-        // Check for existing pending installation by this GitHub user
-        if (githubRequester) {
-          const existingPending = await findPendingInstallationByRequesterId(githubRequester.id);
-
-          if (existingPending) {
-            const existingOwnerId =
-              existingPending.owned_by_organization_id || existingPending.owned_by_user_id;
-
-            console.log('User already has a pending installation', {
-              existingPendingId: existingPending.id,
-              existingOwnerId,
-              githubRequesterId: githubRequester.id,
-            });
-
-            const queryParam =
-              owner.type === 'org'
-                ? `error=pending_installation_exists&org=${existingOwnerId}`
-                : 'error=pending_installation_exists';
-
-            return NextResponse.redirect(
-              new URL(appendQueryParam(redirectPath, queryParam), APP_URL)
-            );
-          }
-        }
-
-        // Create pending installation record with requester info
-        await createPendingIntegration({
-          organizationId: owner.type === 'org' ? owner.id : undefined,
-          userId: owner.type === 'user' ? owner.id : undefined,
-          requester: {
-            kilo_user_id: user.id,
-            kilo_user_email: user.google_user_email,
-            kilo_user_name: user.google_user_name,
-            requested_at: new Date().toISOString(),
-          },
-          githubRequester,
-          githubAppType: appType,
-        });
-
-        // Redirect back to integrations page with pending approval status
-        const queryParam = returnTo ? 'github_pending_approval=true' : 'pending_approval=true';
-
-        return NextResponse.redirect(new URL(appendQueryParam(redirectPath, queryParam), APP_URL));
-      } catch (error) {
-        console.error('Error creating pending installation:', error);
-        captureException(error);
-
-        return NextResponse.redirect(
-          new URL(appendQueryParam(redirectPath, 'error=pending_setup_failed'), APP_URL)
-        );
-      }
-    }
-
-    // Validate installation_id is present for normal install action
-    if (!installationId) {
-      captureMessage('GitHub callback missing installation_id', {
-        level: 'warning',
-        tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-        extra: { setupAction, rawState, allParams: Object.fromEntries(searchParams.entries()) },
-      });
-
-      return NextResponse.redirect(
-        new URL(appendQueryParam(redirectPath, 'error=missing_installation_id'), APP_URL)
-      );
-    }
-
-    // 6. Fetch installation details from GitHub
-    // Create app authentication without installationId to get installation details
-    const auth = createAppAuth({
-      appId: credentials.appId,
-      privateKey: credentials.privateKey,
+    // 6. Both bot-link and database consume returned null.
+    captureMessage('GitHub callback with unrecognized state', {
+      level: 'warning',
+      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
+      extra: { installationId, rawState, allParams: Object.fromEntries(searchParams.entries()) },
     });
-
-    // Get app-level JWT token to fetch installation details
-    const appAuth = await auth({ type: 'app' });
-    const octokitApp = new Octokit({
-      auth: appAuth.token,
-    });
-
-    // Fetch installation details using app-level token
-    let installation;
-    try {
-      console.log('Fetching installation details for ID:', installationId);
-      const result = await octokitApp.apps.getInstallation({
-        installation_id: parseInt(installationId),
-      });
-      installation = result.data;
-    } catch (error) {
-      const err = error as { message?: string; status?: number };
-
-      // Capture to Sentry for monitoring
-      captureException(error, {
-        tags: {
-          endpoint: 'github/callback',
-          source: 'github_api_get_installation',
-          status: err.status?.toString() || 'unknown',
-        },
-        extra: {
-          installationId,
-          ownerId,
-          ownerType: owner.type,
-          setupAction,
-          errorStatus: err.status,
-          errorMessage: err.message,
-        },
-      });
-
-      // If installation not found, it might have been deleted or belongs to a different app
-      if (err.status === 404) {
-        const encodedInstallationId = encodeURIComponent(installationId);
-
-        return NextResponse.redirect(
-          new URL(
-            appendQueryParam(
-              redirectPath,
-              `error=installation_not_found&id=${encodedInstallationId}`
-            ),
-            APP_URL
-          )
-        );
-      }
-
-      throw error;
-    }
-
-    // 7. Get selected repositories
-    // For 'selected' repositories, we fetch the list. For 'all', we set it to null
-    let repositories: PlatformRepository[] | null = null;
-    if (installation.repository_selection === 'selected') {
-      // Need to use installation token (not app token) to list repos
-      console.log('Fetching repositories for installation:', installationId);
-      const installationAuth = await auth({
-        type: 'installation',
-        installationId: parseInt(installationId),
-      });
-      const octokitInstallation = new Octokit({
-        auth: installationAuth.token,
-      });
-
-      const { data: reposData } =
-        await octokitInstallation.apps.listReposAccessibleToInstallation();
-      repositories = reposData.repositories.map(repo => ({
-        id: repo.id,
-        name: repo.name,
-        full_name: repo.full_name,
-        private: repo.private,
-      }));
-    }
-
-    // 8. Store installation in database using new platform_integrations table
-    if (setupAction === 'install' || setupAction === 'update') {
-      // Handle null account and union type (User | Organization)
-      if (!installation.account) {
-        throw new Error('Installation account is missing');
-      }
-
-      const account = installation.account;
-      const accountId = account.id.toString();
-      const accountLogin =
-        'login' in account ? account.login : 'slug' in account ? account.slug : accountId;
-
-      await upsertPlatformIntegrationForOwner(owner, {
-        platform: 'github',
-        integrationType: 'app',
-        platformInstallationId: installationId,
-        platformAccountId: accountId,
-        platformAccountLogin: accountLogin,
-        permissions: installation.permissions as IntegrationPermissions,
-        scopes: installation.events || [],
-        repositoryAccess: installation.repository_selection,
-        repositories: repositories && repositories.length > 0 ? repositories : null,
-        installedAt: installation.created_at
-          ? new Date(installation.created_at).toISOString()
-          : new Date().toISOString(),
-        githubAppType: appType,
-      });
-    }
-
-    // 9. Redirect to success page
-    const successQueryParam = returnTo ? 'github_install=success' : 'success=installed';
-
-    return NextResponse.redirect(
-      new URL(appendQueryParam(redirectPath, successQueryParam), APP_URL)
-    );
+    return NextResponse.redirect(new URL('/', APP_URL));
   } catch (error) {
     console.error('Error handling GitHub App callback:', error);
 
-    // Capture error to Sentry with context for debugging
     const searchParams = request.nextUrl.searchParams;
     const rawState = searchParams.get('state');
 
@@ -427,4 +210,333 @@ export async function GET(request: NextRequest) {
       new URL(appendQueryParam(redirectPath, 'error=installation_failed'), APP_URL)
     );
   }
+}
+
+/**
+ * New database-backed install flow. The state was atomically consumed.
+ * Verify the user matches and run the install flow using row data.
+ */
+async function handleNewInstallFlow(
+  request: NextRequest,
+  user: { id: string; google_user_email: string; google_user_name: string },
+  installRow: GitHubInstallState,
+  installationId: string,
+  setupAction: string | null
+): Promise<Response> {
+  // Verify user identity — a state minted for another user must never be usable.
+  if (installRow.kilo_user_id !== user.id) {
+    captureMessage('GitHub install state consumed by different user', {
+      level: 'warning',
+      tags: { endpoint: 'github/callback', source: 'install_state_user_mismatch' },
+      extra: {
+        tokenUserId: installRow.kilo_user_id,
+        callbackUserId: user.id,
+        installationId,
+      },
+    });
+    return NextResponse.redirect(new URL('/', APP_URL));
+  }
+
+  const ownerType = installRow.owner_type as Owner['type'];
+  const ownerId = installRow.owner_id;
+  const owner: Owner = { type: ownerType, id: ownerId };
+  const returnTo = installRow.return_to;
+
+  return handleCoreInstallFlow({
+    request,
+    user,
+    owner,
+    ownerId,
+    returnTo,
+    installationId,
+    setupAction,
+    githubAppType: installRow.github_app_type,
+  });
+}
+
+/**
+ * Legacy plaintext install flow. Parses owner from the org_/user_ prefix.
+ * Gated by GITHUB_LEGACY_INSTALL_STATE flag.
+ */
+async function handleLegacyInstallFlow(
+  request: NextRequest,
+  user: { id: string; google_user_email: string; google_user_name: string },
+  rawState: string,
+  installationId: string,
+  setupAction: string | null
+): Promise<Response> {
+  const searchParams = request.nextUrl.searchParams;
+
+  // Parse owner from state (with optional |return=<path> suffix)
+  const { ownerToken, returnTo } = parseStateReturn(rawState);
+  let owner: Owner;
+  let ownerId: string;
+
+  if (ownerToken.startsWith('org_')) {
+    ownerId = ownerToken.slice(4);
+    owner = { type: 'org', id: ownerId };
+  } else if (ownerToken.startsWith('user_')) {
+    ownerId = ownerToken.slice(5);
+    owner = { type: 'user', id: ownerId };
+  } else {
+    captureMessage('GitHub callback missing or invalid owner in state', {
+      level: 'warning',
+      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
+      extra: { installationId, rawState, allParams: Object.fromEntries(searchParams.entries()) },
+    });
+    return NextResponse.redirect(new URL('/', APP_URL));
+  }
+
+  const appType = await getGitHubAppTypeForOrganization(owner.type === 'org' ? owner.id : null);
+
+  return handleCoreInstallFlow({
+    request,
+    user,
+    owner,
+    ownerId,
+    returnTo,
+    installationId,
+    setupAction,
+    githubAppType: appType,
+  });
+}
+
+/**
+ * Core install flow shared by both legacy and new branches.
+ * Handles access checks, pending approval, and installation storage.
+ */
+async function handleCoreInstallFlow(params: {
+  request: NextRequest;
+  user: { id: string; google_user_email: string; google_user_name: string };
+  owner: Owner;
+  ownerId: string;
+  returnTo: string | null;
+  installationId: string;
+  setupAction: string | null;
+  githubAppType: string;
+}): Promise<Response> {
+  const { user, owner, ownerId, returnTo, installationId, setupAction, githubAppType } = params;
+  const searchParams = params.request.nextUrl.searchParams;
+
+  // Verify user has access to the owner
+  if (owner.type === 'org') {
+    await ensureOrganizationAccess({ user }, owner.id);
+  } else {
+    if (user.id !== owner.id) {
+      return NextResponse.redirect(new URL('/', APP_URL));
+    }
+  }
+
+  const integrationPath =
+    owner.type === 'org'
+      ? `/organizations/${owner.id}/integrations/github`
+      : `/integrations/github`;
+  const redirectPath = returnTo || integrationPath;
+
+  const credentials = getGitHubAppCredentials(githubAppType);
+
+  // Handle uninstall/suspend actions
+  if (setupAction === 'delete' || setupAction === 'suspend') {
+    console.log(`GitHub App ${setupAction} action detected, skipping installation fetch`);
+
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, `github_action=${setupAction}`), APP_URL)
+    );
+  }
+
+  // Handle pending approval - store requester info for webhook matching
+  if (setupAction === 'request') {
+    const code = searchParams.get('code');
+
+    try {
+      let githubRequester: { id: string; login: string } | undefined;
+
+      if (code) {
+        try {
+          githubRequester = await exchangeGitHubOAuthCode(code, githubAppType);
+
+          console.log('GitHub user fetched', {
+            github_user_id: githubRequester.id,
+            github_user_login: githubRequester.login,
+          });
+        } catch (error) {
+          console.error('Error fetching GitHub user:', error);
+          captureException(error);
+        }
+      }
+
+      if (githubRequester) {
+        const existingPending = await findPendingInstallationByRequesterId(githubRequester.id);
+
+        if (existingPending) {
+          const existingOwnerId =
+            existingPending.owned_by_organization_id || existingPending.owned_by_user_id;
+
+          console.log('User already has a pending installation', {
+            existingPendingId: existingPending.id,
+            existingOwnerId,
+            githubRequesterId: githubRequester.id,
+          });
+
+          const queryParam =
+            owner.type === 'org'
+              ? `error=pending_installation_exists&org=${existingOwnerId}`
+              : 'error=pending_installation_exists';
+
+          return NextResponse.redirect(
+            new URL(appendQueryParam(redirectPath, queryParam), APP_URL)
+          );
+        }
+      }
+
+      await createPendingIntegration({
+        organizationId: owner.type === 'org' ? owner.id : undefined,
+        userId: owner.type === 'user' ? owner.id : undefined,
+        requester: {
+          kilo_user_id: user.id,
+          kilo_user_email: user.google_user_email,
+          kilo_user_name: user.google_user_name,
+          requested_at: new Date().toISOString(),
+        },
+        githubRequester,
+        githubAppType,
+      });
+
+      const queryParam = returnTo ? 'github_pending_approval=true' : 'pending_approval=true';
+
+      return NextResponse.redirect(new URL(appendQueryParam(redirectPath, queryParam), APP_URL));
+    } catch (error) {
+      console.error('Error creating pending installation:', error);
+      captureException(error);
+
+      return NextResponse.redirect(
+        new URL(appendQueryParam(redirectPath, 'error=pending_setup_failed'), APP_URL)
+      );
+    }
+  }
+
+  // Validate installation_id is present for normal install action
+  if (!installationId) {
+    captureMessage('GitHub callback missing installation_id', {
+      level: 'warning',
+      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
+      extra: {
+        setupAction,
+        rawState: searchParams.get('state'),
+        allParams: Object.fromEntries(searchParams.entries()),
+      },
+    });
+
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, 'error=missing_installation_id'), APP_URL)
+    );
+  }
+
+  // Fetch installation details from GitHub
+  const auth = createAppAuth({
+    appId: credentials.appId,
+    privateKey: credentials.privateKey,
+  });
+
+  const appAuth = await auth({ type: 'app' });
+  const octokitApp = new Octokit({
+    auth: appAuth.token,
+  });
+
+  let installation;
+  try {
+    console.log('Fetching installation details for ID:', installationId);
+    const result = await octokitApp.apps.getInstallation({
+      installation_id: parseInt(installationId),
+    });
+    installation = result.data;
+  } catch (error) {
+    const err = error as { message?: string; status?: number };
+
+    captureException(error, {
+      tags: {
+        endpoint: 'github/callback',
+        source: 'github_api_get_installation',
+        status: err.status?.toString() || 'unknown',
+      },
+      extra: {
+        installationId,
+        ownerId,
+        ownerType: owner.type,
+        setupAction,
+        errorStatus: err.status,
+        errorMessage: err.message,
+      },
+    });
+
+    if (err.status === 404) {
+      const encodedInstallationId = encodeURIComponent(installationId);
+
+      return NextResponse.redirect(
+        new URL(
+          appendQueryParam(
+            redirectPath,
+            `error=installation_not_found&id=${encodedInstallationId}`
+          ),
+          APP_URL
+        )
+      );
+    }
+
+    throw error;
+  }
+
+  // Get selected repositories
+  let repositories: PlatformRepository[] | null = null;
+  if (installation.repository_selection === 'selected') {
+    console.log('Fetching repositories for installation:', installationId);
+    const installationAuth = await auth({
+      type: 'installation',
+      installationId: parseInt(installationId),
+    });
+    const octokitInstallation = new Octokit({
+      auth: installationAuth.token,
+    });
+
+    const { data: reposData } = await octokitInstallation.apps.listReposAccessibleToInstallation();
+    repositories = reposData.repositories.map(repo => ({
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.full_name,
+      private: repo.private,
+    }));
+  }
+
+  // Store installation in database
+  if (setupAction === 'install' || setupAction === 'update') {
+    if (!installation.account) {
+      throw new Error('Installation account is missing');
+    }
+
+    const account = installation.account;
+    const accountId = account.id.toString();
+    const accountLogin =
+      'login' in account ? account.login : 'slug' in account ? account.slug : accountId;
+
+    await upsertPlatformIntegrationForOwner(owner, {
+      platform: 'github',
+      integrationType: 'app',
+      platformInstallationId: installationId,
+      platformAccountId: accountId,
+      platformAccountLogin: accountLogin,
+      permissions: installation.permissions as IntegrationPermissions,
+      scopes: installation.events || [],
+      repositoryAccess: installation.repository_selection,
+      repositories: repositories && repositories.length > 0 ? repositories : null,
+      installedAt: installation.created_at
+        ? new Date(installation.created_at).toISOString()
+        : new Date().toISOString(),
+      githubAppType,
+    });
+  }
+
+  // Redirect to success page
+  const successQueryParam = returnTo ? 'github_install=success' : 'success=installed';
+
+  return NextResponse.redirect(new URL(appendQueryParam(redirectPath, successQueryParam), APP_URL));
 }

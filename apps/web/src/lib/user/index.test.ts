@@ -74,6 +74,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  github_install_states,
   code_review_feedback_events,
   code_review_memory_proposals,
   user_github_app_tokens,
@@ -1899,6 +1900,53 @@ describe('User', () => {
           .select({ count: count() })
           .from(referral_codes)
           .where(eq(referral_codes.kilo_user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete github_install_states for the soft-deleted user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      // Insert install states for both users
+      await db.insert(github_install_states).values([
+        {
+          token: 'soft-delete-test-token-' + Date.now(),
+          kilo_user_id: user.id,
+          owner_type: 'user',
+          owner_id: user.id,
+          github_app_type: 'standard',
+          return_to: '/github-app',
+          expires_at: new Date(Date.now() + 600_000).toISOString(),
+        },
+        {
+          token: 'soft-delete-test-token-other-' + Date.now(),
+          kilo_user_id: otherUser.id,
+          owner_type: 'org',
+          owner_id: 'org-999',
+          github_app_type: 'lite',
+          return_to: null,
+          expires_at: new Date(Date.now() + 600_000).toISOString(),
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      // The deleted user's install states must be gone
+      expect(
+        await db
+          .select({ count: count() })
+          .from(github_install_states)
+          .where(eq(github_install_states.kilo_user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+
+      // The other user's install states must remain
+      expect(
+        await db
+          .select({ count: count() })
+          .from(github_install_states)
+          .where(eq(github_install_states.kilo_user_id, otherUser.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

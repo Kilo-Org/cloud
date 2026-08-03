@@ -7,6 +7,7 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
+import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
 import { sentryLogger } from '@/lib/utils.server';
 
 const CRON_SECRET = process.env['CRON_SECRET'];
@@ -43,10 +44,15 @@ export async function GET(request: Request) {
 
     const accessCodesDeleted = await cleanupExpiredAccessCodes();
     sentryLogger('cron', 'info')(`Cleaned up ${accessCodesDeleted} expired access codes`);
+
+    const installStatesDeleted = await cleanupExpiredInstallStates();
+    sentryLogger('cron', 'info')(`Cleaned up ${installStatesDeleted} expired install states`);
+
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
         deleted_device_auth_request_count: deletedCount,
         deleted_access_code_count: accessCodesDeleted,
+        deleted_install_state_count: installStatesDeleted,
       })
     );
 
@@ -54,6 +60,7 @@ export async function GET(request: Request) {
       success: true,
       deletedCount,
       accessCodesDeleted,
+      installStatesDeleted,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

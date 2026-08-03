@@ -10709,4 +10709,27 @@ export const container_usage_segment = pgTable(
 );
 
 export type ContainerUsageSegment = typeof container_usage_segment.$inferSelect;
+
+export const github_install_states = pgTable(
+  'github_install_states',
+  {
+    token: text().primaryKey().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owner_type: text().notNull(),
+    owner_id: text().notNull(),
+    github_app_type: text().notNull(),
+    return_to: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_github_install_states_expires_at').on(table.expires_at),
+    check('github_install_states_owner_type_check', sql`${table.owner_type} IN ('org', 'user')`),
+  ]
+);
+
+export type GitHubInstallState = typeof github_install_states.$inferSelect;
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;

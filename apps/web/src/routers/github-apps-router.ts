@@ -32,6 +32,7 @@ import {
   getGitHubUserAuthorizationStatus,
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
+import { createInstallState } from '@/lib/integrations/github/install-state';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations
@@ -86,6 +87,29 @@ export const githubAppsRouter = createTRPCRouter({
     }
     return getGitHubAppTypeForOrganization(input?.organizationId ?? null);
   }),
+
+  // Mint a one-time install state token for the signed-in user.
+  mintInstallState: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        returnTo: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
+      const appType = await getGitHubAppTypeForOrganization(input.organizationId ?? null);
+
+      const token = await createInstallState({
+        kiloUserId: ctx.user.id,
+        ownerType: owner.type,
+        ownerId: owner.id,
+        githubAppType: appType,
+        returnTo: input.returnTo ?? null,
+      });
+
+      return { token };
+    }),
 
   // Get GitHub App installation status
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {

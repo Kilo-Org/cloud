@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -11,11 +11,14 @@ import { Button } from '@/components/ui/button';
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useOnboarding } from './OnboardingContext';
 import { resolveGitUrlFromRepo } from './onboarding.domain';
+import { buildGitHubInstallState } from '@/components/integrations/github-install-state';
 
 export function OnboardingStepRepo() {
   const { state, setRepo, setTownName } = useOnboarding();
   const { data: user } = useUser();
   const mainTrpc = useTRPC();
+
+  const mintInstallState = useMutation(mainTrpc.githubApps.mintInstallState.mutationOptions());
 
   const [selectedRepoFullName, setSelectedRepoFullName] = useState(state.repo?.fullName ?? '');
 
@@ -64,13 +67,21 @@ export function OnboardingStepRepo() {
 
   const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
 
-  const handleInstallGithub = useCallback(() => {
-    const owner = orgId ? `org_${orgId}` : `user_${user?.id}`;
-    const returnPath = `/gastown/onboarding?step=repo${orgId ? `&orgId=${orgId}` : ''}`;
-    const state = `${owner}|return=${encodeURIComponent(returnPath)}`;
-    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
-    window.location.href = installUrl;
-  }, [orgId, user?.id, githubAppName]);
+  const handleInstallGithub = useCallback(async () => {
+    try {
+      const result = await mintInstallState.mutateAsync({
+        organizationId: orgId ?? undefined,
+        returnTo: `/gastown/onboarding?step=repo${orgId ? `&orgId=${orgId}` : ''}`,
+      });
+      const state = buildGitHubInstallState(result.token);
+      const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
+      window.location.href = installUrl;
+    } catch (err) {
+      toast.error('Failed to start GitHub installation', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }, [orgId, githubAppName, mintInstallState]);
 
   const githubInstallParam = useSearchParams().get('github_install');
   const { refetch: refetchGithubRepos } = githubReposQuery;
@@ -152,10 +163,11 @@ export function OnboardingStepRepo() {
               type="button"
               variant="outline"
               onClick={handleInstallGithub}
+              disabled={mintInstallState.isPending}
               className="w-full gap-2 border-white/10 text-white/70 hover:text-white/90"
             >
               <ExternalLink className="size-4" />
-              Install GitHub App
+              {mintInstallState.isPending ? 'Starting installation...' : 'Install GitHub App'}
             </Button>
           )}
 

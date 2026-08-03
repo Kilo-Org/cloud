@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
 import { applyCustomPricingToPricing } from '@/lib/ai-gateway/custom-pricing';
-import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
+import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 
 const CACHE_CONTROL = 'public, max-age=0, s-maxage=60, stale-while-revalidate=60';
 
@@ -13,7 +13,7 @@ export async function GET(
 ) {
   const { provider, model } = await params;
   const modelId = `${provider}/${model}`;
-  if (isForbiddenFreeModel(modelId)) {
+  if (isUnavailableModel(modelId)) {
     return NextResponse.json(
       { error: { message: 'Not Found', code: 404 } },
       { status: 404, headers: { 'Cache-Control': CACHE_CONTROL } }

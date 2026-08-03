@@ -1,7 +1,7 @@
 import { claude_sonnet_clawsetup_model } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
-const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
+const unavailableModelIds: ReadonlySet<string> = new Set([
   'auto:free', // this is not a free model, OpenRouter can map it to a paid model
   'arcee-ai/trinity-large-preview:free',
   'arcee-ai/trinity-large-thinking:free',
@@ -46,6 +46,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
   'qwen/qwen3.7-plus:free',
+  'sakana/fugu-ultra', // this model is not available in the EU
   'upstage/solar-pro-3:free',
   'x-ai/grok-code-fast-1:optimized:free',
   'xiaomi/mimo-v2-omni:free',
@@ -57,14 +58,16 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   claude_sonnet_clawsetup_model.public_id, // only usable through kilo-auto
 ]);
 
-export function isForbiddenFreeModel(modelId: string): boolean {
-  return forbiddenFreeModelIds.has(modelId);
+export function isUnavailableModel(modelId: string): boolean {
+  return unavailableModelIds.has(modelId);
 }
 
-const forbiddenFreeModelFamilies: ReadonlySet<string> = new Set(
-  [...forbiddenFreeModelIds].map(normalizeModelId)
+// Only free-model families gate free endpoints; non-free unavailable models
+// (e.g. region-restricted) must not suppress a family's free endpoints.
+const unavailableFreeModelFamilies: ReadonlySet<string> = new Set(
+  [...unavailableModelIds].filter(modelId => modelId.endsWith(':free')).map(normalizeModelId)
 );
 
-export function familyHasForbiddenFreeModel(modelId: string): boolean {
-  return forbiddenFreeModelFamilies.has(normalizeModelId(modelId));
+export function familyHasUnavailableFreeModel(modelId: string): boolean {
+  return unavailableFreeModelFamilies.has(normalizeModelId(modelId));
 }

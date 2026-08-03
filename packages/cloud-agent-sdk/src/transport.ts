@@ -29,8 +29,9 @@ type CreateRemoteSessionInput = {
  * Ready-to-render file part for a remote-CLI `send_message` call. Distinct
  * from the cloud-only `attachments` field on {@link TransportSendInput}:
  * the remote CLI fetches these from the `url` and classifies them by
- * their `filename` (which MUST be the server-issued `<uuid>.<ext>`) and
- * `mime` (which the caller derives from the validated extension).
+ * their `mime` (which the caller derives from the validated extension).
+ * `filename` is the original picker filename, NOT the server-issued
+ * R2 key — the CLI uses it for display and file-system materialization.
  *
  * Deliberately the minimum the CLI needs: `id` / `sessionID` / `messageID`
  * are not part of the send payload because the CLI assigns them when it

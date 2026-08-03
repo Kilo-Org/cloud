@@ -19,7 +19,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'google/gemma-3-4b-it:free',
   'google/gemma-3n-e2b-it:free',
   'google/gemma-3n-e4b-it:free',
-  'google/gemma-4-26b-a4b-it:free', // removed Kilo-exclusive free model, formerly usable through kilo-auto
+  'google/gemma-4-26b-a4b-it:free',
   'google/gemma-4-31b-it:free',
   'kilo/auto-free', // discontinued variant of kilo-auto/free
   'kwaipilot/kat-coder-pro-v2.5:free',

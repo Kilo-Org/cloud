@@ -139,10 +139,6 @@ export type ResolveAutoModelResult =
   | { kind: 'no_free_models_available' }
   | { kind: 'organization_auto_configuration_error'; message: string };
 
-/**
- * Picks a model from the kilo-auto/free candidate rotation, deterministically
- * randomized per session (falling back to user id, then client IP).
- */
 async function resolveFreeRotation(
   apiKind: GatewayRequest['kind'] | null,
   sessionId: string | null,
@@ -306,8 +302,6 @@ export async function resolveAutoModel(
     if ((await balancePromise) > 0) {
       return { kind: 'ok', resolved: { model: GEMMA_4_26B_A4B_IT_ID } };
     }
-    // Without balance, kilo-auto/small falls back to the same free model
-    // rotation as kilo-auto/free.
     return resolveFreeRotation(apiKind, sessionId, clientIp, userPromise);
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id) {

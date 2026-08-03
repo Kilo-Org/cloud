@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MESSAGE_INPUT_BORDER_WIDTH,
+  MESSAGE_INPUT_HORIZONTAL_PADDING,
   MESSAGE_INPUT_LINE_HEIGHT,
   MESSAGE_INPUT_MAX_HEIGHT,
   MESSAGE_INPUT_MAX_VISIBLE_LINES,
@@ -12,6 +13,7 @@ import {
   resolveMessageInputBottomPadding,
   resolveMessageInputHeight,
   resolveMessageInputShouldScroll,
+  resolveMessageInputTextContentWidth,
 } from './message-input-layout';
 
 describe('message input layout', () => {
@@ -93,5 +95,19 @@ describe('message input layout', () => {
       returnKeyType: 'default',
       submitBehavior: 'newline',
     });
+  });
+});
+
+describe('resolveMessageInputTextContentWidth', () => {
+  it('subtracts the input border as well as its horizontal padding', () => {
+    expect(resolveMessageInputTextContentWidth(300)).toBe(
+      300 - MESSAGE_INPUT_HORIZONTAL_PADDING - MESSAGE_INPUT_BORDER_WIDTH * 2
+    );
+  });
+
+  it('measures narrower than padding alone so wrapped lines are never undercounted', () => {
+    expect(resolveMessageInputTextContentWidth(300)).toBeLessThan(
+      300 - MESSAGE_INPUT_HORIZONTAL_PADDING
+    );
   });
 });

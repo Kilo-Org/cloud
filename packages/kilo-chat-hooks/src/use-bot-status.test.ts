@@ -210,36 +210,15 @@ describe('useBotStatus', () => {
     }
   });
 
-  it('query is disabled until onConnected fires (wsReady gate)', () => {
+  it('query is enabled when sandboxId is set (no wsReady gate)', () => {
     const { eventClient, kiloChatClient } = makeClients({ connected: false });
 
     beginRender();
     useBotStatus(kiloChatClient, eventClient, 'sb-1');
 
-    // wsReady starts as false — query should be disabled
+    // Query should be enabled even before WS connects
     const queryCall = testState.queryCalls[0];
     expect(queryCall).toBeDefined();
-    expect(queryCall?.enabled).toBe(false);
-  });
-
-  it('query becomes enabled once WS connects', () => {
-    const { eventClient, kiloChatClient } = makeClients({ connected: true });
-
-    beginRender();
-    useBotStatus(kiloChatClient, eventClient, 'sb-1');
-
-    // onConnected fires synchronously when connected=true, which calls setWsReady(true).
-    // In real React this triggers a re-render; verify the slot was updated.
-    expect(testState.stateSlots[0]).toBe(true);
-
-    // Simulate the re-render: reset cursor + effects/queries for the second pass.
-    testState.queryCalls = [];
-    // (Don't reset cleanups — effects shouldn't re-run on a state-only re-render.)
-
-    beginRender();
-    useBotStatus(kiloChatClient, eventClient, 'sb-1');
-
-    const queryCall = testState.queryCalls[0];
     expect(queryCall?.enabled).toBe(true);
   });
 
@@ -373,7 +352,6 @@ describe('useBotStatus', () => {
     useBotStatus(kiloChatClient, eventClient, null);
 
     const queryCall = testState.queryCalls[0];
-    // enabled = sandboxId !== null && wsReady → false
     expect(queryCall?.enabled).toBe(false);
   });
 });

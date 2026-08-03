@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EventServiceClient } from '@kilocode/event-service';
 import {
@@ -32,12 +32,9 @@ export function useBotStatus(
 ): BotStatusRecord | null {
   const queryClient = useQueryClient();
 
-  // WS-ready gate. onConnected fires synchronously if already connected, and on every reconnect.
-  const [wsReady, setWsReady] = useState(false);
+  // On reconnect, refetch to catch up on anything we missed while disconnected.
   useEffect(() => {
     return eventClient.onConnected(() => {
-      setWsReady(true);
-      // On reconnect, refetch to catch up on anything we missed while disconnected.
       if (sandboxId) {
         void queryClient.invalidateQueries({ queryKey: botStatusKey(sandboxId) });
       }
@@ -69,7 +66,7 @@ export function useBotStatus(
       });
       return queryClient.getQueryData<BotStatusRecord | null>(botStatusKey(sandboxId)) ?? null;
     },
-    enabled: sandboxId !== null && wsReady,
+    enabled: sandboxId !== null,
     refetchInterval: POLL_INTERVAL_MS,
     staleTime: 0,
   });

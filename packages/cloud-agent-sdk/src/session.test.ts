@@ -511,7 +511,7 @@ describe('remote session create and retry commands', () => {
       'create_session',
       { protocolVersion: 1 },
       'owner',
-      expect.any(String) as string,
+      expect.any(String) as string
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     session.destroy();
@@ -546,7 +546,7 @@ describe('remote session create and retry commands', () => {
         orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       },
       'owner',
-      expect.any(String) as string,
+      expect.any(String) as string
     );
     session.destroy();
   });

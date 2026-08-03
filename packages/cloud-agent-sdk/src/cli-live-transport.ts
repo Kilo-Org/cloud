@@ -2,42 +2,39 @@
  * CLI live transport - consumes a shared user web connection and translates
  * one remote CLI session into normalized transport events and commands.
  */
-import { normalizeCliEvent, isChatEvent } from "./normalizer";
-import {
-  parseRemoteCommandCatalog,
-  type RemoteCommandState,
-} from "./remote-command-catalog";
-import { parseCreateSessionResponse } from "./create-session";
-import { parseExitSessionResponse } from "./exit-session";
+import { normalizeCliEvent, isChatEvent } from './normalizer';
+import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
+import { parseCreateSessionResponse } from './create-session';
+import { parseExitSessionResponse } from './exit-session';
 import {
   cliConnectionDataSchema,
   heartbeatDataSchema,
   remoteModelCatalogV1Schema,
   sessionsListDataSchema,
-} from "./schemas";
-import type { SlashCommandInfo } from "./schemas";
-import type { RemoteModelState } from "./remote-model-catalog";
+} from './schemas';
+import type { SlashCommandInfo } from './schemas';
+import type { RemoteModelState } from './remote-model-catalog';
 import type {
   CreateRemoteSessionInput,
   TransportFactory,
   TransportSendInput,
   TransportSink,
-} from "./transport";
+} from './transport';
 import type {
   KiloSessionId,
   SessionSnapshot,
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
-} from "./types";
+} from './types';
 import {
   CommandDeliveredError,
   UserWebCommandError,
   type UserWebCliEvent,
   type UserWebConnection,
-} from "./user-web-connection";
+} from './user-web-connection';
 
 /** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
-const INVALID_CREATE_SESSION_COMMAND = "invalid create_session command";
+const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
 
 /**
  * Build `create_session` wire data: always `protocolVersion: 1`, plus any
@@ -60,8 +57,7 @@ function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
   userWebConnection: UserWebConnection;
-  fetchSnapshot?:
-    ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
+  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware root snapshot fetch. When provided, every `replayCurrentSnapshot`
    * (initial bounded read AND reconnect immediate + delayed resync) uses it
@@ -71,7 +67,7 @@ type CliLiveTransportConfig = {
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,
-    options: { cursor?: string },
+    options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome | null>;
   /**
    * Called after a successful initial bounded page read. Reconnect and
@@ -81,8 +77,7 @@ type CliLiveTransportConfig = {
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   onError?: ((message: string) => void) | undefined;
   onRemoteModelStateChange?: ((state: RemoteModelState) => void) | undefined;
-  onRemoteCommandStateChange?:
-    ((state: RemoteCommandState) => void) | undefined;
+  onRemoteCommandStateChange?: ((state: RemoteCommandState) => void) | undefined;
   onCapabilityChange?: (() => void) | undefined;
   /**
    * Fired whenever the per-session capabilities advertised by the owning
@@ -93,9 +88,7 @@ type CliLiveTransportConfig = {
    * to recompute the `supportsAttachments` gate.
    */
   onCapabilitiesChange?:
-    | ((
-        capabilities: { attachments?: boolean | undefined } | undefined,
-      ) => void)
+    | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
     | undefined;
 };
 
@@ -104,7 +97,7 @@ type CliLiveTransportConfig = {
 // still appear after long backgrounding.
 const RECONNECT_RESYNC_DELAY_MS = 5000;
 const REMOTE_SESSION_EXIT_UNAVAILABLE =
-  "Remote session exit is unavailable for the current session";
+  'Remote session exit is unavailable for the current session';
 
 /**
  * Deep-copy a list of validated remote slash commands.
@@ -115,18 +108,14 @@ const REMOTE_SESSION_EXIT_UNAVAILABLE =
  * schema has already validated them. Avoids `JSON.parse(JSON.stringify(...))`
  * because the shape is known and bounded.
  */
-export function deepCopyCommands(
-  commands: SlashCommandInfo[],
-): SlashCommandInfo[] {
-  return commands.map((command) => ({
+export function deepCopyCommands(commands: SlashCommandInfo[]): SlashCommandInfo[] {
+  return commands.map(command => ({
     ...command,
     hints: command.hints.slice(),
   }));
 }
 
-function createCliLiveTransport(
-  config: CliLiveTransportConfig,
-): TransportFactory {
+function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactory {
   return (sink: TransportSink) => {
     let generation = 0;
     let cleanup: (() => void) | null = null;
@@ -140,11 +129,8 @@ function createCliLiveTransport(
      * payload that omitted this session). Compared structurally on every
      * new observation; only emitted on a real change.
      */
-    let currentCapabilities: { attachments?: boolean | undefined } | undefined =
-      undefined;
-    function publishCapabilities(
-      next: { attachments?: boolean | undefined } | undefined,
-    ): void {
+    let currentCapabilities: { attachments?: boolean | undefined } | undefined = undefined;
+    function publishCapabilities(next: { attachments?: boolean | undefined } | undefined): void {
       const previousAttachments = currentCapabilities?.attachments;
       const nextAttachments = next?.attachments;
       if (previousAttachments === nextAttachments) return;
@@ -166,12 +152,12 @@ function createCliLiveTransport(
     } | null = null;
     let remoteModelState: RemoteModelState = {
       ownerConnectionId: null,
-      protocol: "unknown",
-      refresh: "idle",
+      protocol: 'unknown',
+      refresh: 'idle',
     };
     let remoteCommandState: RemoteCommandState = {
       ownerConnectionId: null,
-      refresh: "idle",
+      refresh: 'idle',
       commands: [],
       canExitSession: undefined,
     };
@@ -194,8 +180,7 @@ function createCliLiveTransport(
 
     function canExitSession(): boolean {
       return (
-        remoteCommandState.canExitSession === true &&
-        remoteCommandState.ownerConnectionId !== null
+        remoteCommandState.canExitSession === true && remoteCommandState.ownerConnectionId !== null
       );
     }
 
@@ -206,7 +191,7 @@ function createCliLiveTransport(
       const snapshotted = deepCopyCommands(commands);
       lastValidCommands = snapshotted;
       sink.onServiceEvent({
-        type: "commands.available",
+        type: 'commands.available',
         commands: deepCopyCommands(snapshotted),
       });
     }
@@ -226,8 +211,8 @@ function createCliLiveTransport(
       commandCatalogRequestInFlight = null;
       publishRemoteModelState({
         ownerConnectionId: nextOwnerConnectionId,
-        protocol: "unknown",
-        refresh: nextOwnerConnectionId ? "loading" : "idle",
+        protocol: 'unknown',
+        refresh: nextOwnerConnectionId ? 'loading' : 'idle',
       });
       // Owner replacement clears the command cache; emit an empty catalog
       // event and the matching idle state so consumers can re-render.
@@ -235,14 +220,14 @@ function createCliLiveTransport(
         publishCommands([]);
         publishRemoteCommandState({
           ownerConnectionId: nextOwnerConnectionId,
-          refresh: "idle",
+          refresh: 'idle',
           commands: snapshotCommands(),
           canExitSession: undefined,
         });
       } else {
         publishRemoteCommandState({
           ownerConnectionId: nextOwnerConnectionId,
-          refresh: "idle",
+          refresh: 'idle',
           commands: snapshotCommands(),
           canExitSession: undefined,
         });
@@ -264,7 +249,7 @@ function createCliLiveTransport(
       error: unknown,
       expectedOwnerConnectionId: string,
       expectedGeneration: number,
-      expectedRequestGeneration: number,
+      expectedRequestGeneration: number
     ): void {
       if (
         expectedGeneration !== generation ||
@@ -274,19 +259,16 @@ function createCliLiveTransport(
         return;
       }
 
-      if (
-        error instanceof UserWebCommandError &&
-        error.code === "SESSION_OWNER_CHANGED"
-      ) {
+      if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
         setOwnerConnectionId(null);
         return;
       }
 
-      if (error instanceof Error && error.message.includes("unknown command")) {
+      if (error instanceof Error && error.message.includes('unknown command')) {
         publishRemoteModelState({
           ownerConnectionId: expectedOwnerConnectionId,
-          protocol: "legacy",
-          refresh: "idle",
+          protocol: 'legacy',
+          refresh: 'idle',
         });
         return;
       }
@@ -294,22 +276,14 @@ function createCliLiveTransport(
       publishRemoteModelState({
         ownerConnectionId: expectedOwnerConnectionId,
         protocol: remoteModelState.protocol,
-        ...(remoteModelState.catalog
-          ? { catalog: remoteModelState.catalog }
-          : {}),
-        refresh: "error",
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to discover remote models",
+        ...(remoteModelState.catalog ? { catalog: remoteModelState.catalog } : {}),
+        refresh: 'error',
+        error: error instanceof Error ? error.message : 'Failed to discover remote models',
       });
     }
 
     function discoverModels(expectedOwnerConnectionId: string): void {
-      if (
-        catalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId
-      )
-        return;
+      if (catalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
 
       catalogRequestGeneration += 1;
       const expectedRequestGeneration = catalogRequestGeneration;
@@ -321,21 +295,19 @@ function createCliLiveTransport(
       publishRemoteModelState({
         ownerConnectionId: expectedOwnerConnectionId,
         protocol: remoteModelState.protocol,
-        ...(remoteModelState.catalog
-          ? { catalog: remoteModelState.catalog }
-          : {}),
-        refresh: "loading",
+        ...(remoteModelState.catalog ? { catalog: remoteModelState.catalog } : {}),
+        refresh: 'loading',
       });
 
       void config.userWebConnection
         .sendCommand(
           config.kiloSessionId,
-          "list_models",
+          'list_models',
           { protocolVersion: 1 },
-          expectedOwnerConnectionId,
+          expectedOwnerConnectionId
         )
         .then(
-          (result) => {
+          result => {
             if (
               expectedGeneration !== generation ||
               expectedRequestGeneration !== catalogRequestGeneration ||
@@ -347,33 +319,31 @@ function createCliLiveTransport(
             const parsed = remoteModelCatalogV1Schema.safeParse(result);
             if (!parsed.success) {
               handleCatalogFailure(
-                new Error("Invalid remote model catalog"),
+                new Error('Invalid remote model catalog'),
                 expectedOwnerConnectionId,
                 expectedGeneration,
-                expectedRequestGeneration,
+                expectedRequestGeneration
               );
               return;
             }
 
             publishRemoteModelState({
               ownerConnectionId: expectedOwnerConnectionId,
-              protocol: "v1",
+              protocol: 'v1',
               catalog: parsed.data,
-              refresh: "idle",
+              refresh: 'idle',
             });
           },
-          (error) =>
+          error =>
             handleCatalogFailure(
               error,
               expectedOwnerConnectionId,
               expectedGeneration,
-              expectedRequestGeneration,
-            ),
+              expectedRequestGeneration
+            )
         )
         .finally(() => {
-          if (
-            catalogRequestInFlight?.generation === expectedRequestGeneration
-          ) {
+          if (catalogRequestInFlight?.generation === expectedRequestGeneration) {
             catalogRequestInFlight = null;
           }
         });
@@ -384,7 +354,7 @@ function createCliLiveTransport(
       expectedOwnerConnectionId: string,
       expectedGeneration: number,
       expectedRequestGeneration: number,
-      clearCatalog: boolean,
+      clearCatalog: boolean
     ): void {
       if (
         expectedGeneration !== generation ||
@@ -394,10 +364,7 @@ function createCliLiveTransport(
         return;
       }
 
-      if (
-        error instanceof UserWebCommandError &&
-        error.code === "SESSION_OWNER_CHANGED"
-      ) {
+      if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
         setOwnerConnectionId(null);
         return;
       }
@@ -406,14 +373,11 @@ function createCliLiveTransport(
       // and surface actionable copy through the command state so the chat
       // composer can prompt the user to upgrade. Never populate the global
       // session error atom for this.
-      if (
-        error instanceof UserWebCommandError &&
-        error.code === "CLI_UPGRADE_REQUIRED"
-      ) {
+      if (error instanceof UserWebCommandError && error.code === 'CLI_UPGRADE_REQUIRED') {
         publishCommands([]);
         publishRemoteCommandState({
           ownerConnectionId: expectedOwnerConnectionId,
-          refresh: "upgrade-required",
+          refresh: 'upgrade-required',
           commands: snapshotCommands(),
           canExitSession: undefined,
           message: error.message,
@@ -423,26 +387,23 @@ function createCliLiveTransport(
 
       // Legacy CLI without `list_commands` support: treat as "no commands
       // available" rather than a failure so the composer can hide suggestions.
-      if (error instanceof Error && error.message.includes("unknown command")) {
+      if (error instanceof Error && error.message.includes('unknown command')) {
         publishCommands([]);
         publishRemoteCommandState({
           ownerConnectionId: expectedOwnerConnectionId,
-          refresh: "idle",
+          refresh: 'idle',
           commands: snapshotCommands(),
           canExitSession: undefined,
         });
         return;
       }
 
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to discover remote commands";
+      const message = error instanceof Error ? error.message : 'Failed to discover remote commands';
       if (clearCatalog) {
         publishCommands([]);
         publishRemoteCommandState({
           ownerConnectionId: expectedOwnerConnectionId,
-          refresh: "error",
+          refresh: 'error',
           commands: snapshotCommands(),
           canExitSession: undefined,
           message,
@@ -454,7 +415,7 @@ function createCliLiveTransport(
       // populating the fatal session error atom.
       publishRemoteCommandState({
         ownerConnectionId: expectedOwnerConnectionId,
-        refresh: "error",
+        refresh: 'error',
         commands: snapshotCommands(),
         canExitSession: undefined,
         message,
@@ -462,11 +423,7 @@ function createCliLiveTransport(
     }
 
     function discoverCommands(expectedOwnerConnectionId: string): void {
-      if (
-        commandCatalogRequestInFlight?.ownerConnectionId ===
-        expectedOwnerConnectionId
-      )
-        return;
+      if (commandCatalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
 
       commandCatalogRequestGeneration += 1;
       const expectedRequestGeneration = commandCatalogRequestGeneration;
@@ -477,7 +434,7 @@ function createCliLiveTransport(
       };
       publishRemoteCommandState({
         ownerConnectionId: expectedOwnerConnectionId,
-        refresh: "loading",
+        refresh: 'loading',
         commands: snapshotCommands(),
         canExitSession: undefined,
       });
@@ -485,12 +442,12 @@ function createCliLiveTransport(
       void config.userWebConnection
         .sendCommand(
           config.kiloSessionId,
-          "list_commands",
+          'list_commands',
           { protocolVersion: 1 },
-          expectedOwnerConnectionId,
+          expectedOwnerConnectionId
         )
         .then(
-          (result) => {
+          result => {
             if (
               expectedGeneration !== generation ||
               expectedRequestGeneration !== commandCatalogRequestGeneration ||
@@ -502,11 +459,11 @@ function createCliLiveTransport(
             const parsed = parseRemoteCommandCatalog(result);
             if (!parsed.ok) {
               handleCommandCatalogFailure(
-                new Error("Invalid remote command catalog"),
+                new Error('Invalid remote command catalog'),
                 expectedOwnerConnectionId,
                 expectedGeneration,
                 expectedRequestGeneration,
-                true,
+                true
               );
               return;
             }
@@ -514,12 +471,12 @@ function createCliLiveTransport(
             publishCommands(parsed.commands);
             publishRemoteCommandState({
               ownerConnectionId: expectedOwnerConnectionId,
-              refresh: "idle",
+              refresh: 'idle',
               commands: snapshotCommands(),
               canExitSession: parsed.canExitSession,
             });
           },
-          (error) =>
+          error =>
             handleCommandCatalogFailure(
               error,
               expectedOwnerConnectionId,
@@ -528,28 +485,24 @@ function createCliLiveTransport(
               // A relay `CATALOG_TOO_LARGE` reports the response is over
               // the 512 KiB size cap; clear the prior catalog so the
               // composer can present a clean state.
-              error instanceof UserWebCommandError &&
-                error.code === "CATALOG_TOO_LARGE",
-            ),
+              error instanceof UserWebCommandError && error.code === 'CATALOG_TOO_LARGE'
+            )
         )
         .finally(() => {
-          if (
-            commandCatalogRequestInFlight?.generation ===
-            expectedRequestGeneration
-          ) {
+          if (commandCatalogRequestInFlight?.generation === expectedRequestGeneration) {
             commandCatalogRequestInFlight = null;
           }
         });
     }
 
     function replayPage(page: SessionSnapshotPage): void {
-      sink.onServiceEvent({ type: "session.created", info: page.info });
+      sink.onServiceEvent({ type: 'session.created', info: page.info });
 
       for (const msg of page.messages) {
-        sink.onChatEvent({ type: "message.updated", info: msg.info });
+        sink.onChatEvent({ type: 'message.updated', info: msg.info });
 
         for (const part of msg.parts) {
-          sink.onChatEvent({ type: "message.part.updated", part });
+          sink.onChatEvent({ type: 'message.part.updated', part });
         }
       }
     }
@@ -558,13 +511,9 @@ function createCliLiveTransport(
       sessionId: string,
       parentSessionId: string | undefined,
       event: string,
-      data: unknown,
+      data: unknown
     ): void {
-      if (
-        sessionId !== config.kiloSessionId &&
-        parentSessionId !== config.kiloSessionId
-      )
-        return;
+      if (sessionId !== config.kiloSessionId && parentSessionId !== config.kiloSessionId) return;
 
       const normalized = normalizeCliEvent(event, data);
       if (!normalized) return;
@@ -578,7 +527,7 @@ function createCliLiveTransport(
 
     function stopForDisconnectedSession(): void {
       if (sessionStopped) return;
-      sink.onServiceEvent({ type: "stopped", reason: "disconnected" });
+      sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
       sessionStopped = true;
       // The disconnected state is only cleared by a session.status event, so
       // the next post-reconnect heartbeat must always forward one — even when
@@ -591,18 +540,18 @@ function createCliLiveTransport(
     // fired while the socket was dead is never replayed, which otherwise
     // leaves the UI stuck on a busy indicator forever.
     function forwardHeartbeatStatus(status: string): void {
-      if (status !== "idle" && status !== "busy") return;
+      if (status !== 'idle' && status !== 'busy') return;
       if (status === lastForwardedHeartbeatStatus) return;
       lastForwardedHeartbeatStatus = status;
       sink.onServiceEvent({
-        type: "session.status",
+        type: 'session.status',
         sessionId: config.kiloSessionId,
         status: { type: status },
       });
     }
 
     function handleSystemMessage(event: string, data: unknown): void {
-      if (event === "cli.disconnected") {
+      if (event === 'cli.disconnected') {
         const parsed = cliConnectionDataSchema.safeParse(data);
         if (parsed.success && ownerConnectionId === parsed.data.connectionId) {
           setOwnerConnectionId(null);
@@ -611,13 +560,11 @@ function createCliLiveTransport(
         return;
       }
 
-      if (event === "sessions.list") {
+      if (event === 'sessions.list') {
         const parsed = sessionsListDataSchema.safeParse(data);
         if (!parsed.success) return;
 
-        const session = parsed.data.sessions.find(
-          (item) => item.id === config.kiloSessionId,
-        );
+        const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
         if (session) {
           setOwnerConnectionId(session.connectionId);
           sessionStopped = false;
@@ -631,13 +578,11 @@ function createCliLiveTransport(
         return;
       }
 
-      if (event === "sessions.heartbeat") {
+      if (event === 'sessions.heartbeat') {
         const parsed = heartbeatDataSchema.safeParse(data);
         if (!parsed.success) return;
 
-        const session = parsed.data.sessions.find(
-          (item) => item.id === config.kiloSessionId,
-        );
+        const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
         if (session) {
           setOwnerConnectionId(parsed.data.connectionId);
           sessionStopped = false;
@@ -656,11 +601,10 @@ function createCliLiveTransport(
     async function sendCommand(
       command: string,
       data: unknown,
-      mutationId?: string,
+      mutationId?: string
     ): Promise<unknown> {
       const expectedOwnerConnectionId = ownerConnectionId;
-      if (!expectedOwnerConnectionId)
-        throw new Error("Remote session has no connected owner");
+      if (!expectedOwnerConnectionId) throw new Error('Remote session has no connected owner');
 
       try {
         return await config.userWebConnection.sendCommand(
@@ -668,13 +612,10 @@ function createCliLiveTransport(
           command,
           data,
           expectedOwnerConnectionId,
-          ...(mutationId !== undefined ? [mutationId] : []),
+          ...(mutationId !== undefined ? [mutationId] : [])
         );
       } catch (error) {
-        if (
-          error instanceof UserWebCommandError &&
-          error.code === "SESSION_OWNER_CHANGED"
-        ) {
+        if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
           setOwnerConnectionId(null);
         }
         throw error;
@@ -682,61 +623,52 @@ function createCliLiveTransport(
     }
 
     function getRemoteModelFields(input: TransportSendInput):
-      | { kind: "none" }
+      | { kind: 'none' }
       | {
-          kind: "structured";
+          kind: 'structured';
           model: { providerID: string; modelID: string };
           variant?: string;
         }
-      | { kind: "legacy"; model: string; variant?: string } {
+      | { kind: 'legacy'; model: string; variant?: string } {
       const override = input.remoteModelOverride;
-      if (!override) return { kind: "none" };
+      if (!override) return { kind: 'none' };
 
-      if (
-        remoteModelState.protocol === "v1" &&
-        override.source === "cli-catalog"
-      ) {
+      if (remoteModelState.protocol === 'v1' && override.source === 'cli-catalog') {
         const provider = remoteModelState.catalog?.providers.find(
-          (item) => item.id === override.selection.model.providerID,
+          item => item.id === override.selection.model.providerID
         );
-        const model = provider?.models.find(
-          (item) => item.id === override.selection.model.modelID,
-        );
+        const model = provider?.models.find(item => item.id === override.selection.model.modelID);
         if (!model) {
-          throw new Error(
-            "Selected remote model is not available in the current CLI catalog",
-          );
+          throw new Error('Selected remote model is not available in the current CLI catalog');
         }
 
         const variant = override.selection.variant;
         if (variant && !model.variants.includes(variant)) {
           throw new Error(
-            "Selected remote model variant is not available in the current CLI catalog",
+            'Selected remote model variant is not available in the current CLI catalog'
           );
         }
         return {
-          kind: "structured",
+          kind: 'structured',
           model: override.selection.model,
           ...(variant ? { variant } : {}),
         };
       }
 
       if (
-        remoteModelState.protocol === "legacy" &&
-        override.source === "legacy-gateway" &&
-        override.selection.model.providerID === "kilo"
+        remoteModelState.protocol === 'legacy' &&
+        override.source === 'legacy-gateway' &&
+        override.selection.model.providerID === 'kilo'
       ) {
         return {
-          kind: "legacy",
+          kind: 'legacy',
           model: override.selection.model.modelID,
-          ...(override.selection.variant
-            ? { variant: override.selection.variant }
-            : {}),
+          ...(override.selection.variant ? { variant: override.selection.variant } : {}),
         };
       }
 
       throw new Error(
-        "Selected remote model override is incompatible with the connected CLI model protocol",
+        'Selected remote model override is incompatible with the connected CLI model protocol'
       );
     }
 
@@ -760,12 +692,12 @@ function createCliLiveTransport(
         publishCapabilities(undefined);
         publishRemoteModelState({
           ownerConnectionId: null,
-          protocol: "unknown",
-          refresh: "idle",
+          protocol: 'unknown',
+          refresh: 'idle',
         });
         publishRemoteCommandState({
           ownerConnectionId: null,
-          refresh: "idle",
+          refresh: 'idle',
           commands: snapshotCommands(),
           canExitSession: undefined,
         });
@@ -780,12 +712,7 @@ function createCliLiveTransport(
           const events = bufferedCliEvents;
           bufferedCliEvents = null;
           for (const msg of events ?? []) {
-            handleEventMessage(
-              msg.sessionId,
-              msg.parentSessionId,
-              msg.event,
-              msg.data,
-            );
+            handleEventMessage(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
           }
           sink.onReplayComplete?.();
         };
@@ -835,10 +762,7 @@ function createCliLiveTransport(
               return;
             }
             if (reportError) {
-              const message =
-                error instanceof Error
-                  ? error.message
-                  : "Failed to fetch snapshot";
+              const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
               config.onError?.(message);
             }
             bufferedCliEvents = [
@@ -850,30 +774,28 @@ function createCliLiveTransport(
           };
 
           if (config.fetchSnapshotPage) {
-            void config
-              .fetchSnapshotPage(config.kiloSessionId, {})
-              .then((page) => {
-                if (page && page.kind === "success") {
-                  onPage(page);
-                } else {
-                  onError(
-                    new Error(
-                      page === null
-                        ? "Session not found"
-                        : page.kind === "retryable_failure"
-                          ? "Session history temporarily unavailable"
-                          : page.kind === "too_large"
-                            ? "Session history too large to load"
-                            : "Session history is unavailable",
-                    ),
-                  );
-                }
-              }, onError);
+            void config.fetchSnapshotPage(config.kiloSessionId, {}).then(page => {
+              if (page && page.kind === 'success') {
+                onPage(page);
+              } else {
+                onError(
+                  new Error(
+                    page === null
+                      ? 'Session not found'
+                      : page.kind === 'retryable_failure'
+                        ? 'Session history temporarily unavailable'
+                        : page.kind === 'too_large'
+                          ? 'Session history too large to load'
+                          : 'Session history is unavailable'
+                  )
+                );
+              }
+            }, onError);
             return;
           }
 
           if (config.fetchSnapshot) {
-            void config.fetchSnapshot(config.kiloSessionId).then((snapshot) => {
+            void config.fetchSnapshot(config.kiloSessionId).then(snapshot => {
               onPage({
                 info: snapshot.info,
                 messages: snapshot.messages,
@@ -885,28 +807,20 @@ function createCliLiveTransport(
         };
 
         replayCurrentSnapshot(true);
-        const offCli = config.userWebConnection.onCliEvent(
-          config.kiloSessionId,
-          (msg) => {
-            const normalized = normalizeCliEvent(msg.event, msg.data);
-            const shouldBufferForSnapshot =
-              normalized &&
-              (isChatEvent(normalized) ||
-                normalized.type === "session.created" ||
-                normalized.type === "session.updated");
-            if (shouldBufferForSnapshot && bufferedCliEvents !== null) {
-              bufferedCliEvents.push(msg);
-              return;
-            }
-            handleEventMessage(
-              msg.sessionId,
-              msg.parentSessionId,
-              msg.event,
-              msg.data,
-            );
-          },
-        );
-        const offSystem = config.userWebConnection.onSystemEvent((msg) => {
+        const offCli = config.userWebConnection.onCliEvent(config.kiloSessionId, msg => {
+          const normalized = normalizeCliEvent(msg.event, msg.data);
+          const shouldBufferForSnapshot =
+            normalized &&
+            (isChatEvent(normalized) ||
+              normalized.type === 'session.created' ||
+              normalized.type === 'session.updated');
+          if (shouldBufferForSnapshot && bufferedCliEvents !== null) {
+            bufferedCliEvents.push(msg);
+            return;
+          }
+          handleEventMessage(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
+        });
+        const offSystem = config.userWebConnection.onSystemEvent(msg => {
           handleSystemMessage(msg.event, msg.data);
         });
         const offReconnect = config.userWebConnection.onReconnect(() => {
@@ -929,8 +843,9 @@ function createCliLiveTransport(
             discoverCommands(ownerConnectionId);
           }
         });
-        const releaseSubscription =
-          config.userWebConnection.subscribeToCliSession(config.kiloSessionId);
+        const releaseSubscription = config.userWebConnection.subscribeToCliSession(
+          config.kiloSessionId
+        );
         let released = false;
         cleanup = () => {
           if (released) return;
@@ -968,7 +883,7 @@ function createCliLiveTransport(
           wireData.orgId !== undefined;
         let result: unknown;
         try {
-          result = await sendCommand("create_session", wireData, mutationId);
+          result = await sendCommand('create_session', wireData, mutationId);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
@@ -978,9 +893,9 @@ function createCliLiveTransport(
             error.message === INVALID_CREATE_SESSION_COMMAND
           ) {
             result = await sendCommand(
-              "create_session",
+              'create_session',
               { protocolVersion: 1 },
-              crypto.randomUUID(),
+              crypto.randomUUID()
             );
           } else {
             throw error;
@@ -988,15 +903,15 @@ function createCliLiveTransport(
         }
         const parsed = parseCreateSessionResponse(result);
         if (!parsed.ok) {
-          throw new Error("Invalid create_session response");
+          throw new Error('Invalid create_session response');
         }
         return parsed.kiloSessionId;
       },
       exitSession: async () => {
-        if (remoteCommandState.refresh === "upgrade-required") {
+        if (remoteCommandState.refresh === 'upgrade-required') {
           throw new Error(
             remoteCommandState.message ??
-              "Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.",
+              'Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.'
           );
         }
         if (!canExitSession()) {
@@ -1005,20 +920,20 @@ function createCliLiveTransport(
 
         // `exit_cli` is the compatibility wire command name for
         // session-detach — the product-facing name is "session exit".
-        const result = await sendCommand("exit_cli", { protocolVersion: 1 });
+        const result = await sendCommand('exit_cli', { protocolVersion: 1 });
         if (!parseExitSessionResponse(result).ok) {
-          throw new Error("Invalid exit_cli response");
+          throw new Error('Invalid exit_cli response');
         }
       },
       send: async (input: TransportSendInput) => {
-        if (input.payload.type === "command") {
+        if (input.payload.type === 'command') {
           const remoteModel = getRemoteModelFields(input);
-          return sendCommand("send_command", {
+          return sendCommand('send_command', {
             protocolVersion: 1,
             command: input.payload.command,
             arguments: input.payload.arguments,
             ...(input.messageId ? { messageID: input.messageId } : {}),
-            ...(remoteModel.kind === "none"
+            ...(remoteModel.kind === 'none'
               ? {}
               : {
                   // `send_command` requires a structured model: never emit a
@@ -1028,75 +943,71 @@ function createCliLiveTransport(
                   // `dispatchedKilocodeModelId` would emit for the
                   // equivalent prompt wire.
                   model:
-                    remoteModel.kind === "structured"
+                    remoteModel.kind === 'structured'
                       ? remoteModel.model
                       : {
-                          providerID: "kilo",
-                          modelID: remoteModel.model.replace(/^kilo\//, ""),
+                          providerID: 'kilo',
+                          modelID: remoteModel.model.replace(/^kilo\//, ''),
                         },
-                  ...(remoteModel.variant
-                    ? { variant: remoteModel.variant }
-                    : {}),
+                  ...(remoteModel.variant ? { variant: remoteModel.variant } : {}),
                 }),
           });
         }
         const payload = input.payload;
         const remoteModel = getRemoteModelFields(input);
         const parts: Array<
-          | { type: "text"; text: string }
+          | { type: 'text'; text: string }
           | {
-              type: "file";
+              type: 'file';
               mime: string;
               filename: string;
               url: string;
             }
-        > = [{ type: "text", text: payload.prompt }];
+        > = [{ type: 'text', text: payload.prompt }];
         if (input.attachmentParts && input.attachmentParts.length > 0) {
           for (const part of input.attachmentParts) {
             parts.push({
-              type: "file",
+              type: 'file',
               mime: part.mime,
               filename: part.filename,
               url: part.url,
             });
           }
         }
-        return sendCommand("send_message", {
+        return sendCommand('send_message', {
           sessionID: config.kiloSessionId,
           parts,
           ...(payload.mode ? { agent: payload.mode } : {}),
-          ...(remoteModel.kind === "none"
+          ...(remoteModel.kind === 'none'
             ? {}
             : {
                 model: remoteModel.model,
-                ...(remoteModel.variant
-                  ? { variant: remoteModel.variant }
-                  : {}),
+                ...(remoteModel.variant ? { variant: remoteModel.variant } : {}),
               }),
         });
       },
-      interrupt: () => sendCommand("interrupt", {}),
-      answer: (payload) =>
-        sendCommand("question_reply", {
+      interrupt: () => sendCommand('interrupt', {}),
+      answer: payload =>
+        sendCommand('question_reply', {
           requestID: payload.requestId,
           answers: payload.answers,
         }),
-      reject: (payload) =>
-        sendCommand("question_reject", {
+      reject: payload =>
+        sendCommand('question_reject', {
           requestID: payload.requestId,
         }),
-      respondToPermission: (payload) =>
-        sendCommand("permission_respond", {
+      respondToPermission: payload =>
+        sendCommand('permission_respond', {
           requestID: payload.requestId,
           reply: payload.response,
         }),
-      acceptSuggestion: (payload) =>
-        sendCommand("suggestion_accept", {
+      acceptSuggestion: payload =>
+        sendCommand('suggestion_accept', {
           requestID: payload.requestId,
           index: payload.index,
         }),
-      dismissSuggestion: (payload) =>
-        sendCommand("suggestion_dismiss", {
+      dismissSuggestion: payload =>
+        sendCommand('suggestion_dismiss', {
           requestID: payload.requestId,
         }),
 

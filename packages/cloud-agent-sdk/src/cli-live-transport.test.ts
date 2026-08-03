@@ -2348,7 +2348,7 @@ describe('CliLiveTransport createSession', () => {
       'create_session',
       { protocolVersion: 1 },
       'owner',
-      expect.any(String) as string,
+      expect.any(String) as string
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
@@ -2476,7 +2476,7 @@ describe('CliLiveTransport createSession', () => {
       'create_session',
       { protocolVersion: 1 },
       'owner-a',
-      expect.any(String) as string,
+      expect.any(String) as string
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
@@ -2536,7 +2536,7 @@ describe('CliLiveTransport createSession', () => {
         orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       },
       'owner',
-      expect.any(String) as string,
+      expect.any(String) as string
     );
     transport.destroy();
   });

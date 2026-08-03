@@ -70,7 +70,7 @@ export const deadlineFetch: typeof fetch = async (url, init) => {
       const res = await e2eFetch(url, { ...init, signal });
       return res;
     },
-    init?.signal
+    init?.signal ?? undefined
   );
   return response;
 };

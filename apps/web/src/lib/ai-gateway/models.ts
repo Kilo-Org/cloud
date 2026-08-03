@@ -22,7 +22,11 @@ import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { gemma_4_26b_a4b_it_free_model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
-import { QWEN37_PLUS_MODEL_ID, qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
+import {
+  QWEN37_PLUS_MODEL_ID,
+  qwen36_plus_stealth_model,
+  qwen38_max_model,
+} from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
@@ -89,6 +93,7 @@ export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
+  qwen38_max_model,
   gpt_5_6_sol_stealth_model,
   claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,

@@ -9,6 +9,7 @@ import {
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
+import { qwen38_max_model } from './providers/qwen';
 import { tencent_hy3_free_model } from './providers/tencent';
 
 describe('isFreeModel', () => {
@@ -55,6 +56,24 @@ describe('isFreeModel', () => {
     test('does not register discounted OpenRouter Qwen models as Kilo exclusive', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-max')).toBeNull();
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
+    });
+
+    test('registers Qwen 3.8 Max as a priced unrestricted Vercel model', () => {
+      expect(findKiloExclusiveModel('qwen/qwen-3.8-max')).toBe(qwen38_max_model);
+      expect(qwen38_max_model.internal_id).toBe('alibaba/qwen3.8-max');
+      expect(qwen38_max_model.gateway).toBe('vercel');
+      expect(qwen38_max_model.inference_provider_restriction).toEqual([]);
+      expect(qwen38_max_model.pricing).toEqual([
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million: 2,
+            completion_per_million: 6,
+            input_cache_read_per_million: 0.25,
+            input_cache_write_per_million: 2.5,
+          },
+        },
+      ]);
     });
 
     test('registers Tencent Hy3 as free without adding it to Auto Free', () => {

@@ -12,11 +12,6 @@ type ConsentChange = {
 
 type ConsentChangeListener = (change: ConsentChange) => void;
 
-type ConsentRecord = {
-  readonly v: number;
-  readonly optional: boolean;
-};
-
 const listeners = new Set<ConsentChangeListener>();
 
 // Injective hex-encoding — reversible, alphanumeric, no collisions.
@@ -52,7 +47,7 @@ export async function readConsent(
   const raw = await SecureStore.getItemAsync(keyFor(userId));
   if (raw) {
     try {
-      const record: ConsentRecord = JSON.parse(raw);
+      const record: { v: unknown; optional: unknown } = JSON.parse(raw);
       if (record.v === CURRENT_CONSENT_VERSION) {
         return { mandatory: true, optional: record.optional === true };
       }

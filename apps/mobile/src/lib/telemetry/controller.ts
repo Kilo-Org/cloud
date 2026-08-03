@@ -12,7 +12,7 @@ type TelemetryDecision = {
   optional: boolean;
 };
 
-let decision: TelemetryDecision | undefined;
+let decision: TelemetryDecision | undefined = undefined;
 let generation = 0;
 let epoch = 0;
 

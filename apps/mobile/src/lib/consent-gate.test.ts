@@ -50,10 +50,7 @@ describe('consent gate', () => {
   it('returns needs-consent when only a legacy consent key exists', async () => {
     const { checkConsentGate } = await import('./consent-gate');
     // Legacy key: strip-based, non-injective. e.g. "user-1" → "user1".
-    store.set(
-      'consent-accepted-user1',
-      JSON.stringify({ v: 1, optional: false })
-    );
+    store.set('consent-accepted-user1', JSON.stringify({ v: 1, optional: false }));
 
     const result = await checkConsentGate('user-1');
 

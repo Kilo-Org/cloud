@@ -16,9 +16,15 @@ export const contextUnsubscribeMessageSchema = z.object({
   contexts: z.array(contextSchema).max(MAX_CONTEXTS),
 });
 
+export const ackMessageSchema = z.object({
+  type: z.literal('ack'),
+  seq: z.number().int().nonnegative(),
+});
+
 export const clientMessageSchema = z.discriminatedUnion('type', [
   contextSubscribeMessageSchema,
   contextUnsubscribeMessageSchema,
+  ackMessageSchema,
 ]);
 
 // ── Server → Client ────────────────────────────────────────────────
@@ -28,12 +34,14 @@ export const eventMessageSchema = z.object({
   context: z.string(),
   event: z.string(),
   payload: z.unknown(),
+  seq: z.number().int().nonnegative().optional(),
 });
 
 export const errorMessageSchema = z.object({
   type: z.literal('error'),
   code: z.enum(['too_many_contexts']),
   max: z.number().int().positive(),
+  seq: z.number().int().nonnegative().optional(),
 });
 
 export const serverMessageSchema = z.discriminatedUnion('type', [

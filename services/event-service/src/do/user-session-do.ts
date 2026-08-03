@@ -3,7 +3,13 @@ import { clientMessageSchema, MAX_CONTEXTS } from '@kilocode/event-service';
 import { configureDevLogging, logger, withLogTags } from '../util/logger';
 import type { ServerMessage } from '../types';
 
-type SerializedState = { contexts: string[] };
+/** Number of unacked events before a socket is closed as a zombie. */
+const UNACKED_THRESHOLD = 50;
+
+/** Close code for a socket that fell too far behind on acknowledgements. */
+const ZOMBIE_CLOSE_CODE = 4002;
+
+type SerializedState = { contexts: string[]; seq: number; acked: number; ackReceived: boolean };
 
 export class UserSessionDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -24,7 +30,12 @@ export class UserSessionDO extends DurableObject<Env> {
       const [client, server] = [pair[0], pair[1]];
 
       this.ctx.acceptWebSocket(server);
-      server.serializeAttachment({ contexts: [] } satisfies SerializedState);
+      server.serializeAttachment({
+        contexts: [],
+        seq: 0,
+        acked: 0,
+        ackReceived: false,
+      } satisfies SerializedState);
 
       logger.debug('fetch: accepted websocket');
       return new Response(null, { status: 101, webSocket: client });
@@ -81,6 +92,15 @@ export class UserSessionDO extends DurableObject<Env> {
           logger.debug('unsubscribed', { contexts: msg.contexts });
           break;
         }
+        case 'ack': {
+          const state = this.getState(ws);
+          state.acked = Math.max(state.acked, msg.seq);
+          state.ackReceived = true;
+          this.saveState(ws, state);
+          logger.debug('acked', { seq: msg.seq, acked: state.acked });
+          this.checkZombieClose(ws, state);
+          break;
+        }
       }
     });
   }
@@ -106,19 +126,32 @@ export class UserSessionDO extends DurableObject<Env> {
       logger.setTags({ userId: this.ctx.id.name, context, event });
 
       const sockets = this.ctx.getWebSockets();
-      const message = { type: 'event', context, event, payload } satisfies ServerMessage;
-      const text = JSON.stringify(message);
       let delivered = false;
 
       for (const ws of sockets) {
         const state = this.getState(ws);
         if (!state.contexts.has(context)) continue;
+
+        state.seq += 1;
+        this.saveState(ws, state);
+
+        const message = {
+          type: 'event',
+          context,
+          event,
+          payload,
+          seq: state.seq,
+        } satisfies ServerMessage;
+        const text = JSON.stringify(message);
+
         try {
           ws.send(text);
           delivered = true;
         } catch {
           // Connection dead — hibernation will clean up
         }
+
+        this.checkZombieClose(ws, state);
       }
       logger.debug('pushEvent: delivered', { sockets: sockets.length, delivered });
       return delivered;
@@ -144,14 +177,46 @@ export class UserSessionDO extends DurableObject<Env> {
 
   // ── Helpers ────────────────────────────────────────────────────────
 
-  private getState(ws: WebSocket): { contexts: Set<string> } {
-    const raw = ws.deserializeAttachment() as SerializedState | null;
-    return { contexts: new Set(raw?.contexts ?? []) };
+  /**
+   * Close a socket that has acknowledged at least once but is
+   * too far behind (seq - acked > UNACKED_THRESHOLD).
+   * A socket that has never acknowledged is never closed by this rule.
+   */
+  private checkZombieClose(
+    ws: WebSocket,
+    state: { seq: number; acked: number; ackReceived: boolean }
+  ): void {
+    if (!state.ackReceived) return;
+    if (state.seq - state.acked > UNACKED_THRESHOLD) {
+      logger.warn('zombie close', { seq: state.seq, acked: state.acked });
+      ws.close(ZOMBIE_CLOSE_CODE, 'too many unacked events');
+    }
   }
 
-  private saveState(ws: WebSocket, state: { contexts: Set<string> }): void {
+  private getState(ws: WebSocket): {
+    contexts: Set<string>;
+    seq: number;
+    acked: number;
+    ackReceived: boolean;
+  } {
+    const raw = ws.deserializeAttachment() as SerializedState | null;
+    return {
+      contexts: new Set(raw?.contexts ?? []),
+      seq: raw?.seq ?? 0,
+      acked: raw?.acked ?? 0,
+      ackReceived: raw?.ackReceived ?? false,
+    };
+  }
+
+  private saveState(
+    ws: WebSocket,
+    state: { contexts: Set<string>; seq: number; acked: number; ackReceived: boolean }
+  ): void {
     ws.serializeAttachment({
       contexts: [...state.contexts],
+      seq: state.seq,
+      acked: state.acked,
+      ackReceived: state.ackReceived,
     } satisfies SerializedState);
   }
 }

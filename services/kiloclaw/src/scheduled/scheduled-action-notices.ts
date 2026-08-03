@@ -637,16 +637,19 @@ async function markSent(db: WorkerDb, row: DueNotificationRow): Promise<void> {
   //      exists when the user actually received the original notice.
   //      The target-status gate mirrors the cancel mutation's scoping
   //      (apps/web/src/routers/admin-kiloclaw-instances-router.ts,
-  //      cancelScheduledAction): `status <> 'applied'`, not a literal
-  //      skip_reason='cancelled' check. A target the apply pass claimed
-  //      (pending -> running) can resolve to skipped:pinned,
-  //      skipped:pin_changed_in_flight, or failed with no relation to
-  //      this cancel at all — none of those write skip_reason='cancelled',
-  //      so gating on that literal would silently drop the notification
-  //      for a user who never got the announced change. `status <>
-  //      'applied'` is the real invariant: only a target that actually
-  //      received the change is excluded. Keep both call sites in sync
-  //      if this invariant changes.
+  //      cancelScheduledAction): `status NOT IN ('applied', 'running')`,
+  //      not a literal skip_reason='cancelled' check. A target the
+  //      apply pass claimed (pending -> running) can resolve to
+  //      applied, skipped:pinned, skipped:pin_changed_in_flight, or
+  //      failed with no relation to this cancel at all. Excluding
+  //      'running' here defers the decision for a target still
+  //      unresolved at this instant — the same unresolved-status race
+  //      the cancel mutation defers on — rather than guessing from a
+  //      snapshot that might flip to 'applied' moments later. The
+  //      deferred decision is made in recordScheduledActionTargetOutcome
+  //      (services/kiloclaw/src/db/index.ts) once the real outcome is
+  //      known. Keep all three call sites in sync if this invariant
+  //      changes.
   // ON CONFLICT keeps the insert idempotent against a separate cancel
   // transaction that already queued the cancellation from a 'sent' row.
   await db.execute(sql`
@@ -665,7 +668,7 @@ async function markSent(db: WorkerDb, row: DueNotificationRow): Promise<void> {
     INNER JOIN kiloclaw_scheduled_actions a ON a.id = t.scheduled_action_id
     WHERE f.kind = 'notice'
       AND a.status = 'cancelled'
-      AND t.status <> 'applied'
+      AND t.status NOT IN ('applied', 'running')
     ON CONFLICT (target_id, kind, channel) DO NOTHING
   `);
 }

@@ -3062,37 +3062,51 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // cancellation either. ON CONFLICT DO NOTHING keeps repeat
         // cancels idempotent.
         //
-        // Gated on `t.status <> 'applied'`, not on this cancel's own
-        // skip_reason='cancelled' write. A target claimed by the DO's
-        // apply pass (pending → running) moments before this cancel
-        // transaction runs is untouched by the UPDATE above — it's
-        // still 'running' here and resolves later via
-        // recordScheduledActionTargetOutcome with an outcome/skip_reason
-        // that has nothing to do with this cancel (applied, or
-        // skipped:pinned, skipped:pin_changed_in_flight, or failed).
-        // Scoping on the literal string 'cancelled' would silently drop
-        // the notification for every one of those non-applied outcomes
-        // even though the user never got the announced change. `status
-        // <> 'applied'` is the actual invariant we care about — "did
-        // this target get the change we told the user about" — and it
-        // stays correct regardless of which code path produced the
-        // terminal status. It also still excludes rows that legitimately
-        // applied before this cancel landed. The dispatch side can't
-        // filter this out either: selectDueNotifications lets
-        // kind='cancelled' rows through with no target-status gate (by
-        // design — a cancellation must not be blocked by parent/target
-        // state), so the scoping has to happen here at insert time.
-        // Mirrored in services/kiloclaw/src/scheduled/scheduled-action-notices.ts
-        // markSent — keep both in sync if this invariant changes.
+        // Gated on `t.status NOT IN ('applied', 'running')`, not on this
+        // cancel's own skip_reason='cancelled' write.
+        //
+        // Excluding 'applied' handles the easy case: a target that
+        // already got the announced change must not be told it was
+        // cancelled.
+        //
+        // Excluding 'running' handles a race this mutation cannot
+        // resolve on its own: claimScheduledActionTarget flips a target
+        // pending → running *before* the DO's apply pass dispatches the
+        // side effect. This cancel's own UPDATE above only touches
+        // 'pending' targets, so a target claimed moments earlier is
+        // still 'running' right now — genuinely unresolved. It may go
+        // on to resolve 'applied' (no notification should exist) or to
+        // something else (a notification is owed). We can't know yet,
+        // so we don't decide here. The deferred decision is made in
+        // recordScheduledActionTargetOutcome (services/kiloclaw/src/db/index.ts)
+        // once the real outcome is known: if it's not 'applied' and the
+        // parent is by then 'cancelled', that function queues the same
+        // cancellation-notification insert itself. ON CONFLICT on both
+        // sides keeps this idempotent regardless of which writer gets
+        // there first.
+        //
+        // For non-running, non-applied targets (already skipped/failed
+        // before this cancel ran, or freshly skipped by the UPDATE
+        // above), `status <> 'applied'` is the actual invariant we care
+        // about — "did this target get the change we told the user
+        // about" — and it stays correct regardless of which code path
+        // produced the terminal status. The dispatch side can't filter
+        // this out either: selectDueNotifications lets kind='cancelled'
+        // rows through with no target-status gate (by design — a
+        // cancellation must not be blocked by parent/target state), so
+        // the scoping has to happen here at insert time. Mirrored in
+        // services/kiloclaw/src/scheduled/scheduled-action-notices.ts
+        // markSent — keep all three call sites in sync if this
+        // invariant changes.
         //
         // The race between this cancel and an in-flight 'sending'
         // notice is closed in the sweep's markSent: when markSent
         // moves a row from 'sending' to 'sent' AND the parent action
         // is already in 'cancelled', it inserts a cancellation row in
-        // the same step (subject to the same status <> 'applied' gate).
-        // That makes the cancellation creation contingent on the notice
-        // actually reaching the user; a dispatch failure leaves no
-        // orphan cancellation pending.
+        // the same step (subject to the same gate). That makes the
+        // cancellation creation contingent on the notice actually
+        // reaching the user; a dispatch failure leaves no orphan
+        // cancellation pending.
         await tx.execute(sql`
           INSERT INTO kiloclaw_scheduled_action_notifications
             (target_id, channel, kind, status)
@@ -3103,7 +3117,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           WHERE t.scheduled_action_id = ${input.id}
             AND n.kind = 'notice'
             AND n.status = 'sent'
-            AND t.status <> 'applied'
+            AND t.status NOT IN ('applied', 'running')
           ON CONFLICT (target_id, kind, channel) DO NOTHING
         `);
 

@@ -2933,6 +2933,91 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       expect(target.status).toBe('skipped');
       expect(target.skip_reason).toBe('pinned');
     });
+
+    it('defers on a target still running at cancel time and does not notify if it later applies', async () => {
+      // The most likely real-world timing: an admin cancels while the
+      // DO's apply pass is mid-dispatch on a target it just claimed
+      // (pending -> running, via claimScheduledActionTarget). This
+      // cancel mutation's own UPDATE only touches 'pending' rows, so
+      // the running target is untouched — it is genuinely unresolved
+      // at the instant this mutation decides who to notify. Deciding
+      // eagerly from that snapshot is wrong: if the target goes on to
+      // apply, a "cancelled" notification would be sent for a change
+      // that actually happened.
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      await db
+        .update(kiloclaw_scheduled_action_notifications)
+        .set({ status: 'sent', sent_at: new Date().toISOString() })
+        .where(eq(kiloclaw_scheduled_action_notifications.kind, 'notice'));
+
+      // Simulate claimScheduledActionTarget having just claimed the
+      // target (pending -> running) before this cancel runs.
+      await db
+        .update(kiloclaw_scheduled_action_targets)
+        .set({ status: 'running' })
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+
+      await caller.admin.kiloclawInstances.cancelScheduledAction({ id: created.id });
+
+      // At this point the cancel mutation must NOT have queued a
+      // cancellation notification for the still-unresolved target.
+      const afterCancel = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(
+          and(
+            eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id),
+            eq(kiloclaw_scheduled_action_notifications.kind, 'cancelled')
+          )
+        );
+      expect(afterCancel).toHaveLength(0);
+
+      // The target was left untouched by cancel (still 'running').
+      const [stillRunning] = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(stillRunning.status).toBe('running');
+
+      // Now the target resolves 'applied' — the outcome the eager old
+      // logic could not know about yet. No cancellation notification
+      // must exist for it, before or after this resolution.
+      await db
+        .update(kiloclaw_scheduled_action_targets)
+        .set({ status: 'applied', applied_at: new Date().toISOString() })
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+
+      const afterResolve = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(
+          and(
+            eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id),
+            eq(kiloclaw_scheduled_action_notifications.kind, 'cancelled')
+          )
+        );
+      expect(afterResolve).toHaveLength(0);
+    });
   });
 
   describe('cancelScheduledActionTarget', () => {

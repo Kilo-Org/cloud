@@ -74,7 +74,7 @@
     },
     {
       "path": "/api/cron/db-replication-health",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/dispatch-affiliate-events",

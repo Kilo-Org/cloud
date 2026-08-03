@@ -3043,7 +3043,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             )
           );
 
-        await tx
+        // Capture the target rows this cancel actually took away from
+        // the user. Everything else under this parent has already
+        // resolved (applied / failed / previously skipped) and must NOT
+        // be told "your upgrade was cancelled" — see the notification
+        // scoping below.
+        const cancelledTargets = await tx
           .update(kiloclaw_scheduled_action_targets)
           .set({
             status: 'skipped',
@@ -3054,13 +3059,25 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               eq(kiloclaw_scheduled_action_targets.scheduled_action_id, input.id),
               eq(kiloclaw_scheduled_action_targets.status, 'pending')
             )
-          );
+          )
+          .returning({ id: kiloclaw_scheduled_action_targets.id });
 
         // Queue cancellation notifications for (target, channel) pairs
         // that already had a 'notice' row in 'sent' status. If the
         // user never received a heads-up we do not surface a
         // cancellation either. ON CONFLICT DO NOTHING keeps repeat
         // cancels idempotent.
+        //
+        // Scoped to the targets this cancel just moved pending →
+        // skipped, NOT to every target under the parent. A fleet-wide
+        // action routinely has targets that already applied (or failed)
+        // by the time an admin cancels the remainder; telling those
+        // users their upgrade was cancelled is factually wrong — their
+        // instance is already on the new version. The dispatch side
+        // can't filter this out either: selectDueNotifications lets
+        // kind='cancelled' rows through with no target-status gate (by
+        // design — a cancellation must not be blocked by parent/target
+        // state), so the scoping has to happen here at insert time.
         //
         // The race between this cancel and an in-flight 'sending'
         // notice is closed in the sweep's markSent: when markSent
@@ -3069,18 +3086,22 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // the same step. That makes the cancellation creation
         // contingent on the notice actually reaching the user; a
         // dispatch failure leaves no orphan cancellation pending.
-        await tx.execute(sql`
-          INSERT INTO kiloclaw_scheduled_action_notifications
-            (target_id, channel, kind, status)
-          SELECT n.target_id, n.channel, 'cancelled', 'pending'
-          FROM kiloclaw_scheduled_action_notifications n
-          INNER JOIN kiloclaw_scheduled_action_targets t
-            ON t.id = n.target_id
-          WHERE t.scheduled_action_id = ${input.id}
-            AND n.kind = 'notice'
-            AND n.status = 'sent'
-          ON CONFLICT (target_id, kind, channel) DO NOTHING
-        `);
+        if (cancelledTargets.length > 0) {
+          const cancelledTargetIds = sql.join(
+            cancelledTargets.map(t => sql`${t.id}`),
+            sql`, `
+          );
+          await tx.execute(sql`
+            INSERT INTO kiloclaw_scheduled_action_notifications
+              (target_id, channel, kind, status)
+            SELECT n.target_id, n.channel, 'cancelled', 'pending'
+            FROM kiloclaw_scheduled_action_notifications n
+            WHERE n.target_id IN (${cancelledTargetIds})
+              AND n.kind = 'notice'
+              AND n.status = 'sent'
+            ON CONFLICT (target_id, kind, channel) DO NOTHING
+          `);
+        }
 
         // Void any pending notice rows so the sweep doesn't deliver a
         // notice for a now-cancelled action. The sweep's selectDue

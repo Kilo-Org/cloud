@@ -635,6 +635,14 @@ async function markSent(db: WorkerDb, row: DueNotificationRow): Promise<void> {
   //      creation to a successful markSent means a dispatch failure
   //      leaves no orphan cancellation; the cancellation row only
   //      exists when the user actually received the original notice.
+  //      The target-status gate mirrors the cancel mutation's scoping:
+  //      only a target the cancel actually took away (skipped with
+  //      skip_reason='cancelled') gets told it was cancelled. A target
+  //      that applied in the window between claim and markSent is
+  //      already on the new version, so a cancellation notice would be
+  //      wrong. Safe to read here: markSent only reaches this branch
+  //      once the cancel transaction has committed, and that
+  //      transaction resolves pending targets before committing.
   // ON CONFLICT keeps the insert idempotent against a separate cancel
   // transaction that already queued the cancellation from a 'sent' row.
   await db.execute(sql`
@@ -653,6 +661,8 @@ async function markSent(db: WorkerDb, row: DueNotificationRow): Promise<void> {
     INNER JOIN kiloclaw_scheduled_actions a ON a.id = t.scheduled_action_id
     WHERE f.kind = 'notice'
       AND a.status = 'cancelled'
+      AND t.status = 'skipped'
+      AND t.skip_reason = 'cancelled'
     ON CONFLICT (target_id, kind, channel) DO NOTHING
   `);
 }

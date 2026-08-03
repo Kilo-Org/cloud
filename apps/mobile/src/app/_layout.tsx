@@ -133,6 +133,7 @@ function RootLayoutNav() {
   } = useCurrentUserId({ enabled: token != null });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
+  const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
   // Flipped by every splash-hide site below, so the app_startup drain can
@@ -225,6 +226,7 @@ function RootLayoutNav() {
       if (!token || !userId) {
         setConsentChecked(false);
         setNeedsConsent(false);
+        setOptionalConsentState(false);
         setConsentCheckError(null);
         return;
       }
@@ -237,11 +239,17 @@ function RootLayoutNav() {
       if (result.status === 'error') {
         Sentry.captureException(result.error);
         setNeedsConsent(false);
+        setOptionalConsentState(false);
         setConsentChecked(false);
         setConsentCheckError(result.error);
         return;
       }
 
+      if (result.status === 'accepted') {
+        setOptionalConsentState(result.optional);
+      } else {
+        setOptionalConsentState(false);
+      }
       setConsentCheckError(null);
       setNeedsConsent(result.status === 'needs-consent');
       setConsentChecked(true);
@@ -265,6 +273,7 @@ function RootLayoutNav() {
       }
 
       setNeedsConsent(!change.hasAccepted);
+      setOptionalConsentState(change.optional);
       setConsentChecked(true);
     });
 
@@ -272,7 +281,14 @@ function RootLayoutNav() {
   }, [token, userId]);
 
   useTrackingPermissionPrompt(!isLoading);
-  useAnalyticsConsentGate({ hasToken: token != null, consentChecked, needsConsent, email });
+  useAnalyticsConsentGate({
+    hasToken: token != null,
+    consentChecked,
+    needsConsent,
+    email,
+    accountId: userId,
+    optionalConsent,
+  });
   useScreenTracking();
 
   useEffect(() => {

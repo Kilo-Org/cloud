@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import * as Sentry from '@sentry/react-native';
 import {
   createContext,
   type ReactNode,
@@ -9,8 +10,8 @@ import {
   useState,
 } from 'react';
 
-import { resetAnalyticsUser } from '@/lib/analytics/posthog';
-import { trackEvent } from '@/lib/appsflyer';
+import { discardPostHog } from '@/lib/analytics/posthog';
+import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
@@ -25,6 +26,8 @@ import {
   ORGANIZATION_STORAGE_KEY,
   SESSION_FILTERS_KEY,
 } from '@/lib/storage-keys';
+import { clearTelemetryDecision } from '@/lib/telemetry/controller';
+import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 
 // Pre-load token at module level so it's available before React mounts
 const preloadedToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -62,21 +65,25 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Synchronous gate close — must happen before any await so capture
+    // is denied for the entire async teardown window.
+    clearTelemetryDecision();
+    Sentry.setUser(null);
+
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     // Clear per-user preferences so they don't leak to the next signed-in account
     await SecureStore.deleteItemAsync(ORGANIZATION_STORAGE_KEY);
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
     await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
     await clearLastActiveInstance();
-    // PR-review storage is keyed by (owner, repo, number) so it's not
-    // obviously user-scoped, but the user-facing recents list absolutely
-    // is — clear it so the next signed-in account doesn't inherit the
-    // previous user's recently-opened PRs.
     await clearRecentPrs();
     await clearViewedFiles();
     clearAgentModelPreference();
     clearReasoningPreference();
-    resetAnalyticsUser();
+    // SDK teardown — drop queues, do not flush them.
+    resetAppsFlyerState();
+    await discardPostHog();
+    purgePostHogPersistence();
     queryClient.clear();
     setToken(undefined);
   }, []);

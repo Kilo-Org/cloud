@@ -313,7 +313,7 @@ describe('discardPostHog', () => {
 
     let optOutResolve: (() => void) | undefined = undefined;
     hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         optOutResolve = resolve;
       });
     });
@@ -365,7 +365,7 @@ describe('resumePostHog', () => {
 
     let optOutResolve: (() => void) | undefined = undefined;
     hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         optOutResolve = resolve;
       });
     });

@@ -50,12 +50,15 @@ describe('getCodeReviewTerminalReasonCopy', () => {
 
   it('explains that the byok rate limit is not retried', () => {
     const copy = getCodeReviewTerminalReasonCopy('assistant_rate_limited_byok');
+    // Source line wrapping is not meaningful: markdown collapses single
+    // newlines, so assert on the rendered wording rather than the layout.
+    const wording = copy?.summaryBody.replace(/\s+/g, ' ');
 
-    expect(copy?.summaryBody).toContain('did not run');
-    expect(copy?.summaryBody).toContain('does not retry automatically');
+    expect(wording).toContain('did not run');
+    expect(wording).toContain('does not retry automatically');
     // Inline comments are deliberately left in place, so the summary has to say
     // they are stale rather than let them read as current findings.
-    expect(copy?.summaryBody).toContain('inline comments');
+    expect(wording).toContain('inline comments');
   });
 
   // 'managed' means the request used Kilo's credentials, which currently

@@ -63,14 +63,9 @@ const COPY_BY_TERMINAL_REASON = new Map<CodeReviewTerminalReason, CodeReviewTerm
 ## Code Review Summary
 
 **This review did not run.** Your provider API key hit its rate limit, so the
-request was rejected before the review started.
-
-Kilo does not retry automatically, because the quota is held by your provider
-and a retry would hit the same limit. Push a new commit once the limit resets to
-run the review again.
-
-Any inline comments on this pull request are from an earlier review and have not
-been re-checked against the latest commit.`,
+request was rejected before the review started. Kilo does not retry
+automatically, because the quota is your provider's; push a new commit once it
+resets. Any inline comments below are from an earlier review.`,
     },
   ],
 ]);

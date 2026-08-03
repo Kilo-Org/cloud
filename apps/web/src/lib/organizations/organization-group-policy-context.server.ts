@@ -18,7 +18,19 @@ import { captureException } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
 export type OrganizationPolicySubject =
-  | { type: 'member'; kiloUserId: string }
+  | {
+      type: 'member';
+      kiloUserId: string;
+      /**
+       * Kilo admins and parent-organization owners are authorized for an
+       * organization without holding a membership row, so they belong to no
+       * group. Set this when the caller has already been authorized by another
+       * path: they are then evaluated against organization-level policy instead
+       * of being rejected. Enforcement paths must leave it unset so a caller
+       * without direct access still fails closed.
+       */
+      allowNonMember?: boolean;
+    }
   | { type: 'defaultAccess' };
 
 export type OrganizationGroupPolicyContext = {
@@ -101,6 +113,7 @@ export async function getOrganizationGroupPolicyContext(params: {
   const client = params.tx ?? db;
   const organization = await resolveOrganization(client, params);
 
+  let isDirectMember = false;
   if (params.subject.type === 'member') {
     const [membership] = await client
       .select({ userId: organization_memberships.kilo_user_id })
@@ -112,7 +125,8 @@ export async function getOrganizationGroupPolicyContext(params: {
         )
       )
       .limit(1);
-    if (!membership) {
+    isDirectMember = Boolean(membership);
+    if (!isDirectMember && !params.subject.allowNonMember) {
       throw new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have direct access to this organization',
@@ -134,7 +148,9 @@ export async function getOrganizationGroupPolicyContext(params: {
     : DEFAULT_POLICIES;
 
   let groupPolicies: OrganizationGroupPolicies[] = [];
-  if (params.subject.type === 'member') {
+  // A non-member caller belongs to no group, so only organization-level policy
+  // applies to them.
+  if (params.subject.type === 'member' && isDirectMember) {
     const groups = await client
       .select({ id: organization_groups.id, policies: organization_groups.policies })
       .from(organization_group_memberships)

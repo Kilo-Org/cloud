@@ -97,11 +97,6 @@ export async function shouldRouteToVercel(
   request: GatewayRequest,
   randomSeed: string
 ) {
-  // BYOK in the Vercel AI Gateway was not working for Laguna models.
-  if (requestedModel.includes('laguna')) {
-    return false;
-  }
-
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const percentages = await getVercelRoutingPercentages();
   const routingPercentage = (await isFreeModel(requestedModel))

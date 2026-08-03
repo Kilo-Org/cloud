@@ -36,6 +36,9 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
+import { shouldStartAnalytics } from '@/lib/analytics-consent';
+import { APP_STARTUP_EVENT, captureEvent } from '@/lib/analytics/posthog';
+import { markStartup, markStartupComplete, takeStartupTimings } from '@/lib/startup-timing';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -92,7 +95,6 @@ function initSentry(consented: boolean) {
     sendDefaultPii: false,
 
     enableLogs: true,
-    tracesSampleRate: 0,
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(consented),
 
@@ -112,7 +114,7 @@ captureLaunchDeepLink();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading, signOut } = useAuth();
-  const { updateRequired, isChecking: updateChecking } = useForceUpdate();
+  const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
     JetBrainsMono_600SemiBold,
@@ -133,6 +135,9 @@ function RootLayoutNav() {
   const [needsConsent, setNeedsConsent] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
+  // Flipped by every splash-hide site below, so the app_startup drain can
+  // depend on "startup finished" as an ordinary dependency.
+  const [startupFinished, setStartupFinished] = useState(false);
 
   useEffect(() => {
     if (fontsError) {
@@ -143,7 +148,33 @@ function RootLayoutNav() {
   useSentryConsentSync(consentChecked && !needsConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
-  const isLoading = authLoading || updateChecking || !fontsReady || !themeHasLoaded;
+  // The force-update check is deliberately absent: it is a live network round
+  // trip that fails open in every branch (lib/hooks/use-force-update), so
+  // holding first paint for it only ever costs time. `updateRequired` starts
+  // false, first paint happens, and the effect below routes to /force-update
+  // if the check later says an update is required.
+  const isLoading = authLoading || !fontsReady || !themeHasLoaded;
+
+  // Startup phase timings (lib/startup-timing). Idempotent per mark, so this
+  // effect re-runs freely as gates settle. `userIdLoading` is false while the
+  // query is disabled, so it only counts once there is a token.
+  useEffect(() => {
+    if (!authLoading) {
+      markStartup('auth_ready');
+    }
+    if (fontsReady) {
+      markStartup('fonts_ready');
+    }
+    if (themeHasLoaded) {
+      markStartup('theme_ready');
+    }
+    if (token != null && !userIdLoading) {
+      markStartup('user_ready');
+    }
+    if (consentChecked) {
+      markStartup('consent_ready');
+    }
+  }, [authLoading, fontsReady, themeHasLoaded, token, userIdLoading, consentChecked]);
 
   useEffect(() => {
     if (themeHasLoaded) {
@@ -306,6 +337,8 @@ function RootLayoutNav() {
       if (!inForceUpdate) {
         router.replace('/force-update');
       } else {
+        markStartupComplete('force-update');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
       }
       return;
@@ -318,17 +351,23 @@ function RootLayoutNav() {
 
     if (!token) {
       if (inAuthGroup) {
+        markStartupComplete('login');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
       } else {
         router.replace('/(auth)/login');
       }
     } else {
       if (userIdError) {
+        markStartupComplete('user-error');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
         return;
       }
 
       if (consentCheckError) {
+        markStartupComplete('consent-error');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
         return;
       }
@@ -339,6 +378,8 @@ function RootLayoutNav() {
 
       if (needsConsent) {
         if (onConsentRoute) {
+          markStartupComplete('consent');
+          setStartupFinished(true);
           void SplashScreen.hideAsync();
         } else {
           router.replace('/(app)/consent' as Href);
@@ -351,6 +392,8 @@ function RootLayoutNav() {
         return;
       }
 
+      markStartupComplete('app');
+      setStartupFinished(true);
       void SplashScreen.hideAsync();
       // Navigate to pending deep link (cold start universal link / notification tap)
       const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
@@ -397,6 +440,31 @@ function RootLayoutNav() {
     }
     setPendingShareId(null);
   }, [pendingShareId, isShellReady, onGateRoute, router]);
+
+  // One `app_startup` event per launch. It needs BOTH "startup finished" and
+  // "analytics is allowed to run", and neither implies the other — a
+  // consent-settled launch can still be waiting on fonts, and a splash hidden
+  // at the consent screen has no analytics client yet. So both are
+  // dependencies, and whichever settles last triggers the send.
+  //
+  // Must stay the LAST effect here: `takeStartupTimings()` consumes the payload
+  // and `captureEvent` no-ops while the PostHog client is null, so this has to
+  // run after useAnalyticsConsentGate's initPostHog().
+  //
+  // Signed-out launches are never reported — PostHog does not start without
+  // consent, and that is the intended trade.
+  useEffect(() => {
+    if (
+      !startupFinished ||
+      !shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
+    ) {
+      return;
+    }
+    const timings = takeStartupTimings();
+    if (timings) {
+      captureEvent(APP_STARTUP_EVENT, timings);
+    }
+  }, [startupFinished, token, consentChecked, needsConsent]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;

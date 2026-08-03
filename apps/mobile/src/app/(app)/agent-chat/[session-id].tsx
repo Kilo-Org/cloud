@@ -23,6 +23,7 @@ export default function SessionDetailScreen() {
     via,
     spawned,
     shareId: shareIdParam,
+    autoSend: autoSendRaw,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -39,9 +40,11 @@ export default function SessionDetailScreen() {
      */
     spawned?: string;
     shareId?: string;
+    autoSend?: string;
   }>();
   // Param can be string | string[] depending on how the route was opened.
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
+  const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const trpc = useTRPC();
   const router = useRouter();
   const sessionQuery = useQuery({
@@ -139,6 +142,7 @@ export default function SessionDetailScreen() {
         sessionId={sessionId as KiloSessionId}
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}
+        autoSend={autoSendParam === '1'}
       />
     </AgentSessionProvider>
   );

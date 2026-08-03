@@ -33,7 +33,11 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
-import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
+import {
+  COMPOSER_INPUT_PADDING_HORIZONTAL,
+  resolveComposerTextContentWidth,
+  shouldEnableComposerInputScroll,
+} from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -56,6 +60,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
+import {
+  shouldArmAutoSendOnDelivery,
+  shouldAutoSendPrefilledShare,
+} from '@/lib/composer-auto-send';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
@@ -64,7 +72,6 @@ import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-subm
 const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
 const TEXT_INPUT_VERTICAL_PADDING = 24;
-const TEXT_INPUT_HORIZONTAL_PADDING = 32;
 const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
@@ -116,6 +123,8 @@ type ChatComposerProps = {
   commandState?: RemoteCommandState | null;
   /** Share-gate delivery id; composer takes the payload and clears the route param. */
   shareId?: string;
+  /** Remote-spawn auto-send flag; fires one submit after share delivery completes. */
+  autoSend?: boolean;
 };
 
 export function ChatComposer({
@@ -139,6 +148,7 @@ export function ChatComposer({
   commands = [],
   commandState = null,
   shareId,
+  autoSend,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -152,6 +162,14 @@ export function ChatComposer({
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [autoSendArmed, setAutoSendArmed] = useState(false);
+  const autoSendRef = useRef(autoSend === true);
+  autoSendRef.current = autoSend === true;
+  const [shareDelivered, setShareDelivered] = useState(false);
+  // Ref copy of shareDelivered so handleChangeText (a regular function body)
+  // always reads the current value without depending on a state variable that
+  // React batches behind the render.
+  const shareDeliveredRef = useRef(false);
   // Remount the input row after Stop. iOS leaves the multiline TextInput
   // non-interactive after the editable=false→true flip that happens when
   // the SDK unlocks the composer post-interrupt (Item 14 E2E gate). Defer
@@ -200,7 +218,7 @@ export function ChatComposer({
     minHeight: TEXT_INPUT_MIN_HEIGHT,
     maxHeight: TEXT_INPUT_MAX_HEIGHT,
     verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
-    textContentWidth: inputWidth - TEXT_INPUT_HORIZONTAL_PADDING,
+    textContentWidth: resolveComposerTextContentWidth(inputWidth),
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
@@ -254,6 +272,13 @@ export function ChatComposer({
     measure.setText(value);
     setHasText(value.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(value));
+    // Delivery applies text BEFORE onDelivered fires, so any
+    // handleChangeText after shareDelivered is a user edit. Disarm
+    // so a later gate resolution (upload completion) cannot
+    // auto-send the user's modified draft.
+    if (shareDeliveredRef.current) {
+      setAutoSendArmed(false);
+    }
   }
 
   const { addCandidates, removeAttachment, retryAttachment } = upload;
@@ -264,6 +289,16 @@ export function ChatComposer({
     maxLength: 4000,
     onChangeText: handleChangeText,
     addCandidates,
+    onDelivered: () => {
+      setAutoSendArmed(
+        shouldArmAutoSendOnDelivery({
+          autoSend: autoSendRef.current,
+          deliveredText: textRef.current,
+        })
+      );
+      setShareDelivered(true);
+      shareDeliveredRef.current = true;
+    },
   });
 
   const voiceInput = useVoiceInput({
@@ -547,6 +582,30 @@ export function ChatComposer({
     });
   }
 
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+
+  const autoSendFiredRef = useRef(false);
+  useEffect(() => {
+    if (
+      !shouldAutoSendPrefilledShare({
+        autoSend: autoSendArmed,
+        alreadyFired: autoSendFiredRef.current,
+        shareDelivered,
+        hasText,
+        hasAttachments: upload.attachments.length > 0,
+        attachmentsEnabled,
+        canSend: control.canSend,
+        isUploading: upload.isUploading,
+        hasFailedAttachments: upload.hasFailedAttachments,
+      })
+    ) {
+      return;
+    }
+    autoSendFiredRef.current = true;
+    void submitRef.current();
+  }, [autoSendArmed, shareDelivered, hasText, attachmentsEnabled, control.canSend, upload]);
+
   function handleStop() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     pendingDraftRestoreRef.current = textRef.current;
@@ -577,7 +636,7 @@ export function ChatComposer({
   }
 
   function handleInputLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
+    const nextWidth = Math.max(Math.floor(event.nativeEvent.layout.width), 0);
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
@@ -594,7 +653,7 @@ export function ChatComposer({
     height: measure.height,
     includeFontPadding: false,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
-    paddingHorizontal: 16,
+    paddingHorizontal: COMPOSER_INPUT_PADDING_HORIZONTAL,
     paddingVertical: 12,
     textAlignVertical: 'top',
     width: '100%',

@@ -16,13 +16,19 @@ type ApplySharePrefillOptions = {
   onChangeText: (text: string) => void;
   addCandidates: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
   clearShareIdParam: () => void;
+  /**
+   * Called after a payload was fully delivered (text applied, files queued)
+   * and before the route params are cleared. Optional for callers that only
+   * need text and file prefill.
+   */
+  onDelivered?: () => void;
 };
 
 /**
  * Delivers a share payload into a composer once. Ordered: take → text → files →
- * clear route param. Text is applied before awaiting files so a file failure
- * cannot cost the user their text. On `addCandidates` throw the payload is not
- * restored and text is not re-applied.
+ * signal delivery → clear route params. Text is applied before awaiting files so
+ * a file failure cannot cost the user their text. On `addCandidates` throw the
+ * payload is not restored and text is not re-applied.
  */
 export async function applySharePrefill(options: ApplySharePrefillOptions): Promise<void> {
   const shareId = options.shareId;
@@ -32,6 +38,7 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
 
   const payload = takeSharePayload(shareId);
   if (payload === null) {
+    options.clearShareIdParam();
     return;
   }
 
@@ -53,6 +60,10 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
     }
   }
 
+  // Signal delivery before clearing the route param so the destination
+  // composer arms its auto-send while autoSend is still on the URL.
+  options.onDelivered?.();
+
   // URL hygiene only — nothing depends on clearing the param.
   options.clearShareIdParam();
 }
@@ -63,6 +74,7 @@ type UseSharePrefillOptions = {
   maxLength: number;
   onChangeText: (text: string) => void;
   addCandidates: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
+  onDelivered?: () => void;
 };
 
 /**
@@ -76,6 +88,7 @@ export function useSharePrefill({
   maxLength,
   onChangeText,
   addCandidates,
+  onDelivered,
 }: UseSharePrefillOptions): void {
   const router = useRouter();
   const onChangeTextRef = useRef(onChangeText);
@@ -84,6 +97,8 @@ export function useSharePrefill({
   addCandidatesRef.current = addCandidates;
   const maxLengthRef = useRef(maxLength);
   maxLengthRef.current = maxLength;
+  const onDeliveredRef = useRef(onDelivered);
+  onDeliveredRef.current = onDelivered;
 
   useEffect(() => {
     if (shareId === undefined || shareId === '') {
@@ -101,8 +116,9 @@ export function useSharePrefill({
         await addCandidatesRef.current(candidates);
       },
       clearShareIdParam: () => {
-        router.setParams({ shareId: undefined });
+        router.setParams({ shareId: undefined, autoSend: undefined });
       },
+      onDelivered: onDeliveredRef.current,
     });
   }, [shareId, inputRef, router]);
 }

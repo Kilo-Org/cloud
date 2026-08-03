@@ -1887,9 +1887,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     };
 
-    // Stream 6 MiB of bytes (one more than the 5 MiB + 1 cap) so the
+    // Stream 21 MiB of bytes (one more than the 20 MiB + 1 cap) so the
     // bounded reader triggers the overflow branch deterministically.
-    const total = 6 * 1024 * 1024;
+    const total = 21 * 1024 * 1024;
     const chunk = new Uint8Array(64 * 1024);
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -1916,23 +1916,23 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       { type: 'text', text: 'Process this binary' },
       {
         type: 'text',
-        text: 'attachment too-large.bin could not be retrieved (Attachment too large: bytes exceeded the 5 MiB cap)',
+        text: 'attachment too-large.bin could not be retrieved (Attachment too large: bytes exceeded the 20 MiB cap)',
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(false);
   });
 
-  it('materializes a file exactly at the 5 MiB cap as a binary text part', async () => {
-    const localPath = path.join(tmpDir, 'exactly-5-mib.bin');
+  it('materializes a file exactly at the 20 MiB cap as a binary text part', async () => {
+    const localPath = path.join(tmpDir, 'exactly-20-mib.bin');
     const prompt: WrapperPromptRequest = {
       message: {
         id: 'msg_exact',
         prompt: 'Process this file',
         attachments: [
           {
-            filename: 'exactly-5-mib.bin',
+            filename: 'exactly-20-mib.bin',
             mime: 'application/octet-stream',
-            signedUrl: 'https://r2.example.com/exactly-5-mib.bin',
+            signedUrl: 'https://r2.example.com/exactly-20-mib.bin',
             localPath,
           },
         ],
@@ -1947,20 +1947,20 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     };
 
     const result = await materializePromptAttachments(prompt, {
-      fetch: asFetch(async () => new Response(makeByteStream(5 * 1024 * 1024), { status: 200 })),
+      fetch: asFetch(async () => new Response(makeByteStream(20 * 1024 * 1024), { status: 200 })),
     });
 
     expect(result.message.parts).toEqual([
       { type: 'text', text: 'Process this file' },
       {
         type: 'text',
-        text: `binary attachment saved: filename=exactly-5-mib.bin mime=application/octet-stream size=${5 * 1024 * 1024} path=${localPath}`,
+        text: `binary attachment saved: filename=exactly-20-mib.bin mime=application/octet-stream size=${20 * 1024 * 1024} path=${localPath}`,
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(true);
   });
 
-  it('rejects a file one byte over the 5 MiB cap and deletes the partial file', async () => {
+  it('rejects a file one byte over the 20 MiB cap and deletes the partial file', async () => {
     const localPath = path.join(tmpDir, 'one-byte-over.bin');
     const prompt: WrapperPromptRequest = {
       message: {
@@ -1986,7 +1986,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     const result = await materializePromptAttachments(prompt, {
       fetch: asFetch(
-        async () => new Response(makeByteStream(5 * 1024 * 1024 + 1), { status: 200 })
+        async () => new Response(makeByteStream(20 * 1024 * 1024 + 1), { status: 200 })
       ),
     });
 
@@ -1994,7 +1994,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       { type: 'text', text: 'Process this file' },
       {
         type: 'text',
-        text: 'attachment one-byte-over.bin could not be retrieved (Attachment too large: bytes exceeded the 5 MiB cap)',
+        text: 'attachment one-byte-over.bin could not be retrieved (Attachment too large: bytes exceeded the 20 MiB cap)',
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(false);

@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
@@ -26,6 +26,9 @@ import {
   REMOTE_SPAWN_RETRYABLE_TOAST,
   resolveRemoteSubmitOutcome,
 } from '@/lib/remote-submit-outcome';
+import { resolveRemoteSpawnAdmission } from '@/lib/remote-spawn-admission';
+import { putSharePayload, type SharePayload } from '@/lib/share-payload';
+import { appendShareParams } from '@/lib/share-navigation';
 
 /**
  * Refetch signature matching the slice of
@@ -85,13 +88,11 @@ type UseRemoteSpawnDispatchArgs = {
    */
   instanceList: InstancePickerInstance[];
   /**
-   * When true on a ready outcome, skip `router.replace` so a share that
-   * arrived mid-spawn is not stranded by navigating away. Optional —
-   * only the new-session route passes this today.
+   * Snapshot of the composer, read once at press time. When it returns a
+   * payload the ready path stages it, and the destination composer submits it
+   * once. Optional: a caller with no composer omits it.
    */
-  shouldCancelReadyNavigation?: () => boolean;
-  /** Called when ready navigation is cancelled by `shouldCancelReadyNavigation`. */
-  onReadyNavigationCancelled?: () => void;
+  getSubmitPayload?: () => SharePayload | null;
 };
 
 type UseRemoteSpawnDispatchResult = {
@@ -148,8 +149,7 @@ export function useRemoteSpawnDispatch({
   setRunOnInstance,
   refetchInstances,
   instanceList,
-  shouldCancelReadyNavigation,
-  onReadyNavigationCancelled,
+  getSubmitPayload,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
   const inheritance = useContext(RemoteSpawnInheritanceContext);
@@ -180,26 +180,12 @@ export function useRemoteSpawnDispatch({
     runOnInstanceRef.current = runOnInstance;
   }, [runOnInstance]);
 
-  // Same lifetime concern as runOnInstanceRef: the cancel predicate and
-  // cancelled callback must be read at ready-time, not captured from the
-  // render that started the spawn. Mode/model/variant likewise — spawn
-  // should use the values at press time, but the ref keeps them current
-  // if the parent re-renders mid-flight before spawn is invoked.
-  const shouldCancelReadyNavigationRef = useRef(shouldCancelReadyNavigation);
-  const onReadyNavigationCancelledRef = useRef(onReadyNavigationCancelled);
+  const getSubmitPayloadRef = useRef(getSubmitPayload);
   const spawnFieldsRef = useRef({ mode, model, variant, organizationId });
   useEffect(() => {
-    shouldCancelReadyNavigationRef.current = shouldCancelReadyNavigation;
-    onReadyNavigationCancelledRef.current = onReadyNavigationCancelled;
+    getSubmitPayloadRef.current = getSubmitPayload;
     spawnFieldsRef.current = { mode, model, variant, organizationId };
-  }, [
-    shouldCancelReadyNavigation,
-    onReadyNavigationCancelled,
-    mode,
-    model,
-    variant,
-    organizationId,
-  ]);
+  }, [getSubmitPayload, mode, model, variant, organizationId]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
@@ -207,6 +193,16 @@ export function useRemoteSpawnDispatch({
     }
     const selectedConnectionId = runOnInstance.connectionId;
     const fields = spawnFieldsRef.current;
+    // Press-time snapshot. Read once, here, before any await.
+    const submitPayload = getSubmitPayloadRef.current?.() ?? null;
+    const admission = resolveRemoteSpawnAdmission({
+      instance: runOnInstance,
+      payload: submitPayload,
+    });
+    if (!admission.allowed) {
+      toast.error(admission.toast);
+      return;
+    }
     const createInput = buildCreateRemoteSessionInput({
       mode: fields.mode,
       model: fields.model,
@@ -216,14 +212,15 @@ export function useRemoteSpawnDispatch({
     void (async () => {
       const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput);
       if (outcome.status === 'ready') {
-        if (shouldCancelReadyNavigationRef.current?.() === true) {
-          // Cancel contract: toast via callback, then leave the user on the
-          // cloud composer — not on RemoteSpawnComposer with a live selection.
-          onReadyNavigationCancelledRef.current?.();
-          setRunOnInstance(null);
+        const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
+        if (submitPayload === null) {
+          router.replace(spawnedPath);
           return;
         }
-        router.replace(getSpawnedAgentSessionPath(outcome.sessionID, organizationId));
+        const shareId = putSharePayload(submitPayload);
+        router.replace(
+          appendShareParams(spawnedPath as string, shareId, { autoSend: true }) as Href
+        );
         return;
       }
       if (outcome.status === 'nonRetryable') {

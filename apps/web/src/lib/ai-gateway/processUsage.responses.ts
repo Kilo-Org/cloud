@@ -23,10 +23,7 @@ import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
-type ResponsesApiUsage = Omit<OpenAI.Responses.ResponseUsage, 'input_tokens_details'> & {
-  input_tokens_details: OpenAI.Responses.ResponseUsage['input_tokens_details'] & {
-    cache_write_tokens?: number;
-  };
+type ResponsesApiUsage = OpenAI.Responses.ResponseUsage & {
   cost?: number;
   is_byok?: boolean | null;
   cost_details?: { upstream_inference_cost: number };

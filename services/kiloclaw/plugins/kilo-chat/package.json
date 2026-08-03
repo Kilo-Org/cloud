@@ -28,11 +28,11 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "openclaw": "2026.6.11"
+    "openclaw": "2026.7.1"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
-    "openclaw": "2026.6.11",
+    "openclaw": "2026.7.1",
     "vitest": "catalog:"
   },
   "dependencies": {

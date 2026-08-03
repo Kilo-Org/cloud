@@ -426,6 +426,190 @@ PY
   fi
 }
 
+# The assert above proves the file exists and is well-formed. It does NOT assert
+# the policy VALUES, so a bump (or a controller change) that silently loosened the
+# shipped default from allowlist/on-miss to full/off would still pass it — the
+# exact drift you most want to hear about, since it removes every exec approval
+# prompt.
+#
+# Asserted against what a FRESH instance is seeded with. Deliberately not made
+# configurable: if the default legitimately changes, this should fail and be
+# updated in the same commit that changes it.
+assert_exec_approvals_policy() {
+  local cid="$1"
+  local details
+
+  # No if/else around this: the probe prints the actual policy on success and the
+  # reason on failure, so `$details` is already the value to compare either way.
+  # Branching on the exit status and then calling `check` identically in both arms
+  # would look meaningful while doing nothing, and would let a later edit to one
+  # arm silently apply to only one outcome. `|| true` keeps a non-zero probe from
+  # aborting the whole smoke under `set -euo pipefail`.
+  details=$(docker exec -i "$cid" python3 - <<'PY' 2>&1 || true
+import json
+from pathlib import Path
+
+doc = json.loads(Path('/root/.openclaw/exec-approvals.json').read_text())
+defaults = doc.get('defaults') or {}
+security, ask = defaults.get('security'), defaults.get('ask')
+if security != 'allowlist' or ask != 'on-miss':
+    raise SystemExit(f"security={security!r} ask={ask!r} (expected allowlist/on-miss)")
+print('allowlist/on-miss')
+PY
+  )
+  check "exec-approvals default policy" "allowlist/on-miss" "$details"
+}
+
+# An image model must be configured or the agent cannot process images at all,
+# no matter what the catalog advertises: `openclaw infer image describe` fails
+# with "No image understanding provider is configured or ready", and an agent
+# asked to look at an image answers that it cannot view images.
+#
+# This is a KiloClaw-owned config concern — the controller writes openclaw.json —
+# so it belongs in our smoke rather than being left to upstream defaults.
+assert_image_model_configured() {
+  local cid="$1"
+  local details
+
+  # Assert on the fields that actually NAME a model, not on the mere presence of a
+  # container object. `tools.media` existing as e.g. {"image": {"enabled": false}}
+  # says nothing about an image model being wired up, so treating it as truthy
+  # evidence would let this report "configured" in exactly the state it exists to
+  # catch. These are the two settings OpenClaw itself names when it refuses:
+  # "Configure tools.media.image.models or agents.defaults.imageModel.primary".
+  #
+  # Unconditional `check` (see the note on the sibling above): `$details` already
+  # carries either the resolved model or the reason, so branching would be inert.
+  details=$(docker exec -i "$cid" python3 - <<'PY' 2>&1 || true
+import json
+from pathlib import Path
+
+cfg = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
+
+image_model = ((cfg.get('agents') or {}).get('defaults') or {}).get('imageModel')
+primary = image_model.get('primary') if isinstance(image_model, dict) else image_model
+primary = primary if isinstance(primary, str) and primary.strip() else None
+
+media_models = (((cfg.get('tools') or {}).get('media') or {}).get('image') or {}).get('models')
+media_named = bool(media_models) if isinstance(media_models, (list, tuple, dict)) else False
+
+if primary:
+    print(f'configured ({primary})')
+elif media_named:
+    print('configured (tools.media.image.models)')
+else:
+    raise SystemExit(
+        'no image model named: agents.defaults.imageModel.primary and '
+        'tools.media.image.models are both unset'
+    )
+PY
+  )
+  # Compare on the prefix so the resolved model name can be shown without having
+  # to hard-code which model an instance happens to be seeded with.
+  case "$details" in
+    configured*) check "image model configured" "configured" "configured" ;;
+    *)           check "image model configured" "configured" "$details" ;;
+  esac
+}
+
+# End-to-end image round trip: push a real image through the SAME gateway method
+# the Control UI composer uses (`chat.send` with an `attachments` array), then
+# assert the agent runtime actually received it.
+#
+# Correctness of this assert rests on `promptImages`, taken from OpenClaw's own
+# `[context-diag] pre-prompt:` line, NOT on the model's reply. Asking a model
+# "can you see an image?" tests the model's honesty; `promptImages` is the
+# runtime's own count of image blocks it put in the prompt, so it cannot be
+# talked around.
+#
+# Why this exists: every catalog-level vision assert can pass — models advertising
+# `input=text+image`, the configured model among them — while no image ever
+# reaches the model. Only a round trip catches that, and nothing else here does.
+#
+# NOTE: `chat.send`'s `attachments` is `Type.Array(Type.Unknown())` in OpenClaw's
+# schema, i.e. UNVALIDATED. A malformed element is silently dropped rather than
+# rejected, so a failure here means "the image did not reach the prompt" and does
+# not by itself localise the loss to client, gateway, or agent.
+assert_image_round_trip() {
+  local cid="$1"
+  local session_key="agent:main:kiloclaw-image-roundtrip-$$"
+  local prompt_images
+
+  echo
+  echo "--- image round trip (chat.send attachments -> promptImages) ---"
+
+  # NOTE on `|| true` below: this file runs under `set -euo pipefail`. Every
+  # command here must be guarded, because a non-zero exit would abort the WHOLE
+  # smoke rather than record one failure — losing every later assertion and the
+  # remaining legs. That is not hypothetical: the unguarded `grep` this replaced
+  # took the run down when it found no match, which is precisely the case this
+  # assertion exists to report.
+  # Output is discarded, not captured-then-ignored: this call's stdout/stderr can
+  # carry provider/model response content, so it must never reach the console.
+  # Only the exit status is used.
+  if ! docker exec "$cid" sh -c '
+    set -e
+    SK="'"$session_key"'"
+    IMG=/usr/local/lib/node_modules/openclaw/dist/control-ui/favicon-32.png
+    [ -f "$IMG" ] || IMG=$(find /usr/local/lib/node_modules/openclaw/dist -name "*.png" | head -1)
+    [ -n "$IMG" ] || { echo "no png in image" >&2; exit 1; }
+    B64=$(base64 -w0 "$IMG" 2>/dev/null || base64 "$IMG" | tr -d "\n")
+    python3 - "$B64" "$SK" > /tmp/kc-img-params.json <<PY
+import json, sys
+b64, sk = sys.argv[1], sys.argv[2]
+print(json.dumps({
+    "sessionKey": sk,
+    "agentId": "main",
+    "message": "Describe the attached image in one short sentence.",
+    "deliver": False,
+    "idempotencyKey": sk,
+    "attachments": [{
+        "type": "image",
+        "mimeType": "image/png",
+        "fileName": "kiloclaw-smoke.png",
+        "content": b64,
+    }],
+}))
+PY
+    openclaw gateway call chat.send --params "$(cat /tmp/kc-img-params.json)" \
+      --expect-final --timeout 240000 --json
+  ' >/dev/null 2>&1; then
+    check "image round trip (promptImages >= 1)" "image-received" "chat.send failed"
+    # assert_live_agent_turn suppresses this same class of output, and
+    # DEVELOPMENT.md states the live smoke does not dump provider responses or
+    # controller logs. This assertion must not be the hole in that guarantee.
+    echo "  Gateway output suppressed because provider responses can contain sensitive data."
+    return 0
+  fi
+
+  # POLL, do not read once. `chat.send` acknowledges with status=started and
+  # returns before the run reaches pre-prompt, so a single read right after it
+  # returns races the agent and finds nothing — which reports "no pre-prompt
+  # diag" (looks like a broken/missing session) instead of the true
+  # "promptImages=0". That is the misleading-diagnosis failure mode this
+  # assertion is supposed to eliminate, so it must not create one itself.
+  #
+  # Take the LAST matching pre-prompt line so a retried run cannot leave an
+  # earlier zero-count line winning.
+  local _attempt
+  for _attempt in $(seq 1 60); do
+    prompt_images=$(docker logs "$cid" 2>&1 \
+      | grep -F "sessionKey=$session_key" \
+      | grep -oE 'promptImages=[0-9]+' \
+      | tail -1 | cut -d= -f2 || true)
+    [ -n "$prompt_images" ] && break
+    sleep 1
+  done
+
+  if [ -z "$prompt_images" ]; then
+    check "image round trip (promptImages >= 1)" "image-received" "no pre-prompt diag after 60s"
+  elif [ "$prompt_images" -ge 1 ]; then
+    check "image round trip (promptImages >= 1)" "image-received" "image-received"
+  else
+    check "image round trip (promptImages >= 1)" "image-received" "promptImages=$prompt_images"
+  fi
+}
+
 # Prove the controller repairs a config the gateway cannot start from, in a real
 # container, before every spawn.
 #

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Shared Kilo CLI credential lookup, sourced by the live smoke (smoke-live-provider.sh)
+# Shared Kilo CLI credential lookup, sourced by the live smoke (single-image/live-provider.sh)
 # and the upgrade orchestrator's preflight (openclaw-upgrade-validate.sh) so both
 # decide "is a credential available?" the same way.
 #

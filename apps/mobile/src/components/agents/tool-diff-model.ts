@@ -135,7 +135,8 @@ export function buildToolDiffModel(part: ToolPart): ToolDiffModel | null {
  * when the input ends with a newline because it is not a content line.
  */
 function splitTrimTrailingEmpty(text: string): string[] {
-  const parts = text.split('\n');
+  const normalized = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  const parts = normalized.split('\n');
   if (parts.length > 1 && parts.at(-1) === '') {
     parts.pop();
   }

@@ -1,3 +1,4 @@
+// oxlint-disable max-lines
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
@@ -182,6 +183,30 @@ describe('buildToolDiffModel — edit tool', () => {
     const oldLines = model.lines.filter(l => l.type === 'del');
     expect(oldLines).toHaveLength(EDIT_LINE_CAP);
   });
+
+  it('strips CR from CRLF and bare-CR edit input', () => {
+    const part = makeEditToolPart({
+      oldString: 'alpha\r\nbeta',
+      newString: 'gamma\r\ndelta\r\nepsilon',
+    });
+    const model = mustBe(buildToolDiffModel(part), 'model');
+    expect(model.lines).toHaveLength(5);
+    expect(model.lines[0]).toMatchObject({ type: 'del', oldLine: 1, text: 'alpha' });
+    expect(model.lines[1]).toMatchObject({ type: 'del', oldLine: 2, text: 'beta' });
+    expect(model.lines[2]).toMatchObject({ type: 'add', newLine: 1, text: 'gamma' });
+    expect(model.lines[3]).toMatchObject({ type: 'add', newLine: 2, text: 'delta' });
+    expect(model.lines[4]).toMatchObject({ type: 'add', newLine: 3, text: 'epsilon' });
+
+    const barePart = makeEditToolPart({
+      oldString: 'one\rtwo',
+      newString: 'three\rfour',
+    });
+    const bareModel = mustBe(buildToolDiffModel(barePart), 'model');
+    expect(bareModel.lines[0]).toMatchObject({ type: 'del', oldLine: 1, text: 'one' });
+    expect(bareModel.lines[1]).toMatchObject({ type: 'del', oldLine: 2, text: 'two' });
+    expect(bareModel.lines[2]).toMatchObject({ type: 'add', newLine: 1, text: 'three' });
+    expect(bareModel.lines[3]).toMatchObject({ type: 'add', newLine: 2, text: 'four' });
+  });
 });
 
 describe('buildToolDiffModel — write tool', () => {
@@ -259,6 +284,28 @@ describe('buildToolDiffModel — write tool', () => {
     const model = mustBe(buildToolDiffModel(part), 'model');
     expect(model.truncated).toBe(true);
     expect(model.lines).toHaveLength(WRITE_LINE_CAP);
+  });
+
+  it('strips CR from CRLF, bare-CR, and mixed write content', () => {
+    const crlfPart = makeWriteToolPart({ content: 'alpha\r\nbeta\r\ncharlie' });
+    const crlfModel = mustBe(buildToolDiffModel(crlfPart), 'model');
+    expect(crlfModel.lines).toHaveLength(3);
+    expect(crlfModel.lines[0]).toMatchObject({ type: 'add', newLine: 1, text: 'alpha' });
+    expect(crlfModel.lines[1]).toMatchObject({ type: 'add', newLine: 2, text: 'beta' });
+    expect(crlfModel.lines[2]).toMatchObject({ type: 'add', newLine: 3, text: 'charlie' });
+
+    const barePart = makeWriteToolPart({ content: 'one\rtwo' });
+    const bareModel = mustBe(buildToolDiffModel(barePart), 'model');
+    expect(bareModel.lines).toHaveLength(2);
+    expect(bareModel.lines[0]).toMatchObject({ type: 'add', newLine: 1, text: 'one' });
+    expect(bareModel.lines[1]).toMatchObject({ type: 'add', newLine: 2, text: 'two' });
+
+    const mixedPart = makeWriteToolPart({ content: 'line1\nline2\r\nline3' });
+    const mixedModel = mustBe(buildToolDiffModel(mixedPart), 'model');
+    expect(mixedModel.lines).toHaveLength(3);
+    expect(mixedModel.lines[0]).toMatchObject({ type: 'add', newLine: 1, text: 'line1' });
+    expect(mixedModel.lines[1]).toMatchObject({ type: 'add', newLine: 2, text: 'line2' });
+    expect(mixedModel.lines[2]).toMatchObject({ type: 'add', newLine: 3, text: 'line3' });
   });
 });
 

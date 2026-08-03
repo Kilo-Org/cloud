@@ -114,6 +114,10 @@ const unavailableModels = [
   'sakana/fugu', // this model is not available in the EU
 ];
 
+const replacedOpenRouterModelIds = new Set([
+  'qwen/qwen3.8-max', // Replaced by the Kilo-exclusive qwen/qwen-3.8-max alias.
+]);
+
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
@@ -127,6 +131,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           ) &&
           !isForbiddenFreeModel(model.id) &&
           !model.id.endsWith(':batch') &&
+          !replacedOpenRouterModelIds.has(model.id) &&
           !unavailableModels.some(unavailableId => model.id.includes(unavailableId))
       )
       .map(model => {

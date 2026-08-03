@@ -7,7 +7,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
+import { qwen36_plus_stealth_model, qwen38_max_model } from '@/lib/ai-gateway/providers/qwen';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import {
   findKiloExclusiveModel,
@@ -220,6 +220,30 @@ describe('auto models', () => {
 
     expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
     expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
+  });
+
+  it('replaces the conventional OpenRouter Qwen 3.8 ID with the requested Kilo alias', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [buildModel({ id: 'qwen/qwen3.8-max', name: 'OpenRouter Qwen 3.8 Max' })],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.filter(model => model.id === 'qwen/qwen3.8-max')).toHaveLength(0);
+    expect(models.data.filter(model => model.id === qwen38_max_model.public_id)).toHaveLength(1);
+    expect(models.data.find(model => model.id === qwen38_max_model.public_id)).toMatchObject({
+      name: qwen38_max_model.display_name,
+      pricing: {
+        prompt: '0.000002000000',
+        completion: '0.000006000000',
+      },
+    });
   });
 });
 

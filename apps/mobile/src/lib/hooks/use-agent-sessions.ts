@@ -18,6 +18,7 @@ import {
   DEFAULT_AGENT_SESSION_SORT,
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
+import { selectTrpcErrorCode } from '@/lib/list-diagnostics';
 import { useTRPC } from '@/lib/trpc';
 import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 
@@ -252,6 +253,10 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     storedIsError: stored.isError,
     storedIsSuccess: stored.isSuccess,
     activeIsError: active.isError,
+    storedIsLoading: stored.isLoading,
+    activeIsLoading: active.isLoading,
+    storedErrorCode: selectTrpcErrorCode(stored.error),
+    pageCount: stored.data?.pages.length ?? 0,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage: stored.fetchNextPage,

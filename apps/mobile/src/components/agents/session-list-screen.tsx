@@ -1,3 +1,5 @@
+/* eslint-disable max-lines */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
@@ -5,7 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
 
 import { ActiveNowSection } from '@/components/agents/active-now-section';
+import { DiagnosticsIndicator } from '@/components/agents/diagnostics-indicator';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
+import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import {
   AgentSessionListContent,
@@ -19,6 +23,13 @@ import { SessionFilterChips, SessionFilterModal } from '@/components/agents/plat
 import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
 import { ScreenHeader } from '@/components/screen-header';
+import { captureEvent, LIST_DIAGNOSTICS_EVENT } from '@/lib/analytics/posthog';
+import { useDiagnosticsWindow } from '@/lib/hooks/use-diagnostics-window';
+import {
+  buildAgentsListDiagnostics,
+  buildDiagnosticsSignature,
+  shouldCaptureDiagnostics,
+} from '@/lib/list-diagnostics';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { useOrganization } from '@/lib/organization-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -62,6 +73,9 @@ export function AgentSessionListScreen() {
 
   const ready = filtersLoaded && orgLoaded;
 
+  // D4 — diagnostics window (flag × consent × active time range).
+  const diagnosticsActive = useDiagnosticsWindow();
+
   // Navigation guard: prevent double-push on rapid row taps. Re-arms on next focus.
   const rowNavLockRef = useRef(false);
 
@@ -80,6 +94,11 @@ export function AgentSessionListScreen() {
     search,
     projectOptions,
     contentIsError,
+    storedIsError,
+    storedIsLoading,
+    activeIsLoading,
+    storedErrorCode,
+    pageCount,
     pinnedActive,
     sections,
   } = useAgentSessionListData({
@@ -144,7 +163,7 @@ export function AgentSessionListScreen() {
 
   // Inline error recomputed here (same pure selector, same inputs) so the
   // body-model test continues covering it.
-  const showInlineError = useMemo(
+  const bodyModel = useMemo(
     () =>
       selectSessionListBodyModel({
         hasHistoryContent: sections.length > 0,
@@ -153,9 +172,118 @@ export function AgentSessionListScreen() {
         isSearching,
         isError: contentIsError,
         activeIsError,
-      }).showInlineError,
+      }),
     [activeIsError, contentIsError, hasActiveFilter, hasPinnedActive, isSearching, sections]
   );
+  const showInlineError = bodyModel.showInlineError;
+  const surface = useMemo(
+    () =>
+      selectSessionListContentSurface({
+        isLoading: isLoading || !ready,
+        isError: contentIsError,
+        hasAnySessions,
+        hasPinnedActive,
+        hasHistoryContent: sections.length > 0,
+      }),
+    [contentIsError, hasAnySessions, hasPinnedActive, isLoading, ready, sections]
+  );
+
+  // D4 — diagnostics capture (payload, dedup, under-cap guard).
+  const diagnostics = useMemo(
+    () =>
+      buildAgentsListDiagnostics({
+        surface: surface.kind,
+        list_empty: surface.kind === 'section-list' ? surface.listEmpty : 'none',
+        body_kind: bodyModel.kind,
+        order_by: sortBy,
+        // The limit of the query that produced the rows: 30 for the list
+        // (SESSIONS_PAGE_SIZE, agent-session-input.ts:24), 50 for search
+        // (buildAgentSessionSearchInput, agent-session-input.ts:70).
+        page_size: isSearching ? 50 : 30,
+        // Loaded pages of the stored list query. The search query is not
+        // paged, so it reports 0 and `page_size` carries the search limit.
+        page_count: isSearching ? 0 : pageCount,
+        // `hasNextPage` is `boolean | undefined` — explicit check is deliberate.
+        // eslint-disable-next-line typescript-eslint/no-unnecessary-boolean-literal-compare
+        has_next_page: hasNextPage === true,
+        has_organization: organizationId != null,
+        // eslint-disable-next-line unicorn/no-array-sort -- Hermes has no toSorted
+        platform_filter: [...platformFilter].sort().join(','),
+        project_filter_count: projectFilter.length,
+        is_searching: isSearching,
+        search_query_length: searchQuery.length,
+        stored_count: storedSessions.length,
+        active_count: activeSessions.length,
+        pinned_count: pinnedActive.length,
+        section_count: sections.length,
+        row_count: sections.reduce((total, section) => total + section.data.length, 0),
+        has_any_sessions: hasAnySessions,
+        ready,
+        filters_loaded: filtersLoaded,
+        org_loaded: orgLoaded,
+        // The EFFECTIVE loading flag, identical to the value the body gets at
+        // line 223. The raw query bits follow, so `ready=false` with both raw
+        // bits false is distinguishable from a query that never settles.
+        is_loading: isLoading || !ready,
+        stored_is_loading: storedIsLoading,
+        active_is_loading: activeIsLoading,
+        stored_is_error: storedIsError,
+        active_is_error: activeIsError,
+        search_is_error: search.isError,
+        stored_error_code: storedErrorCode,
+      }),
+    [
+      activeIsError,
+      activeIsLoading,
+      activeSessions.length,
+      bodyModel.kind,
+      filtersLoaded,
+      hasAnySessions,
+      hasNextPage,
+      isLoading,
+      isSearching,
+      orgLoaded,
+      organizationId,
+      pageCount,
+      pinnedActive.length,
+      platformFilter,
+      projectFilter.length,
+      ready,
+      search.isError,
+      searchQuery.length,
+      sections,
+      sortBy,
+      storedErrorCode,
+      storedIsError,
+      storedIsLoading,
+      storedSessions.length,
+      surface,
+    ]
+  );
+  const lastSignatureRef = useRef<string | null>(null);
+  const sentCountRef = useRef(0);
+  useEffect(() => {
+    // Re-arm on every off transition so a second window in the same launch
+    // reports the current state again instead of deduping against the first.
+    if (!diagnosticsActive) {
+      lastSignatureRef.current = null;
+      return;
+    }
+    const signature = buildDiagnosticsSignature(diagnostics);
+    if (
+      !shouldCaptureDiagnostics({
+        active: diagnosticsActive,
+        signature,
+        lastSignature: lastSignatureRef.current,
+        sentCount: sentCountRef.current,
+      })
+    ) {
+      return;
+    }
+    lastSignatureRef.current = signature;
+    sentCountRef.current += 1;
+    captureEvent(LIST_DIAGNOSTICS_EVENT, diagnostics);
+  }, [diagnostics, diagnosticsActive]);
 
   const handleClearQuery = useCallback(() => {
     clearSearchInput();
@@ -192,6 +320,7 @@ export function AgentSessionListScreen() {
           />
         }
       />
+      {diagnosticsActive && <DiagnosticsIndicator />}
       <Animated.View layout={LinearTransition}>
         <SessionFilterChips
           platformFilter={platformFilter}

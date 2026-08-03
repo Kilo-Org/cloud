@@ -10,6 +10,7 @@ import {
   logMicrodollarUsage,
   insertUsageRecord,
   processOpenRouterUsage,
+  processTokenData,
   stripNulBytesInPlace,
   toInsertableDbUsageRecord,
   usageTransactionIdleTimeoutQuery,
@@ -754,6 +755,45 @@ describe('logMicrodollarUsage', () => {
       .from(cost_insight_owner_hour_totals)
       .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
     expect(totals).toHaveLength(0);
+  });
+
+  test('does not charge Kilo balance for a Vercel user-BYOK exclusive model', async () => {
+    const user = await insertTestUser({
+      id: 'test-vercel-exclusive-byok',
+      microdollars_used: 2000,
+      google_user_email: 'vercel-exclusive-byok@example.com',
+    });
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-vercel-exclusive-byok-msg',
+      cost_mUsd: 500,
+      outputTokens: 0,
+      model: 'alibaba/qwen3.8-max',
+      inference_provider: 'alibaba',
+      status_code: 400,
+    };
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      provider: 'vercel',
+      requested_model: 'qwen/qwen-3.8-max',
+      user_byok: true,
+      status_code: 400,
+    };
+
+    await processTokenData(usageStats, usageContext);
+
+    const updatedUser = await findUserById(user.id);
+    expect(updatedUser?.microdollars_used).toBe(2000);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-vercel-exclusive-byok-msg'),
+    });
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, metadataRecord!.id),
+    });
+    expect(usageRecord?.cost).toBe(0);
+    expect(metadataRecord?.market_cost).toBe(500);
+    expect(metadataRecord?.is_user_byok).toBe(true);
   });
 
   test('keeps AI source rows when legacy usage owner does not exist', async () => {

@@ -1,5 +1,10 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, findKiloExclusiveModel, kiloExclusiveModels } from './models';
+import {
+  autoFreeModels,
+  findKiloExclusiveModel,
+  isEligibleForVercelUserByok,
+  kiloExclusiveModels,
+} from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import { getAiSdkProvider } from './providers/model-settings';
@@ -73,6 +78,13 @@ describe('isFreeModel', () => {
           },
         },
       ]);
+    });
+
+    test('allows Vercel-compatible exclusives to use Vercel user BYOK', () => {
+      expect(isEligibleForVercelUserByok('qwen/qwen-3.8-max')).toBe(true);
+      expect(isEligibleForVercelUserByok('google/gemma-4-26b-a4b-it:free')).toBe(true);
+      expect(isEligibleForVercelUserByok('stealth/qwen3.6-plus')).toBe(false);
+      expect(isEligibleForVercelUserByok('anthropic/claude-sonnet-4')).toBe(true);
     });
 
     test('registers Tencent Hy3 as free without adding it to Auto Free', () => {

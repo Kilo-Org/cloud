@@ -16,7 +16,8 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
 
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 
-const KILO_EXCLUSIVE_MODEL = 'deepseek/deepseek-v4-pro:discounted';
+const KILO_EXCLUSIVE_MODEL = 'stealth/qwen3.6-plus';
+const VERCEL_EXCLUSIVE_MODEL = 'qwen/qwen-3.8-max';
 const NON_EXCLUSIVE_MODEL = 'anthropic/claude-sonnet-4';
 
 const fakeDb = {} as never;
@@ -84,6 +85,19 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
     expect(mockGetModelUserByokProviders).not.toHaveBeenCalled();
     expect(mockGetOrganizationByokProviderIds).not.toHaveBeenCalled();
+  });
+
+  it('allows a Vercel exclusive model to bypass the balance check with matching user BYOK', async () => {
+    mockGetModelUserByokProviders.mockResolvedValueOnce(['alibaba']);
+    mockGetUserByokProviderIds.mockResolvedValueOnce(['alibaba']);
+
+    const result = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: fakeDb,
+      user: fakeUser,
+      modelId: VERCEL_EXCLUSIVE_MODEL,
+    });
+
+    expect(result).toEqual({ isFree: false, hasUserByokAvailable: true });
   });
 
   it('returns hasUserByokAvailable: true for a non-Kilo-exclusive paid model with a matching enabled user BYOK provider', async () => {

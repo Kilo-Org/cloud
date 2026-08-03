@@ -81,6 +81,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
 ]);
 
 export const VercelUserByokInferenceProviderIdSchema = z.enum([
+  'alibaba',
   'anthropic',
   'bedrock',
   'deepseek',
@@ -134,6 +135,7 @@ export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
 export const UserByokTestModels = {
+  [VercelUserByokInferenceProviderIdSchema.enum.alibaba]: 'alibaba/qwen3.8-max',
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',

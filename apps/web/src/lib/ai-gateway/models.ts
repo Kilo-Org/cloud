@@ -128,3 +128,12 @@ export function isDeadFreeModel(model: string): boolean {
 export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
   return kiloExclusiveModels.find(m => m.public_id === model && m.status !== 'disabled') ?? null;
 }
+
+export function isEligibleForVercelUserByok(model: string): boolean {
+  const exclusiveModel = findKiloExclusiveModel(model);
+  return (
+    exclusiveModel === null ||
+    exclusiveModel.gateway === 'vercel' ||
+    exclusiveModel.flags.includes('vercel-routing')
+  );
+}

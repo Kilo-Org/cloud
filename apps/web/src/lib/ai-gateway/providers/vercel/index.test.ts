@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   convertProviderOptions,
+  applyVercelSettings,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
@@ -125,6 +126,31 @@ describe('convertProviderOptions', () => {
 
     expect(providerOptions.gateway?.only).toEqual(['anthropic']);
     expect(provider?.only).toEqual(['anthropic', 'amazon-bedrock']);
+  });
+});
+
+describe('applyVercelSettings', () => {
+  it('pins an exclusive model request to the user BYOK provider', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'qwen/qwen-3.8-max',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { only: ['openai'] },
+      },
+    };
+
+    await applyVercelSettings('qwen/qwen-3.8-max', request, [
+      { providerId: 'alibaba', decryptedAPIKey: 'user-key' },
+    ]);
+
+    expect(request.body.model).toBe('alibaba/qwen3.8-max');
+    expect(request.body.providerOptions?.gateway).toEqual({
+      only: ['alibaba'],
+      byok: { alibaba: [{ apiKey: 'user-key' }] },
+      models: undefined,
+    });
+    expect(request.body.provider).toBeUndefined();
   });
 });
 

@@ -14,7 +14,7 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import { getVercelModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isEligibleForVercelUserByok } from '@/lib/ai-gateway/models';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
@@ -71,7 +71,7 @@ export async function addUserByokAvailability(
   return Promise.all(
     models.map(async model => {
       const hasUserByokAvailable =
-        !isKiloExclusiveModel(model.id) &&
+        isEligibleForVercelUserByok(model.id) &&
         (await getModelUserByokProviders(model.id)).some(provider =>
           enabledProviders.has(provider)
         );

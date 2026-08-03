@@ -1,7 +1,7 @@
 import 'server-only';
 import { type db } from '@/lib/drizzle';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isEligibleForVercelUserByok } from '@/lib/ai-gateway/models';
 import {
   getModelUserByokProviders,
   getOrganizationByokProviderIds,
@@ -20,21 +20,13 @@ export type BalanceCheckModelEligibility = {
  *
  * Skips the check when either:
  * - the model is Kilo-funded (free for the user), or
- * - the model is not Kilo-exclusive AND the user has a BYOK provider
+ * - the model is eligible for Vercel user BYOK AND the user has a provider
  *   configured that can serve it, so the session is billed against the
  *   user's own key rather than their balance.
  *
- * Kilo-exclusive models (e.g. `deepseek/deepseek-v4-pro:discounted`) are
- * always excluded from the BYOK bypass: they are Kilo-funded and platform
- * billed, so even when `getModelUserByokProviders` reports a provider that
- * can route the model, they must still go through the worker-side balance
- * check and cannot be legitimately served via a user's own BYOK key.
- *
- * The resulting predicate is a strict subset of the
- * `isFree || hasUserByokAvailable` predicate used by the NewSessionPanel
- * model picker to filter `hasLimitedAccess` users: this router additionally
- * forces Kilo-exclusive models through the balance check, so the picker
- * may offer a model as free while the router still requires a balance.
+ * Kilo-exclusive models are eligible only when their gateway is Vercel or
+ * they explicitly allow Vercel routing. Other exclusives remain platform
+ * billed and must go through the worker-side balance check.
  */
 export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   fromDb: typeof db;
@@ -47,7 +39,7 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
     return { isFree: true, hasUserByokAvailable: false };
   }
 
-  if (isKiloExclusiveModel(params.modelId)) {
+  if (!isEligibleForVercelUserByok(params.modelId)) {
     return { isFree: false, hasUserByokAvailable: false };
   }
 

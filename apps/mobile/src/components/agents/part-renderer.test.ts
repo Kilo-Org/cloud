@@ -61,6 +61,13 @@ describe('PartRenderer', () => {
     expect(result).toBeNull();
   });
 
+  it('does not mount a streaming empty reasoning part', () => {
+    const part = makeReasoningPart('', false);
+    // eslint-disable-next-line new-cap
+    const result = PartRenderer({ part, isStreaming: true });
+    expect(result).toBeNull();
+  });
+
   it('renders completed meaningful reasoning through the renderer seam', () => {
     const part = makeReasoningPart('Meaningful reasoning text', true);
     // eslint-disable-next-line new-cap

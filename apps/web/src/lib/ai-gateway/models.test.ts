@@ -9,6 +9,7 @@ import {
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
+import { tencent_hy3_free_model } from './providers/tencent';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -54,6 +55,13 @@ describe('isFreeModel', () => {
     test('does not register discounted OpenRouter Qwen models as Kilo exclusive', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-max')).toBeNull();
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
+    });
+
+    test('registers Tencent Hy3 as free without adding it to Auto Free', () => {
+      expect(findKiloExclusiveModel('tencent/hy3:free')).toBe(tencent_hy3_free_model);
+      expect(tencent_hy3_free_model.internal_id).toBe('tencent/hy3');
+      expect(tencent_hy3_free_model.inference_provider_restriction).toEqual(['tencent']);
+      expect(autoFreeModels).not.toContain(tencent_hy3_free_model.public_id);
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {

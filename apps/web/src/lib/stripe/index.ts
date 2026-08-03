@@ -52,6 +52,7 @@ import {
 import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
 import { invoiceLooksLikeOrganizationKiloPass } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
 import {
+  endPendingOrganizationKiloPassForTerminalInvoice,
   handleOrganizationKiloPassPaymentAdverseForInvoice,
   handleOrganizationKiloPassInvoicePaid,
   handleOrganizationKiloPassSubscriptionEvent,
@@ -833,6 +834,15 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     // Handle auto-topups via invoice.paid - this has direct access to invoice metadata.
     // invoice.paid is a superset of invoice.payment_succeeded per Stripe docs.
+    case 'invoice.voided':
+    case 'invoice.marked_uncollectible': {
+      const invoice = event.data.object;
+      if (invoiceLooksLikeOrganizationKiloPass(invoice)) {
+        await endPendingOrganizationKiloPassForTerminalInvoice(invoice);
+      }
+      break;
+    }
+
     case 'invoice.paid': {
       const invoice = event.data.object;
 

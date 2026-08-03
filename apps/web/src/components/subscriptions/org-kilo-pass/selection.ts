@@ -1,6 +1,19 @@
+import { z } from 'zod';
 import type { OrgKiloPassAllocation, OrgKiloPassTier } from './types';
 
-export type OrgKiloPassSelection = {
+const orgKiloPassSelectionSchema = z.object({
+  tier: z.enum(['tier_19', 'tier_49', 'tier_199']),
+  allocations: z.array(
+    z.object({
+      organizationId: z.string(),
+      organizationName: z.string(),
+      kind: z.enum(['parent', 'child']),
+      passCount: z.number().int().nonnegative(),
+    })
+  ),
+});
+
+export type OrgKiloPassSelection = z.infer<typeof orgKiloPassSelectionSchema> & {
   tier: OrgKiloPassTier;
   allocations: OrgKiloPassAllocation[];
 };
@@ -28,29 +41,8 @@ export function loadOrgKiloPassSelection(organizationId: string): OrgKiloPassSel
   const raw = sessionStorage.getItem(storageKey(organizationId));
   if (!raw) return null;
   try {
-    const selection = JSON.parse(raw) as Partial<OrgKiloPassSelection>;
-    if (
-      (selection.tier !== 'tier_19' &&
-        selection.tier !== 'tier_49' &&
-        selection.tier !== 'tier_199') ||
-      !Array.isArray(selection.allocations)
-    ) {
-      return null;
-    }
-    return {
-      tier: selection.tier,
-      allocations: selection.allocations.filter(
-        (allocation): allocation is OrgKiloPassAllocation =>
-          typeof allocation === 'object' &&
-          allocation !== null &&
-          typeof allocation.organizationId === 'string' &&
-          typeof allocation.organizationName === 'string' &&
-          (allocation.kind === 'parent' || allocation.kind === 'child') &&
-          typeof allocation.passCount === 'number' &&
-          Number.isInteger(allocation.passCount) &&
-          allocation.passCount >= 0
-      ),
-    };
+    const selection = orgKiloPassSelectionSchema.safeParse(JSON.parse(raw));
+    return selection.success ? selection.data : null;
   } catch {
     return null;
   }

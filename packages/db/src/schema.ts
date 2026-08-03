@@ -2841,10 +2841,10 @@ export const kilo_pass_org_agreements = pgTable(
       .where(sql`${table.state} <> 'ended'`),
     uniqueIndex('UQ_kilo_pass_org_agreements_provider_subscription')
       .on(table.provider_subscription_id)
-      .where(sql`${table.provider_subscription_id} IS NOT NULL`),
+      .where(sql`${table.provider_subscription_id} IS NOT NULL AND ${table.state} <> 'ended'`),
     uniqueIndex('UQ_kilo_pass_org_agreements_provider_seat_add_on_item')
       .on(table.provider_seat_add_on_item_id)
-      .where(sql`${table.provider_seat_add_on_item_id} IS NOT NULL`),
+      .where(sql`${table.provider_seat_add_on_item_id} IS NOT NULL AND ${table.state} <> 'ended'`),
     uniqueIndex('UQ_kilo_pass_org_agreements_external_contract')
       .on(table.external_contract_id)
       .where(sql`${table.external_contract_id} IS NOT NULL`),

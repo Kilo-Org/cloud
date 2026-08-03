@@ -98,6 +98,8 @@ export async function createOrganizationKiloPassCheckout(input: {
     .limit(1);
   if (!purchase) throw new Error('An active organization seat subscription is required');
   const subscription = await stripe.subscriptions.retrieve(purchase.subscriptionId);
+  const existingPassItem = subscription.items.data.find(item => !isSeatLineItem(item));
+  if (existingPassItem) throw new Error('KILO_PASS_ORG_ALREADY_EXISTS');
   const seatItem = paidSeatItem(subscription);
   const cadence = intervalToCadence(seatItem.price.recurring?.interval);
   const paidSeats = seatItem.quantity ?? 0;
@@ -118,6 +120,7 @@ export async function createOrganizationKiloPassCheckout(input: {
       passCapacity: allocation.passCount,
     })),
   });
+  if (!pending.created) throw new Error('KILO_PASS_ORG_ALREADY_EXISTS');
   const price = getStripePriceIdForKiloPass({
     tier: input.tier as KiloPassTier,
     cadence: cadence as KiloPassCadence,
@@ -134,23 +137,16 @@ export async function createOrganizationKiloPassCheckout(input: {
       tier: input.tier,
       cadence,
     },
-    expand: ['latest_invoice.payment_intent'],
+    expand: ['latest_invoice.confirmation_secret'],
   });
   const passItem = organizationPassItem(updated);
   await bindProviderSeatAddOnItem({
     agreementId: pending.agreementId,
     providerSeatAddOnItemId: passItem.id,
   });
-  const invoice = updated.latest_invoice as
-    | (Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string | null })
-    | null;
-  const paymentIntent = invoice?.payment_intent;
-  if (
-    typeof paymentIntent === 'object' &&
-    paymentIntent?.status === 'requires_action' &&
-    paymentIntent.client_secret
-  ) {
-    return { kind: 'payment_action', clientSecret: paymentIntent.client_secret };
+  const invoice = typeof updated.latest_invoice === 'object' ? updated.latest_invoice : null;
+  if (invoice?.confirmation_secret?.client_secret) {
+    return { kind: 'payment_action', clientSecret: invoice.confirmation_secret.client_secret };
   }
   if (invoice?.status === 'paid' || invoice?.amount_due === 0) {
     await handleOrganizationKiloPassInvoicePaid({ invoice });
@@ -345,18 +341,21 @@ export async function scheduleOrganizationKiloPassCancellation(input: {
     target = await stripe.subscriptionSchedules.create({ from_subscription: subscription.id });
   }
   if (!target) throw new Error('SCHEDULE_REWRITE_UNSAFE');
-  const resumedPhase =
-    schedule?.metadata?.origin === ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN
-      ? schedule.phases.at(-1)
-      : undefined;
+  const periodStart = Math.floor(period.start.getTime() / 1000);
+  const periodEnd = Math.floor(period.end.getTime() / 1000);
+  const activePhase = schedule?.phases.find(
+    phase => phase.start_date <= periodStart && phase.end_date >= periodEnd
+  );
+  const activeStart = activePhase?.start_date ?? schedule?.current_phase?.start_date ?? periodStart;
+  const activeEnd = activePhase?.end_date ?? schedule?.current_phase?.end_date ?? periodEnd;
   await stripe.subscriptionSchedules.update(target.id, {
     metadata: { origin: ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN },
     end_behavior: 'release',
     phases: [
       {
         items: currentItems,
-        start_date: resumedPhase?.start_date ?? Math.floor(period.start.getTime() / 1000),
-        end_date: resumedPhase?.end_date ?? Math.floor(period.end.getTime() / 1000),
+        start_date: activeStart,
+        end_date: activeEnd,
       },
       { items: retainedItems },
     ],
@@ -423,7 +422,13 @@ export async function handleOrganizationKiloPassSubscriptionEvent(
   const [agreement] = await db
     .select()
     .from(kilo_pass_org_agreements)
-    .where(eq(kilo_pass_org_agreements.provider_subscription_id, subscription.id))
+    .where(
+      and(
+        eq(kilo_pass_org_agreements.provider_subscription_id, subscription.id),
+        ne(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.Ended)
+      )
+    )
+    .orderBy(desc(kilo_pass_org_agreements.created_at))
     .limit(1);
   if (!agreement) return false;
   const item = subscription.items.data.find(item => !isSeatLineItem(item));
@@ -477,4 +482,45 @@ export async function handleOrganizationKiloPassPaymentAdverseForInvoice(invoice
   const reference = invoice.parent?.subscription_details?.subscription;
   const subscriptionId = typeof reference === 'string' ? reference : reference?.id;
   if (subscriptionId) await handleOrganizationKiloPassPaymentAdverse(subscriptionId);
+}
+
+/** Ends an unpaid checkout only after Stripe has made its invoice terminal. */
+export async function endPendingOrganizationKiloPassForTerminalInvoice(invoice: Stripe.Invoice) {
+  if (invoice.status !== 'void' && invoice.status !== 'uncollectible') return false;
+  const reference = invoice.parent?.subscription_details?.subscription;
+  const subscriptionId = typeof reference === 'string' ? reference : reference?.id;
+  if (!subscriptionId) return false;
+  const [agreement] = await db
+    .select()
+    .from(kilo_pass_org_agreements)
+    .where(
+      and(
+        eq(kilo_pass_org_agreements.provider_subscription_id, subscriptionId),
+        eq(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.PendingPayment)
+      )
+    )
+    .orderBy(desc(kilo_pass_org_agreements.created_at))
+    .limit(1);
+  if (!agreement) return false;
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const passItem = subscription.items.data.find(
+    item => item.id === agreement.provider_seat_add_on_item_id
+  );
+  if (passItem) {
+    await stripe.subscriptions.update(subscriptionId, {
+      proration_behavior: 'none',
+      items: [{ id: passItem.id, deleted: true }],
+    });
+  }
+  await db
+    .update(kilo_pass_org_agreements)
+    .set({ state: KiloPassOrgAgreementState.Ended })
+    .where(
+      and(
+        eq(kilo_pass_org_agreements.id, agreement.id),
+        eq(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.PendingPayment)
+      )
+    );
+  return true;
 }

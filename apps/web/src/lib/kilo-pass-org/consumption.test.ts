@@ -17,8 +17,8 @@ import { repairExpiredOrganizationPassBonuses } from './bonus-repair';
 import { processOrganizationExpirations } from '@/lib/creditExpiration';
 
 const activeWindow = {
-  start: new Date('2026-07-01T00:00:00.000Z'),
-  end: new Date('2026-08-01T00:00:00.000Z'),
+  start: new Date('2027-07-01T00:00:00.000Z'),
+  end: new Date('2027-08-01T00:00:00.000Z'),
 };
 
 describe('organization Pass consumption', () => {
@@ -75,13 +75,45 @@ describe('organization Pass consumption', () => {
     return { owner, organization, agreementId: agreement.agreementId };
   }
 
+  it('updates normal organization usage without duplicating it into the credit ledger', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization(
+      `kpo-no-agreement-${crypto.randomUUID()}`,
+      owner.id
+    );
+    organizationIds.push(organization.id);
+
+    const result = await db.transaction(tx =>
+      recordOrganizationConsumption(tx, {
+        organizationId: organization.id,
+        kiloUserId: owner.id,
+        amountMicrodollars: 100,
+        occurredAt: '2027-07-15T12:00:00.000Z',
+        source: 'ai-gateway',
+        sourceId: 'usage-without-agreement',
+      })
+    );
+
+    expect(result.recorded).toBe(true);
+    const credits = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.organization_id, organization.id));
+    expect(credits).toHaveLength(0);
+    const [updated] = await db
+      .select({ microdollarsUsed: organizations.microdollars_used })
+      .from(organizations)
+      .where(eq(organizations.id, organization.id));
+    expect(updated.microdollarsUsed).toBe(100);
+  });
+
   it('records a concurrent source debit once and unlocks bonus exactly at its threshold', async () => {
     const { owner, organization } = await activePass();
     const input = {
       organizationId: organization.id,
       kiloUserId: owner.id,
       amountMicrodollars: 19_000_000,
-      occurredAt: '2026-07-15T12:00:00.000Z',
+      occurredAt: '2027-07-15T12:00:00.000Z',
       source: 'ai-gateway' as const,
       sourceId: 'usage-replay-safe',
     };
@@ -122,7 +154,7 @@ describe('organization Pass consumption', () => {
         organizationId: organization.id,
         kiloUserId: owner.id,
         amountMicrodollars: 100,
-        occurredAt: '2026-08-01T00:00:00.000Z',
+        occurredAt: '2027-08-01T00:00:00.000Z',
         source: 'exa',
         sourceId: 'outside-window',
       })
@@ -147,7 +179,7 @@ describe('organization Pass consumption', () => {
       window: activeWindow,
       paidSeatCount: 2,
       providerInvoiceLineId: `il_${crypto.randomUUID()}`,
-      now: new Date('2026-07-15T00:00:00.000Z'),
+      now: new Date('2027-07-15T00:00:00.000Z'),
     });
     const snapshots = await db
       .select()
@@ -161,7 +193,7 @@ describe('organization Pass consumption', () => {
         organizationId: organization.id,
         kiloUserId: owner.id,
         amountMicrodollars: 1,
-        occurredAt: '2026-07-16T00:00:00.000Z',
+        occurredAt: '2027-07-16T00:00:00.000Z',
         source: 'exa',
         sourceId: 'supplement-classification',
       })
@@ -186,14 +218,14 @@ describe('organization Pass consumption', () => {
       window: activeWindow,
       paidSeatCount: 2,
       providerInvoiceLineId: `il_${crypto.randomUUID()}`,
-      now: new Date('2026-07-15T00:00:00.000Z'),
+      now: new Date('2027-07-15T00:00:00.000Z'),
     });
     await db.transaction(tx =>
       recordOrganizationConsumption(tx, {
         organizationId: organization.id,
         kiloUserId: owner.id,
         amountMicrodollars: 19_000_000,
-        occurredAt: '2026-07-14T12:00:00.000Z',
+        occurredAt: '2027-07-14T12:00:00.000Z',
         source: 'exa',
         sourceId: `delayed-before-supplement-${crypto.randomUUID()}`,
       })
@@ -205,7 +237,7 @@ describe('organization Pass consumption', () => {
     const supplement = snapshots.find(snapshot => snapshot.kind === 'supplement');
     if (!supplement) throw new Error('supplement snapshot was not created');
     expect(new Date(supplement.qualifying_spend_starts_at).toISOString()).toBe(
-      '2026-07-15T00:00:00.000Z'
+      '2027-07-15T00:00:00.000Z'
     );
     expect(supplement.qualifying_spend_microdollars).toBe(0);
   });
@@ -215,8 +247,8 @@ describe('organization Pass consumption', () => {
     const organization = await createOrganization(`kpo-bridge-${crypto.randomUUID()}`, owner.id);
     organizationIds.push(organization.id);
     const bridge = {
-      start: new Date('2026-07-15T00:00:00.000Z'),
-      end: new Date('2026-08-01T00:00:00.000Z'),
+      start: new Date('2027-07-15T00:00:00.000Z'),
+      end: new Date('2027-08-01T00:00:00.000Z'),
     };
     const agreement = await createPendingAgreement({
       parentOrganizationId: organization.id,
@@ -251,7 +283,7 @@ describe('organization Pass consumption', () => {
         organizationId: organization.id,
         kiloUserId: owner.id,
         amountMicrodollars: snapshot?.unlock_spend_microdollars ?? 0,
-        occurredAt: '2026-07-20T12:00:00.000Z',
+        occurredAt: '2027-07-20T12:00:00.000Z',
         source: 'exa',
         sourceId: `bridge-${crypto.randomUUID()}`,
       })
@@ -265,8 +297,8 @@ describe('organization Pass consumption', () => {
 
   it('records an expired missed unlock once without issuing spendable credit', async () => {
     const expired = {
-      start: new Date('2026-05-01T00:00:00.000Z'),
-      end: new Date('2026-06-01T00:00:00.000Z'),
+      start: new Date('2025-05-01T00:00:00.000Z'),
+      end: new Date('2025-06-01T00:00:00.000Z'),
     };
     const { owner, organization } = await activePass(expired);
     const [snapshot] = await db
@@ -291,14 +323,14 @@ describe('organization Pass consumption', () => {
       allocation_container_organization_id: organization.id,
       credit_transaction_id: source.id,
       spent_microdollars: 19_000_000,
-      occurred_at: '2026-05-15T12:00:00.000Z',
+      occurred_at: '2025-05-15T12:00:00.000Z',
     });
 
     const first = await db.transaction(tx =>
-      repairExpiredOrganizationPassBonuses(tx, '2026-07-01T00:00:00.000Z')
+      repairExpiredOrganizationPassBonuses(tx, '2027-07-01T00:00:00.000Z')
     );
     const replay = await db.transaction(tx =>
-      repairExpiredOrganizationPassBonuses(tx, '2026-07-01T00:00:00.000Z')
+      repairExpiredOrganizationPassBonuses(tx, '2027-07-01T00:00:00.000Z')
     );
     expect(first.recordedMisses).toBe(1);
     expect(replay.recordedMisses).toBe(0);
@@ -316,8 +348,8 @@ describe('organization Pass consumption', () => {
 
   it('records late historical usage and an audit outcome without unlocking an expired bonus', async () => {
     const expired = {
-      start: new Date('2026-05-01T00:00:00.000Z'),
-      end: new Date('2026-06-01T00:00:00.000Z'),
+      start: new Date('2025-05-01T00:00:00.000Z'),
+      end: new Date('2025-06-01T00:00:00.000Z'),
     };
     const { owner, organization } = await activePass(expired);
     await db.transaction(tx =>
@@ -325,7 +357,7 @@ describe('organization Pass consumption', () => {
         organizationId: organization.id,
         kiloUserId: owner.id,
         amountMicrodollars: 19_000_000,
-        occurredAt: '2026-05-15T12:00:00.000Z',
+        occurredAt: '2025-05-15T12:00:00.000Z',
         source: 'exa',
         sourceId: `late-${crypto.randomUUID()}`,
       })
@@ -361,7 +393,7 @@ describe('organization Pass consumption', () => {
         organizationId: organization.id,
         kiloUserId: owner.id,
         amountMicrodollars: 19_000_000,
-        occurredAt: '2026-07-15T12:00:00.000Z',
+        occurredAt: '2027-07-15T12:00:00.000Z',
         source: 'exa',
         sourceId: `unlock-expiring-bonus-${crypto.randomUUID()}`,
       })
@@ -371,7 +403,7 @@ describe('organization Pass consumption', () => {
         organizationId: organization.id,
         kiloUserId: owner.id,
         amountMicrodollars: 1_000_000,
-        occurredAt: '2026-07-16T12:00:00.000Z',
+        occurredAt: '2027-07-16T12:00:00.000Z',
         source: 'exa',
         sourceId: `partially-use-expiring-bonus-${crypto.randomUUID()}`,
       })
@@ -384,7 +416,7 @@ describe('organization Pass consumption', () => {
       credit.credit_category?.startsWith('kpo:bonus-unlock:')
     );
     if (!expiringBonus) throw new Error('unlocked bonus credit was not created');
-    expect(new Date(expiringBonus.expiry_date!).toISOString()).toBe('2026-08-01T00:00:00.000Z');
+    expect(new Date(expiringBonus.expiry_date!).toISOString()).toBe('2027-08-01T00:00:00.000Z');
     expect(expiringBonus.expiration_baseline_microdollars_used).toBe(19_000_000);
     const [org] = await db
       .select()
@@ -397,7 +429,7 @@ describe('organization Pass consumption', () => {
         next_credit_expiration_at: org.next_credit_expiration_at,
         total_microdollars_acquired: org.total_microdollars_acquired,
       },
-      new Date('2026-08-02T00:00:00.000Z')
+      new Date('2027-08-02T00:00:00.000Z')
     );
     const expirations = await db
       .select()

@@ -645,6 +645,43 @@ describe('Kilo Pass organization agreement service', () => {
     );
   });
 
+  it('creates a new agreement on the same provider subscription after the earlier one ends', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-repurchase-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+    const providerSubscriptionId = `sub_${crypto.randomUUID()}`;
+    const first = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [],
+    });
+    await db
+      .update(kilo_pass_org_agreements)
+      .set({ state: KiloPassOrgAgreementState.Ended })
+      .where(eq(kilo_pass_org_agreements.id, first.agreementId));
+
+    const second = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_49',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [],
+    });
+
+    expect(second).toEqual({ agreementId: expect.any(String), created: true });
+    expect(second.agreementId).not.toBe(first.agreementId);
+  });
+
   it('rejects non-child allocation and stale plan writes', async () => {
     const owner = await insertTestUser();
     const parent = await createOrganization(`kpo-parent-${crypto.randomUUID()}`, owner.id);

@@ -2,6 +2,9 @@ import 'server-only';
 
 import {
   credit_transactions,
+  kilo_pass_org_agreements,
+  kilo_pass_org_allocation_plan_rows,
+  kilo_pass_org_allocation_plans,
   kilo_pass_org_audit_records,
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_qualifying_spend_events,
@@ -9,7 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import { KiloPassOrgBonusMode, KiloPassOrgIssuanceKind } from '@kilocode/db/schema-types';
 import type { DrizzleTransaction } from '@/lib/drizzle';
-import { and, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import {
   mutateOrganizationUsage,
   type OrganizationUsageMutationResult,
@@ -42,8 +45,9 @@ function sourceIdentity(input: RecordOrganizationConsumptionInput): string {
 }
 
 /**
- * Records a charge against an organization exactly once at the source's financial
- * transaction boundary. `credit_category` is the durable source identity because
+ * Records normal organization usage for every charge. When the organization is a
+ * current or planned Kilo Pass allocation container, it also writes an idempotent
+ * qualifying debit. `credit_category` is the durable source identity because
  * credit_transactions has no source-record foreign key. Its existing uniqueness
  * index is scoped to the acting user and category, so source IDs must be globally
  * stable for their source system.
@@ -54,6 +58,46 @@ export async function recordOrganizationConsumption(
 ): Promise<OrganizationConsumptionResult> {
   if (!Number.isSafeInteger(input.amountMicrodollars) || input.amountMicrodollars <= 0) {
     return { recorded: false, organizationUsage: noAlert };
+  }
+
+  const [relevantAgreement] = await tx
+    .select({ id: kilo_pass_org_agreements.id })
+    .from(kilo_pass_org_agreements)
+    .leftJoin(
+      kilo_pass_org_allocation_plans,
+      eq(kilo_pass_org_allocation_plans.agreement_id, kilo_pass_org_agreements.id)
+    )
+    .leftJoin(
+      kilo_pass_org_allocation_plan_rows,
+      eq(kilo_pass_org_allocation_plan_rows.allocation_plan_id, kilo_pass_org_allocation_plans.id)
+    )
+    .where(
+      and(
+        ne(kilo_pass_org_agreements.state, 'ended'),
+        or(
+          eq(kilo_pass_org_agreements.parent_organization_id, input.organizationId),
+          and(
+            eq(
+              kilo_pass_org_allocation_plan_rows.allocation_container_organization_id,
+              input.organizationId
+            ),
+            gt(kilo_pass_org_allocation_plan_rows.pass_capacity, 0)
+          )
+        )
+      )
+    )
+    .limit(1);
+
+  if (!relevantAgreement) {
+    return {
+      recorded: true,
+      organizationUsage: await mutateOrganizationUsage(tx, {
+        kilo_user_id: input.kiloUserId,
+        organization_id: input.organizationId,
+        cost: input.amountMicrodollars,
+        created_at: input.occurredAt,
+      }),
+    };
   }
 
   const identity = sourceIdentity(input);

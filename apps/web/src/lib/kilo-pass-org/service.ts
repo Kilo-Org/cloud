@@ -448,8 +448,13 @@ export async function createPendingAgreement(input: {
     const [existing] = await tx
       .select({ id: kilo_pass_org_agreements.id })
       .from(kilo_pass_org_agreements)
-      .where(eq(kilo_pass_org_agreements.provider_subscription_id, input.providerSubscriptionId));
-    if (existing) return { agreementId: existing.id, created: false };
+      .where(
+        and(
+          eq(kilo_pass_org_agreements.parent_organization_id, input.parentOrganizationId),
+          ne(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.Ended)
+        )
+      );
+    if (existing) return { agreementId: existing.id, created: false as const };
     const [term] = await tx
       .select({ id: kilo_pass_org_term_versions.id })
       .from(kilo_pass_org_term_versions)
@@ -481,7 +486,7 @@ export async function createPendingAgreement(input: {
       actorId: input.actorUserId,
       allocations: input.initialAllocations,
     });
-    return { agreementId: agreement.id, created: true };
+    return { agreementId: agreement.id, created: true as const };
   });
 }
 
@@ -1015,7 +1020,13 @@ export async function suspendAgreementForPaymentReview(providerSubscriptionId: s
     const [agreement] = await tx
       .select()
       .from(kilo_pass_org_agreements)
-      .where(eq(kilo_pass_org_agreements.provider_subscription_id, providerSubscriptionId))
+      .where(
+        and(
+          eq(kilo_pass_org_agreements.provider_subscription_id, providerSubscriptionId),
+          ne(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.Ended)
+        )
+      )
+      .orderBy(desc(kilo_pass_org_agreements.created_at))
       .for('update');
     if (!agreement) return;
     if (

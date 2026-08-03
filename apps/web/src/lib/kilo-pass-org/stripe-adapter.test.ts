@@ -15,7 +15,8 @@ const updateDb = jest.fn();
 const updateSet = jest.fn();
 const activatePaidAgreement = jest.fn();
 const createParentSupplement = jest.fn();
-const createPendingAgreement = jest.fn<(input: unknown) => Promise<{ agreementId: string }>>();
+const createPendingAgreement =
+  jest.fn<(input: unknown) => Promise<{ agreementId: string; created: boolean }>>();
 const bindProviderSeatAddOnItem = jest.fn();
 
 jest.mock('@/lib/stripe-client', () => ({
@@ -278,12 +279,14 @@ describe('organization Kilo Pass Stripe adapter', () => {
   });
 
   test('returns a PaymentIntent client secret for payment authentication', async () => {
-    retrieve.mockResolvedValue(subscription());
-    createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1' });
+    retrieve.mockResolvedValue(
+      subscription({ items: { ...subscription().items, data: [subscription().items.data[0]!] } })
+    );
+    createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1', created: true });
     update.mockResolvedValue({
       ...subscription(),
       latest_invoice: {
-        payment_intent: { status: 'requires_action', client_secret: 'pi_secret_1' },
+        confirmation_secret: { type: 'payment_intent', client_secret: 'pi_secret_1' },
       } as unknown as Stripe.Invoice,
     });
     const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
@@ -303,6 +306,40 @@ describe('organization Kilo Pass Stripe adapter', () => {
         proration_behavior: 'always_invoice',
       })
     );
+  });
+
+  test('refuses checkout when the seat subscription already has a pass add-on', async () => {
+    retrieve.mockResolvedValue(subscription());
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).rejects.toThrow('KILO_PASS_ORG_ALREADY_EXISTS');
+    expect(createPendingAgreement).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('refuses checkout when agreement creation finds a concurrent non-ended agreement', async () => {
+    retrieve.mockResolvedValue(
+      subscription({ items: { ...subscription().items, data: [subscription().items.data[0]!] } })
+    );
+    createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1', created: false });
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).rejects.toThrow('KILO_PASS_ORG_ALREADY_EXISTS');
+    expect(update).not.toHaveBeenCalled();
   });
 
   test('reconciles the add-on item when invoice.paid arrives before checkout binding', async () => {
@@ -352,8 +389,10 @@ describe('organization Kilo Pass Stripe adapter', () => {
   });
 
   test('returns completed instead of an empty checkout URL for a zero-due update', async () => {
-    retrieve.mockResolvedValue(subscription());
-    createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1' });
+    retrieve.mockResolvedValue(
+      subscription({ items: { ...subscription().items, data: [subscription().items.data[0]!] } })
+    );
+    createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1', created: true });
     update.mockResolvedValue({
       ...subscription(),
       latest_invoice: {
@@ -381,9 +420,10 @@ describe('organization Kilo Pass Stripe adapter', () => {
         allocations: [],
       })
     ).resolves.toEqual({ kind: 'completed' });
-    expect(activatePaidAgreement).toHaveBeenCalledWith(
-      expect.objectContaining({ agreementId: 'agreement_1' })
-    );
+    expect(bindProviderSeatAddOnItem).toHaveBeenCalledWith({
+      agreementId: 'agreement_1',
+      providerSeatAddOnItemId: 'si_pass',
+    });
   });
 
   test('reconciles a paid latest invoice for a pending agreement', async () => {
@@ -521,7 +561,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     );
   });
 
-  test('preserves the active resumed phase boundary when cancelling after renewal', async () => {
+  test('uses the subscription period rather than the future resumed phase when cancelling again', async () => {
     const resumedSchedule = {
       id: 'sched_after_renewal',
       status: 'active',
@@ -546,6 +586,54 @@ describe('organization Kilo Pass Stripe adapter', () => {
       ],
     } as unknown as Stripe.SubscriptionSchedule;
     retrieve.mockResolvedValue(subscription({ schedule: resumedSchedule }));
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await scheduleOrganizationKiloPassCancellation({
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+    });
+
+    expect(scheduleUpdate).toHaveBeenCalledWith(
+      'sched_after_renewal',
+      expect.objectContaining({
+        phases: expect.arrayContaining([
+          expect.objectContaining({ start_date: 1_767_225_600, end_date: 1_769_904_000 }),
+        ]),
+      })
+    );
+  });
+
+  test('preserves the later active phase after the subscription has renewed', async () => {
+    const resumedSchedule = {
+      id: 'sched_after_renewal',
+      status: 'active',
+      metadata: { origin: 'kilo-pass-org-cancellation' },
+      current_phase: { start_date: 1_769_904_000, end_date: 1_772_582_400 },
+      phases: [
+        {
+          start_date: 1_767_225_600,
+          end_date: 1_769_904_000,
+          items: [
+            { price: 'price_seat', quantity: 9 },
+            { price: 'price_pass', quantity: 9 },
+          ],
+        },
+        {
+          start_date: 1_769_904_000,
+          end_date: 1_772_582_400,
+          items: [
+            { price: 'price_seat', quantity: 9 },
+            { price: 'price_pass', quantity: 9 },
+          ],
+        },
+      ],
+    } as unknown as Stripe.SubscriptionSchedule;
+    const renewed = subscription({ schedule: resumedSchedule });
+    renewed.items.data.forEach(item => {
+      item.current_period_start = 1_769_904_000;
+      item.current_period_end = 1_772_582_400;
+    });
+    retrieve.mockResolvedValue(renewed);
     const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
 
     await scheduleOrganizationKiloPassCancellation({
@@ -642,6 +730,35 @@ describe('organization Kilo Pass Stripe adapter', () => {
     expect(scheduleUpdate).not.toHaveBeenCalled();
   });
 
+  test.each(['void', 'uncollectible'] as const)(
+    'ends pending agreement and removes its add-on when invoice becomes %s',
+    async status => {
+      select.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            orderBy: () => ({ limit: async () => [dbAgreement({ state: 'pending_payment' })] }),
+          }),
+        }),
+      });
+      retrieve.mockResolvedValue(subscription());
+      update.mockResolvedValue(subscription());
+      const { endPendingOrganizationKiloPassForTerminalInvoice } = await import('./stripe-adapter');
+
+      await expect(
+        endPendingOrganizationKiloPassForTerminalInvoice({
+          status,
+          parent: { subscription_details: { subscription: 'sub_1' } },
+        } as unknown as Stripe.Invoice)
+      ).resolves.toBe(true);
+
+      expect(update).toHaveBeenCalledWith('sub_1', {
+        proration_behavior: 'none',
+        items: [{ id: 'si_pass', deleted: true }],
+      });
+      expect(updateSet).toHaveBeenCalledWith({ state: 'ended' });
+    }
+  );
+
   test('keeps a pending agreement pending until its recognized invoice is paid', async () => {
     select.mockReturnValue({
       from: () => ({
@@ -685,6 +802,9 @@ describe('organization Kilo Pass Stripe adapter', () => {
       from: () => ({
         where: () => ({
           limit: async () => [dbAgreement({ state: 'cancel_at_period_end' })],
+          orderBy: () => ({
+            limit: async () => [dbAgreement({ state: 'cancel_at_period_end' })],
+          }),
         }),
       }),
     });

@@ -1,53 +1,239 @@
-import { useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { type AgentMode } from '@/components/agents/mode-selector';
-import { RemoteSpawnInheritanceProvider } from '@/components/agents/use-remote-spawn-dispatch';
-import { resolvePrefillModel } from '@/components/agents/new-session-prefill';
-import { useNewSessionPrefill } from '@/components/agents/use-new-session-prefill';
-import { NewSessionScreenBody } from '@/components/agents/new-session-screen-body';
-import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
+import { useActionSheet } from '@expo/react-native-action-sheet';
+import { useQuery } from '@tanstack/react-query';
 
-/**
- * Outer shell owns picker state and the inheritance Provider so
- * `useNewSessionShareRemote` → `useRemoteSpawnDispatch` (in the inner
- * body) reads mode/model/variant as a true descendant. Provider wrapping
- * only the returned JSX left the hook outside the tree with `{}`.
- *
- * Auto-select also lives here: `setModel`/`setVariant` belong to this
- * component, so the render-phase apply is a same-component update (legal).
- * Doing it in the body after the M1 split was a cross-component setState.
- */
+import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
+import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
+import {
+  NewSessionModelProvider,
+  useNewSessionModelState,
+} from '@/components/agents/new-session-model-provider';
+import { pickAgentAttachments } from '@/components/agents/attachment-picker';
+import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session-prefill';
+import { ScreenHeader } from '@/components/screen-header';
+import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
+import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
+import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
+import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
+import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
+import { useNewSessionRepos } from '@/lib/use-new-session-repos';
+import { useTRPC } from '@/lib/trpc';
+import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
+
 export default function NewSessionScreen() {
-  const prefill = useNewSessionPrefill();
-  const [mode, setMode] = useState<AgentMode>(prefill.mode);
-  const [model, setModel] = useState('');
-  const [variant, setVariant] = useState('');
   const { organizationId } = useLocalSearchParams<{
     organizationId?: string;
   }>();
-  // Same query key as the body — React Query dedupes; used only so
-  // auto-select can run in the state owner without a cross-component update.
-  const { models } = useAvailableModels(organizationId);
-  const autoSelected = useAutoSelectModel(models, organizationId);
-  const hasAppliedAutoSelection = useRef(false);
-  const initialSelection = resolvePrefillModel(models, prefill) ?? autoSelected;
-  if (!hasAppliedAutoSelection.current && initialSelection.model && !model) {
-    hasAppliedAutoSelection.current = true;
-    setModel(initialSelection.model);
-    setVariant(initialSelection.variant);
+  return (
+    <NewSessionModelProvider organizationId={organizationId}>
+      <NewSessionScreenBody />
+    </NewSessionModelProvider>
+  );
+}
+function NewSessionScreenBody() {
+  const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
+  const { showActionSheetWithOptions } = useActionSheet();
+  const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
+    organizationId?: string;
+    shareId?: string;
+  }>();
+  const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
+
+  const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasPrompt, setHasPrompt] = useState(false);
+  const submissionLockRef = useRef(false);
+  const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
+
+  const showRunOnSelector = shouldShowRunOnSelector(organizationId);
+
+  const {
+    models,
+    isLoading: isLoadingModels,
+    isError: isModelsError,
+    refetch: refetchModels,
+  } = useAvailableModels(organizationId);
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { saveModel } = usePersistedAgentModel();
+  const attachments = useAgentAttachmentUpload({ organizationId });
+
+  const trpc = useTRPC();
+  const {
+    repositories,
+    view,
+    isRetrying,
+    openGitHubIntegration: openGitHub,
+    refreshReposForceFresh,
+  } = useNewSessionRepos({ organizationId });
+
+  const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
+    repositories,
+    reposSettled: view === 'repos' && repositories.length > 0,
+    models,
+    modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
+  });
+
+  // Keep the inline selector and picker list in sync.
+  const {
+    data: instancesData,
+    isLoading: isLoadingInstances,
+    refetch: refetchInstances,
+  } = useQuery({
+    ...trpc.activeSessions.listInstances.queryOptions(undefined, {
+      refetchOnWindowFocus: true,
+      staleTime: 5000,
+    }),
+    enabled: showRunOnSelector,
+  });
+  const instanceList: InstancePickerInstance[] = useMemo(
+    () => instancesData?.instances ?? [],
+    [instancesData]
+  );
+
+  const { createSessionFromDraft, promptRef } = useNewSessionCreator({
+    attachments,
+    mode,
+    model,
+    organizationId,
+    selectedRepo,
+    setIsCreating,
+    variant,
+  });
+
+  const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
+    organizationId,
+    runOnInstance,
+    setRunOnInstance,
+    refetchInstances,
+    instanceList,
+    promptRef,
+    attachments: attachments.attachments,
+  });
+
+  const handleModelSelect = useCallback(
+    (modelId: string, newVariant: string) => {
+      setModel(modelId);
+      setVariant(newVariant);
+      saveModel(organizationId, { model: modelId, variant: newVariant });
+      persistServerLastSelected({ model: modelId, ...(newVariant ? { variant: newVariant } : {}) });
+    },
+    [organizationId, saveModel, persistServerLastSelected, setModel, setVariant]
+  );
+
+  function handlePromptChange(text: string) {
+    promptRef.current = text;
+    const nextHasPrompt = text.trim().length > 0;
+    setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
   }
 
+  const submitWithVoiceSettled = useCallback(async (submit: () => Promise<void>) => {
+    await settleVoiceInputBeforeSubmit({
+      lock: submissionLockRef,
+      onPendingChange: setIsSubmitting,
+      settleVoiceInput: async () => {
+        const settleVoiceInput = voiceInputSettlerRef.current;
+        if (settleVoiceInput === null) {
+          return true;
+        }
+        const settled = await settleVoiceInput();
+        return settled;
+      },
+      submit,
+    });
+  }, []);
+
+  const { addCandidates, removeAttachment, retryAttachment } = attachments;
+  const handleAddAttachment = useCallback(async () => {
+    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
+  }, [addCandidates, showActionSheetWithOptions]);
+
+  const handleRemoveAttachment = useCallback(
+    (id: string) => {
+      removeAttachment(id);
+    },
+    [removeAttachment]
+  );
+
+  const handleRetryAttachment = useCallback(
+    (id: string) => {
+      retryAttachment(id);
+    },
+    [retryAttachment]
+  );
+
+  const isRemoteTargetSelected = runOnInstance !== null;
+  const isStartDisabled = isRemoteTargetSelected
+    ? remoteSpawn.isSpawningRemote || isSubmitting || attachments.hasFailedAttachments
+    : resolveNewSessionSubmitDisabled({
+        attachmentsHasFailed: attachments.hasFailedAttachments,
+        attachmentsIsUploading: attachments.isUploading,
+        hasPrompt,
+        isCreating,
+        isRemoteTargetSelected,
+        isSubmitting,
+        model,
+        selectedRepo,
+      });
+
+  const handleStartSession = useCallback(() => {
+    if (runOnInstance !== null) {
+      void submitWithVoiceSettled(async () => {
+        remoteSpawn.onStart();
+        await Promise.resolve();
+      });
+      return;
+    }
+    void submitWithVoiceSettled(createSessionFromDraft);
+  }, [createSessionFromDraft, remoteSpawn, runOnInstance, submitWithVoiceSettled]);
+
   return (
-    <RemoteSpawnInheritanceProvider mode={mode} model={model} variant={variant}>
-      <NewSessionScreenBody
+    <View className="flex-1 bg-background">
+      <ScreenHeader title="New session" />
+      <NewSessionConfigureForm
+        attachments={attachments.attachments}
+        attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
+        isCreating={isCreating}
+        isModelsError={isModelsError}
+        isLoadingModels={isLoadingModels}
         mode={mode}
-        setMode={setMode}
         model={model}
-        setModel={setModel}
         variant={variant}
-        setVariant={setVariant}
+        modelOptions={models}
+        initialPrompt={promptRef.current}
+        onChangeText={handlePromptChange}
+        onModeChange={setMode}
+        onModelSelect={handleModelSelect}
+        onAddAttachment={() => void handleAddAttachment()}
+        onRemoveAttachment={handleRemoveAttachment}
+        onRetryAttachment={handleRetryAttachment}
+        onRefetchModels={() => void refetchModels()}
+        onPrefillAttachments={addCandidates}
+        shareId={shareId}
+        voiceInputSettlerRef={voiceInputSettlerRef}
+        showRunOnSelector={showRunOnSelector}
+        runOnInstance={runOnInstance}
+        instanceList={instanceList}
+        isLoadingInstances={isLoadingInstances}
+        onChangeRunOnInstance={handleRunOnInstanceChange}
+        showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
+        view={view}
+        isRetrying={isRetrying}
+        onChangeRepo={setSelectedRepo}
+        onOpenGitHubIntegration={openGitHub}
+        onRefreshRepos={() => void refreshReposForceFresh()}
+        repositories={repositories}
+        selectedRepo={selectedRepo}
+        isStartDisabled={isStartDisabled}
+        isSpawningRemote={remoteSpawn.isSpawningRemote}
+        onStartSession={handleStartSession}
       />
-    </RemoteSpawnInheritanceProvider>
+    </View>
   );
 }

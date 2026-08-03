@@ -116,6 +116,8 @@ type SessionDetailContentProps = {
   openedVia?: 'push' | 'app';
   /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
   shareId?: string;
+  /** Auto-send flag from remote spawn; the composer fires once after share delivery completes. */
+  autoSend?: boolean;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -129,6 +131,7 @@ export function SessionDetailContent({
   sessionId,
   openedVia = 'app',
   shareId,
+  autoSend,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -960,6 +963,7 @@ export function SessionDetailContent({
                 commands={availableCommands}
                 commandState={remoteCommandState}
                 shareId={shareId}
+                autoSend={autoSend}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

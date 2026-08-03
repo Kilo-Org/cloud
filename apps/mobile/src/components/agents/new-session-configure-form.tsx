@@ -1,9 +1,10 @@
-import { type RefObject } from 'react';
+import { type ReactNode, type RefObject } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
+import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -16,7 +17,8 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
 
-type NewSessionCloudFormProps = {
+type NewSessionConfigureFormProps = {
+  // Prompt / model / attachments (Cloud Agent only).
   attachments: AgentAttachment[];
   attachmentMax: number;
   isCreating: boolean;
@@ -36,31 +38,35 @@ type NewSessionCloudFormProps = {
   onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
   shareId: string | undefined;
   voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
+  initialPrompt?: string;
+  // Run target.
   showRunOnSelector: boolean;
   runOnInstance: InstancePickerInstance | null;
   instanceList: InstancePickerInstance[];
   isLoadingInstances: boolean;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
-  isReposError: boolean;
-  isLoadingRepos: boolean;
-  isRefetchingRepos: boolean;
+  // Repository (Cloud Agent only).
+  view: RepositorySectionView;
+  isRetrying: boolean;
   onChangeRepo: (fullName: string) => void;
   onOpenGitHubIntegration: () => void;
-  onRefetchRepos: () => void;
+  onRefreshRepos: () => void;
   repositories: { fullName: string; isPrivate: boolean }[];
-  showGitHubIntegrationPrompt: boolean;
   selectedRepo: string;
+  // Start.
+  isSpawningRemote: boolean;
   isStartDisabled: boolean;
   onStartSession: () => void;
 };
 
 /**
- * Cloud-Agent branch of the new-session screen: prompt, optional Run on,
- * repository section, and start CTA. Extracted so the route file stays under
- * the max-lines limit.
+ * THE new-session screen body — one screen for every entry point (cloud,
+ * remote CLI, share-staged). The composer, the mode and the model controls
+ * are shared by both targets. Only the repository section is cloud-only,
+ * because a spawned CLI session inherits its repository from the CLI.
  */
-export function NewSessionCloudForm({
+export function NewSessionConfigureForm({
   attachments,
   attachmentMax,
   isCreating,
@@ -80,25 +86,49 @@ export function NewSessionCloudForm({
   onPrefillAttachments,
   shareId,
   voiceInputSettlerRef,
+  initialPrompt,
   showRunOnSelector,
   runOnInstance,
   instanceList,
   isLoadingInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
-  isReposError,
-  isLoadingRepos,
-  isRefetchingRepos,
+  view,
+  isRetrying,
   onChangeRepo,
   onOpenGitHubIntegration,
-  onRefetchRepos,
+  onRefreshRepos,
   repositories,
-  showGitHubIntegrationPrompt,
   selectedRepo,
+  isSpawningRemote,
   isStartDisabled,
   onStartSession,
-}: Readonly<NewSessionCloudFormProps>) {
+}: Readonly<NewSessionConfigureFormProps>) {
   const colors = useThemeColors();
+  const isRemote = runOnInstance !== null;
+  const isStarting = isRemote ? isSpawningRemote : isCreating;
+  const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
+  let runTargetBlock: ReactNode = null;
+  if (showRunOnSelector) {
+    runTargetBlock = (
+      <View className="mt-5">
+        <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
+        <InstanceSelector
+          value={runOnInstance}
+          instances={instanceList}
+          isLoading={isLoadingInstances}
+          onChange={onChangeRunOnInstance}
+          disabled={isStarting}
+        />
+      </View>
+    );
+  } else if (targetLabel) {
+    runTargetBlock = (
+      <View className="mt-2">
+        <Text className="text-sm text-muted-foreground">Run on: {targetLabel}</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -110,7 +140,7 @@ export function NewSessionCloudForm({
       <NewSessionPrompt
         attachments={attachments}
         attachmentMax={attachmentMax}
-        isCreating={isCreating}
+        isCreating={isStarting}
         isModelsError={isModelsError}
         isLoadingModels={isLoadingModels}
         mode={mode}
@@ -127,41 +157,32 @@ export function NewSessionCloudForm({
         onPrefillAttachments={onPrefillAttachments}
         shareId={shareId}
         voiceInputSettlerRef={voiceInputSettlerRef}
+        initialPrompt={initialPrompt}
       />
 
-      {showRunOnSelector ? (
-        <View className="mt-5">
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
-          <InstanceSelector
-            value={runOnInstance}
-            instances={instanceList}
-            isLoading={isLoadingInstances}
-            onChange={onChangeRunOnInstance}
-            disabled={isCreating}
-          />
-          {showInstanceDisconnectedNote ? (
-            <Text className="mt-2 text-sm text-muted-foreground">
-              {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
-            </Text>
-          ) : null}
-        </View>
+      {runTargetBlock}
+
+      {showInstanceDisconnectedNote ? (
+        <Text className="mt-2 text-sm text-muted-foreground">
+          {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
+        </Text>
       ) : null}
 
-      <NewSessionRepositorySection
-        disabled={isCreating}
-        isError={isReposError}
-        isLoading={isLoadingRepos}
-        isRefetching={isRefetchingRepos}
-        onChange={onChangeRepo}
-        onOpenGitHubIntegration={onOpenGitHubIntegration}
-        onRefetch={onRefetchRepos}
-        repositories={repositories}
-        showGitHubIntegrationPrompt={showGitHubIntegrationPrompt}
-        value={selectedRepo}
-      />
+      {!isRemote ? (
+        <NewSessionRepositorySection
+          disabled={isCreating}
+          view={view}
+          isRetrying={isRetrying}
+          onChange={onChangeRepo}
+          onOpenGitHubIntegration={onOpenGitHubIntegration}
+          onRefreshRepos={onRefreshRepos}
+          repositories={repositories}
+          value={selectedRepo}
+        />
+      ) : null}
 
       <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStartSession}>
-        {isCreating ? (
+        {isStarting ? (
           <ActivityIndicator size="small" color={colors.primaryForeground} />
         ) : (
           <Text>Start session</Text>

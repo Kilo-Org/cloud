@@ -97,8 +97,10 @@ export function ToolCardImageAttachments({ part }: Readonly<{ part: ToolPart }>)
     return null;
   }
 
+  // Prefer the first attachment's filename; fall back to tool input filePath.
+  const attachmentFilename = attachments[0]?.filename;
   const filePath = typeof part.state.input.filePath === 'string' ? part.state.input.filePath : '';
-  const label = getFilename(filePath) || part.tool;
+  const label = attachmentFilename ?? getFilename(filePath === '' ? part.tool : filePath);
 
   return (
     <View className="gap-2">

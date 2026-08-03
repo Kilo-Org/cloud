@@ -2,6 +2,7 @@ import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import {
+  getToolFileAttachments,
   getToolImageAttachments,
   IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
   IMAGE_PREVIEW_MAX_ASPECT_RATIO,
@@ -20,14 +21,18 @@ function makeAttachment(mime: string, url: string): FilePart {
   };
 }
 
-function makeToolPart(status: ToolPart['state']['status'], attachments?: FilePart[]): ToolPart {
+function makeToolPart(
+  status: ToolPart['state']['status'],
+  attachments?: FilePart[],
+  tool = 'read'
+): ToolPart {
   const base = {
     id: 'part-1',
     sessionID: 'session-1',
     messageID: 'message-1',
     type: 'tool' as const,
     callID: 'call-1',
-    tool: 'read',
+    tool,
   };
 
   if (status === 'pending') {
@@ -95,6 +100,51 @@ describe('getToolImageAttachments', () => {
     const jpeg = makeAttachment('image/jpeg', '');
     const result = getToolImageAttachments(makeToolPart('completed', [png, pdf, jpeg]));
     expect(result).toEqual([png, jpeg]);
+  });
+});
+
+describe('getToolFileAttachments', () => {
+  it('returns empty for non-send_file tools even when completed', () => {
+    const pdf = makeAttachment('application/pdf', '');
+    expect(getToolFileAttachments(makeToolPart('completed', [pdf], 'read'))).toEqual([]);
+  });
+
+  it('returns empty when attachments key is absent', () => {
+    expect(getToolFileAttachments(makeToolPart('completed', undefined, 'send_file'))).toEqual([]);
+  });
+
+  it('returns empty for pending, running, and error states', () => {
+    const pdf = makeAttachment('application/pdf', '');
+    expect(getToolFileAttachments(makeToolPart('pending', [pdf], 'send_file'))).toEqual([]);
+    expect(getToolFileAttachments(makeToolPart('running', [pdf], 'send_file'))).toEqual([]);
+    expect(getToolFileAttachments(makeToolPart('error', [pdf], 'send_file'))).toEqual([]);
+  });
+
+  it('keeps non-image attachments from send_file', () => {
+    const pdf = makeAttachment('application/pdf', '');
+    const txt = makeAttachment('text/plain', '');
+    const result = getToolFileAttachments(makeToolPart('completed', [pdf, txt], 'send_file'));
+    expect(result).toEqual([pdf, txt]);
+  });
+
+  it('drops image attachments (they belong to image rendering)', () => {
+    const png = makeAttachment('image/png', '');
+    const pdf = makeAttachment('application/pdf', '');
+    const result = getToolFileAttachments(makeToolPart('completed', [png, pdf], 'send_file'));
+    expect(result).toEqual([pdf]);
+  });
+
+  it('keeps blank-url non-image attachments', () => {
+    const pdf = makeAttachment('application/pdf', '');
+    expect(getToolFileAttachments(makeToolPart('completed', [pdf], 'send_file'))).toEqual([pdf]);
+  });
+
+  it('filters a mixed array preserving order', () => {
+    const pdf = makeAttachment('application/pdf', '');
+    const png = makeAttachment('image/png', '');
+    const txt = makeAttachment('text/plain', '');
+    const result = getToolFileAttachments(makeToolPart('completed', [pdf, png, txt], 'send_file'));
+    expect(result).toEqual([pdf, txt]);
   });
 });
 

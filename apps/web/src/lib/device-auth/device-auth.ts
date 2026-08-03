@@ -4,6 +4,7 @@ import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, lt, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
+import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
@@ -177,6 +178,8 @@ export async function consumeDeviceAuthByDeviceCode(
 ): Promise<{
   status: 'pending' | 'approved' | 'denied' | 'expired' | 'consumed';
   token?: string;
+  refreshToken?: string;
+  expiresIn?: number;
   userId?: string;
   userEmail?: string;
 }> {
@@ -232,7 +235,26 @@ export async function consumeDeviceAuthByDeviceCode(
     throw new Error('User not found');
   }
 
-  const token = generateApiToken(user, { deviceAuthRequestCode: consumed.code });
+  const token = options?.supportsRefresh
+    ? undefined
+    : generateApiToken(user, { deviceAuthRequestCode: consumed.code });
+
+  if (options?.supportsRefresh) {
+    const sessionId = await createDeviceSession({
+      userId: user.id,
+      userAgent: consumed.user_agent ?? undefined,
+      deviceAuthRequestId: consumed.id,
+    });
+    const pair = await issueSessionCredentials(user, sessionId);
+    return {
+      status: 'approved',
+      token: pair.token,
+      refreshToken: pair.refreshToken,
+      expiresIn: pair.expiresIn,
+      userId: user.id,
+      userEmail: user.google_user_email,
+    };
+  }
 
   return {
     status: 'approved',

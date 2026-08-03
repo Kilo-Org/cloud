@@ -35,6 +35,7 @@ import {
   organization_recommendation_dismissals,
   magic_link_tokens,
   device_auth_requests,
+  device_sessions,
   auto_top_up_configs,
   platform_integrations,
   platform_oauth_credentials,
@@ -1256,6 +1257,8 @@ export async function softDeleteUser(userId: string) {
       .delete(code_review_feedback_events)
       .where(eq(code_review_feedback_events.owned_by_user_id, userId));
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
+    // device_sessions cascade deletes device_refresh_tokens via FK
+    await tx.delete(device_sessions).where(eq(device_sessions.kilo_user_id, userId));
     await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));

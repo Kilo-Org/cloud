@@ -36,6 +36,8 @@ export async function POST(request: Request) {
         {
           status: 'approved',
           token: result.token,
+          ...(result.refreshToken ? { refreshToken: result.refreshToken } : {}),
+          ...(result.expiresIn ? { expiresIn: result.expiresIn } : {}),
           userId: result.userId,
           userEmail: result.userEmail,
         },

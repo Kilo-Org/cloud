@@ -282,6 +282,35 @@ describe('Device Auth', () => {
         expect(approved[0]!.token).toBeDefined();
       }
     });
+
+    test('supportsRefresh: true creates a device session and issues short-lived token pair', async () => {
+      const { code, deviceCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(code, testUserId);
+
+      const result = await consumeDeviceAuthByDeviceCode(deviceCode, {
+        supportsRefresh: true,
+      });
+
+      expect(result.status).toBe('approved');
+      expect(result.token).toBeDefined();
+      expect(result.refreshToken).toBeDefined();
+      expect(result.expiresIn).toBe(60 * 60);
+      expect(result.userId).toBe(testUserId);
+    });
+
+    test('supportsRefresh: false returns long-lived token only', async () => {
+      const { code, deviceCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(code, testUserId);
+
+      const result = await consumeDeviceAuthByDeviceCode(deviceCode, {
+        supportsRefresh: false,
+      });
+
+      expect(result.status).toBe('approved');
+      expect(result.token).toBeDefined();
+      expect(result.refreshToken).toBeUndefined();
+      expect(result.expiresIn).toBeUndefined();
+    });
   });
 
   describe('pollDeviceAuthRequest (legacy)', () => {

@@ -26,8 +26,16 @@ jest.mock('@/lib/auth/magic-link-tokens');
 jest.mock('@/lib/user');
 jest.mock('@/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
+jest.mock('@/lib/auth/native-admission');
+jest.mock('@/lib/auth/device-sessions');
+jest.mock('@sentry/nextjs', () => ({
+  captureMessage: jest.fn(),
+}));
 
 import { POST } from './route';
+import { checkNativeAdmission } from '@/lib/auth/native-admission';
+import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { captureMessage } from '@sentry/nextjs';
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
@@ -38,6 +46,10 @@ const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
 const mockFindUserIdByAuthProvider = jest.mocked(findUserIdByAuthProvider);
 const mockGenerateApiToken = jest.mocked(generateApiToken);
 const mockCheckDomainSignInEligibility = jest.mocked(checkDomainSignInEligibility);
+const mockCheckNativeAdmission = jest.mocked(checkNativeAdmission);
+const mockCreateDeviceSession = jest.mocked(createDeviceSession);
+const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
@@ -68,6 +80,7 @@ describe('POST /api/auth/native/token', () => {
     mockFindUserById.mockResolvedValue(undefined);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
     mockFindUserIdByAuthProvider.mockResolvedValue(null);
+    mockCheckNativeAdmission.mockReturnValue({ ok: true });
   });
 
   describe('apple', () => {
@@ -511,5 +524,112 @@ describe('POST /api/auth/native/token', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
+  });
+
+  describe('admission', () => {
+    it('returns 403 ADMISSION_REQUIRED when admission check fails', async () => {
+      mockCheckNativeAdmission.mockReturnValue({
+        ok: false,
+        errorCode: 'ADMISSION_REQUIRED',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      // Must not proceed to provider verification.
+      expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('runs admission check before provider verification', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+      expect(response.status).toBe(200);
+      expect(mockCheckNativeAdmission).toHaveBeenCalled();
+      expect(mockVerifyNativeGoogleIdToken).toHaveBeenCalled();
+    });
+  });
+
+  describe('supportsRefresh', () => {
+    it('returns short-lived pair when supportsRefresh is true', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateDeviceSession.mockResolvedValue('session-1');
+      mockIssueSessionCredentials.mockResolvedValue({
+        token: 'short-jwt',
+        refreshToken: 'refresh-abc',
+        expiresIn: 3600,
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'google',
+          idToken: 'google-id-token',
+          supportsRefresh: true,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        token: 'short-jwt',
+        refreshToken: 'refresh-abc',
+        expiresIn: 3600,
+      });
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined, // NextRequest has no user-agent header by default
+      });
+      expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1');
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    });
+
+    it('returns long-lived token when supportsRefresh is absent', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
+    });
+
+    it('returns long-lived token when supportsRefresh is false', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'google',
+          idToken: 'google-id-token',
+          supportsRefresh: false,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
+    });
   });
 });

@@ -18,6 +18,9 @@ import {
 } from '@/lib/user';
 import { generateApiToken } from '@/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import { checkNativeAdmission } from '@/lib/auth/native-admission';
+import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { captureMessage } from '@sentry/nextjs';
 
 // Bad/expired ID tokens are a 401; JWKS-fetch or network failures during verification are
 // server faults and must surface as 500, not be misreported as an invalid token.
@@ -63,31 +66,39 @@ const requestSchema = z.discriminatedUnion('provider', [
     provider: z.literal('apple'),
     idToken: z.string(),
     fullName: z.string().optional(),
+    supportsRefresh: z.boolean().optional(),
+    admission: z.unknown().optional(),
   }),
   z.object({
     provider: z.literal('google'),
     idToken: z.string(),
+    supportsRefresh: z.boolean().optional(),
+    admission: z.unknown().optional(),
   }),
   z.object({
     provider: z.literal('email'),
     email: z.string().email(),
     code: z.string(),
+    supportsRefresh: z.boolean().optional(),
+    admission: z.unknown().optional(),
   }),
 ]);
 
 /**
  * Native (mobile) sign-in token exchange. Verifies an Apple/Google ID token or an
- * email sign-in code, creates or updates the user, and mints the same API token
- * shape as the device-auth poll endpoint.
+ * email sign-in code, creates or updates the user, and mints an API token.
  *
  * Response contract (frozen — mobile client is built against it):
- *   200 { token }
+ *   200 { token, refreshToken?, expiresIn? }  — refreshToken+expiresIn only when
+ *                                                   the client opts into refresh
+ *                                                   (supportsRefresh: true)
  *   401 { error: 'INVALID_TOKEN' }        — bad apple/google ID token
  *   401 { error: 'INVALID_CODE' }         — bad email sign-in code
  *   429 { error: 'TOO_MANY_ATTEMPTS' }    — email code attempt budget exhausted
  *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? } — apple/google domain
  *                                            blacklisted or SSO-enforced (checkDomainSignInEligibility)
  *   403 { error: AuthErrorType }          — createOrUpdateUser rejected the sign-in
+ *   403 { error: 'ADMISSION_REQUIRED' }   — admission check failed under enforce mode
  *   400                                   — invalid request body
  */
 export async function POST(request: NextRequest) {
@@ -99,6 +110,13 @@ export async function POST(request: NextRequest) {
   }
 
   const data = validation.data;
+
+  // Admission check: must run before any provider verification.
+  const admission = checkNativeAdmission(body);
+  if (!admission.ok) {
+    return NextResponse.json({ error: admission.errorCode }, { status: 403 });
+  }
+
   let args: CreateOrUpdateUserArgs;
   let autoLinkToExistingUser: boolean;
 
@@ -205,6 +223,21 @@ export async function POST(request: NextRequest) {
     return eligibilityResponse(resolvedEligibility);
   }
 
+  // ponytail: remove legacy long-lived path after all shipped clients have
+  // refreshed their token at least once and the legacy counter has drained.
+  if (data.supportsRefresh) {
+    const sessionId = await createDeviceSession({
+      userId: result.user.id,
+      userAgent: request.headers.get('user-agent') ?? undefined,
+    });
+    const pair = await issueSessionCredentials(result.user, sessionId);
+    return NextResponse.json(
+      { token: pair.token, refreshToken: pair.refreshToken, expiresIn: pair.expiresIn },
+      { status: 200 }
+    );
+  }
+
+  captureMessage('native_token_legacy_long_lived_count: 1');
   const token = generateApiToken(result.user);
   return NextResponse.json({ token }, { status: 200 });
 }

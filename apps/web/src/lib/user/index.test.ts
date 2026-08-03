@@ -29,6 +29,8 @@ import {
   cloud_agent_feedback,
   user_admin_notes,
   magic_link_tokens,
+  device_sessions,
+  device_refresh_tokens,
   stytch_fingerprints,
   kiloclaw_instances,
   kiloclaw_google_oauth_connections,
@@ -4075,6 +4077,69 @@ describe('User', () => {
         .from(byok_api_keys)
         .where(eq(byok_api_keys.kilo_user_id, user.id));
       expect(byokKeys).toHaveLength(0);
+    });
+
+    it('should delete device sessions and refresh tokens', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      // Create a device session for the user
+      const [session] = await db
+        .insert(device_sessions)
+        .values({
+          kilo_user_id: user.id,
+          user_agent: 'TestAgent/1.0',
+        })
+        .returning({ id: device_sessions.id });
+
+      // Create a refresh token for the session
+      await db.insert(device_refresh_tokens).values({
+        token_hash: 'test-hash-1',
+        device_session_id: session.id,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      // Create a session for the other user
+      const [otherSession] = await db
+        .insert(device_sessions)
+        .values({
+          kilo_user_id: otherUser.id,
+          user_agent: 'OtherAgent/1.0',
+        })
+        .returning({ id: device_sessions.id });
+
+      await db.insert(device_refresh_tokens).values({
+        token_hash: 'test-hash-2',
+        device_session_id: otherSession.id,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      // User's sessions and tokens must be gone
+      expect(
+        await db
+          .select({ count: count() })
+          .from(device_sessions)
+          .where(eq(device_sessions.kilo_user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+
+      // Other user's sessions and tokens must remain
+      expect(
+        await db
+          .select({ count: count() })
+          .from(device_sessions)
+          .where(eq(device_sessions.kilo_user_id, otherUser.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, otherSession.id))
+          .then(r => r[0].count)
+      ).toBe(1);
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw instance even without live subscription', async () => {

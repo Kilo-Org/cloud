@@ -6422,6 +6422,50 @@ export const device_auth_requests = pgTable(
 
 export type DeviceAuthRequest = typeof device_auth_requests.$inferSelect;
 
+export const device_sessions = pgTable(
+  'device_sessions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    device_auth_request_id: uuid(),
+    user_agent: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_reason: text(),
+  },
+  table => [
+    index('IDX_device_sessions_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_device_sessions_revoked_at').on(table.revoked_at),
+  ]
+);
+
+export type DeviceSession = typeof device_sessions.$inferSelect;
+
+export const device_refresh_tokens = pgTable(
+  'device_refresh_tokens',
+  {
+    token_hash: text().primaryKey().notNull(),
+    device_session_id: uuid()
+      .notNull()
+      .references(() => device_sessions.id, { onDelete: 'cascade' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_device_refresh_tokens_device_session_id').on(table.device_session_id),
+    index('IDX_device_refresh_tokens_expires_at').on(table.expires_at),
+  ]
+);
+
+export type DeviceRefreshToken = typeof device_refresh_tokens.$inferSelect;
+
 // App Builder Projects
 export const app_builder_projects = pgTable(
   'app_builder_projects',

@@ -52,6 +52,30 @@ describe('POST /api/device-auth/token', () => {
     expect(mockConsume).toHaveBeenCalledWith('secret123', { supportsRefresh: true });
   });
 
+  test('returns refreshToken and expiresIn when consumer returns short pair', async () => {
+    mockConsume.mockResolvedValue({
+      status: 'approved',
+      token: 'short-jwt',
+      refreshToken: 'refresh-abc',
+      expiresIn: 3600,
+      userId: 'user-1',
+      userEmail: 'user@example.com',
+    });
+
+    const response = await POST(createRequest({ deviceCode: 'secret123', supportsRefresh: true }));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      status: 'approved',
+      token: 'short-jwt',
+      refreshToken: 'refresh-abc',
+      expiresIn: 3600,
+      userId: 'user-1',
+      userEmail: 'user@example.com',
+    });
+  });
+
   test('returns 202 on pending', async () => {
     mockConsume.mockResolvedValue({ status: 'pending' });
 

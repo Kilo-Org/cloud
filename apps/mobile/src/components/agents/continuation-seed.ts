@@ -1,10 +1,10 @@
-import { type StoredMessage, type TextPart } from '@kilocode/cloud-agent-sdk';
+import { type Part, type StoredMessage, type TextPart } from '@kilocode/cloud-agent-sdk';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import {
   buildContinuePrefillParams,
+  type NewSessionPrefill,
   resolvePrefillModel,
   resolvePrefillRepo,
-  type NewSessionPrefill,
 } from '@/components/agents/new-session-prefill';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 
@@ -16,9 +16,13 @@ Reply with a short confirmation of the context you carried over (one or two sent
 
 const SEED_OMISSION_MARKER = '[… middle of the transcript omitted for length …]';
 
-interface Turn {
+type Turn = {
   label: 'User' | 'Assistant';
   text: string;
+};
+
+function isTextPart(part: Part): part is TextPart {
+  return part.type === 'text';
 }
 
 function joinLen(parts: readonly string[]): number {
@@ -33,30 +37,19 @@ export function buildContinuationSeed(messages: readonly StoredMessage[]): strin
   // Step 1: extract text turns from messages.
   const turns: Turn[] = [];
   for (const msg of messages) {
-    if (msg.info.role !== 'user' && msg.info.role !== 'assistant') {
-      continue;
-    }
-
     const text = msg.parts
-      .filter(
-        part =>
-          part.type === 'text' &&
-          typeof (part as TextPart).text === 'string' &&
-          part.synthetic !== true &&
-          part.ignored !== true
-      )
-      .map(part => (part as TextPart).text)
+      .filter(part => isTextPart(part))
+      .filter(part => part.synthetic !== true && part.ignored !== true)
+      .map(part => part.text)
       .join('\n')
       .trim();
 
-    if (!text) {
-      continue;
+    if (text) {
+      turns.push({
+        label: msg.info.role === 'user' ? 'User' : 'Assistant',
+        text,
+      });
     }
-
-    turns.push({
-      label: msg.info.role === 'user' ? 'User' : 'Assistant',
-      text,
-    });
   }
 
   // Step 2: no turns → null.
@@ -65,41 +58,45 @@ export function buildContinuationSeed(messages: readonly StoredMessage[]): strin
   }
 
   // Step 3: full transcript fits → return as-is.
-  const full = turns.map(serialize).join('\n\n');
+  const full = turns.map(turn => serialize(turn)).join('\n\n');
   const seed = `${SEED_PREAMBLE}\n\n${full}`;
   if (seed.length <= CONTINUATION_SEED_MAX_CHARS) {
     return seed;
   }
 
   // Step 4: truncation branch.
-  const body = CONTINUATION_SEED_MAX_CHARS - SEED_PREAMBLE.length - 2; // the 2 is '\n\n' after the preamble
-  const head = serialize(turns[0]!);
+  // The 2 accounts for '\n\n' after the preamble.
+  const body = CONTINUATION_SEED_MAX_CHARS - SEED_PREAMBLE.length - 2;
+  const firstTurn = turns[0];
+  if (!firstTurn) {
+    return null;
+  }
+  const head = serialize(firstTurn);
 
   // Greedily collect trailing turns newest-first.
-  const tail: string[] = [];
-  for (let i = turns.length - 1; i >= 1; i--) {
-    const candidate = [serialize(turns[i]!), ...tail];
+  const midTurns = turns.slice(1);
+  let tailParts: string[] = [];
+  for (let i = midTurns.length - 1; i >= 0; i -= 1) {
+    const turn = midTurns[i];
+    if (!turn) {
+      break;
+    }
+    const candidate = [serialize(turn), ...tailParts];
     const candidateLen =
       head.length +
       2 +
       SEED_OMISSION_MARKER.length +
       (candidate.length > 0 ? 2 + joinLen(candidate) : 0);
     if (candidateLen <= body) {
-      tail.length = 0;
-      tail.push(...candidate);
+      tailParts = candidate;
     } else {
       break;
     }
   }
 
-  const omitted = turns.length - 1 - tail.length;
-  let resultBody: string;
-  if (omitted === 0) {
-    resultBody = head + (tail.length > 0 ? `\n\n${tail.join('\n\n')}` : '');
-  } else {
-    resultBody =
-      head + `\n\n${SEED_OMISSION_MARKER}` + (tail.length > 0 ? `\n\n${tail.join('\n\n')}` : '');
-  }
+  const omitted = turns.length - 1 - tailParts.length;
+  const tailStr = tailParts.length > 0 ? `\n\n${tailParts.join('\n\n')}` : '';
+  let resultBody = omitted === 0 ? head + tailStr : `${head}\n\n${SEED_OMISSION_MARKER}${tailStr}`;
 
   // Safety guard: if head + marker alone exceeds body.
   if (resultBody.length > body) {

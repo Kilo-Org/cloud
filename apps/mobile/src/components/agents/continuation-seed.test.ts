@@ -9,6 +9,12 @@ import {
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 
+import {
+  buildContinuationSeed,
+  CONTINUATION_SEED_MAX_CHARS,
+  resolveContinuationDestinations,
+} from './continuation-seed';
+
 vi.mock('lucide-react-native', () => ({
   Bug: 'Bug',
   Code: 'Code',
@@ -16,12 +22,6 @@ vi.mock('lucide-react-native', () => ({
   NotebookPen: 'NotebookPen',
   Workflow: 'Workflow',
 }));
-
-import {
-  buildContinuationSeed,
-  CONTINUATION_SEED_MAX_CHARS,
-  resolveContinuationDestinations,
-} from './continuation-seed';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -129,20 +129,22 @@ describe('buildContinuationSeed', () => {
 
     const seed = buildContinuationSeed(messages);
     expect(seed).not.toBeNull();
-    expect(seed!).toContain('User:\nhello');
-    expect(seed!).toContain('Assistant:\nhi there');
-    expect(seed!).toContain('User:\nvisible');
-    expect(seed!).toContain('Assistant:\nshown');
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    const s = seed!;
+    expect(s).toContain('User:\nhello');
+    expect(s).toContain('Assistant:\nhi there');
+    expect(s).toContain('User:\nvisible');
+    expect(s).toContain('Assistant:\nshown');
     // Synthetic text must not appear.
-    expect(seed!).not.toContain('synthetic');
+    expect(s).not.toContain('synthetic');
     // Ignored text must not appear.
-    expect(seed!).not.toContain('ignored');
+    expect(s).not.toContain('ignored');
     // Non-text-only messages produce no text, so u3 and u4 are skipped.
     // The preamble must appear exactly once.
-    const preambleCount = seed!.split('You are continuing a conversation').length - 1;
+    const preambleCount = s.split('You are continuing a conversation').length - 1;
     expect(preambleCount).toBe(1);
     // No omission marker for a short transcript.
-    expect(seed!).not.toContain('[… middle of the transcript');
+    expect(s).not.toContain('[… middle of the transcript');
   });
 
   it('returns null for an empty array', () => {
@@ -165,13 +167,15 @@ describe('buildContinuationSeed', () => {
 
     const seed = buildContinuationSeed(messages);
     expect(seed).not.toBeNull();
-    expect(seed!).toContain('User:\nwhat is the key phrase?');
-    expect(seed!).toContain('Assistant:\nthe key phrase is "pineapple23"');
-    expect(seed!).toContain('You are continuing a conversation');
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    const s = seed!;
+    expect(s).toContain('User:\nwhat is the key phrase?');
+    expect(s).toContain('Assistant:\nthe key phrase is "pineapple23"');
+    expect(s).toContain('You are continuing a conversation');
     // Exactly one preamble.
-    expect(seed!.split('You are continuing a conversation').length - 1).toBe(1);
-    expect(seed!).not.toContain('[… middle of the transcript');
-    expect(seed!.length).toBeLessThanOrEqual(CONTINUATION_SEED_MAX_CHARS);
+    expect(s.split('You are continuing a conversation').length - 1).toBe(1);
+    expect(s).not.toContain('[… middle of the transcript');
+    expect(s.length).toBeLessThanOrEqual(CONTINUATION_SEED_MAX_CHARS);
   });
 
   it('truncates a long transcript: first turn, omission marker, and last turn fit', () => {
@@ -188,14 +192,16 @@ describe('buildContinuationSeed', () => {
 
     const seed = buildContinuationSeed(messages);
     expect(seed).not.toBeNull();
-    expect(seed!.length).toBeLessThanOrEqual(CONTINUATION_SEED_MAX_CHARS);
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    const s = seed!;
+    expect(s.length).toBeLessThanOrEqual(CONTINUATION_SEED_MAX_CHARS);
 
     // First turn must be present.
-    expect(seed!).toContain('first ');
+    expect(s).toContain('first ');
     // Omission marker must appear.
-    expect(seed!).toContain('[… middle of the transcript');
+    expect(s).toContain('[… middle of the transcript');
     // Last turn must be present.
-    expect(seed!).toContain('last ');
+    expect(s).toContain('last ');
   });
 
   it('handles a two-turn transcript whose second turn is oversized', () => {
@@ -209,11 +215,13 @@ describe('buildContinuationSeed', () => {
 
     const seed = buildContinuationSeed(messages);
     expect(seed).not.toBeNull();
-    expect(seed!.length).toBeLessThanOrEqual(CONTINUATION_SEED_MAX_CHARS);
-    expect(seed!).toContain('User:\nshort first turn');
-    expect(seed!).toContain('[… middle of the transcript');
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    const s = seed!;
+    expect(s.length).toBeLessThanOrEqual(CONTINUATION_SEED_MAX_CHARS);
+    expect(s).toContain('User:\nshort first turn');
+    expect(s).toContain('[… middle of the transcript');
     // The oversized second turn must not appear.
-    expect(seed!).not.toContain('zzzzzzzz');
+    expect(s).not.toContain('zzzzzzzz');
   });
 
   it('handles a single oversized first turn with no omission marker', () => {
@@ -224,11 +232,13 @@ describe('buildContinuationSeed', () => {
 
     const seed = buildContinuationSeed(messages);
     expect(seed).not.toBeNull();
-    expect(seed!.length).toBeLessThanOrEqual(CONTINUATION_SEED_MAX_CHARS);
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    const s = seed!;
+    expect(s.length).toBeLessThanOrEqual(CONTINUATION_SEED_MAX_CHARS);
     // A truncated slice of the original text must appear.
-    expect(seed!).toContain('wwww');
+    expect(s).toContain('wwww');
     // Single turn → no marker.
-    expect(seed!).not.toContain('[… middle of the transcript');
+    expect(s).not.toContain('[… middle of the transcript');
   });
 });
 
@@ -268,7 +278,8 @@ describe('resolveContinuationDestinations', () => {
       mode: 'code',
       model: 'test-model',
       variant: 'default',
-      repositories: [], // repo "owner/repo" is not listed
+      // repo "owner/repo" is not listed.
+      repositories: [],
       models: MODELS,
       instances: [INSTANCE_A],
     });
@@ -299,7 +310,8 @@ describe('resolveContinuationDestinations', () => {
       model: 'test-model',
       variant: 'default',
       repositories: REPOS,
-      models: [], // model not found
+      // model not found.
+      models: [],
       instances: [INSTANCE_A],
     });
 

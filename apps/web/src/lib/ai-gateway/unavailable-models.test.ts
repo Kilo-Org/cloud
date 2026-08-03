@@ -16,4 +16,9 @@ describe('unavailable models', () => {
     expect(familyHasUnavailableFreeModel('openai/gpt-oss-20b')).toBe(true);
     expect(familyHasUnavailableFreeModel('cohere/north-mini-code')).toBe(false);
   });
+
+  test('ignores families of unavailable models that are not free', () => {
+    expect(familyHasUnavailableFreeModel('sakana/fugu-ultra')).toBe(false);
+    expect(familyHasUnavailableFreeModel('giga-potato')).toBe(false);
+  });
 });

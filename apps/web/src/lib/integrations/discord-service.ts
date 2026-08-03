@@ -8,14 +8,9 @@ import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN } from '@/lib/config.server';
-import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import {
-  createAllowPredicateFromRestrictions,
-  hasActiveModelRestrictions,
-} from '@/lib/model-allow.server';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
-import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
 // Discord OAuth2 scopes for the bot integration
@@ -371,15 +366,8 @@ export async function updateModel(
 
   // For org integrations, validate the model against org access policy.
   if (owner.type === 'org') {
-    const organization = await getOrganizationById(owner.id);
-    if (organization) {
-      const restrictions = getEffectiveModelRestrictions(organization);
-      if (hasActiveModelRestrictions(restrictions)) {
-        const isAllowed = createAllowPredicateFromRestrictions(restrictions);
-        if (!(await isAllowed(modelSlug))) {
-          return { success: false, error: 'Model is not allowed by organization policy' };
-        }
-      }
+    if (!(await isOrganizationModelUpdateAllowed(owner.id, modelSlug))) {
+      return { success: false, error: 'Model is not allowed by organization policy' };
     }
   }
 

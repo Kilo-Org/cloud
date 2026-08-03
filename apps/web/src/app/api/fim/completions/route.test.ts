@@ -8,6 +8,7 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
 } from '@/lib/ai-gateway/processUsage.types';
+import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 let mockInceptionPromoRunning = true;
 
@@ -25,6 +26,11 @@ jest.mock('@/lib/config.server', () => ({
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
 jest.mock('@/lib/ai-gateway/byok');
+jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+  resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
+    decision: { allowed: true },
+  }),
+}));
 jest.mock('@/lib/redis', () => ({
   redisClient: {
     get: jest.fn().mockResolvedValue(null),
@@ -58,6 +64,9 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedGetBYOKforOrganization = jest.mocked(getBYOKforOrganization);
 const mockedGetBYOKforUser = jest.mocked(getBYOKforUser);
+const mockedResolveOrganizationMemberModelDecision = jest.mocked(
+  resolveOrganizationMemberModelDecision
+);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -122,6 +131,10 @@ describe('POST /api/fim/completions', () => {
     mockInceptionPromoRunning = true;
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
+    mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
+      policy: {} as never,
+      decision: { allowed: true },
+    });
   });
 
   afterAll(() => {

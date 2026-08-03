@@ -196,6 +196,30 @@ describe('GET /api/organizations/[id]/defaults', () => {
     expect(body.defaultModel).toBe('kilo-auto/org');
   });
 
+  // Kilo admins and parent-organization owners are authorized for an organization
+  // without a membership row; they must not get a 500 from the group-policy lookup.
+  test('authorized caller without direct membership resolves organization-level defaults', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization('Test Org', owner.id);
+    const nonMemberAdmin = await insertTestUser();
+
+    mockedGetAuthorizedOrgContext.mockResolvedValue({
+      success: true,
+      data: {
+        user: { ...nonMemberAdmin, role: 'owner' },
+        organization: { ...organization, settings: {} },
+      },
+    });
+
+    const response = await GET(new NextRequest('http://localhost:3000'), {
+      params: Promise.resolve({ id: organization.id }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.defaultModel).toBe(PRIMARY_DEFAULT_MODEL);
+  });
+
   test('returns 409 when all available models are blocked by policy', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);

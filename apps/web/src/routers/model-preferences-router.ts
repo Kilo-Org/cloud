@@ -27,12 +27,19 @@ const getInput = z
   .optional();
 
 async function getAllowedModelIdsForOrg(
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  kiloUserId: string
 ): Promise<Set<string> | null> {
   if (!organizationId) {
     return null;
   }
-  const response = await getAvailableModelsForOrganization(organizationId);
+  const response = await getAvailableModelsForOrganization(organizationId, {
+    type: 'member',
+    kiloUserId,
+    // Callers reach this after `ensureOrganizationAccess`, which also admits Kilo
+    // admins and parent-organization owners without a membership row.
+    allowNonMember: true,
+  });
   if (!response) {
     return new Set();
   }
@@ -51,7 +58,7 @@ export const modelPreferencesRouter = createTRPCRouter({
     }
 
     const [allowed, row] = await Promise.all([
-      getAllowedModelIdsForOrg(organizationId),
+      getAllowedModelIdsForOrg(organizationId, ctx.user.id),
       db.query.user_model_preferences.findFirst({
         where: eq(user_model_preferences.user_id, ctx.user.id),
       }),

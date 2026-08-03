@@ -21,6 +21,7 @@ import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
+import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
@@ -220,7 +221,9 @@ async function validateOrganizationDefaultReplacement(
   );
   let availableModels: Awaited<ReturnType<typeof getAvailableModelsForOrganization>>;
   try {
-    availableModels = await getAvailableModelsForOrganization(organization.id);
+    availableModels = await getAvailableModelsForOrganization(organization.id, {
+      type: 'defaultAccess',
+    });
   } catch {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -314,10 +317,17 @@ export const organizationsSettingsRouter = createTRPCRouter({
   listAvailableModels: organizationMemberProcedure
     .input(OrganizationIdInputSchema)
     .output(z.custom<OpenRouterModelsResponse>())
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const { organizationId } = input;
 
-      const result = await getAvailableModelsForOrganization(organizationId);
+      const result = await getAvailableModelsForOrganization(organizationId, {
+        type: 'member',
+        kiloUserId: ctx.user.id,
+        // `ensureOrganizationAccess` also admits Kilo admins and parent-organization
+        // owners, who hold no membership row and belong to no group; they resolve
+        // against organization-level policy instead of being rejected.
+        allowNonMember: true,
+      });
       if (!result) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -345,6 +355,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
 
       let previousSettings: OrganizationSettings | undefined;
       const updatedSettings = await db.transaction(async tx => {
+        await bumpOrganizationGroupPolicyRevision(tx, organizationId, ctx.user.id);
         const settings = await mutateOrganizationSettings(
           organizationId,
           async organization => {

@@ -933,6 +933,27 @@ const OrganizationSettingsSchema = z.object({
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
 
+export const MAX_ORGANIZATION_GROUPS = 100;
+export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
+
+// Persisted shape of organization group policies. The runtime Zod contracts,
+// per-policy schemas, limits, defaults, and helpers live in the web app
+// (`apps/web/src/lib/organizations/group-policies`) so this package stays
+// focused on database concerns. These structural types exist only to type the
+// `jsonb` columns in `schema.ts`; the app-side schemas assert compatibility.
+export type OrganizationGroupPolicyType = 'model_access';
+
+export type OrganizationGroupModelAccessPolicy = {
+  type: 'model_access';
+  data:
+    | { mode: 'all' }
+    | { mode: 'none' }
+    | { mode: 'selected'; model_allow_list: string[]; provider_allow_list: string[] };
+};
+
+export type OrganizationGroupPolicy = OrganizationGroupModelAccessPolicy;
+export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
+
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);
 
 const EditGroupConfigSchema = z.object({
@@ -1084,6 +1105,17 @@ export const AuditLogAction = z.enum([
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
+  'organization.group.create',
+  'organization.group.update',
+  'organization.group.delete',
+  'organization.group.members.set',
+  'organization.group.member_groups.set',
+  'organization.group.policy.set',
+  'organization.group.policy.remove',
+  'organization.group.default_policy.set',
+  'organization.group.default_policy.remove',
+  'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
+  'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅

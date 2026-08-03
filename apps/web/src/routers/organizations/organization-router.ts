@@ -71,6 +71,8 @@ import { organizationBitbucketRouter } from '@/routers/organizations/organizatio
 import { organizationFundsRouter } from '@/routers/organizations/organization-funds-router';
 import { organizationCostInsightsRouter } from '@/routers/organizations/organization-cost-insights-router';
 import { organizationKiloPassRouter } from '@/routers/organizations/organization-kilo-pass-router';
+import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
+import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -134,6 +136,7 @@ export const organizationsRouter = createTRPCRouter({
   funds: organizationFundsRouter,
   costInsights: organizationCostInsightsRouter,
   kiloPass: organizationKiloPassRouter,
+  groups: organizationGroupsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;
@@ -402,10 +405,13 @@ export const organizationsRouter = createTRPCRouter({
       })
     )
     .mutation(async opts => {
-      await db
-        .update(organizations)
-        .set({ plan: opts.input.plan })
-        .where(eq(organizations.id, opts.input.organizationId));
+      await db.transaction(async tx => {
+        await bumpOrganizationGroupPolicyRevision(tx, opts.input.organizationId, opts.ctx.user.id);
+        await tx
+          .update(organizations)
+          .set({ plan: opts.input.plan })
+          .where(eq(organizations.id, opts.input.organizationId));
+      });
       return {
         organization: {
           id: opts.input.organizationId,

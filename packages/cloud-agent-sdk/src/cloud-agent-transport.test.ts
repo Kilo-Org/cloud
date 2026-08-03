@@ -919,4 +919,204 @@ describe('CloudAgentTransport page-seam', () => {
       jest.useRealTimers();
     }
   });
+
+  describe('watermark cursor', () => {
+    it('uses fromId on first connect when the page carries a watermark', async () => {
+      const page = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' } as const,
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+        watermarkEventId: 42,
+      };
+      const { transport } = createTransportWithPageFetch(page);
+
+      transport.connect();
+      await flushPromises();
+
+      expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+      const wsUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
+      expect(wsUrl).toContain('fromId=42');
+      expect(wsUrl).not.toContain('replay=false');
+
+      transport.destroy();
+    });
+
+    it('uses replay=false on first connect when the page has no watermark', async () => {
+      const page = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' } as const,
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      };
+      const { transport } = createTransportWithPageFetch(page);
+
+      transport.connect();
+      await flushPromises();
+
+      expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+      const wsUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
+      expect(wsUrl).toContain('replay=false');
+      expect(wsUrl).not.toContain('fromId');
+
+      transport.destroy();
+    });
+
+    it('uses fromId with watermark null on reconnect when wire events have set lastEventId', async () => {
+      jest.useFakeTimers();
+      try {
+        async function flushMicrotasks(): Promise<void> {
+          for (let i = 0; i < 10; i++) {
+            await Promise.resolve();
+          }
+        }
+
+        const page = {
+          kind: 'success' as const,
+          info: { id: 'ses-1' } as const,
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+          watermarkEventId: 10,
+        };
+        const fetchSnapshotPage = jest.fn().mockResolvedValue(page);
+
+        const chatEvents: ChatEvent[] = [];
+        const serviceEvents: ServiceEvent[] = [];
+        const factory = createCloudAgentTransport({
+          sessionId: cloudAgentId('ses-1'),
+          kiloSessionId: kiloId('ses-1'),
+          api: createMockApi(),
+          getTicket: () => 'test-ticket',
+          fetchSnapshot: () => Promise.reject(new Error('should not be called')),
+          fetchSnapshotPage,
+          websocketBaseUrl: 'ws://localhost:9999',
+        });
+
+        const transport = factory({
+          onChatEvent: event => chatEvents.push(event),
+          onServiceEvent: event => serviceEvents.push(event),
+        });
+
+        transport.connect();
+        await flushMicrotasks();
+
+        // Verify first connect used the watermark
+        const firstUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
+        expect(firstUrl).toContain('fromId=10');
+
+        // Send a wire event with eventId > 0 to advance the live cursor
+        const establish = {
+          eventId: 55,
+          executionId: null,
+          sessionId: 'ses-1',
+          streamEventType: 'kilocode',
+          timestamp: new Date().toISOString(),
+          data: {
+            type: 'session.status',
+            properties: { sessionID: 'ses-1', status: { type: 'busy' } },
+          },
+        };
+        sendRaw(establish);
+
+        // Disconnect and reconnect
+        mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+        jest.advanceTimersByTime(2000);
+        await flushMicrotasks();
+
+        const reconnectUrl = String(webSocketConstructor.mock.calls.at(-1)?.[0]);
+        // Reconnect must use the live cursor (55), not the stale watermark (10)
+        expect(reconnectUrl).toContain('fromId=55');
+        // fetchSnapshotPage must NOT be called on reconnect when a cursor exists
+        // because the socket replays missed events via fromId
+        expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+
+        transport.destroy();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('reconnect on a watermarked page with only sentinel events uses the original watermark and skips the page refetch', async () => {
+      jest.useFakeTimers();
+      try {
+        async function flushMicrotasks(): Promise<void> {
+          for (let i = 0; i < 10; i++) {
+            await Promise.resolve();
+          }
+        }
+
+        const page = {
+          kind: 'success' as const,
+          info: { id: 'ses-1' } as const,
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+          watermarkEventId: 42,
+        };
+        const fetchSnapshotPage = jest.fn().mockResolvedValue(page);
+
+        const chatEvents: ChatEvent[] = [];
+        const serviceEvents: ServiceEvent[] = [];
+        const factory = createCloudAgentTransport({
+          sessionId: cloudAgentId('ses-1'),
+          kiloSessionId: kiloId('ses-1'),
+          api: createMockApi(),
+          getTicket: () => 'test-ticket',
+          fetchSnapshot: () => Promise.reject(new Error('should not be called')),
+          fetchSnapshotPage,
+          websocketBaseUrl: 'ws://localhost:9999',
+        });
+
+        const transport = factory({
+          onChatEvent: event => chatEvents.push(event),
+          onServiceEvent: event => serviceEvents.push(event),
+        });
+
+        transport.connect();
+        await flushMicrotasks();
+
+        // Verify first connect used the watermark as fromId.
+        const firstUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
+        expect(firstUrl).toContain('fromId=42');
+        expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+
+        // Send only sentinel events (eventId: 0) — they do NOT advance the
+        // live cursor, so lastEventId stays at the watermark value.
+        const sentinel: CloudAgentEvent = {
+          eventId: 0,
+          executionId: null,
+          sessionId: 'ses-1',
+          streamEventType: 'kilocode',
+          timestamp: new Date().toISOString(),
+          data: {
+            type: 'session.status',
+            properties: { sessionID: 'ses-1', status: { type: 'busy' } },
+          },
+        };
+        sendRaw(sentinel);
+
+        // Disconnect and reconnect.
+        mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+        jest.advanceTimersByTime(2000);
+        await flushMicrotasks();
+
+        const reconnectUrl = String(webSocketConstructor.mock.calls.at(-1)?.[0]);
+        // Reconnect must still use the watermark (42) because sentinel events
+        // never advance the cursor past the watermark.
+        expect(reconnectUrl).toContain('fromId=42');
+        expect(reconnectUrl).not.toContain('replay=false');
+
+        // No second page fetch — lastEventId (watermark 42) is not null, so
+        // onReconnected skips the snapshot fallback path entirely.
+        expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+
+        transport.destroy();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
 });

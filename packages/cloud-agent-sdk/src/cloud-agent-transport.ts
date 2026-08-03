@@ -85,11 +85,15 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     function buildWebsocketUrl(): string {
       const url = new URL('/stream', websocketBaseUrl);
       url.searchParams.set('cloudAgentSessionId', config.sessionId);
-      if (lastEventId === null) {
-        // First connect: messages are pre-loaded via REST, skip the full replay.
-        url.searchParams.set('replay', 'false');
-      } else {
+      if (lastEventId !== null) {
+        // Reconnect cursor or initial watermark: the DO replays everything
+        // after this id — either a live cursor from the wire, or the
+        // event-log watermark from the initial bounded page.
         url.searchParams.set('fromId', String(lastEventId));
+      } else {
+        // No cursor and no watermark: messages are pre-loaded via REST,
+        // skip the DO replay.
+        url.searchParams.set('replay', 'false');
       }
       return url.toString();
     }
@@ -145,6 +149,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           return null;
         }
         if (page.kind === 'success') {
+          // Seed lastEventId from the page's event-log watermark so the
+          // first WebSocket connect uses `fromId`. The DO replays any
+          // events persisted between the page snapshot and the socket
+          // open, closing the gap. On reconnect, wire events advance
+          // lastEventId and the live cursor takes over.
+          lastEventId = page.watermarkEventId ?? null;
           config.onInitialPageLoaded?.(page);
           replayPage(page);
           return { ticket };

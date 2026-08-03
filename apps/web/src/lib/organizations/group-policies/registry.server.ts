@@ -5,7 +5,6 @@ import type {
   OrganizationGroupPolicyOf,
   OrganizationGroupPolicyType,
 } from '@/lib/organizations/group-policies/organization-group-policies';
-import { normalizeMcpServerAccessPolicy } from './mcp-server-access/mcp-server-access.server';
 import { normalizeModelAccessPolicy } from './model-access/model-access.server';
 
 type PolicyServerRegistry = {
@@ -20,10 +19,6 @@ export const organizationGroupPolicyServerRegistry = {
     type: 'model_access',
     normalize: normalizeModelAccessPolicy,
   },
-  mcp_server_access: {
-    type: 'mcp_server_access',
-    normalize: normalizeMcpServerAccessPolicy,
-  },
 } satisfies PolicyServerRegistry;
 
 export function normalizeRegisteredOrganizationGroupPolicy(
@@ -32,7 +27,5 @@ export function normalizeRegisteredOrganizationGroupPolicy(
   switch (policy.type) {
     case 'model_access':
       return organizationGroupPolicyServerRegistry.model_access.normalize(policy);
-    case 'mcp_server_access':
-      return organizationGroupPolicyServerRegistry.mcp_server_access.normalize(policy);
   }
 }

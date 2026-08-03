@@ -30,7 +30,6 @@ import {
   organizationMemberProcedure,
   organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
-import { getMcpServerAccessPolicyEditorData } from '@/lib/organizations/group-policies/mcp-server-access/mcp-server-access.server';
 import { getModelAccessPolicyEditorData } from '@/lib/organizations/group-policies/model-access/model-access.server';
 
 const GroupIdInputSchema = OrganizationIdInputSchema.extend({ groupId: z.uuid() }).strict();
@@ -214,8 +213,6 @@ export const organizationGroupsRouter = createTRPCRouter({
       switch (input.policyType) {
         case 'model_access':
           return await getModelAccessPolicyEditorData(input.organizationId);
-        case 'mcp_server_access':
-          return await getMcpServerAccessPolicyEditorData(input.organizationId);
       }
     }),
 

@@ -1,11 +1,9 @@
 import type { OrganizationGroupPolicyType } from '@/lib/organizations/group-policies/organization-group-policies';
 import type { OrganizationGroupPolicyClientDefinition } from './types';
-import { mcpServerAccessPolicyClientDefinition } from './mcp-server-access/mcp-server-access.definition.client';
 import { modelAccessPolicyClientDefinition } from './model-access/model-access.definition.client';
 
 export const organizationGroupPolicyClientRegistry = {
   model_access: modelAccessPolicyClientDefinition,
-  mcp_server_access: mcpServerAccessPolicyClientDefinition,
 } satisfies {
   [T in OrganizationGroupPolicyType]: OrganizationGroupPolicyClientDefinition<T>;
 };

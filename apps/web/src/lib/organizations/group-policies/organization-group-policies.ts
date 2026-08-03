@@ -5,21 +5,15 @@ import type {
 } from '@kilocode/db/schema-types';
 import * as z from 'zod';
 import {
-  ORGANIZATION_GROUP_MCP_SERVER_ACCESS_POLICY_TYPE,
-  OrganizationGroupMcpServerAccessPolicySchema,
-} from './mcp-server-access/mcp-server-access.schema';
-import {
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
   OrganizationGroupModelAccessPolicySchema,
 } from './model-access/model-access.schema';
 
-export * from './mcp-server-access/mcp-server-access.schema';
 export * from './model-access/model-access.schema';
 
 // Re-export the persisted policy types from the database package so app code
 // has a single import site for both the runtime schemas and the shapes.
 export type {
-  OrganizationGroupMcpServerAccessPolicy,
   OrganizationGroupModelAccessPolicy,
   OrganizationGroupPolicies,
   OrganizationGroupPolicy,
@@ -30,12 +24,10 @@ export const MAX_ORGANIZATION_GROUP_POLICIES = 20;
 
 export const OrganizationGroupPolicyTypeSchema = z.enum([
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
-  ORGANIZATION_GROUP_MCP_SERVER_ACCESS_POLICY_TYPE,
 ]);
 
 export const OrganizationGroupPolicySchema = z.discriminatedUnion('type', [
   OrganizationGroupModelAccessPolicySchema,
-  OrganizationGroupMcpServerAccessPolicySchema,
 ]);
 
 export const OrganizationGroupPoliciesSchema = z

@@ -941,7 +941,7 @@ export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
 // (`apps/web/src/lib/organizations/group-policies`) so this package stays
 // focused on database concerns. These structural types exist only to type the
 // `jsonb` columns in `schema.ts`; the app-side schemas assert compatibility.
-export type OrganizationGroupPolicyType = 'model_access' | 'mcp_server_access';
+export type OrganizationGroupPolicyType = 'model_access';
 
 export type OrganizationGroupModelAccessPolicy = {
   type: 'model_access';
@@ -951,18 +951,7 @@ export type OrganizationGroupModelAccessPolicy = {
     | { mode: 'selected'; model_allow_list: string[]; provider_allow_list: string[] };
 };
 
-/**
- * `config_ids` holds `mcp_gateway_configs.config_id` values owned by the
- * organization, so the persisted policy stays joinable to the gateway tables.
- */
-export type OrganizationGroupMcpServerAccessPolicy = {
-  type: 'mcp_server_access';
-  data: { mode: 'all' } | { mode: 'none' } | { mode: 'selected'; config_ids: string[] };
-};
-
-export type OrganizationGroupPolicy =
-  | OrganizationGroupModelAccessPolicy
-  | OrganizationGroupMcpServerAccessPolicy;
+export type OrganizationGroupPolicy = OrganizationGroupModelAccessPolicy;
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
 
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);

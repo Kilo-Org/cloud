@@ -106,6 +106,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { logExceptInTest } from '@/lib/utils.server';
+import { readDb } from '@/lib/drizzle';
 
 export const maxDuration = 800;
 
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const balanceAndSettingsPromise = authPromise.then(res =>
     res.user
-      ? getBalanceAndOrgSettings(res.organizationId, res.user)
+      ? getBalanceAndOrgSettings(res.organizationId, res.user, readDb)
       : { balance: 0, settings: undefined, plan: undefined }
   );
   const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(

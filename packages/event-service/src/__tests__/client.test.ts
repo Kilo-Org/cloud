@@ -1141,4 +1141,109 @@ describe('EventServiceClient', () => {
       }
     });
   });
+
+  describe('acquire / release refcounting', () => {
+    it('two acquires then one release holds the socket open', async () => {
+      const client = makeClient();
+      client.subscribe(['room:1']);
+
+      await client.acquire();
+      expect(client.isConnected()).toBe(true);
+      const ws1 = lastMockWs;
+
+      // Second acquire: no new WebSocket, refcount is 2.
+      await client.acquire();
+      expect(allMockWs).toHaveLength(1);
+      expect(client.isConnected()).toBe(true);
+
+      // One release: refcount drops to 1, socket stays open.
+      client.release();
+      expect(client.isConnected()).toBe(true);
+      expect(ws1.readyState).toBe(1);
+
+      // Verify the socket still delivers events.
+      const received: unknown[] = [];
+      client.on('test.event', (_, payload) => received.push(payload));
+      ws1.triggerMessage({
+        type: 'event',
+        context: 'room:1',
+        event: 'test.event',
+        payload: 'hello',
+      });
+      expect(received).toEqual(['hello']);
+    });
+
+    it('the last release closes the socket', async () => {
+      const client = makeClient();
+
+      await client.acquire();
+      expect(client.isConnected()).toBe(true);
+
+      client.release();
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('next acquire after full release reconnects', async () => {
+      const client = makeClient();
+
+      await client.acquire();
+      expect(client.isConnected()).toBe(true);
+      expect(allMockWs).toHaveLength(1);
+
+      client.release();
+      expect(client.isConnected()).toBe(false);
+
+      await client.acquire();
+      expect(client.isConnected()).toBe(true);
+      expect(allMockWs).toHaveLength(2);
+    });
+
+    it('extra releases are no-ops', async () => {
+      const client = makeClient();
+
+      await client.acquire();
+      expect(client.isConnected()).toBe(true);
+      expect(allMockWs).toHaveLength(1);
+
+      client.release();
+      expect(client.isConnected()).toBe(false);
+
+      // Extra release: no crash, no side effects.
+      client.release();
+      expect(client.isConnected()).toBe(false);
+      expect(allMockWs).toHaveLength(1);
+    });
+
+    it('acquire after extra release reconnects normally', async () => {
+      const client = makeClient();
+
+      await client.acquire();
+      client.release();
+      client.release(); // extra
+
+      await client.acquire();
+      expect(client.isConnected()).toBe(true);
+      expect(allMockWs).toHaveLength(2);
+    });
+
+    it('reacquire after release triggers resync handlers', async () => {
+      const client = makeClient();
+      const resyncCalls: number[] = [];
+      client.onResync(() => resyncCalls.push(1));
+
+      // First acquire: connect() does NOT fire resync (not a reconnect).
+      await client.acquire();
+      expect(client.isConnected()).toBe(true);
+      expect(resyncCalls).toHaveLength(0);
+
+      // Release closes the socket.
+      client.release();
+      expect(client.isConnected()).toBe(false);
+
+      // Reacquire: connect() fires resync on reconnect.
+      await client.acquire();
+      expect(client.isConnected()).toBe(true);
+      expect(resyncCalls).toHaveLength(1);
+    });
+  });
 });

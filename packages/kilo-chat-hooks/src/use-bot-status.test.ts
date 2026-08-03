@@ -354,4 +354,26 @@ describe('useBotStatus', () => {
     const queryCall = testState.queryCalls[0];
     expect(queryCall?.enabled).toBe(false);
   });
+
+  it('disables polling when active is false', () => {
+    const { eventClient, kiloChatClient } = makeClients({ connected: false });
+
+    beginRender();
+    useBotStatus(kiloChatClient, eventClient, 'sb-1', false);
+
+    const queryCall = testState.queryCalls[0];
+    expect(queryCall?.enabled).toBe(true);
+    expect(queryCall?.refetchInterval).toBeUndefined();
+  });
+
+  it('enables polling by default (active defaults to true)', () => {
+    const { eventClient, kiloChatClient } = makeClients({ connected: false });
+
+    beginRender();
+    useBotStatus(kiloChatClient, eventClient, 'sb-1');
+
+    const queryCall = testState.queryCalls[0];
+    expect(queryCall?.enabled).toBe(true);
+    expect(queryCall?.refetchInterval).toBe(15_000);
+  });
 });

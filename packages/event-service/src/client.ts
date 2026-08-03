@@ -90,6 +90,11 @@ export class EventServiceClient {
   private reconnectHandlers = new Set<() => void>();
   private connectedHandlers = new Set<() => void>();
   private resyncHandlers = new Set<() => void>();
+  // Acquire/release lifecycle refcount. Multiple consumers can independently
+  // hold the socket open. The 0→1 transition calls connect(); the 1→0
+  // transition calls disconnect(). Acquire after release reconnects by
+  // clearing destroyed through connect() (which resets the flag on entry).
+  private acquireCount = 0;
   // Per-socket sequence state. The server emits seq starting at 1.
   // Initialize to 0 so the first in-order seq:1 event does not trigger
   // a gap (1 > 0 + 1 is false).
@@ -288,6 +293,33 @@ export class EventServiceClient {
     }
     this.stopPing();
     this.connected = false;
+  }
+
+  /**
+   * Holds the socket open for this caller. The zero-to-one transition calls
+   * connect(); every subsequent call increments an internal refcount without
+   * creating a second socket. Call release() when the caller no longer needs
+   * the connection. Callers must pair every acquire with exactly one release.
+   */
+  async acquire(): Promise<void> {
+    this.acquireCount++;
+    if (this.acquireCount === 1) {
+      await this.connect();
+    }
+  }
+
+  /**
+   * Releases one refcount. The one-to-zero transition calls disconnect() and
+   * tears down the socket. Safe to call more times than acquire (extra calls
+   * are no-ops). After the last release, the next acquire reconnects because
+   * connect() clears the destroyed flag.
+   */
+  release(): void {
+    if (this.acquireCount <= 0) return;
+    this.acquireCount--;
+    if (this.acquireCount === 0) {
+      this.disconnect();
+    }
   }
 
   isConnected(): boolean {

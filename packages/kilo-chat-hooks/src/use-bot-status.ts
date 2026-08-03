@@ -28,7 +28,8 @@ export function reduceBotStatusOnEvent(
 export function useBotStatus(
   client: KiloChatClient,
   eventClient: EventServiceClient,
-  sandboxId: string | null
+  sandboxId: string | null,
+  active: boolean = true
 ): BotStatusRecord | null {
   const queryClient = useQueryClient();
 
@@ -67,7 +68,7 @@ export function useBotStatus(
       return queryClient.getQueryData<BotStatusRecord | null>(botStatusKey(sandboxId)) ?? null;
     },
     enabled: sandboxId !== null,
-    refetchInterval: POLL_INTERVAL_MS,
+    refetchInterval: active ? POLL_INTERVAL_MS : undefined,
     staleTime: 0,
   });
 

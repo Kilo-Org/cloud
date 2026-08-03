@@ -116,6 +116,7 @@ describe('EventServiceClient', () => {
     expect(fetch).toHaveBeenCalledWith('http://localhost:8080/connect-ticket', {
       method: 'POST',
       headers: { authorization: 'Bearer header.payload.sig' },
+      signal: expect.any(AbortSignal) as unknown,
     });
     expect(lastMockWs.url).toBe('ws://localhost:8080/connect?ticket=ticket-1');
     expectNonSecretProtocol(lastMockWs.protocols);
@@ -273,6 +274,7 @@ describe('EventServiceClient', () => {
       expect(fetch).toHaveBeenLastCalledWith('http://localhost:8080/connect-ticket', {
         method: 'POST',
         headers: { authorization: 'Bearer fresh.token.sig' },
+        signal: expect.any(AbortSignal) as unknown,
       });
       expect(allMockWs[1]?.url).toBe('ws://localhost:8080/connect?ticket=ticket-2');
       expectNonSecretProtocol(allMockWs[1]?.protocols);
@@ -1244,6 +1246,130 @@ describe('EventServiceClient', () => {
       await client.acquire();
       expect(client.isConnected()).toBe(true);
       expect(resyncCalls).toHaveLength(1);
+    });
+  });
+
+  describe('fetchConnectionTicket deadline', () => {
+    it('times out after CONTROL_PLANE_DEADLINE_MS when the ticket endpoint hangs', async () => {
+      vi.useFakeTimers();
+      try {
+        // Override the global fetch to never resolve — simulates a hanging
+        // /connect-ticket endpoint. The mock respects the abort signal so
+        // the withDeadline timeout actually propagates.
+        vi.stubGlobal(
+          'fetch',
+          vi.fn((_url, init?: RequestInit) => {
+            return new Promise<Response>((_resolve, reject) => {
+              const signal = init?.signal;
+              if (signal) {
+                if (signal.aborted) {
+                  reject(signal.reason);
+                  return;
+                }
+                signal.addEventListener('abort', () => reject(signal.reason));
+              }
+            });
+          })
+        );
+
+        const client = makeClient();
+        const connectPromise = client.connect();
+
+        // Advance past the 15s control-plane deadline.
+        await vi.advanceTimersByTimeAsync(15_001);
+
+        // connect() catches the error and schedules a reconnect. The promise
+        // resolves (connect doesn't propagate the error).
+        await connectPromise;
+
+        // No WebSocket was created because the ticket fetch never returned.
+        expect(allMockWs).toHaveLength(0);
+        expect(client.isConnected()).toBe(false);
+
+        // A reconnect should be scheduled.
+        await vi.advanceTimersByTimeAsync(2_000);
+        expect(fetch).toHaveBeenCalledTimes(2); // first call timed out, second is reconnect
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('ticket fetch rejects on deadline, handshake timer stays independent', async () => {
+      vi.useFakeTimers();
+      try {
+        // Fetch hangs forever (with signal respect for deadline).
+        vi.stubGlobal(
+          'fetch',
+          vi.fn((_url, init?: RequestInit) => {
+            return new Promise<Response>((_resolve, reject) => {
+              const signal = init?.signal;
+              if (signal) {
+                if (signal.aborted) {
+                  reject(signal.reason);
+                  return;
+                }
+                signal.addEventListener('abort', () => reject(signal.reason));
+              }
+            });
+          })
+        );
+
+        const client = makeClient();
+        const connectPromise = client.connect();
+
+        // Advance to just before the 15s deadline.
+        await vi.advanceTimersByTimeAsync(14_000);
+
+        // Ticket has not yet timed out — no WebSocket created.
+        expect(allMockWs).toHaveLength(0);
+
+        // Advance past the 15s deadline.
+        await vi.advanceTimersByTimeAsync(2_000);
+        await connectPromise;
+
+        // Still no WebSocket — ticket fetch timed out before WS creation.
+        expect(allMockWs).toHaveLength(0);
+        expect(client.isConnected()).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('successful ticket fetch creates WebSocket and clears deadline', async () => {
+      vi.useFakeTimers();
+      try {
+        // Fetch resolves just under the 15s deadline.
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(
+            () =>
+              new Promise<Response>(resolve => {
+                setTimeout(() => {
+                  resolve(
+                    new Response(JSON.stringify({ ticket: 'fast-ticket' }), {
+                      headers: { 'content-type': 'application/json' },
+                    })
+                  );
+                }, 5_000);
+              })
+          )
+        );
+
+        const client = makeClient();
+        client.subscribe(['room:1']);
+        const connectPromise = client.connect();
+
+        // Advance past the 5s fetch resolve.
+        await vi.advanceTimersByTimeAsync(6_000);
+        await connectPromise;
+
+        // WebSocket was created and opened successfully.
+        expect(allMockWs.length).toBeGreaterThanOrEqual(1);
+        expect(client.isConnected()).toBe(true);
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

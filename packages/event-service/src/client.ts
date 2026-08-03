@@ -1,5 +1,6 @@
 import type { ClientMessage, ConnectTicketQuery, EventServiceConfig } from './types';
 import { connectTicketResponseSchema, serverMessageSchema } from './schemas';
+import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from './deadline';
 
 const WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 
@@ -53,19 +54,22 @@ function connectUrlFor(wsBase: string, ticket: string): string {
 }
 
 async function fetchConnectionTicket(wsBase: string, token: string): Promise<string> {
-  const response = await fetch(ticketEndpointFor(wsBase), {
-    method: 'POST',
-    headers: { authorization: `Bearer ${token}` },
-  });
-  if (response.status === 401 || response.status === 403) {
-    throw new WebSocketAuthError();
-  }
-  if (!response.ok) {
-    throw new Error('Failed to mint WebSocket connection ticket');
-  }
+  return withDeadline(CONTROL_PLANE_DEADLINE_MS, async signal => {
+    const response = await fetch(ticketEndpointFor(wsBase), {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+      signal,
+    });
+    if (response.status === 401 || response.status === 403) {
+      throw new WebSocketAuthError();
+    }
+    if (!response.ok) {
+      throw new Error('Failed to mint WebSocket connection ticket');
+    }
 
-  const body = connectTicketResponseSchema.parse(await response.json());
-  return body.ticket;
+    const body = connectTicketResponseSchema.parse(await response.json());
+    return body.ticket;
+  });
 }
 
 export class EventServiceClient {

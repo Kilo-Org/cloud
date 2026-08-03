@@ -1,5 +1,6 @@
 import {
   DirectUserByokInferenceProviderIdSchema,
+  openRouterToVercelInferenceProviderId,
   OpenRouterInferenceProviderIdSchema,
   VercelInferenceProviderIdSchema,
 } from './inference-provider-id';
@@ -19,5 +20,9 @@ describe('inference provider ids', () => {
     );
 
     expect(overlappingProviderIds).toEqual([]);
+  });
+
+  test('maps the OpenRouter Claude AWS provider to its Vercel provider id', () => {
+    expect(openRouterToVercelInferenceProviderId('claude-on-aws')).toBe('claudeaws');
   });
 });

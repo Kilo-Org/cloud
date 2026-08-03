@@ -65,7 +65,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'sambanova-turbo',
   'seed',
   'siliconflow',
-  'stealth', // Internal provider for Kilo-exclusive stealth models
+  'stealth',
   'stepfun',
   'streamlake',
   'tencent',
@@ -217,6 +217,8 @@ export type VercelInferenceProviderId = z.infer<typeof VercelInferenceProviderId
 const openRouterToVercelInferenceProviderMapping = {
   [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']]:
     VercelUserByokInferenceProviderIdSchema.enum.bedrock,
+  [OpenRouterInferenceProviderIdSchema.enum['claude-on-aws']]:
+    VercelNonUserByokInferenceProviderIdSchema.enum.claudeaws,
   [OpenRouterInferenceProviderIdSchema.enum['google-ai-studio']]:
     VercelUserByokInferenceProviderIdSchema.enum.google,
   [OpenRouterInferenceProviderIdSchema.enum['google-vertex']]:

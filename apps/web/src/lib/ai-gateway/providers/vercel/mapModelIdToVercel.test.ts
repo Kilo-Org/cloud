@@ -104,6 +104,10 @@ describe('mapModelIdToVercel', () => {
   });
 
   describe('kilo-exclusive models', () => {
+    it('maps Qwen 3.8 Max to its Vercel model id', () => {
+      expect(mapModelIdToVercel('qwen/qwen3.8-max')).toBe('alibaba/qwen3.8-max');
+    });
+
     it('maps an exclusive flagged with vercel-routing to its internal id', () => {
       // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
       // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.

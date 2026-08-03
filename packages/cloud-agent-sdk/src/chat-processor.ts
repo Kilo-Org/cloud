@@ -31,10 +31,9 @@ type ChatProcessorOptions = {
    * mobile's file-system cache). Web never passes it, so web behaviour is
    * unchanged. Sink failures are caught and must not interrupt processing.
    */
-  onToolAttachment?: (
-    partId: string,
-    attachment: { mime: string; filename?: string; dataUrl: string }
-  ) => void;
+  onToolAttachment?:
+    | ((partId: string, attachment: { mime: string; filename?: string; dataUrl: string }) => void)
+    | undefined;
 };
 
 function hasTextField(part: { text?: string } | unknown): part is { text: string } {
@@ -72,14 +71,14 @@ function emitToolAttachmentsBeforeStrip(
 }
 
 function createChatProcessor(
-  storage: SessionStorage,
+  sessionStorage: SessionStorage,
   options?: ChatProcessorOptions
 ): ChatProcessor {
   return {
     process(event) {
       switch (event.type) {
         case 'message.updated':
-          storage.upsertMessage(event.info);
+          sessionStorage.upsertMessage(event.info);
           break;
         case 'message.part.updated': {
           if (options?.onToolAttachment) {
@@ -87,20 +86,20 @@ function createChatProcessor(
           }
           const stripped = stripPartContentIfFile(event.part);
           if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {
-            const existingParts = storage.getParts(stripped.messageID);
+            const existingParts = sessionStorage.getParts(stripped.messageID);
             const existing = existingParts.find(p => p.id === stripped.id);
             if (existing && hasTextField(existing) && existing.text.length > 0) {
               break;
             }
           }
-          storage.upsertPart(stripped.messageID, stripped);
+          sessionStorage.upsertPart(stripped.messageID, stripped);
           break;
         }
         case 'message.part.delta':
-          storage.applyPartDelta(event.messageId, event.partId, event.field, event.delta);
+          sessionStorage.applyPartDelta(event.messageId, event.partId, event.field, event.delta);
           break;
         case 'message.part.removed':
-          storage.deletePart(event.messageId, event.partId);
+          sessionStorage.deletePart(event.messageId, event.partId);
           break;
       }
     },
@@ -109,7 +108,7 @@ function createChatProcessor(
       // Empty or missing content can't form a renderable user message; wait for
       // the authoritative `message.updated` payload from the wrapper instead.
       if (!content) return;
-      if (storage.getMessageInfo(messageId)) return;
+      if (sessionStorage.getMessageInfo(messageId)) return;
 
       const syntheticMessage: UserMessage = {
         id: messageId,
@@ -119,7 +118,7 @@ function createChatProcessor(
         agent: '',
         model: { providerID: '', modelID: '' },
       };
-      storage.upsertMessage(syntheticMessage);
+      sessionStorage.upsertMessage(syntheticMessage);
 
       const syntheticPart: TextPart = {
         id: `${messageId}-text`,
@@ -129,7 +128,7 @@ function createChatProcessor(
         text: content,
         synthetic: true,
       };
-      storage.upsertPart(messageId, syntheticPart);
+      sessionStorage.upsertPart(messageId, syntheticPart);
     },
   };
 }

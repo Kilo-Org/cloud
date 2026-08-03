@@ -81,10 +81,17 @@ type SessionConfig = {
   repository: string;
   mode: string;
   model: string;
-  providerID?: string | null;
-  variant?: string | null;
+  providerID?: string | null | undefined;
+  variant?: string | null | undefined;
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
-  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
+  runtimeAgents?:
+    | Array<{
+        slug: string;
+        name: string;
+        model?: string | undefined;
+        variant?: string | undefined;
+      }>
+    | undefined;
 };
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
@@ -101,7 +108,7 @@ type StandaloneSuggestion = {
   text: string;
   actions: SuggestionAction[];
   /** Tool call ID that emitted this suggestion, when available. */
-  callId?: string;
+  callId?: string | undefined;
 };
 type ChildSessionHydrationState =
   | { status: 'idle' }
@@ -641,7 +648,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * reported any (older CLIs, mid-reconnect, or a session that the active
    * CLI no longer claims).
    */
-  let currentCapabilities: { attachments?: boolean } | undefined = undefined;
+  let currentCapabilities: { attachments?: boolean | undefined } | undefined = undefined;
   let observedModelSource: ObservedModelSource | null = null;
   // True while a connect/reconnect cycle is still replaying its message
   // history; false once live events are flowing. See clearOverrideIfDiverged.
@@ -1255,7 +1262,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
       },
-      websocketBaseUrl: config.websocketBaseUrl,
+      ...(config.websocketBaseUrl ? { websocketBaseUrl: config.websocketBaseUrl } : {}),
       storage: jotaiStorage,
       onToolAttachment: config.onToolAttachment,
       onSessionCreated: info => {

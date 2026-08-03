@@ -12,7 +12,7 @@
  * consumers cannot accidentally pass a cloud-agent session ID into a
  * session-scoped transport.
  */
-import { createSessionResponseV1Schema, type CreateSessionResponseV1 } from './schemas';
+import { createSessionResponseV1Schema } from './schemas';
 import type { CreateRemoteSessionInput } from './transport';
 import type { KiloSessionId } from './types';
 import { CommandDeliveredError, type UserWebConnection } from './user-web-connection';

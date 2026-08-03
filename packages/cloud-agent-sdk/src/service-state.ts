@@ -25,42 +25,40 @@ import type {
 type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
-  onError?: (message: string) => void;
-  onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
-  onQuestionResolved?: (requestId: string) => void;
-  onPermissionAsked?: (
-    requestId: string,
-    permission?: string,
-    patterns?: string[],
-    metadata?: Record<string, unknown>,
-    always?: string[]
-  ) => void;
-  onPermissionResolved?: (requestId: string) => void;
+  onError?: ((message: string) => void) | undefined;
+  onQuestionAsked?: ((requestId: string, questions?: QuestionInfo[]) => void) | undefined;
+  onQuestionResolved?: ((requestId: string) => void) | undefined;
+  onPermissionAsked?:
+    | ((
+        requestId: string,
+        permission?: string,
+        patterns?: string[],
+        metadata?: Record<string, unknown>,
+        always?: string[]
+      ) => void)
+    | undefined;
+  onPermissionResolved?: ((requestId: string) => void) | undefined;
   /** Fired when a `suggest` tool asks the user to pick an action. */
-  onSuggestionAsked?: (
-    requestId: string,
-    text: string,
-    actions: SuggestionAction[],
-    callId?: string
-  ) => void;
+  onSuggestionAsked?:
+    | ((requestId: string, text: string, actions: SuggestionAction[], callId?: string) => void)
+    | undefined;
   /** Fired when a suggestion is resolved (accepted or dismissed). */
-  onSuggestionResolved?: (requestId: string) => void;
-  onBranchChanged?: (branch: string) => void;
-  onSessionCreated?: (info: SessionInfo) => void;
-  onSessionUpdated?: (info: SessionInfo) => void;
+  onSuggestionResolved?: ((requestId: string) => void) | undefined;
+  onBranchChanged?: ((branch: string) => void) | undefined;
+  onSessionCreated?: ((info: SessionInfo) => void) | undefined;
+  onSessionUpdated?: ((info: SessionInfo) => void) | undefined;
   /** Fired when async preparation completes (preparing step === 'ready'). */
-  onPreparationReady?: () => void;
+  onPreparationReady?: (() => void) | undefined;
   /** Fired when async preparation fails (preparing step === 'failed'). */
-  onPreparationFailed?: (message: string) => void;
+  onPreparationFailed?: ((message: string) => void) | undefined;
   /** Fired when the server acknowledges a user message was queued. */
-  onMessageQueued?: (messageId: string) => void;
+  onMessageQueued?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message's execution terminates in 'completed'. */
-  onMessageCompleted?: (messageId: string) => void;
+  onMessageCompleted?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message fails delivery or its execution fails. */
-  onMessageFailed?: (
-    messageId: string,
-    state: Extract<MessageDeliveryState, { status: 'failed' }>
-  ) => void;
+  onMessageFailed?:
+    | ((messageId: string, state: Extract<MessageDeliveryState, { status: 'failed' }>) => void)
+    | undefined;
 };
 
 type ServiceState = {
@@ -575,7 +573,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       status: 'failed',
       error: event.error,
       reason: event.reason,
-      attempts: event.attempts,
+      ...(event.attempts !== undefined ? { attempts: event.attempts } : {}),
     };
     pendingMessages.delete(event.messageId);
     if (event.reason === 'interrupted') {

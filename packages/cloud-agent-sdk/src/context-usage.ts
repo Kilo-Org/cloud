@@ -18,31 +18,31 @@ function isFiniteNonNegativeNumber(value: unknown): value is number {
 }
 
 function getAssistantContextUsage(info: unknown): AssistantContextUsageResult {
-  if (!isRecord(info) || info.role !== 'assistant') return { status: 'ineligible' };
-  if (!isRecord(info.tokens)) return { status: 'malformed' };
+  if (!isRecord(info) || info['role'] !== 'assistant') return { status: 'ineligible' };
+  if (!isRecord(info['tokens'])) return { status: 'malformed' };
 
-  const { input, output, reasoning, cache } = info.tokens;
+  const { input, output, reasoning, cache } = info['tokens'];
   if (!isFiniteNonNegativeNumber(output)) return { status: 'malformed' };
   if (output === 0) return { status: 'ineligible' };
-  if (typeof info.providerID !== 'string' || typeof info.modelID !== 'string') {
+  if (typeof info['providerID'] !== 'string' || typeof info['modelID'] !== 'string') {
     return { status: 'malformed' };
   }
   if (!isFiniteNonNegativeNumber(input)) return { status: 'malformed' };
   if (!isFiniteNonNegativeNumber(reasoning)) return { status: 'malformed' };
   if (!isRecord(cache)) return { status: 'malformed' };
-  if (!isFiniteNonNegativeNumber(cache.read) || !isFiniteNonNegativeNumber(cache.write)) {
+  if (!isFiniteNonNegativeNumber(cache['read']) || !isFiniteNonNegativeNumber(cache['write'])) {
     return { status: 'malformed' };
   }
 
-  const contextTokens = input + output + reasoning + cache.read + cache.write;
+  const contextTokens = input + output + reasoning + cache['read'] + cache['write'];
   if (!Number.isFinite(contextTokens)) return { status: 'malformed' };
 
   return {
     status: 'usage',
     contextUsage: {
       contextTokens,
-      providerID: info.providerID,
-      modelID: info.modelID,
+      providerID: info['providerID'],
+      modelID: info['modelID'],
     },
   };
 }

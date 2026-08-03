@@ -47,7 +47,7 @@ type RemoteAttachmentPart = {
 type CloudAgentStreamTicket = {
   ticket: string;
   /** Unix timestamp in seconds when the ticket expires. */
-  expiresAt?: number;
+  expiresAt?: number | undefined;
 };
 
 type CloudAgentStreamTicketResult = string | CloudAgentStreamTicket;
@@ -97,10 +97,10 @@ type CloudAgentSendPayload = CloudAgentPromptPayload | SendCommandPayload;
 
 type TransportSendInput = {
   payload: TransportSendPayload;
-  messageId?: string;
-  attachments?: CloudAgentAttachments;
-  images?: Images;
-  remoteModelOverride?: RemoteModelOverride;
+  messageId?: string | undefined;
+  attachments?: CloudAgentAttachments | undefined;
+  images?: Images | undefined;
+  remoteModelOverride?: RemoteModelOverride | undefined;
   /**
    * Ready file parts to append to the remote CLI's `send_message` `parts`
    * array (after the text part). Distinct from the cloud-only `attachments`
@@ -109,7 +109,7 @@ type TransportSendInput = {
    * heartbeat). Transports that don't support the path (cloud-agent, read-
    * only, non-capable remote) ignore it.
    */
-  attachmentParts?: RemoteAttachmentPart[];
+  attachmentParts?: RemoteAttachmentPart[] | undefined;
 };
 
 /** Lifecycle interface for a transport. */

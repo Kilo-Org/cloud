@@ -50,7 +50,7 @@ type PrReviewQueryState =
  * `shape.data.code`. Anything else is treated as an unknown transient
  * error (retryable).
  */
-function readTrpcErrorCode(error: unknown): string | undefined {
+export function readTrpcErrorCode(error: unknown): string | undefined {
   if (!error || typeof error !== 'object') {
     return undefined;
   }

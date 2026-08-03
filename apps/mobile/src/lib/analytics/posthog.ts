@@ -12,9 +12,11 @@ import { POSTHOG_API_KEY } from '@/lib/config';
  * person double-counts across platforms.
  *
  * Payload rules (hard): stable enum strings only — no free text, no PII. This
- * binds OUR `captureEvent` / `customAppProperties` payloads. The SDK's stock
- * auto-captured device fields (`$device_name`, `$device_manufacturer`, etc.)
- * are an intentional exception — still no PII beyond stock device metadata.
+ * binds OUR `captureEvent` / `customAppProperties` payloads. The
+ * `mobile_list_diagnostics` event obeys the same rule — counts, booleans, and
+ * enum strings only; no URL, no search text, no error message, no PII. The
+ * SDK's stock auto-captured device fields (`$device_name`, `$device_manufacturer`,
+ * etc.) are an intentional exception — still no PII beyond stock device metadata.
  *
  * Auto-captured on every event (posthog-react-native 4.59.0 `native-deps.js`):
  * - Once `expo-device` is installed: `$device_manufacturer`, `$device_name`,
@@ -44,12 +46,14 @@ export const KILO_PASS_PURCHASE_STARTED_EVENT = 'kilo_pass_purchase_started';
 export const KILO_PASS_PURCHASE_COMPLETED_EVENT = 'kilo_pass_purchase_completed';
 export const KILO_PASS_PURCHASE_FAILED_EVENT = 'kilo_pass_purchase_failed';
 export const APP_STARTUP_EVENT = 'app_startup';
+export const LIST_DIAGNOSTICS_EVENT = 'mobile_list_diagnostics';
 
 export type AnalyticsSurface = 'claw' | 'cloud-agent' | 'remote-session';
 
 // PostHog feature flags. The project is shared with web, so mobile-only flags
 // are prefixed to avoid colliding with web flag keys.
 export const FEATURE_FLAG_PR_REVIEW = 'mobile-pr-review';
+export const FEATURE_FLAG_DEEP_DIAGNOSTICS = 'mobile-deep-diagnostics';
 
 let client: PostHog | null = null;
 
@@ -144,6 +148,13 @@ export function resetAnalyticsUser(): void {
   client?.reset();
 }
 
+function subscribeToFlagUpdates(onChange: () => void): () => void {
+  flagListeners.add(onChange);
+  return () => {
+    flagListeners.delete(onChange);
+  };
+}
+
 function isFeatureEnabled(key: string, defaultValue: boolean): boolean {
   const value = client?.getFeatureFlag(key);
   return value === undefined ? defaultValue : value === true;
@@ -155,12 +166,23 @@ function isFeatureEnabled(key: string, defaultValue: boolean): boolean {
  * `defaultValue`. Flags only ever flip UI off on an explicit `false`.
  */
 export function useFeatureFlag(key: string, defaultValue = false): boolean {
-  const subscribe = useCallback((onChange: () => void) => {
-    flagListeners.add(onChange);
-    return () => {
-      flagListeners.delete(onChange);
-    };
-  }, []);
+  const subscribe = useCallback(subscribeToFlagUpdates, []);
   const getSnapshot = useCallback(() => isFeatureEnabled(key, defaultValue), [key, defaultValue]);
+  return useSyncExternalStore(subscribe, getSnapshot);
+}
+
+/**
+ * Reactively read a feature flag's JSON payload as a string. The snapshot is
+ * serialized because `useSyncExternalStore` compares snapshots with `Object.is`
+ * and the SDK returns a new object on every read. Returns `null` when the
+ * client is absent (dev builds, no consent) or the flag has no payload.
+ */
+export function useFeatureFlagPayloadJson(key: string): string | null {
+  const subscribe = useCallback(subscribeToFlagUpdates, []);
+  const getSnapshot = useCallback(() => {
+    // eslint-disable-next-line typescript-eslint/no-deprecated -- silent read avoids $feature_flag_called
+    const payload = client?.getFeatureFlagPayload(key);
+    return payload === undefined || payload === null ? null : JSON.stringify(payload);
+  }, [key]);
   return useSyncExternalStore(subscribe, getSnapshot);
 }

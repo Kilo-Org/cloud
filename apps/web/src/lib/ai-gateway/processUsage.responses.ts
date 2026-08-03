@@ -23,7 +23,10 @@ import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
-type ResponsesApiUsage = OpenAI.Responses.ResponseUsage & {
+type ResponsesApiUsage = Omit<OpenAI.Responses.ResponseUsage, 'input_tokens_details'> & {
+  input_tokens_details: OpenAI.Responses.ResponseUsage['input_tokens_details'] & {
+    cache_write_tokens?: number;
+  };
   cost?: number;
   is_byok?: boolean | null;
   cost_details?: { upstream_inference_cost: number };
@@ -54,6 +57,7 @@ export function processResponsesApiUsage(
   const inputTokens = usage?.input_tokens ?? 0;
   const outputTokens = usage?.output_tokens ?? 0;
   const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+  const cacheWriteTokens = usage?.input_tokens_details?.cache_write_tokens ?? 0;
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {
@@ -62,7 +66,7 @@ export function processResponsesApiUsage(
       coreProps,
       'responses_sse_processing'
     );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens: 0, cost_mUsd, is_byok };
+    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
   }
 
   // Vercel path: cost is in provider_metadata.gateway
@@ -73,7 +77,7 @@ export function processResponsesApiUsage(
       inputTokens,
       outputTokens,
       cacheHitTokens,
-      cacheWriteTokens: 0,
+      cacheWriteTokens,
       cost_mUsd,
       is_byok: extractVercelIsByok(vercelGateway),
     };
@@ -84,7 +88,7 @@ export function processResponsesApiUsage(
     inputTokens,
     outputTokens,
     cacheHitTokens,
-    cacheWriteTokens: 0,
+    cacheWriteTokens,
     cost_mUsd: 0,
     is_byok: null,
   };

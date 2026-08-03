@@ -74,7 +74,7 @@ describe('processResponsesApiUsage', () => {
       input_tokens: 2425,
       output_tokens: 5,
       total_tokens: 2430,
-      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 15374 },
       output_tokens_details: { reasoning_tokens: 0 },
     };
     const providerMetadata = {
@@ -87,6 +87,7 @@ describe('processResponsesApiUsage', () => {
     expect(result.is_byok).toBeNull();
     expect(result.inputTokens).toBe(2425);
     expect(result.outputTokens).toBe(5);
+    expect(result.cacheWriteTokens).toBe(15374);
   });
 
   test('returns zero cost when no usage or metadata is provided', () => {

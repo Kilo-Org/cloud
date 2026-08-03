@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
 import { expectSelectedModelId, selectModelById } from './model-picker-e2e-helpers';
 
-const localBackendUrl = 'http://localhost:3000';
+const localBackendUrl = process.env['LOCAL_BACKEND_ORIGIN'] ?? 'http://localhost:3000';
 const localUserEmail = 'fl@fl.fl';
 const frontierModel = 'kilo-auto/frontier';
 

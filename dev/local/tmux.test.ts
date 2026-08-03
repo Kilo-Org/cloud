@@ -10,9 +10,15 @@ import {
   buildInteractiveShellCommand,
   captureServicePane,
   listWindows,
+  pipeServicePane,
   setPaneServiceIdentity,
 } from './tmux';
-import { buildStartCommand, restartServiceInTmux } from './runner';
+import {
+  buildFollowLogPipeCommand,
+  buildLogPipeCommand,
+  buildStartCommand,
+  restartServiceInTmux,
+} from './runner';
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
   const startupCommand =
@@ -45,24 +51,23 @@ test(
   () => {
     const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
     const serviceName = 'mobile';
+    const output = path.join(os.tmpdir(), `${sessionName}.log`);
+    const followOutput = path.join(os.tmpdir(), `${sessionName}-follow.log`);
     const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
 
     try {
       tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
-      tmux(
-        'new-window',
-        '-d',
-        '-t',
-        sessionName,
-        '-n',
-        serviceName,
-        '/bin/sh',
-        '-c',
-        'printf "worktree-mobile-pane\\n"; sleep 120'
-      );
+      tmux('new-window', '-d', '-t', sessionName, '-n', serviceName, '/bin/sh');
       const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
       assert.ok(serviceWindow);
       setPaneServiceIdentity(sessionName, serviceWindow.index, 0, serviceName);
+      tmux(
+        'send-keys',
+        '-t',
+        `${sessionName}:${serviceWindow.index}.0`,
+        'printf "worktree-mobile-pane\\n"',
+        'Enter'
+      );
       tmux(
         'join-pane',
         '-h',
@@ -72,7 +77,36 @@ test(
         `${sessionName}:0.0`
       );
       assert.match(captureServicePane(sessionName, serviceName, 20), /worktree-mobile-pane/);
+      pipeServicePane(sessionName, serviceName, buildFollowLogPipeCommand(output, followOutput));
+      tmux('send-keys', '-t', `${sessionName}:0.1`, 'printf "followed-pane\\n"', 'Enter');
+      for (
+        let i = 0;
+        i < 60 &&
+        (!fs.existsSync(followOutput) ||
+          !fs.readFileSync(followOutput, 'utf8').includes('followed-pane') ||
+          !fs.existsSync(output) ||
+          !fs.readFileSync(output, 'utf8').includes('followed-pane'));
+        i++
+      ) {
+        execFileSync('sleep', ['0.05']);
+      }
+      assert.match(fs.readFileSync(output, 'utf8'), /followed-pane/);
+      assert.match(fs.readFileSync(followOutput, 'utf8'), /followed-pane/);
+      pipeServicePane(sessionName, serviceName, buildLogPipeCommand(output));
+      tmux('send-keys', '-t', `${sessionName}:0.1`, 'printf "replacement-pane\\n"', 'Enter');
+      for (
+        let i = 0;
+        i < 60 &&
+        (!fs.existsSync(output) || !fs.readFileSync(output, 'utf8').includes('replacement-pane'));
+        i++
+      ) {
+        execFileSync('sleep', ['0.05']);
+      }
+      assert.match(fs.readFileSync(output, 'utf8'), /replacement-pane/);
+      assert.doesNotMatch(fs.readFileSync(followOutput, 'utf8'), /replacement-pane/);
     } finally {
+      fs.rmSync(output, { force: true });
+      fs.rmSync(followOutput, { force: true });
       try {
         tmux('kill-session', '-t', sessionName);
       } catch {

@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEFAULT_SOURCE_SKIPS, SourceSkips } from '@expo/fingerprint';
+import { DEFAULT_SOURCE_SKIPS, SourceSkips, type HashSourceContents } from '@expo/fingerprint';
+
+import { hashRootNativeInputs } from './mobile-native-build';
 
 const PACKAGE_ID = 'com.kilocode.kiloapp';
 const BUILD_MODE = 'debug-dev-client';
@@ -41,14 +43,26 @@ export type AndroidBuildDeps = {
   now: () => Date;
 };
 
+// Repo-root inputs that shape the native build but live outside
+// apps/mobile (pnpm patches, pnpm-workspace.yaml, pnpm-lock.yaml) are
+// mixed in as an extra source.
 export function buildAndroidFingerprintOptions(): {
   platforms: ['android'];
   sourceSkips: number;
+  extraSources: HashSourceContents[];
   silent: boolean;
 } {
   return {
     platforms: ['android'],
     sourceSkips: DEFAULT_SOURCE_SKIPS | SourceSkips.ExpoConfigExtraSection,
+    extraSources: [
+      {
+        type: 'contents',
+        id: 'repoRootNativeInputs',
+        contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+        reasons: ['repo-root patches/, pnpm-workspace.yaml, and pnpm-lock.yaml'],
+      },
+    ],
     silent: true,
   };
 }

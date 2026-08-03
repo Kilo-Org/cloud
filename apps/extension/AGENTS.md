@@ -29,6 +29,20 @@ pnpm --filter kilo-extension zip:firefox
 pnpm --filter kilo-extension validate:firefox
 ```
 
+## Public Build Variables
+
+These `VITE_*` env vars are baked at build time and available in the extension
+runtime via `import.meta.env`:
+
+- `VITE_KILO_API_BASE_URL` — Kilo API base URL (defaults to localhost in `wxt serve`, production API in `wxt build`). Read by `src/shared/auth.ts`.
+- `VITE_CLOUD_AGENT_WS_URL` — WebSocket URL for Cloud Agent Next streaming. Read by `src/shared/cloud-agent-config.ts`.
+- `VITE_SESSION_INGEST_WS_URL` — WebSocket URL for session ingest. Read by `src/shared/cloud-agent-config.ts`.
+- `VITE_POSTHOG_API_KEY` — PostHog public project API key. Absent → analytics disabled. Read by `src/shared/analytics.ts`.
+
+Analytics E2E specs need the key at BUILD time: targeted manual runs must rebuild with `VITE_POSTHOG_API_KEY=e2e-test-key pnpm --filter kilo-extension build` first (the `e2e:chrome` script does this itself; without the key analytics is compiled out and every event wait fails).
+
+Under heavy machine load `e2e:firefox` can die mid-run with `UnsupportedOperationError: newSession` (geckodriver cannot spawn the next per-scenario Firefox). Retry the command; never patch product code or the harness for this.
+
 Before committing extension changes, run `pnpm format`. Prefer `pnpm --filter kilo-extension verify` over full-repo typecheck unless the change crosses package boundaries.
 
 ## Browser Targets

@@ -396,6 +396,9 @@ describe('createSessionManager', () => {
     mockSession.destroy.mockClear();
     mockSession.send.mockClear();
     mockSession.interrupt.mockClear();
+    mockSession.interrupt.mockResolvedValue({});
+    mockSession.createRemoteSession.mockClear();
+    mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_12345678901234567890123456'));
     mockSession.exitRemoteSession.mockClear();
     mockSession.exitRemoteSession.mockResolvedValue();
     mockSession.respondToPermission.mockClear();
@@ -409,6 +412,7 @@ describe('createSessionManager', () => {
     mockSession.state.getCloudStatus.mockReturnValue(null);
     mockSession.state.getSetupLog.mockReturnValue([]);
     mockSession.state.getPendingMessages.mockReturnValue(new Map());
+    mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
     mockSession.storage = latestStorage;
     latestStorage = null;
     mockSessionCallbacks.onQuestionAsked = undefined;
@@ -417,6 +421,7 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onPermissionResolved = undefined;
     mockSessionCallbacks.onSessionCreated = undefined;
     mockSessionCallbacks.onSessionUpdated = undefined;
+    mockSessionCallbacks.onReplayComplete = undefined;
     mockSessionCallbacks.onResolved = undefined;
     mockSessionCallbacks.onRemoteModelStateChange = undefined;
     mockSessionCallbacks.onTransportCapabilityChange = undefined;
@@ -2609,7 +2614,7 @@ describe('createSessionManager', () => {
       );
     });
 
-    it('sets error on failure', async () => {
+    it('shows error indicator on failure without poisoning errorAtom', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -2617,8 +2622,13 @@ describe('createSessionManager', () => {
       mockSession.interrupt.mockRejectedValueOnce(new Error('interrupt failed'));
       await mgr.interrupt();
 
-      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
-        'Failed to stop execution'
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      const indicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(indicator).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Failed to stop execution' })
       );
     });
 
@@ -2636,6 +2646,76 @@ describe('createSessionManager', () => {
       // After a failed interrupt, atoms should be restored from session state
       expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
       expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+    });
+
+    it('restores canSend and canInterrupt on interrupt success without external events', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Success path must re-enable immediately after ACK (no heartbeat needed).
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('re-enables canSend after interrupt even when session.canSend is briefly false', async () => {
+      // Remote ownerConnectionId can clear during the interrupt round-trip;
+      // the composer must not stay locked until the next heartbeat.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.canSend = false;
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+    });
+
+    it('holds canSend unlocked when a post-interrupt state tick still reports canSend false', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(true);
+
+      mockSession.canSend = false;
+      mockSession.interrupt.mockImplementation(async () => {
+        // State tick during/after ACK with canSend still false must not re-lock.
+        mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+        notifyStateChange?.();
+      });
+      await mgr.interrupt();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+
+      // Another false tick after unlock still held.
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Live gate recovery clears the latch.
+      mockSession.canSend = true;
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
     });
 
     it('is a no-op without active session', async () => {
@@ -2703,6 +2783,318 @@ describe('createSessionManager', () => {
         })
       ).resolves.not.toThrow();
       expect(mockSession.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('holds canSend after ACK when session.canSend is true at ACK then flips false', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // canSend is true at interrupt ACK time — the old synchronous clear path
+      // (restoreAfterInterrupt mirroring session.canSend) would have wrongly
+      // dropped the latch here because canSend was still true. The mock
+      // interrupt resolves without changing canSend, so the pre-ACK state
+      // is identical to the post-ACK state, exposing any code that
+      // gate-checks canSend inside restoreAfterInterrupt.
+      mockSession.canSend = true;
+      mockSession.interrupt.mockImplementation(async () => {
+        // State tick occurs after ACK, before restoreAfterInterrupt returns.
+        mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      });
+      await mgr.interrupt();
+
+      // Latch armed — restoreAfterInterrupt set postInterruptUnlock.
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(false);
+
+      // Now flip canSend false AFTER the latch is armed. This is the "owner
+      // disconnected between ACK and next heartbeat" race that the latch
+      // exists to protect against.
+      mockSession.canSend = false;
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Live gate recovers — latch clears via updateCapabilityAtoms.
+      mockSession.canSend = true;
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Normal false tick after latch cleared — canSend follows session.canSend.
+      mockSession.canSend = false;
+      notifyStateChange?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+    });
+
+    it('disconnect clears interrupt unlock latch and uses normal canSend semantics', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Arm the latch: interrupt with canSend=false (forces latch but doesn't clear).
+      mockSession.canSend = false;
+      mockSession.interrupt.mockResolvedValueOnce({});
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
+      await mgr.interrupt();
+
+      // Latch armed: canSend is true despite session.canSend=false.
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Now disconnect: latch must clear, canSend follows session.canSend=false.
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      mockSession.state.getStatus.mockReturnValue({ type: 'disconnected' });
+      notifyStateChange?.();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+      // isReadOnly follows normal session-type semantics: cloud-agent is never read-only.
+      expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+    });
+
+    it('suppresses Aborted onError from the interrupted session so errorAtom stays clear', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Interrupt fires, service emits "Aborted" onError synchronously
+      // (mock implementation fires it during the interrupt await).
+      mockSession.interrupt.mockImplementation(async () => {
+        mockSessionCallbacks.onError?.('Aborted');
+      });
+      await mgr.interrupt();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      const indicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(indicator).toEqual(
+        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+      );
+    });
+
+    it('still surfaces a non-Aborted onError from the interrupted session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockImplementation(async () => {
+        mockSessionCallbacks.onError?.('Connection to agent lost');
+      });
+      await mgr.interrupt();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Connection to agent lost'
+      );
+    });
+
+    it('does not suppress Aborted onError when no interrupt is pending', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Direct onError call without a preceding interrupt — should land in errorAtom.
+      mockSessionCallbacks.onError?.('Aborted');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+    });
+
+    it('does not suppress Aborted from a stale session after switchSession', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Capture the first session's onError callback before switching.
+      const firstSessionOnError = mockSessionCallbacks.onError;
+      expect(firstSessionOnError).toBeDefined();
+
+      // Initiate interrupt on session A — guard is set for session A.
+      mockSession.interrupt.mockImplementation(async () => {
+        // Don't fire anything here — we'll fire Aborted later from the stale session.
+      });
+      const interruptPromise = mgr.interrupt();
+
+      // Switch to session B — clearAllAtoms resets the guard.
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // Session A's onError fires "Aborted" after switch — must NOT be suppressed
+      // because the guard was cleared.
+      firstSessionOnError?.('Aborted');
+
+      // The error should land on the current store (session B's context).
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+
+      await interruptPromise;
+    });
+
+    it('stale Aborted from distinct old session does not consume the current interrupt guard', async () => {
+      // The shared mock factory returns the same object for every session,
+      // so `pendingInterruptSession === session` always matches. This test
+      // overrides the first factory call with a distinct identity via
+      // Object.create so the guard can distinguish A from B. After
+      // switching to B and arming its guard, session A's stale Aborted
+      // must NOT consume B's guard.
+      type SF = (cfg: Parameters<typeof createCloudAgentSession>[0]) => MockSession;
+      const defaultFactory = (createCloudAgentSession as jest.Mock).getMockImplementation() as
+        | SF
+        | undefined;
+      expect(defaultFactory).toBeDefined();
+
+      (createCloudAgentSession as jest.Mock).mockImplementationOnce((cfg: Parameters<SF>[0]) => {
+        // Return a distinct-wrapper that delegates to mockSession.
+        // The onError closure in switchSession captures this wrapper,
+        // so pendingInterruptSession === session correctly distinguishes
+        // session A from session B (the raw mockSession).
+        const session = defaultFactory!(cfg);
+        return Object.create(session) as MockSession;
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Capture session A's onError before switching away.
+      const sessionAOnError = mockSessionCallbacks.onError;
+      expect(sessionAOnError).toBeDefined();
+
+      // Arm the guard for session A (distinct wrapper).
+      mockSession.interrupt.mockImplementation(async () => {
+        // No Aborted fired here — we'll fire it later from the stale callback.
+      });
+      await mgr.interrupt();
+
+      // Switch to session B — clearAllAtoms clears pendingInterruptSession.
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // Arm the guard for session B (raw mockSession).
+      mockSession.canInterrupt = true;
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Fire A's stale Aborted — must NOT match B's guard.
+      sessionAOnError?.('Aborted');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+
+      // B's guard must still be intact — B's own Aborted should be suppressed.
+      mgr.clearError();
+      mockSessionCallbacks.onError?.('Aborted');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('clears the abort guard on destroy so late Aborted is not suppressed', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const firstSessionOnError = mockSessionCallbacks.onError;
+      expect(firstSessionOnError).toBeDefined();
+
+      mockSession.interrupt.mockImplementation(async () => {
+        // Don't fire Aborted — we'll fire it after destroy.
+      });
+      const interruptPromise = mgr.interrupt();
+
+      mgr.destroy();
+
+      // Late Aborted from destroyed session's transport still surfaces.
+      firstSessionOnError?.('Aborted');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+
+      await interruptPromise;
+    });
+
+    it('suppresses Aborted emitted after interrupt settles so errorAtom stays clear', async () => {
+      // The real timing gap: interrupt RPC settles, finally clears the guard,
+      // THEN the WebSocket delivers onError('Aborted'). The one-shot guard
+      // must persist past the finally so the late Aborted is still suppressed.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Late Aborted after the interrupt Promise has already settled.
+      mockSessionCallbacks.onError?.('Aborted');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      const indicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(indicator).toEqual(
+        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+      );
+    });
+
+    it('surfaces non-Aborted error emitted after interrupt settles', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Late non-Aborted error after interrupt settles — must still surface.
+      mockSessionCallbacks.onError?.('Connection to agent lost');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Connection to agent lost'
+      );
+    });
+
+    it('state recovery to busy preserves the expected abort guard', async () => {
+      // After the session recovers (activity → busy), the one-shot guard
+      // must survive — a delayed Aborted from the prior interrupt
+      // must still be suppressed to avoid re-bricking the composer.
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+
+      // Simulate state recovery: session becomes busy (new user message).
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' });
+      notifyStateChange?.();
+
+      // A late Aborted after recovery must still be suppressed —
+      // the guard survives the busy transition.
+      mockSessionCallbacks.onError?.('Aborted');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+
+      // A non-Aborted real error still surfaces.
+      mockSessionCallbacks.onError?.('Connection to agent lost');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Connection to agent lost'
+      );
     });
   });
 
@@ -2790,7 +3182,7 @@ describe('createSessionManager', () => {
   // -------------------------------------------------------------------------
 
   describe('activeQuestion / activePermission', () => {
-    it('onQuestionAsked sets activeQuestion', async () => {
+    it('onQuestionAsked queues asks and keeps the oldest active', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -2813,10 +3205,12 @@ describe('createSessionManager', () => {
 
       const questions2 = [{ question: 'Pick a shape', header: 'Shape', options: [] }];
       mockSessionCallbacks.onQuestionAsked?.('req-2', questions2);
+      // Head stays the oldest (req-1), not overwritten by req-2.
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
-        requestId: 'req-2',
-        questions: questions2,
+        requestId: 'req-1',
+        questions,
       });
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(2);
     });
 
     it('onQuestionResolved clears activeQuestion', async () => {
@@ -2832,7 +3226,7 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
     });
 
-    it('onPermissionAsked sets activePermission', async () => {
+    it('onPermissionAsked queues asks and keeps the oldest active', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -2849,13 +3243,15 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onPermissionAsked?.('req-2', 'bash', ['**'], { command: 'rm' }, [
         'write',
       ]);
+      // Head stays the oldest (req-1), not overwritten by req-2.
       expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
-        requestId: 'req-2',
-        permission: 'bash',
-        patterns: ['**'],
-        metadata: { command: 'rm' },
-        always: ['write'],
+        requestId: 'req-1',
+        permission: 'write',
+        patterns: ['*.ts'],
+        metadata: {},
+        always: [],
       });
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(2);
     });
 
     it('onPermissionResolved clears activePermission', async () => {
@@ -2868,6 +3264,151 @@ describe('createSessionManager', () => {
 
       mockSessionCallbacks.onPermissionResolved?.('req-1');
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+    });
+
+    it('onPermissionResolved advances head to the next entry', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onPermissionAsked?.('req-1', 'write', ['*.ts'], {}, []);
+      mockSessionCallbacks.onPermissionAsked?.('req-2', 'bash', ['**'], { command: 'rm' }, [
+        'write',
+      ]);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(2);
+
+      mockSessionCallbacks.onPermissionResolved?.('req-1');
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
+        requestId: 'req-2',
+        permission: 'bash',
+        patterns: ['**'],
+        metadata: { command: 'rm' },
+        always: ['write'],
+      });
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
+    });
+
+    it('onPermissionResolved with unknown id preserves the queue', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onPermissionAsked?.('req-1', 'write', [], {}, []);
+      mockSessionCallbacks.onPermissionResolved?.('req-unknown');
+
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
+        requestId: 'req-1',
+        permission: 'write',
+        patterns: [],
+        metadata: {},
+        always: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
+    });
+
+    it('a repeat onPermissionAsked with the same id keeps length 1 and replaces the payload', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onPermissionAsked?.('req-1', 'write', ['*.ts'], {}, []);
+      mockSessionCallbacks.onPermissionAsked?.(
+        'req-1',
+        'edit',
+        ['**/*.js'],
+        { reason: 'changed' },
+        ['read']
+      );
+
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
+        requestId: 'req-1',
+        permission: 'edit',
+        patterns: ['**/*.js'],
+        metadata: { reason: 'changed' },
+        always: ['read'],
+      });
+    });
+
+    it('onQuestionResolved advances head to the next entry', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const q1 = [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ];
+      const q2 = [
+        {
+          question: 'Pick a shape',
+          header: 'Shape',
+          options: [{ label: 'Circle', description: '' }],
+        },
+      ];
+      mockSessionCallbacks.onQuestionAsked?.('req-1', q1);
+      mockSessionCallbacks.onQuestionAsked?.('req-2', q2);
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(2);
+
+      mockSessionCallbacks.onQuestionResolved?.('req-1');
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
+        requestId: 'req-2',
+        questions: q2,
+      });
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+    });
+
+    it('onQuestionResolved with unknown id preserves the queue', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const q1 = [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ];
+      mockSessionCallbacks.onQuestionAsked?.('req-1', q1);
+      mockSessionCallbacks.onQuestionResolved?.('req-unknown');
+
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
+        requestId: 'req-1',
+        questions: q1,
+      });
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+    });
+
+    it('a repeat onQuestionAsked with the same id keeps length 1 and replaces the payload', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const q1 = [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ];
+      const q2 = [
+        {
+          question: 'Pick a shape',
+          header: 'Shape',
+          options: [{ label: 'Circle', description: '' }],
+        },
+      ];
+      mockSessionCallbacks.onQuestionAsked?.('req-1', q1);
+      mockSessionCallbacks.onQuestionAsked?.('req-1', q2);
+
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
+        requestId: 'req-1',
+        questions: q2,
+      });
+    });
+
+    it('onQuestionAsked with undefined questions leaves the queue empty', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onQuestionAsked?.('req-1', undefined);
+
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(0);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
     });
 
     it('onSuggestionAsked sets activeSuggestion with callId', async () => {
@@ -2917,7 +3458,7 @@ describe('createSessionManager', () => {
       expect(mockSession.dismissSuggestion).toHaveBeenCalledWith({ requestId: 'sug-2' });
     });
 
-    it('destroy clears activeQuestion and activePermission', async () => {
+    it('destroy clears activeQuestion, activePermission, pendingQuestions, and pendingPermissions', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -2928,14 +3469,18 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onPermissionAsked?.('req-p', 'write', [], {}, []);
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).not.toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).not.toBeNull();
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
 
       mgr.destroy();
 
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(0);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(0);
     });
 
-    it('switchSession clears activeQuestion and activePermission', async () => {
+    it('switchSession clears activeQuestion, activePermission, pendingQuestions, and pendingPermissions', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -2946,11 +3491,15 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onPermissionAsked?.('req-p', 'write', [], {}, []);
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).not.toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).not.toBeNull();
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(1);
 
       await mgr.switchSession(kiloId('ses-2'));
 
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.pendingQuestions)).toHaveLength(0);
+      expect(atomValue(config.store, mgr.atoms.pendingPermissions)).toHaveLength(0);
     });
 
     it('switchSession clears availableCommands immediately', async () => {
@@ -3226,6 +3775,552 @@ describe('createSessionManager', () => {
       await expect(mgr.createRemoteSession()).rejects.toThrow(
         REMOTE_SESSION_CREATION_NOT_SUPPORTED
       );
+    });
+
+    it('forwards inheritance: model from override.selection, agent from sessionConfig.mode, orgId from fetched data', async () => {
+      const orgId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          organizationId: orgId,
+          mode: 'architect',
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'));
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'architect',
+        model: {
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          variant: 'high',
+        },
+        orgId,
+      });
+    });
+
+    it('prefers override.selection over observedModel and omits variant when absent', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb'));
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      config.store.set(mgr.atoms.observedModel, {
+        model: { providerID: 'openai', modelID: 'gpt-4' },
+      });
+      mgr.setRemoteModelOverride({
+        source: 'legacy-gateway',
+        selection: {
+          model: { providerID: 'kilo', modelID: 'kilo-auto' },
+        },
+      });
+
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'code',
+        model: { providerID: 'kilo', modelID: 'kilo-auto' },
+      });
+    });
+
+    it('falls back to observedModel when override is null', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_cccccccccccccccccccccccccc'));
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      config.store.set(mgr.atoms.observedModel, {
+        model: { providerID: 'openai', modelID: 'gpt-4o' },
+        variant: 'fast',
+      });
+
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'code',
+        model: { providerID: 'openai', modelID: 'gpt-4o', variant: 'fast' },
+      });
+    });
+
+    it('treats empty sessionConfig.mode as absent and uses lastPromptMode', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: null,
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_dddddddddddddddddddddddddd'));
+      mockSession.send.mockResolvedValue({});
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      // mode hydrates as '' when fetch returns null
+      expect(atomValue<{ mode: string } | null>(config.store, mgr.atoms.sessionConfig)?.mode).toBe(
+        ''
+      );
+
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'hi', mode: 'debug' },
+      });
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'debug',
+      });
+    });
+
+    it('prefers non-empty sessionConfig.mode over lastPromptMode', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: 'architect',
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_eeeeeeeeeeeeeeeeeeeeeeeeee'));
+      mockSession.send.mockResolvedValue({});
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'hi', mode: 'debug' },
+      });
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'architect',
+      });
+    });
+
+    it('omits orgId when organizationId is not a uuid', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          organizationId: 'not-a-uuid',
+          mode: null,
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_ffffffffffffffffffffffffff'));
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      await mgr.createRemoteSession();
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith(undefined);
+    });
+
+    it('forwards explicit input fields over inheritance', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: 'architect',
+          organizationId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        }),
+      });
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_11111111111111111111111111'));
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      await mgr.createRemoteSession({
+        agent: 'custom',
+        model: { providerID: 'kilo', modelID: 'kilo-auto' },
+      });
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith({
+        agent: 'custom',
+        model: { providerID: 'kilo', modelID: 'kilo-auto' },
+        orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // clearTranscript / /clear interception
+  // -------------------------------------------------------------------------
+
+  describe('clearTranscript', () => {
+    it('clears storage, blocks older loads, shows info indicator, leaves question/pending intact', async () => {
+      const fetchSnapshotPage = jest.fn().mockResolvedValue({
+        kind: 'success',
+        info: { id: 'ses-1' },
+        messages: [
+          {
+            info: stubUserMessage({ id: 'msg-clear-1', sessionID: 'ses-1' }),
+            parts: [
+              stubTextPart({
+                id: 'part-1',
+                sessionID: 'ses-1',
+                messageID: 'msg-clear-1',
+                text: 'hello',
+              }),
+            ],
+          },
+        ],
+        nextCursor: 'cursor-older',
+        omittedItemCount: 0,
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      // Flush the mock transport's async onInitialPageLoaded.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Seed a question + pending message so we can assert they survive.
+      config.store.set(mgr.atoms.question, {
+        requestId: 'q-1',
+        questions: [{ question: 'Continue?', header: 'q', options: [], multiple: false }],
+      });
+      config.store.set(
+        mgr.atoms.pendingMessages,
+        new Map([['msg-p', { status: 'queued' as const }]])
+      );
+      config.store.set(mgr.atoms.permission, {
+        requestId: 'perm-1',
+        permission: 'edit',
+        patterns: ['*'],
+        metadata: {},
+        always: [],
+      });
+
+      expect(
+        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).length
+      ).toBeGreaterThan(0);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+      mgr.clearTranscript();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'info',
+          message: 'View cleared — earlier messages are still on this session',
+        })
+      );
+      // Non-goals: question / permission / pending survive.
+      expect(atomValue(config.store, mgr.atoms.question)).toEqual(
+        expect.objectContaining({ requestId: 'q-1' })
+      );
+      expect(atomValue(config.store, mgr.atoms.permission)).toEqual(
+        expect.objectContaining({ requestId: 'perm-1' })
+      );
+      expect(
+        atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+          config.store,
+          mgr.atoms.pendingMessages
+        ).size
+      ).toBe(1);
+      // Composer / streaming untouched.
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue(config.store, mgr.atoms.isStreaming)).toBe(false);
+
+      // Older-page loads blocked while marker set.
+      fetchSnapshotPage.mockClear();
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).not.toHaveBeenCalled();
+    });
+
+    it('purges all replayed history on reconnect with no post-clear send', async () => {
+      // E2E case 4: /clear → kill/reconnect, no send → view stays cleared.
+      const fetchSnapshotPage = jest.fn().mockResolvedValue({
+        kind: 'success',
+        info: { id: 'ses-1' },
+        messages: [
+          {
+            info: stubUserMessage({ id: 'msg_b_view', sessionID: 'ses-1' }),
+            parts: [],
+          },
+        ],
+        nextCursor: 'cursor-older',
+        omittedItemCount: 0,
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      // Real reconnect order: session.created (empty survivors) → snapshot → onReplayComplete.
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
+      latestStorage?.upsertMessage(
+        stubUserMessage({ id: 'msg_a_never_loaded', sessionID: 'ses-1' })
+      );
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_b_view', sessionID: 'ses-1' }));
+      latestStorage?.upsertMessage(
+        stubUserMessage({ id: 'msg_c_only_in_snapshot', sessionID: 'ses-1' })
+      );
+      mockSessionCallbacks.onReplayComplete?.();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      // Older-page loads stay blocked while the marker is set.
+      fetchSnapshotPage.mockClear();
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).not.toHaveBeenCalled();
+    });
+
+    it('keeps live post-clear turns that landed before reconnect replay', async () => {
+      // No successful send() yet (marker still set) but a live turn is already
+      // in local storage when replay starts — that id is a survivor.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_post_live', sessionID: 'ses-1' }));
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_pre_history', sessionID: 'ses-1' }));
+      mockSessionCallbacks.onReplayComplete?.();
+
+      expect(
+        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+      ).toEqual(['msg_post_live']);
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+    });
+
+    it('resets marker on first successful send so reconnect keeps full history', async () => {
+      // /clear → send → reconnect: marker cleared; full snapshot (incl. pre-clear) stays.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'after clear', mode: 'code' },
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_pre_clear', sessionID: 'ses-1' }));
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_post_clear', sessionID: 'ses-1' }));
+      mockSessionCallbacks.onReplayComplete?.();
+
+      expect(
+        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+      ).toEqual(['msg_post_clear', 'msg_pre_clear']);
+    });
+
+    it('re-sets marker on a second /clear after send so reconnect purges again', async () => {
+      // /clear → send → /clear → reconnect: second clear re-arms purge.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mgr.clearTranscript();
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'between clears', mode: 'code' },
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_pre', sessionID: 'ses-1' }));
+      latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_mid', sessionID: 'ses-1' }));
+      mockSessionCallbacks.onReplayComplete?.();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+    });
+
+    it('does not reset marker when send fails', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.clearTranscript();
+      mockSession.send.mockRejectedValue(new Error('offline'));
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'will fail', mode: 'code' },
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+    });
+
+    it('clears the marker on switchSession so history can reload', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+    });
+
+    it('clears the marker on destroy', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+
+      mgr.destroy();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+    });
+
+    it('intercepts /clear command for remote sessions without hitting the transport', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.send.mockClear();
+
+      const ok = await mgr.send({
+        payload: { type: 'command', command: 'clear', arguments: '' },
+      });
+
+      expect(ok).toBe(true);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(true);
+    });
+
+    it('does not intercept /clear for cloud-agent sessions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      // default resolution is cloud-agent
+      mockSession.send.mockResolvedValue({});
+
+      await mgr.send({
+        payload: { type: 'command', command: 'clear', arguments: '' },
+      });
+
+      expect(mockSession.send).toHaveBeenCalled();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+    });
+
+    it('does not intercept /clear with non-empty arguments', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.send.mockResolvedValue({});
+
+      await mgr.send({
+        payload: { type: 'command', command: 'clear', arguments: 'extra' },
+      });
+
+      expect(mockSession.send).toHaveBeenCalled();
+      expect(atomValue<boolean>(config.store, mgr.atoms.transcriptCleared)).toBe(false);
+    });
+
+    it('resets isLoadingOlderMessages when /clear races an in-flight older-page fetch', async () => {
+      let resolvePage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+      const slowPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+        resolvePage = resolve;
+      });
+
+      const fetchSnapshotPage = jest.fn() as jest.MockedFunction<
+        NonNullable<SessionManagerConfig['fetchSnapshotPage']>
+      >;
+      fetchSnapshotPage
+        .mockResolvedValueOnce({
+          kind: 'success',
+          info: { id: 'ses-1' },
+          messages: [],
+          nextCursor: 'cursor-older',
+          omittedItemCount: 0,
+        })
+        .mockReturnValueOnce(slowPage);
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      // Flush the mock transport's async onInitialPageLoaded.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+      const loading = mgr.loadOlderMessages();
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(true);
+
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+
+      // Late resolution must not re-stick the loading flag (generation guard).
+      resolvePage({
+        kind: 'success',
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+      await loading;
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+    });
+
+    it('clears a prior olderMessagesError so the banner does not outlive /clear', async () => {
+      const fetchSnapshotPage = jest.fn() as jest.MockedFunction<
+        NonNullable<SessionManagerConfig['fetchSnapshotPage']>
+      >;
+      fetchSnapshotPage
+        .mockResolvedValueOnce({
+          kind: 'success',
+          info: { id: 'ses-1' },
+          messages: [],
+          nextCursor: 'cursor-older',
+          omittedItemCount: 0,
+        })
+        .mockResolvedValueOnce({ kind: 'retryable_failure' as const });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await mgr.loadOlderMessages();
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toEqual({
+        kind: 'retryable',
+      });
+
+      mgr.clearTranscript();
+
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
     });
   });
 
@@ -3616,6 +4711,20 @@ describe('formatError', () => {
 
   it('handles shape-nested codes (alternative tRPC format)', () => {
     expect(formatError({ data: {}, shape: { code: 'PAYMENT_REQUIRED' } })).toBe(
+      'Insufficient credits. Please add at least $1 to continue using Cloud Agent.'
+    );
+  });
+
+  it('handles TRPCClientError with numeric shape.code (JSON-RPC code from tRPC v11)', () => {
+    const err = Object.assign(new Error('Insufficient credits'), {
+      data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+      shape: {
+        message: 'Insufficient credits',
+        code: -32000,
+        data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+      },
+    });
+    expect(formatError(err)).toBe(
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.'
     );
   });

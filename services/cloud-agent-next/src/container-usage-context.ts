@@ -20,11 +20,28 @@ export const SANDBOX_USAGE_SKUS = {
 } as const;
 
 export type SandboxClassName = keyof typeof SANDBOX_USAGE_SKUS;
+
+// Production values mirror this service's top-level wrangler.jsonc entries and
+// apps/web/src/lib/cloudflare/container-capacity.ts. The parity test reads all three sources.
+// Development intentionally uses different named instance types and does not query Analytics.
+export const SANDBOX_CAPACITIES: Record<
+  SandboxClassName,
+  { vcpu: number; memoryMiB: number; diskMB: number }
+> = {
+  Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
+  SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
+  SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
+  SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
+};
 export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
   sandboxId: SandboxId;
 };
 export type MeteredSandboxInstance = SandboxInstance & {
   configureBilling(input: unknown): Promise<void>;
+  isContainerRunning(): Promise<boolean>;
 };
 
 const sandboxBillingInputEnvelopeSchema = z
@@ -166,6 +183,31 @@ export async function configureSandboxBilling(
   sandboxId: SandboxId
 ): Promise<void> {
   await configureSandboxBillingInput(sandbox, buildSandboxBillingInput(metadata, sandboxId));
+}
+
+/**
+ * Whether the sandbox's container is currently running, read over Durable Object RPC.
+ *
+ * This deliberately avoids any container fetch (`exec`, `listProcesses`, …), because
+ * those boot a sleeping container. Callers use it to answer "is there anything running
+ * in there?" without paying for a wake-up.
+ *
+ * Returns `undefined` when the sandbox does not expose the method, so callers can fall
+ * back to their existing behaviour rather than treating an unknown state as "stopped".
+ */
+export async function isSandboxContainerRunning(
+  sandbox: SandboxInstance
+): Promise<boolean | undefined> {
+  const isContainerRunning = (sandbox as Partial<MeteredSandboxInstance>).isContainerRunning;
+  if (typeof isContainerRunning !== 'function') return undefined;
+  try {
+    return await (sandbox as MeteredSandboxInstance).isContainerRunning();
+  } catch (error) {
+    logger
+      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .warn('Container running probe failed');
+    return undefined;
+  }
 }
 
 export async function configureSandboxBillingInput(

@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, Coins, ExternalLink, Info, Settings } from 'lucide-react';
+import { Calendar, ExternalLink, Info, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SubscriptionStatusBadge } from '@/components/subscriptions/SubscriptionStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
@@ -139,7 +140,7 @@ function HeaderRow() {
     <div className="flex items-start justify-between gap-3">
       <CardTitle className="flex items-center gap-2">
         <span className="grid h-9 w-9 place-items-center rounded-lg bg-linear-to-br from-amber-500/30 to-amber-300/10 ring-1 ring-amber-400/25">
-          <Coins className="h-5 w-5 text-amber-300" />
+          <KiloPassIcon className="h-5 w-5 text-amber-300" />
         </span>
         <span className="leading-none">
           <span className="flex flex-wrap items-center gap-2">
@@ -224,6 +225,7 @@ function UsageProgressOrBonusUnlocked() {
     usageUsd,
     bonusUsd,
     isBonusUnlocked: subscription.isBonusUnlocked,
+    isBonusAvailableToUnlock: subscription.isBonusAvailableToUnlock,
   });
   if (!model) return null;
 
@@ -377,6 +379,8 @@ function BottomClarification() {
       </div>
     );
   }
+
+  if (!subscription.isBonusUnlocked && !subscription.isBonusAvailableToUnlock) return null;
 
   return (
     <div className="text-muted-foreground text-xs">

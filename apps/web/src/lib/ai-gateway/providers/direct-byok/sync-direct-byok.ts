@@ -64,6 +64,7 @@ const ModelsDevModelSchema = z.object({
       output: z.array(ModalitySchema).optional(),
     })
     .optional(),
+  tool_call: z.boolean().optional(),
 });
 
 const ModelsDevProviderSchema = z.object({
@@ -186,7 +187,9 @@ export function parseModelsDevProviderModels(
       model =>
         model.status !== 'deprecated' &&
         (!model.modalities?.output || model.modalities.output.includes('text')) &&
-        (!availableModelIds || availableModelIds.has(model.id))
+        (!availableModelIds || availableModelIds.has(model.id)) &&
+        model.tool_call !== false &&
+        (!model.modalities?.input || model.modalities.input.includes('text'))
     )
     .map(model => {
       const modelId = `${providerId}/${model.id}`.toLowerCase();
@@ -254,6 +257,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Neuralwatt',
     url: 'https://api.neuralwatt.com/v1/models',
   }),
+  modelsDevFetcher('nvidia-byok', 'nvidia', 'https://integrate.api.nvidia.com/v1/models'),
   openAICompatibleFetcher({
     providerId: 'chutes-byok',
     label: 'Chutes',

@@ -7,6 +7,8 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { useTranscriptTextSelectable } from './bubble-text-selection-context';
+
 type ReasoningPartRendererProps = {
   text: string;
   isStreaming?: boolean;
@@ -20,6 +22,7 @@ export function ReasoningPartRenderer({
 }: Readonly<ReasoningPartRendererProps>) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const colors = useThemeColors();
+  const textSelectable = useTranscriptTextSelectable();
 
   return (
     <View className="rounded-xl border-[1.5px] border-dashed border-border p-3">
@@ -43,7 +46,7 @@ export function ReasoningPartRenderer({
 
       {isExpanded && text ? (
         <Animated.View entering={FadeIn.duration(200)} className="mt-2">
-          <Text selectable className="text-sm leading-5 text-muted-foreground">
+          <Text selectable={textSelectable} className="text-sm leading-5 text-muted-foreground">
             {text}
           </Text>
         </Animated.View>

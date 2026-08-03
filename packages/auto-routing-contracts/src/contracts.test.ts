@@ -3,8 +3,11 @@ import {
   AutoRoutingClassifierAnalyticsResponseSchema,
   AutoRoutingClassifierModelResponseSchema,
   AutoRoutingDecisionResponseSchema,
+  AutoRoutingDecisionSchema,
+  AutoRoutingSettingsResponseSchema,
   MirrorPayloadSchema,
   RoutingConstraintsSchema,
+  UpdateAutoRoutingSettingsRequestSchema,
   UpdateClassifierModelRequestSchema,
   detectRequiredInputModalities,
   estimateRoutingTokens,
@@ -12,8 +15,12 @@ import {
 import type { RoutingConstraints } from './index';
 import {
   BenchmarkConfigSchema,
+  BenchmarkDeciderModelSchema,
+  BenchmarkModelSummarySchema,
+  BenchmarkProfileStatusesRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
+  RegisterBenchmarkProfilesRequestSchema,
   resolveBenchmarkIdentity,
 } from './benchmark';
 
@@ -482,5 +489,226 @@ describe('package root re-exports', () => {
 
   it('re-exports RoutingConstraintsSchema from the package root', () => {
     expect(RoutingConstraintsSchema.safeParse({}).success).toBe(true);
+  });
+});
+
+describe('BenchmarkModelSummarySchema variant field', () => {
+  const baseSummary = {
+    model: 'provider/model',
+    routeKey: '*' as const,
+    accuracy: 0.9,
+    avgCostUsd: 0.001,
+    avgLatencyMs: 100,
+    p50LatencyMs: 90,
+    p95LatencyMs: 120,
+    cases: 10,
+    errors: 0,
+  };
+
+  it('parses legacy summaries without variant', () => {
+    const parsed = BenchmarkModelSummarySchema.parse(baseSummary);
+    expect(parsed.variant).toBeUndefined();
+  });
+
+  it('parses optional nullable variant', () => {
+    expect(BenchmarkModelSummarySchema.parse({ ...baseSummary, variant: 'xhigh' }).variant).toBe(
+      'xhigh'
+    );
+    expect(BenchmarkModelSummarySchema.parse({ ...baseSummary, variant: null }).variant).toBeNull();
+  });
+});
+
+describe('BenchmarkDeciderModelSchema variant compatibility', () => {
+  it('parses legacy effort-only models', () => {
+    const parsed = BenchmarkDeciderModelSchema.parse({ id: 'm', reasoningEffort: 'high' });
+    expect(parsed).toMatchObject({ id: 'm', reasoningEffort: 'high' });
+    expect(parsed.variant).toBeUndefined();
+  });
+
+  it('parses variant-only models', () => {
+    const parsed = BenchmarkDeciderModelSchema.parse({ id: 'm', variant: 'xhigh' });
+    expect(parsed).toMatchObject({ id: 'm', variant: 'xhigh', reasoningEffort: null });
+  });
+
+  it('rejects both non-null variant and reasoningEffort', () => {
+    expect(
+      BenchmarkDeciderModelSchema.safeParse({
+        id: 'm',
+        variant: 'xhigh',
+        reasoningEffort: 'high',
+      }).success
+    ).toBe(false);
+  });
+
+  it('allows both null/absent (default effort null)', () => {
+    expect(BenchmarkDeciderModelSchema.parse({ id: 'm' })).toMatchObject({
+      id: 'm',
+      reasoningEffort: null,
+    });
+  });
+});
+
+describe('AutoRoutingDecisionSchema variant compatibility', () => {
+  const baseBenchmark = {
+    model: 'provider/model',
+    taskType: 'implementation' as const,
+    subtaskType: 'feature_development' as const,
+    source: 'benchmark' as const,
+    tableVersion: 'v1',
+    sticky: false,
+  };
+
+  it('parses a legacy decision with reasoningEffort only', () => {
+    const parsed = AutoRoutingDecisionSchema.parse({
+      ...baseBenchmark,
+      reasoningEffort: 'high',
+    });
+    expect(parsed).toMatchObject({ reasoningEffort: 'high' });
+    expect('variant' in parsed ? parsed.variant : undefined).toBeUndefined();
+  });
+
+  it('parses a decision with variant only', () => {
+    const parsed = AutoRoutingDecisionSchema.parse({
+      ...baseBenchmark,
+      variant: 'xhigh',
+    });
+    expect(parsed).toMatchObject({ variant: 'xhigh' });
+  });
+
+  it('rejects a decision with both non-null variant and reasoningEffort', () => {
+    expect(
+      AutoRoutingDecisionSchema.safeParse({
+        ...baseBenchmark,
+        variant: 'xhigh',
+        reasoningEffort: 'high',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('owner pool settings wire contracts', () => {
+  it('accepts null pool (inherit) on update', () => {
+    const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: null,
+      pool: null,
+    });
+    expect(parsed.pool).toBeNull();
+  });
+
+  it('accepts a configured pool on settings response with statuses', () => {
+    const parsed = AutoRoutingSettingsResponseSchema.parse({
+      ownerType: 'org',
+      ownerId: 'org-1',
+      mode: 'cost_per_accuracy',
+      configuredMode: null,
+      defaultMode: 'cost_per_accuracy',
+      configuredPool: [{ model: 'a/b', variant: null }],
+      poolStatuses: [{ entry: { model: 'a/b', variant: null }, status: 'pending' }],
+    });
+    expect(parsed.poolStatuses).toHaveLength(1);
+  });
+
+  it('accepts optional retryEntries that are a subset of pool by poolEntryKey', () => {
+    const pool = [
+      { model: 'a/b', variant: null as string | null },
+      { model: 'c/d', variant: 'xhigh' as string | null },
+    ];
+    const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: 'cost_per_accuracy',
+      pool,
+      retryEntries: [{ model: 'c/d', variant: 'xhigh' }],
+    });
+    expect(parsed.retryEntries).toEqual([{ model: 'c/d', variant: 'xhigh' }]);
+  });
+
+  it('rejects retryEntries that are not in pool', () => {
+    const result = UpdateAutoRoutingSettingsRequestSchema.safeParse({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: null,
+      pool: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'other/model', variant: 'max' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects retryEntries when pool is null', () => {
+    const result = UpdateAutoRoutingSettingsRequestSchema.safeParse({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: null,
+      pool: null,
+      retryEntries: [{ model: 'a/b', variant: null }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('benchmark profile request entry bounds', () => {
+  const eleven = Array.from({ length: 11 }, (_, i) => ({
+    model: `model/${i}`,
+    variant: null as string | null,
+  }));
+
+  it('bounds RegisterBenchmarkProfilesRequestSchema entries at 10', () => {
+    expect(
+      RegisterBenchmarkProfilesRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries: eleven,
+      }).success
+    ).toBe(false);
+    expect(
+      RegisterBenchmarkProfilesRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries: eleven.slice(0, 10),
+      }).success
+    ).toBe(true);
+  });
+
+  it('bounds BenchmarkProfileStatusesRequestSchema entries at 10', () => {
+    expect(BenchmarkProfileStatusesRequestSchema.safeParse({ entries: eleven }).success).toBe(
+      false
+    );
+    expect(
+      BenchmarkProfileStatusesRequestSchema.safeParse({ entries: eleven.slice(0, 1) }).success
+    ).toBe(true);
+  });
+
+  it('accepts optional retryEntries that are a subset of entries', () => {
+    const entries = [
+      { model: 'a/b', variant: null as string | null },
+      { model: 'c/d', variant: 'xhigh' as string | null },
+    ];
+    expect(
+      RegisterBenchmarkProfilesRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries,
+      }).success
+    ).toBe(true);
+    expect(
+      RegisterBenchmarkProfilesRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries,
+        retryEntries: [{ model: 'a/b', variant: null }],
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects retryEntries that are not in entries', () => {
+    const result = RegisterBenchmarkProfilesRequestSchema.safeParse({
+      ownerType: 'org',
+      ownerId: 'o1',
+      entries: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'other/model', variant: 'max' }],
+    });
+    expect(result.success).toBe(false);
   });
 });

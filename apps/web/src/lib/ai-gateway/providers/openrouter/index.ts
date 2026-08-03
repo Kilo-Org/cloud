@@ -16,7 +16,7 @@ import {
   convertFromKiloExclusiveModel,
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
+import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS, type AutoModel } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -27,7 +27,6 @@ import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/t
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
-import { isOpenRouterGpt56PromoModel } from '@/lib/ai-gateway/providers/openai';
 import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
 
 // Re-export from shared module for backwards compatibility
@@ -86,11 +85,6 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
-  const discount = model.pricing.discount;
-  if (isOpenRouterGpt56PromoModel(model.id) && discount !== undefined && discount > 0) {
-    const percentage = Number((discount * 100).toFixed(2));
-    return `${name} (${percentage}% off)`;
-  }
   const promptPrice = Number.parseFloat(model.pricing.prompt);
   const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
   if (isExpensive) return name + ' ($$$$)';
@@ -116,10 +110,6 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
   return model.status !== 'disabled' || model.pricing === null;
 }
 
-const unavailableModels = [
-  'sakana/fugu', // this model is not available in the EU
-];
-
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
@@ -131,9 +121,8 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
-          !isForbiddenFreeModel(model.id) &&
-          !model.id.endsWith(':batch') &&
-          !unavailableModels.some(unavailableId => model.id.includes(unavailableId))
+          !isUnavailableModel(model.id) &&
+          !model.id.endsWith(':batch')
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
@@ -146,7 +135,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
                 normalizeInferenceProviderId(e.tag) ===
                 normalizeInferenceProviderId(preferredProvider)
             )?.pricing);
-        const pricing = getModelDisplayPricing(model.id, rawPricing);
+        const pricing = getModelDisplayPricing(rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
         return {
           ...model,

@@ -3,12 +3,14 @@ import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 
+import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { MarkdownViewerModal } from './markdown-viewer-modal';
 import { type MarkdownPreview } from './read-tool-markdown';
 import { getFilename } from './tool-card-utils';
 
 export function ReadMarkdownPreview({ preview }: Readonly<{ preview: MarkdownPreview }>) {
+  const textSelectable = useTranscriptTextSelectable();
   const [readerVisible, setReaderVisible] = useState(false);
 
   if (preview.text === '') {
@@ -25,7 +27,7 @@ export function ReadMarkdownPreview({ preview }: Readonly<{ preview: MarkdownPre
         accessibilityLabel={`Open ${getFilename(preview.path)} full screen`}
         className="active:opacity-80"
       >
-        <ChatMarkdownText value={preview.inlineText} />
+        <ChatMarkdownText value={preview.inlineText} selectable={textSelectable} />
       </Pressable>
       {preview.footer ? (
         <Text className="text-xs text-muted-foreground">{preview.footer}</Text>

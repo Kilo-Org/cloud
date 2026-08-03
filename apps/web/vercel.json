@@ -25,6 +25,14 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/kilo-pass-org-bonus-repair",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/kilo-pass-org-issuance",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/kilo-pass-store-subscription-reconcile",
       "schedule": "*/15 * * * *"
     },
@@ -49,6 +57,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/coding-plans-inventory-summary",
+      "schedule": "0 12 * * *"
+    },
+    {
       "path": "/api/cron/cost-insights-hourly",
       "schedule": "5 * * * *"
     },
@@ -58,6 +70,10 @@
     },
     {
       "path": "/api/cron/db-pool-metrics",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/db-replication-health",
       "schedule": "* * * * *"
     },
     {

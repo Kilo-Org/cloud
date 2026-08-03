@@ -15,6 +15,7 @@ import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import { readDb } from '@/lib/drizzle';
 
 jest.mock('next/server', () => {
   return {
@@ -34,6 +35,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
+jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
 jest.mock('@/lib/ai-gateway/abuse-service', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/abuse-service');
   return {
@@ -269,6 +271,16 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       expect.anything(),
       expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' })
     );
+  });
+
+  it('uses the read replica for balance and organization settings', async () => {
+    const { POST } = await import('./route');
+
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
+    expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[2]).toBe(readDb);
   });
 
   it('rate limits rules-engine rate-limit actions before upstream', async () => {

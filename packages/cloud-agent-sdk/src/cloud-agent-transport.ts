@@ -62,11 +62,11 @@ type CloudAgentTransportConfig = {
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome | null>;
   /** Called after a successful initial bounded page read. */
-  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
+  onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   websocketBaseUrl: string;
-  onError?: (message: string) => void;
-  lifecycleHooks?: ConnectionLifecycleHooks;
-  websocketHeaders?: WebSocketHeaders;
+  onError?: ((message: string) => void) | undefined;
+  lifecycleHooks?: ConnectionLifecycleHooks | undefined;
+  websocketHeaders?: WebSocketHeaders | undefined;
 };
 
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {

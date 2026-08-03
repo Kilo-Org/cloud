@@ -100,12 +100,12 @@ describe('cloudAgentGetAttachmentUploadUrlSchema', () => {
     ).toBe(false);
   });
 
-  it('preserves the 5 MB positive contentLength cap even with an extension', () => {
+  it('preserves the 20 MB positive contentLength cap even with an extension', () => {
     const result = cloudAgentGetAttachmentUploadUrlSchema.safeParse({
       messageUuid: MESSAGE_UUID,
       attachmentId: ATTACHMENT_ID,
       contentType: 'application/octet-stream',
-      contentLength: 5 * 1024 * 1024 + 1,
+      contentLength: 20 * 1024 * 1024 + 1,
       extension: 'kilo',
     });
     expect(result.success).toBe(false);

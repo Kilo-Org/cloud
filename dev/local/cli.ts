@@ -1,7 +1,11 @@
 import { execFileSync, execSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+  applyPortOffset,
+  candidatePortOffsets,
+  clearDevLogs,
   resolveTargets,
   getService,
   getGroups,
@@ -10,9 +14,11 @@ import {
   resolveGroups,
   topologicalSort,
   portOffset,
+  writePersistedPortOffset,
   resolveSessionNextAuthUrl,
   services,
 } from './services';
+import { acquireProcessLock, withProcessLockAsync } from './process-lock';
 import { syncEnvVars } from './env-sync';
 import { getWranglerRegistryPath } from './wrangler-registry';
 import {
@@ -36,6 +42,7 @@ import {
   findServicePane,
   isPaneRunningCommand,
   captureServicePane,
+  pipeServicePane,
 } from './tmux';
 import { detectLanIp, prepareMobileEnvironment } from './mobile-env';
 import { probeDockerApi } from './docker-api-probe';
@@ -47,6 +54,8 @@ import {
   readEnvValue,
   readEnvMtime,
   waitForEnvValueChange,
+  buildFollowLogPipeCommand,
+  buildLogPipeCommand,
   probePort,
   restartServiceInTmux,
 } from './runner';
@@ -56,6 +65,195 @@ import {
 // ---------------------------------------------------------------------------
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+// Scan the resolved services' full computed port set for occupants. The
+// shared kiloclaw-docker-tcp bridge on 23750 is reused (not a conflict) when
+// the listener really is the Docker API.
+async function findPortConflicts(
+  serviceNames: string[],
+  portProbe: typeof probePort = probePort,
+  dockerProbe: typeof probeDockerApi = probeDockerApi
+): Promise<{
+  conflicts: string[];
+  reusedHostServices: Set<string>;
+}> {
+  const conflicts: string[] = [];
+  const reusedHostServices = new Set<string>();
+  for (const name of serviceNames) {
+    const service = getService(name);
+    if (service.type === 'infra' || service.port <= 0) continue;
+    const ports = [
+      { label: name, port: service.port },
+      ...(service.type === 'worker'
+        ? [{ label: `${name}-inspector`, port: service.port + 10_000 }]
+        : []),
+    ];
+    for (const candidate of ports) {
+      if (!(await portProbe(candidate.port))) continue;
+      if (
+        name === 'kiloclaw-docker-tcp' &&
+        candidate.port === service.port &&
+        (await dockerProbe(candidate.port))
+      ) {
+        reusedHostServices.add(name);
+      } else {
+        conflicts.push(`${candidate.label}:${candidate.port}`);
+      }
+    }
+  }
+  return { conflicts, reusedHostServices };
+}
+
+function processIdentity(pid: number): string | undefined {
+  try {
+    return (
+      execFileSync('ps', ['-o', 'lstart=', '-p', String(pid)], {
+        encoding: 'utf8',
+      })
+        .replace(/\s+/g, ' ')
+        .trim() || undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+async function acquirePortOffsetLease(
+  serviceNames: string[],
+  explicit: boolean,
+  repoRoot: string,
+  sessionName: string,
+  leasesRoot = path.join(os.tmpdir(), 'kilo-port-offset-leases'),
+  scanPorts: typeof findPortConflicts = findPortConflicts
+): Promise<Set<string>> {
+  const startingOffset = portOffset;
+  const candidates = explicit
+    ? [startingOffset]
+    : [startingOffset, ...candidatePortOffsets(startingOffset)];
+  fs.mkdirSync(leasesRoot, { recursive: true });
+
+  for (const candidate of candidates) {
+    applyPortOffset(candidate);
+    const claimPath = path.join(leasesRoot, `${candidate}.json`);
+    let release: () => Promise<void>;
+    try {
+      release = await acquireProcessLock(
+        path.join(leasesRoot, `${candidate}.lock`),
+        `port offset ${candidate}`
+      );
+    } catch {
+      if (explicit)
+        throw new Error(`KILO_PORT_OFFSET ${candidate} is being started by another worktree`);
+      continue;
+    }
+    try {
+      let claim: { identity?: string; pid?: number; session?: string } | undefined;
+      try {
+        claim = JSON.parse(fs.readFileSync(claimPath, 'utf8'));
+      } catch {
+        fs.rmSync(claimPath, { force: true });
+      }
+      const pendingPid = claim?.pid;
+      const pending =
+        typeof pendingPid === 'number' &&
+        Number.isInteger(pendingPid) &&
+        pendingPid > 0 &&
+        typeof claim?.identity === 'string' &&
+        processIdentity(pendingPid) === claim.identity;
+      if ((claim?.session && sessionExists(claim.session)) || pending) {
+        if (explicit)
+          throw new Error(`KILO_PORT_OFFSET ${candidate} is reserved by another worktree`);
+        continue;
+      }
+      fs.rmSync(claimPath, { force: true });
+
+      const scan = await scanPorts(serviceNames);
+      if (scan.conflicts.length > 0) {
+        if (explicit) {
+          throw new Error(
+            `Refusing to share occupied worktree service ports: ${scan.conflicts.join(', ')}. ` +
+              'Stop the owning worktree or set a distinct KILO_PORT_OFFSET.'
+          );
+        }
+        continue;
+      }
+      const temp = `${claimPath}.${process.pid}.tmp`;
+      const identity = processIdentity(process.pid);
+      if (!identity) throw new Error('Could not identify the port-offset starter process');
+      fs.writeFileSync(
+        temp,
+        JSON.stringify({
+          identity,
+          pid: process.pid,
+          repoRoot,
+          session: sessionName,
+        })
+      );
+      fs.renameSync(temp, claimPath);
+      return scan.reusedHostServices;
+    } finally {
+      await release();
+    }
+  }
+
+  applyPortOffset(startingOffset);
+  throw new Error('No free worktree port offset is available');
+}
+
+async function releasePortOffsetClaims(
+  repoRoot: string,
+  sessionName: string,
+  leasesRoot = path.join(os.tmpdir(), 'kilo-port-offset-leases'),
+  lockWaitMs = 5000,
+  removeClaim = (claimPath: string) => fs.rmSync(claimPath, { force: true })
+): Promise<void> {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(leasesRoot).filter(entry => /^\d+\.json$/.test(entry));
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const offset = entry.slice(0, -5);
+    let release: () => Promise<void>;
+    try {
+      release = await acquireProcessLock(
+        path.join(leasesRoot, `${offset}.lock`),
+        `port offset ${offset}`,
+        lockWaitMs
+      );
+    } catch {
+      console.warn(`Skipping busy port offset ${offset} claim; it will be reclaimed when stale`);
+      continue;
+    }
+    try {
+      const claimPath = path.join(leasesRoot, entry);
+      let claim: { repoRoot?: string; session?: string };
+      try {
+        claim = JSON.parse(fs.readFileSync(claimPath, 'utf8'));
+      } catch {
+        continue;
+      }
+      if (claim.repoRoot === repoRoot && claim.session === sessionName) removeClaim(claimPath);
+    } catch (error) {
+      console.warn(
+        `Could not remove port offset ${offset} claim; it will be reclaimed when stale: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    } finally {
+      try {
+        await release();
+      } catch (error) {
+        console.warn(
+          `Could not release port offset ${offset} cleanup lock: ${
+            error instanceof Error ? error.message : error
+          }`
+        );
+      }
+    }
+  }
+}
 
 function determineEnabledGroups(serviceNames: string[]): string[] {
   const nameSet = new Set(serviceNames);
@@ -83,9 +281,10 @@ const CAPTURE_TIMEOUT_MS = 30_000;
 // Commands
 // ---------------------------------------------------------------------------
 
-async function cmdUp(args: string[], repoRoot: string): Promise<void> {
+async function cmdUp(args: string[], repoRoot: string): Promise<string | undefined> {
   const noAttach = args.includes('--no-attach');
-  const targets = args.filter(arg => arg !== '--no-attach');
+  const reuseRunning = args.includes('--reuse-running');
+  const targets = args.filter(arg => arg !== '--no-attach' && arg !== '--reuse-running');
 
   // --- Preflight checks ---
   if (!isTmuxAvailable()) {
@@ -112,8 +311,60 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     console.warn('  To sync from Vercel: vercel env pull .env.local');
   }
 
+  // --- Resolve targets ---
+  // Always start core (always-on) groups; additional targets are merged in
+  const coreServices = resolveGroups(getAlwaysOnGroupIds());
+  const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
+  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+
+  const sessionName = getSessionName();
+  const sessionAlreadyRunning = sessionExists(sessionName);
+
+  // --- Pick a free port offset before anything derives URLs from ports ---
+  // An explicit KILO_PORT_OFFSET is honored as-is. Otherwise, when the
+  // hash/persisted offset's ports are held by a foreign occupant (another
+  // worktree's stack, macOS AirPlay on 5000/7000), probe +100 candidate
+  // offsets and take the first whose full computed port set is free. Never
+  // silently share. The chosen offset is persisted before startup so later
+  // port-computing commands agree even if startup is interrupted.
+  const offsetIsExplicit =
+    process.env.KILO_PORT_OFFSET !== undefined && process.env.KILO_PORT_OFFSET !== 'auto';
+  let reusedHostServices = new Set<string>();
+  if (!sessionAlreadyRunning) {
+    const originalOffset = portOffset;
+    reusedHostServices = await acquirePortOffsetLease(
+      serviceNames,
+      offsetIsExplicit,
+      repoRoot,
+      sessionName
+    );
+    if (portOffset !== originalOffset)
+      console.log(`${DIM}Auto-selected port offset ${portOffset}${RESET}`);
+    // Persist before tmux or any service exists: a killed partial startup still
+    // leaves every later command on the ports the children inherited.
+    writePersistedPortOffset(repoRoot, portOffset);
+  }
+
   // --- Export port offset for child processes (e.g. scripts/dev.sh) ---
   process.env.KILO_PORT_OFFSET = String(portOffset);
+
+  // Repeated bundle setup calls reuse a complete stack without refreshing
+  // secrets or restarting live panes.
+  if (sessionAlreadyRunning && reuseRunning) {
+    const manifest = readManifest(repoRoot);
+    const missing = await missingRunningServices(manifest, sessionName, serviceNames, {
+      repoRoot,
+      waitMs: 30_000,
+      pollMs: 500,
+    });
+    if (missing.length > 0)
+      throw new Error(
+        `Cannot reuse session ${sessionName}; requested services are missing or stayed down for 30s: ${missing.join(', ')}. ` +
+          'Do not rerun without --reuse-running while another verifier may use the stack. Retry the same command once; if it still fails, stop every shard, stop the stack, and start a fresh round.'
+      );
+    console.log(`Reusing running session ${sessionName} without restarting services.`);
+    return noAttach ? undefined : sessionName;
+  }
 
   const otherSessions = findOtherKiloDevSessions();
   if (otherSessions.length > 0) {
@@ -131,12 +382,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     console.log(`${DIM}Port offset: ${portOffset} (KILO_PORT_OFFSET)${RESET}`);
   }
 
-  // --- Resolve targets ---
-  // Always start core (always-on) groups; additional targets are merged in
-  const coreServices = resolveGroups(getAlwaysOnGroupIds());
-  const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
-  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
-
   const mobileEnv: Record<string, string> = {};
   if (serviceNames.includes('mobile')) {
     const host = process.env.MOBILE_DEV_HOST || detectLanIp();
@@ -152,8 +397,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Check for existing session ---
-  const sessionName = getSessionName();
-  if (sessionExists(sessionName)) {
+  if (sessionAlreadyRunning) {
     for (const name of serviceNames) {
       const service = getService(name);
       if (service.type !== 'worker' || !findServicePane(sessionName, name)) continue;
@@ -180,28 +424,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
         ? `Session ${sessionName} already running.`
         : `Session ${sessionName} already running — attaching.`
     );
-    if (!noAttach) attachSession(sessionName);
-    return;
-  }
-
-  const conflictingPorts: string[] = [];
-  const reusedHostServices = new Set<string>();
-  for (const name of serviceNames) {
-    const service = getService(name);
-    if (service.type !== 'infra' && service.port > 0 && (await probePort(service.port))) {
-      if (name === 'kiloclaw-docker-tcp') {
-        if (await probeDockerApi(service.port)) reusedHostServices.add(name);
-        else conflictingPorts.push(`${name}:${service.port}`);
-      } else {
-        conflictingPorts.push(`${name}:${service.port}`);
-      }
-    }
-  }
-  if (conflictingPorts.length > 0) {
-    throw new Error(
-      `Refusing to share occupied worktree service ports: ${conflictingPorts.join(', ')}. ` +
-        'Stop the owning worktree or set a distinct KILO_PORT_OFFSET.'
-    );
+    return noAttach ? undefined : sessionName;
   }
 
   // --- Check for socat when kiloclaw-docker-tcp is requested ---
@@ -249,11 +472,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Prepare log directory ---
-  const logDir = path.join(repoRoot, 'dev', 'logs');
-  fs.mkdirSync(logDir, { recursive: true });
-  for (const entry of fs.readdirSync(logDir)) {
-    fs.rmSync(path.join(logDir, entry), { recursive: true, force: true });
-  }
+  clearDevLogs(repoRoot);
 
   // --- Create tmux session ---
   // Pass critical runtime env into the session so panes see this worktree's
@@ -542,7 +761,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   console.log(
     `${GREEN}Started ${startedServices.length} services in session ${sessionName}${RESET}`
   );
-  if (!noAttach) attachSession(sessionName);
+  return noAttach ? undefined : sessionName;
 }
 
 type ServiceStatus = 'up' | 'down';
@@ -603,6 +822,59 @@ function readManifest(repoRoot: string): Manifest | undefined {
   } catch {
     return undefined;
   }
+}
+
+async function missingRunningServices(
+  manifest: Manifest | undefined,
+  sessionName: string,
+  requested: string[],
+  checks: {
+    repoRoot?: string;
+    findPane?: typeof findServicePane;
+    isPaneRunning?: typeof isPaneRunningCommand;
+    probe?: typeof probePort;
+    waitMs?: number;
+    pollMs?: number;
+  } = {}
+): Promise<string[]> {
+  if (manifest?.session !== sessionName) return requested;
+  const entries = new Map(
+    manifest.services.flatMap(service =>
+      typeof service?.name === 'string' ? [[service.name, service] as const] : []
+    )
+  );
+  const findPane = checks.findPane ?? findServicePane;
+  const isPaneRunning = checks.isPaneRunning ?? isPaneRunningCommand;
+  const probe = checks.probe ?? probePort;
+  const repoRoot = checks.repoRoot ?? process.cwd();
+  const missing = requested.filter(name => getService(name).type !== 'infra' && !entries.has(name));
+  let pending = requested.filter(name => getService(name).type === 'infra' || entries.has(name));
+  const check = async (names: string[]): Promise<string[]> => {
+    const down = await Promise.all(
+      names.map(async name => {
+        const service = getService(name);
+        if (service.type === 'infra') return service.port <= 0 || !(await probe(service.port));
+        const entry = entries.get(name);
+        if (!entry) return true;
+        const port =
+          name === 'nextjs'
+            ? (readNextjsDevPort(repoRoot) ?? entry.port ?? service.port)
+            : (entry.port ?? service.port);
+        if (name === 'kiloclaw-docker-tcp') return !(await probeDockerApi(port));
+        const pane = findPane(sessionName, name);
+        if (!pane) return true;
+        return port === 0 ? !isPaneRunning(sessionName, pane) : !(await probe(port));
+      })
+    );
+    return names.filter((_, index) => down[index]);
+  };
+  const deadline = Date.now() + (checks.waitMs ?? 0);
+  while (pending.length > 0) {
+    pending = await check(pending);
+    if (pending.length === 0 || Date.now() >= deadline) break;
+    await sleep(checks.pollMs ?? 100);
+  }
+  return [...missing, ...pending];
 }
 
 function readNextjsDevPort(repoRoot: string): number | undefined {
@@ -688,6 +960,31 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 }
 
+// Metro's jest-haste-map cache ($TMPDIR/metro-file-map-*) persists per project
+// root across dependency relayouts and then serves stale module instances
+// (deterministic white screen + metroRequire stack overflow). Clearing this
+// worktree's file-map on every mobile restart makes the recovery automatic.
+function clearStaleMetroFileMaps(repoRoot: string): void {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(os.tmpdir());
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.startsWith('metro-file-map-')) continue;
+    const full = path.join(os.tmpdir(), entry);
+    try {
+      if (!fs.statSync(full).isFile()) continue;
+      if (!fs.readFileSync(full).includes(repoRoot)) continue;
+      fs.rmSync(full, { force: true });
+      console.log(`Cleared stale Metro file-map ${entry}`);
+    } catch {
+      // Another worktree's file or a race with Metro — leave it.
+    }
+  }
+}
+
 async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
   if (!services.has(serviceName)) {
     console.error(`Unknown service: ${serviceName}`);
@@ -718,6 +1015,7 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
     if (!host) throw new Error('Could not detect LAN IP. Set MOBILE_DEV_HOST explicitly.');
     restartEnv = prepareMobileEnvironment(repoRoot, host).sessionEnv;
     setSessionEnvironment(sessionName, restartEnv);
+    clearStaleMetroFileMaps(repoRoot);
   }
 
   console.log(`Restarting ${serviceName} (waiting for the old process to shut down)...`);
@@ -738,6 +1036,21 @@ function cmdCapture(serviceName: string, linesArg: string | undefined): void {
   process.stdout.write(captureServicePane(getSessionName(), serviceName, lines));
 }
 
+function cmdCaptureFollow(serviceName: string, outputPath?: string): void {
+  if (!services.has(serviceName)) throw new Error(`Unknown service: ${serviceName}`);
+  const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
+  if (outputPath === undefined) {
+    pipeServicePane(getSessionName(), serviceName, buildLogPipeCommand(logPath));
+    console.log(`Stopped continuous capture for ${serviceName}`);
+    return;
+  }
+  const resolved = path.resolve(outputPath);
+  fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  fs.closeSync(fs.openSync(resolved, 'a'));
+  pipeServicePane(getSessionName(), serviceName, buildFollowLogPipeCommand(logPath, resolved));
+  console.log(`Capturing ${serviceName} continuously to ${resolved}`);
+}
+
 async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
   const sessionName = getSessionName();
 
@@ -745,6 +1058,7 @@ async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
     killSession(sessionName);
     console.log(`Killed tmux session ${sessionName}`);
   }
+  await releasePortOffsetClaims(repoRoot, sessionName);
 
   // Docker Compose uses project name "dev" for every worktree, so containers
   // (postgres, redis, grafana) are shared singletons. Tearing them down here
@@ -793,14 +1107,18 @@ async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
 function printUsage(): void {
   console.log(`
 Usage:
-  dev:start [--no-attach] [targets...]
+  dev:start [--no-attach] [--reuse-running] [targets...]
                           Start services (default: core)
+                          --reuse-running never restarts an existing complete stack
   dev:stop [--force]      Stop all services (skips shared Docker infra if
                           other kilo-dev sessions are running; --force overrides)
   dev:status [--json]     Show running services and their ports
   dev:restart <service>   Restart a running service
   dev:capture <service> [lines]
                           Capture a service pane wherever the dashboard moved it
+  dev:capture <service> --follow <file>
+  dev:capture <service> --stop-follow
+                          Start or stop continuous capture on the resolved pane
   dev:env [targets...]    Sync env vars (.dev.vars + .env.development.local)
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
@@ -820,10 +1138,23 @@ async function main() {
 
   switch (command) {
     case 'up':
-      await cmdUp(args.slice(1), repoRoot);
+      {
+        const sessionToAttach = await withProcessLockAsync(
+          path.join(repoRoot, 'dev', 'logs', 'start.lock'),
+          'dev:start',
+          () => cmdUp(args.slice(1), repoRoot),
+          1_200_000
+        );
+        if (sessionToAttach) attachSession(sessionToAttach);
+      }
       break;
     case 'stop':
-      await cmdStop(repoRoot, args.includes('--force') || args.includes('-f'));
+      await withProcessLockAsync(
+        path.join(repoRoot, 'dev', 'logs', 'start.lock'),
+        'dev:start/stop',
+        () => cmdStop(repoRoot, args.includes('--force') || args.includes('-f')),
+        1_200_000
+      );
       break;
     case 'status':
       await cmdStatus(repoRoot, args.includes('--json'));
@@ -839,8 +1170,19 @@ async function main() {
     }
     case 'capture': {
       const serviceName = args[1];
-      if (!serviceName) throw new Error('Usage: dev:capture <service> [lines]');
-      cmdCapture(serviceName, args[2]);
+      if (!serviceName)
+        throw new Error('Usage: dev:capture <service> [lines|--follow <file>|--stop-follow]');
+      if (args[2] === '--follow') {
+        if (!args[3] || args.length !== 4)
+          throw new Error('Usage: dev:capture <service> --follow <file>');
+        cmdCaptureFollow(serviceName, args[3]);
+      } else if (args[2] === '--stop-follow') {
+        if (args.length !== 3) throw new Error('Usage: dev:capture <service> --stop-follow');
+        cmdCaptureFollow(serviceName);
+      } else {
+        if (args.length > 3) throw new Error('Usage: dev:capture <service> [lines]');
+        cmdCapture(serviceName, args[2]);
+      }
       break;
     }
     case 'env':
@@ -855,7 +1197,18 @@ async function main() {
   }
 }
 
-main().catch((err: unknown) => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+const isMain =
+  process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename);
+if (isMain) {
+  main().catch((err: unknown) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}
+
+export {
+  acquirePortOffsetLease,
+  findPortConflicts,
+  missingRunningServices,
+  releasePortOffsetClaims,
+};

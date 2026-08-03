@@ -23,6 +23,7 @@ jest.mock('@/lib/organizations/organizations', () => ({
   addSsoUserToOrganization: jest.fn(async () => false),
   getOrganizationById: jest.fn(async () => ({ id: 'org-local' })),
   getOrganizationMembers: jest.fn(async () => []),
+  skipCustomerSourceSurveyForOrgJoin: jest.fn(async () => {}),
 }));
 
 jest.mock('@/lib/organizations/organization-sso-policy', () => ({
@@ -46,11 +47,15 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import { createOrUpdateUser } from '@/lib/user';
-import { addSsoUserToOrganization } from '@/lib/organizations/organizations';
+import {
+  addSsoUserToOrganization,
+  skipCustomerSourceSurveyForOrgJoin,
+} from '@/lib/organizations/organizations';
 import { processSSOUserLogin } from './sso';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockAddSsoUserToOrganization = jest.mocked(addSsoUserToOrganization);
+const mockSkipCustomerSourceSurveyForOrgJoin = jest.mocked(skipCustomerSourceSurveyForOrgJoin);
 const { mockWorkOSInstance } = jest.requireMock('@workos-inc/node') as {
   mockWorkOSInstance: { organizations: { listOrganizations: jest.Mock } };
 };
@@ -106,6 +111,40 @@ describe('processSSOUserLogin', () => {
       'impact-click-123',
       trackingContext
     );
-    expect(mockAddSsoUserToOrganization).toHaveBeenCalledWith('org-local', 'user-workos');
+    expect(mockAddSsoUserToOrganization).toHaveBeenCalledWith('org-local', 'user-workos', {
+      isNewUser: true,
+    });
+  });
+
+  it('skips the customer-source survey when the user joins the org via SSO', async () => {
+    mockAddSsoUserToOrganization.mockResolvedValueOnce(true);
+    const accountInfo = {
+      google_user_email: 'new-user@example.com',
+      google_user_name: 'New User',
+      google_user_image_url: 'https://example.com/avatar.png',
+      hosted_domain: 'example.com',
+      provider: 'workos' as const,
+      provider_account_id: 'workos-user-123',
+    };
+
+    await expect(processSSOUserLogin(accountInfo)).resolves.toBe(true);
+
+    expect(mockSkipCustomerSourceSurveyForOrgJoin).toHaveBeenCalledWith('user-workos');
+  });
+
+  it('does not touch the customer-source survey when the user is already a member', async () => {
+    mockAddSsoUserToOrganization.mockResolvedValueOnce(false);
+    const accountInfo = {
+      google_user_email: 'new-user@example.com',
+      google_user_name: 'New User',
+      google_user_image_url: 'https://example.com/avatar.png',
+      hosted_domain: 'example.com',
+      provider: 'workos' as const,
+      provider_account_id: 'workos-user-123',
+    };
+
+    await expect(processSSOUserLogin(accountInfo)).resolves.toBe(true);
+
+    expect(mockSkipCustomerSourceSurveyForOrgJoin).not.toHaveBeenCalled();
   });
 });

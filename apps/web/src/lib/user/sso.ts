@@ -8,6 +8,7 @@ import {
   addSsoUserToOrganization,
   getOrganizationById,
   getOrganizationMembers,
+  skipCustomerSourceSurveyForOrgJoin,
 } from '@/lib/organizations/organizations';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { sendOrgSSOUserJoinedEmail } from '@/lib/email';
@@ -81,8 +82,13 @@ async function processSSOInternal(
 
   const savedUser = res.user;
   // add user to organization since its been fully created
-  const added = await addSsoUserToOrganization(kiloOrg.id, savedUser.id);
+  const added = await addSsoUserToOrganization(kiloOrg.id, savedUser.id, {
+    isNewUser: res.isNew,
+  });
   if (added) {
+    // Users who join through SSO should not be asked how they heard about Kilo.
+    await skipCustomerSourceSurveyForOrgJoin(savedUser.id);
+
     // get all owners for org
     const members = await getOrganizationMembers(kiloOrg.id);
     const owners = members.filter(m => m.role === 'owner');

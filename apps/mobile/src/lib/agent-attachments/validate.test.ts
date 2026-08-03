@@ -11,7 +11,9 @@ import {
   describeClassificationFailure,
   mimeForExtension,
   normalizeAttachmentExtension,
+  sanitizeAttachmentFilename,
 } from './validate';
+import { utf8ByteLength } from '../utf8-utils';
 
 describe('normalizeAttachmentExtension', () => {
   it('lowercases a known extension', () => {
@@ -38,6 +40,162 @@ describe('normalizeAttachmentExtension', () => {
     // also fall through to `bin` if the MIME lookup would fail.
     const ext = normalizeAttachmentExtension('clip.mov');
     expect(ext).toBe('mov');
+  });
+});
+
+describe('sanitizeAttachmentFilename', () => {
+  it('passes a safe picker name unchanged', () => {
+    expect(sanitizeAttachmentFilename('inbound-8mib.bin')).toBe('inbound-8mib.bin');
+  });
+
+  it('passes common safe names unchanged', () => {
+    expect(sanitizeAttachmentFilename('archive.zip')).toBe('archive.zip');
+    expect(sanitizeAttachmentFilename('notes.txt')).toBe('notes.txt');
+    expect(sanitizeAttachmentFilename('image.png')).toBe('image.png');
+    expect(sanitizeAttachmentFilename('report.PDF')).toBe('report.PDF');
+    expect(sanitizeAttachmentFilename('some_large_document-v2.pdf')).toBe(
+      'some_large_document-v2.pdf'
+    );
+  });
+
+  it('strips directory traversal with forward slash', () => {
+    // Basename extraction drops the directory prefix; the isolated
+    // basename is safe because it has no separators.
+    expect(sanitizeAttachmentFilename('../../etc/passwd')).toBe('passwd');
+    expect(sanitizeAttachmentFilename('a/../../../b.txt')).toBe('b.txt');
+    expect(sanitizeAttachmentFilename('/root/secret.key')).toBe('secret.key');
+  });
+
+  it('strips directory traversal with backslash', () => {
+    expect(sanitizeAttachmentFilename(String.raw`..\..\windows\system.ini`)).toBe('system.ini');
+    expect(sanitizeAttachmentFilename(String.raw`C:\Users\admin\desktop.ini`)).toBe('desktop.ini');
+  });
+
+  it('maps bare traversal tokens to safe fallback', () => {
+    // Direct traversal tokens reach the sanitizer when the picker
+    // reports a raw name that IS the traversal entry itself.
+    expect(sanitizeAttachmentFilename('.')).toBe('file.bin');
+    expect(sanitizeAttachmentFilename('..')).toBe('file.bin');
+  });
+
+  it('maps path-prefixed traversal tokens to safe fallback', () => {
+    // The basename is `..` after prefix stripping; it must fall back.
+    expect(sanitizeAttachmentFilename('../..')).toBe('file.bin');
+    expect(sanitizeAttachmentFilename('a/..')).toBe('file.bin');
+    expect(sanitizeAttachmentFilename(String.raw`..\..`)).toBe('file.bin');
+  });
+
+  it('preserves safe names with multiple consecutive dots', () => {
+    expect(sanitizeAttachmentFilename('file..backup.txt')).toBe('file..backup.txt');
+    expect(sanitizeAttachmentFilename('version..2.bin')).toBe('version..2.bin');
+    expect(sanitizeAttachmentFilename('a...b.txt')).toBe('a...b.txt');
+  });
+
+  it('strips control characters', () => {
+    expect(sanitizeAttachmentFilename('test\u0000file.txt')).toBe('testfile.txt');
+    expect(sanitizeAttachmentFilename('foo\u001Fbar.bin')).toBe('foobar.bin');
+    expect(sanitizeAttachmentFilename('name\u007F.txt')).toBe('name.txt');
+  });
+
+  it('truncates excess UTF-8 bytes to 255 and preserves the extension', () => {
+    const long = `${'a'.repeat(500)}.txt`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
+    expect(utf8ByteLength(result)).toBe(255);
+    expect(result.endsWith('.txt')).toBe(true);
+  });
+
+  it('truncates a multibyte filename to at most 255 bytes without unpaired surrogates', () => {
+    // 🌟 is U+1F31F, encoded as surrogate pair \uD83C\uDF1F, 4 UTF-8 bytes each
+    const star = '🌟';
+    const long = star.repeat(300);
+    const result = sanitizeAttachmentFilename(long);
+    // No unpaired surrogates
+    const hasUnpaired =
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(result);
+    expect(hasUnpaired).toBe(false);
+    // Byte count stays within the bound (each star is 4 UTF-8 bytes)
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
+    // 63 stars × 4 bytes = 252 bytes; 64 × 4 = 256 > 255
+    expect(utf8ByteLength(result)).toBe(252);
+  });
+
+  it('preserves the extension when truncating a multibyte filename', () => {
+    // 日本語 = 3 CJK chars, each 3 UTF-8 bytes = 9 bytes per unit
+    const cjk = '日本語';
+    // 30 repetitions = 270 bytes for name, extension "txt" = 3 bytes, dot = 1 byte
+    // Budget: 255 - 3 - 1 = 251 bytes for name → 251 / 9 = 27 full chars = 243 bytes
+    const long = `${cjk.repeat(30)}.txt`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
+    expect(result.endsWith('.txt')).toBe(true);
+  });
+
+  it('preserves the extension for an extreme emoji name', () => {
+    // 4 UTF-8 bytes
+    const rocket = '🚀';
+    const long = `${rocket.repeat(100)}.pdf`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
+    expect(result.endsWith('.pdf')).toBe(true);
+    // No unpaired surrogates
+    const hasUnpaired =
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(result);
+    expect(hasUnpaired).toBe(false);
+  });
+
+  it('truncates without an extension when none is present', () => {
+    // CJK-only filename, no dot → no extension to preserve
+    const long = '日'.repeat(200);
+    const result = sanitizeAttachmentFilename(long);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
+    // 85 × 3 = 255 bytes exactly
+    expect(utf8ByteLength(result)).toBe(255);
+    expect(result.includes('.')).toBe(false);
+  });
+
+  it('falls back when no complete stem code point fits in the name budget', () => {
+    // ñ is U+00F1, 2 UTF-8 bytes. Extension is 253 ASCII bytes.
+    // Total: 2 + 1 + 253 = 256 > 255. nameBudget = 255 - 253 - 1 = 1.
+    // The 2-byte stem does not fit in 1 byte, so the truncated name is
+    // empty. The result must NOT be ".a…a" — a leading-dot name.
+    const ext253 = 'a'.repeat(253);
+    const long = `ñ.${ext253}`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(utf8ByteLength(result)).toBeLessThanOrEqual(255);
+    // Must not start with a dot
+    expect(result.startsWith('.')).toBe(false);
+    // The stem ñ (2 bytes) + dot (1 byte) + 252 'a' chars = 255 bytes
+    expect(utf8ByteLength(result)).toBe(255);
+    expect(result.startsWith('ñ.')).toBe(true);
+  });
+
+  it('preserves extension from a safe ASCII name at the byte boundary', () => {
+    // 251 'a' + '.txt' = 251 + 1 + 3 = 255 bytes
+    const long = `${'a'.repeat(300)}.txt`;
+    const result = sanitizeAttachmentFilename(long);
+    expect(utf8ByteLength(result)).toBe(255);
+    expect(result).toBe(`${'a'.repeat(251)}.txt`);
+  });
+
+  it('returns safe fallback for empty input', () => {
+    expect(sanitizeAttachmentFilename('')).toBe('file.bin');
+  });
+
+  it('preserves whitespace-only filenames', () => {
+    // Spaces are above control range so they survive. The CLI handles
+    // whitespace-only filenames.
+    expect(sanitizeAttachmentFilename('   ')).toBe('   ');
+  });
+
+  it('returns safe fallback for control-char-only input', () => {
+    expect(sanitizeAttachmentFilename('\u0000\u0001\u0002')).toBe('file.bin');
+    expect(sanitizeAttachmentFilename('\u001F\u007F')).toBe('file.bin');
+  });
+
+  it('preserves trailing dots', () => {
+    expect(sanitizeAttachmentFilename('data.')).toBe('data.');
+    expect(sanitizeAttachmentFilename('something....')).toBe('something....');
   });
 });
 
@@ -97,24 +255,24 @@ describe('classifyAttachment', () => {
     }
   });
 
-  it('rejects a file over the 5 MB cap', () => {
-    expect(classifyAttachment({ name: 'big.pdf', size: 6 * 1024 * 1024 })).toEqual({
+  it('rejects a file over the 20 MB cap', () => {
+    expect(classifyAttachment({ name: 'big.pdf', size: 21 * 1024 * 1024 })).toEqual({
       ok: false,
       reason: 'too-large',
     });
   });
 
-  it('accepts a file exactly at the 5 MB cap', () => {
-    expect(classifyAttachment({ name: 'edge.pdf', size: 5 * 1024 * 1024 })).toEqual({
+  it('accepts a file exactly at the 20 MB cap', () => {
+    expect(classifyAttachment({ name: 'edge.pdf', size: 20 * 1024 * 1024 })).toEqual({
       ok: true,
       kind: 'document',
       extension: 'pdf',
-      size: 5 * 1024 * 1024,
+      size: 20 * 1024 * 1024,
     });
   });
 
-  it('checks the deny list before the size cap (a 5 MB .exe is denied, not too-large)', () => {
-    expect(classifyAttachment({ name: 'big.exe', size: 5 * 1024 * 1024 + 1 })).toEqual({
+  it('checks the deny list before the size cap (a 20 MB .exe is denied, not too-large)', () => {
+    expect(classifyAttachment({ name: 'big.exe', size: 20 * 1024 * 1024 + 1 })).toEqual({
       ok: false,
       reason: 'denied',
     });
@@ -146,7 +304,7 @@ describe('describeClassificationFailure', () => {
   it('returns the locked copy for each reason', () => {
     expect(describeClassificationFailure('denied')).toMatch(/can't be attached/i);
     expect(describeClassificationFailure('empty')).toMatch(/empty/i);
-    expect(describeClassificationFailure('too-large')).toMatch(/5 MB/);
+    expect(describeClassificationFailure('too-large')).toMatch(/20 MB/);
     expect(describeClassificationFailure('unreadable')).toBe("Couldn't read this file");
   });
 });

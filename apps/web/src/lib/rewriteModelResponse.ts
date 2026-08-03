@@ -11,6 +11,7 @@ import { db } from '@/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
+import { sanitizeJsonbValue } from '@/lib/sanitize-jsonb';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
@@ -109,9 +110,9 @@ async function createRequestLogCapture(
           status_code: status,
           model,
           provider,
-          request: request.body,
+          request: sanitizeJsonbValue(request.body),
           response: responseText,
-          error,
+          error: sanitizeJsonbValue(error),
         })
         .returning({ id: api_request_log.id });
       logExceptInTest(
@@ -159,7 +160,6 @@ type ResponseReadError = {
   errorType: 'timeout' | 'upstream_disconnect';
   /** Already carries the request id suffix when one is available. */
   message: string;
-  vercelRequestId?: string;
 };
 
 const STREAM_PROGRESS_LOG_INTERVAL_MS = 30_000;
@@ -182,6 +182,20 @@ function createStreamProgressLogger() {
   };
 }
 
+function logTerminalStreamEvent(
+  kind: GatewayRequest['kind'],
+  eventType: string,
+  generationId: string | undefined,
+  vercelRequestId: string | null | undefined
+) {
+  logExceptInTest('[rewriteModelResponse] received terminal stream event', {
+    kind,
+    eventType,
+    generationId: generationId ?? '<none>',
+    vercelRequestId: vercelRequestId ?? '<none>',
+  });
+}
+
 function getResponseReadError(
   error: unknown,
   vercelRequestId: string | null | undefined
@@ -194,10 +208,9 @@ function getResponseReadError(
     return {
       errorType: 'upstream_disconnect',
       message: withRequestId(
-        'The upstream provider disconnected while sending the response.',
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.',
         vercelRequestId
       ),
-      vercelRequestId: vercelRequestId ?? undefined,
     };
   }
 
@@ -208,7 +221,6 @@ function getResponseReadError(
         'The upstream provider timed out while sending the response.',
         vercelRequestId
       ),
-      vercelRequestId: vercelRequestId ?? undefined,
     };
   }
 
@@ -239,9 +251,6 @@ async function readResponseText(
           error: responseReadError.message,
           error_type: responseReadError.errorType,
           message: responseReadError.message,
-          ...(responseReadError.vercelRequestId && {
-            vercel_request_id: responseReadError.vercelRequestId,
-          }),
         },
         { status: 503, headers }
       ),
@@ -249,25 +258,31 @@ async function readResponseText(
   }
 }
 
+function partialCapturedBody(capturedChunks: string[] | null): string | undefined {
+  return capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined;
+}
+
 async function rewriteSseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   parser: ReturnType<typeof createParser>,
   controller: ReadableStreamDefaultController<string>,
   doneReceived: () => boolean,
+  terminalEventReceived: () => boolean,
   serializeError: (error: ResponseReadError) => string,
   onFinally: () => void,
   vercelRequestId: string | null | undefined,
-  capture: RequestLogCapture | null
+  capture: RequestLogCapture | null,
+  capturedChunks: string[] | null
 ) {
   const decoder = new TextDecoder();
-  // Accumulate the raw upstream text for request logging while the stream is
-  // being processed anyway, so it doesn't have to be processed a second time.
-  const capturedChunks: string[] | null = capture ? [] : null;
   const settleReadError = (error: unknown) =>
-    capture?.setReadError(
-      error,
-      capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined
-    );
+    capture?.setReadError(error, partialCapturedBody(capturedChunks));
+  const settleBody = () => {
+    if (capturedChunks) {
+      capturedChunks.push(decoder.decode());
+      capture?.setBody(capturedChunks.join(''));
+    }
+  };
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -279,15 +294,29 @@ async function rewriteSseStream(
           controller.enqueue('data: [DONE]\n\n');
         }
         controller.close();
-        if (capturedChunks) {
-          capturedChunks.push(decoder.decode());
-          capture?.setBody(capturedChunks.join(''));
-        }
+        settleBody();
         return;
       }
       const chunk = decoder.decode(value, { stream: true });
       capturedChunks?.push(chunk);
       parser.feed(chunk);
+      if (terminalEventReceived()) {
+        if (doneReceived()) {
+          controller.enqueue('data: [DONE]\n\n');
+        }
+        const cancellation = reader.cancel();
+        controller.close();
+        settleBody();
+        try {
+          await cancellation;
+        } catch (error) {
+          errorExceptInTest(
+            '[rewriteModelResponse] failed to cancel terminal upstream stream',
+            error
+          );
+        }
+        return;
+      }
     }
   } catch (error) {
     const responseReadError = getResponseReadError(error, vercelRequestId);
@@ -363,6 +392,11 @@ export async function rewriteModelResponse_ChatCompletions(
     });
   }
 
+  // Accumulate the raw upstream text for request logging while the stream is
+  // being processed anyway, so it doesn't have to be processed a second time.
+  // Shared with the stream's cancel() callback so a client disconnect still
+  // logs the partially received response body.
+  const capturedChunks: string[] | null = capture ? [] : null;
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -373,12 +407,17 @@ export async function rewriteModelResponse_ChatCompletions(
       }
 
       let doneReceived = false;
+      let terminalEventReceived = false;
       let generationId: string | undefined;
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          if (doneReceived || terminalEventReceived) {
+            return;
+          }
           progress.eventProcessed();
           if (event.data === '[DONE]') {
+            logTerminalStreamEvent('chat_completions', event.data, generationId, vercelRequestId);
             doneReceived = true;
             return;
           }
@@ -410,8 +449,15 @@ export async function rewriteModelResponse_ChatCompletions(
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+          terminalEventReceived = 'error' in json && json.error != null;
+          if (terminalEventReceived) {
+            logTerminalStreamEvent('chat_completions', 'error', generationId, vercelRequestId);
+          }
         },
         onComment() {
+          if (doneReceived || terminalEventReceived) {
+            return;
+          }
           controller.enqueue(': KILO PROCESSING\n\n');
         },
       });
@@ -421,6 +467,7 @@ export async function rewriteModelResponse_ChatCompletions(
         parser,
         controller,
         () => doneReceived,
+        () => doneReceived || terminalEventReceived,
         responseReadError =>
           'data: ' +
           JSON.stringify({
@@ -429,19 +476,20 @@ export async function rewriteModelResponse_ChatCompletions(
               code: 503,
               message: responseReadError.message,
               type: responseReadError.errorType,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',
         progress.stop,
         vercelRequestId,
-        capture
+        capture,
+        capturedChunks
       );
     },
     cancel() {
-      capture?.setReadError(new Error('response stream was cancelled'));
+      capture?.setReadError(
+        new Error('response stream was cancelled'),
+        partialCapturedBody(capturedChunks)
+      );
     },
   });
 
@@ -467,6 +515,11 @@ type MessagesApiMessageDelta = {
   type: 'message_delta';
   usage: MessagesApiUsage;
   delta: Anthropic.Messages.MessageDeltaEvent['delta'];
+};
+
+type MessagesApiError = {
+  type: 'error';
+  error: unknown;
 };
 
 function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
@@ -516,6 +569,11 @@ export async function rewriteModelResponse_Messages(
     });
   }
 
+  // Accumulate the raw upstream text for request logging while the stream is
+  // being processed anyway, so it doesn't have to be processed a second time.
+  // Shared with the stream's cancel() callback so a client disconnect still
+  // logs the partially received response body.
+  const capturedChunks: string[] | null = capture ? [] : null;
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -526,18 +584,24 @@ export async function rewriteModelResponse_Messages(
       }
 
       let doneReceived = false;
+      let terminalEventReceived = false;
       let generationId: string | undefined;
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          if (doneReceived || terminalEventReceived) {
+            return;
+          }
           progress.eventProcessed();
           if (event.data === '[DONE]') {
+            logTerminalStreamEvent('messages', event.data, generationId, vercelRequestId);
             doneReceived = true;
             return;
           }
           const json = JSON.parse(event.data) as
             | MessagesApiMessageStart
             | MessagesApiMessageDelta
+            | MessagesApiError
             | Anthropic.Messages.MessageStreamEvent;
 
           if (json.type === 'message_start') {
@@ -563,8 +627,15 @@ export async function rewriteModelResponse_Messages(
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+          terminalEventReceived = json.type === 'message_stop' || json.type === 'error';
+          if (terminalEventReceived) {
+            logTerminalStreamEvent('messages', json.type, generationId, vercelRequestId);
+          }
         },
         onComment() {
+          if (doneReceived || terminalEventReceived) {
+            return;
+          }
           controller.enqueue(': KILO PROCESSING\n\n');
         },
       });
@@ -574,6 +645,7 @@ export async function rewriteModelResponse_Messages(
         parser,
         controller,
         () => doneReceived,
+        () => doneReceived || terminalEventReceived,
         responseReadError =>
           'event: error\n' +
           'data: ' +
@@ -584,19 +656,20 @@ export async function rewriteModelResponse_Messages(
               type: 'api_error',
               message: responseReadError.message,
               error_type: responseReadError.errorType,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',
         progress.stop,
         vercelRequestId,
-        capture
+        capture,
+        capturedChunks
       );
     },
     cancel() {
-      capture?.setReadError(new Error('response stream was cancelled'));
+      capture?.setReadError(
+        new Error('response stream was cancelled'),
+        partialCapturedBody(capturedChunks)
+      );
     },
   });
 
@@ -652,6 +725,11 @@ export async function rewriteModelResponse_Responses(
     });
   }
 
+  // Accumulate the raw upstream text for request logging while the stream is
+  // being processed anyway, so it doesn't have to be processed a second time.
+  // Shared with the stream's cancel() callback so a client disconnect still
+  // logs the partially received response body.
+  const capturedChunks: string[] | null = capture ? [] : null;
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -662,13 +740,18 @@ export async function rewriteModelResponse_Responses(
       }
 
       let doneReceived = false;
+      let terminalEventReceived = false;
       let generationId: string | undefined;
       let nextSequenceNumber = 0;
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          if (doneReceived || terminalEventReceived) {
+            return;
+          }
           progress.eventProcessed();
           if (event.data === '[DONE]') {
+            logTerminalStreamEvent('responses', event.data, generationId, vercelRequestId);
             doneReceived = true;
             return;
           }
@@ -690,8 +773,19 @@ export async function rewriteModelResponse_Responses(
           }
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+          terminalEventReceived =
+            json.type === 'response.completed' ||
+            json.type === 'response.incomplete' ||
+            json.type === 'response.failed' ||
+            json.type === 'error';
+          if (terminalEventReceived) {
+            logTerminalStreamEvent('responses', json.type, generationId, vercelRequestId);
+          }
         },
         onComment() {
+          if (doneReceived || terminalEventReceived) {
+            return;
+          }
           controller.enqueue(': KILO PROCESSING\n\n');
         },
       });
@@ -701,6 +795,7 @@ export async function rewriteModelResponse_Responses(
         parser,
         controller,
         () => doneReceived,
+        () => doneReceived || terminalEventReceived,
         responseReadError =>
           'event: error\n' +
           'data: ' +
@@ -712,19 +807,20 @@ export async function rewriteModelResponse_Responses(
               type: responseReadError.errorType,
               code: responseReadError.errorType === 'timeout' ? '504' : '503',
               message: responseReadError.message,
-              ...(responseReadError.vercelRequestId && {
-                vercel_request_id: responseReadError.vercelRequestId,
-              }),
             },
           }) +
           '\n\n',
         progress.stop,
         vercelRequestId,
-        capture
+        capture,
+        capturedChunks
       );
     },
     cancel() {
-      capture?.setReadError(new Error('response stream was cancelled'));
+      capture?.setReadError(
+        new Error('response stream was cancelled'),
+        partialCapturedBody(capturedChunks)
+      );
     },
   });
 

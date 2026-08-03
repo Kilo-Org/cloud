@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { useOrganization } from '@/lib/organization-context';
 
 // kilocode_change - K1/C2: the pure classifier/spawner logic lives in
 // `remote-instance-spawn-classifier.ts`, a separate module with no React
@@ -11,11 +12,16 @@ import { useUserWebConnection } from '@/components/agents/user-web-connection-pr
 // RN/Expo config transitively, which is why the split exists — see that
 // file's header comment for the full explanation.
 import {
+  buildCreateRemoteSessionInput,
+  type CreateRemoteSessionInput,
   type CreateSessionOutcome,
   createSessionSpawner,
+  mergeSpawnOrganizationId,
+  resolveSpawnOrganizationId,
 } from './remote-instance-spawn-classifier';
 
-export type { CreateSessionOutcome };
+export type { CreateRemoteSessionInput, CreateSessionOutcome };
+export { buildCreateRemoteSessionInput };
 
 export type RemoteInstanceSpawnStatus =
   | { status: 'idle' }
@@ -32,21 +38,36 @@ export type RemoteInstanceSpawnStatus =
  * status in component state so UI can re-render on each attempt. The
  * underlying SDK call is one-shot per `spawn()` call — no in-hook retry
  * loop, no toast, no debouncing; the caller drives those.
+ *
+ * `organizationId` tri-state:
+ *   - omitted (`undefined`) — inherit live `useOrganization()` (share-gate
+ *     and other zero-arg callers that intentionally follow global context)
+ *   - `null` — explicitly personal; never attribute to context org (wins
+ *     over a later context switch after the route froze personal)
+ *   - `string` — that org id
+ *
+ * Explicit `opts.orgId` on `spawn()` still wins when the caller sets it.
  */
-export function useRemoteInstanceSpawn(): {
+export function useRemoteInstanceSpawn(organizationId?: string | null): {
   status: RemoteInstanceSpawnStatus;
-  spawn: (connectionId: string) => Promise<CreateSessionOutcome>;
+  spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
 } {
   const connection = useUserWebConnection();
+  const { organizationId: contextOrganizationId } = useOrganization();
+  const resolvedOrganizationId = resolveSpawnOrganizationId(organizationId, contextOrganizationId);
   const [status, setStatus] = useState<RemoteInstanceSpawnStatus>({ status: 'idle' });
 
   // Re-create the spawner only when the connection reference changes
   // (provider mounts once, so this is effectively a singleton).
   const spawner = useMemo(() => createSessionSpawner(connection), [connection]);
 
-  const spawn = async (connectionId: string): Promise<CreateSessionOutcome> => {
+  const spawn = async (
+    connectionId: string,
+    opts?: CreateRemoteSessionInput
+  ): Promise<CreateSessionOutcome> => {
     setStatus({ status: 'inFlight' });
-    const outcome = await spawner.spawn(connectionId);
+    const merged = mergeSpawnOrganizationId(opts, resolvedOrganizationId);
+    const outcome = await spawner.spawn(connectionId, merged);
     setStatus({ ...outcome, creationKey: spawner.creationKey });
     return outcome;
   };

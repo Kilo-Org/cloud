@@ -1,5 +1,4 @@
 import { describe, expect, it } from '@jest/globals';
-import { OPENROUTER_GPT56_PROMO_MODEL_IDS } from '@/lib/ai-gateway/providers/openai';
 import {
   getModelDisplayPricing,
   undoPricingDiscount,
@@ -44,23 +43,23 @@ describe('undoPricingDiscount', () => {
   });
 });
 
-describe('OpenRouter GPT-5.6 promotion', () => {
-  const discountedPricing = {
-    prompt: '0.000001',
-    completion: '0.000004',
-    input_cache_read: '0.0000001',
-    discount: 0.5,
-  };
-
-  it.each(OPENROUTER_GPT56_PROMO_MODEL_IDS)('preserves discounted pricing for %s', modelId => {
-    expect(getModelDisplayPricing(modelId, discountedPricing)).toBe(discountedPricing);
-  });
-
-  it('continues to undo endpoint discounts for other models', () => {
-    expect(getModelDisplayPricing('openai/gpt-5.6-sol', discountedPricing)).toEqual({
+describe('getModelDisplayPricing', () => {
+  it('undoes endpoint discounts', () => {
+    expect(
+      getModelDisplayPricing({
+        prompt: '0.000001',
+        completion: '0.000004',
+        input_cache_read: '0.0000001',
+        discount: 0.5,
+      })
+    ).toEqual({
       prompt: '0.000002000000',
       completion: '0.000008000000',
       input_cache_read: '0.000000200000',
     });
+  });
+
+  it('returns undefined when there is no pricing', () => {
+    expect(getModelDisplayPricing(undefined)).toBeUndefined();
   });
 });

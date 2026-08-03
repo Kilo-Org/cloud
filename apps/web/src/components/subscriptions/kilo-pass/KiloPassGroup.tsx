@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Crown } from 'lucide-react';
+import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { useTRPC } from '@/lib/trpc/utils';
 import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
@@ -101,7 +101,7 @@ export function KiloPassGroup({
     <SubscriptionGroup
       title="Kilo Pass"
       description="Manage your Kilo Pass subscription and credit entitlements."
-      headerIcon={<Crown className="size-5" />}
+      headerIcon={<KiloPassIcon className="size-5" />}
       isLoading={query.isLoading}
       isError={query.isError}
       error={query.error}
@@ -112,7 +112,7 @@ export function KiloPassGroup({
     >
       {shouldShowSubscription && subscriptionDisplay && providerManagement ? (
         <SubscriptionCard
-          icon={<Crown className="size-5" />}
+          icon={<KiloPassIcon className="size-5" />}
           title={`Kilo Pass ${formatKiloPassTierLabel(subscription.tier)}`}
           subtitle={`${formatKiloPassTierLabel(subscription.tier)} tier • ${formatKiloPassCadenceLabel(subscription.cadence)}`}
           status={subscriptionDisplay.status}

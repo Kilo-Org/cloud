@@ -236,6 +236,7 @@ const REVIEW_THREADS_QUERY = /* GraphQL */ `
                 databaseId
                 id
                 body
+                diffHunk
                 createdAt
                 author {
                   login
@@ -405,6 +406,7 @@ type GraphQlCommentNode = {
   databaseId: number;
   id: string;
   body: string;
+  diffHunk?: string | null;
   createdAt: string;
   author: { login: string; avatarUrl: string } | null;
   reactionGroups: GraphQlReactionGroup[];
@@ -840,6 +842,7 @@ export const githubPrReviewRouter = createTRPCRouter({
               originalLine: node.originalLine,
               originalStartLine: node.originalStartLine,
               diffSide: node.diffSide,
+              diffHunk: node.comments.nodes[0]?.diffHunk ?? null,
               comments,
             };
           })

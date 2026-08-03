@@ -19,6 +19,15 @@ export function SheetHeader({
     // flattened header breaks that native pass and the list paints over it.
     <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
       <View className="h-11 flex-row items-center justify-center">
+        <View className="flex-1 px-24">
+          <Text
+            className="text-center text-lg font-semibold text-foreground"
+            numberOfLines={1}
+            accessibilityRole="header"
+          >
+            {title}
+          </Text>
+        </View>
         {onCancel ? (
           <Pressable
             onPress={onCancel}
@@ -30,9 +39,6 @@ export function SheetHeader({
             <Text className="text-base font-medium text-foreground">Cancel</Text>
           </Pressable>
         ) : null}
-        <Text className="text-lg font-semibold text-foreground" accessibilityRole="header">
-          {title}
-        </Text>
         <Pressable
           onPress={onDone}
           hitSlop={8}

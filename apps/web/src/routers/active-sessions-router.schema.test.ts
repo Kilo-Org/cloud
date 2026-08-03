@@ -62,6 +62,35 @@ describe('activeSessionSchema capabilities', () => {
     }
   });
 
+  it('accepts optional lastActivityAt as a raw DB timestamp string', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+      lastActivityAt: '2026-07-20 08:00:00+00',
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.lastActivityAt).toBe('2026-07-20 08:00:00+00');
+    }
+  });
+
+  it('accepts a session row without lastActivityAt', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.lastActivityAt).toBeUndefined();
+    }
+  });
+
   it('rejects a non-boolean capabilities.attachments value', () => {
     const row = {
       id: 's1',
@@ -89,5 +118,62 @@ describe('activeSessionSchema capabilities', () => {
     if (result.success) {
       expect(result.data.capabilities).toEqual({});
     }
+  });
+});
+
+describe('activeSessionSchema totalCostMicrodollars', () => {
+  it('accepts a session row with totalCostMicrodollars as a number', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+      totalCostMicrodollars: 12_000_000,
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.totalCostMicrodollars).toBe(12_000_000);
+    }
+  });
+
+  it('accepts a session row with totalCostMicrodollars as zero', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+      totalCostMicrodollars: 0,
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.totalCostMicrodollars).toBe(0);
+    }
+  });
+
+  it('accepts a session row without totalCostMicrodollars', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+    };
+    const result = activeSessionSchema.safeParse(row);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.totalCostMicrodollars).toBeUndefined();
+    }
+  });
+
+  it('rejects a non-number totalCostMicrodollars value', () => {
+    const row = {
+      id: 's1',
+      status: 'busy',
+      title: 'Fix bug',
+      connectionId: 'cli-1',
+      totalCostMicrodollars: '12000',
+    };
+    expect(activeSessionSchema.safeParse(row).success).toBe(false);
   });
 });

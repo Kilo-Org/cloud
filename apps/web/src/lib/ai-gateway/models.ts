@@ -17,7 +17,6 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
@@ -25,11 +24,11 @@ import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { gemma_4_26b_a4b_it_free_model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { QWEN37_PLUS_MODEL_ID, qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exclusive';
-import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import {
   deepseek_v4_pro_discounted_model,
@@ -42,6 +41,7 @@ export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 export const autoFreeModels = [
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
   'inclusionai/ling-3.0-flash:free',
+  'poolside/laguna-s-2.1:free',
 ].filter(m => m !== null);
 
 export const preferredModels = [
@@ -87,8 +87,6 @@ export function isKiloExclusiveModel(model: string): boolean {
 
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
-  seed_20_code_free_model,
-  kat_coder_pro_v2_5_free_model,
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
   gpt_5_6_sol_stealth_model,
@@ -98,6 +96,7 @@ export const kiloExclusiveModels = [
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
   stepfun_37_flash_free_model,
+  tencent_hy3_free_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {

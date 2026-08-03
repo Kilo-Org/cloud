@@ -96,6 +96,7 @@ import {
 } from '@/lib/cost-insights/canonical-sources';
 import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
+import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
 
 const posthogClient = PostHogClient();
 
@@ -440,6 +441,7 @@ type UsageStatementExecutor = Pick<DrizzleTransaction, 'execute'>;
 
 type UsageStatementResult = UsageRecordInsertResult & {
   kiloPassThreshold: number | null;
+  organizationUsage?: OrganizationUsageMutationResult;
 };
 
 type UsageTransactionResult = {
@@ -484,6 +486,21 @@ async function insertUsageTransaction(
       coreUsageFields,
       metadataFields
     );
+    if (coreUsageFields.organization_id) {
+      if (coreUsageFields.cost > 0) {
+        const consumption = await recordOrganizationConsumption(tx, {
+          organizationId: coreUsageFields.organization_id,
+          kiloUserId: coreUsageFields.kilo_user_id,
+          amountMicrodollars: coreUsageFields.cost,
+          occurredAt: coreUsageFields.created_at,
+          source: 'ai-gateway',
+          sourceId: coreUsageFields.id,
+        });
+        inserted.organizationUsage = consumption.organizationUsage;
+      } else if (coreUsageFields.cost < 0) {
+        inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
+      }
+    }
     if (coreUsageFields.cost !== 0) {
       await enqueueDailyUsageRollupRepair(tx, {
         usageId: coreUsageFields.id,
@@ -572,18 +589,16 @@ function scheduleCostInsightEvaluationSafely(
   }
 }
 
-function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostCommitTask | null {
+function organizationUsageMutationTask(
+  usage: MicrodollarUsage,
+  result: UsageStatementResult
+): BestEffortPostCommitTask | null {
   const organizationId = usage.organization_id;
-  if (!organizationId) return null;
+  const organizationUsage = result.organizationUsage;
+  if (!organizationId || !organizationUsage) return null;
 
   return {
-    run: async () => {
-      const result: OrganizationUsageMutationResult = await db.transaction(async tx => {
-        await setCostInsightCaptureTimeouts(tx);
-        return mutateOrganizationUsage(tx, usage);
-      });
-      scheduleOrganizationLowBalanceAlert(organizationId, result);
-    },
+    run: async () => scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage),
     reportError: error => {
       reportPostCommitFailure(
         'post-commit organization usage mutation failed',
@@ -648,10 +663,11 @@ function costInsightSpendCaptureTask(
 
 async function runPostCommitUsageWork(
   usage: MicrodollarUsage,
-  metadataFields: UsageMetaData
+  metadataFields: UsageMetaData,
+  result: UsageStatementResult
 ): Promise<void> {
   const tasks = [
-    organizationUsageMutationTask(usage),
+    organizationUsageMutationTask(usage, result),
     costInsightSpendCaptureTask(usage, metadataFields),
   ].filter(task => task !== null);
   await runBestEffortPostCommitTasks(tasks);
@@ -717,7 +733,7 @@ export async function insertUsageRecord(
       }
     );
 
-    await runPostCommitUsageWork(coreUsageFields, metadataFields);
+    await runPostCommitUsageWork(coreUsageFields, metadataFields, result.inserted);
     scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);
     return {
       usageId: result.inserted.usageId,
@@ -1253,11 +1269,19 @@ export async function processTokenData(
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
     if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
+      // The provider's generation lookup and the response's own usage payload should
+      // yield the same cost. A mismatch means inconsistent token or pricing data from
+      // the provider; the generation lookup values win (see assignment below).
       console.warn(
-        `DEV ODDITY / WARNING: Usage stats do not match generation data:`,
-        genStats.model,
-        [genStats.cost_mUsd, usageStats.cost_mUsd],
-        [genStats.cacheDiscount_mUsd, usageStats.cacheDiscount_mUsd]
+        'Cost from provider generation lookup differs from cost computed from response usage data:',
+        {
+          model: genStats.model,
+          cost_mUsd: { generation: genStats.cost_mUsd, response: usageStats.cost_mUsd },
+          cacheDiscount_mUsd: {
+            generation: genStats.cacheDiscount_mUsd,
+            response: usageStats.cacheDiscount_mUsd,
+          },
+        }
       );
     }
     usageStats = genStats;

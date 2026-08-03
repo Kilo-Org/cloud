@@ -266,6 +266,52 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     // blob could never be lazily fetched — it keeps a normal full clone.
     const cloneCall = gitCalls.find(args => args[0] === 'clone');
     expect(cloneCall).not.toContain('--filter=blob:none');
+    // The raw-token origin is stripped to a credential-free URL.
+    expect(gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(true);
+  });
+
+  it('uses a blobless clone and keeps the capability origin for a contained Bitbucket review session', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://bitbucket.org/acme/repo.git',
+      token: 'kbb1.opaque-capability',
+      platform: 'bitbucket',
+    };
+    request.workspace.branchName = 'feature/login';
+
+    const gitCalls: string[][] = [];
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          gitCalls.push(args);
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    // A capability origin stays authenticated through the outbound interceptor,
+    // so the clone is blobless and the origin is NOT stripped.
+    expect(gitCalls.find(args => args[0] === 'clone')).toContain('--filter=blob:none');
+    expect(gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(false);
   });
 
   it('uses a blobless partial clone for GitLab review sessions', async () => {
@@ -387,6 +433,181 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(cloneArgs.length).toBe(2);
     expect(cloneArgs[0]).toContain('--filter=blob:none');
     expect(cloneArgs[1]).not.toContain('--filter=blob:none');
+  });
+
+  it('reports blobless clone telemetry with size proxies parsed from git progress', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return {
+              stdout: '',
+              stderr: [
+                'remote: Enumerating objects: 1234, done.',
+                'remote: Total 1234 (delta 456), reused 1000 (delta 300), pack-reused 0',
+                'Receiving objects: 100% (1234/1234), 1.50 MiB | 12.34 MiB/s, done.',
+              ].join('\n'),
+              exitCode: 0,
+            };
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          if (args[0] === 'config' && args.includes('remote.origin.promisor')) {
+            return { stdout: 'true\n', stderr: '', exitCode: 0 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(result.clone?.mode).toBe('blobless');
+    expect(result.clone?.attempts).toBe(1);
+    expect(result.clone?.filterRejected).toBe(false);
+    expect(result.clone?.repoKind).toBe('github');
+    expect(result.clone?.repoPlatform).toBe('github');
+    expect(result.clone?.shallow).toBe(false);
+    expect(result.clone?.totalObjects).toBe(1234);
+    expect(result.clone?.receivedBytes).toBe(1.5 * 1024 * 1024);
+  });
+
+  it('downgrades to full mode when a blobless clone succeeds but the server silently ignored the filter', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return { stdout: '', stderr: '', exitCode: 0 };
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          if (args[0] === 'config' && args.includes('remote.origin.promisor')) {
+            // Server ignored --filter=blob:none: no promisor remote was configured.
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(result.clone?.mode).toBe('full');
+    expect(result.clone?.attempts).toBe(1);
+    expect(result.clone?.filterRejected).toBe(false);
+  });
+
+  it('reports blobless_fallback telemetry when the server rejects the filter', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            if (args.includes('--filter=blob:none')) {
+              return { stdout: '', stderr: 'fatal: filter blob:none not supported', exitCode: 128 };
+            }
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return { stdout: '', stderr: '', exitCode: 0 };
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(result.clone?.mode).toBe('blobless_fallback');
+    expect(result.clone?.attempts).toBe(2);
+    expect(result.clone?.filterRejected).toBe(true);
+  });
+
+  it('reports full clone telemetry for sessions that are not blobless eligible', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.env.KILO_PLATFORM = 'code-review';
+    request.materialized.setupCommands = [];
+    request.repo = {
+      kind: 'git',
+      url: 'https://bitbucket.org/acme/repo.git',
+      token: 'bb-token',
+      platform: 'bitbucket',
+    };
+    request.workspace.branchName = 'feature/login';
+
+    const result = await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(result.clone?.mode).toBe('full');
+    expect(result.clone?.attempts).toBe(1);
+    expect(result.clone?.filterRejected).toBe(false);
+    expect(result.clone?.repoKind).toBe('git');
+    expect(result.clone?.repoPlatform).toBe('bitbucket');
+    // git reported no progress counters, so the size proxies stay absent
+    // rather than defaulting to a misleading zero.
+    expect(result.clone?.totalObjects).toBeUndefined();
+    expect(result.clone?.receivedBytes).toBeUndefined();
   });
 
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {
@@ -1666,9 +1887,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     };
 
-    // Stream 6 MiB of bytes (one more than the 5 MiB + 1 cap) so the
+    // Stream 21 MiB of bytes (one more than the 20 MiB + 1 cap) so the
     // bounded reader triggers the overflow branch deterministically.
-    const total = 6 * 1024 * 1024;
+    const total = 21 * 1024 * 1024;
     const chunk = new Uint8Array(64 * 1024);
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -1695,23 +1916,23 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       { type: 'text', text: 'Process this binary' },
       {
         type: 'text',
-        text: 'attachment too-large.bin could not be retrieved (Attachment too large: bytes exceeded the 5 MiB cap)',
+        text: 'attachment too-large.bin could not be retrieved (Attachment too large: bytes exceeded the 20 MiB cap)',
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(false);
   });
 
-  it('materializes a file exactly at the 5 MiB cap as a binary text part', async () => {
-    const localPath = path.join(tmpDir, 'exactly-5-mib.bin');
+  it('materializes a file exactly at the 20 MiB cap as a binary text part', async () => {
+    const localPath = path.join(tmpDir, 'exactly-20-mib.bin');
     const prompt: WrapperPromptRequest = {
       message: {
         id: 'msg_exact',
         prompt: 'Process this file',
         attachments: [
           {
-            filename: 'exactly-5-mib.bin',
+            filename: 'exactly-20-mib.bin',
             mime: 'application/octet-stream',
-            signedUrl: 'https://r2.example.com/exactly-5-mib.bin',
+            signedUrl: 'https://r2.example.com/exactly-20-mib.bin',
             localPath,
           },
         ],
@@ -1726,20 +1947,20 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     };
 
     const result = await materializePromptAttachments(prompt, {
-      fetch: asFetch(async () => new Response(makeByteStream(5 * 1024 * 1024), { status: 200 })),
+      fetch: asFetch(async () => new Response(makeByteStream(20 * 1024 * 1024), { status: 200 })),
     });
 
     expect(result.message.parts).toEqual([
       { type: 'text', text: 'Process this file' },
       {
         type: 'text',
-        text: `binary attachment saved: filename=exactly-5-mib.bin mime=application/octet-stream size=${5 * 1024 * 1024} path=${localPath}`,
+        text: `binary attachment saved: filename=exactly-20-mib.bin mime=application/octet-stream size=${20 * 1024 * 1024} path=${localPath}`,
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(true);
   });
 
-  it('rejects a file one byte over the 5 MiB cap and deletes the partial file', async () => {
+  it('rejects a file one byte over the 20 MiB cap and deletes the partial file', async () => {
     const localPath = path.join(tmpDir, 'one-byte-over.bin');
     const prompt: WrapperPromptRequest = {
       message: {
@@ -1765,7 +1986,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     const result = await materializePromptAttachments(prompt, {
       fetch: asFetch(
-        async () => new Response(makeByteStream(5 * 1024 * 1024 + 1), { status: 200 })
+        async () => new Response(makeByteStream(20 * 1024 * 1024 + 1), { status: 200 })
       ),
     });
 
@@ -1773,7 +1994,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       { type: 'text', text: 'Process this file' },
       {
         type: 'text',
-        text: 'attachment one-byte-over.bin could not be retrieved (Attachment too large: bytes exceeded the 5 MiB cap)',
+        text: 'attachment one-byte-over.bin could not be retrieved (Attachment too large: bytes exceeded the 20 MiB cap)',
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(false);

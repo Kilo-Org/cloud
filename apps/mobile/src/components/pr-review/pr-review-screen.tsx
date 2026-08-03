@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Check, Share as ShareIcon } from 'lucide-react-native';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
@@ -101,6 +101,17 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     });
   }, [pr.data, owner, repo, number]);
 
+  // Share the PR's public GitHub URL via the native share sheet. The URL comes
+  // from the route params, so this works before the PR query resolves; the title
+  // is added once it is known. Fire-and-forget, like the invite-link share in
+  // `invited-member-row.tsx` — cancelling resolves with `dismissedAction`, and a
+  // sheet the platform refuses to present has no actionable recovery.
+  const sharePullRequest = useCallback(() => {
+    const url = `https://github.com/${owner}/${repo}/pull/${number}`;
+    const title = pr.data?.title;
+    void Share.share({ message: title ? `${title}\n${url}` : url });
+  }, [owner, repo, number, pr.data?.title]);
+
   const handleRefresh = useCallback(() => {
     void (async () => {
       setRefreshing(true);
@@ -178,21 +189,31 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         title={`#${number}`}
         eyebrow={`${owner}/${repo}`}
         headerRight={
-          // P1-F-46b: the Submit-review affordance is reachable from the
-          // Overview tab (header right) and the Files tab (floating
-          // action bar). The Discussion tab is intentionally left without
-          // a submit affordance — comment threads there are read-only.
-          tab === 'overview' ? (
-            <Button
-              size="sm"
-              onPress={openReviewSubmit}
-              accessibilityLabel="Submit review"
-              className={cn('px-3')}
+          <View className="flex-row items-center gap-1">
+            <Pressable
+              onPress={sharePullRequest}
+              accessibilityRole="button"
+              accessibilityLabel="Share pull request"
+              className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
             >
-              <Check size={14} color={colors.primaryForeground} />
-              <Text>Submit review</Text>
-            </Button>
-          ) : null
+              <ShareIcon size={18} color={colors.foreground} />
+            </Pressable>
+            {/* P1-F-46b: the Submit-review affordance is reachable from the
+                Overview tab (header right) and the Files tab (floating
+                action bar). The Discussion tab is intentionally left without
+                a submit affordance — comment threads there are read-only. */}
+            {tab === 'overview' ? (
+              <Button
+                size="sm"
+                onPress={openReviewSubmit}
+                accessibilityLabel="Submit review"
+                className={cn('px-3')}
+              >
+                <Check size={14} color={colors.primaryForeground} />
+                <Text>Submit review</Text>
+              </Button>
+            ) : null}
+          </View>
         }
       />
       <View className="px-4 pb-2 pt-3">

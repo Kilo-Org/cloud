@@ -68,6 +68,8 @@ type NewSessionPromptProps = {
   onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
   shareId?: string;
   voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
+  /** Optional initial prompt text seeded into the uncontrolled input once on mount. */
+  initialPrompt?: string;
 };
 
 /**
@@ -100,9 +102,11 @@ export function NewSessionPrompt({
   onPrefillAttachments,
   shareId,
   voiceInputSettlerRef,
+  initialPrompt,
 }: Readonly<NewSessionPromptProps>) {
   const colors = useThemeColors();
-  const promptRef = useRef('');
+  const promptRef = useRef(initialPrompt ?? '');
+  const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
@@ -113,6 +117,11 @@ export function NewSessionPrompt({
     fontSize: 16,
     lineHeight: PROMPT_INPUT_LINE_HEIGHT,
   });
+
+  const promptMeasureSetTextRef = useRef(promptMeasure.setText);
+  useEffect(() => {
+    promptMeasureSetTextRef.current(initialPromptRef.current);
+  }, []);
 
   const handlePromptChange = useCallback(
     (text: string) => {
@@ -188,6 +197,7 @@ export function NewSessionPrompt({
           placeholder="What would you like to work on?"
           placeholderTextColor={colors.mutedForeground}
           multiline
+          defaultValue={initialPrompt}
           className={cn(
             'w-full px-2 py-2 text-base leading-6 text-foreground',
             isCreating && 'opacity-50'

@@ -297,6 +297,23 @@ export async function createOrganization(
   return organization;
 }
 
+/**
+ * When a user joins an organization through SSO or an invitation we should not
+ * ask them how they heard about Kilo. Mark the customer-source survey as
+ * dismissed by setting `customer_source` to an empty string, but only when they
+ * have not already answered or dismissed it (`customer_source IS NULL`) so an
+ * existing answer is never overwritten.
+ */
+export async function skipCustomerSourceSurveyForOrgJoin(
+  userId: User['id'],
+  txn?: DrizzleTransaction
+): Promise<void> {
+  await (txn || db)
+    .update(kilocode_users)
+    .set({ customer_source: '' })
+    .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.customer_source)));
+}
+
 export async function addUserToOrganization(
   organizationId: Organization['id'],
   userId: User['id'],
@@ -338,7 +355,8 @@ async function lockOrganizationMembershipMutation(
 
 export async function addSsoUserToOrganization(
   organizationId: Organization['id'],
-  userId: User['id']
+  userId: User['id'],
+  options?: { isNewUser?: boolean }
 ): Promise<boolean> {
   return db.transaction(async tx => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
@@ -354,7 +372,20 @@ export async function addSsoUserToOrganization(
       .limit(1);
 
     if (removal) return false;
-    return addUserToOrganization(organizationId, userId, 'member', tx);
+    const added = await addUserToOrganization(organizationId, userId, 'member', tx);
+
+    // A brand-new account provisioned through SSO exists only because of the
+    // organization, so it has no standalone personal account. Mirror the
+    // invite-driven signup behavior (acceptOrganizationInvite) and disable it.
+    // Existing users who authenticate through SSO keep their current value.
+    if (added && options?.isNewUser) {
+      await tx
+        .update(kilocode_users)
+        .set({ personal_account_disabled: true })
+        .where(eq(kilocode_users.id, userId));
+    }
+
+    return added;
   });
 }
 
@@ -812,6 +843,10 @@ export async function acceptOrganizationInvite(
         invited_by: invitation.invited_by,
       });
 
+      // Users who join through an invitation should not be asked how they
+      // heard about Kilo.
+      await skipCustomerSourceSurveyForOrgJoin(userId, tx);
+
       // If the invitation predates the account, the account was created after
       // (i.e. because of) a pending invite: this is a brand-new user joining an
       // organization via invite, so disable their personal account. Existing
@@ -971,8 +1006,11 @@ export async function setOrganizationRecommendationsDigestEnabled(
   return row?.settings ?? {};
 }
 
-export async function markOrganizationAsDeleted(organizationId: Organization['id']): Promise<void> {
-  await db
+export async function markOrganizationAsDeleted(
+  organizationId: Organization['id'],
+  txn?: DrizzleTransaction
+): Promise<void> {
+  await (txn ?? db)
     .update(organizations)
     .set({ ...auto_deleted_at })
     .where(eq(organizations.id, organizationId));

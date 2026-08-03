@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   type WrapperBootstrapAttachment,
+  type WrapperCloneTelemetry,
   type WrapperPromptRequest,
   type WrapperPromptPart,
   type WrapperSessionReadyRequest,
@@ -36,7 +37,7 @@ const PROGRESS_UPDATE_INTERVAL_MS = 5_000;
 const SETUP_COMMAND_ERROR_OUTPUT_MAX_BYTES = 4_096;
 const SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES = 1_024;
 const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
-const MAX_ATTACHMENT_BYTES = 5_242_880;
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_ATTACHMENT_DOWNLOAD_BYTES = MAX_ATTACHMENT_BYTES + 1;
 
 function cleanTerminalOutput(text: string): string {
@@ -151,6 +152,9 @@ export type BootstrapProgress = {
 
 export type WrapperBootstrapResult = {
   workspaceWasWarm: boolean;
+  restoredFromBackup: boolean;
+  /** Absent when the workspace was warm and no clone ran. */
+  clone?: WrapperCloneTelemetry;
 };
 
 type GitRunner = (args: string[], opts?: ProcessOptions) => Promise<ExecResult>;
@@ -213,6 +217,43 @@ function gitOperationError(
 
 const GIT_PROGRESS_PATTERN =
   /\b(Receiving objects|Resolving deltas|Updating files|Checking out files|Compressing objects):\s+(\d+)%/g;
+
+// Size proxies straight out of git's own progress output, so measuring clone size
+// costs no extra subprocess:
+//   remote: Total 1234 (delta 456), reused 1000 (delta 300), pack-reused 0
+//   Receiving objects: 100% (1234/1234), 45.67 MiB | 12.34 MiB/s, done.
+const GIT_TOTAL_OBJECTS_PATTERN = /\bTotal\s+(\d+)\b/;
+const GIT_RECEIVED_SIZE_PATTERN =
+  /Receiving objects:\s+100%\s+\([^)]*\),\s+([\d.]+)\s+(bytes|KiB|MiB|GiB)/;
+const BYTE_UNIT_MULTIPLIERS: Record<string, number> = {
+  bytes: 1,
+  KiB: 1024,
+  MiB: 1024 * 1024,
+  GiB: 1024 * 1024 * 1024,
+};
+
+function parseCloneSizeProxies(output: string): {
+  totalObjects?: number;
+  receivedBytes?: number;
+} {
+  // git writes progress with carriage returns and may colorize it.
+  const text = stripAnsi(output).replace(/\r/g, '\n');
+  const proxies: { totalObjects?: number; receivedBytes?: number } = {};
+  const objects = GIT_TOTAL_OBJECTS_PATTERN.exec(text);
+  if (objects) {
+    const parsed = Number.parseInt(objects[1], 10);
+    if (Number.isFinite(parsed)) proxies.totalObjects = parsed;
+  }
+  const size = GIT_RECEIVED_SIZE_PATTERN.exec(text);
+  if (size) {
+    const amount = Number.parseFloat(size[1]);
+    const multiplier = BYTE_UNIT_MULTIPLIERS[size[2]];
+    if (Number.isFinite(amount) && multiplier !== undefined) {
+      proxies.receivedBytes = Math.round(amount * multiplier);
+    }
+  }
+  return proxies;
+}
 
 function gitProgressReporter(
   progress: BootstrapProgress | undefined,
@@ -345,14 +386,30 @@ function isBitbucketReviewSession(
   return isCodeReviewSession(request) && repo?.kind === 'git' && repo.platform === 'bitbucket';
 }
 
+// Wire-format prefix of a Bitbucket outbound session capability (see the
+// git-token-service BitbucketSessionCapabilityCodec). A capability in the origin
+// stays authenticated through the outbound interceptor, unlike a raw token which
+// is stripped after bootstrap.
+const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
+
+function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): boolean {
+  return (
+    isBitbucketReviewSession(request) &&
+    typeof request.repo.token === 'string' &&
+    request.repo.token.startsWith(BITBUCKET_CAPABILITY_PREFIX)
+  );
+}
+
 function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
   if (!isCodeReviewSession(request)) return false;
   const repo = request.repo;
-  // Only GitHub and GitLab: their session origin keeps working credentials via
-  // outbound injection, so blobs deferred by a partial clone can be fetched
-  // lazily during the review. Bitbucket's origin is credential-stripped, and
-  // other/unknown git remotes have no such guarantee, so they keep a full clone.
-  return repo?.kind === 'github' || (repo?.kind === 'git' && repo.platform === 'gitlab');
+  // GitHub/GitLab keep working credentials via outbound injection. Bitbucket
+  // keeps them only when the session uses an outbound capability (a raw-token
+  // origin is credential-stripped after bootstrap). Other/unknown git remotes
+  // have no such guarantee, so they keep a full clone.
+  if (repo?.kind === 'github') return true;
+  if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
+  return hasBitbucketReviewCapability(request);
 }
 
 async function cloneRepository(
@@ -360,7 +417,7 @@ async function cloneRepository(
   runGit: GitRunner,
   progress: BootstrapProgress | undefined,
   signal: AbortSignal
-): Promise<void> {
+): Promise<WrapperCloneTelemetry> {
   const repo = request.repo;
   if (!repo) {
     throw new Error('Session metadata is missing a repository source');
@@ -369,14 +426,14 @@ async function cloneRepository(
   const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
   const platform = repo.kind === 'git' ? repo.platform : 'github';
   const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
-  // GitHub/GitLab code review reads changed files from the working tree and gets
-  // the PR diff from the provider API or a local `git diff <prev>..HEAD`. It needs
-  // the full commit graph but not every historical file blob, so a blobless
-  // partial clone keeps the clone bounded by the current working tree (git fetches
-  // blobs lazily on demand) instead of full history, which on large repositories
-  // otherwise exceeds the clone timeout. Full history is retained, so incremental
-  // diffs and merge-base still work. See isBloblessReviewCloneEligible for why
-  // only GitHub/GitLab qualify.
+  // Code review reads changed files from the working tree and gets the PR diff
+  // from the provider API or a local `git diff <prev>..HEAD`. It needs the full
+  // commit graph but not every historical file blob, so a blobless partial clone
+  // fetches blobs lazily on demand instead of downloading every historical blob,
+  // which on large repositories otherwise exceeds the clone timeout. Full history
+  // is retained, so incremental diffs and merge-base still work. See
+  // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
+  // capability-backed Bitbucket, whose origin stays authenticated for lazy fetch).
   const useBlobless = isBloblessReviewCloneEligible(request);
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {
@@ -396,20 +453,58 @@ async function cloneRepository(
   // Most servers without partial-clone support ignore the filter and full-clone,
   // but some reject it outright. If the blobless attempt failed with a filter
   // error, retry once as a full clone so a review is never lost to the optimization.
+  const startedAt = Date.now();
+  let attempts = 1;
+  let filterRejected = false;
   let result = await runClone(useBlobless);
   if (
     useBlobless &&
     result.exitCode !== 0 &&
     /filter/i.test(`${result.stderr}\n${result.stdout}`)
   ) {
+    filterRejected = true;
     logToFile(
       `bootstrap blobless clone rejected; retrying full clone kiloSessionId=${request.kiloSessionId}`
     );
     result = await runClone(false);
+    attempts = 2;
   }
   if (result.exitCode !== 0) {
     throw gitOperationError(result, 'clone');
   }
+  // A server without partial-clone support commonly ignores `--filter=blob:none`
+  // outright (exit 0, full clone) rather than rejecting it, so a successful
+  // blobless attempt does not guarantee the filter took effect. git records an
+  // accepted filter by marking the remote as a promisor remote; confirm that
+  // before reporting `mode: 'blobless'` so silently-full clones aren't
+  // misclassified as partial.
+  let filterHonored = false;
+  if (useBlobless && !filterRejected) {
+    const promisorCheck = await runGit(['config', '--get', 'remote.origin.promisor'], {
+      cwd: request.workspace.workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+    });
+    filterHonored = promisorCheck.exitCode === 0 && promisorCheck.stdout.trim() === 'true';
+  }
+  const cloneTelemetry: WrapperCloneTelemetry = {
+    mode: !useBlobless
+      ? 'full'
+      : filterRejected
+        ? 'blobless_fallback'
+        : filterHonored
+          ? 'blobless'
+          : 'full',
+    attempts,
+    filterRejected,
+    durationMs: Date.now() - startedAt,
+    repoKind: repo.kind,
+    repoPlatform: platform ?? 'unknown',
+    shallow: repo.shallow === true,
+    ...parseCloneSizeProxies(`${result.stderr}\n${result.stdout}`),
+  };
+  logToFile(
+    `bootstrap clone complete kiloSessionId=${request.kiloSessionId} mode=${cloneTelemetry.mode} attempts=${attempts} durationMs=${cloneTelemetry.durationMs} totalObjects=${cloneTelemetry.totalObjects ?? '(unknown)'} receivedBytes=${cloneTelemetry.receivedBytes ?? '(unknown)'}`
+  );
 
   const authorName =
     repo.kind === 'github' ? (repo.gitAuthor?.name ?? 'Kilo Code Cloud') : 'Kilo Code Cloud';
@@ -426,6 +521,7 @@ async function cloneRepository(
   if (authorNameResult.exitCode !== 0 || authorEmailResult.exitCode !== 0) {
     throw new Error('Failed to configure git author identity');
   }
+  return cloneTelemetry;
 }
 
 async function branchExists(
@@ -539,11 +635,16 @@ async function sanitizeBitbucketCodeReviewRemote(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
 ): Promise<boolean> {
-  // Single source of truth with the blobless-skip check in cloneRepository: the
-  // filter is skipped for exactly this session type because this function strips
-  // origin credentials, which would break a partial clone's later blob fetches.
   if (!isBitbucketReviewSession(request)) {
     return false;
+  }
+  // A capability origin stays authenticated through the outbound interceptor and
+  // is safe to expose (scoped to one repo, useless outside this container), so it
+  // must stay in place for a blobless clone's later lazy blob fetches. Only a raw
+  // workspace token needs stripping. Either way this is a handled code-review
+  // remote (return true), so callers do not refresh a token over it.
+  if (hasBitbucketReviewCapability(request)) {
+    return true;
   }
   const canonicalUrl = new URL(request.repo.url);
   canonicalUrl.username = '';
@@ -926,7 +1027,9 @@ async function downloadBounded(
 
   if (overflowed) {
     await safeUnlink(filePath);
-    throw new Error('Attachment too large: bytes exceeded the 5 MiB cap');
+    throw new Error(
+      `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
+    );
   }
 
   return { bytesWritten };
@@ -1070,6 +1173,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
 
   let workspaceWasWarm = false;
   let workspaceNeedsBootstrap = true;
+  let cloneTelemetry: WrapperCloneTelemetry | undefined;
   const restoredFromBackup = request.workspace.restoredFromBackup === true;
 
   try {
@@ -1105,7 +1209,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap cold workspace cloning repository kiloSessionId=${request.kiloSessionId}`
       );
-      await cloneRepository(request, runGit, progress, signal);
+      cloneTelemetry = await cloneRepository(request, runGit, progress, signal);
       logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
     }
 
@@ -1155,7 +1259,11 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       `bootstrap workspace ready kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap}`
     );
     progress?.('kilo_server', 'Starting Kilo...');
-    return { workspaceWasWarm };
+    return {
+      workspaceWasWarm,
+      restoredFromBackup,
+      ...(cloneTelemetry ? { clone: cloneTelemetry } : {}),
+    };
   } catch (error) {
     if (error instanceof RestoredWorkspaceReconciliationError) {
       if (workspaceNeedsBootstrap) {

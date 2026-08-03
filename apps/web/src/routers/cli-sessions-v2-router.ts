@@ -51,6 +51,7 @@ import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrati
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
+import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
 
 /**
@@ -1307,6 +1308,9 @@ export const cliSessionsV2Router = createTRPCRouter({
 
   /**
    * Rename a V2 session by updating its title.
+   *
+   * After a successful DB write, best-effort notify the owning CLI via
+   * session-ingest (Next `after` — rename response never fails on notify errors).
    */
   rename: baseProcedure.input(RenameSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id, title } = input;
@@ -1329,6 +1333,20 @@ export const cliSessionsV2Router = createTRPCRouter({
         message: 'Session not found',
       });
     }
+
+    // Input title is validated non-empty; DB column is nullable so prefer input for notify.
+    after(() =>
+      notifyCliSessionRenamed({
+        sessionId: session_id,
+        title,
+        userId: ctx.user.id,
+      }).catch(error => {
+        captureException(error, {
+          tags: { source: 'cli-sessions-v2-router', endpoint: 'rename-notify' },
+          extra: { sessionId: session_id },
+        });
+      })
+    );
 
     return { title: updated.title };
   }),

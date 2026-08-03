@@ -11,7 +11,7 @@ export const proxyErrorTypeSchema = z.enum([
   'byok_error',
   'context_length_exceeded',
   'model_not_allowed',
-  'discontinued_free_model',
+  'unavailable_model',
   'model_not_found',
   'unsupported_field',
   'authentication_required',

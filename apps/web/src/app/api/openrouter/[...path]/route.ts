@@ -47,7 +47,7 @@ import {
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
-  forbiddenFreeModelResponse,
+  unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
@@ -85,7 +85,7 @@ import {
   getToolsUsed,
 } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
+import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
@@ -633,10 +633,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (
     isDeadFreeModel(effectiveModelIdLowerCased) ||
-    (!autoModel && isForbiddenFreeModel(effectiveModelIdLowerCased))
+    (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
   ) {
-    console.warn(`User requested forbidden free model ${effectiveModelIdLowerCased}; rejecting.`);
-    return forbiddenFreeModelResponse();
+    console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
+    return unavailableModelResponse();
   }
 
   let classifyResult = shouldBlockOnClassify ? await awaitClassifyAbuse(classifyPromise) : null;

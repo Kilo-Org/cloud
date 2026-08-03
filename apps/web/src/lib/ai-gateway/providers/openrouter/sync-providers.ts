@@ -45,7 +45,7 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
-import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
+import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -302,7 +302,7 @@ async function syncProviders(
               completion: model.pricing.completion,
             },
             ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
-              !isForbiddenFreeModel(kfm.public_id) && {
+              !isUnavailableModel(kfm.public_id) && {
                 data_policy: { training: true, retainsPrompts: true },
               }),
           },

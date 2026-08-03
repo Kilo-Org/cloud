@@ -16,7 +16,7 @@ import {
   convertFromKiloExclusiveModel,
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
+import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS, type AutoModel } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -110,7 +110,7 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
   return model.status !== 'disabled' || model.pricing === null;
 }
 
-const unavailableModels = [
+const regionRestrictedModels = [
   'sakana/fugu', // this model is not available in the EU
 ];
 
@@ -125,9 +125,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
-          !isForbiddenFreeModel(model.id) &&
+          !isUnavailableModel(model.id) &&
           !model.id.endsWith(':batch') &&
-          !unavailableModels.some(unavailableId => model.id.includes(unavailableId))
+          !regionRestrictedModels.some(unavailableId => model.id.includes(unavailableId))
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);

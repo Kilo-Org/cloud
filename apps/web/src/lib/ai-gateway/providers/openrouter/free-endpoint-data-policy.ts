@@ -1,8 +1,5 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import {
-  familyHasForbiddenFreeModel,
-  isForbiddenFreeModel,
-} from '@/lib/ai-gateway/forbidden-free-models';
+import { familyHasUnavailableModel, isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
@@ -24,7 +21,7 @@ export function getOpenRouterFreeEndpoints(
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);
     for (const model of models) {
-      if (model.endpoint?.is_free && !familyHasForbiddenFreeModel(model.slug)) {
+      if (model.endpoint?.is_free && !familyHasUnavailableModel(model.slug)) {
         endpoints.push({ modelId: normalizeModelId(model.slug), providerId });
       }
     }
@@ -38,8 +35,7 @@ function dataCollectingKiloExclusiveModels(
   const models = new Map<string, ReadonlySet<string> | null>();
   for (const model of kiloExclusiveModels) {
     const collectsData = model.pricing === null || model.flags.includes('requires-data-collection');
-    if (model.status !== 'public' || !collectsData || isForbiddenFreeModel(model.public_id))
-      continue;
+    if (model.status !== 'public' || !collectsData || isUnavailableModel(model.public_id)) continue;
     const modelId = normalizeModelId(model.public_id);
     if (model.inference_provider_restriction.length === 0) {
       models.set(modelId, null);

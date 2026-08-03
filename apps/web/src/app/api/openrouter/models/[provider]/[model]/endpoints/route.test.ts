@@ -87,7 +87,7 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
   });
 
-  test('returns 404 for forbidden free models without reading cached metadata', async () => {
+  test('returns 404 for unavailable models without reading cached metadata', async () => {
     mockedGetOpenRouterModelsMetadataFromDatabase.mockClear();
     const modelId = 'openai/gpt-oss-20b:free';
 

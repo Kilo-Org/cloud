@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
+import {
+  buildFileItems,
+  buildItems,
+  buildPaginationItem,
+} from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { type BuildItemsArgs, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 
@@ -289,5 +293,19 @@ describe('buildItems trailing gap totalLines', () => {
       state: 'partial',
       context: { startLine: 9, endLine: 9 },
     });
+  });
+});
+
+describe('buildItems composition', () => {
+  it('deep-equals [...buildFileItems(args), buildPaginationItem(args)]', () => {
+    const args = baseArgs({
+      files: [makeFile(singleHunkPatch)],
+      expanded: { 'a.ts': true },
+      hasNextPage: true,
+      isFetchingNextPage: false,
+    });
+    const composed = [...buildFileItems(args), buildPaginationItem(args)];
+    const direct = buildItems(args);
+    expect(composed).toEqual(direct);
   });
 });

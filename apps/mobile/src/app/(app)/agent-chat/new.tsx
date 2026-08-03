@@ -1,111 +1,50 @@
-import { type Dispatch, type SetStateAction, useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
-import * as WebBrowser from 'expo-web-browser';
-import { toast } from 'sonner-native';
 
-import { NewSessionCloudForm } from '@/components/agents/new-session-cloud-form';
-import { RemoteSpawnComposer } from '@/components/agents/remote-spawn-composer';
+import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
-import { RemoteSpawnInheritanceProvider } from '@/components/agents/use-remote-spawn-dispatch';
-import { pickAgentAttachments } from '@/components/agents/attachment-picker';
-import { type AgentMode } from '@/components/agents/mode-selector';
-import { ScreenHeader } from '@/components/screen-header';
 import {
-  getGitHubIntegrationUrl,
-  shouldShowGitHubIntegrationPrompt,
-} from '@/lib/agent-github-integration';
+  NewSessionModelProvider,
+  useNewSessionModelState,
+} from '@/components/agents/new-session-model-provider';
+import { pickAgentAttachments } from '@/components/agents/attachment-picker';
+import { ScreenHeader } from '@/components/screen-header';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
-import { isRepositorySectionVisible } from '@/lib/is-repository-section-visible';
 import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
+import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
-/**
- * Outer shell owns picker state and the inheritance Provider so
- * `useNewSessionShareRemote` → `useRemoteSpawnDispatch` (in the inner
- * body) reads mode/model/variant as a true descendant. Provider wrapping
- * only the returned JSX left the hook outside the tree with `{}`.
- *
- * Auto-select also lives here: `setModel`/`setVariant` belong to this
- * component, so the render-phase apply is a same-component update (legal).
- * Doing it in the body after the M1 split was a cross-component setState.
- */
 export default function NewSessionScreen() {
-  const [mode, setMode] = useState<AgentMode>('code');
-  const [model, setModel] = useState('');
-  const [variant, setVariant] = useState('');
   const { organizationId } = useLocalSearchParams<{
     organizationId?: string;
   }>();
-  // Same query key as the body — React Query dedupes; used only so
-  // auto-select can run in the state owner without a cross-component update.
-  const { models } = useAvailableModels(organizationId);
-  const autoSelected = useAutoSelectModel(models, organizationId);
-  const hasAppliedAutoSelection = useRef(false);
-  if (!hasAppliedAutoSelection.current && autoSelected.model && !model) {
-    hasAppliedAutoSelection.current = true;
-    setModel(autoSelected.model);
-    setVariant(autoSelected.variant);
-  }
-
   return (
-    <RemoteSpawnInheritanceProvider mode={mode} model={model} variant={variant}>
-      <NewSessionScreenBody
-        mode={mode}
-        setMode={setMode}
-        model={model}
-        setModel={setModel}
-        variant={variant}
-        setVariant={setVariant}
-      />
-    </RemoteSpawnInheritanceProvider>
+    <NewSessionModelProvider organizationId={organizationId}>
+      <NewSessionScreenBody />
+    </NewSessionModelProvider>
   );
 }
-
-type NewSessionScreenBodyProps = {
-  mode: AgentMode;
-  setMode: Dispatch<SetStateAction<AgentMode>>;
-  model: string;
-  setModel: Dispatch<SetStateAction<string>>;
-  variant: string;
-  setVariant: Dispatch<SetStateAction<string>>;
-};
-
-function NewSessionScreenBody({
-  mode,
-  setMode,
-  model,
-  setModel,
-  variant,
-  setVariant,
-}: NewSessionScreenBodyProps) {
+function NewSessionScreenBody() {
+  const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { showActionSheetWithOptions } = useActionSheet();
   const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
     organizationId?: string;
     shareId?: string;
   }>();
-  // Param can be string | string[] depending on how the route was opened.
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
 
-  // ── Selectors state ──────────────────────────────────────────────
   const [selectedRepo, setSelectedRepo] = useState('');
-  // `null` = default Cloud Agent target (the existing path). Any
-  // non-null value is a live `kilo remote` instance the user picked.
-  // C3b switches the JSX to a reduced composer when this is non-null
-  // and routes the submit through `useRemoteSpawnDispatch` instead of
-  // the cloud-agent `submitCreate` flow.
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -113,10 +52,8 @@ function NewSessionScreenBody({
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
 
-  // Org contexts support CLI instances (org attribution travels with create).
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
-  // ── Models ───────────────────────────────────────────────────────
   const {
     models,
     isLoading: isLoadingModels,
@@ -127,47 +64,16 @@ function NewSessionScreenBody({
   const { saveModel } = usePersistedAgentModel();
   const attachments = useAgentAttachmentUpload({ organizationId });
 
-  // ── Repositories ─────────────────────────────────────────────────
   const trpc = useTRPC();
   const {
-    data: repoData,
-    isLoading: isLoadingRepos,
-    isError: isReposError,
-    isRefetching: isRefetchingRepos,
-    refetch: refetchRepos,
-  } = useQuery(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
-          forceRefresh: false,
-        })
-  );
+    repositories,
+    view,
+    isRetrying,
+    openGitHubIntegration: openGitHub,
+    refreshReposForceFresh,
+  } = useNewSessionRepos({ organizationId });
 
-  const showGitHubIntegrationPrompt = shouldShowGitHubIntegrationPrompt({
-    isLoadingRepos,
-    integrationInstalled: repoData?.integrationInstalled,
-    repositoryCount: repoData?.repositories.length,
-  });
-
-  const repositories = useMemo(() => {
-    if (!repoData?.repositories) {
-      return [];
-    }
-    return (repoData.repositories as { fullName: string; private: boolean }[]).map(r => ({
-      fullName: r.fullName,
-      isPrivate: r.private,
-    }));
-  }, [repoData]);
-
-  // "Run on" instance list. Fetched at the screen level (not inside the
-  // picker) so the selector's value label and the picker's row list stay
-  // in sync without round-tripping through the bridge. The picker ALSO
-  // re-queries on focus + polls (per the spec), so this is a soft
-  // pre-population, not the source of truth. C3b also reuses the
-  // `refetch` for the retryable-spawn-failure recovery path.
+  // Keep the inline selector and picker list in sync.
   const {
     data: instancesData,
     isLoading: isLoadingInstances,
@@ -184,7 +90,6 @@ function NewSessionScreenBody({
     [instancesData]
   );
 
-  // ── Session creator ──────────────────────────────────────────────
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
     attachments,
     mode,
@@ -195,18 +100,16 @@ function NewSessionScreenBody({
     variant,
   });
 
-  // Share latch + remote spawn + share-aware Run-on (F1/F2). Runs under
-  // RemoteSpawnInheritanceProvider so mode/model/variant reach the wire.
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
-    shareId,
     organizationId,
     runOnInstance,
     setRunOnInstance,
     refetchInstances,
     instanceList,
+    promptRef,
+    attachments: attachments.attachments,
   });
 
-  // ── Handlers ─────────────────────────────────────────────────────
   const handleModelSelect = useCallback(
     (modelId: string, newVariant: string) => {
       setModel(modelId);
@@ -217,22 +120,13 @@ function NewSessionScreenBody({
     [organizationId, saveModel, persistServerLastSelected, setModel, setVariant]
   );
 
-  const handleOpenGitHubIntegration = useCallback(async () => {
-    try {
-      await WebBrowser.openAuthSessionAsync(getGitHubIntegrationUrl(WEB_BASE_URL, organizationId));
-      await refetchRepos();
-    } catch {
-      toast.error('Could not open GitHub setup. Please try again.');
-    }
-  }, [organizationId, refetchRepos]);
-
   function handlePromptChange(text: string) {
     promptRef.current = text;
     const nextHasPrompt = text.trim().length > 0;
     setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
   }
 
-  const submitCreate = useCallback(async () => {
+  const submitWithVoiceSettled = useCallback(async (submit: () => Promise<void>) => {
     await settleVoiceInputBeforeSubmit({
       lock: submissionLockRef,
       onPendingChange: setIsSubmitting,
@@ -244,32 +138,32 @@ function NewSessionScreenBody({
         const settled = await settleVoiceInput();
         return settled;
       },
-      submit: createSessionFromDraft,
+      submit,
     });
-  }, [createSessionFromDraft]);
+  }, []);
 
-  const { addCandidates } = attachments;
+  const { addCandidates, removeAttachment, retryAttachment } = attachments;
   const handleAddAttachment = useCallback(async () => {
-    // Fire-and-forget: the upload hook owns its own progress + error toasts,
-    // and `canCreate` (computed from `attachments.isUploading` /
-    // `attachments.hasFailedAttachments`) gates the start-session button.
     void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
   }, [addCandidates, showActionSheetWithOptions]);
 
-  // Cloud-Agent vs. remote-instance submit safety.
-  //
-  // - Cloud Agent (`runOnInstance === null`): `isStartDisabled` is the
-  //   full pre-C3a canCreate expression, byte-identical to today's
-  //   contract — the cloud-agent submit path runs through
-  //   `handleStartSession` -> `submitCreate` -> `createSessionFromDraft`.
-  //   No change to that branch.
-  // - Remote target (`runOnInstance !== null`): the start button is
-  //   gated only by `isSpawningRemote` so the user can re-press after
-  //   a non-retryable / retryable failure.
-  const isRemoteTargetSelected = runOnInstance !== null;
+  const handleRemoveAttachment = useCallback(
+    (id: string) => {
+      removeAttachment(id);
+    },
+    [removeAttachment]
+  );
 
+  const handleRetryAttachment = useCallback(
+    (id: string) => {
+      retryAttachment(id);
+    },
+    [retryAttachment]
+  );
+
+  const isRemoteTargetSelected = runOnInstance !== null;
   const isStartDisabled = isRemoteTargetSelected
-    ? remoteSpawn.isSpawningRemote
+    ? remoteSpawn.isSpawningRemote || isSubmitting || attachments.hasFailedAttachments
     : resolveNewSessionSubmitDisabled({
         attachmentsHasFailed: attachments.hasFailedAttachments,
         attachmentsIsUploading: attachments.isUploading,
@@ -283,78 +177,56 @@ function NewSessionScreenBody({
 
   const handleStartSession = useCallback(() => {
     if (runOnInstance !== null) {
-      remoteSpawn.onStart();
+      void submitWithVoiceSettled(async () => {
+        remoteSpawn.onStart();
+        await Promise.resolve();
+      });
       return;
     }
-    void submitCreate();
-  }, [remoteSpawn, runOnInstance, submitCreate]);
+    void submitWithVoiceSettled(createSessionFromDraft);
+  }, [createSessionFromDraft, remoteSpawn, runOnInstance, submitWithVoiceSettled]);
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="New session" />
-
-      {isRepositorySectionVisible(runOnInstance) ? (
-        <NewSessionCloudForm
-          attachments={attachments.attachments}
-          attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
-          isCreating={isCreating}
-          isModelsError={isModelsError}
-          isLoadingModels={isLoadingModels}
-          mode={mode}
-          model={model}
-          variant={variant}
-          modelOptions={models}
-          onChangeText={handlePromptChange}
-          onModeChange={setMode}
-          onModelSelect={handleModelSelect}
-          onAddAttachment={() => {
-            void handleAddAttachment();
-          }}
-          onRemoveAttachment={id => {
-            attachments.removeAttachment(id);
-          }}
-          onRetryAttachment={id => {
-            attachments.retryAttachment(id);
-          }}
-          onRefetchModels={() => {
-            void refetchModels();
-          }}
-          onPrefillAttachments={addCandidates}
-          shareId={shareId}
-          voiceInputSettlerRef={voiceInputSettlerRef}
-          showRunOnSelector={showRunOnSelector}
-          runOnInstance={runOnInstance}
-          instanceList={instanceList}
-          isLoadingInstances={isLoadingInstances}
-          onChangeRunOnInstance={handleRunOnInstanceChange}
-          showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
-          isReposError={isReposError}
-          isLoadingRepos={isLoadingRepos}
-          isRefetchingRepos={isRefetchingRepos}
-          onChangeRepo={setSelectedRepo}
-          onOpenGitHubIntegration={() => {
-            void handleOpenGitHubIntegration();
-          }}
-          onRefetchRepos={() => {
-            void refetchRepos();
-          }}
-          repositories={repositories}
-          showGitHubIntegrationPrompt={showGitHubIntegrationPrompt}
-          selectedRepo={selectedRepo}
-          isStartDisabled={isStartDisabled}
-          onStartSession={handleStartSession}
-        />
-      ) : (
-        <RemoteSpawnComposer
-          runOnInstance={runOnInstance}
-          instanceList={instanceList}
-          isLoadingInstances={isLoadingInstances}
-          onChangeRunOnInstance={handleRunOnInstanceChange}
-          isSpawningRemote={remoteSpawn.isSpawningRemote}
-          isStartDisabled={isStartDisabled}
-          onStart={handleStartSession}
-        />
-      )}
+      <NewSessionConfigureForm
+        attachments={attachments.attachments}
+        attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
+        isCreating={isCreating}
+        isModelsError={isModelsError}
+        isLoadingModels={isLoadingModels}
+        mode={mode}
+        model={model}
+        variant={variant}
+        modelOptions={models}
+        initialPrompt={promptRef.current}
+        onChangeText={handlePromptChange}
+        onModeChange={setMode}
+        onModelSelect={handleModelSelect}
+        onAddAttachment={() => void handleAddAttachment()}
+        onRemoveAttachment={handleRemoveAttachment}
+        onRetryAttachment={handleRetryAttachment}
+        onRefetchModels={() => void refetchModels()}
+        onPrefillAttachments={addCandidates}
+        shareId={shareId}
+        voiceInputSettlerRef={voiceInputSettlerRef}
+        showRunOnSelector={showRunOnSelector}
+        runOnInstance={runOnInstance}
+        instanceList={instanceList}
+        isLoadingInstances={isLoadingInstances}
+        onChangeRunOnInstance={handleRunOnInstanceChange}
+        showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
+        view={view}
+        isRetrying={isRetrying}
+        onChangeRepo={setSelectedRepo}
+        onOpenGitHubIntegration={openGitHub}
+        onRefreshRepos={() => void refreshReposForceFresh()}
+        repositories={repositories}
+        selectedRepo={selectedRepo}
+        isStartDisabled={isStartDisabled}
+        isSpawningRemote={remoteSpawn.isSpawningRemote}
+        onStartSession={handleStartSession}
+      />
     </View>
   );
 }

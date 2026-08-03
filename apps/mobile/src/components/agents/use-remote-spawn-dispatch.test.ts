@@ -2,6 +2,11 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import {
+  __resetSharePayloadStoreForTests,
+  peekSharePayload,
+  type SharePayload,
+} from '@/lib/share-payload';
 import { buildCreateRemoteSessionInput } from '@/lib/hooks/remote-instance-spawn-classifier';
 
 import {
@@ -36,6 +41,16 @@ vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
 
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'share-id-fixed' }));
+
+vi.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: null,
+  copyAsync: vi.fn().mockResolvedValue('/tmp/copy'),
+  deleteAsync: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('expo-share-intent', () => ({}));
+
 // Keep the real input builder; only stub the RN-touching spawn hook.
 vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
   buildCreateRemoteSessionInput,
@@ -64,6 +79,9 @@ const INSTANCE: InstancePickerInstance = {
   projectName: 'kilo',
 };
 
+/** Stub payload for the ready-path-with-payload case. */
+const samplePayload: SharePayload = { text: 'hello', files: [], failedFiles: [] };
+
 /**
  * Minimal React hook runner. Mirrors the fake-dispatcher pattern in
  * `use-interaction-handlers.test.ts` so we can exercise
@@ -79,6 +97,7 @@ function runHookWithProvider(args: {
   providerMode?: string;
   providerModel?: string;
   providerVariant?: string;
+  getSubmitPayload?: () => SharePayload | null;
 }) {
   const reactInternals = React as typeof React & ReactInternals;
   const hookState: unknown[] = [];
@@ -94,7 +113,6 @@ function runHookWithProvider(args: {
     },
     useContext: context => {
       hookIndex += 1;
-      // Only RemoteSpawnInheritanceContext is read; return staged value.
       void context;
       return contextValue as never;
     },
@@ -146,7 +164,6 @@ function runHookWithProvider(args: {
   refIndex = 0;
   reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
   try {
-    // Alias avoids rules-of-hooks lexical false positives under the fake dispatcher.
     const mountDispatch = useRemoteSpawnDispatch;
     return mountDispatch({
       organizationId: args.organizationId,
@@ -154,14 +171,12 @@ function runHookWithProvider(args: {
       model: args.model,
       variant: args.variant,
       runOnInstance: INSTANCE,
-      setRunOnInstance: (_next: InstancePickerInstance | null) => {
-        // no-op setter for the dispatch harness
-      },
-      refetchInstances: async () => {
-        await Promise.resolve();
-        return { data: { instances: [INSTANCE] } };
-      },
+      // eslint-disable-next-line no-empty-function -- no-op setter for harness
+      setRunOnInstance: (_next: InstancePickerInstance | null) => {},
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      refetchInstances: () => Promise.resolve({ data: { instances: [INSTANCE] } }),
       instanceList: [INSTANCE],
+      getSubmitPayload: args.getSubmitPayload,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -174,11 +189,10 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     spawnMock.mockClear();
     useRemoteInstanceSpawnMock.mockClear();
     routerReplace.mockClear();
+    __resetSharePayloadStoreForTests();
   });
 
   it('onStart builds agent/model/variant/orgId from inheritance provider fields', async () => {
-    // Would fail if context were always {} (Provider mounted after the hook):
-    // spawn would receive undefined / org-only instead of the full wire shape.
     const { onStart } = runHookWithProvider({
       organizationId: 'org-xyz',
       withProvider: true,
@@ -194,16 +208,12 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     expect(spawnMock).toHaveBeenCalledWith('conn-abc', {
       agent: 'plan',
-      model: {
-        providerID: 'kilo',
-        modelID: 'kilo-auto/efficient',
-        variant: 'medium',
-      },
+      model: { providerID: 'kilo', modelID: 'kilo-auto/efficient', variant: 'medium' },
       orgId: 'org-xyz',
     });
   });
 
-  it('onStart without inheritance yields org-only (or bare) input — empty context regression', async () => {
+  it('onStart without inheritance yields org-only input — empty context regression', async () => {
     const { onStart } = runHookWithProvider({
       organizationId: 'org-xyz',
       withProvider: false,
@@ -214,9 +224,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       expect(spawnMock).toHaveBeenCalled();
     });
 
-    expect(spawnMock).toHaveBeenCalledWith('conn-abc', {
-      orgId: 'org-xyz',
-    });
+    expect(spawnMock).toHaveBeenCalledWith('conn-abc', { orgId: 'org-xyz' });
   });
 
   it('explicit mode/model/variant args win over empty context', async () => {
@@ -248,10 +256,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith('org-route-1');
   });
 
-  it('personal route (no param) passes null so context org cannot win after a switch', () => {
-    // undefined route param must become null — not omitted — or the spawn
-    // hook would inherit live useOrganization() and mis-attribute personal
-    // spawns after the user switches org in the global switcher.
+  it('personal route (no param) passes null so context org cannot win', () => {
     runHookWithProvider({ organizationId: undefined, withProvider: false });
     expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith(null);
   });
@@ -269,11 +274,72 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       expect(spawnMock).toHaveBeenCalled();
     });
 
-    // Exact args — no orgId key (personal route must not inherit context org).
     expect(spawnMock).toHaveBeenCalledWith('conn-abc', {
       agent: 'code',
       model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
     });
+  });
+
+  it('ready path stages the press-time payload and navigates with shareId + autoSend', async () => {
+    const { onStart } = runHookWithProvider({
+      organizationId: 'org-xyz',
+      withProvider: false,
+      getSubmitPayload: () => samplePayload,
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(routerReplace).toHaveBeenCalled();
+    });
+
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(typeof calledWith).toBe('string');
+    expect(calledWith).toContain('spawned=1');
+    expect(calledWith).toContain('shareId=share-id-fixed');
+    expect(calledWith).toContain('autoSend=1');
+    expect(calledWith).toContain('ses_12345678901234567890123456');
+
+    const stored = peekSharePayload('share-id-fixed');
+    expect(stored).not.toBeNull();
+    expect(stored?.text).toBe('hello');
+  });
+
+  it('ready path navigates without share params when press-time payload is null', async () => {
+    const { onStart } = runHookWithProvider({
+      organizationId: 'org-xyz',
+      withProvider: false,
+      getSubmitPayload: () => null,
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(routerReplace).toHaveBeenCalled();
+    });
+
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(typeof calledWith).toBe('string');
+    expect(calledWith).toContain('spawned=1');
+    expect(calledWith).toContain('ses_12345678901234567890123456');
+    expect(calledWith).not.toContain('shareId=');
+    expect(calledWith).not.toContain('autoSend=');
+  });
+
+  it('ready path navigates without share params when getSubmitPayload is omitted', async () => {
+    const { onStart } = runHookWithProvider({
+      organizationId: 'org-xyz',
+      withProvider: false,
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(routerReplace).toHaveBeenCalled();
+    });
+
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(typeof calledWith).toBe('string');
+    expect(calledWith).toContain('spawned=1');
+    expect(calledWith).not.toContain('shareId=');
+    expect(calledWith).not.toContain('autoSend=');
   });
 });
 

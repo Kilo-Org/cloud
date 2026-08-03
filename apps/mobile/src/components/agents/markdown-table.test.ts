@@ -4,19 +4,48 @@ import { MarkdownTable } from './markdown-table';
 
 import { type MarkdownPalette } from './markdown-palette';
 
-// Stub native modules that markdown-table.tsx imports at module scope.
+// Stub native modules that markdown-table.tsx imports at module scope. Without
+// a stub, the reanimated / gesture-handler / worklets entry points reach this
+// `node` project as Flow source and the suite dies on `SyntaxError: Unexpected
+// token 'typeof'`.
 // `useState` returns `true` so the modal renders its children, exposing
 // the close Pressable in the element tree for direct-call assertions.
 vi.mock('react', () => ({
+  useCallback: (fn: unknown) => fn,
+  useEffect: vi.fn(),
+  useRef: () => ({ current: null }),
   useState: () => [true, vi.fn()],
 }));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
   Text: 'Text',
   View: 'View',
   useWindowDimensions: () => ({ width: 390, height: 844 }),
+}));
+vi.mock('react-native-gesture-handler', () => {
+  // RNGH's builder API chains without a fixed shape: `Gesture.Pinch()
+  // .simultaneousWithExternalGesture(...).onStart(...).onEnd(...)`. One
+  // self-returning proxy answers every link, so a new builder call in the
+  // component never needs a new stub here.
+  const chainable: unknown = new Proxy(vi.fn(), {
+    apply: () => chainable,
+    get: () => chainable,
+  });
+  return {
+    Gesture: chainable,
+    GestureDetector: 'GestureDetector',
+    GestureHandlerRootView: 'GestureHandlerRootView',
+    ScrollView: 'ScrollView',
+  };
+});
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  useAnimatedStyle: () => ({}),
+  useSharedValue: (initial: unknown) => ({ value: initial }),
+}));
+vi.mock('react-native-worklets', () => ({
+  scheduleOnRN: vi.fn(),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),

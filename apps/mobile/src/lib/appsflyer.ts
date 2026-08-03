@@ -4,11 +4,17 @@ import appsFlyer, { AppsFlyerPurchaseConnector, StoreKitVersion } from 'react-na
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
+import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 
 let initialized = false;
 /** Blocks re-entry into create() within one JS bundle (before initSdk succeeds). */
 let purchaseConnectorCreateStarted = false;
-const pendingEvents: { name: string; values: Record<string, string> }[] = [];
+type PendingEvent = {
+  name: string;
+  values: Record<string, string>;
+  generation: number;
+};
+const pendingEvents: PendingEvent[] = [];
 
 const CONNECTOR_ALREADY_CONFIGURED = 'Connector already configured';
 
@@ -81,13 +87,18 @@ function noop() {}
 
 function drainPendingEvents() {
   for (const event of pendingEvents) {
-    // Error callback is `noop` for the same reason as in trackEvent below.
-    appsFlyer.logEvent(event.name, event.values, noop, noop);
+    if (event.generation === currentGeneration()) {
+      // Error callback is `noop` for the same reason as in trackEvent below.
+      appsFlyer.logEvent(event.name, event.values, noop, noop);
+    }
   }
   pendingEvents.length = 0;
 }
 
 export function initAppsFlyer(): void {
+  if (!allowsOptional()) {
+    return;
+  }
   if (initialized) {
     return;
   }
@@ -134,6 +145,9 @@ export function initAppsFlyer(): void {
 }
 
 export function trackEvent(name: string, values?: Record<string, string>): void {
+  if (!allowsOptional()) {
+    return;
+  }
   const eventValues = values ?? {};
 
   // Mirror attribution events into PostHog so the onboarding funnel is
@@ -142,7 +156,7 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
   captureEvent(name, eventValues);
 
   if (!initialized) {
-    pendingEvents.push({ name, values: eventValues });
+    pendingEvents.push({ name, values: eventValues, generation: currentGeneration() });
     return;
   }
 
@@ -152,4 +166,32 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
   // dev key or app id, or a broken purchase connector — still reach Sentry
   // through initSdk's and the connector's error callbacks.
   appsFlyer.logEvent(name, eventValues, noop, noop);
+}
+
+/**
+ * Tear down the native SDK and clear JS state. A successful `initSdk` keeps
+ * native transmission alive until explicitly stopped, so this calls
+ * `stop(true)` and, on iOS, `stopObservingTransactions()`. Also clears the
+ * pending-event buffer so stale events from a prior account do not transmit
+ * on a later init.
+ *
+ * Does NOT reset `purchaseConnectorCreateStarted`: native `PCAppsFlyer` keeps
+ * a process-lifetime static connector, so re-entering `create()` rejects with
+ * "Connector already configured".
+ */
+export function resetAppsFlyerState(): void {
+  if (typeof (appsFlyer as Record<string, unknown>).stop === 'function') {
+    appsFlyer.stop(true);
+  }
+
+  if (
+    Platform.OS === 'ios' &&
+    typeof (AppsFlyerPurchaseConnector as unknown as Record<string, unknown>)
+      .stopObservingTransactions === 'function'
+  ) {
+    AppsFlyerPurchaseConnector.stopObservingTransactions();
+  }
+
+  initialized = false;
+  pendingEvents.length = 0;
 }

@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => {
@@ -5,32 +6,58 @@ const hoisted = vi.hoisted(() => {
     register: vi.fn(),
     setPersonPropertiesForFlags: vi.fn(),
     onFeatureFlags: vi.fn(),
+    capture: vi.fn(),
+    screen: vi.fn(),
+    identify: vi.fn(),
+    reloadFeatureFlags: vi.fn(),
+    getFeatureFlag: vi.fn(),
+    reset: vi.fn(),
+    setPersistedProperty: vi.fn(),
+    optOut: vi.fn().mockResolvedValue(undefined),
+    shutdown: vi.fn(),
+    flush: vi.fn(),
   };
   const holder: { options?: Record<string, unknown> } = {};
-  const device: { deviceType: number | null } = { deviceType: null };
-  return { client, holder, device };
+  const device = { deviceType: null as number | null };
+  const controller = {
+    allowsOptional: vi.fn().mockReturnValue(true),
+    currentGeneration: vi.fn().mockReturnValue(0),
+  };
+  let sealedState = false;
+  const storage = {
+    sealPostHogStorage: vi.fn().mockImplementation(() => {
+      sealedState = true;
+    }),
+    unsealPostHogStorage: vi.fn().mockImplementation(() => {
+      sealedState = false;
+    }),
+    purgePostHogPersistence: vi.fn(),
+    isPostHogStorageSealed: vi.fn().mockImplementation(() => sealedState),
+    // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
+    posthogCustomStorage: {} as Record<string, unknown>,
+  };
+  return { client, holder, device, controller, storage };
 });
 
 vi.mock('posthog-react-native', () => ({
-  // Must be a `function`, not an arrow: arrows are not constructible and
-  // `new PostHog(...)` throws "not a constructor". A `function` returning an
-  // object makes `new` yield that object.
   default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
     hoisted.holder.options = options;
     return hoisted.client;
   }),
+  PostHogPersistedProperty: {
+    Queue: 'queue',
+    LogsQueue: 'logs_queue',
+    AiQueue: 'ai_queue',
+  },
 }));
 
 vi.mock('expo-device', () => ({
   DeviceType: { UNKNOWN: 0, PHONE: 1, TABLET: 2, DESKTOP: 3, TV: 4 },
-  // Getter: reads the holder at access time, so per-test values take effect.
   get deviceType() {
     return hoisted.device.deviceType;
   },
 }));
 
-// Required: the real expo-application import pulls in react-native, which
-// pure vitest cannot load.
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.2.3',
   nativeBuildVersion: '45',
@@ -38,14 +65,27 @@ vi.mock('expo-application', () => ({
 
 vi.mock('@/lib/config', () => ({ POSTHOG_API_KEY: 'test-key' }));
 
+vi.mock('@/lib/telemetry/controller', () => ({
+  allowsOptional: hoisted.controller.allowsOptional,
+  currentGeneration: hoisted.controller.currentGeneration,
+}));
+
+vi.mock('@/lib/telemetry/posthog-storage', () => ({
+  sealPostHogStorage: hoisted.storage.sealPostHogStorage,
+  unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
+  purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
+  isPostHogStorageSealed: hoisted.storage.isPostHogStorageSealed,
+  posthogCustomStorage: hoisted.storage.posthogCustomStorage,
+}));
+
 vi.stubGlobal('__DEV__', false);
 
-type CustomAppProperties = (properties: Record<string, unknown>) => Record<string, unknown>;
-
-function readCustomAppProperties(): CustomAppProperties {
-  const customAppProperties = hoisted.holder.options?.customAppProperties;
-  expect(customAppProperties).toEqual(expect.any(Function));
-  return customAppProperties as CustomAppProperties;
+function readCustomAppProperties(): (
+  properties: Record<string, unknown>
+) => Record<string, unknown> {
+  const fn = hoisted.holder.options?.customAppProperties;
+  expect(fn).toEqual(expect.any(Function));
+  return fn as (properties: Record<string, unknown>) => Record<string, unknown>;
 }
 
 async function loadInitPostHog() {
@@ -54,11 +94,19 @@ async function loadInitPostHog() {
   return module.initPostHog;
 }
 
+// oxlint-disable-next-line require-await -- async required by promise-function-async
+async function loadModule() {
+  vi.resetModules();
+  return import('./posthog');
+}
+
 describe('initPostHog device_form_factor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.holder.options = undefined;
     hoisted.device.deviceType = null;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
   });
 
   it.each([
@@ -102,5 +150,244 @@ describe('initPostHog device_form_factor', () => {
     initPostHog();
 
     expect(PostHog).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes customStorage to PostHog', async () => {
+    const initPostHog = await loadInitPostHog();
+    initPostHog();
+
+    expect(hoisted.holder.options?.customStorage).toBe(hoisted.storage.posthogCustomStorage);
+  });
+});
+
+describe('initPostHog gate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('returns early when optional consent is not given', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const initPostHog = await loadInitPostHog();
+    initPostHog();
+
+    const posthogModule = await import('posthog-react-native');
+    expect(posthogModule.default).not.toHaveBeenCalled();
+  });
+
+  it('initializes when optional consent is true', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    const initPostHog = await loadInitPostHog();
+    initPostHog();
+
+    const posthogModule = await import('posthog-react-native');
+    expect(posthogModule.default).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('capture gate and generation scoping', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+  });
+
+  it('captureEvent returns early when optional consent is not given', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog, captureEvent } = await loadModule();
+    initPostHog();
+    captureEvent('test-event');
+
+    expect(hoisted.client.capture).not.toHaveBeenCalled();
+  });
+
+  it('captureEvent drops a stale-generation capture', async () => {
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+    const module = await loadModule();
+    module.initPostHog();
+
+    // Bump the generation after init.
+    hoisted.controller.currentGeneration.mockReturnValue(1);
+    module.captureEvent('test-event');
+    module.captureScreen('test-screen');
+    module.identifyUser('stale@test.com');
+
+    expect(hoisted.client.capture).not.toHaveBeenCalled();
+    expect(hoisted.client.screen).not.toHaveBeenCalled();
+    expect(hoisted.client.identify).not.toHaveBeenCalled();
+  });
+
+  it('captureEvent allows a current-generation capture', async () => {
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+    const { initPostHog, captureEvent } = await loadModule();
+    initPostHog();
+    captureEvent('test-event');
+
+    expect(hoisted.client.capture).toHaveBeenCalledWith('test-event', undefined);
+  });
+
+  it('captureScreen returns early when optional consent is not given', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog, captureScreen } = await loadModule();
+    initPostHog();
+    captureScreen('test-screen');
+
+    expect(hoisted.client.screen).not.toHaveBeenCalled();
+  });
+
+  it('identifyUser returns early when optional consent is not given', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog, identifyUser } = await loadModule();
+    initPostHog();
+    identifyUser('test@test.com');
+
+    expect(hoisted.client.identify).not.toHaveBeenCalled();
+  });
+});
+
+describe('discardPostHog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('seals storage, clears queues, opts out, drops client in order', async () => {
+    const { initPostHog, discardPostHog } = await loadModule();
+    initPostHog();
+
+    const callOrder: string[] = [];
+    hoisted.storage.sealPostHogStorage.mockImplementation(() => {
+      callOrder.push('seal');
+    });
+    hoisted.client.setPersistedProperty.mockImplementation(() => {
+      callOrder.push('clear');
+    });
+    hoisted.client.optOut.mockImplementation(() => {
+      callOrder.push('optOut');
+    });
+
+    await discardPostHog();
+    expect(callOrder).toEqual(['seal', 'clear', 'clear', 'clear', 'optOut']);
+    expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.setPersistedProperty).toHaveBeenCalledWith('queue', null);
+    expect(hoisted.client.setPersistedProperty).toHaveBeenCalledWith('logs_queue', null);
+    expect(hoisted.client.setPersistedProperty).toHaveBeenCalledWith('ai_queue', null);
+    expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('never calls shutdown or flush', async () => {
+    const { initPostHog, discardPostHog } = await loadModule();
+    initPostHog();
+    await discardPostHog();
+    expect(hoisted.client.shutdown).not.toHaveBeenCalled();
+    expect(hoisted.client.flush).not.toHaveBeenCalled();
+  });
+
+  it('drops the client reference after discard', async () => {
+    const { initPostHog, discardPostHog } = await loadModule();
+    initPostHog();
+    await discardPostHog();
+    const posthogModule = await import('posthog-react-native');
+    const prevCalls = (posthogModule.default as ReturnType<typeof vi.fn>).mock.calls.length;
+    const { initPostHog: init2 } = await loadModule();
+    init2();
+    expect((posthogModule.default as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
+      prevCalls + 1
+    );
+  });
+
+  it('handles a bare mock with no setPersistedProperty gracefully', async () => {
+    const { discardPostHog } = await loadModule();
+    await expect(discardPostHog()).resolves.toBeUndefined();
+    expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.optOut).not.toHaveBeenCalled();
+  });
+
+  it('allows concurrent re-init to create a fresh client', async () => {
+    const { initPostHog, discardPostHog } = await loadModule();
+    initPostHog();
+
+    let optOutResolve: (() => void) | undefined = undefined;
+    hoisted.client.optOut.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        optOutResolve = resolve;
+      });
+    });
+
+    const discardPromise = discardPostHog();
+
+    // Let the synchronous part of discardPostHog run: seal, clear queues,
+    // client = null, flagListeners.clear(), then it awaits optOut.
+    await new Promise<void>(resolve => {
+      void setTimeout(resolve, 0);
+    });
+
+    initPostHog();
+    const posthogModule = await import('posthog-react-native');
+    expect(posthogModule.default).toHaveBeenCalledTimes(2);
+    expect(hoisted.client.onFeatureFlags).toHaveBeenCalledTimes(2);
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
+    optOutResolve!();
+    await discardPromise;
+  });
+});
+
+describe('resumePostHog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('returns a Promise and unseals storage after the 110 ms debounce', async () => {
+    vi.useFakeTimers();
+    const { resumePostHog } = await loadModule();
+    const promise = resumePostHog();
+    expect(promise).toBeInstanceOf(Promise);
+    expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(50);
+    expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(60);
+    await Promise.resolve();
+    expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
+    await promise;
+    vi.useRealTimers();
+  });
+
+  it('awaits active discard before unsealing', async () => {
+    const { initPostHog, discardPostHog, resumePostHog } = await loadModule();
+    initPostHog();
+
+    let optOutResolve: (() => void) | undefined = undefined;
+    hoisted.client.optOut.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        optOutResolve = resolve;
+      });
+    });
+
+    const discardPromise = discardPostHog();
+    await new Promise<void>(resolve => {
+      void setTimeout(resolve, 0);
+    });
+
+    const resumePromise = resumePostHog();
+    await new Promise<void>(resolve => {
+      void setTimeout(resolve, 10);
+    });
+
+    // Unseal must not have been called — discard is still in flight.
+    expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
+    optOutResolve!();
+    await discardPromise;
+    await resumePromise;
+
+    expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
   });
 });

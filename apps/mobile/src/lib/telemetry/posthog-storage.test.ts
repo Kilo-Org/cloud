@@ -82,8 +82,16 @@ function makeNextFile(opts?: {
         return exists;
       },
       text: textReject ? vi.fn().mockRejectedValue(textReject) : vi.fn().mockResolvedValue(''),
-      write: writeReject ? vi.fn(() => { throw writeReject; }) : vi.fn(),
-      delete: deleteReject ? vi.fn(() => { throw deleteReject; }) : vi.fn(),
+      write: writeReject
+        ? vi.fn(() => {
+            throw writeReject;
+          })
+        : vi.fn(),
+      delete: deleteReject
+        ? vi.fn(() => {
+            throw deleteReject;
+          })
+        : vi.fn(),
     };
   });
 }
@@ -95,7 +103,7 @@ beforeEach(() => {
 
 // ---- tests ----
 
-describe(POSTHOG_STORAGE_FILES, () => {
+describe('POSTHOG_STORAGE_FILES', () => {
   it('has two entries matching the SDK storage files', () => {
     expect(POSTHOG_STORAGE_FILES).toEqual(['.posthog-rn.json', '.posthog-rn-logs.json']);
   });
@@ -282,14 +290,18 @@ describe('purgePostHogPersistence', () => {
       };
     });
 
-    expect(() => { purgePostHogPersistence(); }).not.toThrow();
+    expect(() => {
+      purgePostHogPersistence();
+    }).not.toThrow();
   });
 
   it('swallows a delete error', () => {
     sealPostHogStorage();
     makeNextFile({ deleteReject: new Error('permission denied') });
 
-    expect(() => { purgePostHogPersistence(); }).not.toThrow();
+    expect(() => {
+      purgePostHogPersistence();
+    }).not.toThrow();
   });
 });
 

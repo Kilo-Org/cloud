@@ -444,12 +444,26 @@ function readWranglerPort(dir: string): number {
 // Build service definitions from serviceMeta + wrangler.jsonc
 // ---------------------------------------------------------------------------
 
+// Base host ports for the Compose stack. A worktree with a port offset runs its
+// own Compose project on offset host ports, so its database, its data, and its
+// container lifecycle are its own — a sibling worktree's `docker compose down`
+// can no longer drop connections mid-run. dev/local/infra-env.ts publishes the
+// offset ports to Compose and to the app env.
 const INFRA_PORTS: Record<string, number> = {
   postgres: 5432,
   redis: 6379,
   'redis-http': 8079,
   grafana: 4000,
 };
+
+export function getInfraBasePort(serviceName: string): number | undefined {
+  return INFRA_PORTS[serviceName];
+}
+
+/** Connection string for this worktree's PostgreSQL container. */
+export function localPostgresUrl(): string {
+  return `postgres://postgres:postgres@localhost:${INFRA_PORTS.postgres + portOffset}/postgres`;
+}
 
 // Docker Compose profile that gates each infra service, if any. Services not
 // listed here are part of the default profile and start with a plain `up -d`.
@@ -475,9 +489,18 @@ export function getAllInfraProfiles(): string[] {
 const CONTAINER_EGRESS_IMAGE_ARM64 =
   'cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c';
 
-function containerEgressImageEnvPrefix(): string[] {
-  if (process.arch !== 'arm64') return [];
-  return ['env', `MINIFLARE_CONTAINER_EGRESS_IMAGE=${CONTAINER_EGRESS_IMAGE_ARM64}`];
+// Env prefix for every worker command. Wrangler reads the Hyperdrive variable
+// instead of the committed `localConnectionString`, which points at the default
+// port; without it an offset worktree's workers talk to the primary database.
+function workerEnvPrefix(): string[] {
+  const vars: string[] = [];
+  if (process.arch === 'arm64') {
+    vars.push(`MINIFLARE_CONTAINER_EGRESS_IMAGE=${CONTAINER_EGRESS_IMAGE_ARM64}`);
+  }
+  if (portOffset > 0) {
+    vars.push(`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=${localPostgresUrl()}`);
+  }
+  return vars.length > 0 ? ['env', ...vars] : [];
 }
 
 function buildServiceDefs(): ServiceDef[] {
@@ -546,7 +569,7 @@ function buildServiceDefs(): ServiceDef[] {
         name,
         type: 'infra',
         dir: 'dev',
-        port: INFRA_PORTS[name],
+        port: INFRA_PORTS[name] + portOffset,
         dependsOn: meta.dependsOn,
         command: dockerComposeUp(name),
         group: meta.group,
@@ -643,7 +666,7 @@ function buildServiceDefs(): ServiceDef[] {
     const inspectorPort = port + 10000;
 
     const command = [
-      ...containerEgressImageEnvPrefix(),
+      ...workerEnvPrefix(),
       'pnpm',
       'run',
       'dev',

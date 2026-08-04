@@ -71,7 +71,11 @@ read_env_value() {
 }
 
 export PORT
+# Precedence: shell env > .env files > default port. An offset worktree runs
+# its own Redis, and its .env.local names that port.
+REDIS_URL="${REDIS_URL:-$(read_env_value REDIS_URL)}"
 export REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
+UPSTASH_REDIS_REST_URL="${UPSTASH_REDIS_REST_URL:-$(read_env_value UPSTASH_REDIS_REST_URL)}"
 export UPSTASH_REDIS_REST_URL="${UPSTASH_REDIS_REST_URL:-http://localhost:8079}"
 export UPSTASH_REDIS_REST_TOKEN="${UPSTASH_REDIS_REST_TOKEN:-example_token}"
 NEXT_DEV_HOSTNAME="${NEXT_DEV_HOSTNAME:-0.0.0.0}"

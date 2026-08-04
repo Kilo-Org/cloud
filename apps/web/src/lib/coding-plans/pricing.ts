@@ -4,8 +4,9 @@ export const CODING_PLAN_IDS = [
   'minimax-token-plan-plus',
   'minimax-token-plan-max',
   'minimax-token-plan-ultra',
+  'byteplus-coding-plan-team-lite',
 ] as const;
-export const CODING_PLAN_PROVIDER_IDS = ['minimax'] as const;
+export const CODING_PLAN_PROVIDER_IDS = ['minimax', 'byteplus-coding'] as const;
 
 export type CodingPlanId = (typeof CODING_PLAN_IDS)[number];
 export type CodingPlanProviderId = (typeof CODING_PLAN_PROVIDER_IDS)[number];
@@ -65,6 +66,33 @@ export const CODING_PLAN_CATALOG = {
     costMicrodollars: 120_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~12.5B tokens per month of M3 usage.', 'Run 6-7 concurrent agents.'),
+  },
+  'byteplus-coding-plan-team-lite': {
+    planId: 'byteplus-coding-plan-team-lite',
+    providerName: 'BytePlus',
+    name: 'Coding Plan Lite',
+    providerId: 'byteplus-coding',
+    coveredModelIds: [
+      'byteplus-coding/dola-seed-2.0-pro',
+      'byteplus-coding/dola-seed-2.0-lite',
+      'byteplus-coding/dola-seed-2.0-code',
+      'byteplus-coding/bytedance-seed-code',
+      'byteplus-coding/kimi-k2.5',
+      'byteplus-coding/glm-5.1',
+      'byteplus-coding/glm-5.2',
+      'byteplus-coding/deepseek-v4-flash',
+      'byteplus-coding/deepseek-v4-pro',
+      'byteplus-coding/gpt-oss-120b',
+    ],
+    costMicrodollars: 20_000_000,
+    billingPeriodDays: 30,
+    features: [
+      'Kilo automatically configures BytePlus in your BYOK settings.',
+      'For moderate-intensity development use.',
+      'Approximately 1,900 requests every 5 hours, 12,000 requests per week, and 24,000 requests per 30-day subscription period.',
+      'Access to the approved BytePlus coding model set.',
+      'Supported models share one plan quota; one prompt can use multiple model requests.',
+    ],
   },
 } satisfies Record<CodingPlanId, CodingPlanCatalogEntry>;
 

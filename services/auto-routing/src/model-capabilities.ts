@@ -68,6 +68,17 @@ const MODEL_CAPABILITIES_KV_TTL_SECONDS = 3_600;
 // request budget.
 const MODEL_CAPABILITIES_LOOKUP_BUDGET_MS = 500;
 
+// Keep this in sync with the BytePlus Coding Plan default in
+// apps/web/src/lib/ai-gateway/providers/direct-byok/byteplus-coding.ts.
+// Direct BYOK models are absent from the OpenRouter model_stats sync, so this
+// narrow fallback lets the recognized Coding Plan default satisfy constraints.
+const BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID = 'byteplus-coding/bytedance-seed-code';
+const BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES: ModelCapabilities = {
+  inputModalities: new Set(['image']),
+  contextLength: 262_144,
+  isActive: true,
+};
+
 type ModelCapabilitiesEnv = Pick<
   Env,
   'AUTO_ROUTING_CONFIG' | 'HYPERDRIVE' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
@@ -255,6 +266,12 @@ export async function getModelCapabilities(
     if (missing.length > 0) {
       const fromDb = await queryModelCapabilities(env, missing);
       mergeInto(result, fromDb);
+    }
+    if (
+      options.codingPlanModelId === BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID &&
+      !result.has(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID)
+    ) {
+      result.set(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID, BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES);
     }
     return result;
   };

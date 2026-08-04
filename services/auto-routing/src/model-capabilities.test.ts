@@ -333,6 +333,61 @@ describe('getModelCapabilities', () => {
     expect(result.get('coding-plan/chat')?.contextLength).toBe(200000);
   });
 
+  it('supplies static image capabilities for the recognized BytePlus coding-plan default', async () => {
+    const env = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+      })
+    );
+    const result = await getModelCapabilities(env, {
+      codingPlanModelId: 'byteplus-coding/bytedance-seed-code',
+    });
+    const capabilities = result.get('byteplus-coding/bytedance-seed-code');
+    expect(capabilities?.inputModalities.has('image')).toBe(true);
+    expect(capabilities?.inputModalities.has('file')).toBe(false);
+    expect(capabilities?.contextLength).toBe(262_144);
+    expect(capabilities?.isActive).toBe(true);
+  });
+
+  it('lets a database capability row override the static BytePlus fallback', async () => {
+    dbWhere.mockResolvedValue([
+      {
+        openrouterId: 'byteplus-coding/bytedance-seed-code',
+        inputModalities: ['file'],
+        contextLength: 4096,
+        isActive: false,
+      },
+    ]);
+    const env = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+      })
+    );
+    const result = await getModelCapabilities(env, {
+      codingPlanModelId: 'byteplus-coding/bytedance-seed-code',
+    });
+    const capabilities = result.get('byteplus-coding/bytedance-seed-code');
+    expect(capabilities?.inputModalities.has('image')).toBe(false);
+    expect(capabilities?.inputModalities.has('file')).toBe(true);
+    expect(capabilities?.contextLength).toBe(4096);
+    expect(capabilities?.isActive).toBe(false);
+  });
+
+  it('does not synthesize capabilities when BytePlus is not the coding-plan model', async () => {
+    const env = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+      })
+    );
+    const result = await getModelCapabilities(env, {
+      additionalModelIds: ['byteplus-coding/bytedance-seed-code'],
+    });
+    expect(result.has('byteplus-coding/bytedance-seed-code')).toBe(false);
+  });
+
   it('distinguishes an unavailable routing table from a genuinely empty one when caching capabilities', async () => {
     const put = vi.fn(async () => undefined);
     const get = vi.fn(async () => null);

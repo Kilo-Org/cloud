@@ -16,6 +16,7 @@ const dbSelect = vi.hoisted(() => vi.fn());
 const dbFrom = vi.hoisted(() => vi.fn());
 const dbInnerJoin = vi.hoisted(() => vi.fn());
 const dbWhere = vi.hoisted(() => vi.fn());
+const dbOrderBy = vi.hoisted(() => vi.fn());
 const dbLimit = vi.hoisted(() => vi.fn());
 // Model-capabilities mock chain (select -> from -> where, no innerJoin/limit).
 const dbWhereCaps = vi.hoisted(() => vi.fn());
@@ -221,7 +222,7 @@ describe('auto routing worker', () => {
     dbSelect.mockReset();
     dbSelect.mockReturnValue({ from: dbFrom });
     dbFrom.mockReset();
-    // The coding-plan path goes through `innerJoin -> where -> limit`; the
+    // The coding-plan path goes through `innerJoin -> where -> orderBy -> limit`; the
     // model-capabilities path goes straight to `where` and awaits a plain
     // promise. Both are mounted on the same `from()` so a single test can
     // exercise either chain without a separate mock harness.
@@ -229,7 +230,9 @@ describe('auto routing worker', () => {
     dbInnerJoin.mockReset();
     dbInnerJoin.mockReturnValue({ where: dbWhere });
     dbWhere.mockReset();
-    dbWhere.mockReturnValue({ limit: dbLimit });
+    dbWhere.mockReturnValue({ orderBy: dbOrderBy });
+    dbOrderBy.mockReset();
+    dbOrderBy.mockReturnValue({ limit: dbLimit });
     dbLimit.mockReset();
     dbLimit.mockResolvedValue([]);
     dbWhereCaps.mockReset();
@@ -538,6 +541,86 @@ describe('auto routing worker', () => {
         decision: { model: 'minimax/minimax-m3', source: 'coding_plan_default' },
       });
       expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    });
+
+    it('takes the BytePlus coding-plan short-circuit for image requests using static capabilities', async () => {
+      configGet.mockImplementation(async (key: string) =>
+        key.startsWith('coding_plan_preference:')
+          ? JSON.stringify({
+              active: true,
+              planId: 'byteplus-coding-plan-team-lite',
+              providerId: 'byteplus-coding',
+              modelId: 'byteplus-coding/bytedance-seed-code',
+            })
+          : null
+      );
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: {
+          model: 'byteplus-coding/bytedance-seed-code',
+          source: 'coding_plan_default',
+        },
+      });
+      expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    });
+
+    it('falls through the BytePlus coding-plan short-circuit for file input', async () => {
+      configGet.mockImplementation(async (key: string) =>
+        key.startsWith('coding_plan_preference:')
+          ? JSON.stringify({
+              active: true,
+              planId: 'byteplus-coding-plan-team-lite',
+              providerId: 'byteplus-coding',
+              modelId: 'byteplus-coding/bytedance-seed-code',
+            })
+          : null
+      );
+      setVisionBenchmark();
+      dbWhereCaps.mockResolvedValue([
+        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 1_000_000 },
+        {
+          openrouterId: 'vision/chat',
+          inputModalities: ['image', 'file'],
+          contextLength: 1_000_000,
+        },
+      ]);
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['file'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'vision/chat', source: 'benchmark' },
+      });
+      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls through the BytePlus coding-plan short-circuit above its context limit', async () => {
+      configGet.mockImplementation(async (key: string) =>
+        key.startsWith('coding_plan_preference:')
+          ? JSON.stringify({
+              active: true,
+              planId: 'byteplus-coding-plan-team-lite',
+              providerId: 'byteplus-coding',
+              modelId: 'byteplus-coding/bytedance-seed-code',
+            })
+          : null
+      );
+      setVisionBenchmark();
+      dbWhereCaps.mockResolvedValue([
+        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 1_000_000 },
+        { openrouterId: 'vision/chat', inputModalities: ['image'], contextLength: 1_000_000 },
+      ]);
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { promptTokensEstimate: 262_145 } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'text-only/chat', source: 'benchmark' },
+      });
+      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
     });
 
     it('returns null when capability lookup fails on the coding-plan path with an image requirement', async () => {
@@ -1452,6 +1535,31 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
   });
 
+  it('falls back to benchmark routing when the BytePlus coding-plan default model is denied', async () => {
+    configGet.mockImplementation(async (key: string) =>
+      key.startsWith('coding_plan_preference:')
+        ? JSON.stringify({
+            active: true,
+            planId: 'byteplus-coding-plan-team-lite',
+            providerId: 'byteplus-coding',
+            modelId: 'byteplus-coding/bytedance-seed-code',
+          })
+        : null
+    );
+
+    const response = await decideRequest(
+      mirrorPayload({
+        routingPolicy: { deniedModelIds: ['byteplus-coding/bytedance-seed-code'] },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
+    });
+    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+  });
+
   it('loads and caches a coding-plan preference on cache miss', async () => {
     dbLimit.mockResolvedValueOnce([{ planId: 'minimax-token-plan-plus', providerId: 'minimax' }]);
 
@@ -1476,6 +1584,7 @@ describe('auto routing worker', () => {
     expect(dbFrom).toHaveBeenCalledTimes(1);
     expect(dbInnerJoin).toHaveBeenCalledTimes(1);
     expect(dbWhere).toHaveBeenCalledTimes(1);
+    expect(dbOrderBy).toHaveBeenCalledTimes(1);
     expect(dbLimit).toHaveBeenCalledWith(1);
     expect(configPut).toHaveBeenCalledWith(
       expect.stringMatching(/^coding_plan_preference:[0-9a-f]{16}$/),
@@ -1488,6 +1597,77 @@ describe('auto routing worker', () => {
       { expirationTtl: 60 }
     );
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('loads and caches the BytePlus coding-plan preference on cache miss', async () => {
+    dbLimit.mockResolvedValueOnce([
+      { planId: 'byteplus-coding-plan-team-lite', providerId: 'byteplus-coding' },
+    ]);
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'byteplus-coding/bytedance-seed-code',
+        source: 'coding_plan_default',
+      },
+    });
+    expect(configPut).toHaveBeenCalledWith(
+      expect.stringMatching(/^coding_plan_preference:[0-9a-f]{16}$/),
+      JSON.stringify({
+        active: true,
+        planId: 'byteplus-coding-plan-team-lite',
+        providerId: 'byteplus-coding',
+        modelId: 'byteplus-coding/bytedance-seed-code',
+      }),
+      { expirationTtl: 60 }
+    );
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('uses the database-selected BytePlus row when both recognized plans are active', async () => {
+    dbLimit.mockResolvedValueOnce([
+      { planId: 'byteplus-coding-plan-team-lite', providerId: 'byteplus-coding' },
+    ]);
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'byteplus-coding/bytedance-seed-code',
+        source: 'coding_plan_default',
+      },
+    });
+    expect(dbOrderBy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([['missing managed key'], ['disabled managed key'], ['cancelled subscription']])(
+    'falls back to benchmark routing when the query excludes a %s',
+    async () => {
+      dbLimit.mockResolvedValueOnce([]);
+
+      const response = await decideRequest(mirrorPayload());
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
+      });
+      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('falls back to benchmark routing for an unrecognized plan/provider row', async () => {
+    dbLimit.mockResolvedValueOnce([{ planId: 'unknown-plan', providerId: 'unknown-provider' }]);
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
+    });
+    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
   });
 
   it('serves a cached classification for the session without calling the classifier', async () => {

@@ -19,7 +19,7 @@ export default {
     Promise.resolve([
       {
         id: 'bytedance-seed-code',
-        name: 'Seed-Code',
+        name: 'ByteDance-Seed-Code',
         description:
           "ByteDance's latest code model has been deeply optimized for agentic programming tasks.",
         flags: ['recommended', 'vision', 'reasoning'],
@@ -48,13 +48,30 @@ export default {
         variants: REASONING_VARIANTS_BINARY,
       },
       {
-        id: 'glm-4.7',
-        name: 'GLM-4.7',
-        description:
-          "Z.ai's latest flagship model, enhanced programming capabilities and more stable multi-step reasoning/execution.",
+        id: 'glm-5.2',
+        name: 'GLM-5.2',
+        description: 'Z.AI’s latest flagship model for long-horizon agentic work.',
         flags: ['reasoning'],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
+      },
+      {
+        id: 'deepseek-v4-flash',
+        name: 'DeepSeek-V4-Flash',
+        description: 'DeepSeek V4 optimized for fast coding and agentic tasks.',
+        flags: ['reasoning'],
+        context_length: 128000,
+        max_completion_tokens: 65536,
+        variants: REASONING_VARIANTS_BINARY,
+      },
+      {
+        id: 'deepseek-v4-pro',
+        name: 'DeepSeek-V4-Pro',
+        description: 'DeepSeek V4 for complex coding and agentic tasks.',
+        flags: ['reasoning'],
+        context_length: 128000,
+        max_completion_tokens: 65536,
         variants: REASONING_VARIANTS_BINARY,
       },
       {

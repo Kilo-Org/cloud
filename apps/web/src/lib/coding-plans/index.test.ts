@@ -45,6 +45,8 @@ const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
 const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
 const PROVIDER_ID = 'minimax';
+const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
+const BYTEPLUS_PROVIDER_ID = 'byteplus-coding';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
 const ULTRA_COST_MICRODOLLARS = 120_000_000;
@@ -57,9 +59,10 @@ function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.ran
 
 async function seedInventoryKey(
   key = `managed-test-key-${crypto.randomUUID()}`,
-  planId: CodingPlanId = PLAN_ID
+  planId: CodingPlanId = PLAN_ID,
+  providerId = PROVIDER_ID
 ) {
-  await uploadKeysToInventory(PROVIDER_ID, planId, [inventoryEntry(key)], validatedInventoryUpload);
+  await uploadKeysToInventory(providerId, planId, [inventoryEntry(key)], validatedInventoryUpload);
 }
 
 async function createUserWithBalance(microdollars: number) {
@@ -118,6 +121,56 @@ describe('coding plans', () => {
         '~12.5B tokens per month of M3 usage.',
         'Run 6-7 concurrent agents.',
       ]),
+    });
+    expect(CODING_PLAN_CATALOG[BYTEPLUS_PLAN_ID]).toEqual({
+      planId: BYTEPLUS_PLAN_ID,
+      providerName: 'BytePlus',
+      name: 'Coding Plan Lite',
+      providerId: BYTEPLUS_PROVIDER_ID,
+      coveredModelIds: [
+        'byteplus-coding/dola-seed-2.0-pro',
+        'byteplus-coding/dola-seed-2.0-lite',
+        'byteplus-coding/dola-seed-2.0-code',
+        'byteplus-coding/bytedance-seed-code',
+        'byteplus-coding/kimi-k2.5',
+        'byteplus-coding/glm-5.1',
+        'byteplus-coding/glm-5.2',
+        'byteplus-coding/deepseek-v4-flash',
+        'byteplus-coding/deepseek-v4-pro',
+        'byteplus-coding/gpt-oss-120b',
+      ],
+      costMicrodollars: COST_MICRODOLLARS,
+      billingPeriodDays: 30,
+      features: expect.arrayContaining([
+        'Kilo automatically configures BytePlus in your BYOK settings.',
+      ]),
+    });
+  });
+
+  it('activates BytePlus alongside MiniMax using its managed BYOK provider slot', async () => {
+    const user = await createUserWithBalance(COST_MICRODOLLARS * 2);
+    await seedInventoryKey('minimax-key');
+    await seedInventoryKey('byteplus-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
+
+    await subscribeToCodingPlan(user.id, PLAN_ID, 'minimax-activation');
+    const byteplus = await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'byteplus-activation');
+    const [subscription] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, byteplus.subscriptionId));
+    const [managedKey] = await db
+      .select()
+      .from(byok_api_keys)
+      .where(eq(byok_api_keys.id, subscription.installed_byok_key_id!));
+
+    expect(subscription).toMatchObject({
+      plan_id: BYTEPLUS_PLAN_ID,
+      provider_id: BYTEPLUS_PROVIDER_ID,
+      status: 'active',
+    });
+    expect(managedKey).toMatchObject({
+      provider_id: BYTEPLUS_PROVIDER_ID,
+      management_source: 'coding_plan',
     });
   });
 
@@ -496,6 +549,7 @@ describe('coding plans', () => {
     expect(validateCredential).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       planId: PLAN_ID,
+      providerId: PROVIDER_ID,
       upstreamPlanId: 'minimax-upstream-plan-123',
     });
     expect(inventory.plan_id).toBe(PLAN_ID);
@@ -517,6 +571,7 @@ describe('coding plans', () => {
     expect(validateCredential).toHaveBeenCalledWith({
       apiKey: 'invalid-key',
       planId: PLAN_ID,
+      providerId: PROVIDER_ID,
       upstreamPlanId: 'minimax-plan-id',
     });
     expect(await db.select().from(coding_plan_key_inventory)).toHaveLength(0);
@@ -605,6 +660,7 @@ describe('coding plans', () => {
     expect(validateCredential).toHaveBeenCalledWith({
       apiKey: 'replace-new-key',
       planId: PLAN_ID,
+      providerId: PROVIDER_ID,
       upstreamPlanId: 'minimax-replace-plan',
     });
     expect(credential.status).toBe('available');

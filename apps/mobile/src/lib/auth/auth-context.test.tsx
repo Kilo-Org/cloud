@@ -156,9 +156,8 @@ async function mountAndGetContext(): Promise<{ ctx: AuthContextValue; unmount: (
 
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   await act(async () => {
-    // oxlint-disable-next-line react/no-children-prop -- React 19 createElement requires children in props, not as third arg
     renderer = TestRenderer.create(
-      createElement(mod.AuthProvider, { children: createElement(Consumer) })
+      createElement(mod.AuthProvider, null, createElement(Consumer))
     );
     await Promise.resolve();
   });

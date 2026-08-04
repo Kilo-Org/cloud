@@ -47,7 +47,6 @@ const unavailableModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
   'qwen/qwen3.7-plus:free',
-  'sakana/fugu-ultra', // this model is not available in the EU
   'upstage/solar-pro-3:free',
   'x-ai/grok-code-fast-1:optimized:free',
   'xiaomi/mimo-v2-omni:free',

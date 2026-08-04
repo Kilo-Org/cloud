@@ -495,7 +495,8 @@ Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 
 `pnpm dev:infra-env` publishes the endpoints, and `pnpm dev:start`, `pnpm dev:env`, and `pnpm test:db` call it for you:
 
 - `dev/.env` carries `COMPOSE_PROJECT_NAME` and one `KILO_*_PORT` per container. Docker Compose reads that file by default, so a plain `docker compose -f dev/docker-compose.yml …` in a terminal uses the same project and ports.
-- `.env.local` gets this worktree's `POSTGRES_URL`, `REDIS_URL`, and `UPSTASH_REDIS_REST_URL`, which is what Next.js, drizzle-kit, `pnpm dev:seed`, and the tests read. A value that names another host (a remote database, a tunnel) is left alone.
+- `.env.local` gets this worktree's `POSTGRES_URL`, `REDIS_URL`, and `UPSTASH_REDIS_REST_URL`, which is what Next.js, drizzle-kit, and `pnpm dev:seed` read. A value that names another host (a remote database, a tunnel) is left alone.
+- `apps/web/.env.test.local` gets this worktree's `POSTGRES_URL`, and nothing else. The Jest setup loads `apps/web/.env.test`, which commits the default port, with `override: true`, and it never loads `.env.local`. `.env.test.local` is the last file that setup loads, so it is the one place a worktree can put its own port. Without it, every worktree's `pnpm test` runs against port 5432, and two worktrees drop each other's `postgres-<worker>` databases mid-run.
 - Every worker command gets `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`, because each `wrangler.jsonc` commits a `localConnectionString` on the default port.
 
 The Next.js dev script reads `REDIS_URL` and `UPSTASH_REDIS_REST_URL` from the shell, then from the env files, and falls back to `redis://localhost:6379` and `http://localhost:8079`. It also exports `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper; `REDIS_URL` serves Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.

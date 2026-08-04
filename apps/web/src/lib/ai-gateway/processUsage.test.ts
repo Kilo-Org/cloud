@@ -26,10 +26,6 @@ import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { db } from '@/lib/drizzle';
 import {
-  cost_insight_owner_hour_driver_buckets,
-  cost_insight_owner_hour_totals,
-  cost_insight_rollup_degraded_intervals,
-  cost_insight_rollup_repairs,
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_daily_repairs,
@@ -613,34 +609,6 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.has_error).toBe(false);
     expect(usageRecord?.created_at).toBeTruthy();
     expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
-
-    await waitForExpectation(async () => {
-      const [total] = await db
-        .select()
-        .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
-      expect(total).toMatchObject({
-        owned_by_organization_id: null,
-        spend_category: 'variable',
-        total_microdollars: 500,
-        spend_record_count: 1,
-      });
-
-      const [driver] = await db
-        .select()
-        .from(cost_insight_owner_hour_driver_buckets)
-        .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, user.id));
-      expect(driver).toMatchObject({
-        source: 'ai_gateway',
-        product_key: 'vscode-extension',
-        feature_key: 'chat_completions',
-        model_or_plan_key: 'anthropic/claude-3.7-sonnet',
-        provider_key: 'Provider',
-        actor_user_id: user.id,
-        total_microdollars: 500,
-        spend_record_count: 1,
-      });
-    });
   });
 
   test('stores session_id when provided', async () => {
@@ -748,12 +716,6 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.has_error).toBe(true);
     expect(usageRecord?.model).toBe('openai/gpt-4.1');
     expect(metadataRecord?.has_middle_out_transform).toBe(false);
-
-    const totals = await db
-      .select()
-      .from(cost_insight_owner_hour_totals)
-      .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
-    expect(totals).toHaveLength(0);
   });
 
   test('keeps AI source rows when legacy usage owner does not exist', async () => {
@@ -773,83 +735,7 @@ describe('logMicrodollarUsage', () => {
         .from(microdollar_usage)
         .where(eq(microdollar_usage.kilo_user_id, missingUserId));
       expect(sourceRows).toHaveLength(1);
-
-      await new Promise(resolve => setImmediate(resolve));
-      await new Promise(resolve => setImmediate(resolve));
-
-      const totals = await db
-        .select()
-        .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
-      expect(totals).toHaveLength(0);
-
-      const degradedIntervals = await db
-        .select()
-        .from(cost_insight_rollup_degraded_intervals)
-        .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
-      expect(degradedIntervals).toHaveLength(0);
     } finally {
-      consoleErrorSpy.mockRestore();
-    }
-  });
-
-  test('keeps usage and balance write and enqueues owner-hour repair after capture fails', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const user = await insertTestUser({
-      id: ` test-cost-insight-failure-user-${crypto.randomUUID()} `,
-      microdollars_used: 0,
-      google_user_email: 'cost-insight-failure@example.com',
-    });
-    const organization = await createTestOrganization(
-      'Cost insight capture failure organization',
-      user.id,
-      10_000
-    );
-    const { core, metadata } = await defineMicrodollarUsage();
-
-    try {
-      const result = await insertUsageRecord(
-        { ...core, kilo_user_id: user.id, organization_id: organization.id, cost: 1000 },
-        metadata
-      );
-
-      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: null });
-
-      const sourceRows = await db
-        .select()
-        .from(microdollar_usage)
-        .where(eq(microdollar_usage.kilo_user_id, user.id));
-      expect(sourceRows).toHaveLength(1);
-
-      await new Promise(resolve => setImmediate(resolve));
-      await new Promise(resolve => setImmediate(resolve));
-
-      const totals = await db
-        .select()
-        .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
-      expect(totals).toHaveLength(0);
-
-      const degradedIntervals = await db
-        .select()
-        .from(cost_insight_rollup_degraded_intervals)
-        .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
-      expect(degradedIntervals).toHaveLength(0);
-
-      const repairs = await db
-        .select()
-        .from(cost_insight_rollup_repairs)
-        .where(eq(cost_insight_rollup_repairs.owned_by_organization_id, organization.id));
-      expect(repairs).toHaveLength(1);
-      expect(repairs[0].usage_id).toBe(core.id);
-      expect(new Date(repairs[0].hour_start).toISOString()).toBe(
-        new Date(Math.floor(Date.parse(core.created_at) / 3_600_000) * 3_600_000).toISOString()
-      );
-      expect(Date.parse(repairs[0].next_attempt_at)).toBeGreaterThan(Date.parse(core.created_at));
-    } finally {
-      await db
-        .delete(cost_insight_rollup_repairs)
-        .where(eq(cost_insight_rollup_repairs.owned_by_organization_id, organization.id));
       consoleErrorSpy.mockRestore();
     }
   });
@@ -1040,17 +926,6 @@ describe('logMicrodollarUsage', () => {
       expect(memberUsage).toMatchObject({
         kilo_user_id: user.id,
         microdollar_usage: 500,
-      });
-
-      const [total] = await db
-        .select()
-        .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
-      expect(total).toMatchObject({
-        owned_by_user_id: null,
-        spend_category: 'variable',
-        total_microdollars: 500,
-        spend_record_count: 1,
       });
     });
   });

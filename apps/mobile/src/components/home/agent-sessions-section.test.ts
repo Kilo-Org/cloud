@@ -5,6 +5,7 @@ import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-se
 
 vi.mock('expo-router', () => ({
   useRouter: vi.fn(),
+  useFocusEffect: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({

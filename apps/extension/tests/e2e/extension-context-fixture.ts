@@ -16,24 +16,29 @@ import type { NormalizedPosthogEvent } from './posthog-fixture';
 export const extensionPath = resolvePath(import.meta.dirname, '../../.output/chrome-mv3');
 
 export const startFixtureServer = async ({
+  bodyHtml,
+  pathHtml,
   title = 'Kilo extension fixture',
 }: {
+  bodyHtml?: string;
+  pathHtml?: Record<string, string>;
   title?: string;
 } = {}): Promise<{ close: () => Promise<void>; url: string }> => {
-  const server = createServer((_request, response) => {
+  const fallbackHtml = `<!doctype html>
+<html>
+  <head><title>${title}</title></head>
+  <body>
+    <main>
+      <h1>${title}</h1>
+      ${bodyHtml ?? '<p>This page exists so content scripts run in a normal HTTP tab.</p>'}
+    </main>
+  </body>
+</html>`;
+  const server = createServer((request, response) => {
+    const requestPath = (request.url ?? '/').split('?')[0] ?? '/';
+    const html = pathHtml?.[requestPath] ?? fallbackHtml;
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    response.end(`
-      <!doctype html>
-      <html>
-        <head><title>${title}</title></head>
-        <body>
-          <main>
-            <h1>${title}</h1>
-            <p>This page exists so content scripts run in a normal HTTP tab.</p>
-          </main>
-        </body>
-      </html>
-    `);
+    response.end(html);
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -53,6 +58,12 @@ export const startFixtureServer = async ({
   return {
     close: () =>
       new Promise<void>((resolve, reject) => {
+        // Force-close idle and active connections so server.close does NOT
+        // Wait for the browser keep-alive connection to drain. Without this
+        // The teardown hangs for ~55 s until the test times out.
+        if (typeof server.closeAllConnections === 'function') {
+          server.closeAllConnections();
+        }
         server.close(error => {
           if (error) {
             reject(error);

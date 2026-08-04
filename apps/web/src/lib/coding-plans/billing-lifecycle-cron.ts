@@ -6,13 +6,8 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
 import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
-import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
-import {
-  captureCostInsightSpend,
-  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
-} from '@kilocode/db/cost-insights-rollups';
 import {
   byok_api_keys,
   coding_plan_key_inventory,
@@ -352,18 +347,6 @@ async function processRenewal(
         original_baseline_microdollars_used: row.microdollars_used,
         created_at: occurredAt,
       });
-      await captureCostInsightSpend(tx, {
-        owner: { type: 'user', id: row.user_id },
-        actorUserId: row.user_id,
-        occurredAt,
-        amountMicrodollars: row.cost_microdollars,
-        category: 'scheduled',
-        source: 'coding_plan',
-        productKey: COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
-        featureKey: 'renewal',
-        modelOrPlanKey: row.plan_id,
-        providerKey: row.provider_id,
-      });
       await tx.insert(coding_plan_terms).values({
         subscription_id: row.id,
         user_id: row.user_id,
@@ -445,8 +428,5 @@ async function processRenewal(
     }
     return 'terminated';
   });
-  if (result === 'renewed') {
-    scheduleCostInsightEvaluationAfterSpend({ type: 'user', id: selectedRow.user_id });
-  }
   return result;
 }

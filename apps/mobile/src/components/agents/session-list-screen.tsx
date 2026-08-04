@@ -15,6 +15,7 @@ import {
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
+import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
@@ -62,9 +63,6 @@ export function AgentSessionListScreen() {
 
   const ready = filtersLoaded && orgLoaded;
 
-  // Navigation guard: prevent double-push on rapid row taps. Re-arms on next focus.
-  const rowNavLockRef = useRef(false);
-
   const {
     storedSessions,
     activeSessions,
@@ -96,7 +94,6 @@ export function AgentSessionListScreen() {
   }, [refetch]);
   useFocusEffect(
     useCallback(() => {
-      rowNavLockRef.current = false;
       void refetchRef.current();
     }, [])
   );
@@ -114,24 +111,7 @@ export function AgentSessionListScreen() {
     [storedSessions]
   );
 
-  const navigateToSession = useCallback(
-    (sessionId: string, sessionOrgId?: string | null) => {
-      if (rowNavLockRef.current) {
-        return;
-      }
-      rowNavLockRef.current = true;
-      try {
-        router.push(
-          (sessionOrgId
-            ? `/(app)/agent-chat/${sessionId}?organizationId=${sessionOrgId}`
-            : `/(app)/agent-chat/${sessionId}`) as Href
-        );
-      } catch {
-        rowNavLockRef.current = false;
-      }
-    },
-    [router]
-  );
+  const navigateToSession = useAgentSessionNavigator();
 
   const handleEndReached = useCallback(() => {
     if (!isSearching && hasNextPage && !isFetchingNextPage) {

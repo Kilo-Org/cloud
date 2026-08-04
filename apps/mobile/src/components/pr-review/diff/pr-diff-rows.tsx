@@ -10,7 +10,6 @@ export {
   EmptyFilesView,
   ExpandSeparatorRow,
   HunkHeaderRow,
-  LIST_CONTENT_STYLE,
   PaginationRow,
   TabStateMessage,
 } from '@/components/pr-review/diff/pr-diff-hunk-rows';

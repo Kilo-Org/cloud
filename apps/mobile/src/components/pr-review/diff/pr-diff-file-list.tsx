@@ -25,7 +25,7 @@
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
 import {
@@ -41,12 +41,9 @@ import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
-import {
-  EmptyFilesView,
-  LIST_CONTENT_STYLE,
-  TabStateMessage,
-} from '@/components/pr-review/diff/pr-diff-rows';
+import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
 import { buildFileItems, buildPaginationItem } from '@/lib/pr-review/diff/pr-diff-list-builder';
+import { prDiffListBottomPadding } from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
 import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { stickyFileHeaderIndices } from '@/lib/pr-review/diff/sticky-file-headers';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
@@ -114,6 +111,25 @@ export function PrReviewFileList({
   // selection can never leak into the next mount. Re-mounting this
   // list always starts with no selection.
   useEffect(() => clearDiffSelection, []);
+
+  // Measured floating-bar height (null until the first layout event).
+  const [barHeight, setBarHeight] = useState<number | null>(null);
+
+  // Stable callback: ignore sub-one-point noise to avoid unnecessary
+  // re-renders.  Layout events can fire with fractional-pixel deltas.
+  const handleHeightChange = useCallback((height: number) => {
+    setBarHeight(prev => {
+      if (prev !== null && Math.abs(prev - height) < 1) {
+        return prev;
+      }
+      return height;
+    });
+  }, []);
+
+  const contentContainerStyle = useMemo<ViewStyle>(
+    () => ({ paddingBottom: prDiffListBottomPadding(barHeight) }),
+    [barHeight]
+  );
 
   const viewedCount = useMemo(() => {
     let count = 0;
@@ -319,7 +335,7 @@ export function PrReviewFileList({
               }
             }}
             onEndReachedThreshold={0.5}
-            contentContainerStyle={LIST_CONTENT_STYLE}
+            contentContainerStyle={contentContainerStyle}
             ItemSeparatorComponent={null}
           />
         )}
@@ -330,6 +346,7 @@ export function PrReviewFileList({
           viewMode={effectiveViewMode}
           selection={selection}
           onClearSelection={clearSelection}
+          onHeightChange={handleHeightChange}
         />
       </View>
     </DiffFontMetricsContext.Provider>

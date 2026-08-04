@@ -1,6 +1,5 @@
 import {
   ManualByokProviderDefinitionSchema,
-  type ManualByokApiKind,
   type ManualByokModel,
   type ManualByokProviderDefinition,
 } from '@kilocode/db/schema-types';
@@ -34,42 +33,19 @@ function apiForAiSdkProvider(provider: ManualByokProviderDefinition['preferred_a
   return 'chat_completions';
 }
 
-const BLOCKED_EXTRA_HEADERS = new Set([
-  'authorization',
-  'connection',
-  'content-length',
-  'host',
-  'proxy-authorization',
-  'transfer-encoding',
-  'upgrade',
-  'x-api-key',
-]);
-const SECRET_HEADER_PART = /(^|[-_])(auth|authorization|cookie|key|secret|token)([-_]|$)/;
-
 export const ValidatedManualByokProviderDefinitionSchema =
   ManualByokProviderDefinitionSchema.superRefine((definition, ctx) => {
     const supportedApis = new Set(definition.supported_apis);
     if (supportedApis.size !== definition.supported_apis.length) {
       ctx.addIssue({ code: 'custom', path: ['supported_apis'], message: 'APIs must be unique.' });
     }
-    for (const api of definition.supported_apis) {
-      const baseUrl = definition.base_urls[api];
-      if (!baseUrl) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['base_urls', api],
-          message: 'A base URL is required for every supported API.',
-        });
-      } else {
-        const parsedUrl = new URL(baseUrl);
-        if (parsedUrl.username || parsedUrl.password || parsedUrl.search || parsedUrl.hash) {
-          ctx.addIssue({
-            code: 'custom',
-            path: ['base_urls', api],
-            message: 'Base URLs cannot contain credentials, query strings, or fragments.',
-          });
-        }
-      }
+    const parsedUrl = new URL(definition.base_url);
+    if (parsedUrl.username || parsedUrl.password || parsedUrl.search || parsedUrl.hash) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['base_url'],
+        message: 'Base URLs cannot contain credentials, query strings, or fragments.',
+      });
     }
     const preferredApi = apiForAiSdkProvider(definition.preferred_ai_sdk_provider);
     if (!supportedApis.has(preferredApi)) {
@@ -78,20 +54,6 @@ export const ValidatedManualByokProviderDefinitionSchema =
         path: ['preferred_ai_sdk_provider'],
         message: `The preferred AI SDK provider requires the ${preferredApi} API.`,
       });
-    }
-
-    for (const header of Object.keys(definition.extra_headers ?? {})) {
-      const normalizedHeader = header.toLowerCase();
-      if (
-        BLOCKED_EXTRA_HEADERS.has(normalizedHeader) ||
-        SECRET_HEADER_PART.test(normalizedHeader)
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['extra_headers', header],
-          message: 'Authentication and transport headers cannot be configured here.',
-        });
-      }
     }
 
     const modelIds = new Set<string>();
@@ -128,13 +90,6 @@ export function safeParseManualByokProviderDefinition(value: unknown) {
 
 export function formatManualByokModelId(providerId: ManualByokProviderId, modelId: string): string {
   return `${providerId}/${modelId}`.toLowerCase();
-}
-
-export function getManualByokBaseUrl(
-  definition: ManualByokProviderDefinition,
-  apiKind: ManualByokApiKind
-): string | null {
-  return definition.base_urls[apiKind] ?? null;
 }
 
 export function resolveManualByokModel(

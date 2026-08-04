@@ -44,7 +44,6 @@ import {
 } from '@/lib/ai-gateway/providers/direct-byok';
 import {
   formatManualByokProviderId,
-  getManualByokBaseUrl,
   isManualByokEnabled,
   ManualByokProviderIdSchema,
   safeParseManualByokProviderDefinition,
@@ -546,13 +545,9 @@ export const byokRouter = createTRPCRouter({
         const settings = parsedSettings.data;
         const model = settings.models[0];
         const apiKind = settings.supported_apis[0];
-        const baseUrl = getManualByokBaseUrl(settings, apiKind);
-        if (!baseUrl) {
-          return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
-        }
         try {
           const response = await testManualProvider(
-            baseUrl,
+            settings.base_url,
             apiKind,
             model.id,
             decryptedKey.decryptedAPIKey,

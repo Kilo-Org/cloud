@@ -18,7 +18,7 @@ import type { ManualByokProviderDefinition } from '@kilocode/db/schema-types';
 
 const manualProviderSettings = {
   name: 'Dedicated inference',
-  base_urls: { chat_completions: 'http://inference.internal/v1' },
+  base_url: 'http://inference.internal/v1',
   use_x_api_key: false,
   supported_apis: ['chat_completions'],
   preferred_ai_sdk_provider: 'openai-compatible',

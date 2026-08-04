@@ -12,7 +12,7 @@ const originalVercelEnv = process.env.VERCEL_ENV;
 
 const definition = {
   name: 'Local models',
-  base_urls: { chat_completions: 'http://inference.internal/v1' },
+  base_url: 'http://inference.internal/v1',
   use_x_api_key: false,
   supported_apis: ['chat_completions'] as const,
   preferred_ai_sdk_provider: 'openai-compatible' as const,
@@ -39,7 +39,7 @@ describe('manual BYOK provider definitions', () => {
     expect(() => formatManualByokProviderId('Local_models')).toThrow();
   });
 
-  test('requires a base URL for every supported API and unique model IDs', () => {
+  test('requires unique model IDs', () => {
     expect(ValidatedManualByokProviderDefinitionSchema.safeParse(definition).success).toBe(true);
     const invalid = {
       ...definition,
@@ -49,26 +49,26 @@ describe('manual BYOK provider definitions', () => {
     const result = ValidatedManualByokProviderDefinitionSchema.safeParse(invalid);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.map(issue => issue.path.join('.'))).toEqual(
-        expect.arrayContaining(['base_urls.messages', 'models.1.id'])
-      );
+      expect(result.error.issues.map(issue => issue.path.join('.'))).toContain('models.1.id');
     }
   });
 
-  test('rejects credential headers and preferred adapters without their API', () => {
+  test('allows arbitrary advanced headers', () => {
     expect(
       ValidatedManualByokProviderDefinitionSchema.safeParse({
         ...definition,
         extra_headers: { Authorization: 'plaintext-secret' },
-        preferred_ai_sdk_provider: 'anthropic',
       }).success
-    ).toBe(false);
+    ).toBe(true);
     expect(
       ValidatedManualByokProviderDefinitionSchema.safeParse({
         ...definition,
         extra_headers: { 'api-key': 'plaintext-secret', Cookie: 'session=secret' },
       }).success
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  test('rejects preferred adapters without their API', () => {
     expect(
       ValidatedManualByokProviderDefinitionSchema.safeParse({
         ...definition,
@@ -81,13 +81,13 @@ describe('manual BYOK provider definitions', () => {
     expect(
       ValidatedManualByokProviderDefinitionSchema.safeParse({
         ...definition,
-        base_urls: { chat_completions: 'https://example.com/v1?api-version=1' },
+        base_url: 'https://example.com/v1?api-version=1',
       }).success
     ).toBe(false);
     expect(
       ValidatedManualByokProviderDefinitionSchema.safeParse({
         ...definition,
-        base_urls: { chat_completions: 'https://secret@example.com/v1' },
+        base_url: 'https://secret@example.com/v1',
       }).success
     ).toBe(false);
   });

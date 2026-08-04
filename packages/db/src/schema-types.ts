@@ -2142,11 +2142,7 @@ export type ManualByokModel = z.infer<typeof ManualByokModelSchema>;
 
 export const ManualByokProviderDefinitionSchema = z.object({
   name: z.string().min(1),
-  base_urls: z.object({
-    messages: z.url().optional(),
-    chat_completions: z.url().optional(),
-    responses: z.url().optional(),
-  }),
+  base_url: z.url(),
   use_x_api_key: z.boolean(),
   supported_apis: z.array(ManualByokApiKindSchema).min(1),
   preferred_ai_sdk_provider: ManualByokAiSdkProviderSchema,

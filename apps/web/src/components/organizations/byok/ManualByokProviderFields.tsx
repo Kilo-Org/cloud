@@ -41,7 +41,7 @@ const AI_SDK_PROVIDERS = [
 
 export const INITIAL_MANUAL_BYOK_SETTINGS: ManualByokProviderDefinition = {
   name: '',
-  base_urls: { chat_completions: '' },
+  base_url: '',
   use_x_api_key: false,
   supported_apis: ['chat_completions'],
   preferred_ai_sdk_provider: 'openai-compatible',
@@ -344,10 +344,6 @@ export function ManualByokProviderFields({
     invalidJsonFields.current = next;
     onJsonValidityChange(next.size === 0);
   };
-  const firstBaseUrl = settings.supported_apis
-    .map(api => settings.base_urls[api])
-    .find((url): url is string => !!url);
-
   const toggleApi = (api: ManualByokApiKind, enabled: boolean) => {
     onSettingsChange({
       ...settings,
@@ -396,6 +392,20 @@ export function ManualByokProviderFields({
       </div>
 
       <div className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor="manual-base-url">Base URL</Label>
+          <Input
+            id="manual-base-url"
+            type="url"
+            value={settings.base_url}
+            onChange={event => onSettingsChange({ ...settings, base_url: event.target.value })}
+            placeholder="https://api.example.com/v1"
+          />
+          <p className="text-muted-foreground text-xs">
+            This URL is shared by every supported API. Create another provider for a different
+            endpoint.
+          </p>
+        </div>
         <Label>Supported APIs</Label>
         <div className="grid gap-3 sm:grid-cols-3">
           {API_OPTIONS.map(api => (
@@ -408,23 +418,6 @@ export function ManualByokProviderFields({
             </label>
           ))}
         </div>
-        {API_OPTIONS.filter(api => settings.supported_apis.includes(api.id)).map(api => (
-          <div key={api.id} className="space-y-2">
-            <Label htmlFor={`manual-base-url-${api.id}`}>{api.label} base URL</Label>
-            <Input
-              id={`manual-base-url-${api.id}`}
-              type="url"
-              value={settings.base_urls[api.id] ?? ''}
-              onChange={event =>
-                onSettingsChange({
-                  ...settings,
-                  base_urls: { ...settings.base_urls, [api.id]: event.target.value },
-                })
-              }
-              placeholder="https://api.example.com/v1"
-            />
-          </div>
-        ))}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -568,11 +561,11 @@ export function ManualByokProviderFields({
               type="button"
               variant="secondary"
               size="sm"
-              disabled={!firstBaseUrl || !apiKey || fetchModels.isPending}
+              disabled={!settings.base_url || !apiKey || fetchModels.isPending}
               onClick={() => {
-                if (!firstBaseUrl) return;
+                if (!settings.base_url) return;
                 fetchModels.mutate({
-                  base_url: firstBaseUrl,
+                  base_url: settings.base_url,
                   api_key: apiKey,
                   use_x_api_key: settings.use_x_api_key,
                 });

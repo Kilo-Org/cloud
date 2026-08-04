@@ -5,9 +5,19 @@ jest.mock('next/headers', () => ({
   headers: jest.fn().mockResolvedValue(new Headers()),
 }));
 
-jest.mock('@/lib/device-auth/device-auth');
+jest.mock('@/lib/device-auth/device-auth', () => {
+  const actual = jest.requireActual('@/lib/device-auth/device-auth');
+  return {
+    ...actual,
+    createDeviceAuthRequest: jest.fn(),
+  };
+});
 
-import { createDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+import {
+  createDeviceAuthRequest,
+  DeviceAuthPendingLimitError,
+  DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
+} from '@/lib/device-auth/device-auth';
 import { POST } from './route';
 
 const mockCreate = jest.mocked(createDeviceAuthRequest);
@@ -67,5 +77,30 @@ describe('POST /api/device-auth/codes', () => {
     expect(data.verificationUrl).toEqual(
       expect.stringContaining(`${APP_URL}/device-auth?code=WXYZ-1234`)
     );
+  });
+
+  test('returns 429 with non-empty message when pending limit is hit', async () => {
+    mockCreate.mockRejectedValue(new DeviceAuthPendingLimitError());
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+    });
+
+    const response = await POST(req);
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.error).toBe(DEVICE_AUTH_PENDING_LIMIT_MESSAGE);
+    expect(data.error.length).toBeGreaterThan(0);
+  });
+
+  test('re-throws unexpected errors to the global 500 handler', async () => {
+    mockCreate.mockRejectedValue(new Error('unexpected'));
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+    });
+
+    await expect(POST(req)).rejects.toThrow('unexpected');
   });
 });

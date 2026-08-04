@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
-import { classifyPollResponse } from '@/lib/auth/poll-response';
+import { classifyPollResponse, getDeviceAuth429Message } from '@/lib/auth/poll-response';
 
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
 
@@ -207,6 +207,20 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         if (!response.ok) {
+          if (response.status === 429) {
+            const body = (await response.json().catch(() => undefined)) as
+              | { error?: string }
+              | undefined;
+            const message = getDeviceAuth429Message(body);
+            setState({
+              status: 'error',
+              code: undefined,
+              token: undefined,
+              error: message,
+              verificationUrl: undefined,
+            });
+            return;
+          }
           setState({
             status: 'error',
             code: undefined,

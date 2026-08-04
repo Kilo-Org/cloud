@@ -10,6 +10,17 @@ const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
 const MAX_PENDING_REQUESTS_PER_IP = 5;
 
+export const DEVICE_AUTH_PENDING_LIMIT_MESSAGE =
+  'Too many sign-in attempts from this network. Wait a few minutes and try again.';
+
+/** Rate-limit error thrown when an IP has too many live pending requests. */
+export class DeviceAuthPendingLimitError extends Error {
+  constructor() {
+    super(DEVICE_AUTH_PENDING_LIMIT_MESSAGE);
+    this.name = 'DeviceAuthPendingLimitError';
+  }
+}
+
 /**
  * Generate a random human-readable device authorization code.
  * Uses only unambiguous characters for better UX.
@@ -66,12 +77,13 @@ export async function createDeviceAuthRequest(params: {
       .where(
         and(
           eq(device_auth_requests.ip_address, ipAddress),
-          eq(device_auth_requests.status, 'pending')
+          eq(device_auth_requests.status, 'pending'),
+          gt(device_auth_requests.expires_at, new Date().toISOString())
         )
       );
 
     if (result && result.count >= MAX_PENDING_REQUESTS_PER_IP) {
-      throw new Error('Too many pending authorization requests from this IP');
+      throw new DeviceAuthPendingLimitError();
     }
   }
 

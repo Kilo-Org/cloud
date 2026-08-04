@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+import { createDeviceAuthRequest, DeviceAuthPendingLimitError } from '@/lib/device-auth/device-auth';
 import { headers } from 'next/headers';
 import { APP_URL } from '@/lib/constants';
 import {
@@ -12,20 +12,30 @@ export async function POST(request: Request) {
   const userAgent = headersList.get('user-agent') || undefined;
   const ipAddress = headersList.get('x-forwarded-for') || undefined;
 
-  const { code, userCode, deviceCode, expiresAt } = await createDeviceAuthRequest({
-    userAgent,
-    ipAddress,
-  });
+  try {
+    const { code, userCode, deviceCode, expiresAt } = await createDeviceAuthRequest({
+      userAgent,
+      ipAddress,
+    });
 
-  const verificationUrl = buildDeviceAuthVerificationUrl(APP_URL, userCode, {
-    app: getDeviceAuthAppModeFromRequestUrl(request.url),
-  });
+    const verificationUrl = buildDeviceAuthVerificationUrl(APP_URL, userCode, {
+      app: getDeviceAuthAppModeFromRequestUrl(request.url),
+    });
 
-  return NextResponse.json({
-    code,
-    user_code: userCode,
-    device_code: deviceCode,
-    verificationUrl,
-    expiresIn: Math.floor((expiresAt.getTime() - Date.now()) / 1000),
-  });
+    return NextResponse.json({
+      code,
+      user_code: userCode,
+      device_code: deviceCode,
+      verificationUrl,
+      expiresIn: Math.floor((expiresAt.getTime() - Date.now()) / 1000),
+    });
+  } catch (error) {
+    if (error instanceof DeviceAuthPendingLimitError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 429 }
+      );
+    }
+    throw error;
+  }
 }

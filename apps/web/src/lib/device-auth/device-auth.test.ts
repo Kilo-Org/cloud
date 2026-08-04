@@ -15,6 +15,8 @@ import {
   consumeDeviceAuthByDeviceCode,
   isDeviceAuthRequestExpired,
   cleanupExpiredDeviceAuthRequests,
+  DeviceAuthPendingLimitError,
+  DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
 } from './device-auth';
 
 describe('Device Auth', () => {
@@ -116,17 +118,48 @@ describe('Device Auth', () => {
       expect(request?.ip_address).toBe('127.0.0.1');
     });
 
-    test('enforces rate limiting per IP', async () => {
-      const ipAddress = '192.168.1.1';
+    test('enforces rate limiting per IP — live rows block, expired rows do not', async () => {
+      const ipAddress = `192.168.1.${(Date.now() * 7) % 254}`;
 
-      // Create 5 pending requests (the limit)
+      // Clean up any leftover rows from previous runs with this IP.
+      await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+
+      // Create 5 expired pending requests with the same IP — these must not block a new request.
+      for (let i = 0; i < 5; i++) {
+        const { code } = await createDeviceAuthRequest({ ipAddress });
+        // Manually expire each row so the pending count excludes them.
+        await db
+          .update(device_auth_requests)
+          .set({
+            status: 'pending',
+            expires_at: new Date(Date.now() - 60_000).toISOString(),
+          })
+          .where(eq(device_auth_requests.code, code));
+      }
+
+      // A new request from the same IP should succeed because all pending rows
+      // are expired.
+      const result = await createDeviceAuthRequest({ ipAddress });
+      expect(result.code).toBeDefined();
+      expect(result.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    });
+    test('rejects the sixth live pending request from the same IP', async () => {
+      const ipAddress = `192.168.1.${(Date.now() * 11) % 254}`;
+
+      // Clean up any leftover rows.
+      await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+
+      // Create 5 live pending requests.
       for (let i = 0; i < 5; i++) {
         await createDeviceAuthRequest({ ipAddress });
       }
 
-      // 6th request should fail
+      // The 6th request must be rejected.
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
-        'Too many pending authorization requests from this IP'
+        DeviceAuthPendingLimitError
+      );
+      await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
+        DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );
     });
   });

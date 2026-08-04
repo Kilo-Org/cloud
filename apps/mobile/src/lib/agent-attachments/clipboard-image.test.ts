@@ -188,6 +188,7 @@ describe('readClipboardImageFile', () => {
           throw new Error('disk full');
         }),
         filename: 'pasted-image-uuid-1.png',
+        directory: _directory as { name?: string },
       };
       fileInstances.push(instance);
       return instance;

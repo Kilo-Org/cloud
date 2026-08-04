@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { CRON_SECRET } from '@/lib/config.server';
-import { provisionExaUsageLogPartitions } from '@/lib/exa-usage-partitions';
+import {
+  provisionContainerUsageChargePartitions,
+  provisionExaUsageLogPartitions,
+} from '@/lib/exa-usage-partitions';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');
@@ -21,7 +24,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { created, errors: partitionErrors } = await provisionExaUsageLogPartitions(db);
+  const [
+    { created: exaCreated, errors: exaErrors },
+    { created: chargeCreated, errors: chargeErrors },
+  ] = await Promise.all([
+    provisionExaUsageLogPartitions(db),
+    provisionContainerUsageChargePartitions(db),
+  ]);
+  const created = [...exaCreated, ...chargeCreated];
+  const partitionErrors = [...exaErrors, ...chargeErrors];
   const errors: string[] = [];
 
   for (const { name, error } of partitionErrors) {

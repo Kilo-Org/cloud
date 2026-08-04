@@ -9,6 +9,9 @@ export type ExaUsageLogPartitionProvisioningResult = {
   errors: Array<{ name: string; error: unknown }>;
 };
 
+export type ContainerUsageChargePartitionProvisioningResult =
+  ExaUsageLogPartitionProvisioningResult;
+
 export type ExaUsageLogPartitionIndexDefinition = {
   name: string;
   statement: string;
@@ -112,5 +115,36 @@ export async function provisionExaUsageLogPartitions(
     }
   }
 
+  return { created, errors };
+}
+
+/** Keeps the container debit ledger writable through the current and next two months. */
+export async function provisionContainerUsageChargePartitions(
+  fromDb: ExaPartitionDb,
+  now: Date = new Date()
+): Promise<ContainerUsageChargePartitionProvisioningResult> {
+  const created: string[] = [];
+  const errors: Array<{ name: string; error: unknown }> = [];
+
+  for (let offset = 0; offset <= 2; offset++) {
+    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const nextMonth = new Date(target.getFullYear(), target.getMonth() + 1, 1);
+    const name = `container_usage_charge_${format(target, 'yyyy_MM')}`;
+    try {
+      await fromDb.execute(
+        sql.raw(
+          `CREATE TABLE IF NOT EXISTS "public"."${name}" PARTITION OF "public"."container_usage_charge" FOR VALUES FROM ('${format(target, 'yyyy-MM-dd')}') TO ('${format(nextMonth, 'yyyy-MM-dd')}')`
+        )
+      );
+      await fromDb.execute(
+        sql.raw(
+          `CREATE INDEX IF NOT EXISTS "${name}_subject_created_idx" ON "public"."${name}" ("subject_type", "subject_id", "created_at")`
+        )
+      );
+      created.push(name);
+    } catch (error) {
+      errors.push({ name, error });
+    }
+  }
   return { created, errors };
 }

@@ -9840,6 +9840,7 @@ export type NewCloudBillingSku = typeof cloud_billing_sku.$inferInsert;
 export type ContainerUsageSubjectType = 'user' | 'org';
 export type ContainerUsageActorType = 'user' | 'bot';
 export type ContainerUsageIntervalStatus = 'open' | 'closed';
+export type ContainerUsageBillingMode = 'shadow' | 'paid';
 export type ContainerUsageCloseReason =
   | 'exit'
   | 'runtime_signal'
@@ -9870,6 +9871,10 @@ export const container_usage_interval = pgTable(
     last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     last_heartbeat_seq: integer().notNull().default(0),
     confirmed_seconds: integer().notNull().default(0),
+    billing_mode: text().$type<ContainerUsageBillingMode>().notNull().default('shadow'),
+    // Paid intervals retain the accepted SKU price even after the SKU is superseded.
+    rate_cents_per_unit: decimal({ precision: 24, scale: 12 }),
+    settled_billable_seconds: integer().notNull().default(0),
     stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     close_reason: text().$type<ContainerUsageCloseReason>(),
     exit_code: integer(),
@@ -9899,6 +9904,14 @@ export const container_usage_interval = pgTable(
     ),
     check('container_usage_interval_status', sql`${table.status} IN ('open', 'closed')`),
     check(
+      'container_usage_interval_billing_mode',
+      sql`${table.billing_mode} IN ('shadow', 'paid')`
+    ),
+    check(
+      'container_usage_interval_paid_rate',
+      sql`(${table.billing_mode} = 'shadow' AND ${table.rate_cents_per_unit} IS NULL) OR (${table.billing_mode} = 'paid' AND ${table.rate_cents_per_unit} > 0)`
+    ),
+    check(
       'container_usage_interval_open_closed_shape',
       sql`(${table.status} = 'open' AND ${table.stopped_at} IS NULL AND ${table.close_reason} IS NULL) OR (${table.status} = 'closed' AND ${table.stopped_at} IS NOT NULL AND ${table.close_reason} IS NOT NULL)`
     ),
@@ -9913,6 +9926,10 @@ export const container_usage_interval = pgTable(
     check(
       'container_usage_interval_confirmed_seconds_nonnegative',
       sql`${table.confirmed_seconds} >= 0`
+    ),
+    check(
+      'container_usage_interval_settled_billable_seconds_nonnegative',
+      sql`${table.settled_billable_seconds} >= 0 AND ${table.settled_billable_seconds} <= ${table.confirmed_seconds}`
     ),
     check(
       'container_usage_interval_final_stop_seq_positive',
@@ -10013,3 +10030,38 @@ export const native_attested_keys = pgTable(
 
 export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
+
+// Immutable debit ledger, partitioned monthly on the source segment's received_at.
+// The partition key is included in the primary key because PostgreSQL requires it
+// for partitioned unique constraints; interval locking is the primary replay guard.
+export const container_usage_charge = pgTable(
+  'container_usage_charge',
+  {
+    interval_id: text()
+      .notNull()
+      .references(() => container_usage_interval.id, { onDelete: 'cascade' }),
+    seq: integer().notNull(),
+    subject_type: text().$type<ContainerUsageSubjectType>().notNull(),
+    subject_id: text().notNull(),
+    amount_microdollars: bigint({ mode: 'number' }).notNull(),
+    settled_billable_seconds_after: integer().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.interval_id, table.seq, table.created_at] }),
+    index('IDX_container_usage_charge_subject_created').on(
+      table.subject_type,
+      table.subject_id,
+      table.created_at
+    ),
+    check('container_usage_charge_subject_type', sql`${table.subject_type} IN ('user', 'org')`),
+    check('container_usage_charge_amount_positive', sql`${table.amount_microdollars} > 0`),
+    check(
+      'container_usage_charge_settled_seconds_positive',
+      sql`${table.settled_billable_seconds_after} > 0`
+    ),
+  ]
+);
+
+export type ContainerUsageCharge = typeof container_usage_charge.$inferSelect;
+export type NewContainerUsageCharge = typeof container_usage_charge.$inferInsert;

@@ -6,7 +6,10 @@ import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { provisionExaUsageLogPartitions } from '@/lib/exa-usage-partitions';
+import {
+  provisionContainerUsageChargePartitions,
+  provisionExaUsageLogPartitions,
+} from '@/lib/exa-usage-partitions';
 import { provisionModelExperimentRequestPartitions } from '@/lib/model-experiment-request-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
@@ -62,6 +65,14 @@ beforeAll(async () => {
       const [{ name, error }] = partitionErrors;
       throw new Error(
         `Failed to create Exa usage log partition ${name}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    const { errors: chargePartitionErrors } = await provisionContainerUsageChargePartitions(testDb);
+    if (chargePartitionErrors.length > 0) {
+      const [{ name, error }] = chargePartitionErrors;
+      throw new Error(
+        `Failed to create container usage charge partition ${name}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
 

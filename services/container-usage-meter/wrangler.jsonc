@@ -19,6 +19,12 @@
     "logs": { "enabled": true, "head_sampling_rate": 1 },
     "traces": { "enabled": true, "head_sampling_rate": 0.01 },
   },
+  "vars": {
+    "CONTAINER_BILLING_SERVICES": "",
+    "CONTAINER_BILLING_USER_IDS": "",
+    "CONTAINER_BILLING_ORG_IDS": "",
+    "CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS": "10000000",
+  },
   "triggers": {
     "crons": ["*/5 * * * *"],
   },

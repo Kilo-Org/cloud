@@ -11,7 +11,10 @@ describe('isProductionInternal (internal guard)', () => {
   const originalEnv = process.env.NODE_ENV;
 
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv;
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: originalEnv,
+      writable: false,
+    });
   });
 
   test('returns false in test environment', () => {
@@ -19,7 +22,10 @@ describe('isProductionInternal (internal guard)', () => {
   });
 
   test('returns true when NODE_ENV is production', () => {
-    process.env.NODE_ENV = 'production';
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: 'production',
+      writable: false,
+    });
     expect(isProductionInternal()).toBe(true);
   });
 });
@@ -29,7 +35,10 @@ describe('verifyPlayIntegrity production bypass guard', () => {
   const originalBypass = process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS;
 
   afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: originalNodeEnv,
+      writable: false,
+    });
     if (originalBypass === undefined) {
       delete process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS;
     } else {
@@ -38,7 +47,10 @@ describe('verifyPlayIntegrity production bypass guard', () => {
   });
 
   test('bypass is NOT taken in production even with NATIVE_ADMISSION_SIMULATOR_BYPASS=true', async () => {
-    process.env.NODE_ENV = 'production';
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: 'production',
+      writable: false,
+    });
     process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS = 'true';
 
     // In production with bypass=true and no credentials configured,
@@ -50,7 +62,10 @@ describe('verifyPlayIntegrity production bypass guard', () => {
   });
 
   test('bypass is taken in non-production with NATIVE_ADMISSION_SIMULATOR_BYPASS=true', async () => {
-    process.env.NODE_ENV = 'development';
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: 'development',
+      writable: false,
+    });
     process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS = 'true';
 
     const result = await verifyPlayIntegrity('fake-token', 'fake-challenge');

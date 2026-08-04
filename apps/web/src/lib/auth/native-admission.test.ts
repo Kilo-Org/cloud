@@ -542,7 +542,7 @@ describe('verifyAdmissionAsync', () => {
     jest.mocked(db.update).mockReturnValue({ set: setMock } as any);
 
     // No existing key found
-    jest.mocked(db.query.native_attested_keys.findFirst).mockResolvedValue(null);
+    jest.mocked(db.query.native_attested_keys.findFirst).mockResolvedValue(null as any);
 
     const admission: AdmissionPayload = {
       platform: 'ios',

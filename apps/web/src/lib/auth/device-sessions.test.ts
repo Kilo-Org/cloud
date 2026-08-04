@@ -30,7 +30,7 @@ describe('device-sessions', () => {
       google_user_name: 'Test User',
       google_user_image_url: 'https://example.com/avatar.jpg',
       api_token_pepper: undefined,
-    } as User;
+    } as unknown as User;
   });
 
   afterEach(async () => {

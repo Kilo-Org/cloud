@@ -34,7 +34,30 @@ function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.ran
   return `${key}::${upstreamPlanId}`;
 }
 
+function usageResponse() {
+  return new Response(
+    JSON.stringify({
+      base_resp: { status_code: 0, status_msg: 'success' },
+      model_remains: [
+        {
+          model_name: 'general',
+          current_interval_remaining_percent: 80,
+          current_interval_status: 1,
+          start_time: 1_781_262_000_000,
+          end_time: 1_781_280_000_000,
+          current_weekly_remaining_percent: 70,
+          current_weekly_status: 1,
+          weekly_start_time: 1_781_280_000_000,
+          weekly_end_time: 1_781_884_800_000,
+        },
+      ],
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } }
+  );
+}
+
 afterEach(async () => {
+  jest.restoreAllMocks();
   await db.delete(coding_plan_availability_intents);
   await db.delete(coding_plan_terms);
   await db.delete(coding_plan_subscriptions);
@@ -312,6 +335,198 @@ describe('coding plans router', () => {
     await expect(
       otherCaller.codingPlans.getBillingHistory({ subscriptionId: activation.subscriptionId })
     ).rejects.toThrow('Coding Plan subscription not found.');
+  });
+
+  it('returns owner-scoped managed usage without exposing the credential', async () => {
+    const managedKey = `sk-cp-managed-${crypto.randomUUID()}`;
+    const owner = await insertTestUser({
+      total_microdollars_acquired: COST_MICRODOLLARS,
+      microdollars_used: 0,
+    });
+    const otherUser = await insertTestUser();
+    await uploadKeysToInventory('minimax', PLAN_ID, [inventoryEntry(managedKey)], {
+      validateCredential: async () => true,
+    });
+    const ownerCaller = await createCallerForUser(owner.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+    const activation = await ownerCaller.codingPlans.subscribe({
+      planId: PLAN_ID,
+      idempotencyKey: 'managed-usage',
+    });
+    const request = jest.spyOn(global, 'fetch').mockImplementation(async () => usageResponse());
+
+    const active = await ownerCaller.codingPlans.getUsage({
+      subscriptionId: activation.subscriptionId,
+    });
+    expect(active).toEqual({
+      schemaVersion: 1,
+      fetchedAt: expect.stringContaining('T'),
+      subscription: {
+        id: activation.subscriptionId,
+        planId: PLAN_ID,
+        planName: 'Token Plan Plus',
+        providerId: 'minimax',
+        providerName: 'MiniMax',
+        windows: [
+          {
+            id: 'short_term',
+            remainingPercent: 80,
+            startsAt: new Date(1_781_262_000_000).toISOString(),
+            resetsAt: new Date(1_781_280_000_000).toISOString(),
+            period: { unit: 'hour', value: 5 },
+          },
+          {
+            id: 'weekly',
+            remainingPercent: 70,
+            startsAt: new Date(1_781_280_000_000).toISOString(),
+            resetsAt: new Date(1_781_884_800_000).toISOString(),
+            period: { unit: 'week', value: 1 },
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(active)).not.toContain(managedKey);
+    await expect(
+      otherCaller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Coding Plan subscription not found.',
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    for (const call of request.mock.calls) {
+      expect(call[0]).toBe('https://api.minimax.io/v1/token_plan/remains');
+      expect(call[1]?.headers).toEqual(
+        expect.objectContaining({ Authorization: `Bearer ${managedKey}` })
+      );
+    }
+  });
+
+  it('serves usage for non-terminal subscriptions and rejects terminal ones', async () => {
+    const owner = await insertTestUser({
+      total_microdollars_acquired: COST_MICRODOLLARS,
+      microdollars_used: 0,
+    });
+    await uploadKeysToInventory(
+      'minimax',
+      PLAN_ID,
+      [inventoryEntry(`sk-cp-state-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
+    const caller = await createCallerForUser(owner.id);
+    const activation = await caller.codingPlans.subscribe({
+      planId: PLAN_ID,
+      idempotencyKey: 'usage-states',
+    });
+    jest.spyOn(global, 'fetch').mockImplementation(async () => usageResponse());
+    const past = new Date(Date.now() - 60_000).toISOString();
+
+    // A period deadline that already passed does not end usage early; the
+    // billing lifecycle sweep owns termination.
+    await db
+      .update(coding_plan_subscriptions)
+      .set({ status: 'active', cancel_at_period_end: true, current_period_end: past })
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).resolves.toMatchObject({ subscription: { id: activation.subscriptionId } });
+
+    await db
+      .update(coding_plan_subscriptions)
+      .set({ status: 'past_due', cancel_at_period_end: false, payment_grace_expires_at: past })
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).resolves.toMatchObject({ subscription: { id: activation.subscriptionId } });
+
+    await db
+      .update(coding_plan_subscriptions)
+      .set({ status: 'canceled' })
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Coding Plan subscription is not eligible for usage.',
+    });
+  });
+
+  it('fails safely for a corrupt inventory assignment without affecting database-only reads', async () => {
+    const owner = await insertTestUser({
+      total_microdollars_acquired: COST_MICRODOLLARS,
+      microdollars_used: 0,
+    });
+    await uploadKeysToInventory(
+      'minimax',
+      PLAN_ID,
+      [inventoryEntry(`sk-cp-corrupt-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
+    const caller = await createCallerForUser(owner.id);
+    const activation = await caller.codingPlans.subscribe({
+      planId: PLAN_ID,
+      idempotencyKey: 'corrupt-assignment',
+    });
+    const [subscription] = await db
+      .select({ inventoryId: coding_plan_subscriptions.key_inventory_id })
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    if (!subscription.inventoryId) throw new Error('Expected assigned inventory');
+    await db
+      .update(coding_plan_key_inventory)
+      .set({ assigned_to_user_id: null })
+      .where(eq(coding_plan_key_inventory.id, subscription.inventoryId));
+    const request = jest.spyOn(global, 'fetch');
+
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Coding Plan usage is unavailable.',
+    });
+    expect(request).not.toHaveBeenCalled();
+    await expect(caller.codingPlans.listSubscriptions()).resolves.toHaveLength(1);
+    await expect(
+      caller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
+    ).resolves.toMatchObject({ id: activation.subscriptionId, status: 'active' });
+  });
+
+  it('isolates upstream usage failures from subscription metadata', async () => {
+    const owner = await insertTestUser({
+      total_microdollars_acquired: COST_MICRODOLLARS,
+      microdollars_used: 0,
+    });
+    await uploadKeysToInventory(
+      'minimax',
+      PLAN_ID,
+      [inventoryEntry(`sk-cp-upstream-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
+    const caller = await createCallerForUser(owner.id);
+    const activation = await caller.codingPlans.subscribe({
+      planId: PLAN_ID,
+      idempotencyKey: 'upstream-failure',
+    });
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response('raw provider failure', { status: 503 }));
+
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).rejects.toMatchObject({
+      code: 'BAD_GATEWAY',
+      message: 'Coding Plan usage is temporarily unavailable.',
+    });
+    await expect(caller.codingPlans.listSubscriptions()).resolves.toHaveLength(1);
+    await expect(
+      caller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
+    ).resolves.toMatchObject({ id: activation.subscriptionId });
   });
 
   it('rejects a second live purchase instead of creating a prepaid extension', async () => {

@@ -1,11 +1,17 @@
 export type KiloGatewayToolName =
+  | 'delete_workflow'
   | 'eval'
   | 'find_in_page'
   | 'get_element_details'
   | 'get_memory'
   | 'get_page_snapshot'
   | 'get_viewport_screenshot'
+  | 'get_workflow'
+  | 'run_workflow'
+  | 'save_memory'
+  | 'save_workflow'
   | 'search_memories'
+  | 'search_workflows'
   | `mcp_${string}`;
 
 export type KiloGatewayChatContentPart =

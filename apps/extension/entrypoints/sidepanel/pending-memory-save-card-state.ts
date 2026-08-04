@@ -53,8 +53,15 @@ export const deriveNoteCharacterCount = (
   max: MAX_MEMORY_NOTE_LENGTH,
 });
 
-export const classifySaveError = (error: unknown): SaveErrorClassification =>
-  error instanceof AgentMemoryStoreFullError ? 'full' : 'retryable';
+export const classifySaveError = (error: unknown): SaveErrorClassification => {
+  if (error instanceof AgentMemoryStoreFullError) {
+    return 'full';
+  }
+  if (error instanceof Error && error.name === 'AgentMemoryStoreFullError') {
+    return 'full';
+  }
+  return 'retryable';
+};
 
 export const deriveSaveCardState = ({
   isLoaded,
@@ -63,6 +70,7 @@ export const deriveSaveCardState = ({
   pendingDraft,
   savedConfirmation,
   saveError,
+  fullOutcome,
 }: {
   isLoaded: boolean;
   loadError: boolean;
@@ -70,6 +78,7 @@ export const deriveSaveCardState = ({
   pendingDraft: PendingAgentMemoryDraft | undefined;
   savedConfirmation: boolean;
   saveError: string | undefined;
+  fullOutcome: boolean;
 }): SaveCardView => {
   if (!isLoaded) {
     return { kind: 'hidden' };
@@ -84,6 +93,10 @@ export const deriveSaveCardState = ({
   }
 
   if (!loadError && pendingDraft !== undefined && memories.length >= MAX_MEMORY_COUNT) {
+    return { kind: 'full' };
+  }
+
+  if (!loadError && pendingDraft !== undefined && fullOutcome) {
     return { kind: 'full' };
   }
 

@@ -1,6 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
-import type { CaptureCostInsightSpendInput } from '@kilocode/db/cost-insights-rollups';
 
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -27,20 +26,9 @@ import {
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   coding_plan_terms,
-  cost_insight_owner_hour_driver_buckets,
-  cost_insight_owner_hour_totals,
   credit_transactions,
   kilocode_users,
 } from '@kilocode/db/schema';
-
-jest.mock('@kilocode/db/cost-insights-rollups', () => ({
-  captureCostInsightSpend: jest.fn(async () => undefined),
-  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY: 'coding-plan',
-}));
-
-const captureCostInsightSpendMock = jest.requireMock<{
-  captureCostInsightSpend: jest.Mock<Promise<void>, [unknown, CaptureCostInsightSpendInput]>;
-}>('@kilocode/db/cost-insights-rollups').captureCostInsightSpend;
 
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
@@ -74,9 +62,6 @@ async function createUserWithBalance(microdollars: number) {
 }
 
 afterEach(async () => {
-  captureCostInsightSpendMock.mockClear();
-  await db.delete(cost_insight_owner_hour_driver_buckets);
-  await db.delete(cost_insight_owner_hour_totals);
   await db.delete(coding_plan_terms);
   await db.delete(coding_plan_subscriptions);
   await db.delete(byok_api_keys);
@@ -196,22 +181,7 @@ describe('coding plans', () => {
     expect(terms).toHaveLength(1);
     expect(terms[0].kind).toBe('activation');
     expect(terms[0].cost_microdollars).toBe(COST_MICRODOLLARS);
-    expect(captureCostInsightSpendMock).toHaveBeenCalledWith(expect.anything(), {
-      owner: { type: 'user', id: user.id },
-      actorUserId: user.id,
-      occurredAt: expect.any(String),
-      amountMicrodollars: COST_MICRODOLLARS,
-      category: 'scheduled',
-      source: 'coding_plan',
-      productKey: 'coding-plan',
-      featureKey: 'activation',
-      modelOrPlanKey: PLAN_ID,
-      providerKey: PROVIDER_ID,
-    });
-    const captureInput = captureCostInsightSpendMock.mock.calls[0]?.[1] as
-      | { occurredAt: string }
-      | undefined;
-    expect(new Date(deduction.created_at).toISOString()).toBe(captureInput?.occurredAt);
+    expect(deduction.amount_microdollars).toBe(-COST_MICRODOLLARS);
     expect(managedKey.provider_id).toBe(PROVIDER_ID);
     expect(managedKey.management_source).toBe('coding_plan');
     expect(inventoryKey.status).toBe('assigned');
@@ -239,7 +209,6 @@ describe('coding plans', () => {
     expect(terms).toHaveLength(1);
     expect(assigned).toHaveLength(1);
     expect(updatedUser.microdollars_used).toBe(COST_MICRODOLLARS);
-    expect(captureCostInsightSpendMock).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a new purchase while an active subscription exists', async () => {
@@ -395,33 +364,6 @@ describe('coding plans', () => {
       .from(kilocode_users)
       .where(eq(kilocode_users.id, fundedUser.id));
     expect(unchargedUser.microdollars_used).toBe(0);
-  });
-
-  it('rolls back activation when scheduled-spend capture fails', async () => {
-    const user = await createUserWithBalance(COST_MICRODOLLARS);
-    await seedInventoryKey();
-    captureCostInsightSpendMock.mockImplementationOnce(async () => {
-      throw new Error('rollup unavailable');
-    });
-
-    await expect(subscribeToCodingPlan(user.id, PLAN_ID, 'rollup-failure')).rejects.toThrow(
-      'rollup unavailable'
-    );
-
-    const [updatedUser] = await db
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, user.id));
-    const transactions = await db.select().from(credit_transactions);
-    const terms = await db.select().from(coding_plan_terms);
-    const subscriptions = await db.select().from(coding_plan_subscriptions);
-    const [inventory] = await db.select().from(coding_plan_key_inventory);
-
-    expect(updatedUser.microdollars_used).toBe(0);
-    expect(transactions).toHaveLength(0);
-    expect(terms).toHaveLength(0);
-    expect(subscriptions).toHaveLength(0);
-    expect(inventory.status).toBe('available');
   });
 
   it('rejects activation when the personal MiniMax BYOK slot is occupied', async () => {

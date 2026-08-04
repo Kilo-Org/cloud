@@ -16,11 +16,6 @@ import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
-import {
-  appendNewSessionPrefill,
-  buildContinuePrefillParams,
-} from '@/components/agents/new-session-prefill';
-import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
@@ -104,6 +99,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useContinueSession } from '@/components/agents/use-continue-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -236,6 +232,12 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
+  const { continueSession, isContinuing } = useContinueSession({
+    organizationId,
+    manager,
+    models: modelOptions,
+    modelsLoading: gatewayModelsLoading,
+  });
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
     [contextUsage, sessionModels.options]
@@ -764,15 +766,13 @@ export function SessionDetailContent({
   );
 
   const handleContinueInNewSession = useCallback(() => {
-    const base = getNewAgentSessionPath(organizationId ?? null);
-    const params = buildContinuePrefillParams({
+    void continueSession({
       gitUrl: fetchedData?.gitUrl,
       mode: currentMode,
       model: currentModel,
       variant: currentVariant,
     });
-    router.push(appendNewSessionPrefill(base, params) as Href);
-  }, [organizationId, fetchedData?.gitUrl, currentMode, currentModel, currentVariant, router]);
+  }, [continueSession, fetchedData?.gitUrl, currentMode, currentModel, currentVariant]);
 
   const isFocused = useIsFocused();
   // Focus bounds the awake window to the visible working UI; a backgrounded
@@ -946,6 +946,7 @@ export function SessionDetailContent({
               variant="outline"
               size="sm"
               accessibilityLabel="Continue in a new session"
+              disabled={isContinuing}
               onPress={handleContinueInNewSession}
             >
               <Text>Continue in a new session</Text>

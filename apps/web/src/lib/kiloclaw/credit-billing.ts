@@ -15,11 +15,6 @@ import {
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
 import {
-  captureCostInsightSpend,
-  COST_INSIGHT_DRIVER_FALLBACK,
-  COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
-} from '@kilocode/db/cost-insights-rollups';
-import {
   credit_transactions,
   kilocode_users,
   kiloclaw_email_log,
@@ -34,7 +29,6 @@ import {
   autoResumeIfSuspended,
   clearTrialInactivityStopAfterTrialTransition,
 } from '@/lib/kiloclaw/instance-lifecycle';
-import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
@@ -1542,19 +1536,6 @@ export async function enrollWithCredits(params: {
       return;
     }
 
-    await captureCostInsightSpend(tx, {
-      owner: { type: 'user', id: userId },
-      actorUserId: userId,
-      occurredAt: periodStartIso,
-      amountMicrodollars: costMicrodollars,
-      category: 'scheduled',
-      source: 'kiloclaw',
-      productKey: COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
-      featureKey: 'enrollment',
-      modelOrPlanKey: plan,
-      providerKey: COST_INSIGHT_DRIVER_FALLBACK,
-    });
-
     if (
       currentSubscription?.status === 'canceled' &&
       currentSubscription.kiloclaw_price_version !== kiloclawPriceVersion
@@ -1701,8 +1682,6 @@ export async function enrollWithCredits(params: {
       error: error instanceof Error ? error.message : String(error),
     });
   }
-  scheduleCostInsightEvaluationAfterSpend({ type: 'user', id: userId });
-
   // Step 5: Auto-resume if suspended (spec rule 7)
   if (transitionedFromTrial) {
     try {

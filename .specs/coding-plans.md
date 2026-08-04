@@ -76,6 +76,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 3.5. An Installed BYOK Configuration **MUST** remain read-only while it contains Kilo's issued credential. User-facing BYOK surfaces **MUST** identify its Coding Plan origin and **MUST NOT** offer update, enable/disable, or delete controls. The corresponding API operations **MUST** reject attempts to mutate it. Non-mutating credential testing **MAY** remain available. The surface **MUST** direct users who want the configuration removed to cancel the plan in the Subscription Center, which removes it at Effective Cancellation.
 
+3.6. Cloud **MAY** query current Upstream Provider quota for an authenticated owner of an active or `past_due` Coding Plan by using the retained assigned Managed Plan Credential. Decryption and provider access **MUST** remain server-side. The Managed Plan Credential, inventory identity, Upstream Plan ID, fingerprint, ciphertext, and authorization metadata **MUST NOT** leave Cloud. Cloud **MUST** normalize provider quota into subscription-owned quota windows before returning it to Kilo clients; provider-native fields, status codes, and display labels **MUST NOT** cross that boundary.
+
 ## 4. Credential provisioning and inventory
 
 4.1. Kilo **MUST** acquire or provision Managed Plan Credentials before accepting a purchase that depends on them. For an offering initially provisioned by operator upload, only authorized administrative tooling **MAY** insert credentials into inventory.
@@ -130,6 +132,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 6.4. While a live BytePlus subscription has its enabled managed key, Kilo Auto **MUST** prefer `byteplus-coding/bytedance-seed-code`. When both BytePlus and a recognized MiniMax Coding Plan are active, BytePlus takes precedence, followed by the MiniMax preference, followed by ordinary Kilo Auto routing. If the preferred model is denied or incompatible with request constraints, routing **MUST** continue through ordinary Kilo Auto rather than selecting another model from that provider.
 
+6.4. Current routing state **MUST** be reported separately from subscription and provider-quota state. Quota authorization **MUST** derive from the subscription's retained assigned Managed Plan Credential rather than its Installed BYOK Configuration.
+
 ## 7. User-facing behavior
 
 7.1. Users **MUST** be able to view catalog offerings, purchase a Coding Plan, view their subscription status and paid-period dates, and request cancellation from Kilo surfaces.
@@ -144,6 +148,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 7.6. A sold-out offering **MUST** display its unavailable state and **MUST** offer an authenticated user a way to record an Availability Notification Intent. Recording the same intent again **MUST** be idempotent, **MUST NOT** reserve capacity or initiate billing, and **MUST** show the saved intent state. A successful activation **MUST** clear the activated user's intent for that Plan ID.
 
+7.7. Authenticated Kilo clients **MAY** reuse Cloud's current personal billing and Coding Plan data to present current plans, routing state, and current provider quota. A current quota response **MUST** identify the purchased subscription, Kilo Plan ID and name, provider ID and name, and that subscription's own ordered set of quota windows. Each window **MUST** have a stable semantic ID, remaining percentage, reset timestamp, and positive semantic period. Ended plans, charged-term history, invoices, and billing history **MUST** remain in the Subscription Center rather than the current-plan response.
+
 ## 8. Security and observability
 
 8.1. Logs and monitoring **MUST NOT** contain raw Managed Plan Credentials, credential-bearing authorization headers, provider-management secrets, or unfiltered provider/SDK key-test error content.
@@ -151,3 +157,5 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 8.2. General administrative credential inventory responses **MUST** return non-secret status and remediation metadata only. For a `revocation_pending` or `revocation_failed` item, the manual-revocation admin console **MAY** display its Upstream Plan ID to authorized staff. Raw credential values **MUST NOT** be returned by queue, list, or remediation APIs or appear on customer surfaces.
 
 8.3. The initial pilot does not require a Coding Plans audit-log history for admin inventory upload or manual revocation actions. Inventory lifecycle state, Upstream Plan ID, request/completion timestamps, attempt count, and sanitized failure information **MUST** record current disposition without retaining raw credentials after remediation starts.
+
+8.4. Current quota responses and logs **MUST NOT** contain Managed Plan Credentials, authorization headers, raw provider bodies or messages, inventory metadata, Upstream Plan IDs, fingerprints, ciphertext, or provider-native quota fields. Provider responses **MUST** be bounded, validated, and normalized to an explicit non-secret subscription quota-window contract before leaving the Cloud boundary. The initial quota-window contract **MUST NOT** represent monetary balances or purchased-credit balances as subscription quota.

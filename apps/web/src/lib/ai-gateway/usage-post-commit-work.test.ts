@@ -17,7 +17,7 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 }
 
 describe('runBestEffortPostCommitTasks', () => {
-  test('awaits personal Cost Insights transaction through commit and connection release', async () => {
+  test('awaits a task transaction through commit and connection release', async () => {
     const transactionMayCommit = deferred();
     const events: string[] = [];
     const reportError = jest.fn((_error: unknown): void => {});

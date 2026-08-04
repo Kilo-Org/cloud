@@ -61,12 +61,8 @@
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/cron/cost-insights-hourly",
+      "path": "/api/cron/usage-daily-rollup-repairs",
       "schedule": "5 * * * *"
-    },
-    {
-      "path": "/api/cron/cost-insights-retention",
-      "schedule": "15 3 * * *"
     },
     {
       "path": "/api/cron/db-pool-metrics",

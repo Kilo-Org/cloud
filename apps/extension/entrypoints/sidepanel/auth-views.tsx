@@ -13,6 +13,7 @@ import { ExtensionAgentsProvider } from './agents-provider';
 import { Shell } from './auth-shell';
 import { useOrganizationCreditAccount } from './organization-credit-account';
 import { PendingMemorySaveCard } from './pending-memory-save-card';
+import { PendingWorkflowSaveCard } from './pending-workflow-save-card';
 
 const primaryAuthButtonClassName =
   'rounded-md bg-brand-primary type-label text-brand-primary-foreground transition hover:bg-brand-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle';
@@ -180,6 +181,7 @@ export const SignedInView = ({
       {mode === 'browser' ? (
         <>
           <PendingMemorySaveCard />
+          <PendingWorkflowSaveCard />
           <AgentChatPanel
             auth={auth}
             onHeaderBeforeSettingsChange={setHeaderBeforeSettings}

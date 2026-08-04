@@ -2113,6 +2113,59 @@ export const CustomLlmDefinitionSchema = z.object({
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
+export const ManualByokApiKindSchema = z.enum(['messages', 'chat_completions', 'responses']);
+
+export type ManualByokApiKind = z.infer<typeof ManualByokApiKindSchema>;
+
+export const ManualByokAiSdkProviderSchema = z.enum([
+  'openrouter',
+  'openai-compatible',
+  'anthropic',
+  'openai',
+]);
+
+export type ManualByokAiSdkProvider = z.infer<typeof ManualByokAiSdkProviderSchema>;
+
+export const ManualByokModelSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).optional(),
+  supports_image_input: z.boolean().optional(),
+  supports_reasoning: z.boolean().optional(),
+  add_cache_breakpoints: z.boolean().optional(),
+  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+  context_length: z.number().int().positive().optional(),
+  max_completion_tokens: z.number().int().positive().optional(),
+  preferred_ai_sdk_provider: ManualByokAiSdkProviderSchema.optional(),
+});
+
+export type ManualByokModel = z.infer<typeof ManualByokModelSchema>;
+
+export const ManualByokProviderDefinitionSchema = z.object({
+  name: z.string().min(1),
+  base_urls: z.object({
+    messages: z.url().optional(),
+    chat_completions: z.url().optional(),
+    responses: z.url().optional(),
+  }),
+  use_x_api_key: z.boolean(),
+  supported_apis: z.array(ManualByokApiKindSchema).min(1),
+  preferred_ai_sdk_provider: ManualByokAiSdkProviderSchema,
+  model_defaults: z.object({
+    supports_image_input: z.boolean(),
+    supports_reasoning: z.boolean(),
+    add_cache_breakpoints: z.boolean(),
+    variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+    context_length: z.number().int().positive().optional(),
+    max_completion_tokens: z.number().int().positive().optional(),
+  }),
+  extra_body: z.record(z.string(), z.unknown()).optional(),
+  extra_headers: z.record(z.string(), z.string()).optional(),
+  remove_from_body: z.array(z.string()).optional(),
+  models: z.array(ManualByokModelSchema).min(1),
+});
+
+export type ManualByokProviderDefinition = z.infer<typeof ManualByokProviderDefinitionSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({

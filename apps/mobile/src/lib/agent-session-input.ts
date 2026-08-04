@@ -21,7 +21,7 @@ type AgentSessionListInput = {
   organizationId?: string | null;
 };
 
-export const SESSIONS_PAGE_SIZE = 30;
+const SESSIONS_PAGE_SIZE = 30;
 
 function resolveSortBy(sortBy: AgentSessionSortBy | undefined): AgentSessionSortBy {
   return parseAgentSessionSortBy(sortBy ?? DEFAULT_AGENT_SESSION_SORT);

@@ -9,6 +9,7 @@ const mockedReadConsent = vi.hoisted(() => vi.fn());
 const mockedSetOptionalConsent = vi.hoisted(() => vi.fn());
 const mockedRevokeConsent = vi.hoisted(() => vi.fn());
 const mockedSignOut = vi.hoisted(() => vi.fn());
+const currentUserId = vi.hoisted(() => ({ value: 'test-user-1' as string | undefined }));
 
 vi.mock('@/lib/consent', () => ({
   acceptConsent: mockedAcceptConsent,
@@ -21,7 +22,7 @@ vi.mock('@/lib/auth/auth-context', () => ({
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({
-    userId: 'test-user-1',
+    userId: currentUserId.value,
     email: 'a@b.com',
     isLoading: false,
     isError: false,
@@ -127,6 +128,7 @@ async function flush() {
 describe('ConsentCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    currentUserId.value = 'test-user-1';
     mockedReadConsent.mockResolvedValue({ mandatory: true, optional: false });
     mockedAcceptConsent.mockResolvedValue(undefined);
     mockedSetOptionalConsent.mockResolvedValue(undefined);
@@ -251,6 +253,33 @@ describe('ConsentCard', () => {
     await act(flush);
     expect(mockedSetOptionalConsent).toHaveBeenCalledTimes(2);
     expect(texts(renderer.root)).not.toContain('Could not save your choice. Please try again.');
+  });
+
+  it('allows stored load after review toggle reverts without userId', async () => {
+    currentUserId.value = undefined;
+    mockedReadConsent.mockResolvedValue({ mandatory: true, optional: true });
+    const renderer = mountCard('review');
+
+    // Toggle should revert — no userId available.
+    const sw = singleSwitch(renderer.root);
+    expect(sw.props.value).toBe(false);
+    await act(async () => {
+      await Promise.resolve();
+      (sw.props.onValueChange as (v: boolean) => void)(true);
+    });
+    await act(flush);
+    // Switch reverted.
+    expect(singleSwitch(renderer.root).props.value).toBe(false);
+    expect(texts(renderer.root)).toContain('Could not load your account. Please try again.');
+
+    // Later: userId arrives — stored value must load.
+    currentUserId.value = 'test-user-1';
+    await act(() => {
+      renderer.update(createElement(ConsentCard, { mode: 'review' }));
+    });
+    await act(flush);
+    expect(mockedReadConsent).toHaveBeenCalledWith('test-user-1');
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
   it('renders Account row with literal ampersand, not HTML entity', () => {

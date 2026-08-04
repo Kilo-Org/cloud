@@ -235,9 +235,9 @@ export function resetAnalyticsUser(): void {
  * 3. Drop the module-level `client` reference so concurrent code cannot
  *    capture through the stale instance, and a concurrent `initPostHog()`
  *    can create a fresh client.
- * 4. Clear flag listeners — must happen BEFORE any async work so stale
- *    callbacks cannot fire during the `optOut` gap and a concurrent
- *    `initPostHog()` registrations survive.
+ * 4. Flag listeners persist — like ready listeners, they must survive the
+ *    discard so mounted `useFeatureFlag` subscribers receive updates when
+ *    a later `initPostHog` re-creates the client.
  * 5. `optOut` so a relaunch does not resume capture on the stored anonymous
  *    id. The completion is appended to `discardChain` so `resumePostHog()`
  *    can await every prior discard before unsealing storage.

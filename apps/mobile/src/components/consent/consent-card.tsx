@@ -154,9 +154,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     (next: boolean) => {
       setOptionalToggle(next);
       setError(null);
-      userToggledRef.current = true;
 
       if (mode === 'review' && userId) {
+        userToggledRef.current = true;
         setSavingOptional(true);
         // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- fire-and-forget toggle revert pattern.
         void setOptionalConsent(userId, next).then(

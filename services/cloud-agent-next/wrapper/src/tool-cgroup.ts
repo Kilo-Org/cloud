@@ -110,7 +110,7 @@ const DEFAULT_CPU_WEIGHT = 100;
 const MAX_CPU_WEIGHT = 10000;
 const DEFAULT_SWEEP_INTERVAL_MS = 1000;
 const MIN_SWEEP_INTERVAL_MS = 200;
-const DEFAULT_STATS_INTERVAL_MS = 10 * 1000;
+const DEFAULT_STATS_INTERVAL_MS = 15 * 1000;
 /** Below this cap the box is too small to meaningfully partition; stay uncapped. */
 const MIN_CAP_BYTES = 1024 * 1024 * 1024;
 /** §2.2 budget check: server cap + this headroom must fit under the tool reserve. */

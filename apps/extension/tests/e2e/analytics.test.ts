@@ -9,7 +9,7 @@ import {
   seedExtensionAuth,
   startFixtureServer,
 } from './extension-context-fixture';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import { findCapturedEvent, findCapturedEvents } from './posthog-fixture';
 import type { NormalizedPosthogEvent } from './posthog-fixture';
 
@@ -364,13 +364,7 @@ test('analytics captures message sent and user-created conversation events', asy
   try {
     await mockKiloApi(context, {
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Analytics reply.' } }] }],
-      toolNames: [
-        'get_page_snapshot',
-        'get_element_details',
-        'find_in_page',
-        'search_memories',
-        'get_memory',
-      ],
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();

@@ -10,6 +10,7 @@ import {
   dangerousToolNames,
   installChatCompletionAbortObserver,
   mockKiloApi,
+  safeToolNames,
   wasChatCompletionAborted,
 } from './kilo-api-fixture';
 
@@ -22,13 +23,7 @@ test('new conversation keeps the running request in its original tab', async () 
     await mockKiloApi(context, {
       beforeFirstCompletion: () => pendingCompletion,
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Original tab completed.' } }] }],
-      toolNames: [
-        'get_page_snapshot',
-        'get_element_details',
-        'find_in_page',
-        'search_memories',
-        'get_memory',
-      ],
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();

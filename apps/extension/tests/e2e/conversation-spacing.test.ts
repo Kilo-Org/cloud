@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames, workflowToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -202,6 +202,7 @@ test('tool rows stay spaced without overlapping message bubbles', async () => {
         'search_memories',
         'get_memory',
         'get_viewport_screenshot',
+        ...workflowToolNames,
       ],
     });
 

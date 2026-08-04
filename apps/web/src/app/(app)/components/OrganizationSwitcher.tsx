@@ -97,6 +97,8 @@ export function OrganizationSwitcherView({
     switch (role) {
       case 'owner':
         return 'Owner';
+      case 'admin':
+        return 'Admin';
       case 'billing_manager':
         return 'Billing Manager';
       case 'member':

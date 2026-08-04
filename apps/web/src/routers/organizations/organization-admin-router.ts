@@ -39,6 +39,7 @@ import {
   addUserToOrganization,
   markOrganizationAsDeleted,
 } from '@/lib/organizations/organizations';
+import { OrganizationRoleSchema } from '@/lib/organizations/organization-types';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { findUserById } from '@/lib/user';
 import { TRPCError } from '@trpc/server';
@@ -240,7 +241,7 @@ const OrganizationMetricsSchema = z.object({
 const AddMemberInputSchema = z.object({
   organizationId: z.uuid(),
   userId: z.string(),
-  role: z.enum(['owner', 'member', 'billing_manager']),
+  role: OrganizationRoleSchema,
 });
 
 const childOrganizationSettings = {

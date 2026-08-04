@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getLinearOAuthUrl } from '@/lib/integrations/linear-service';
@@ -93,7 +94,7 @@ describe('GET /api/integrations/linear/connect', () => {
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
       { user: expect.objectContaining({ id: USER_ID }) },
       'org-linear-123',
-      ['owner', 'billing_manager']
+      ORGANIZATION_BILLING_ROLES
     );
     expect(mockedRequireActiveSubscriptionOrTrial).toHaveBeenCalledWith('org-linear-123');
     const state = mockedGetLinearOAuthUrl.mock.calls[0]?.[0];

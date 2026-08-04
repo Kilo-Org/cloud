@@ -787,7 +787,7 @@ export type ContributorChampionTier =
 
 // --- Organization types ---
 
-export type OrganizationRole = 'owner' | 'member' | 'billing_manager';
+export type OrganizationRole = 'owner' | 'admin' | 'member' | 'billing_manager';
 
 export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
 

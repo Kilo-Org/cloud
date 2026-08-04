@@ -16,6 +16,7 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import {
   ensureOrganizationAccess,
   ensureOrganizationsAccess,
@@ -221,18 +222,13 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
   // Batched into a fixed number of queries so a large org list cannot fan out
   // into one authorization query per id.
   if (filters.organizationIds && filters.organizationIds.length > 0) {
-    await ensureOrganizationsAccess(ctx, filters.organizationIds, ['owner', 'billing_manager']);
+    await ensureOrganizationsAccess(ctx, filters.organizationIds, ORGANIZATION_BILLING_ROLES);
     return;
   }
 
   if (filters.organizationId) {
-    const requiredRoles =
-      filters.viewAs === 'org-wide' ? (['owner', 'billing_manager'] as const) : undefined;
-    await ensureOrganizationAccess(
-      ctx,
-      filters.organizationId,
-      requiredRoles ? [...requiredRoles] : undefined
-    );
+    const requiredRoles = filters.viewAs === 'org-wide' ? ORGANIZATION_BILLING_ROLES : undefined;
+    await ensureOrganizationAccess(ctx, filters.organizationId, requiredRoles);
 
     if (filters.viewAs === 'self') {
       const allUserFilterValues = [...(filters.userIds ?? []), ...(filters.excludedUserIds ?? [])];
@@ -1030,7 +1026,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(ScopeOrganizationsInputSchema)
     .output(ScopeOrganizationsOutputSchema)
     .query(async ({ input, ctx }) => {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+      await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
 
       const [org] = await readDb
         .select({ id: organizations.id, name: organizations.name })

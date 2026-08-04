@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { buildBitbucketOrganizationCredentialLockKey } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { DrizzleTransaction } from '@/lib/drizzle';
@@ -71,7 +72,7 @@ export async function requireBitbucketWorkspaceAccessTokenOrganizationManager(
         and(
           eq(organization_memberships.organization_id, organizationId),
           eq(organization_memberships.kilo_user_id, actorUserId),
-          inArray(organization_memberships.role, ['owner', 'billing_manager'])
+          inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
         )
       )
       .for('update');

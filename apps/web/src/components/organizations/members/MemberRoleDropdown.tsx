@@ -17,6 +17,7 @@ import {
 } from '@/components/organizations/OrganizationContext';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 const getRoleBadgeVariant = (role: string) => {
   switch (role) {
@@ -31,15 +32,19 @@ const getRoleBadgeVariant = (role: string) => {
 
 const ROLE_LABELS = {
   owner: 'Owner',
+  admin: 'Admin',
   member: 'Member',
   billing_manager: 'Billing Manager',
 } as const;
 
+const ASSIGNABLE_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
+
+// Owners, admins and Kilo staff may assign any role; nobody else may change roles.
 const getAvailableRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
-  return isKiloAdmin || currentUserRole === 'owner' ? ['owner', 'member', 'billing_manager'] : [];
+  return isKiloAdmin || canManageOrganization(currentUserRole) ? [...ASSIGNABLE_ROLES] : [];
 };
 
 type MemberRoleDropdownProps = {
@@ -118,7 +123,7 @@ export function MemberRoleDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {(['owner', 'member', 'billing_manager'] as const).map(role => {
+        {ASSIGNABLE_ROLES.map(role => {
           const isCurrentRole = member.role === role;
           const isAllowed = availableRoles.includes(role);
           const isDisabled = isCurrentRole || mutation.isPending || !isAllowed;

@@ -45,6 +45,7 @@ import { toast } from 'sonner';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -77,7 +78,7 @@ function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
 }
 
 const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
-  isKiloAdmin || role === 'owner';
+  isKiloAdmin || canManageOrganization(role);
 
 const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
   canManageMembers(role, isKiloAdmin) || role === 'billing_manager';

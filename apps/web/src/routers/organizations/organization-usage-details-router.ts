@@ -2,7 +2,7 @@ import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationMemberProcedure,
-  organizationOwnerMutationProcedure,
+  organizationAdminMutationProcedure,
 } from '@/routers/organizations/utils';
 import { db, readDb } from '@/lib/drizzle';
 import { organizations, organization_recommendation_dismissals } from '@kilocode/db/schema';
@@ -153,7 +153,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       }
       return { checks: result.checks, recommendations: result.recommendations };
     }),
-  dismissRecommendation: organizationOwnerMutationProcedure
+  dismissRecommendation: organizationAdminMutationProcedure
     .input(DismissRecommendationInputSchema)
     .mutation(async ({ ctx, input }) => {
       await assertEnterprise(input.organizationId);
@@ -172,7 +172,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         });
       return { dismissed: true };
     }),
-  restoreRecommendation: organizationOwnerMutationProcedure
+  restoreRecommendation: organizationAdminMutationProcedure
     .input(DismissRecommendationInputSchema)
     .mutation(async ({ input }) => {
       await assertEnterprise(input.organizationId);

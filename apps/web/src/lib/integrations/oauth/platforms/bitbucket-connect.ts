@@ -12,6 +12,7 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import { getUserFromAuth } from '@/lib/user/server';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 function detailPath(organizationId: string | null): string {
@@ -33,7 +34,7 @@ export async function handleBitbucketOAuthConnect(request: NextRequest): Promise
       ? { type: 'org', id: organizationId }
       : { type: 'user', id: user.id };
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id, ['owner', 'billing_manager']);
+      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
     }
 
     const returnToParam = request.nextUrl.searchParams.get('returnTo');

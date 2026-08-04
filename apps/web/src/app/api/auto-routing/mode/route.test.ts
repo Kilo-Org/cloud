@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import { NextRequest } from 'next/server';
 import {
@@ -93,7 +94,7 @@ describe('/api/auto-routing/mode', () => {
         user: expect.objectContaining({ id: USER_ID, is_admin: false }),
       }),
       ORGANIZATION_ID,
-      ['owner', 'billing_manager']
+      ORGANIZATION_BILLING_ROLES
     );
     expect(mockedRequireActiveSubscriptionOrTrial).toHaveBeenCalledWith(ORGANIZATION_ID);
     expect(mockedUpdateAutoRoutingMode).toHaveBeenCalledWith({

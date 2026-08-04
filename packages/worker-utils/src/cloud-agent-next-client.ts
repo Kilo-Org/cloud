@@ -192,6 +192,11 @@ export const CLOUD_AGENT_TERMINAL_REASONS = [
   'session_import_failed',
   'setup_command_failed',
   'container_shutdown',
+  // Written only by the stale review reaper on the app side, never sent by the
+  // orchestrator. It is listed here because this enum and the db one are kept
+  // identical: the callback allowlist is built from this list, so an omission
+  // would reject the reason if it ever did arrive on a callback.
+  'abandoned',
   'unknown',
 ] as const;
 

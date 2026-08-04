@@ -81,7 +81,7 @@ function isRefreshSessionCurrent(sessionVersion: number): boolean {
 
 async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
   const previous = credentialWrite;
-  let release: (() => void) | undefined = undefined;
+  let release = undefined as (() => void) | undefined;
   credentialWrite = new Promise<void>(resolve => {
     release = resolve;
   });

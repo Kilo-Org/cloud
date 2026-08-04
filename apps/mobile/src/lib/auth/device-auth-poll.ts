@@ -82,9 +82,10 @@ export function startDeviceAuthPoll(params: {
       if (parsed && (parsed.status === 'denied' || parsed.status === 'expired')) {
         cleanup();
         const message = parsed.status === 'denied' ? 'Access denied by user' : 'Code expired';
+        const terminalStatus: 'denied' | 'expired' = parsed.status;
         setState(previous =>
           terminalDeviceAuthState({
-            status: parsed.status,
+            status: terminalStatus,
             code,
             error: message,
             previousVerificationUrl: previous.verificationUrl,

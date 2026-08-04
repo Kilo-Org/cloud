@@ -198,7 +198,7 @@ describe('performRefresh', () => {
 
   it('does not restore credentials after sign-out invalidates a refresh', async () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
-    let resolveResponse: ((response: Response) => void) | undefined = undefined;
+    let resolveResponse = undefined as ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
       await new Promise<void>(resolve => {
         resolve();
@@ -224,7 +224,7 @@ describe('performRefresh', () => {
 
   it('does not overwrite a newer sign-in when refresh completes later', async () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
-    let resolveResponse: ((response: Response) => void) | undefined = undefined;
+    let resolveResponse = undefined as ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
       await new Promise<void>(resolve => {
         resolve();
@@ -252,7 +252,7 @@ describe('performRefresh', () => {
 
   it('does not refuse a newer session after an old refresh receives 401', async () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
-    let resolveResponse: ((response: Response) => void) | undefined = undefined;
+    let resolveResponse = undefined as ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
       await new Promise<void>(resolve => {
         resolve();

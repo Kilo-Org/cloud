@@ -4,7 +4,7 @@ import {
   cost_insight_notification_deliveries,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import {
@@ -97,13 +97,8 @@ describe('Cost Insights notification claims', () => {
     });
   });
 
-  test('skips malformed event snapshots without retrying delivery', async () => {
-    const { deliveryId, eventId } = await createDelivery();
-    await db.execute(sql`
-      UPDATE ${cost_insight_events}
-      SET snapshot = '"malformed"'::jsonb
-      WHERE id = ${eventId}
-    `);
+  test('skips every claimed delivery instead of sending a discontinued alert', async () => {
+    const { deliveryId } = await createDelivery();
 
     await expect(dispatchPendingCostInsightNotifications(db, 1)).resolves.toMatchObject({
       claimed: 1,
@@ -118,7 +113,8 @@ describe('Cost Insights notification claims', () => {
 
     expect(delivery).toMatchObject({
       status: 'skipped',
-      last_error_redacted: 'invalid_event_snapshot',
+      sent_at: null,
+      last_error_redacted: 'feature_discontinued',
     });
   });
 });

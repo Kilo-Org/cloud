@@ -17,12 +17,7 @@ import {
   fetchGitHubBranches,
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import {
-  createAllowPredicateFromRestrictions,
-  hasActiveModelRestrictions,
-} from '@/lib/model-allow.server';
-import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 
 /**
  * List all integrations for an owner
@@ -324,15 +319,8 @@ export async function updateModel(
 
   // For org integrations, validate the model against org access policy.
   if (owner.type === 'org') {
-    const organization = await getOrganizationById(owner.id);
-    if (organization) {
-      const restrictions = getEffectiveModelRestrictions(organization);
-      if (hasActiveModelRestrictions(restrictions)) {
-        const isAllowed = createAllowPredicateFromRestrictions(restrictions);
-        if (!(await isAllowed(modelSlug))) {
-          return { success: false, error: 'Model is not allowed by organization policy' };
-        }
-      }
+    if (!(await isOrganizationModelUpdateAllowed(owner.id, modelSlug))) {
+      return { success: false, error: 'Model is not allowed by organization policy' };
     }
   }
 

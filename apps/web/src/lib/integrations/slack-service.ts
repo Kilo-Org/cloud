@@ -10,14 +10,9 @@ import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { SLACK_CLIENT_ID } from '@/lib/config.server';
 import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
-import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import {
-  createAllowPredicateFromRestrictions,
-  hasActiveModelRestrictions,
-} from '@/lib/model-allow.server';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
-import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
   constructor(teamName: string) {
@@ -452,15 +447,8 @@ export async function updateModel(
 
   // For org integrations, validate the model against org access policy.
   if (owner.type === 'org') {
-    const organization = await getOrganizationById(owner.id);
-    if (organization) {
-      const restrictions = getEffectiveModelRestrictions(organization);
-      if (hasActiveModelRestrictions(restrictions)) {
-        const isAllowed = createAllowPredicateFromRestrictions(restrictions);
-        if (!(await isAllowed(modelSlug))) {
-          return { success: false, error: 'Model is not allowed by organization policy' };
-        }
-      }
+    if (!(await isOrganizationModelUpdateAllowed(owner.id, modelSlug))) {
+      return { success: false, error: 'Model is not allowed by organization policy' };
     }
   }
 

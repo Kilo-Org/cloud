@@ -1,10 +1,9 @@
 import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/ai-gateway/models';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import {
-  createAllowPredicateFromRestrictions,
-  hasActiveModelRestrictions,
-} from '@/lib/model-allow.server';
-import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+  getEffectiveModelDecision,
+  resolveOrganizationDefaultModelPolicy,
+} from '@/lib/organizations/effective-model-access.server';
 
 /**
  * Get a default model that is allowed for an organization.
@@ -19,14 +18,23 @@ export async function getDefaultAllowedModel(
     return globalDefault;
   }
 
-  const restrictions = getEffectiveModelRestrictions(organization);
-
-  // If no restrictions, use global default
-  if (!hasActiveModelRestrictions(restrictions)) {
+  // Resolve the organization's default policy once. When it imposes no
+  // restriction (non-Enterprise, or an unrestricted grant with no deny list and
+  // no provider ceiling), return `globalDefault` exactly as the pre-policy code
+  // did. The organization's own `default_model` is only consulted on the
+  // restricted path below, after `isAllowed` accepts it, because it may hold a
+  // non-routable virtual id such as `organization-auto`.
+  const policy = await resolveOrganizationDefaultModelPolicy({ organizationId });
+  const isUnrestricted =
+    policy.memberGrant.mode === 'unrestricted' &&
+    policy.organizationModelDenyList.length === 0 &&
+    !policy.organizationProviderCeiling;
+  if (isUnrestricted) {
     return globalDefault;
   }
 
-  const isAllowed = createAllowPredicateFromRestrictions(restrictions);
+  const isAllowed = async (modelId: string) =>
+    (await getEffectiveModelDecision(policy, modelId)).allowed;
 
   // Check if the organization's default model is allowed
   const orgDefaultModel = organization.settings?.default_model;

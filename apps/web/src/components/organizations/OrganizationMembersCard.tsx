@@ -43,6 +43,8 @@ import {
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -440,6 +442,11 @@ export function OrganizationAdminMembers({
     error,
     refetch,
   } = useOrganizationWithMembers(organizationId);
+  const trpc = useTRPC();
+  const groupsQuery = useQuery({
+    ...trpc.organizations.groups.list.queryOptions({ organizationId }),
+    enabled: organizationData?.plan === 'enterprise',
+  });
 
   const handleMemberAdded = () => {
     void refetch();
@@ -596,6 +603,17 @@ export function OrganizationAdminMembers({
                             <InvitedBadge member={member} />
                           </div>
                           <p className="text-muted-foreground text-sm">{member.email}</p>
+                          {member.status === 'active' && groupsQuery.data?.access === 'manager' && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {groupsQuery.data.groups
+                                .filter(group => group.memberIds.includes(member.id))
+                                .map(group => (
+                                  <Badge key={group.id} variant="outline">
+                                    {group.name}
+                                  </Badge>
+                                ))}
+                            </div>
+                          )}
                           <div className="text-muted-foreground flex items-center gap-4 text-xs">
                             <span>
                               Joined: {member.inviteDate ? formatDate(member.inviteDate) : 'N/A'}

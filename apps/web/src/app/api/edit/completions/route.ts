@@ -20,6 +20,7 @@ import {
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
+  modelNotAllowedResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -28,6 +29,7 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -207,6 +209,20 @@ export async function POST(request: NextRequest) {
     organizationPlan: plan,
   });
   if (modelRestrictionError) return modelRestrictionError;
+
+  if (organizationId) {
+    const { decision } = await resolveOrganizationMemberModelDecision({
+      organizationId,
+      kiloUserId: user.id,
+      modelId: requestBody.model,
+    });
+    if (
+      !decision.allowed ||
+      (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(editProvider))
+    ) {
+      return modelNotAllowedResponse();
+    }
+  }
 
   // Org-level "do not collect my data" opt-out. The OpenRouter/Vercel paths
   // honor this by setting `provider.data_collection = 'deny'` on the upstream

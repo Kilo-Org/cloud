@@ -19,6 +19,7 @@ import {
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
+  modelNotAllowedResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -27,6 +28,7 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -218,6 +220,18 @@ export async function POST(request: NextRequest) {
     organizationPlan: plan,
   });
   if (modelRestrictionError) return modelRestrictionError;
+
+  if (organizationId) {
+    const { decision } = await resolveOrganizationMemberModelDecision({
+      organizationId,
+      kiloUserId: user.id,
+      modelId: requestBody.model,
+    });
+    if (!decision.allowed) return modelNotAllowedResponse();
+    if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {
+      return modelNotAllowedResponse();
+    }
+  }
 
   // FIM routes directly to providers, so enforce the resolved provider name here.
   if (providerConfig?.only && !providerConfig.only.includes(fimProvider)) {

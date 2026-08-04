@@ -9,6 +9,7 @@ const unavailableModelIds: ReadonlySet<string> = new Set([
   'arcee-ai/trinity-mini:free',
   'bytedance-seed/dola-seed-2.0-code:free',
   'bytedance-seed/dola-seed-2.0-pro:free',
+  'byteplus-coding/glm-4.7',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',
   'deepseek/deepseek-v4-flash:free',

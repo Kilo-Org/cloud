@@ -5,7 +5,7 @@ import {
   model_experiment_variant,
   model_experiment_variant_version,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { readDb } from '@/lib/drizzle';
 import { decryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -40,7 +40,7 @@ export async function getRoutingExperimentForPublicId(publicId: string): Promise
 }
 
 async function loadExperimentFromDb(publicId: string): Promise<ResolveResult> {
-  const [experiment] = await db
+  const [experiment] = await readDb
     .select({
       id: model_experiment.id,
       public_model_id: model_experiment.public_model_id,
@@ -62,7 +62,7 @@ async function loadExperimentFromDb(publicId: string): Promise<ResolveResult> {
   const status = experiment.status as ExperimentStatus;
 
   // Variants for this experiment.
-  const variantRows = await db
+  const variantRows = await readDb
     .select({
       id: model_experiment_variant.id,
       weight: model_experiment_variant.weight,
@@ -87,7 +87,7 @@ async function loadExperimentFromDb(publicId: string): Promise<ResolveResult> {
   // Resolve "current version" per variant: the latest version row whose
   // effective_at <= now() per (variant_id, effective_at desc, id desc).
   // Postgres SELECT DISTINCT ON for one query, no per-variant round trips.
-  const { rows: versionRows } = await db.execute<{
+  const { rows: versionRows } = await readDb.execute<{
     id: string;
     variant_id: string;
     upstream: unknown;

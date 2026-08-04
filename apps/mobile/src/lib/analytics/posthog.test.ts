@@ -293,8 +293,10 @@ describe('discardPostHog', () => {
     await discardPostHog();
     const posthogModule = await import('posthog-react-native');
     const prevCalls = (posthogModule.default as ReturnType<typeof vi.fn>).mock.calls.length;
-    const { initPostHog: init2 } = await loadModule();
-    init2();
+    // Re-init on the *same* module instance — after discard nulled client,
+    // initPostHog must construct a new client. resetModules would force a
+    // fresh client=null and prove nothing.
+    initPostHog();
     expect((posthogModule.default as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
       prevCalls + 1
     );

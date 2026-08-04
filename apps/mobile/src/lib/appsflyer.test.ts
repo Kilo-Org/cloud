@@ -465,6 +465,41 @@ describe('resetAppsFlyerState', () => {
     expect(stopOrder!).toBeLessThan(initSdkOrder!);
   });
 
+  it('invalidates JS state even when stop throws, blocking stale callback', async () => {
+    const successHolders: ((result: string) => void)[] = [];
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        successHolders.push(onSuccess);
+      }
+    );
+
+    const module = await loadModule();
+    module.initAppsFlyer();
+    expect(successHolders).toHaveLength(1);
+
+    // Make stop throw AFTER initAppsFlyer so the initial stop(false) in
+    // initAppsFlyer succeeds. Only the stop(true) inside reset must throw.
+    mockedAppsFlyer.stop.mockImplementation(() => {
+      throw new Error('native bridge down');
+    });
+
+    // reset must not throw despite the native exception.
+    expect(() => {
+      module.resetAppsFlyerState();
+    }).not.toThrow();
+
+    // Fire the stale callback — must not re-arm the SDK.
+    successHolders[0]?.('ok');
+    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
+
+    // Track an event — must buffer, not log, because initialized was cleared.
+    module.trackEvent('post-reset-event');
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+
+    // Clean up: reset the throwing mock so other tests are not affected.
+    mockedAppsFlyer.stop.mockReset();
+  });
+
   it('clears initialized and pending events', async () => {
     mockedController.currentGeneration.mockReturnValue(0);
     mockedAppsFlyer.initSdk.mockImplementation(

@@ -206,19 +206,32 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
  * "Connector already configured".
  */
 export function resetAppsFlyerState(): void {
-  if (typeof (appsFlyer as Record<string, unknown>).stop === 'function') {
-    appsFlyer.stop(true);
-  }
-
-  if (
-    Platform.OS === 'ios' &&
-    typeof (AppsFlyerPurchaseConnector as unknown as Record<string, unknown>)
-      .stopObservingTransactions === 'function'
-  ) {
-    AppsFlyerPurchaseConnector.stopObservingTransactions();
-  }
-
+  // Invalidate JS state BEFORE native teardown calls. If a native call throws,
+  // the JS token, the initialized flag, and pendingEvents are already cleared —
+  // a late initSdk success after reset cannot re-arm the SDK or drain events.
   callbackToken += 1;
   initialized = false;
   pendingEvents.length = 0;
+
+  try {
+    if (typeof (appsFlyer as Record<string, unknown>).stop === 'function') {
+      appsFlyer.stop(true);
+    }
+  } catch {
+    // Native stop may throw — JS invalidation has already run.
+  }
+
+  if (Platform.OS === 'ios') {
+    try {
+      if (
+        typeof (AppsFlyerPurchaseConnector as unknown as Record<string, unknown>)
+          .stopObservingTransactions === 'function'
+      ) {
+        AppsFlyerPurchaseConnector.stopObservingTransactions();
+      }
+    } catch {
+      // Native stopObservingTransactions may throw — JS invalidation has
+      // already run.
+    }
+  }
 }

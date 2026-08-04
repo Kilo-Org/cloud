@@ -1,6 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
+import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, lt, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
@@ -183,6 +183,9 @@ export async function denyDeviceAuthRequest(code: string): Promise<void> {
 /**
  * Atomically consume an approved request by device code.
  * Returns the appropriate status and mints a token only once per row.
+ *
+ * If credential issuance fails after the atomic consume succeeds, the row is
+ * restored to `approved` so the request remains redeemable.
  */
 export async function consumeDeviceAuthByDeviceCode(
   deviceCode: string,
@@ -233,60 +236,79 @@ export async function consumeDeviceAuthByDeviceCode(
   }
 
   // Only reachable after a successful atomic consume.
-  if (!consumed.kilo_user_id) {
-    throw new Error('Approved request has no user');
-  }
+  let sessionId: string | undefined;
+  try {
+    if (!consumed.kilo_user_id) {
+      throw new Error('Approved request has no user');
+    }
 
-  const [user] = await db
-    .select()
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, consumed.kilo_user_id))
-    .limit(1);
+    const [user] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, consumed.kilo_user_id))
+      .limit(1);
 
-  if (!user) {
-    throw new Error('User not found');
-  }
+    if (!user) {
+      throw new Error('User not found');
+    }
 
-  if (user.blocked_reason) {
-    await db
-      .update(device_auth_requests)
-      .set({ status: 'denied' })
-      .where(eq(device_auth_requests.code, consumed.code));
-    return { status: 'denied' };
-  }
+    if (user.blocked_reason) {
+      await db
+        .update(device_auth_requests)
+        .set({ status: 'denied' })
+        .where(eq(device_auth_requests.code, consumed.code));
+      return { status: 'denied' };
+    }
 
-  const token = options?.supportsRefresh
-    ? undefined
-    : generateApiToken(user, { deviceAuthRequestCode: consumed.code });
+    const token = options?.supportsRefresh
+      ? undefined
+      : generateApiToken(user, { deviceAuthRequestCode: consumed.code });
 
-  if (options?.supportsRefresh) {
-    const sessionId = await createDeviceSession({
-      userId: user.id,
-      userAgent: consumed.user_agent ?? undefined,
-      deviceAuthRequestId: consumed.id,
-    });
-    const pair = await issueSessionCredentials(user, sessionId);
+    if (options?.supportsRefresh) {
+      sessionId = await createDeviceSession({
+        userId: user.id,
+        userAgent: consumed.user_agent ?? undefined,
+        deviceAuthRequestId: consumed.id,
+      });
+      const pair = await issueSessionCredentials(user, sessionId);
+      return {
+        status: 'approved',
+        token: pair.token,
+        refreshToken: pair.refreshToken,
+        expiresIn: pair.expiresIn,
+        userId: user.id,
+        userEmail: user.google_user_email,
+      };
+    }
+
     return {
       status: 'approved',
-      token: pair.token,
-      refreshToken: pair.refreshToken,
-      expiresIn: pair.expiresIn,
+      token,
       userId: user.id,
       userEmail: user.google_user_email,
     };
+  } catch (err) {
+    // If a device session was created, delete it to avoid orphans.
+    if (sessionId) {
+      await db.delete(device_sessions).where(eq(device_sessions.id, sessionId));
+    }
+    // Restore the row so the request remains redeemable.
+    await db
+      .update(device_auth_requests)
+      .set({ status: 'approved', consumed_at: null })
+      .where(
+        and(eq(device_auth_requests.id, consumed.id), eq(device_auth_requests.status, 'consumed'))
+      );
+    throw err;
   }
-
-  return {
-    status: 'approved',
-    token,
-    userId: user.id,
-    userEmail: user.google_user_email,
-  };
 }
 
 /**
  * Poll for device authorization status and return token if approved.
  * Legacy path — uses atomic consume to prevent double-spend.
+ *
+ * If credential issuance fails after the atomic consume succeeds, the row is
+ * restored to `approved` so the request remains redeemable.
  */
 export async function pollDeviceAuthRequest(code: string): Promise<{
   status: 'pending' | 'approved' | 'denied' | 'expired';
@@ -313,39 +335,50 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
 
   if (consumed) {
     // Only reachable after a successful atomic consume.
-    const kiloUserId = consumed.kilo_user_id;
-    if (!kiloUserId) {
-      throw new Error('Approved request has no user');
-    }
+    try {
+      const kiloUserId = consumed.kilo_user_id;
+      if (!kiloUserId) {
+        throw new Error('Approved request has no user');
+      }
 
-    const [user] = await db
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, kiloUserId))
-      .limit(1);
+      const [user] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, kiloUserId))
+        .limit(1);
 
-    if (!user) {
-      throw new Error('User not found');
-    }
+      if (!user) {
+        throw new Error('User not found');
+      }
 
-    if (user.blocked_reason) {
+      if (user.blocked_reason) {
+        await db
+          .update(device_auth_requests)
+          .set({ status: 'denied' })
+          .where(eq(device_auth_requests.code, code));
+        return { status: 'denied' };
+      }
+
+      const token = generateApiToken(user, {
+        deviceAuthRequestCode: consumed.code,
+      });
+
+      return {
+        status: 'approved',
+        token,
+        userId: user.id,
+        userEmail: user.google_user_email,
+      };
+    } catch (err) {
+      // Restore the row so the request remains redeemable.
       await db
         .update(device_auth_requests)
-        .set({ status: 'denied' })
-        .where(eq(device_auth_requests.code, code));
-      return { status: 'denied' };
+        .set({ status: 'approved', consumed_at: null })
+        .where(
+          and(eq(device_auth_requests.id, consumed.id), eq(device_auth_requests.status, 'consumed'))
+        );
+      throw err;
     }
-
-    const token = generateApiToken(user, {
-      deviceAuthRequestCode: consumed.code,
-    });
-
-    return {
-      status: 'approved',
-      token,
-      userId: user.id,
-      userEmail: user.google_user_email,
-    };
   }
 
   // Fall through: not consumed, look up current status.

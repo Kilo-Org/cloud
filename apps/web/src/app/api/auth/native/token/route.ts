@@ -337,18 +337,9 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Consume the code BEFORE issuing any credential.
-      const committed = await commitSignInCode(data.email, data.code, data.challengeId);
-      if (!committed) {
-        const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
-        if (!consumed) {
-          return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
-        }
-        captureMessage('native_token_code_reservation_lapsed');
-      }
-      phase = 'committed';
-
       // ── Step 5: Persist attested key after settlement ─────────────────
+      // Must run BEFORE code commit so a key collision under enforce does
+      // not burn the sign-in code without issuing a credential.
       let sessionId: string | undefined;
       let refreshCredentials:
         | { token: string; refreshToken: string; expiresIn: number }
@@ -373,6 +364,7 @@ export async function POST(request: NextRequest) {
           if (err instanceof KeyCollisionError) {
             captureMessage('native_attested_key_cross_user_collision');
             if (shouldRefuseAsyncFailure()) {
+              phase = 'release';
               return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
             }
             // Report mode: log, admit, and issue credentials without binding the key.
@@ -388,6 +380,7 @@ export async function POST(request: NextRequest) {
           if (err instanceof KeyCollisionError) {
             captureMessage('native_attested_key_cross_user_collision');
             if (shouldRefuseAsyncFailure()) {
+              phase = 'release';
               return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
             }
             // Report mode: log, admit, and issue credentials without binding the key.
@@ -396,6 +389,19 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+
+      // ── Step 6: Consume the sign-in code AFTER key persistence ─────────
+      // The code is only committed once all pre-credential gates pass, so
+      // a refusal never burns a code without issuing a credential.
+      const committed = await commitSignInCode(data.email, data.code, data.challengeId);
+      if (!committed) {
+        const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
+        if (!consumed) {
+          return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
+        }
+        captureMessage('native_token_code_reservation_lapsed');
+      }
+      phase = 'committed';
 
       // Emit deferred sign-in analytics after all gates pass.
       if (result.deferredSignInEvent) {

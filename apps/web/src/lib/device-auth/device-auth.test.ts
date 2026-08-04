@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@/lib/drizzle';
-import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
+import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
   generateUserCode,
@@ -18,6 +18,40 @@ import {
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
 } from './device-auth';
+import { issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { generateApiToken } from '@/lib/tokens';
+
+// Capture real implementations for pass-through default behaviour.
+// Must use var declarations — jest.mock factories are hoisted and run before
+// const/let initializers, but var is hoisted with an undefined initial value
+// that is safe to assign to.
+// eslint-disable-next-line no-var
+var _realIssueSessionCredentials: ((...args: any[]) => any) | undefined;
+// eslint-disable-next-line no-var
+var _realGenerateApiToken: ((...args: any[]) => any) | undefined;
+
+jest.mock('@/lib/auth/device-sessions', () => {
+  const actual = jest.requireActual('@/lib/auth/device-sessions') as any;
+  _realIssueSessionCredentials = actual.issueSessionCredentials;
+  return {
+    ...actual,
+    issueSessionCredentials: jest.fn((...args: any[]) =>
+      (_realIssueSessionCredentials as any)(...args)
+    ),
+  };
+});
+
+jest.mock('@/lib/tokens', () => {
+  const actual = jest.requireActual('@/lib/tokens') as any;
+  _realGenerateApiToken = actual.generateApiToken;
+  return {
+    ...actual,
+    generateApiToken: jest.fn((...args: any[]) => (_realGenerateApiToken as any)(...args)),
+  };
+});
+
+const mockedIssueSessionCredentials = jest.mocked(issueSessionCredentials);
+const mockedGenerateApiToken = jest.mocked(generateApiToken);
 
 describe('Device Auth', () => {
   const testUserId = 'test-user-' + Date.now();
@@ -35,6 +69,15 @@ describe('Device Auth', () => {
   });
 
   afterEach(async () => {
+    // Reset mocks to pass-through defaults.
+    mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
+      (_realIssueSessionCredentials as any)(...args)
+    );
+    mockedGenerateApiToken.mockImplementation((...args: any[]) =>
+      (_realGenerateApiToken as any)(...args)
+    );
+    jest.clearAllMocks();
+
     // Clean up test data
     await db.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, testUserId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUserId));
@@ -364,6 +407,104 @@ describe('Device Auth', () => {
       const request = await getDeviceAuthRequest(code);
       expect(request?.status).toBe('denied');
     });
+
+    test('failed issuance after consume restores row and removes orphan session (supportsRefresh)', async () => {
+      mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
+
+      const { code, deviceCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(code, testUserId);
+
+      // First consume fails because issueSessionCredentials throws.
+      await expect(
+        consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
+      ).rejects.toThrow('issuance failed');
+
+      // Row was restored to approved.
+      const request = await getDeviceAuthRequest(code);
+      expect(request?.status).toBe('approved');
+      expect(request?.consumed_at).toBeNull();
+
+      // No device session was left behind.
+      const sessions = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.device_auth_request_id, request!.id));
+      expect(sessions).toHaveLength(0);
+
+      // Reset mock to pass-through for the re-consume.
+      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
+        (_realIssueSessionCredentials as any)(...args)
+      );
+
+      // A later consume succeeds.
+      const retry = await consumeDeviceAuthByDeviceCode(deviceCode);
+      expect(retry.status).toBe('approved');
+      expect(retry.token).toBeDefined();
+    });
+
+    test('manually restored approved row is redeemable again', async () => {
+      // Manually restore a consumed row to approved status, simulating what the
+      // catch block does after a real issuance failure. A subsequent consume must
+      // succeed, proving the restore enables re-redemption.
+      const { code, deviceCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(code, testUserId);
+
+      // First consume succeeds.
+      const first = await consumeDeviceAuthByDeviceCode(deviceCode);
+      expect(first.status).toBe('approved');
+      expect(first.token).toBeDefined();
+
+      // Manually restore the row (simulating what the catch block does on failure).
+      await db
+        .update(device_auth_requests)
+        .set({ status: 'approved', consumed_at: null })
+        .where(eq(device_auth_requests.code, code));
+
+      // Second consume succeeds — the restored row is redeemable again.
+      const second = await consumeDeviceAuthByDeviceCode(deviceCode);
+      expect(second.status).toBe('approved');
+      expect(second.token).toBeDefined();
+    });
+
+    test('does not delete another request session during cleanup', async () => {
+      const { code: code1, deviceCode: deviceCode1 } = await createDeviceAuthRequest({});
+      const { code: code2, deviceCode: deviceCode2 } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(code1, testUserId);
+      await approveDeviceAuthRequest(code2, testUserId);
+
+      // Consume code2 successfully with a session first.
+      const result2 = await consumeDeviceAuthByDeviceCode(deviceCode2, { supportsRefresh: true });
+      expect(result2.status).toBe('approved');
+      expect(result2.token).toBeDefined();
+
+      // Now make code1's issuance fail.
+      mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
+
+      await expect(
+        consumeDeviceAuthByDeviceCode(deviceCode1, { supportsRefresh: true })
+      ).rejects.toThrow('issuance failed');
+
+      // Code1's session was cleaned up.
+      const request1 = await getDeviceAuthRequest(code1);
+      const sessions1 = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.device_auth_request_id, request1!.id));
+      expect(sessions1).toHaveLength(0);
+
+      // Code2's session must still exist.
+      const request2 = await getDeviceAuthRequest(code2);
+      const sessions2 = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.device_auth_request_id, request2!.id));
+      expect(sessions2).toHaveLength(1);
+
+      // Reset mock.
+      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
+        (_realIssueSessionCredentials as any)(...args)
+      );
+    });
   });
 
   describe('pollDeviceAuthRequest (legacy)', () => {
@@ -466,6 +607,33 @@ describe('Device Auth', () => {
       // Verify the request is durably denied, not consumed.
       const request = await getDeviceAuthRequest(code);
       expect(request?.status).toBe('denied');
+    });
+
+    test('failed token generation after consume restores row for re-redemption', async () => {
+      mockedGenerateApiToken.mockImplementation(() => {
+        throw new Error('token generation failed');
+      });
+
+      const { code } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(code, testUserId);
+
+      // First poll fails because generateApiToken throws.
+      await expect(pollDeviceAuthRequest(code)).rejects.toThrow('token generation failed');
+
+      // Row was restored to approved.
+      const request = await getDeviceAuthRequest(code);
+      expect(request?.status).toBe('approved');
+      expect(request?.consumed_at).toBeNull();
+
+      // Reset mock to pass-through for the re-consume.
+      mockedGenerateApiToken.mockImplementation((...args: any[]) =>
+        (_realGenerateApiToken as any)(...args)
+      );
+
+      // A later poll succeeds.
+      const retry = await pollDeviceAuthRequest(code);
+      expect(retry.status).toBe('approved');
+      expect(retry.token).toBeDefined();
     });
   });
 

@@ -21,7 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
   }
 
-  Sentry.captureMessage('legacy-poll-device-auth', { level: 'info', extra: { code } });
+  Sentry.captureMessage('legacy-poll-device-auth-count: 1', { level: 'info' });
 
   const result = await pollDeviceAuthRequest(code);
 

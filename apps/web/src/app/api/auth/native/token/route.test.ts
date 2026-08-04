@@ -1116,6 +1116,81 @@ describe('POST /api/auth/native/token', () => {
       expect(mockReleaseSignInCode).toHaveBeenCalled();
     });
 
+    // ── Fix 3: KeyCollisionError during persistence does not burn the code ─
+
+    it('refuses key collision during persistence without burning the sign-in code (enforce, email, supportsRefresh)', async () => {
+      mockShouldRefuseAsyncFailure.mockReturnValue(true);
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      // Verification succeeds with no prior owner — passes preflight ownership check.
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+        // No existingKeyUserId — preflight check passes.
+      });
+      // But the transactional persistence throws KeyCollisionError (concurrent insert).
+      mockCreateDeviceSessionWithAttestedKey.mockRejectedValue(new KeyCollisionError());
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'emailuser@example.com',
+          code: '123456',
+          supportsRefresh: true,
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      // Code must NOT be committed — persistence failed BEFORE commit.
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      // Code must be released so it remains usable.
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+    });
+
+    it('refuses key collision during persistence without burning the sign-in code (enforce, email, no supportsRefresh)', async () => {
+      mockShouldRefuseAsyncFailure.mockReturnValue(true);
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+      });
+      mockPersistAttestedKey.mockRejectedValue(new KeyCollisionError());
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'emailuser@example.com',
+          code: '123456',
+          supportsRefresh: false,
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+    });
+
     it('logs ownership mismatch and issues token in report mode (apple/google)', async () => {
       // shouldRefuseAsyncFailure defaults to false (report mode)
       mockVerifyNativeAppleIdToken.mockResolvedValue({

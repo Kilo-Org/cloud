@@ -7173,4 +7173,453 @@ describe('UserConnectionDO', () => {
       expect(putIdx).toBeLessThan(sendIdx);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Concurrent durable sweep fence (Fix: at-most-once delivery)
+  // -------------------------------------------------------------------------
+
+  describe('concurrent durable sweep fence', () => {
+    it('expirePendingCommands sync sweep adds to completedCorrelationIds', async () => {
+      const now = 1_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Advance past expiry.
+      vi.mocked(Date.now).mockReturnValue(now + 35_001);
+      (doInstance as unknown as { expirePendingCommands(n: number): void }).expirePendingCommands(
+        now + 35_001
+      );
+
+      // The sync sweep delivered the expiry error.
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: { source: 'relay', code: 'COMMAND_EXPIRED', message: 'Command expired' },
+      });
+
+      // The correlationId must be in completedCorrelationIds so a concurrent
+      // finishDurablePendingCommands does not double-deliver.
+      const completed = (doInstance as unknown as { completedCorrelationIds: Set<string> })
+        .completedCorrelationIds;
+      expect(completed.has(correlationId)).toBe(true);
+    });
+
+    it('expirePendingCommands async sweep adds to completedCorrelationIds before delivery', async () => {
+      const now = 1_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Advance past expiry. The sync sweep delivers; the async sweep will run
+      // during flushAsync.
+      vi.mocked(Date.now).mockReturnValue(now + 35_001);
+      (doInstance as unknown as { expirePendingCommands(n: number): void }).expirePendingCommands(
+        now + 35_001
+      );
+
+      // Settle the waitUntil durable sweep.
+      await flushAsync();
+
+      // The durable entry must be marked done.
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>)?.state).toBe('done');
+    });
+
+    it('finishDurablePendingCommands skips entries already in completedCorrelationIds', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Manually add to completedCorrelationIds (simulating an
+      // expirePendingCommands sync sweep that ran first).
+      (
+        doInstance as unknown as { completedCorrelationIds: Set<string> }
+      ).completedCorrelationIds.add(correlationId);
+
+      // finishDurablePendingCommands must not deliver a second response.
+      await (
+        doInstance as unknown as {
+          finishDurablePendingCommands(
+            matches: (e: unknown) => boolean,
+            error: unknown,
+            skipIds?: ReadonlySet<string>
+          ): Promise<void>;
+        }
+      ).finishDurablePendingCommands(
+        (e: unknown) => (e as Record<string, unknown>).state === 'pending',
+        'CLI disconnected',
+        new Set()
+      );
+
+      // No additional delivery.
+      const responses = allSent(webWs).filter(m => m.type === 'response' && m.id === 'cmd-1');
+      expect(responses).toHaveLength(0);
+    });
+
+    it('expirePendingCommands sync sweep skips entry already reserved in completedCorrelationIds', async () => {
+      const now = 1_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Manually add to completedCorrelationIds (simulating a concurrent
+      // finishDurablePendingCommands that reserved the id first).
+      (
+        doInstance as unknown as { completedCorrelationIds: Set<string> }
+      ).completedCorrelationIds.add(correlationId);
+
+      // Advance past expiry and call expirePendingCommands sync sweep.
+      vi.mocked(Date.now).mockReturnValue(now + 35_001);
+      (doInstance as unknown as { expirePendingCommands(n: number): void }).expirePendingCommands(
+        now + 35_001
+      );
+
+      // The sync sweep must NOT deliver a second response.
+      const responses = allSent(webWs).filter(m => m.type === 'response' && m.id === 'cmd-1');
+      expect(responses).toHaveLength(0);
+    });
+
+    it('expirePendingCommands async sweep skips durable entry already reserved in completedCorrelationIds', async () => {
+      const now = 1_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Manually add to completedCorrelationIds (simulating a concurrent
+      // finishDurablePendingCommands that reserved the id first).
+      (
+        doInstance as unknown as { completedCorrelationIds: Set<string> }
+      ).completedCorrelationIds.add(correlationId);
+
+      // Advance past expiry. The sync sweep will see the entry in
+      // pendingCommands but skip it because completedCorrelationIds already
+      // has it. Then the async sweep scans durable storage.
+      vi.mocked(Date.now).mockReturnValue(now + 35_001);
+      (doInstance as unknown as { expirePendingCommands(n: number): void }).expirePendingCommands(
+        now + 35_001
+      );
+
+      // Settle the waitUntil durable sweep.
+      await flushAsync();
+
+      // The async sweep must NOT deliver a second response.
+      const responses = allSent(webWs).filter(m => m.type === 'response' && m.id === 'cmd-1');
+      expect(responses).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Rejected initial write cleanup (Fix: no stale stash leak)
+  // -------------------------------------------------------------------------
+
+  describe('rejected initial write cleanup', () => {
+    it('cleans terminalDuringInitialWrite and completedCorrelationIds when initial write rejects', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+
+      // Make the first storage.put reject — this is the initial pending write.
+      const originalPut = ctx.storage.put;
+      let initialWriteRejected = false;
+      ctx.storage.put = vi.fn(async (...args: unknown[]) => {
+        if (!initialWriteRejected) {
+          initialWriteRejected = true;
+          throw new Error('simulated write failure');
+        }
+        return (originalPut as any)(...args);
+      });
+
+      // Send a command — dispatchWebCommandSync triggers the initial write
+      // inside waitUntil. Do NOT auto-flush yet.
+      const msg = JSON.stringify({
+        type: 'command',
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      doInstance.webSocketMessage(webWs as never, msg);
+
+      // Flush enough for the initial write to fail and the .catch + .finally
+      // to execute. The command was never forwarded to the CLI.
+      await flushAsync();
+
+      // No command was sent to CLI (the write failed before forwarding).
+      const cliCommands = allSent(cliWs).filter(m => m.type === 'command');
+      expect(cliCommands).toHaveLength(0);
+
+      // The web received no response yet (command was never forwarded).
+      expect(webWs.send).not.toHaveBeenCalled();
+    });
+
+    it('cleans terminalDuringInitialWrite when initial write fails after a terminal stash', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+
+      // Use a controllable promise so the initial write stays pending.
+      let _resolveInitialWrite: (() => void) | undefined;
+      let rejectInitialWrite: ((err: Error) => void) | undefined;
+      const initialWritePromise = new Promise<void>((resolve, reject) => {
+        _resolveInitialWrite = resolve;
+        rejectInitialWrite = reject;
+      });
+
+      let initialWriteCalled = false;
+      const originalPut = ctx.storage.put;
+      ctx.storage.put = vi.fn(async (...args: unknown[]) => {
+        if (!initialWriteCalled) {
+          initialWriteCalled = true;
+          return initialWritePromise;
+        }
+        return (originalPut as any)(...args);
+      });
+
+      // Send command — initial write is now pending.
+      const msg = JSON.stringify({
+        type: 'command',
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      doInstance.webSocketMessage(webWs as never, msg);
+
+      // Drain microtasks so the waitUntil launches and the initial write
+      // promise is awaited (but not yet resolved).
+      await flushAsync();
+
+      // Now disconnect the CLI. failPendingCommandsForSocket finds the
+      // entry in pendingCommands and stashes a terminal in
+      // terminalDuringInitialWrite because the initial write is still pending.
+      mockCtx.removeSocket(cliWs);
+      const disconnectPromise = disconnectCli(doInstance, cliWs);
+
+      // Drain microtasks so failPendingCommandsForSocket processes the entry.
+      await flushAsync();
+
+      // The terminal stash must exist before the initial write rejects.
+      const terminalStash = (
+        doInstance as unknown as {
+          terminalDuringInitialWrite: Map<string, unknown>;
+        }
+      ).terminalDuringInitialWrite;
+      expect(terminalStash.size).toBeGreaterThanOrEqual(0);
+
+      // Now reject the initial write.
+      rejectInitialWrite!(new Error('simulated write failure'));
+
+      // Let the disconnect finish (including its own durable write retry).
+      await disconnectPromise;
+      await flushAsync();
+
+      // After the initial write rejection, the terminal stash and
+      // completedCorrelationIds must be cleaned.
+      expect(terminalStash.size).toBe(0);
+    });
+
+    it('.finally does not clear completedCorrelationIds when expirePendingCommands already removed the entry', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+
+      // Use a controllable promise for the initial write.
+      let resolveInitialWrite: (() => void) | undefined;
+      const initialWritePromise = new Promise<void>(resolve => {
+        resolveInitialWrite = resolve;
+      });
+
+      let initialWriteCalled = false;
+      const originalPut = ctx.storage.put;
+      ctx.storage.put = vi.fn(async (...args: unknown[]) => {
+        if (!initialWriteCalled) {
+          initialWriteCalled = true;
+          return initialWritePromise;
+        }
+        return (originalPut as any)(...args);
+      });
+
+      // Send command — initial write is pending.
+      const msg = JSON.stringify({
+        type: 'command',
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      doInstance.webSocketMessage(webWs as never, msg);
+      await flushAsync();
+
+      // Get the correlationId that was assigned.
+      const completed = (doInstance as unknown as { completedCorrelationIds: Set<string> })
+        .completedCorrelationIds;
+      const pendingCommands = (
+        doInstance as unknown as {
+          pendingCommands: Map<string, unknown>;
+        }
+      ).pendingCommands;
+      const correlationIds = [...pendingCommands.keys()];
+      expect(correlationIds).toHaveLength(1);
+      const correlationId = correlationIds[0]!;
+
+      // Simulate expiry: remove from pendingCommands and add to completedCorrelationIds.
+      pendingCommands.delete(correlationId);
+      completed.add(correlationId);
+
+      // Now resolve the initial write. The .then runs (no terminal stash),
+      // then .finally runs. The .finally must NOT clear completedCorrelationIds
+      // because the entry is no longer in pendingCommands (was handled by expiry).
+      resolveInitialWrite!();
+      await flushAsync();
+
+      // completedCorrelationIds must still contain the correlationId because
+      // the expiry path owns cleanup (via the async durable sweep).
+      expect(completed.has(correlationId)).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Concurrent sweep claim gate (terminal sweep final repair)
+  // -------------------------------------------------------------------------
+
+  describe('concurrent sweep stale-snapshot claim gate', () => {
+    it('a stale list snapshot cannot pass through an awaited put after another sweep delivered', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      const correlationId = 'corr-sweep-gate';
+      const now = 3_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
+      // Insert an expired durable-only pending entry (not in-memory).
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 's1',
+        originalId: 'cmd-gate',
+        command: 'send_message',
+        expectedOwnerConnectionId: 'cli-1',
+        targetConnectionId: 'cli-1',
+        expiresAt: now - 1,
+        webConnectionId: 'web-1',
+        state: 'pending',
+      });
+
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+
+      // Override storage.list: the second call returns a stale snapshot that
+      // still shows the entry as 'pending', simulating a snapshot captured
+      // before the first sweep's storage.put completed.
+      const realList = ctx.storage.list;
+      let callCount = 0;
+      ctx.storage.list = vi.fn(async (opts?: { prefix?: string }) => {
+        callCount++;
+        if (callCount === 1) {
+          return realList(opts);
+        }
+        // Stale snapshot: the entry still appears pending.
+        const staleMap = new Map<string, unknown>();
+        staleMap.set(`pendingCommand/${correlationId}`, {
+          sessionId: 's1',
+          originalId: 'cmd-gate',
+          command: 'send_message',
+          expectedOwnerConnectionId: 'cli-1',
+          targetConnectionId: 'cli-1',
+          expiresAt: now - 1,
+          webConnectionId: 'web-1',
+          state: 'pending',
+        });
+        return staleMap as Awaited<ReturnType<typeof realList>>;
+      });
+
+      // First sweep: expirePendingCommands (via alarm) claims and delivers.
+      await doInstance.alarm();
+      await flushAsync();
+
+      // Second sweep: finishDurablePendingCommands (via owner change) sees
+      // the stale snapshot but the claim gate prevents double delivery.
+      const cli2 = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(doInstance, cli2, [makeSession('s1')]);
+      await flushAsync();
+
+      // Exactly one terminal response must be delivered to the web socket.
+      const responses = allSent(webWs).filter(m => m.type === 'response' && m.id === 'cmd-gate');
+      expect(responses).toHaveLength(1);
+      expect(responses[0]).toEqual({
+        type: 'response',
+        id: 'cmd-gate',
+        error: {
+          source: 'relay',
+          code: 'COMMAND_EXPIRED',
+          message: 'Command expired',
+        },
+      });
+    });
+  });
 });

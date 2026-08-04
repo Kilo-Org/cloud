@@ -1628,6 +1628,11 @@ export class UserConnectionDO extends DurableObject<Env> {
           });
         })
         .catch((error: unknown) => {
+          // The initial durable write failed: the command was never forwarded to
+          // the CLI. Clean any terminal stash and its reservation marker so they
+          // do not leak until DO eviction.
+          this.terminalDuringInitialWrite.delete(correlationId);
+          this.completedCorrelationIds.delete(correlationId);
           console.error('Failed to persist durable pending command before forwarding', {
             correlationId,
             error: error instanceof Error ? error.message : String(error),
@@ -1636,7 +1641,14 @@ export class UserConnectionDO extends DurableObject<Env> {
         .finally(() => {
           this.pendingInitialCommandWrites.delete(correlationId);
           if (!this.terminalDuringInitialWrite.has(correlationId)) {
-            this.completedCorrelationIds.delete(correlationId);
+            // Only clear the reservation marker when the entry is still tracked
+            // in-memory. If expirePendingCommands already removed it and set
+            // the marker, the async sweep owns cleanup and we must not clear it
+            // here (otherwise a concurrent finishDurablePendingCommands could
+            // double-deliver).
+            if (this.pendingCommands.has(correlationId)) {
+              this.completedCorrelationIds.delete(correlationId);
+            }
           }
         })
     );
@@ -2329,30 +2341,42 @@ export class UserConnectionDO extends DurableObject<Env> {
         // Prevents a duplicate delivery when the in-memory storage.put and
         // finishDurablePendingCommands race within separate waitUntil tasks.
         if (skipIds?.has(correlationId)) return [];
-        // Persist the terminal outcome durably BEFORE any live delivery.
-        // If storage.put fails, no live send occurs — the error propagates
-        // to the waitUntil boundary and the caller handles the rejection.
-        const putPromise = this.ctx.storage.put(key, {
-          ...entry,
-          state: 'done',
-          error,
-        });
+        // Claim the correlation BEFORE the durable put so a concurrent
+        // sweep with a stale list snapshot cannot pass through its
+        // awaited put and send after we already delivered.
+        if (this.completedCorrelationIds.has(correlationId)) return [];
+        this.completedCorrelationIds.add(correlationId);
         // After the durable write succeeds, deliver to a reattached web
         // socket (D8 case 3). The in-memory sweep already delivered to the
         // original socket; this path covers a socket that reconnected after
         // the original disconnected (different webConnectionId path).
         const webWs = this.findWebByConnectionId(entry.webConnectionId);
-        if (webWs) {
-          return [
-            putPromise.then(() => {
+        const putPromise = this.ctx.storage
+          .put(key, {
+            ...entry,
+            state: 'done' as const,
+            error,
+          })
+          .then(() => {
+            if (webWs) {
               this.sendToWeb(webWs, {
                 type: 'response',
                 id: entry.originalId,
                 error,
               });
-            }),
-          ];
-        }
+            }
+          })
+          .catch((_error: unknown) => {
+            // On storage failure: release the claim so a retry or another
+            // concurrent path can deliver.  Log but do not rethrow —
+            // Promise.all already rejects on unhandled rejections; the
+            // caller's waitUntil catch logs upstream.
+            this.completedCorrelationIds.delete(correlationId);
+            console.error('Failed to persist finishDurablePendingCommands terminal outcome', {
+              correlationId,
+              error: _error instanceof Error ? _error.message : String(_error),
+            });
+          });
         return [putPromise];
       })
     );
@@ -2388,7 +2412,16 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const [id, entry] of this.pendingCommands) {
       if (entry.expiresAt > now) continue;
       this.pendingCommands.delete(id);
+      // Reserve the correlationId so a concurrent finishDurablePendingCommands
+      // (from failPendingCommandsForSocket/failPendingCommandsForOwnerChange)
+      // does not double-deliver the same terminal response.  But if a
+      // concurrent path already reserved it, skip — that path owns delivery.
+      if (this.completedCorrelationIds.has(id)) {
+        deliveredInMemory.add(id);
+        continue;
+      }
       deliveredInMemory.add(id);
+      this.completedCorrelationIds.add(id);
       this.sendToWeb(entry.ws, {
         type: 'response',
         id: entry.originalId,
@@ -2409,17 +2442,42 @@ export class UserConnectionDO extends DurableObject<Env> {
           if (durable.expiresAt > now) continue;
 
           if (durable.state === 'pending') {
-            // Write terminal outcome durably (step 26a).
-            await this.ctx.storage.put(key, {
-              ...durable,
-              state: 'done',
-              error: COMMAND_EXPIRED_ERROR,
-            });
+            const correlationId = key.slice(PENDING_COMMAND_KEY_PREFIX.length);
+            // Entries already delivered in the in-memory sweep above still need
+            // the durable 'done' mark, but should not claim or send again.
+            if (deliveredInMemory.has(correlationId)) {
+              await this.ctx.storage.put(key, {
+                ...durable,
+                state: 'done',
+                error: COMMAND_EXPIRED_ERROR,
+              });
+              continue;
+            }
+            // Claim the correlation BEFORE the durable put so a concurrent
+            // sweep with a stale list snapshot cannot pass through its
+            // awaited put and send after we already delivered.
+            if (this.completedCorrelationIds.has(correlationId)) continue;
+            this.completedCorrelationIds.add(correlationId);
+
+            try {
+              await this.ctx.storage.put(key, {
+                ...durable,
+                state: 'done',
+                error: COMMAND_EXPIRED_ERROR,
+              });
+            } catch (_error: unknown) {
+              // On storage failure: release the claim so a retry or another
+              // concurrent path can deliver.
+              this.completedCorrelationIds.delete(correlationId);
+              console.error('Failed to persist expirePendingCommands terminal outcome', {
+                correlationId,
+                error: _error instanceof Error ? _error.message : String(_error),
+              });
+              continue;
+            }
+
             // Deliver the terminal response to a live matching web socket
             // that reconnected after the original socket disconnected (D8 case 3).
-            // Skip entries already delivered in the in-memory sweep above.
-            const correlationId = key.slice(PENDING_COMMAND_KEY_PREFIX.length);
-            if (deliveredInMemory.has(correlationId)) continue;
             const webWs = this.findWebByConnectionId(durable.webConnectionId);
             if (webWs) {
               this.sendToWeb(webWs, {
@@ -2432,7 +2490,6 @@ export class UserConnectionDO extends DurableObject<Env> {
             // Already done and past TTL: clean up.
             await this.ctx.storage.delete(key);
           }
-          this.completedCorrelationIds.delete(key.slice(PENDING_COMMAND_KEY_PREFIX.length));
         }
       })().catch((error: unknown) => {
         console.error('Failed to sweep durable pending commands', {

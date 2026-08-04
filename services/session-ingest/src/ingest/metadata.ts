@@ -8,6 +8,7 @@ import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { isNeedsInputStatus } from '../dos/session-ingest-attention';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { SessionStatusSchema } from '../types/user-connection-protocol';
+import { isDefaultSessionTitle } from './default-session-title';
 
 /** Stored status written when a CLI disconnects while the session is waiting on input. */
 export const CLI_DISCONNECT_ATTENTION_RESET_STATUS = 'retry' as const;
@@ -131,12 +132,13 @@ export async function applyMetadataChanges(
           })();
 
     // Agent-generated titles arrive asynchronously and can race a user rename. A session's
-    // title starts out NULL (the placeholder set at row creation); only promote it from that
-    // placeholder here. Once the title is non-null — whether from a user rename or an earlier
-    // agent-generated write — leave it alone so a later user rename can never be clobbered by
-    // an in-flight ingest.
+    // title starts out as a creation placeholder — NULL, or the default title stamped at
+    // creation (e.g. cloud-agent-next inserts `New session - <ISO timestamp>`); only promote
+    // it from that placeholder here. Once the title holds anything else — whether from a user
+    // rename or an earlier agent-generated write — leave it alone so a later user rename can
+    // never be clobbered by an in-flight ingest.
     if (mergedChanges.has('title')) {
-      if (currentRow.title === null) {
+      if (isDefaultSessionTitle(currentRow.title)) {
         titleWriteApplied = true;
       } else {
         console.warn('Skipping agent-generated title write; title is no longer the placeholder', {

@@ -685,6 +685,24 @@ describe('applyMetadataChanges', () => {
       );
     });
 
+    it('applies the agent-generated title over the default title stamped at creation (cloud-agent-next)', async () => {
+      // cloud-agent-next creates rows with a non-null default title
+      // (`New session - <ISO timestamp>`) via createSessionForCloudAgent; that title is
+      // still the creation placeholder and must not block the agent-generated title.
+      const db = createApplyMetadataDb({ initialTitle: 'New session - 2026-08-04T10:00:00.000Z' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['title', 'Agent title']]));
+
+      expect(db.updateSets).toEqual([expect.objectContaining({ title: 'Agent title' })]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    });
+
     it('skips the agent-generated title write when the user already renamed the session', async () => {
       const db = createApplyMetadataDb({ initialTitle: 'User chosen title' });
       vi.mocked(getWorkerDb).mockReturnValue(db as never);

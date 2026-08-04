@@ -106,7 +106,11 @@ export const applyApprovalDecision = async (
   approved: boolean
 ): Promise<ApprovalOutcome> => {
   if (!approved) {
-    await clearDraft(storage, kind);
+    try {
+      await clearDraft(storage, kind);
+    } catch {
+      // Draft could not be cleared — still report rejected so the caller does not throw.
+    }
     return { status: 'rejected' };
   }
 

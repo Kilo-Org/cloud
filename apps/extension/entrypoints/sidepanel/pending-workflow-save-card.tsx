@@ -23,6 +23,7 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
   const [isSaving, setIsSaving] = useState(false);
   const [storedWorkflow, setStoredWorkflow] = useState<AgentWorkflow | undefined>();
   const settledRef = useRef(false);
+  const lastDraftKeyRef = useRef<string | null>(null);
 
   // Load draft and atom on mount.
   useEffect(() => {
@@ -30,6 +31,17 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
       // If atom has an entry for workflow kind, use it.
       if (approvalEntry !== undefined && approvalEntry.kind === 'workflow') {
         const { draft } = approvalEntry;
+
+        const draftKey = `${draft.createdAt}:${draft.script}`;
+        if (lastDraftKeyRef.current !== null && lastDraftKeyRef.current !== draftKey) {
+          // New draft arrived — reset settled guard, stale errors, and stored workflow.
+          settledRef.current = false;
+          setSaveError(undefined);
+          setLoadError(undefined);
+          setStoredWorkflow(undefined);
+        }
+        lastDraftKeyRef.current = draftKey;
+
         setPendingDraft(draft);
 
         // For updates, also load the stored workflow for old-script comparison.

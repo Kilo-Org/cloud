@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- card states + draft form push past 300, and splitting would scatter related logic */
 import { storage } from '#imports';
 import { useAtom, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
@@ -51,12 +52,14 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
       setSavedConfirmation(false);
       setSaveError(undefined);
       setNote(pendingDraft.note ?? '');
+      setFullOutcome(false);
       settledRef.current = false;
     } else if (lastDraftKeyRef.current === null) {
       // Fresh draft while confirmation may still be showing from a prior save.
       setSavedConfirmation(false);
       setSaveError(undefined);
       setNote(pendingDraft.note ?? '');
+      setFullOutcome(false);
       settledRef.current = false;
     }
 
@@ -156,7 +159,8 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
           setApprovalEntry(undefined);
         }
 
-        if (classifySaveError(new Error(outcome.reason)) === 'full') {
+        // Only true store-full outcomes set the full view; generic failures stay retryable.
+        if (outcome.reason === 'Memory store is full.') {
           setFullOutcome(true);
           reload();
           return;

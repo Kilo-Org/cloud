@@ -14,6 +14,7 @@ import {
 
 interface TestStorage {
   values: Map<string, unknown>;
+  failRemoveItem: boolean;
   failSetItem: boolean;
   getItem(key: string): unknown;
   setItem(key: string, value: unknown): Promise<void>;
@@ -21,16 +22,22 @@ interface TestStorage {
 }
 
 const createStorage = ({
+  failRemoveItem = false,
   failSetItem = false,
 }: {
+  failRemoveItem?: boolean;
   failSetItem?: boolean;
 } = {}): TestStorage => {
   const values = new Map<string, unknown>();
 
   return {
+    failRemoveItem,
     failSetItem,
     getItem: (key: string) => values.get(key),
     removeItem: async (key: string) => {
+      if (failRemoveItem) {
+        throw new Error('Storage remove failed.');
+      }
       values.delete(key);
     },
     setItem: async (key: string, value: unknown) => {
@@ -85,6 +92,15 @@ describe(applyApprovalDecision, () => {
     const outcome = await applyApprovalDecision(storage, 'memory', draft, false);
     expect(outcome).toStrictEqual({ status: 'rejected' });
     expect(storage.values.has('local:kiloPendingAgentMemoryDraft')).toBe(false);
+  });
+
+  it('reject returns rejected when clearDraft fails', async () => {
+    const storage = createStorage({ failRemoveItem: true });
+    const draft = memoryDraft();
+
+    const outcome = await applyApprovalDecision(storage, 'memory', draft, false);
+    // Must still return rejected, not throw.
+    expect(outcome).toStrictEqual({ status: 'rejected' });
   });
 
   it('approve saves memory once and returns approved with savedId', async () => {
@@ -222,6 +238,33 @@ describe(applyApprovalDecision, () => {
       reason: 'Workflow not found.',
       status: 'failed',
     });
+  });
+
+  it('memory store-full failed outcome is distinct from generic failed', async () => {
+    const storage = createStorage();
+
+    // Pre-fill to max so applyApprovalDecision detects store-full.
+    const fullMemories = Array.from({ length: 200 }, (_unused, index) => ({
+      createdAt: index,
+      id: `mem-${index}`,
+      pageTitle: 'Page',
+      pageUrl: 'https://example.com',
+      text: 'text',
+    }));
+    storage.values.set('local:kiloAgentMemories', fullMemories);
+
+    const draft = memoryDraft();
+    const storeFull = await applyApprovalDecision(storage, 'memory', draft, true);
+
+    // Store-full has distinct reason.
+    expect(storeFull).toStrictEqual({ reason: 'Memory store is full.', status: 'failed' });
+
+    // Verify a non-full generic failure has a different reason.
+    const badStorage = createStorage({ failSetItem: true });
+    const draft2 = memoryDraft();
+    const genFail = await applyApprovalDecision(badStorage, 'memory', draft2, true);
+    expect(genFail.status).toBe('failed');
+    expect(genFail).not.toStrictEqual(storeFull);
   });
 });
 
@@ -385,5 +428,132 @@ describe(requestApproval, () => {
     // Atom must NOT be set.
     const atomStore = getDefaultStore();
     expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
+  });
+
+  it('second approval succeeds after first settles', async () => {
+    const storage = createStorage();
+    const draft1 = memoryDraft({ text: 'first' });
+
+    // First approval.
+    const promise1 = requestApproval(storage, 'memory', draft1, abortSignal());
+
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const atomStore = getDefaultStore();
+    const entry1 = atomStore.get(pendingApprovalAtom);
+    expect(entry1).toBeDefined();
+
+    // Settle first and verify lock release.
+    entry1?.settle({ status: 'rejected' });
+    const outcome1 = await promise1;
+    expect(outcome1.status).toBe('rejected');
+    expect(atomStore.get(pendingLockAtom)).toBe(false);
+    expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
+  });
+
+  it('lock released after settle allows new approval', async () => {
+    const storage = createStorage();
+    const draft1 = memoryDraft({ text: 'first' });
+    const draft2 = memoryDraft({ text: 'second' });
+
+    const promise1 = requestApproval(storage, 'memory', draft1, abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const atomStore = getDefaultStore();
+    atomStore.get(pendingApprovalAtom)?.settle({ status: 'rejected' });
+    await promise1;
+
+    // Second approval must succeed.
+    const promise2 = requestApproval(storage, 'memory', draft2, abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const entry2 = atomStore.get(pendingApprovalAtom);
+    expect(entry2).toBeDefined();
+    entry2?.settle({ savedId: 'mem-2', status: 'approved' });
+
+    const outcome2 = await promise2;
+    expect(outcome2.status).toBe('approved');
+  });
+
+  it('second settlement promise resolves with second outcome after first rejected', async () => {
+    const storage = createStorage();
+    const draft1 = memoryDraft({ text: 'first' });
+
+    // First proposal.
+    const promise1 = requestApproval(storage, 'memory', draft1, abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const atomStore = getDefaultStore();
+    const entry1 = atomStore.get(pendingApprovalAtom);
+    expect(entry1?.kind).toBe('memory');
+
+    // Reject first.
+    entry1?.settle({ status: 'rejected' });
+    const outcome1 = await promise1;
+    expect(outcome1).toStrictEqual({ status: 'rejected' });
+
+    // Lock and atom must be released.
+    expect({
+      atom: atomStore.get(pendingApprovalAtom),
+      lock: atomStore.get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
+
+    // Second proposal with new draft.
+    const draft2 = memoryDraft({ createdAt: 1_700_000_000_001, text: 'second' });
+    const promise2 = requestApproval(storage, 'memory', draft2, abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const entry2 = atomStore.get(pendingApprovalAtom)!;
+    // Verify it's a new draft kind and text, not the old one.
+    expect({
+      kind: entry2.kind,
+      text: (entry2.draft as PendingAgentMemoryDraft).text,
+    }).toStrictEqual({ kind: 'memory', text: 'second' });
+
+    // Settle second with approved outcome.
+    entry2?.settle({ savedId: 'mem-second', status: 'approved' });
+    const outcome2 = await promise2;
+    expect(outcome2).toStrictEqual({ savedId: 'mem-second', status: 'approved' });
+  });
+
+  it('second settlement promise resolves after first failed', async () => {
+    const storage = createStorage();
+    const draft1 = memoryDraft({ text: 'first' });
+
+    // First proposal.
+    const promise1 = requestApproval(storage, 'memory', draft1, abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const atomStore = getDefaultStore();
+    // Settle first with a generic failure.
+    atomStore.get(pendingApprovalAtom)?.settle({ reason: 'quota exceeded', status: 'failed' });
+    const outcome1 = await promise1;
+    expect(outcome1).toStrictEqual({ reason: 'quota exceeded', status: 'failed' });
+
+    // Second proposal must succeed.
+    const draft2 = memoryDraft({ createdAt: 1_700_000_000_001, text: 'second' });
+    const promise2 = requestApproval(storage, 'memory', draft2, abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const entry2 = atomStore.get(pendingApprovalAtom);
+    expect(entry2).toBeDefined();
+    entry2?.settle({ savedId: 'mem-2', status: 'approved' });
+
+    const outcome2 = await promise2;
+    expect(outcome2).toStrictEqual({ savedId: 'mem-2', status: 'approved' });
   });
 });

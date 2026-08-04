@@ -53,8 +53,15 @@ export const deriveNoteCharacterCount = (
   max: MAX_MEMORY_NOTE_LENGTH,
 });
 
-export const classifySaveError = (error: unknown): SaveErrorClassification =>
-  error instanceof AgentMemoryStoreFullError ? 'full' : 'retryable';
+export const classifySaveError = (error: unknown): SaveErrorClassification => {
+  if (error instanceof AgentMemoryStoreFullError) {
+    return 'full';
+  }
+  if (error instanceof Error && error.name === 'AgentMemoryStoreFullError') {
+    return 'full';
+  }
+  return 'retryable';
+};
 
 export const deriveSaveCardState = ({
   isLoaded,

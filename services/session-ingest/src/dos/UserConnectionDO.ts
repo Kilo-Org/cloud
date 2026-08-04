@@ -524,7 +524,16 @@ export class UserConnectionDO extends DurableObject<Env> {
         // Extend the DO lifetime for the async durable write (fix: reply
         // must persist before hibernation, but the surrounding handler stays
         // synchronous for existing callers).
-        this.ctx.waitUntil(this.handleCliResponse(ws, msg.id, msg.result, msg.error));
+        // Catches storage read/write failures so the waitUntil task is
+        // never left unhandled (rejected).
+        this.ctx.waitUntil(
+          this.handleCliResponse(ws, msg.id, msg.result, msg.error).catch((error: unknown) => {
+            console.error('Failed to handle CLI response (non-fatal)', {
+              correlationId: msg.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          })
+        );
         break;
     }
   }
@@ -824,117 +833,250 @@ export class UserConnectionDO extends DurableObject<Env> {
     // does not need a second read (fix: second read can return undefined
     // and abandon terminal processing).
     let rehydratedDurable: PendingCommandEntry | undefined;
+    let ownsReservation = false;
 
     // Step 24: on in-memory miss, try to load the durable entry (D8 case 1).
     if (!entry) {
-      const durable = await this.getDurablePendingCommand(id);
-      if (!durable || durable.state !== 'pending') {
-        // If the live path already delivered this response and the durable
-        // write is still in-flight, skip the rehydration delivery.
-        if (durable && this.completedCorrelationIds.has(id)) return;
-        return;
-      }
-      // Prevent duplicate delivery: a concurrently completed live response
-      // already sent the reply; the durable write will update the state soon.
+      // Synchronously reserve the correlationId before the async durable
+      // read so a concurrent duplicate CLI reply cannot also process the
+      // same pending durable state after a wake.
       if (this.completedCorrelationIds.has(id)) return;
-      rehydratedDurable = durable;
+      this.completedCorrelationIds.add(id);
+      ownsReservation = true;
 
-      // Guard: a rehydrated entry that has already expired must not deliver
-      // or persist a late success outcome. Write the terminal expiry error
-      // durably and return without delivering.
-      if (durable.expiresAt <= Date.now()) {
-        await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
-          ...durable,
-          state: 'done',
-          error: COMMAND_EXPIRED_ERROR,
-        });
-        return;
+      try {
+        const durable = await this.getDurablePendingCommand(id);
+        if (!durable || durable.state !== 'pending') {
+          this.completedCorrelationIds.delete(id);
+          ownsReservation = false;
+          return;
+        }
+        rehydratedDurable = durable;
+
+        // Guard: a rehydrated entry that has already expired must not deliver
+        // or persist a late success outcome. Write the terminal expiry error
+        // durably and return without delivering.
+        if (durable.expiresAt <= Date.now()) {
+          await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
+            ...durable,
+            state: 'done',
+            error: COMMAND_EXPIRED_ERROR,
+          });
+          // Reservation held through the terminal write; clear after success.
+          this.completedCorrelationIds.delete(id);
+          ownsReservation = false;
+          return;
+        }
+
+        // Validate the responding CLI by attachment connectionId.
+        const respondingAttachment = respondingWs.deserializeAttachment() as WSAttachment | null;
+        if (
+          respondingAttachment?.role !== 'cli' ||
+          respondingAttachment.connectionId !== durable.targetConnectionId
+        ) {
+          this.completedCorrelationIds.delete(id);
+          ownsReservation = false;
+          return;
+        }
+
+        // Resolve the originating web socket by persisted webConnectionId.
+        const webWs = this.findWebByConnectionId(durable.webConnectionId);
+        if (!webWs) {
+          // D8 case 2: web socket is gone. Shape the terminal outcome
+          // (catalog guard, error normalization) before persisting done
+          // so a mutationId retry receives the same shaped outcome as
+          // live delivery.
+          const shaped = this.shapeCommandError(durable.command, result, error);
+          const shapedResult = this.boundDurableResult(shaped.result);
+          await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
+            ...durable,
+            state: 'done',
+            ...(shapedResult !== undefined ? { result: shapedResult } : {}),
+            ...(shaped.error !== undefined ? { error: shaped.error } : {}),
+          });
+          // Reservation held through the terminal write; clear after success.
+          this.completedCorrelationIds.delete(id);
+          ownsReservation = false;
+          return;
+        }
+
+        // Build an in-memory entry so the rest of handleCliResponse works.
+        entry = {
+          ws: webWs,
+          sessionId: durable.sessionId,
+          originalId: durable.originalId,
+          command: durable.command,
+          expectedOwnerConnectionId: durable.expectedOwnerConnectionId,
+          targetConnectionId: durable.targetConnectionId,
+          expiresAt: durable.expiresAt,
+          targetCliWs: respondingWs,
+        };
+        rehydrated = true;
+        // Reservation held through the rest of handleCliResponse — cleared
+        // after terminal storage.put succeeds (catalog guard and normal
+        // path) or on any throw.
+      } catch (error: unknown) {
+        // Clean reservation on unexpected error during rehydration.
+        this.completedCorrelationIds.delete(id);
+        ownsReservation = false;
+        throw error;
       }
-
-      // Validate the responding CLI by attachment connectionId.
-      const respondingAttachment = respondingWs.deserializeAttachment() as WSAttachment | null;
-      if (
-        respondingAttachment?.role !== 'cli' ||
-        respondingAttachment.connectionId !== durable.targetConnectionId
-      ) {
-        return;
-      }
-
-      // Resolve the originating web socket by persisted webConnectionId.
-      const webWs = this.findWebByConnectionId(durable.webConnectionId);
-      if (!webWs) {
-        // D8 case 2: web socket is gone. Shape the terminal outcome
-        // (catalog guard, error normalization) before persisting done
-        // so a mutationId retry receives the same shaped outcome as
-        // live delivery.
-        const shaped = this.shapeCommandError(durable.command, result, error);
-        const shapedResult = this.boundDurableResult(shaped.result);
-        await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
-          ...durable,
-          state: 'done',
-          ...(shapedResult !== undefined ? { result: shapedResult } : {}),
-          ...(shaped.error !== undefined ? { error: shaped.error } : {}),
-        });
-        return;
-      }
-
-      // Build an in-memory entry so the rest of handleCliResponse works.
-      entry = {
-        ws: webWs,
-        sessionId: durable.sessionId,
-        originalId: durable.originalId,
-        command: durable.command,
-        expectedOwnerConnectionId: durable.expectedOwnerConnectionId,
-        targetConnectionId: durable.targetConnectionId,
-        expiresAt: durable.expiresAt,
-        targetCliWs: respondingWs,
-      };
-      rehydrated = true;
     } else if (entry.targetCliWs !== respondingWs) {
       // Strict socket-identity check for an entry still in memory.
       return;
     }
 
-    // Validate catalog result size for rehydrated entries too.
-    if (CATALOG_DEDUPE_COMMANDS.has(entry.command) && result !== undefined) {
-      const serializedResult = JSON.stringify(result);
-      const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
-      if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
-        // For non-rehydrated entries, send the oversized error synchronously
-        // before the durable write so the mock harness sees the send.
-        if (!rehydrated) {
-          // Guard: do not override an already-expired terminal outcome.
-          const now = Date.now();
-          if (entry.expiresAt <= now) {
+    // All code after acquisition is protected: catalog serialization,
+    // boundDurableResult, attachment reads, and storage.put are inside
+    // this try block. The finally clears any reservation that survives
+    // a throw.
+    try {
+      // Validate catalog result size for rehydrated entries too.
+      if (CATALOG_DEDUPE_COMMANDS.has(entry.command) && result !== undefined) {
+        const serializedResult = JSON.stringify(result);
+        const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
+        if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
+          // For non-rehydrated entries, reserve the correlationId before the
+          // durable write so a concurrent CLI reply is fenced.
+          if (!rehydrated) {
+            // Guard: do not override an already-expired terminal outcome.
+            const now = Date.now();
+            if (entry.expiresAt <= now) {
+              this.pendingCommands.delete(id);
+              return;
+            }
             this.pendingCommands.delete(id);
-            return;
+            // Reserve the correlationId synchronously so a concurrent CLI
+            // reply cannot re-process the same command during the durable
+            // write window.
+            this.completedCorrelationIds.add(id);
+            ownsReservation = true;
           }
-          this.pendingCommands.delete(id);
-          this.sendToWeb(entry.ws, {
-            type: 'response',
-            id: entry.originalId,
-            error: CATALOG_TOO_LARGE_ERROR,
-          });
-          this.completedCorrelationIds.add(id);
-        }
 
-        // Persist the terminal outcome durably.
-        let catWebConnectionId: string;
-        if (rehydrated) {
-          // Use the durable entry captured at the top of handleCliResponse.
-          // A second getDurablePendingCommand can miss (race), which would
-          // abandon terminal processing.
-          catWebConnectionId = rehydratedDurable?.webConnectionId ?? 'unknown';
-        } else {
-          catWebConnectionId =
-            (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
-              ? (
-                  entry.ws.deserializeAttachment() as WSAttachment & {
-                    role: 'web';
-                  }
-                ).connectionId
-              : 'unknown';
+          // Persist the terminal outcome durably BEFORE sending any live
+          // response.  If storage fails, no live send occurs and reservations
+          // are cleaned — the error propagates to waitUntil.
+          let catWebConnectionId: string;
+          if (rehydrated) {
+            // Use the durable entry captured at the top of handleCliResponse.
+            // A second getDurablePendingCommand can miss (race), which would
+            // abandon terminal processing.
+            catWebConnectionId = rehydratedDurable?.webConnectionId ?? 'unknown';
+          } else {
+            catWebConnectionId =
+              (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
+                ? (
+                    entry.ws.deserializeAttachment() as WSAttachment & {
+                      role: 'web';
+                    }
+                  ).connectionId
+                : 'unknown';
+          }
+          try {
+            await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
+              sessionId: entry.sessionId,
+              originalId: entry.originalId,
+              command: entry.command,
+              expectedOwnerConnectionId: entry.expectedOwnerConnectionId,
+              targetConnectionId: entry.targetConnectionId,
+              expiresAt: entry.expiresAt,
+              webConnectionId: catWebConnectionId,
+              state: 'done',
+              error: CATALOG_TOO_LARGE_ERROR,
+            } satisfies PendingCommandEntry);
+          } catch (_error: unknown) {
+            this.completedCorrelationIds.delete(id);
+            ownsReservation = false;
+            // Re-throw to the surrounding waitUntil catch so the task
+            // failure is logged and never left unhandled.
+            throw _error;
+          }
+
+          // Durable write succeeded — clear the marker.  The durable 'done'
+          // state now guards against duplicate delivery.
+          this.completedCorrelationIds.delete(id);
+          ownsReservation = false;
+
+          // Send the live response now that the durable entry is stored.
+          if (!rehydrated) {
+            this.sendToWeb(entry.ws, {
+              type: 'response',
+              id: entry.originalId,
+              error: CATALOG_TOO_LARGE_ERROR,
+            });
+          } else {
+            const targetWeb = this.findWebByConnectionId(catWebConnectionId);
+            if (targetWeb) {
+              this.sendToWeb(targetWeb, {
+                type: 'response',
+                id: entry.originalId,
+                error: CATALOG_TOO_LARGE_ERROR,
+              });
+            }
+          }
+          return;
         }
+      }
+
+      let structuredError: {
+        source: string;
+        code: string;
+        message: string;
+      } | null = null;
+      let stringError: string | null = null;
+      let sanitizeAsFailed = false;
+
+      if (typeof error === 'string' && CLI_UPGRADE_REQUIRED_COMMANDS.has(entry.command)) {
+        if (error === `unknown command: ${entry.command}`) {
+          structuredError =
+            entry.command === 'create_session'
+              ? CLI_UPGRADE_REQUIRED_CREATE_SESSION_ERROR
+              : CLI_UPGRADE_REQUIRED_SLASH_ERROR;
+        } else {
+          stringError = error;
+        }
+      } else if (typeof error === 'string') {
+        stringError = error;
+      } else if (error !== undefined) {
+        sanitizeAsFailed = true;
+      }
+
+      const terminalError =
+        structuredError ?? stringError ?? (sanitizeAsFailed ? CLI_COMMAND_ERROR : undefined);
+
+      // Write the terminal outcome durably BEFORE any live response.
+      // If storage.put fails, the error propagates to the waitUntil boundary
+      // — reservation markers are cleaned and no live send has occurred.
+      //
+      // Guard: a live entry that has already expired must not override the
+      // terminal outcome set by expirePendingCommands. Drop silently.
+      if (!rehydrated) {
+        const now = Date.now();
+        if (entry.expiresAt <= now) {
+          this.pendingCommands.delete(id);
+          return;
+        }
+        this.pendingCommands.delete(id);
+        // Reserve the correlationId synchronously so a concurrent CLI
+        // reply cannot re-process the same command during the durable
+        // write window.
+        this.completedCorrelationIds.add(id);
+        ownsReservation = true;
+      }
+
+      // boundDurableResult, attachment reads, and storage.put are inside this
+      // try block so any throw (e.g. JSON.stringify on oversized results)
+      // is caught by the outer finally, which clears the reservation.
+      let durableResult: unknown;
+      let webConnectionId: string;
+      try {
+        durableResult = this.boundDurableResult(result);
+        webConnectionId = rehydrated
+          ? (rehydratedDurable?.webConnectionId ?? 'unknown')
+          : (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
+            ? (entry.ws.deserializeAttachment() as WSAttachment & { role: 'web' }).connectionId
+            : 'unknown';
+
         await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
           sessionId: entry.sessionId,
           originalId: entry.originalId,
@@ -942,119 +1084,29 @@ export class UserConnectionDO extends DurableObject<Env> {
           expectedOwnerConnectionId: entry.expectedOwnerConnectionId,
           targetConnectionId: entry.targetConnectionId,
           expiresAt: entry.expiresAt,
-          webConnectionId: catWebConnectionId,
+          webConnectionId: webConnectionId ?? 'unknown',
           state: 'done',
-          error: CATALOG_TOO_LARGE_ERROR,
+          ...(durableResult !== undefined ? { result: durableResult } : {}),
+          ...(terminalError !== undefined ? { error: terminalError } : {}),
         } satisfies PendingCommandEntry);
-
-        // Clean up the synchronous completion marker.
+      } catch (_error: unknown) {
+        // Clean the synchronous reservation on storage failure — the error
+        // propagates to waitUntil; no live send has occurred.
         this.completedCorrelationIds.delete(id);
-
-        // For a rehydrated entry, re-resolve and send now.
-        if (rehydrated) {
-          const targetWeb = this.findWebByConnectionId(catWebConnectionId);
-          if (targetWeb) {
-            this.sendToWeb(targetWeb, {
-              type: 'response',
-              id: entry.originalId,
-              error: CATALOG_TOO_LARGE_ERROR,
-            });
-          }
-        }
-        return;
+        ownsReservation = false;
+        // Re-throw to the surrounding waitUntil catch so the task
+        // failure is logged and never left unhandled.
+        throw _error;
       }
-    }
 
-    let structuredError: {
-      source: string;
-      code: string;
-      message: string;
-    } | null = null;
-    let stringError: string | null = null;
-    let sanitizeAsFailed = false;
+      // Durable write succeeded. Clear the in-memory marker on both paths:
+      // the durable 'done' state replaces it as the dedupe guard.
+      this.completedCorrelationIds.delete(id);
+      ownsReservation = false;
 
-    if (typeof error === 'string' && CLI_UPGRADE_REQUIRED_COMMANDS.has(entry.command)) {
-      if (error === `unknown command: ${entry.command}`) {
-        structuredError =
-          entry.command === 'create_session'
-            ? CLI_UPGRADE_REQUIRED_CREATE_SESSION_ERROR
-            : CLI_UPGRADE_REQUIRED_SLASH_ERROR;
-      } else {
-        stringError = error;
-      }
-    } else if (typeof error === 'string') {
-      stringError = error;
-    } else if (error !== undefined) {
-      sanitizeAsFailed = true;
-    }
-
-    const terminalError =
-      structuredError ?? stringError ?? (sanitizeAsFailed ? CLI_COMMAND_ERROR : undefined);
-
-    // Step 26a: write terminal outcome durably, always.
-    // For non-rehydrated entries, send the live response synchronously
-    // before the durable write so the response reaches the client without
-    // yielding to an async storage put.
-    //
-    // Guard: a live entry that has already expired must not override the
-    // terminal outcome set by expirePendingCommands. Drop silently.
-    if (!rehydrated) {
-      const now = Date.now();
-      if (entry.expiresAt <= now) {
-        this.pendingCommands.delete(id);
-        return;
-      }
-      this.pendingCommands.delete(id);
-      this.sendToWeb(entry.ws, {
-        type: 'response',
-        id: entry.originalId,
-        ...(result !== undefined ? { result } : {}),
-        ...(structuredError !== null
-          ? { error: structuredError }
-          : stringError !== null
-            ? { error: stringError }
-            : sanitizeAsFailed
-              ? { error: CLI_COMMAND_ERROR }
-              : {}),
-      });
-      // Mark completed synchronously so a rehydration path does not
-      // deliver a duplicate response before the durable write lands.
-      this.completedCorrelationIds.add(id);
-    }
-
-    // Persist the durable entry. Storage write is extended by the
-    // surrounding ctx.waitUntil; the live response has already been
-    // delivered for the non-rehydrated case above.
-    // Bound the result so the durable put never exceeds the DO value limit.
-    const durableResult = this.boundDurableResult(result);
-    const webConnectionId = rehydrated
-      ? rehydratedDurable?.webConnectionId
-      : (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
-        ? (entry.ws.deserializeAttachment() as WSAttachment & { role: 'web' }).connectionId
-        : 'unknown';
-    await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
-      sessionId: entry.sessionId,
-      originalId: entry.originalId,
-      command: entry.command,
-      expectedOwnerConnectionId: entry.expectedOwnerConnectionId,
-      targetConnectionId: entry.targetConnectionId,
-      expiresAt: entry.expiresAt,
-      webConnectionId: webConnectionId ?? 'unknown',
-      state: 'done',
-      ...(durableResult !== undefined ? { result: durableResult } : {}),
-      ...(terminalError !== undefined ? { error: terminalError } : {}),
-    } satisfies PendingCommandEntry);
-
-    // Clean up the synchronous completion marker after the durable write.
-    this.completedCorrelationIds.delete(id);
-
-    // For a rehydrated entry, re-resolve the web socket by the persisted
-    // id and send the response now (the non-rehydrated path already sent
-    // it synchronously above).
-    if (rehydrated) {
-      const targetWebWs = this.findWebByConnectionId(webConnectionId ?? 'unknown');
-      if (targetWebWs) {
-        this.sendToWeb(targetWebWs, {
+      if (!rehydrated) {
+        // Send the live response now that the durable entry is safely stored.
+        this.sendToWeb(entry.ws, {
           type: 'response',
           id: entry.originalId,
           ...(result !== undefined ? { result } : {}),
@@ -1066,6 +1118,28 @@ export class UserConnectionDO extends DurableObject<Env> {
                 ? { error: CLI_COMMAND_ERROR }
                 : {}),
         });
+      } else {
+        // Rehydrated entry: re-resolve the web socket by the persisted id
+        // and send the response now.
+        const targetWebWs = this.findWebByConnectionId(webConnectionId ?? 'unknown');
+        if (targetWebWs) {
+          this.sendToWeb(targetWebWs, {
+            type: 'response',
+            id: entry.originalId,
+            ...(result !== undefined ? { result } : {}),
+            ...(structuredError !== null
+              ? { error: structuredError }
+              : stringError !== null
+                ? { error: stringError }
+                : sanitizeAsFailed
+                  ? { error: CLI_COMMAND_ERROR }
+                  : {}),
+          });
+        }
+      }
+    } finally {
+      if (ownsReservation) {
+        this.completedCorrelationIds.delete(id);
       }
     }
   }

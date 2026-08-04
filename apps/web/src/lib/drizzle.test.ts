@@ -22,6 +22,18 @@ describe('drizzle', () => {
       // that must not crash the test runner.
       expect(pool.listenerCount('error')).toBeGreaterThan(0);
     });
+
+    it('does not throw on an idle-client error in test mode', () => {
+      // The test-mode handler catches errors without exit.
+      // Verifying the emit does not throw proves the listener works.
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        expect(() => pool.emit('error', new Error('idle client disconnect'))).not.toThrow();
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
+
   });
 
   describe('replica selection', () => {

@@ -135,7 +135,7 @@ if (process.env.NODE_ENV !== 'test') {
 // In test mode, pool.end() during cleanup triggers idle client errors.
 // Attach a non-exiting listener in test mode to prevent Node from throwing
 // on an emitted error with zero listeners (same contract as replication-health.ts).
-pool.on('error', err => {
+pool.on('error', (err: Error) => {
   console.error('Unexpected error on idle client (primary)', err);
   if (process.env.NODE_ENV !== 'test') {
     process.exit(-1);
@@ -143,7 +143,7 @@ pool.on('error', err => {
 });
 
 if (usesSeparateReplica) {
-  replicaPool.on('error', err => {
+  replicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
     if (process.env.NODE_ENV !== 'test') {
       process.exit(-1);
@@ -190,6 +190,13 @@ export const auto_deleted_at = { deleted_at: drizzleSql`now()` };
 // NOTE: With this simplified setup, the connection is created eagerly and not reset.
 // Tests should not rely on closing and reopening the connection within the same process.
 
+/**
+ * Ends all pool connections. Error listeners stay attached because pg-pool
+ * can emit idle-client errors after end() returns (client.end() runs async).
+ * Removing listeners before those late emits causes unhandled exceptions.
+ * An EventEmitter listener does not keep the event loop alive, so keeping
+ * the listener does not block process exit.
+ */
 export async function closeAllDrizzleConnections(): Promise<void> {
   await pool.end();
   if (usesSeparateReplica) {

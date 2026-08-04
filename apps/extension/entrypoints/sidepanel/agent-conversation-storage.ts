@@ -2,17 +2,14 @@ import { storage } from '#imports';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { z } from 'zod';
+import { conversationEventsSchema, storedConversationsSchema } from './agent-conversation-schemas';
 import { toPersistedConversationEvents } from '@/src/shared/agent-conversation-persistence';
-import type {
-  AgentConversationEvent,
-  RemoteMcpAgentToolName,
-} from '@/src/shared/agent-conversation';
+import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import { normalizeStoredConversations } from '@/src/shared/agent-conversation-tabs';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
 export {
-  closeStoredConversationTab,
   closeStoredConversation,
+  closeStoredConversationTab,
   createNextStoredConversation,
   deleteStoredConversation,
   getActiveStoredConversation,
@@ -31,92 +28,12 @@ export type { StoredAgentConversation } from '@/src/shared/agent-conversation-ta
 const legacyConversationStorageKey = 'local:kiloAgentConversation';
 const conversationStorageKey = 'local:kiloAgentConversations';
 const conversationStoreQueryKey = ['side-panel', 'agent-conversations'] as const;
-const conversationEventSchema = z.union([
-  z.object({
-    id: z.string(),
-    role: z.enum(['assistant', 'user']),
-    systemEnvironment: z.string().optional(),
-    text: z.string(),
-    type: z.literal('message'),
-  }),
-  z.object({
-    id: z.string(),
-    text: z.string(),
-    type: z.literal('thinking'),
-  }),
-  z.object({
-    code: z.string(),
-    id: z.string(),
-    name: z.literal('eval'),
-    providerToolCallId: z.string().optional(),
-    tabId: z.number(),
-    type: z.literal('tool-call'),
-  }),
-  z.object({
-    elementId: z.string().optional(),
-    id: z.string(),
-    memoryId: z.string().optional(),
-    name: z.enum([
-      'find_in_page',
-      'get_element_details',
-      'get_memory',
-      'get_page_snapshot',
-      'get_viewport_screenshot',
-      'search_memories',
-    ]),
-    providerToolCallId: z.string().optional(),
-    query: z.string().optional(),
-    snapshotId: z.string().optional(),
-    tabId: z.number(),
-    type: z.literal('tool-call'),
-  }),
-  z.object({
-    arguments: z.record(z.string(), z.unknown()),
-    id: z.string(),
-    name: z.custom<RemoteMcpAgentToolName>(
-      value => typeof value === 'string' && value.startsWith('mcp_')
-    ),
-    providerToolCallId: z.string().optional(),
-    remoteToolName: z.string(),
-    serverId: z.string(),
-    serverName: z.string(),
-    type: z.literal('tool-call'),
-  }),
-  z.object({
-    error: z.string().optional(),
-    id: z.string(),
-    ok: z.boolean(),
-    toolCallId: z.string(),
-    type: z.literal('tool-result'),
-    value: z.unknown().optional(),
-  }),
-]);
-const conversationEventsSchema = z.array(conversationEventSchema);
-const storedConversationSchema = z.object({
-  events: conversationEventsSchema,
-  id: z.string(),
-  mode: z.enum(['dangerous', 'safe']).optional(),
-  model: z.string().optional(),
-  selectedTabId: z.number().optional(),
-  thinkingEffort: z.string().optional(),
-  title: z.string(),
-  updatedAt: z.string().optional(),
-});
-const storedConversationsSchema = z.object({
-  activeConversationId: z.string(),
-  conversations: z.array(storedConversationSchema),
-  openConversationIds: z.array(z.string()).optional(),
-});
-
 const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] | undefined => {
   const parsed = conversationEventsSchema.safeParse(value);
-
   if (!parsed.success) {
     return undefined;
   }
-
   const events: AgentConversationEvent[] = [];
-
   for (const event of parsed.data) {
     switch (event.type) {
       case 'message': {
@@ -160,7 +77,7 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
           });
           break;
         }
-
+        // Remote MCP events carry a remoteToolName field.
         if ('remoteToolName' in event) {
           events.push({
             arguments: event.arguments,
@@ -176,7 +93,20 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
           });
           break;
         }
-
+        // Workflow events have arguments but no remoteToolName; must precede the safe fallback.
+        if ('arguments' in event) {
+          events.push({
+            arguments: event.arguments,
+            id: event.id,
+            name: event.name,
+            ...(event.providerToolCallId === undefined
+              ? {}
+              : { providerToolCallId: event.providerToolCallId }),
+            tabId: event.tabId,
+            type: event.type,
+          });
+          break;
+        }
         events.push({
           ...(event.elementId === undefined ? {} : { elementId: event.elementId }),
           id: event.id,
@@ -194,7 +124,6 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
       }
     }
   }
-
   return events;
 };
 
@@ -202,11 +131,9 @@ export const normalizeStoredConversationStore = (
   value: unknown
 ): StoredAgentConversationStore | undefined => {
   const parsed = storedConversationsSchema.safeParse(value);
-
   if (!parsed.success) {
     return undefined;
   }
-
   return normalizeStoredConversations({
     store: {
       activeConversationId: parsed.data.activeConversationId,
@@ -272,20 +199,17 @@ export const useStoredAgentConversations = (
     queryFn: () => loadStoredConversationStore(createDefaultEvents),
     queryKey: conversationStoreQueryKey,
   });
-
   useEffect(() => {
     if (isSuccess && loadedStore !== undefined) {
       setStore(loadedStore);
       setIsLoaded(true);
     }
   }, [isSuccess, loadedStore]);
-
   useEffect(() => {
     if (isLoaded) {
       void storage.setItem(conversationStorageKey, toPersistedConversationStore(store));
       void storage.removeItem(legacyConversationStorageKey);
     }
   }, [isLoaded, store]);
-
   return [store, setStore, isLoaded];
 };

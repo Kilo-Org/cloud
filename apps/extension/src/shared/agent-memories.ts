@@ -24,6 +24,7 @@ export type AgentMemoryInput = Omit<AgentMemory, 'id'>;
 
 export interface PendingAgentMemoryDraft {
   text: string;
+  note?: string | undefined;
   pageTitle: string;
   pageUrl: string;
   createdAt: number;
@@ -58,6 +59,7 @@ export const storedAgentMemoriesSchema = z.array(z.unknown());
 export const pendingAgentMemoryDraftSchema = z
   .object({
     createdAt: z.number(),
+    note: z.string().max(MAX_MEMORY_NOTE_LENGTH).optional(),
     pageTitle: z.string(),
     pageUrl: z.string(),
     text: z.string(),

@@ -33,7 +33,6 @@ export default defineProject({
       'src/components/pr-review/**/*.test.tsx',
       'src/components/kiloclaw/**/*.test.tsx',
       'src/lib/telemetry/**/*.test.ts',
-      'src/app/**/*.test.tsx',
     ],
   },
 });

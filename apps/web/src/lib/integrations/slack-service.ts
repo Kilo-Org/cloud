@@ -14,8 +14,8 @@ import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 import {
-  countSlackConnections,
   deleteSlackWorkspaceInstallation,
+  deleteSlackWorkspaceInstallationIfUnreferenced,
   getSlackBotToken,
   upsertSlackWorkspaceInstallation,
 } from '@/lib/integrations/slack-workspace-installation';
@@ -226,23 +226,6 @@ export async function upsertSlackInstallation({
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
       : DEFAULT_BOT_MODEL;
 
-  // The bot token belongs to the workspace, not to this owner, so it is written to
-  // slack_workspace_installations first: a failure here must not leave an active
-  // integration behind with no durable record of its token.
-  //
-  // `access_token` and `bot_user_id` are also mirrored into metadata below. The
-  // mirror is what the previous release reads, so it keeps a rolling deploy and a
-  // rollback working; see getSlackBotToken for why it is still the preferred read
-  // while it exists. A follow-up removes the mirror and that preference together.
-  await upsertSlackWorkspaceInstallation({
-    teamId,
-    teamName,
-    botToken: installation.botToken,
-    botUserId: installation.botUserId,
-    scopes: SLACK_SCOPES,
-    installedByUserId,
-  });
-
   const metadata = {
     ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
     access_token: installation.botToken,
@@ -262,28 +245,55 @@ export async function upsertSlackInstallation({
   // stored token has to go with it.
   const previousTeamId = existing?.platform_installation_id ?? null;
 
+  // The workspace record and the integration row are written together.
+  //
+  // The token belongs to the workspace rather than to this owner, so it lives in
+  // slack_workspace_installations, but the two writes have to be atomic: a
+  // half-applied install would either leave a token nothing references or an
+  // active integration with no durable record of its token. A rollback also
+  // restores the previous token, which is what the caller expects when the install
+  // did not take effect.
+  //
+  // `access_token` and `bot_user_id` are also mirrored into metadata. The mirror is
+  // what the previous release reads, so it keeps a rolling deploy and a rollback
+  // working; see getSlackBotToken for why it is still the preferred read while it
+  // exists. A follow-up removes the mirror and that preference together.
   let integration: PlatformIntegration;
   try {
-    if (existing) {
-      [integration] = await db
-        .update(platform_integrations)
-        .set({
-          platform_installation_id: teamId,
-          platform_account_id: teamId,
-          platform_account_login: teamName,
-          scopes: SLACK_SCOPES,
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          // A successful install clears any earlier suspension, including rows
-          // detached by the 0108 duplicate-workspace migration.
-          suspended_at: null,
-          suspended_by: null,
-          metadata,
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(platform_integrations.id, existing.id))
-        .returning();
-    } else {
-      [integration] = await db
+    integration = await db.transaction(async tx => {
+      await upsertSlackWorkspaceInstallation({
+        teamId,
+        teamName,
+        botToken: installation.botToken,
+        botUserId: installation.botUserId,
+        scopes: SLACK_SCOPES,
+        installedByUserId,
+        executor: tx,
+      });
+
+      if (existing) {
+        const [updated] = await tx
+          .update(platform_integrations)
+          .set({
+            platform_installation_id: teamId,
+            platform_account_id: teamId,
+            platform_account_login: teamName,
+            scopes: SLACK_SCOPES,
+            integration_status: INTEGRATION_STATUS.ACTIVE,
+            // A successful install clears any earlier suspension, including rows
+            // detached by the 0108 duplicate-workspace migration.
+            suspended_at: null,
+            suspended_by: null,
+            metadata,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(platform_integrations.id, existing.id))
+          .returning();
+
+        return updated;
+      }
+
+      const [created] = await tx
         .insert(platform_integrations)
         .values({
           owned_by_user_id: owner.type === 'user' ? owner.id : null,
@@ -299,22 +309,19 @@ export async function upsertSlackInstallation({
           installed_at: new Date().toISOString(),
         })
         .returning();
-    }
-  } catch (error) {
-    // The workspace record was written above, so a failed integration write would
-    // otherwise leave it with nothing pointing at it. The helper only deletes when
-    // the workspace is unreferenced, so a row another owner legitimately claimed
-    // in the meantime is left alone.
-    await deleteWorkspaceInstallationIfUnused(teamId);
 
+      return created;
+    });
+  } catch (error) {
     if (isSlackWorkspaceUniqueViolation(error)) {
       throw new SlackWorkspaceAlreadyConnectedError(teamName);
     }
     throw error;
   }
 
+  // Moving to a different workspace leaves the previous one unreferenced.
   if (previousTeamId && previousTeamId !== teamId) {
-    await deleteWorkspaceInstallationIfUnused(previousTeamId);
+    await deleteSlackWorkspaceInstallationIfUnreferenced(previousTeamId);
   }
 
   return integration;
@@ -383,22 +390,10 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   // Drop the workspace record once nothing is connected to the workspace any
   // more, so the stored bot token does not outlive the integrations that used it.
   if (shouldDeleteSlackInstallation && integration.platform_installation_id) {
-    await deleteWorkspaceInstallationIfUnused(integration.platform_installation_id);
+    await deleteSlackWorkspaceInstallationIfUnreferenced(integration.platform_installation_id);
   }
 
   return { success: true };
-}
-
-/**
- * Remove the workspace record when no platform integration references the
- * workspace any more.
- */
-async function deleteWorkspaceInstallationIfUnused(teamId: string): Promise<void> {
-  if ((await countSlackConnections(teamId)) > 0) {
-    return;
-  }
-
-  await deleteSlackWorkspaceInstallation(teamId);
 }
 
 /**
@@ -415,7 +410,7 @@ export async function deleteInstallationByTeamId(teamId: string) {
   }
 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-  await deleteWorkspaceInstallationIfUnused(teamId);
+  await deleteSlackWorkspaceInstallationIfUnreferenced(teamId);
 
   return { success: true, deleted: true };
 }
@@ -440,7 +435,7 @@ export async function removeDbRowOnly(owner: Owner) {
   // Also drop the workspace record, otherwise re-running the OAuth flow would
   // resolve the previous token instead of the freshly issued one.
   if (integration.platform_installation_id) {
-    await deleteWorkspaceInstallationIfUnused(integration.platform_installation_id);
+    await deleteSlackWorkspaceInstallationIfUnreferenced(integration.platform_installation_id);
   }
 
   return { success: true };

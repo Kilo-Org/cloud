@@ -12,11 +12,12 @@ const mockAuthRevoke = jest.fn();
 const mockAuthTest = jest.fn();
 const mockUpsertWorkspaceInstallation = jest.fn();
 const mockDeleteWorkspaceInstallation = jest.fn();
-const mockCountSlackConnections = jest.fn();
+const mockDeleteWorkspaceInstallationIfUnreferenced = jest.fn();
 const mockGetSlackBotToken = jest.fn();
+const mockTransaction = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
-  db: {
+jest.mock('@/lib/drizzle', () => {
+  const client = {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
         where: jest.fn(() => ({
@@ -33,8 +34,13 @@ jest.mock('@/lib/drizzle', () => ({
     insert: jest.fn(() => ({
       values: mockInsertValues,
     })),
-  },
-}));
+    // Hands the callback the same client, so statements issued inside a
+    // transaction land on the same assertions as statements issued outside one.
+    transaction: (...args: unknown[]) => mockTransaction(...args),
+  };
+
+  return { db: client };
+});
 
 jest.mock('@slack/web-api', () => ({
   WebClient: jest.fn(() => ({
@@ -53,7 +59,8 @@ jest.mock('@/lib/integrations/slack-workspace-installation', () => ({
     mockUpsertWorkspaceInstallation(...args),
   deleteSlackWorkspaceInstallation: (...args: unknown[]) =>
     mockDeleteWorkspaceInstallation(...args),
-  countSlackConnections: (...args: unknown[]) => mockCountSlackConnections(...args),
+  deleteSlackWorkspaceInstallationIfUnreferenced: (...args: unknown[]) =>
+    mockDeleteWorkspaceInstallationIfUnreferenced(...args),
   getSlackBotToken: (...args: unknown[]) => mockGetSlackBotToken(...args),
 }));
 
@@ -85,15 +92,20 @@ function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function resetTransactionMock() {
+  const { db } = jest.requireMock('@/lib/drizzle') as { db: unknown };
+  mockTransaction.mockReset();
+  mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(db));
+}
+
 function resetWorkspaceInstallationMocks() {
   mockUpsertWorkspaceInstallation.mockReset();
   mockDeleteWorkspaceInstallation.mockReset();
-  mockCountSlackConnections.mockReset();
+  mockDeleteWorkspaceInstallationIfUnreferenced.mockReset();
   mockGetSlackBotToken.mockReset();
   mockUpsertWorkspaceInstallation.mockResolvedValue({ team_id: 'T123' });
   mockDeleteWorkspaceInstallation.mockResolvedValue(undefined);
-  // Nothing left connected once the integration row is gone.
-  mockCountSlackConnections.mockResolvedValue(0);
+  mockDeleteWorkspaceInstallationIfUnreferenced.mockResolvedValue(undefined);
   mockGetSlackBotToken.mockResolvedValue('xoxb-token');
 }
 
@@ -111,24 +123,18 @@ describe('slack-service uninstallApp', () => {
     mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
     mockDeleteWhere.mockResolvedValue(undefined);
     resetWorkspaceInstallationMocks();
+    resetTransactionMock();
   });
 
-  it('removes the workspace installation once nothing references the workspace', async () => {
+  // Whether the record is actually removed depends on the reference check inside
+  // deleteSlackWorkspaceInstallationIfUnreferenced, which is covered against a real
+  // database in slack-workspace-installation.test.ts.
+  it('asks for the workspace installation to be removed', async () => {
     mockLimit.mockResolvedValue([buildSlackIntegration()]);
 
     await uninstallApp(owner);
 
-    expect(mockCountSlackConnections).toHaveBeenCalledWith('T123');
-    expect(mockDeleteWorkspaceInstallation).toHaveBeenCalledWith('T123');
-  });
-
-  it('keeps the workspace installation while another integration still references the workspace', async () => {
-    mockLimit.mockResolvedValue([buildSlackIntegration()]);
-    mockCountSlackConnections.mockResolvedValue(1);
-
-    await uninstallApp(owner);
-
-    expect(mockDeleteWorkspaceInstallation).not.toHaveBeenCalled();
+    expect(mockDeleteWorkspaceInstallationIfUnreferenced).toHaveBeenCalledWith('T123');
   });
 
   it('revokes the token resolved from the workspace installation', async () => {
@@ -221,7 +227,7 @@ describe('slack-service uninstallApp', () => {
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
     expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
-    expect(mockDeleteWorkspaceInstallation).not.toHaveBeenCalled();
+    expect(mockDeleteWorkspaceInstallationIfUnreferenced).not.toHaveBeenCalled();
   });
 });
 
@@ -231,6 +237,7 @@ describe('slack-service deleteInstallationByTeamId', () => {
     mockDeleteWhere.mockReset();
     mockDeleteWhere.mockResolvedValue(undefined);
     resetWorkspaceInstallationMocks();
+    resetTransactionMock();
   });
 
   it('deletes the platform integration and Chat SDK state for a Slack team', async () => {
@@ -242,7 +249,7 @@ describe('slack-service deleteInstallationByTeamId', () => {
     });
 
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
-    expect(mockDeleteWorkspaceInstallation).toHaveBeenCalledWith('T123');
+    expect(mockDeleteWorkspaceInstallationIfUnreferenced).toHaveBeenCalledWith('T123');
   });
 
   it('still clears workspace state when the platform integration is already gone', async () => {
@@ -263,6 +270,7 @@ describe('slack-service testConnection', () => {
     mockLimit.mockReset();
     mockAuthTest.mockReset();
     resetWorkspaceInstallationMocks();
+    resetTransactionMock();
   });
 
   it('returns success when auth.test succeeds', async () => {
@@ -341,6 +349,7 @@ describe('upsertSlackInstallation', () => {
     mockInsertValues.mockReturnValue({ returning: mockInsertReturning });
     mockInsertReturning.mockResolvedValue([buildSlackIntegration()]);
     resetWorkspaceInstallationMocks();
+    resetTransactionMock();
   });
 
   it('writes the bot token to the workspace installation store', async () => {
@@ -359,14 +368,16 @@ describe('upsertSlackInstallation', () => {
       installedByUserId: 'user-1',
     });
 
-    expect(mockUpsertWorkspaceInstallation).toHaveBeenCalledWith({
-      teamId: 'T123',
-      teamName: 'Kilo Team',
-      botToken: 'xoxb-new-token',
-      botUserId: 'U_NEW_BOT',
-      scopes: SLACK_SCOPES,
-      installedByUserId: 'user-1',
-    });
+    expect(mockUpsertWorkspaceInstallation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId: 'T123',
+        teamName: 'Kilo Team',
+        botToken: 'xoxb-new-token',
+        botUserId: 'U_NEW_BOT',
+        scopes: SLACK_SCOPES,
+        installedByUserId: 'user-1',
+      })
+    );
   });
 
   it('writes the workspace installation before the platform integration row', async () => {
@@ -401,8 +412,7 @@ describe('upsertSlackInstallation', () => {
     expect(mockUpsertWorkspaceInstallation).toHaveBeenCalledWith(
       expect.objectContaining({ teamId: 'T_NEW' })
     );
-    expect(mockCountSlackConnections).toHaveBeenCalledWith('T_OLD');
-    expect(mockDeleteWorkspaceInstallation).toHaveBeenCalledWith('T_OLD');
+    expect(mockDeleteWorkspaceInstallationIfUnreferenced).toHaveBeenCalledWith('T_OLD');
   });
 
   it('keeps the previous workspace installation when the workspace is unchanged', async () => {
@@ -418,14 +428,11 @@ describe('upsertSlackInstallation', () => {
 
     await upsertSlackInstallation({ owner, teamId: 'T123', installation });
 
-    expect(mockDeleteWorkspaceInstallation).not.toHaveBeenCalled();
+    expect(mockDeleteWorkspaceInstallationIfUnreferenced).not.toHaveBeenCalled();
   });
 
-  it('keeps the previous workspace installation while something still references it', async () => {
-    mockLimit.mockResolvedValue([
-      buildSlackIntegration({ platform_installation_id: 'T_OLD', platform_account_id: 'T_OLD' }),
-    ]);
-    mockCountSlackConnections.mockResolvedValue(1);
+  it('writes the workspace installation inside the integration transaction', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const installation = {
       botToken: 'xoxb-new-token',
@@ -433,12 +440,17 @@ describe('upsertSlackInstallation', () => {
       teamName: 'Kilo Team',
     } satisfies SlackInstallation;
 
-    await upsertSlackInstallation({ owner, teamId: 'T_NEW', installation });
+    await upsertSlackInstallation({ owner, teamId: 'T123', installation });
 
-    expect(mockDeleteWorkspaceInstallation).not.toHaveBeenCalled();
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockUpsertWorkspaceInstallation).toHaveBeenCalledWith(
+      expect.objectContaining({ executor: expect.anything() })
+    );
   });
 
-  it('removes the new workspace installation when persisting the integration fails', async () => {
+  // The transaction rolls the workspace record back, so there is no compensating
+  // delete to issue and no risk of one masking the original error.
+  it('propagates the original error without a compensating delete when the write fails', async () => {
     mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     mockInsertReturning.mockRejectedValue(new Error('insert exploded'));
 
@@ -452,7 +464,25 @@ describe('upsertSlackInstallation', () => {
       'insert exploded'
     );
 
-    expect(mockDeleteWorkspaceInstallation).toHaveBeenCalledWith('T123');
+    expect(mockDeleteWorkspaceInstallationIfUnreferenced).not.toHaveBeenCalled();
+    expect(mockDeleteWorkspaceInstallation).not.toHaveBeenCalled();
+  });
+
+  it('still translates a workspace unique violation when the write fails', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockInsertReturning.mockRejectedValue({
+      constraint: 'UQ_platform_integrations_slack_platform_inst',
+    });
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await expect(upsertSlackInstallation({ owner, teamId: 'T123', installation })).rejects.toThrow(
+      SlackWorkspaceAlreadyConnectedError
+    );
   });
 
   it('clears an earlier suspension when refreshing an existing installation', async () => {

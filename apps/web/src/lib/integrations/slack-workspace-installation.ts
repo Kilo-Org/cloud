@@ -1,13 +1,16 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   platform_integrations,
   slack_workspace_installations,
   type PlatformIntegration,
   type SlackWorkspaceInstallation,
 } from '@kilocode/db/schema';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, notExists } from 'drizzle-orm';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+
+/** Either the pooled client or an open transaction. */
+type Executor = typeof db | DrizzleTransaction;
 
 /**
  * Workspace-level Slack installation state.
@@ -47,6 +50,10 @@ export async function getSlackWorkspaceInstallation(
 /**
  * Create or refresh the workspace record. Called on every completed Slack OAuth
  * install so the stored token always matches the most recent installation.
+ *
+ * Pass the transaction that also writes the `platform_integrations` row: the two
+ * writes have to land together, otherwise a concurrent teardown can observe a
+ * workspace record with nothing referencing it yet and delete it.
  */
 export async function upsertSlackWorkspaceInstallation({
   teamId,
@@ -55,6 +62,7 @@ export async function upsertSlackWorkspaceInstallation({
   botUserId,
   scopes,
   installedByUserId,
+  executor = db,
 }: {
   teamId: string;
   teamName?: string | null;
@@ -62,10 +70,11 @@ export async function upsertSlackWorkspaceInstallation({
   botUserId?: string | null;
   scopes?: string[] | null;
   installedByUserId?: string | null;
+  executor?: Executor;
 }): Promise<SlackWorkspaceInstallation> {
   const now = new Date().toISOString();
 
-  const [installation] = await db
+  const [installation] = await executor
     .insert(slack_workspace_installations)
     .values({
       team_id: teamId,
@@ -100,26 +109,38 @@ export async function deleteSlackWorkspaceInstallation(teamId: string): Promise<
 }
 
 /**
- * Number of platform integrations still connected to a Slack workspace.
+ * Delete the workspace record, but only if no platform integration still
+ * references the workspace.
  *
- * Used to decide whether workspace-wide teardown (token revocation, Chat SDK
- * state, this table) is safe. Only rows with a non-NULL
- * `platform_installation_id` count: detached 0108 rows no longer hold a claim on
- * the workspace.
+ * The reference check is part of the delete rather than a preceding query, so a
+ * concurrent install cannot slip between a check and the delete. Installs also
+ * write the workspace record and the integration row in one transaction, which is
+ * what makes this safe: either this statement sees the integration row and keeps
+ * the record, or the install has not committed yet and there is no record here to
+ * remove.
+ *
+ * Only rows with a non-NULL `platform_installation_id` count as references:
+ * detached 0108 rows no longer hold a claim on the workspace.
  */
-export async function countSlackConnections(teamId: string): Promise<number> {
-  const connections = await db
-    .select({ id: platform_integrations.id })
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.SLACK),
-        eq(platform_integrations.platform_installation_id, teamId),
-        isNotNull(platform_integrations.platform_installation_id)
+export async function deleteSlackWorkspaceInstallationIfUnreferenced(
+  teamId: string
+): Promise<void> {
+  await db.delete(slack_workspace_installations).where(
+    and(
+      eq(slack_workspace_installations.team_id, teamId),
+      notExists(
+        db
+          .select({ id: platform_integrations.id })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.platform, PLATFORM.SLACK),
+              eq(platform_integrations.platform_installation_id, teamId)
+            )
+          )
       )
-    );
-
-  return connections.length;
+    )
+  );
 }
 
 /**

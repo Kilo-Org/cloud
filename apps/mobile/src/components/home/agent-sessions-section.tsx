@@ -2,6 +2,7 @@ import { type Href, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
+import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { SectionHeader } from '@/components/home/section-header';
@@ -104,19 +105,13 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
   const { activeSessions, storedSessions, activeSessionIds, activeIsError } = useAgentSessions({
     organizationId,
   });
+  const navigateToSession = useAgentSessionNavigator();
 
   const rows = buildRows({ activeSessions, storedSessions, activeSessionIds });
 
   if (rows.length === 0) {
     return null;
   }
-
-  const navigateTo = (sessionId: string, sessionOrgId?: string | null) => {
-    const path = sessionOrgId
-      ? `/(app)/agent-chat/${sessionId}?organizationId=${sessionOrgId}`
-      : `/(app)/agent-chat/${sessionId}`;
-    router.push(path as Href);
-  };
 
   return (
     <View>
@@ -146,7 +141,7 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
                   variant="card"
                   interactive={false}
                   onPress={() => {
-                    navigateTo(session.id);
+                    navigateToSession(session.id);
                   }}
                 />
               </View>
@@ -164,7 +159,7 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
                 variant="card"
                 interactive={false}
                 onPress={() => {
-                  navigateTo(session.session_id, session.organization_id);
+                  navigateToSession(session.session_id, session.organization_id);
                 }}
               />
             </View>

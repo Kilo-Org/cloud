@@ -52,6 +52,9 @@ export function useAnalyticsConsentGate({
   useEffect(() => {
     if (!hasToken || !consentChecked || !accountId) {
       clearTelemetryDecision();
+      const epoch = currentEpoch();
+      resetAppsFlyerState();
+      void discardOptionalTelemetry(epoch);
       return;
     }
     if (needsConsent || !optionalConsent) {

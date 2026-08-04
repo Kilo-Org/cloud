@@ -2130,6 +2130,10 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'session_import_failed',
   'setup_command_failed',
   'container_shutdown',
+  // Closed out by the stale review reaper because it sat in a non-terminal state
+  // past the reap threshold. Distinct from 'timeout', which means the agent
+  // itself timed out; this one means nothing ever reported back at all.
+  'abandoned',
   'unknown',
 ] as const;
 
@@ -2166,6 +2170,14 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
   // ownership could be either.
   'assistant_rate_limited_byok',
+  // Set only by the stale review reaper, which measures cleanup rather than the
+  // fault that stranded the review, so alerting on it would count janitorial work
+  // as incidents. Every stranded pending review measured on 2026-08-04 traced to
+  // customer-side state: Code Reviewer disabled, the platform integration
+  // suspended, or an action-required disable. The signal for genuinely stuck work
+  // is the live "Running > 90m" queue health counter, which is unaffected by this
+  // and does not depend on a review having been reaped yet.
+  'abandoned',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

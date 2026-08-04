@@ -99,6 +99,7 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   workspace_capacity: 'Sandbox Capacity',
   sandbox_connection: 'Sandbox Connection',
   container_shutdown: 'Container Shutdown',
+  abandoned: 'Abandoned (reaped)',
   assistant_rate_limited: 'Rate Limited',
   // Named by owner rather than by the internal `providerOwnership` value.
   // "managed key" required knowing that 'managed' means Kilo's own credential,
@@ -436,7 +437,10 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         cancelled_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
         interrupted_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
         in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
-        avg_duration_seconds: sql<number>`AVG(EXTRACT(EPOCH FROM (${durationCompletedAt}::timestamp - ${durationStartedAt}::timestamp))) FILTER (WHERE ${durationCompletedAt} IS NOT NULL AND ${durationStartedAt} IS NOT NULL)`,
+        // Reaped reviews get completed_at stamped at reap time, ~48h+ after they
+        // started, so a handful of them would dominate an average built from
+        // minutes-long real runs. They are closures, not measurements.
+        avg_duration_seconds: sql<number>`AVG(EXTRACT(EPOCH FROM (${durationCompletedAt}::timestamp - ${durationStartedAt}::timestamp))) FILTER (WHERE ${durationCompletedAt} IS NOT NULL AND ${durationStartedAt} IS NOT NULL AND COALESCE(${statusTable.terminal_reason}, '') <> 'abandoned')`,
         wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${waitCondition})`,
         avg_wait_seconds: sql<number>`AVG(${waitSeconds}) FILTER (WHERE ${waitCondition})`,
         p95_wait_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSeconds}) FILTER (WHERE ${waitCondition})`,

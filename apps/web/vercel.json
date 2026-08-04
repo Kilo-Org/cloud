@@ -81,6 +81,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/reap-stale-code-reviews",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/exa-partition-maintenance",
       "schedule": "0 0 1 * *"
     },

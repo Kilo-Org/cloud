@@ -20,7 +20,7 @@
   "dependencies": {
     "@kilocode/wl-sdk": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "@sentry/cloudflare": "^9",
+    "@sentry/cloudflare": "9.47.1",
     "@hono/trpc-server": "^0.4.2",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
@@ -32,7 +32,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
-    "@sentry/cli": "^2.58.2",
+    "@sentry/cli": "catalog:",
     "@types/node": "^22",
     "@typescript/native-preview": "7.0.0-dev.20251019.1",
     "typescript": "catalog:",

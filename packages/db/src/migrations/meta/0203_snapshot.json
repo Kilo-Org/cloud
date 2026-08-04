@@ -1,5 +1,5 @@
 {
-  "id": "c64b8652-4ffe-4fa6-b4ff-a7cb270ca607",
+  "id": "13235361-1dc7-44a3-ac34-c44343d386ed",
   "prevId": "163e9748-fe27-492c-ac35-3836492d0545",
   "version": "7",
   "dialect": "postgresql",
@@ -13699,109 +13699,6 @@
         "github_branch_pull_requests_review_decision_check": {
           "name": "github_branch_pull_requests_review_decision_check",
           "value": "\"github_branch_pull_requests\".\"pr_review_decision\" IS NULL OR \"github_branch_pull_requests\".\"pr_review_decision\" IN ('approved', 'changes_requested', 'review_required')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.github_install_states": {
-      "name": "github_install_states",
-      "schema": "",
-      "columns": {
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "owner_type": {
-          "name": "owner_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "github_app_type": {
-          "name": "github_app_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "return_to": {
-          "name": "return_to",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consumed_at": {
-          "name": "consumed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_github_install_states_expires_at": {
-          "name": "IDX_github_install_states_expires_at",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "github_install_states_kilo_user_id_kilocode_users_id_fk": {
-          "name": "github_install_states_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "github_install_states",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "github_install_states_owner_type_check": {
-          "name": "github_install_states_owner_type_check",
-          "value": "\"github_install_states\".\"owner_type\" IN ('org', 'user')"
         }
       },
       "isRLSEnabled": false
@@ -27991,6 +27888,318 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organization_group_memberships": {
+      "name": "organization_group_memberships",
+      "schema": "",
+      "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assigned_by_kilo_user_id": {
+          "name": "assigned_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_organization_group_memberships_organization_user": {
+          "name": "IDX_organization_group_memberships_organization_user",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "FK_organization_group_memberships_group": {
+          "name": "FK_organization_group_memberships_group",
+          "tableFrom": "organization_group_memberships",
+          "tableTo": "organization_groups",
+          "columnsFrom": [
+            "organization_id",
+            "group_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "FK_organization_group_memberships_member": {
+          "name": "FK_organization_group_memberships_member",
+          "tableFrom": "organization_group_memberships",
+          "tableTo": "organization_memberships",
+          "columnsFrom": [
+            "organization_id",
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "kilo_user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "PK_organization_group_memberships": {
+          "name": "PK_organization_group_memberships",
+          "columns": [
+            "organization_id",
+            "group_id",
+            "kilo_user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organization_group_policy_settings": {
+      "name": "organization_group_policy_settings",
+      "schema": "",
+      "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "default_policies": {
+          "name": "default_policies",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[{\"type\":\"model_access\",\"data\":{\"mode\":\"all\"}}]'::jsonb"
+        },
+        "policy_revision": {
+          "name": "policy_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "updated_by_kilo_user_id": {
+          "name": "updated_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organization_group_policy_settings_organization_id_organizations_id_fk": {
+          "name": "organization_group_policy_settings_organization_id_organizations_id_fk",
+          "tableFrom": "organization_group_policy_settings",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "organization_group_policy_settings_revision_check": {
+          "name": "organization_group_policy_settings_revision_check",
+          "value": "\"organization_group_policy_settings\".\"policy_revision\" >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.organization_groups": {
+      "name": "organization_groups",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "policies": {
+          "name": "policies",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "created_by_kilo_user_id": {
+          "name": "created_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_organization_groups_organization_id_canonical_name": {
+          "name": "UQ_organization_groups_organization_id_canonical_name",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(btrim(\"name\"))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_organization_groups_organization_id": {
+          "name": "IDX_organization_groups_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organization_groups_organization_id_organizations_id_fk": {
+          "name": "organization_groups_organization_id_organizations_id_fk",
+          "tableFrom": "organization_groups",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_organization_groups_organization_id_id": {
+          "name": "UQ_organization_groups_organization_id_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "organization_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "organization_groups_name_check": {
+          "name": "organization_groups_name_check",
+          "value": "char_length(btrim(\"organization_groups\".\"name\")) BETWEEN 1 AND 80"
+        },
+        "organization_groups_description_check": {
+          "name": "organization_groups_description_check",
+          "value": "\"organization_groups\".\"description\" IS NULL OR char_length(\"organization_groups\".\"description\") <= 500"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.organization_invitations": {

@@ -29,9 +29,13 @@ export async function GET(
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const auth = await tryGetUserFromAuth();
   try {
-    const result = auth?.organizationId
-      ? await getAvailableModelsForOrganization(auth.organizationId)
-      : null;
+    const result =
+      auth?.organizationId && auth.user
+        ? await getAvailableModelsForOrganization(auth.organizationId, {
+            type: 'member',
+            kiloUserId: auth.user.id,
+          })
+        : null;
     if (result) {
       return NextResponse.json({
         ...result,

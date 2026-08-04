@@ -27,6 +27,9 @@ import {
   referral_codes,
   organizations,
   organization_memberships,
+  organization_groups,
+  organization_group_memberships,
+  organization_group_policy_settings,
   organization_user_limits,
   organization_user_usage,
   organization_invitations,
@@ -1372,6 +1375,19 @@ export async function softDeleteUser(userId: string) {
       .update(organization_audit_logs)
       .set({ actor_email: null, actor_name: null })
       .where(eq(organization_audit_logs.actor_id, userId));
+
+    await tx
+      .update(organization_groups)
+      .set({ created_by_kilo_user_id: null })
+      .where(eq(organization_groups.created_by_kilo_user_id, userId));
+    await tx
+      .update(organization_group_memberships)
+      .set({ assigned_by_kilo_user_id: null })
+      .where(eq(organization_group_memberships.assigned_by_kilo_user_id, userId));
+    await tx
+      .update(organization_group_policy_settings)
+      .set({ updated_by_kilo_user_id: null })
+      .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
 
     // Security audit logs: keep org-owned entries, strip actor PII
     // (user-owned entries are cascade-deleted via owned_by_user_id FK)

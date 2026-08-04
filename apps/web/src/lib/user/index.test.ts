@@ -20,6 +20,9 @@ import {
   organization_user_limits,
   organization_user_usage,
   organization_audit_logs,
+  organization_groups,
+  organization_group_memberships,
+  organization_group_policy_settings,
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
@@ -2106,6 +2109,55 @@ describe('User', () => {
       expect(logs[0].actor_name).toBeNull();
       expect(logs[0].actor_id).toBe(user.id); // actor_id preserved for reference
       expect(logs[0].message).toBe('User joined org'); // message preserved
+    });
+
+    it('should clear organization group attribution fields', async () => {
+      const actor = await insertTestUser();
+      const member = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Group attribution org', plan: 'enterprise' })
+        .returning();
+      await db.insert(organization_memberships).values([
+        { organization_id: organization.id, kilo_user_id: actor.id, role: 'member' },
+        { organization_id: organization.id, kilo_user_id: member.id, role: 'member' },
+      ]);
+      const [group] = await db
+        .insert(organization_groups)
+        .values({
+          organization_id: organization.id,
+          name: 'Engineering',
+          created_by_kilo_user_id: actor.id,
+        })
+        .returning();
+      await db.insert(organization_group_memberships).values({
+        organization_id: organization.id,
+        group_id: group.id,
+        kilo_user_id: member.id,
+        assigned_by_kilo_user_id: actor.id,
+      });
+      await db.insert(organization_group_policy_settings).values({
+        organization_id: organization.id,
+        updated_by_kilo_user_id: actor.id,
+      });
+
+      await softDeleteUser(actor.id);
+
+      const [storedGroup] = await db
+        .select()
+        .from(organization_groups)
+        .where(eq(organization_groups.id, group.id));
+      const [storedAssignment] = await db
+        .select()
+        .from(organization_group_memberships)
+        .where(eq(organization_group_memberships.group_id, group.id));
+      const [storedSettings] = await db
+        .select()
+        .from(organization_group_policy_settings)
+        .where(eq(organization_group_policy_settings.organization_id, organization.id));
+      expect(storedGroup.created_by_kilo_user_id).toBeNull();
+      expect(storedAssignment.assigned_by_kilo_user_id).toBeNull();
+      expect(storedSettings.updated_by_kilo_user_id).toBeNull();
     });
 
     it('should anonymize security audit logs where user is actor', async () => {

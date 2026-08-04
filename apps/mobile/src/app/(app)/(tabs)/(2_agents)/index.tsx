@@ -4,8 +4,8 @@ import { Alert } from 'react-native';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
 import {
   getGitHubInstallReturnOutcome,
-  subscribeToGitHubInstallReturnOutcome,
   type GitHubInstallReturnOutcome,
+  subscribeToGitHubInstallReturnOutcome,
 } from '@/lib/github-install-return';
 
 function showReturnOutcome(result: GitHubInstallReturnOutcome) {

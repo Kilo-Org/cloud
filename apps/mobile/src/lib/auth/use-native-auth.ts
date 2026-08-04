@@ -170,9 +170,7 @@ export function useNativeAuth(): NativeAuthResult {
       // token payload as-is.  The server must compute SHA-256 of the raw nonce
       // and compare against payload.nonce.
       const rawNonceBytes = await getRandomBytesAsync(32);
-      const rawNonce = Array.from(rawNonceBytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+      const rawNonce = [...rawNonceBytes].map(b => b.toString(16).padStart(2, '0')).join('');
       const nonceDigest = await digestStringAsync(CryptoDigestAlgorithm.SHA256, rawNonce);
 
       const credential = await AppleAuthentication.signInAsync({

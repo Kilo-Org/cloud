@@ -40,7 +40,7 @@ describe('EmailOtpForm', () => {
     }
 
     const texts = renderer.root.findAll(
-      node => typeof node.type === 'string' && node.type === 'Text'
+      node => typeof node.type === 'string' && node.type === ('Text' as string)
     );
 
     const eligibilityText = texts.find(

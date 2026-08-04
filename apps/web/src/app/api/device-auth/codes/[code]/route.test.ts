@@ -86,7 +86,7 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
 describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetUserFromAuth.mockResolvedValue({ user: fakeUser, authFailedResponse: undefined });
+    mockGetUserFromAuth.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false } as never);
   });
 
@@ -144,9 +144,9 @@ describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => 
 
   test('returns 401 when user is not authenticated', async () => {
     mockGetUserFromAuth.mockResolvedValue({
-      user: undefined as never,
+      user: null,
       authFailedResponse: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }),
-    });
+    } as never);
 
     const response = await DELETE(
       createRequest('ABCD-EFGH', { 'x-device-auth-viewer-token': 'valid-token' }),

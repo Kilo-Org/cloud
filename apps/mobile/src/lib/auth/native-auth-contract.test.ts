@@ -52,8 +52,8 @@ describe('parseDeviceAuthCodeResponse', () => {
 
 describe('shouldRefreshBeforeRequest', () => {
   it('refreshes an expiring credential before an authenticated request', () => {
-    expect(shouldRefreshBeforeRequest(10_000, 5_000, 5_000)).toBe(true);
-    expect(shouldRefreshBeforeRequest(10_001, 5_000, 5_000)).toBe(false);
+    expect(shouldRefreshBeforeRequest(10_000, 5000, 5000)).toBe(true);
+    expect(shouldRefreshBeforeRequest(10_001, 5000, 5000)).toBe(false);
   });
 });
 

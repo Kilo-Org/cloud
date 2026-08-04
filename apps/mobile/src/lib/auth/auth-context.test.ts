@@ -200,7 +200,7 @@ describe('performRefresh', () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
     let resolveResponse: ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
-      () =>
+      async () =>
         new Promise<Response>(resolve => {
           resolveResponse = resolve;
         })
@@ -224,7 +224,7 @@ describe('performRefresh', () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
     let resolveResponse: ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
-      () =>
+      async () =>
         new Promise<Response>(resolve => {
           resolveResponse = resolve;
         })
@@ -250,7 +250,7 @@ describe('performRefresh', () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
     let resolveResponse: ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
-      () =>
+      async () =>
         new Promise<Response>(resolve => {
           resolveResponse = resolve;
         })

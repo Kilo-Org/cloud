@@ -284,8 +284,9 @@ describe('exchangeNativeGoogleAuthCode', () => {
   });
 
   it('throws NativeIdTokenError when getToken fails with a server response (replayed code)', async () => {
-    const oauthError = new Error('invalid_grant');
-    (oauthError as Record<string, unknown>).response = { data: { error: 'invalid_grant' } };
+    const oauthError = Object.assign(new Error('invalid_grant'), {
+      response: { data: { error: 'invalid_grant' } },
+    });
     mockGetToken.mockRejectedValue(oauthError);
 
     await expect(exchangeNativeGoogleAuthCode('replayed-code')).rejects.toThrow(NativeIdTokenError);

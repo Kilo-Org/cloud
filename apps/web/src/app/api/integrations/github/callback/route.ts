@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
+import type { User } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
@@ -8,6 +9,7 @@ import {
   getGitHubAppTypeForOrganization,
   getGitHubAppCredentials,
   assertUserAdministersInstallation,
+  type GitHubAppType,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
@@ -90,7 +92,7 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     return htmlPage('Link Failed', 'You are not the owner of this GitHub integration.', 403);
   }
 
-  const appType = integration.github_app_type ?? 'standard';
+  const appType = (integration.github_app_type ?? 'standard') as GitHubAppType;
   const githubUser = await exchangeGitHubOAuthCode(code, appType);
 
   await bot.initialize();
@@ -262,7 +264,7 @@ async function handleNewInstallFlow(
     returnTo,
     installationId,
     setupAction,
-    githubAppType: installRow.github_app_type,
+    githubAppType: installRow.github_app_type as GitHubAppType,
   });
 }
 
@@ -325,14 +327,14 @@ async function handleCoreInstallFlow(params: {
   returnTo: string | null;
   installationId: string;
   setupAction: string | null;
-  githubAppType: string;
+  githubAppType: GitHubAppType;
 }): Promise<Response> {
   const { user, owner, ownerId, returnTo, installationId, setupAction, githubAppType } = params;
   const searchParams = params.request.nextUrl.searchParams;
 
   // Verify user has access to the owner
   if (owner.type === 'org') {
-    await ensureOrganizationAccess({ user }, owner.id);
+    await ensureOrganizationAccess({ user: user as unknown as User }, owner.id);
   } else {
     if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/', APP_URL));

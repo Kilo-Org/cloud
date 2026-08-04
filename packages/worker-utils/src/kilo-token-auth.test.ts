@@ -66,6 +66,22 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(verifyToken(token)).resolves.toBeNull();
   });
 
+  it('rejects tokens when getUserPepper returns null', async () => {
+    userResultByUserId.clear();
+    // Simulate a custom getUserPepper that returns null instead of undefined
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token: await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' }).then(
+          ({ token }) => token
+        ),
+        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        workerEnv: 'production',
+        connectionString: 'postgres://test',
+        getUserPepper: async () => null,
+      })
+    ).resolves.toBeNull();
+  });
+
   it('rejects tokens with stale peppers', async () => {
     const { token } = await signToken({ pepper: 'pepper-stale', tokenSource: 'kilo-chat' });
 

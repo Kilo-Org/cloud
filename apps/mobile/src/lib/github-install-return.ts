@@ -18,7 +18,9 @@ const listeners = new Set<() => void>();
 
 export function setGitHubInstallReturnOutcome(next: GitHubInstallReturnOutcome): void {
   outcome = next;
-  for (const listener of listeners) listener();
+  for (const listener of listeners) {
+    listener();
+  }
 }
 
 export function getGitHubInstallReturnOutcome(): GitHubInstallReturnOutcome {

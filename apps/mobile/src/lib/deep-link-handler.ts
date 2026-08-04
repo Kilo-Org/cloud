@@ -14,10 +14,14 @@ const AGENTS_TAB_HREF = '/(app)/(tabs)/(2_agents)';
  */
 function getQueryFromRaw(raw: string): string | null {
   const q = raw.indexOf('?');
-  if (q < 0) return null;
+  if (q === -1) {
+    return null;
+  }
   let end = raw.length;
   const h = raw.indexOf('#');
-  if (h >= 0 && h < end) end = h;
+  if (h !== -1 && h < end) {
+    end = h;
+  }
   return raw.slice(q, end);
 }
 

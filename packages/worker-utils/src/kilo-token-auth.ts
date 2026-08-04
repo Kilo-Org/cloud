@@ -57,7 +57,7 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
     }
 
     const result = await getUserPepper(params.connectionString, payload.kiloUserId);
-    if (result === undefined) {
+    if (!result) {
       return null;
     }
 

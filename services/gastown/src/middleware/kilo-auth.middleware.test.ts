@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { SignJWT } from 'jose';
 import { kiloAuthMiddleware } from './kilo-auth.middleware';
+import type { GastownEnv } from '../gastown.worker';
 
 const TEST_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
 function createApp() {
-  const app = new Hono();
+  const app = new Hono<GastownEnv>();
   app.use('/api/*', kiloAuthMiddleware);
   app.get('/api/whoami', c => {
     return c.json({ kiloUserId: c.get('kiloUserId') });
@@ -46,7 +47,7 @@ describe('kiloAuthMiddleware', () => {
       { NEXTAUTH_SECRET: TEST_SECRET } as never
     );
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { kiloUserId: string };
     expect(body.kiloUserId).toBe('user-abc');
   });
 });
@@ -68,7 +69,7 @@ describe('C15 deviceSessionId compatibility', () => {
       { NEXTAUTH_SECRET: TEST_SECRET } as never
     );
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { kiloUserId: string };
     expect(body.kiloUserId).toBe('user-abc');
   });
 });

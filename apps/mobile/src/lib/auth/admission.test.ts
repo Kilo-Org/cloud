@@ -61,7 +61,7 @@ describe('getAdmission', () => {
     // This test verifies the contract: a build without attestation packages
     // sends no admission field. The server's legacy path admits the request.
     vi.mocked(Platform).OS = 'ios';
-    setupFetch(() => new Response(null, { status: 200 }));
+    setupFetch(async () => Promise.resolve(new Response(null, { status: 200 })));
 
     const result = await getAdmission();
 

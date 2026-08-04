@@ -123,7 +123,11 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       installationId: INSTALLATION_ID,
       callbackPath: '/github/link',
     });
-    mockedExchangeGitHubOAuthCode.mockResolvedValue({ id: GITHUB_USER_ID, login: 'octocat' });
+    mockedExchangeGitHubOAuthCode.mockResolvedValue({
+      id: GITHUB_USER_ID,
+      login: 'octocat',
+      accessToken: 'test-token',
+    });
     mockedFindIntegrationByInstallationId.mockResolvedValue({
       owned_by_organization_id: 'org_1',
       owned_by_user_id: null,

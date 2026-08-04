@@ -1,16 +1,26 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-const mockListInstallationsForAuthenticatedUser = jest.fn();
+const mockListInstallationsForAuthenticatedUser =
+  jest.fn<
+    (_params: {
+      per_page: number;
+      page: number;
+    }) => Promise<{ data: { total_count: number; installations: Array<{ id: number }> } }>
+  >();
 
-jest.mock('@octokit/rest', () => ({
-  Octokit: jest.fn().mockImplementation(() => ({
-    rest: {
-      apps: {
-        listInstallationsForAuthenticatedUser: mockListInstallationsForAuthenticatedUser,
-      },
-    },
-  })),
-}));
+jest.mock(
+  '@octokit/rest',
+  () =>
+    ({
+      Octokit: jest.fn().mockImplementation(() => ({
+        rest: {
+          apps: {
+            listInstallationsForAuthenticatedUser: mockListInstallationsForAuthenticatedUser,
+          },
+        },
+      })),
+    }) as never
+);
 
 let assertUserAdministersInstallation: (params: {
   accessToken: string;

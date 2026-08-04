@@ -1,6 +1,10 @@
 import * as Sentry from '@sentry/react-native';
 import { Platform } from 'react-native';
-import appsFlyer, { AppsFlyerPurchaseConnector, StoreKitVersion } from 'react-native-appsflyer';
+import appsFlyer, {
+  AppsFlyerConsent,
+  AppsFlyerPurchaseConnector,
+  StoreKitVersion,
+} from 'react-native-appsflyer';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
@@ -125,6 +129,18 @@ export function initAppsFlyer(): void {
     );
   }
 
+  // Send the optional-consent signal before the SDK starts so attribution
+  // data is either collected with consent or not collected at all.
+  // isUserSubjectToGDPR is left undefined: we do not know the user's GDPR
+  // status at this layer, and a false negative is a legal risk.  The SDK
+  // treats undefined as "not determined."
+  appsFlyer.setConsentData(
+    new AppsFlyerConsent(undefined, allowsOptional(), allowsOptional(), allowsOptional())
+  );
+
+  // Resume the SDK if it was stopped by a prior reset.
+  appsFlyer.stop(false);
+
   appsFlyer.initSdk(
     {
       devKey: APPSFLYER_DEV_KEY,
@@ -169,11 +185,10 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
 }
 
 /**
- * Tear down the native SDK and clear JS state. A successful `initSdk` keeps
- * native transmission alive until explicitly stopped, so this calls
- * `stop(true)` and, on iOS, `stopObservingTransactions()`. Also clears the
- * pending-event buffer so stale events from a prior account do not transmit
- * on a later init.
+ * Tear down the native SDK and clear JS state. Calls `stop(true)` to stop
+ * native transmission, then, on iOS, `stopObservingTransactions()`. Also
+ * clears the pending-event buffer so stale events from a prior account do
+ * not transmit on a later init.
  *
  * Does NOT reset `purchaseConnectorCreateStarted`: native `PCAppsFlyer` keeps
  * a process-lifetime static connector, so re-entering `create()` rejects with

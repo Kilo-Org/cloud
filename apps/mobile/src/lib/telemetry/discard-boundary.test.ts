@@ -39,6 +39,7 @@ const hoisted = vi.hoisted(() => {
     initSdk: vi.fn(),
     logEvent: vi.fn(),
     stop: vi.fn(),
+    setConsentData: vi.fn(),
     create: vi.fn(),
     startObservingTransactions: vi.fn(),
     stopObservingTransactions: vi.fn(),
@@ -94,7 +95,21 @@ vi.mock('react-native-appsflyer', () => ({
     initSdk: hoisted.appsFlyer.initSdk,
     logEvent: hoisted.appsFlyer.logEvent,
     stop: hoisted.appsFlyer.stop,
+    setConsentData: hoisted.appsFlyer.setConsentData,
   },
+  // oxlint-disable-next-line func-names max-params
+  AppsFlyerConsent: vi.fn(function (
+    this: Record<string, unknown>,
+    isUserSubjectToGDPR?: boolean,
+    hasConsentForDataUsage?: boolean,
+    hasConsentForAdsPersonalization?: boolean,
+    hasConsentForAdStorage?: boolean
+  ) {
+    this.isUserSubjectToGDPR = isUserSubjectToGDPR;
+    this.hasConsentForDataUsage = hasConsentForDataUsage;
+    this.hasConsentForAdsPersonalization = hasConsentForAdsPersonalization;
+    this.hasConsentForAdStorage = hasConsentForAdStorage;
+  }),
   AppsFlyerPurchaseConnector: {
     create: hoisted.appsFlyer.create,
     startObservingTransactions: hoisted.appsFlyer.startObservingTransactions,

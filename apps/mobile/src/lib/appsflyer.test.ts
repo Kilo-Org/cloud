@@ -1,3 +1,5 @@
+// oxlint-disable max-lines — one coherent lifecycle/integration suite; splitting
+// would duplicate the shared mock scaffold and weaken the causal ordering tests.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' }));
@@ -6,6 +8,7 @@ const mockedAppsFlyer = vi.hoisted(() => ({
   initSdk: vi.fn(),
   logEvent: vi.fn(),
   stop: vi.fn(),
+  setConsentData: vi.fn(),
   create: vi.fn(),
   startObservingTransactions: vi.fn(),
   stopObservingTransactions: vi.fn(),
@@ -20,12 +23,24 @@ vi.mock('react-native', () => ({
   Platform: mockedPlatform,
 }));
 
+// Named constructor mock satisfies func-names and keeps the parameter
+// list under max-params via rest args while matching the real
+// AppsFlyerConsent constructor shape.
+function AppsFlyerConsentCtor(this: Record<string, unknown>, ...args: (boolean | undefined)[]) {
+  this.isUserSubjectToGDPR = args[0];
+  this.hasConsentForDataUsage = args[1];
+  this.hasConsentForAdsPersonalization = args[2];
+  this.hasConsentForAdStorage = args[3];
+}
+
 vi.mock('react-native-appsflyer', () => ({
   default: {
     initSdk: mockedAppsFlyer.initSdk,
     logEvent: mockedAppsFlyer.logEvent,
     stop: mockedAppsFlyer.stop,
+    setConsentData: mockedAppsFlyer.setConsentData,
   },
+  AppsFlyerConsent: vi.fn(AppsFlyerConsentCtor),
   AppsFlyerPurchaseConnector: {
     create: mockedAppsFlyer.create,
     startObservingTransactions: mockedAppsFlyer.startObservingTransactions,
@@ -277,6 +292,73 @@ describe('AppsFlyer gate', () => {
   });
 });
 
+describe('AppsFlyer consent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedPlatform.OS = 'ios';
+    mockedController.allowsOptional.mockReturnValue(true);
+    mockedController.currentGeneration.mockReturnValue(0);
+    mockedAppsFlyer.create.mockResolvedValue(undefined);
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        onSuccess('ok');
+      }
+    );
+  });
+
+  it('calls setConsentData before initSdk', async () => {
+    const initAppsFlyer = await loadInit();
+    initAppsFlyer();
+
+    const setConsentCallOrder = mockedAppsFlyer.setConsentData.mock.invocationCallOrder[0];
+    const initSdkCallOrder = mockedAppsFlyer.initSdk.mock.invocationCallOrder[0];
+    expect(setConsentCallOrder).toBeDefined();
+    expect(initSdkCallOrder).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
+    expect(setConsentCallOrder!).toBeLessThan(initSdkCallOrder!);
+  });
+
+  it('sends consent values from allowsOptional', async () => {
+    mockedController.allowsOptional.mockReturnValue(true);
+    const initAppsFlyer = await loadInit();
+    initAppsFlyer();
+
+    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
+    const consentArg = mockedAppsFlyer.setConsentData.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(consentArg.isUserSubjectToGDPR).toBeUndefined();
+    expect(consentArg.hasConsentForDataUsage).toBe(true);
+    expect(consentArg.hasConsentForAdsPersonalization).toBe(true);
+    expect(consentArg.hasConsentForAdStorage).toBe(true);
+  });
+
+  it('does not call the SDK when optional consent is not given', async () => {
+    mockedController.allowsOptional.mockReturnValue(false);
+    const initAppsFlyer = await loadInit();
+    initAppsFlyer();
+
+    // initAppsFlyer returns early when allowsOptional is false — the SDK is
+    // never called, including setConsentData and initSdk.
+    expect(mockedAppsFlyer.setConsentData).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.initSdk).not.toHaveBeenCalled();
+  });
+
+  it('re-sends consent after reset when re-initing', async () => {
+    const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
+    initAppsFlyer();
+    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
+
+    resetAppsFlyerState();
+    mockedAppsFlyer.setConsentData.mockClear();
+    mockedAppsFlyer.stop.mockClear();
+    mockedAppsFlyer.initSdk.mockClear();
+
+    initAppsFlyer();
+    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(false);
+    expect(mockedAppsFlyer.initSdk).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('AppsFlyer generation scoping', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -321,7 +403,7 @@ describe('resetAppsFlyerState', () => {
     );
   });
 
-  it('calls stop(true)', async () => {
+  it('calls stop(true) to stop native transmission', async () => {
     const { resetAppsFlyerState } = await loadModule();
     resetAppsFlyerState();
 
@@ -354,6 +436,33 @@ describe('resetAppsFlyerState', () => {
     }).not.toThrow();
 
     (mockedAppsFlyer as Record<string, unknown>).stop = origStop;
+  });
+
+  it('re-init after reset calls setConsentData, then stop(false), then initSdk', async () => {
+    const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
+    // Initial init.
+    initAppsFlyer();
+
+    resetAppsFlyerState();
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(true);
+
+    mockedAppsFlyer.setConsentData.mockClear();
+    mockedAppsFlyer.stop.mockClear();
+    mockedAppsFlyer.initSdk.mockClear();
+
+    // Re-init after reset.
+    initAppsFlyer();
+
+    const setConsentOrder = mockedAppsFlyer.setConsentData.mock.invocationCallOrder[0];
+    const stopOrder = mockedAppsFlyer.stop.mock.invocationCallOrder[0];
+    const initSdkOrder = mockedAppsFlyer.initSdk.mock.invocationCallOrder[0];
+    expect(setConsentOrder).toBeDefined();
+    expect(stopOrder).toBeDefined();
+    expect(initSdkOrder).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
+    expect(setConsentOrder!).toBeLessThan(stopOrder!);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
+    expect(stopOrder!).toBeLessThan(initSdkOrder!);
   });
 
   it('clears initialized and pending events', async () => {

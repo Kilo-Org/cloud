@@ -34,7 +34,7 @@ function usage(): string {
     'Usage:',
     '  pnpm --filter web script:run db credit-transaction-indexes [--execute]',
     '',
-    'Defaults to dry-run. --execute creates Cost Insights credit transaction indexes concurrently.',
+    'Defaults to dry-run. --execute creates the credit transaction indexes concurrently.',
   ].join('\n');
 }
 

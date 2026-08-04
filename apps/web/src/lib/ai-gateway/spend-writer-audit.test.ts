@@ -41,7 +41,7 @@ function listTypeScriptFiles(directory: string): string[] {
   return files;
 }
 
-describe('Cost Insights Credit-spend writer audit', () => {
+describe('Credit-spend writer audit', () => {
   test('requires every direct microdollars_used increment to have an explicit classification', () => {
     const detectedWriters = sourceRoots
       .flatMap(sourceRoot => listTypeScriptFiles(join(repositoryRoot, sourceRoot)))

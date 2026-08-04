@@ -517,6 +517,22 @@ function joinWithAnd(fragments: SQL[]): SQL {
 }
 
 /**
+ * Compute the cursor (next page offset) for search paging.
+ *
+ * Returns `null` on the last page or when the current page is empty.
+ * An empty page with a stale `total` larger than `pageOffset` would return
+ * the same cursor under the naive `nextOffset < total` formula and loop
+ * loading. The `resultsLength > 0` guard prevents this.
+ */
+export function computeSearchNextCursor(
+  resultsLength: number,
+  nextOffset: number,
+  total: number
+): number | null {
+  return resultsLength > 0 && nextOffset < total ? nextOffset : null;
+}
+
+/**
  * Router for cli_sessions_v2 table operations.
  * Used by cloud-agent-next for session storage and retrieval.
  *
@@ -675,9 +691,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       total,
       limit,
       offset: pageOffset,
-      // `null` on the last page. Derived from the row count actually returned,
-      // so a short page cannot leave a cursor pointing past the end.
-      nextCursor: nextOffset < total ? nextOffset : null,
+      nextCursor: computeSearchNextCursor(results.length, nextOffset, total),
     };
   }),
 

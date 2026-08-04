@@ -14,7 +14,7 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
+import { parseGitHubOwnerRepo, computeSearchNextCursor } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -1878,6 +1878,26 @@ describe('cli-sessions-v2-router', () => {
       expect(result.results).toHaveLength(2);
       expect(result.total).toBe(3);
       expect(result.offset).toBe(0);
+    });
+
+    it('returns null nextCursor on an empty page even when nextOffset < total', () => {
+      // Empty page: results.length === 0, nextOffset === pageOffset.
+      // When pageOffset (2) < total (3), the naive formula
+      //   nextOffset < total ? nextOffset : null
+      // returns 2 — a non-null cursor that would cause an infinite loop.
+      // The empty-results guard prevents this.
+      const resultsLength = 0;
+      const nextOffset = 2;
+      const total = 3;
+
+      const withGuard = computeSearchNextCursor(resultsLength, nextOffset, total);
+      expect(withGuard).toBeNull();
+
+      // Old formula:  nextOffset < total → truthy, returns nextOffset (wrong)
+      // Empty guard:  resultsLength > 0 → false → null (correct)
+      const oldFormula: number | null = nextOffset < total ? nextOffset : null;
+      expect(oldFormula).toBe(nextOffset);
+      expect(withGuard).not.toBe(oldFormula);
     });
   });
 

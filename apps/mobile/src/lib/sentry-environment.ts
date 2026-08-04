@@ -4,5 +4,5 @@ export function resolveSentryEnvironment(raw: string | undefined, isDev: boolean
   if (trimmed) {
     return trimmed;
   }
-  return isDev ? 'development' : 'production';
+  return isDev ? 'development' : 'unknown';
 }

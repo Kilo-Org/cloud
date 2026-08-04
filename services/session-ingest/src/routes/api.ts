@@ -18,6 +18,7 @@ import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
+import { isDefaultSessionTitle } from '../ingest/default-session-title';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 
 export type ApiContext = {
@@ -524,16 +525,6 @@ api.post('/session/:sessionId/unshare', async c => {
 
   return c.json({ success: true }, 200);
 });
-
-// Duplicated from kilocode packages/opencode/src/session/session.ts:55-62
-// (isDefaultTitle). Keep in sync when the CLI default-title pattern changes.
-const DEFAULT_SESSION_TITLE_PATTERN =
-  /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-
-function isDefaultSessionTitle(title: string | null | undefined): boolean {
-  if (title == null) return true;
-  return DEFAULT_SESSION_TITLE_PATTERN.test(title);
-}
 
 const reportSessionTitleSchema = z.object({
   title: z.string().trim().min(1).max(200),

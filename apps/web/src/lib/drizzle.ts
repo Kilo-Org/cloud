@@ -130,15 +130,24 @@ if (process.env.NODE_ENV !== 'test') {
   }
 }
 
+// Pool error handlers: idle client errors trigger process exit in production
+// because a failed connection pool means the process cannot serve traffic.
+// In test mode, pool.end() during cleanup triggers idle client errors.
+// Attach a non-exiting listener in test mode to prevent Node from throwing
+// on an emitted error with zero listeners (same contract as replication-health.ts).
 pool.on('error', err => {
   console.error('Unexpected error on idle client (primary)', err);
-  process.exit(-1);
+  if (process.env.NODE_ENV !== 'test') {
+    process.exit(-1);
+  }
 });
 
 if (usesSeparateReplica) {
   replicaPool.on('error', err => {
     console.error('Unexpected error on idle client (replica)', err);
-    process.exit(-1);
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(-1);
+    }
   });
 }
 

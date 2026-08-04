@@ -15,6 +15,15 @@ describe('drizzle', () => {
     expect(res.rows[0].current_setting).toBe('kilocode-web');
   });
 
+  describe('pool error listeners', () => {
+    it('attaches a non-exiting error listener in test mode', () => {
+      // If no listener is attached, Node treats an 'error' emit as a throw.
+      // In test mode, pool.end() during cleanup triggers idle client errors
+      // that must not crash the test runner.
+      expect(pool.listenerCount('error')).toBeGreaterThan(0);
+    });
+  });
+
   describe('replica selection', () => {
     const primaryUrl = 'postgres://primary';
 

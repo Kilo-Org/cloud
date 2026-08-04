@@ -69,7 +69,6 @@ import { organizationAutoTopUpRouter } from '@/routers/organizations/organizatio
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
 import { organizationFundsRouter } from '@/routers/organizations/organization-funds-router';
-import { organizationCostInsightsRouter } from '@/routers/organizations/organization-cost-insights-router';
 import { organizationKiloPassRouter } from '@/routers/organizations/organization-kilo-pass-router';
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
@@ -134,7 +133,6 @@ export const organizationsRouter = createTRPCRouter({
   kiloclaw: organizationKiloclawRouter,
   bitbucket: organizationBitbucketRouter,
   funds: organizationFundsRouter,
-  costInsights: organizationCostInsightsRouter,
   kiloPass: organizationKiloPassRouter,
   groups: organizationGroupsRouter,
 

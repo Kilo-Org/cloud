@@ -108,6 +108,14 @@ function deviceFormFactor(): 'phone' | 'tablet' | 'desktop' | 'tv' | 'unknown' {
   return 'unknown';
 }
 
+/**
+ * Allowed person properties and event super properties (hard). Custom fields:
+ * `platform`, `device_form_factor`, `app_version`, `app_build`. SDK stock
+ * auto-captured fields: `$device_manufacturer`, `$device_name`, `$os_name`,
+ * `$os_version`, `$is_emulator`, `$device_type`, `$app_name`, `$app_version`,
+ * `$app_build`, `$app_namespace`, `$locale`, `$timezone`, `$screen_width`,
+ * `$screen_height`. Anything outside this list needs a DEC-02 amendment.
+ */
 export function initPostHog(): void {
   if (!allowsOptional()) {
     return;
@@ -117,6 +125,7 @@ export function initPostHog(): void {
   }
   client = new PostHog(POSTHOG_API_KEY, {
     host: 'https://us.i.posthog.com',
+    disableGeoip: true,
     // No events are sent from dev builds.
     disabled: __DEV__,
     customAppProperties: properties => ({
@@ -161,8 +170,9 @@ export function identifyUser(email: string): void {
     return;
   }
   // Persist version/build on the person profile too, so cohorts and insights
-  // can segment by release (not just flag targeting).
-  client?.identify(email, { email, ...appVersionProperties() });
+  // can segment by release (not just flag targeting). No email or name — the
+  // allowed-field list above this function governs person properties.
+  client?.identify(email, appVersionProperties());
   // Pull the freshly-identified user's flags so gated UI resolves promptly.
   void client?.reloadFeatureFlags();
 }

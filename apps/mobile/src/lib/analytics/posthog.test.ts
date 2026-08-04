@@ -337,6 +337,60 @@ describe('discardPostHog', () => {
   });
 });
 
+describe('identifyUser person properties', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('sends no email or name person key on identifyUser', async () => {
+    const { initPostHog, identifyUser } = await loadModule();
+    initPostHog();
+    identifyUser('test@test.com');
+
+    expect(hoisted.client.identify).toHaveBeenCalledTimes(1);
+
+    // First arg: distinct ID must be the email — unchanged by this slice.
+    expect(hoisted.client.identify).toHaveBeenCalledWith('test@test.com', expect.any(Object));
+
+    const properties = hoisted.client.identify.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(properties).not.toHaveProperty('email');
+    expect(properties).not.toHaveProperty('name');
+  });
+
+  it('identifyUser sends app_version and app_build as person properties', async () => {
+    const { initPostHog, identifyUser } = await loadModule();
+    initPostHog();
+    identifyUser('test@test.com');
+
+    const properties = hoisted.client.identify.mock.calls[0]?.[1] as
+      | Record<string, unknown>
+      | undefined;
+    expect(properties).toEqual({
+      app_version: '1.2.3',
+      app_build: '45',
+    });
+  });
+});
+
+describe('initPostHog constructor options', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('passes disableGeoip: true to the constructor', async () => {
+    const initPostHog = await loadInitPostHog();
+    initPostHog();
+
+    expect(hoisted.holder.options?.disableGeoip).toBe(true);
+  });
+});
+
 describe('resumePostHog', () => {
   beforeEach(() => {
     vi.clearAllMocks();

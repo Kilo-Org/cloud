@@ -254,6 +254,8 @@ export class UserConnectionDO extends DurableObject<Env> {
       targetCliWs: WebSocket;
     }
   >();
+  private pendingInitialCommandWrites = new Set<string>();
+  private terminalDuringInitialWrite = new Map<string, PendingCommandEntry>();
   // Last heartbeat timestamp per CLI connectionId (for staleness eviction)
   private lastHeartbeatAt = new Map<string, number>();
   // In-memory mirror of readyPush KV fireAt values — scheduling only; KV is source of truth
@@ -565,7 +567,14 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const prev of previousSessions) {
       if (!currentIds.has(prev.id) && this.sessionOwners.get(prev.id) === connectionId) {
         this.sessionOwners.delete(prev.id);
-        this.failPendingCommandsForOwnerChange(prev.id, undefined);
+        this.ctx.waitUntil(
+          this.failPendingCommandsForOwnerChange(prev.id, undefined).catch((error: unknown) => {
+            console.error('Failed to persist terminal commands for dropped session', {
+              sessionId: prev.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          })
+        );
       }
     }
 
@@ -574,7 +583,16 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const session of sessions) {
       const previousOwner = this.sessionOwners.get(session.id);
       if (previousOwner && previousOwner !== connectionId) {
-        this.failPendingCommandsForOwnerChange(session.id, connectionId);
+        this.ctx.waitUntil(
+          this.failPendingCommandsForOwnerChange(session.id, connectionId).catch(
+            (error: unknown) => {
+              console.error('Failed to persist terminal commands for owner change', {
+                sessionId: session.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          )
+        );
       }
       // First sight of a main session on this DO: schedule a delayed session-ready
       // push (Decision 9). The durable claim in SessionIngestDO makes reconnect
@@ -1567,6 +1585,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     now: number
   ): void {
     const correlationId = crypto.randomUUID();
+    const pendingCommandKey = `${PENDING_COMMAND_KEY_PREFIX}${correlationId}`;
     this.pendingCommands.set(correlationId, {
       ws,
       sessionId: msg.sessionId,
@@ -1577,9 +1596,10 @@ export class UserConnectionDO extends DurableObject<Env> {
       expiresAt: now + UserConnectionDO.PENDING_COMMAND_TTL_MS,
       targetCliWs: targetCli,
     });
+    this.pendingInitialCommandWrites.add(correlationId);
     this.ctx.waitUntil(
       this.ctx.storage
-        .put(`${PENDING_COMMAND_KEY_PREFIX}${correlationId}`, {
+        .put(pendingCommandKey, {
           sessionId: msg.sessionId,
           originalId: msg.id,
           command: msg.command,
@@ -1589,7 +1609,14 @@ export class UserConnectionDO extends DurableObject<Env> {
           webConnectionId,
           state: 'pending' as const,
         } satisfies PendingCommandEntry)
-        .then(() => {
+        .then(async () => {
+          const terminalEntry = this.terminalDuringInitialWrite.get(correlationId);
+          if (terminalEntry) {
+            await this.ctx.storage.put(pendingCommandKey, terminalEntry);
+            this.completedCorrelationIds.delete(correlationId);
+            this.terminalDuringInitialWrite.delete(correlationId);
+            return;
+          }
           this.scheduleNextAlarm(now);
           this.scheduleDurablePendingAlarm();
           this.sendToCli(targetCli, {
@@ -1605,6 +1632,12 @@ export class UserConnectionDO extends DurableObject<Env> {
             correlationId,
             error: error instanceof Error ? error.message : String(error),
           });
+        })
+        .finally(() => {
+          this.pendingInitialCommandWrites.delete(correlationId);
+          if (!this.terminalDuringInitialWrite.has(correlationId)) {
+            this.completedCorrelationIds.delete(correlationId);
+          }
         })
     );
   }
@@ -1630,8 +1663,10 @@ export class UserConnectionDO extends DurableObject<Env> {
       return att?.role === 'cli' && att.connectionId === connectionId;
     });
 
-    // Fail pending commands that targeted this specific socket
-    this.failPendingCommandsForSocket(disconnectedWs, !replaced);
+    // Fail pending commands that targeted this specific socket.
+    // Await so the durable terminal entries are persisted before we proceed
+    // to broadcast cli.disconnected. Failed first writes retry in waitUntil.
+    await this.failPendingCommandsForSocket(disconnectedWs, !replaced);
 
     if (replaced) {
       console.log('Stale CLI socket closed (already replaced)', {
@@ -1887,7 +1922,14 @@ export class UserConnectionDO extends DurableObject<Env> {
       const att = ws.deserializeAttachment() as WSAttachment | null;
       if (att?.role === 'cli' && att.connectionId === connectionId) {
         console.log('Closing stale CLI socket for reconnect', { connectionId });
-        this.failPendingCommandsForSocket(ws, false);
+        this.ctx.waitUntil(
+          this.failPendingCommandsForSocket(ws, false).catch((error: unknown) => {
+            console.error('Failed to persist terminal commands for stale socket', {
+              connectionId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          })
+        );
         // Preserve session ownership — the reconnecting CLI still owns these sessions
         ws.close(1000, 'replaced by reconnect');
         return true;
@@ -1950,13 +1992,17 @@ export class UserConnectionDO extends DurableObject<Env> {
     return undefined;
   }
 
-  private failPendingCommandsForSocket(targetWs: WebSocket, cliGone: boolean): void {
+  private async failPendingCommandsForSocket(targetWs: WebSocket, cliGone: boolean): Promise<void> {
     // Collect correlationIds handled in the in-memory sweep so the durable
     // sweep in finishDurablePendingCommands does not double-deliver.
     const handledIds = new Set<string>();
-    for (const [id, entry] of this.pendingCommands) {
-      if (entry.targetCliWs !== targetWs) continue;
+    const entries = [...this.pendingCommands].filter(([, entry]) => entry.targetCliWs === targetWs);
+    for (const [id] of entries) {
       handledIds.add(id);
+      this.pendingCommands.delete(id);
+      this.completedCorrelationIds.add(id);
+    }
+    for (const [id, entry] of entries) {
       // The owning CLI is really gone, so a forwarded `exit_cli` got what it
       // asked for: this session is no longer owned by anyone.
       const exited = cliGone && entry.command === 'exit_cli';
@@ -1969,6 +2015,67 @@ export class UserConnectionDO extends DurableObject<Env> {
           ? SESSION_OWNER_CHANGED_ERROR
           : 'CLI disconnected';
       const durableError = liveError;
+
+      // Step 26: pair the in-memory delete with a durable done transition.
+      // Persist the terminal outcome BEFORE sending the live response.
+      // If storage.put fails, no live send occurs. A waitUntil retry keeps
+      // the terminal outcome fenced while the loop continues.
+      const webAtt = entry.ws.deserializeAttachment() as WSAttachment | null;
+      const durableEntry: PendingCommandEntry = {
+        sessionId: entry.sessionId,
+        originalId: entry.originalId,
+        command: entry.command,
+        expectedOwnerConnectionId: entry.expectedOwnerConnectionId,
+        targetConnectionId: entry.targetConnectionId,
+        expiresAt: entry.expiresAt,
+        webConnectionId: webAtt?.role === 'web' ? webAtt.connectionId : 'unknown',
+        state: 'done',
+        ...(exited ? { result: {} } : { error: durableError }),
+      };
+      const initialWritePending = this.pendingInitialCommandWrites.has(id);
+      if (initialWritePending) {
+        this.terminalDuringInitialWrite.set(id, durableEntry);
+      }
+      try {
+        await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, durableEntry);
+      } catch (error) {
+        this.ctx.waitUntil(
+          this.ctx.storage
+            .put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, durableEntry)
+            .then(() => {
+              if (!initialWritePending) {
+                this.completedCorrelationIds.delete(id);
+              }
+              const webWs = this.findWebByConnectionId(durableEntry.webConnectionId);
+              if (webWs) {
+                this.sendToWeb(
+                  webWs,
+                  exited
+                    ? { type: 'response', id: durableEntry.originalId, result: {} }
+                    : {
+                        type: 'response',
+                        id: durableEntry.originalId,
+                        error: durableError,
+                      }
+                );
+              }
+            })
+            .catch(retryError => {
+              console.error('Failed to retry durable CLI-disconnect terminal outcome', {
+                correlationId: id,
+                error: retryError instanceof Error ? retryError.message : String(retryError),
+              });
+            })
+        );
+        console.error('Failed to persist durable CLI-disconnect terminal outcome', {
+          correlationId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      if (!initialWritePending) {
+        this.completedCorrelationIds.delete(id);
+      }
       this.sendToWeb(
         entry.ws,
         exited
@@ -1978,23 +2085,6 @@ export class UserConnectionDO extends DurableObject<Env> {
               id: entry.originalId,
               error: liveError,
             }
-      );
-      this.pendingCommands.delete(id);
-
-      // Step 26: pair the in-memory delete with a durable done transition.
-      const webAtt = entry.ws.deserializeAttachment() as WSAttachment | null;
-      this.ctx.waitUntil(
-        this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
-          sessionId: entry.sessionId,
-          originalId: entry.originalId,
-          command: entry.command,
-          expectedOwnerConnectionId: entry.expectedOwnerConnectionId,
-          targetConnectionId: entry.targetConnectionId,
-          expiresAt: entry.expiresAt,
-          webConnectionId: webAtt?.role === 'web' ? webAtt.connectionId : 'unknown',
-          state: 'done',
-          ...(exited ? { result: {} } : { error: durableError }),
-        } satisfies PendingCommandEntry)
       );
     }
 
@@ -2010,20 +2100,85 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  private failPendingCommandsForOwnerChange(
+  private async failPendingCommandsForOwnerChange(
     sessionId: string,
     nextOwnerConnectionId: string | undefined
-  ): void {
+  ): Promise<void> {
     const handledIds = new Set<string>();
-    for (const [id, entry] of this.pendingCommands) {
-      if (entry.sessionId !== sessionId || entry.targetConnectionId === nextOwnerConnectionId) {
-        continue;
-      }
+    const entries = [...this.pendingCommands].filter(
+      ([, entry]) =>
+        entry.sessionId === sessionId && entry.targetConnectionId !== nextOwnerConnectionId
+    );
+    for (const [id] of entries) {
       handledIds.add(id);
       this.pendingCommands.delete(id);
+      this.completedCorrelationIds.add(id);
+    }
+    for (const [id, entry] of entries) {
       // `exit_cli` asked for exactly this: the session is no longer owned.
       // Ownership moving to another CLI is a genuine owner change and still fails.
       const exited = entry.command === 'exit_cli' && nextOwnerConnectionId === undefined;
+
+      // Step 26: pair the in-memory delete with a durable done transition.
+      // Persist the terminal outcome BEFORE sending the live response.
+      // If storage.put fails, no live send occurs. A waitUntil retry keeps
+      // the terminal outcome fenced while the loop continues.
+      const webAtt = entry.ws.deserializeAttachment() as WSAttachment | null;
+      const durableEntry: PendingCommandEntry = {
+        sessionId: entry.sessionId,
+        originalId: entry.originalId,
+        command: entry.command,
+        expectedOwnerConnectionId: entry.expectedOwnerConnectionId,
+        targetConnectionId: entry.targetConnectionId,
+        expiresAt: entry.expiresAt,
+        webConnectionId: webAtt?.role === 'web' ? webAtt.connectionId : 'unknown',
+        state: 'done',
+        ...(exited ? { result: {} } : { error: SESSION_OWNER_CHANGED_ERROR }),
+      };
+      const initialWritePending = this.pendingInitialCommandWrites.has(id);
+      if (initialWritePending) {
+        this.terminalDuringInitialWrite.set(id, durableEntry);
+      }
+      try {
+        await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, durableEntry);
+      } catch (error) {
+        this.ctx.waitUntil(
+          this.ctx.storage
+            .put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, durableEntry)
+            .then(() => {
+              if (!initialWritePending) {
+                this.completedCorrelationIds.delete(id);
+              }
+              const webWs = this.findWebByConnectionId(durableEntry.webConnectionId);
+              if (webWs) {
+                this.sendToWeb(
+                  webWs,
+                  exited
+                    ? { type: 'response', id: durableEntry.originalId, result: {} }
+                    : {
+                        type: 'response',
+                        id: durableEntry.originalId,
+                        error: SESSION_OWNER_CHANGED_ERROR,
+                      }
+                );
+              }
+            })
+            .catch(retryError => {
+              console.error('Failed to retry durable owner-change terminal outcome', {
+                correlationId: id,
+                error: retryError instanceof Error ? retryError.message : String(retryError),
+              });
+            })
+        );
+        console.error('Failed to persist durable owner-change terminal outcome', {
+          correlationId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      if (!initialWritePending) {
+        this.completedCorrelationIds.delete(id);
+      }
       this.sendToWeb(
         entry.ws,
         exited
@@ -2033,22 +2188,6 @@ export class UserConnectionDO extends DurableObject<Env> {
               id: entry.originalId,
               error: SESSION_OWNER_CHANGED_ERROR,
             }
-      );
-
-      // Step 26: pair the in-memory delete with a durable done transition.
-      const webAtt = entry.ws.deserializeAttachment() as WSAttachment | null;
-      this.ctx.waitUntil(
-        this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
-          sessionId: entry.sessionId,
-          originalId: entry.originalId,
-          command: entry.command,
-          expectedOwnerConnectionId: entry.expectedOwnerConnectionId,
-          targetConnectionId: entry.targetConnectionId,
-          expiresAt: entry.expiresAt,
-          webConnectionId: webAtt?.role === 'web' ? webAtt.connectionId : 'unknown',
-          state: 'done',
-          ...(exited ? { result: {} } : { error: SESSION_OWNER_CHANGED_ERROR }),
-        } satisfies PendingCommandEntry)
       );
     }
 
@@ -2293,6 +2432,7 @@ export class UserConnectionDO extends DurableObject<Env> {
             // Already done and past TTL: clean up.
             await this.ctx.storage.delete(key);
           }
+          this.completedCorrelationIds.delete(key.slice(PENDING_COMMAND_KEY_PREFIX.length));
         }
       })().catch((error: unknown) => {
         console.error('Failed to sweep durable pending commands', {

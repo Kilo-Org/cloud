@@ -1406,6 +1406,11 @@ describe('UserConnectionDO', () => {
 
       connectCliSocket(doInstance, 'cli-1');
 
+      // failPendingCommandsForSocket runs inside ctx.waitUntil from
+      // closeStaleSocket. Drain microtasks so the durable write and
+      // live response settle before the assertion.
+      await flushAsync();
+
       expect(firstCli.close).toHaveBeenCalledWith(1000, 'replaced by reconnect');
       expect(parseSent(webWs)).toEqual({
         type: 'response',
@@ -3291,6 +3296,10 @@ describe('UserConnectionDO', () => {
       // Exit's own effect: CLI heartbeat no longer lists the session.
       sendHeartbeat(doInstance, cliWs, []);
 
+      // failPendingCommandsForOwnerChange runs inside ctx.waitUntil.
+      // Drain microtasks so the durable write and live response settle.
+      await flushAsync();
+
       expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
         type: 'response',
         id: 'cmd-1',
@@ -3361,6 +3370,9 @@ describe('UserConnectionDO', () => {
 
         sendHeartbeat(doInstance, cliWs, []);
 
+        // failPendingCommandsForOwnerChange runs inside ctx.waitUntil.
+        await flushAsync();
+
         expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
           type: 'response',
           id: 'cmd-1',
@@ -3394,6 +3406,9 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
 
+      // failPendingCommandsForOwnerChange runs inside ctx.waitUntil.
+      await flushAsync();
+
       expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
         type: 'response',
         id: 'cmd-1',
@@ -3422,6 +3437,10 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       connectCliSocket(doInstance, 'cli-1');
+
+      // failPendingCommandsForSocket runs inside ctx.waitUntil from
+      // closeStaleSocket. Drain microtasks before asserting.
+      await flushAsync();
 
       expect(firstCli.close).toHaveBeenCalledWith(1000, 'replaced by reconnect');
       expect(parseSent(webWs)).toEqual({
@@ -6258,6 +6277,426 @@ describe('UserConnectionDO', () => {
       expect(putIdx).toBeLessThan(sendIdx);
     });
 
+    it('retries an in-memory disconnect terminal write before one live response', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendCommand(doInstance, webWs, {
+        id: 'disconnect-write-fail',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      webWs.send.mockClear();
+      ctx.storage.put.mockRejectedValueOnce(new Error('durable write failed'));
+
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
+      await flushAsync();
+
+      const responses = allSent(webWs).filter(
+        message => message.type === 'response' && message.id === 'disconnect-write-fail'
+      );
+      expect(responses).toHaveLength(1);
+      expect(responses[0].error).toBe('CLI disconnected');
+      expect(markers.size).toBe(0);
+      const entry = await ctx.storage.get(`pendingCommand/${getCorrelationId(cliWs)}`);
+      expect(entry).toMatchObject({ state: 'done', error: 'CLI disconnected' });
+    });
+
+    it('retries an in-memory owner-change terminal write before one live response', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const firstOwner = addCliSocket(mockCtx, 'cli-1');
+      const nextOwner = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, firstOwner, [makeSession('s1')]);
+      sendHeartbeat(doInstance, nextOwner, []);
+      await sendCommand(doInstance, webWs, {
+        id: 'owner-write-fail',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      webWs.send.mockClear();
+      ctx.storage.put.mockRejectedValueOnce(new Error('durable write failed'));
+
+      sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+
+      const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
+      await flushAsync();
+
+      const responses = allSent(webWs).filter(
+        message => message.type === 'response' && message.id === 'owner-write-fail'
+      );
+      expect(responses).toHaveLength(1);
+      expect(responses[0].error).toEqual({
+        source: 'relay',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+      });
+      expect(markers.size).toBe(0);
+      const entry = await ctx.storage.get(`pendingCommand/${getCorrelationId(firstOwner)}`);
+      expect(entry).toMatchObject({
+        state: 'done',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+    });
+
+    it('fences a disconnect terminal outcome while its durable write is pending', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendCommand(doInstance, webWs, {
+        id: 'disconnect-fence',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      let resolvePut: (() => void) | undefined;
+      ctx.storage.put.mockImplementationOnce(
+        (key, value) =>
+          new Promise<void>(resolve => {
+            resolvePut = () => {
+              ctx.storage.store.set(key, value);
+              resolve();
+            };
+          })
+      );
+
+      mockCtx.removeSocket(cliWs);
+      const closing = disconnectCli(doInstance, cliWs);
+      await Promise.resolve();
+
+      const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
+      expect(markers.has(correlationId)).toBe(true);
+
+      await sendCliResponse(doInstance, cliWs, { id: correlationId, result: { wrong: true } });
+      expect(
+        allSent(webWs).filter(
+          message => message.type === 'response' && message.id === 'disconnect-fence'
+        )
+      ).toHaveLength(0);
+
+      resolvePut?.();
+      await closing;
+
+      const responses = allSent(webWs).filter(
+        message => message.type === 'response' && message.id === 'disconnect-fence'
+      );
+      expect(responses).toHaveLength(1);
+      expect(responses[0].error).toBe('CLI disconnected');
+      expect(markers.has(correlationId)).toBe(false);
+    });
+
+    it('fences an owner-change terminal outcome while its durable write is pending', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const firstOwner = addCliSocket(mockCtx, 'cli-1');
+      const nextOwner = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, firstOwner, [makeSession('s1')]);
+      sendHeartbeat(doInstance, nextOwner, []);
+      await sendCommand(doInstance, webWs, {
+        id: 'owner-fence',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(firstOwner);
+      webWs.send.mockClear();
+
+      let resolvePut: (() => void) | undefined;
+      ctx.storage.put.mockImplementationOnce(
+        (key, value) =>
+          new Promise<void>(resolve => {
+            resolvePut = () => {
+              ctx.storage.store.set(key, value);
+              resolve();
+            };
+          })
+      );
+
+      sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+      await Promise.resolve();
+
+      const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
+      expect(markers.has(correlationId)).toBe(true);
+
+      await sendCliResponse(doInstance, firstOwner, { id: correlationId, result: { wrong: true } });
+      expect(
+        allSent(webWs).filter(
+          message => message.type === 'response' && message.id === 'owner-fence'
+        )
+      ).toHaveLength(0);
+
+      resolvePut?.();
+      await flushAsync();
+
+      const responses = allSent(webWs).filter(
+        message => message.type === 'response' && message.id === 'owner-fence'
+      );
+      expect(responses).toHaveLength(1);
+      expect(responses[0].error).toEqual({
+        source: 'relay',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+      });
+      expect(markers.has(correlationId)).toBe(false);
+    });
+
+    it('continues disconnect cleanup after one terminal write retries', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendCommand(doInstance, webWs, {
+        id: 'first-disconnect',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      await sendCommand(doInstance, webWs, {
+        id: 'second-disconnect',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      webWs.send.mockClear();
+      ctx.storage.put.mockRejectedValueOnce(new Error('durable write failed'));
+
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+      await flushAsync();
+
+      for (const id of ['first-disconnect', 'second-disconnect']) {
+        const responses = allSent(webWs).filter(
+          message => message.type === 'response' && message.id === id
+        );
+        expect(responses).toHaveLength(1);
+        expect(responses[0].error).toBe('CLI disconnected');
+      }
+      expect(
+        allSent(webWs).some(
+          message => message.type === 'system' && message.event === 'cli.disconnected'
+        )
+      ).toBe(true);
+    });
+
+    it('fences every matching disconnect command before the first terminal write settles', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendCommand(doInstance, webWs, {
+        id: 'fence-first',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      await sendCommand(doInstance, webWs, {
+        id: 'fence-second',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const [firstCorrelationId, secondCorrelationId] = [
+        getCorrelationId(cliWs, 0),
+        getCorrelationId(cliWs, 1),
+      ];
+      webWs.send.mockClear();
+
+      let resolvePut: (() => void) | undefined;
+      ctx.storage.put.mockImplementationOnce(
+        (key, value) =>
+          new Promise<void>(resolve => {
+            resolvePut = () => {
+              ctx.storage.store.set(key, value);
+              resolve();
+            };
+          })
+      );
+
+      mockCtx.removeSocket(cliWs);
+      const closing = disconnectCli(doInstance, cliWs);
+      await Promise.resolve();
+
+      const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
+      expect(markers.has(firstCorrelationId)).toBe(true);
+      expect(markers.has(secondCorrelationId)).toBe(true);
+
+      await sendCliResponse(doInstance, cliWs, {
+        id: secondCorrelationId,
+        result: { wrong: true },
+      });
+      expect(
+        allSent(webWs).filter(
+          message => message.type === 'response' && message.id === 'fence-second'
+        )
+      ).toHaveLength(0);
+
+      resolvePut?.();
+      await closing;
+      await flushAsync();
+
+      for (const id of ['fence-first', 'fence-second']) {
+        const responses = allSent(webWs).filter(
+          message => message.type === 'response' && message.id === id
+        );
+        expect(responses).toHaveLength(1);
+        expect(responses[0].error).toBe('CLI disconnected');
+      }
+      for (const correlationId of [firstCorrelationId, secondCorrelationId]) {
+        await expect(ctx.storage.get(`pendingCommand/${correlationId}`)).resolves.toMatchObject({
+          state: 'done',
+          error: 'CLI disconnected',
+        });
+      }
+    });
+
+    it('keeps a disconnect terminal outcome after the initial pending write settles', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      let resolveInitialPut: (() => void) | undefined;
+      ctx.storage.put.mockImplementationOnce(
+        (key, value) =>
+          new Promise<void>(resolve => {
+            resolveInitialPut = () => {
+              ctx.storage.store.set(key, value);
+              resolve();
+            };
+          })
+      );
+
+      doInstance.webSocketMessage(
+        webWs as never,
+        JSON.stringify({
+          type: 'command',
+          id: 'initial-write-disconnect',
+          command: 'send_message',
+          sessionId: 's1',
+        })
+      );
+      const correlationId = [
+        ...(Reflect.get(doInstance, 'pendingInitialCommandWrites') as Set<string>),
+      ][0];
+      expect(correlationId).toBeDefined();
+      webWs.send.mockClear();
+
+      mockCtx.removeSocket(cliWs);
+      const closing = disconnectCli(doInstance, cliWs);
+      await Promise.resolve();
+      resolveInitialPut?.();
+      await Promise.resolve();
+      const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
+      expect(markers.has(correlationId!)).toBe(true);
+      doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'response', id: correlationId, result: { wrong: true } })
+      );
+      await closing;
+      await flushAsync();
+
+      await expect(ctx.storage.get(`pendingCommand/${correlationId!}`)).resolves.toMatchObject({
+        state: 'done',
+        error: 'CLI disconnected',
+      });
+      expect(
+        allSent(webWs).filter(
+          message => message.type === 'response' && message.id === 'initial-write-disconnect'
+        )
+      ).toEqual([{ type: 'response', id: 'initial-write-disconnect', error: 'CLI disconnected' }]);
+
+      await sendCliResponse(doInstance, cliWs, { id: correlationId!, result: { wrong: true } });
+      expect(
+        allSent(webWs).filter(
+          message => message.type === 'response' && message.id === 'initial-write-disconnect'
+        )
+      ).toHaveLength(1);
+    });
+
+    it('keeps an owner-change terminal outcome after the initial pending write settles', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const firstOwner = addCliSocket(mockCtx, 'cli-1');
+      const nextOwner = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, firstOwner, [makeSession('s1')]);
+      sendHeartbeat(doInstance, nextOwner, []);
+      let resolveInitialPut: (() => void) | undefined;
+      ctx.storage.put.mockImplementationOnce(
+        (key, value) =>
+          new Promise<void>(resolve => {
+            resolveInitialPut = () => {
+              ctx.storage.store.set(key, value);
+              resolve();
+            };
+          })
+      );
+
+      doInstance.webSocketMessage(
+        webWs as never,
+        JSON.stringify({
+          type: 'command',
+          id: 'initial-write-owner-change',
+          command: 'send_message',
+          sessionId: 's1',
+        })
+      );
+      const correlationId = [
+        ...(Reflect.get(doInstance, 'pendingInitialCommandWrites') as Set<string>),
+      ][0];
+      expect(correlationId).toBeDefined();
+      webWs.send.mockClear();
+
+      sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+      await Promise.resolve();
+      resolveInitialPut?.();
+      await Promise.resolve();
+      const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
+      expect(markers.has(correlationId!)).toBe(true);
+      doInstance.webSocketMessage(
+        firstOwner as never,
+        JSON.stringify({ type: 'response', id: correlationId, result: { wrong: true } })
+      );
+      await flushAsync();
+
+      const error = {
+        source: 'relay',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+      };
+      await expect(ctx.storage.get(`pendingCommand/${correlationId!}`)).resolves.toMatchObject({
+        state: 'done',
+        error,
+      });
+      expect(
+        allSent(webWs).filter(
+          message => message.type === 'response' && message.id === 'initial-write-owner-change'
+        )
+      ).toEqual([{ type: 'response', id: 'initial-write-owner-change', error }]);
+
+      await sendCliResponse(doInstance, firstOwner, {
+        id: correlationId!,
+        result: { wrong: true },
+      });
+      expect(
+        allSent(webWs).filter(
+          message => message.type === 'response' && message.id === 'initial-write-owner-change'
+        )
+      ).toHaveLength(1);
+    });
+
     // -------------------------------------------------------------------------
     // Fix: handleCliResponse failure caught at waitUntil boundary
     // -------------------------------------------------------------------------
@@ -6658,7 +7097,10 @@ describe('UserConnectionDO', () => {
       // Ownership change via heartbeat — failPendingCommandsForOwnerChange
       // processes the in-memory entry, then finishDurablePendingCommands
       // scans durable entries. The fix passes handledIds to skip the duplicate.
+      // failPendingCommandsForOwnerChange runs inside ctx.waitUntil; drain
+      // microtasks so both the in-memory and durable sweeps settle.
       sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+      await flushAsync();
 
       // Exactly one SESSION_OWNER_CHANGED error.
       const errors = allSent(webWs).filter(m => m.type === 'response' && m.id === 'race-owner');

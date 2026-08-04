@@ -799,11 +799,16 @@ export class UserConnectionDO extends DurableObject<Env> {
   ): Promise<void> {
     let entry = this.pendingCommands.get(id);
     let rehydrated = false;
+    // Captured at the first durable read so the catalog-too-large branch
+    // does not need a second read (fix: second read can return undefined
+    // and abandon terminal processing).
+    let rehydratedDurable: PendingCommandEntry | undefined;
 
     // Step 24: on in-memory miss, try to load the durable entry (D8 case 1).
     if (!entry) {
       const durable = await this.getDurablePendingCommand(id);
       if (!durable || durable.state !== 'pending') return;
+      rehydratedDurable = durable;
 
       // Validate the responding CLI by attachment connectionId.
       const respondingAttachment = respondingWs.deserializeAttachment() as WSAttachment | null;
@@ -816,10 +821,24 @@ export class UserConnectionDO extends DurableObject<Env> {
 
       // Resolve the originating web socket by persisted webConnectionId.
       const webWs = this.findWebByConnectionId(durable.webConnectionId);
+      if (!webWs) {
+        // D8 case 2: web socket is gone. Shape the terminal outcome
+        // (catalog guard, error normalization) before persisting done
+        // so a mutationId retry receives the same shaped outcome as
+        // live delivery.
+        const shaped = this.shapeCommandError(durable.command, result, error);
+        await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
+          ...durable,
+          state: 'done',
+          ...(shaped.result !== undefined ? { result: shaped.result } : {}),
+          ...(shaped.error !== undefined ? { error: shaped.error } : {}),
+        });
+        return;
+      }
 
       // Build an in-memory entry so the rest of handleCliResponse works.
       entry = {
-        ws: webWs!,
+        ws: webWs,
         sessionId: durable.sessionId,
         originalId: durable.originalId,
         command: durable.command,
@@ -851,15 +870,22 @@ export class UserConnectionDO extends DurableObject<Env> {
         }
 
         // Persist the terminal outcome durably.
-        const catWebConnectionId = rehydrated
-          ? (await this.getDurablePendingCommand(id))!.webConnectionId
-          : (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
-            ? (
-                entry.ws.deserializeAttachment() as WSAttachment & {
-                  role: 'web';
-                }
-              ).connectionId
-            : 'unknown';
+        let catWebConnectionId: string;
+        if (rehydrated) {
+          // Use the durable entry captured at the top of handleCliResponse.
+          // A second getDurablePendingCommand can miss (race), which would
+          // abandon terminal processing.
+          catWebConnectionId = rehydratedDurable?.webConnectionId ?? 'unknown';
+        } else {
+          catWebConnectionId =
+            (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
+              ? (
+                  entry.ws.deserializeAttachment() as WSAttachment & {
+                    role: 'web';
+                  }
+                ).connectionId
+              : 'unknown';
+        }
         await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
           sessionId: entry.sessionId,
           originalId: entry.originalId,
@@ -937,7 +963,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     // surrounding ctx.waitUntil; the live response has already been
     // delivered for the non-rehydrated case above.
     const webConnectionId = rehydrated
-      ? (await this.getDurablePendingCommand(id))?.webConnectionId
+      ? rehydratedDurable?.webConnectionId
       : (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
         ? (entry.ws.deserializeAttachment() as WSAttachment & { role: 'web' }).connectionId
         : 'unknown';
@@ -1844,6 +1870,61 @@ export class UserConnectionDO extends DurableObject<Env> {
         SESSION_OWNER_CHANGED_ERROR
       )
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Command error shaping
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Compute the shaped terminal outcome for a command reply.
+   * Applies catalog size guard and error normalization (CLI_UPGRADE_REQUIRED
+   * mapping, CLI_COMMAND_ERROR sanitization). Pure computation — no side effects.
+   */
+  private shapeCommandError(
+    command: string,
+    result: unknown,
+    error: unknown
+  ): { result?: unknown; error?: unknown } {
+    // Catalog size guard: oversized results must not persist their raw payload.
+    if (CATALOG_DEDUPE_COMMANDS.has(command) && result !== undefined) {
+      const serializedResult = JSON.stringify(result);
+      const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
+      if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
+        return { error: CATALOG_TOO_LARGE_ERROR };
+      }
+    }
+
+    let structuredError: {
+      source: string;
+      code: string;
+      message: string;
+    } | null = null;
+    let stringError: string | null = null;
+    let sanitizeAsFailed = false;
+
+    if (typeof error === 'string' && CLI_UPGRADE_REQUIRED_COMMANDS.has(command)) {
+      if (error === `unknown command: ${command}`) {
+        structuredError =
+          command === 'create_session'
+            ? CLI_UPGRADE_REQUIRED_CREATE_SESSION_ERROR
+            : CLI_UPGRADE_REQUIRED_SLASH_ERROR;
+      } else {
+        stringError = error;
+      }
+    } else if (typeof error === 'string') {
+      stringError = error;
+    } else if (error !== undefined) {
+      sanitizeAsFailed = true;
+    }
+
+    const terminalError =
+      structuredError ?? stringError ?? (sanitizeAsFailed ? CLI_COMMAND_ERROR : undefined);
+
+    return {
+      ...(result !== undefined ? { result } : {}),
+      ...(terminalError !== undefined ? { error: terminalError } : {}),
+    };
   }
 
   // ---------------------------------------------------------------------------

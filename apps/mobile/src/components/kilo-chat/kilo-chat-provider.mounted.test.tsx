@@ -4,6 +4,8 @@ import { createElement, type ReactElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { KiloChatProvider } from './kilo-chat-provider';
+
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const mocks = vi.hoisted(() => {
@@ -71,8 +73,6 @@ vi.mock('./hooks/use-kilo-chat-token', () => ({
   useKiloChatTokenGetter: mocks.useKiloChatTokenGetter,
   useKiloChatTokenResponseGetter: mocks.useKiloChatTokenResponseGetter,
 }));
-
-import { KiloChatProvider } from './kilo-chat-provider';
 
 // ── Flat render helper ─────────────────────────────────────────────────────
 

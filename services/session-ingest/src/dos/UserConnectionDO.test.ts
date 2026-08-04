@@ -4870,7 +4870,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       // Send the CLI response with the correlation id.
-      await sendCliResponse(doInstance, cliWs, {
+      sendCliResponse(doInstance, cliWs, {
         id: correlationId,
         result: { ok: true },
       });
@@ -4909,7 +4909,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('ses-b', 'busy', 'Session B')]);
 
       // Send the CLI response.
-      await sendCliResponse(doInstance, cliWs, {
+      sendCliResponse(doInstance, cliWs, {
         id: correlationId,
         result: { ok: true },
       });
@@ -4944,7 +4944,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       // Send a second command with the same mutationId.
-      await sendCommand(doInstance, webWs, {
+      sendCommand(doInstance, webWs, {
         id: 'second-req',
         command: 'send_message',
         sessionId: 'ses-c',
@@ -4987,7 +4987,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       // Send a retry with the same mutationId but new wire id.
-      await sendCommand(doInstance, webWs, {
+      sendCommand(doInstance, webWs, {
         id: 'retry-req-id',
         command: 'send_message',
         sessionId: 'ses-d',
@@ -5012,6 +5012,50 @@ describe('UserConnectionDO', () => {
       expect(cliCommands).toHaveLength(0);
     });
 
+    it('returns both stored result and error for a done mutationId with combined outcome', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const mutationId = 'mut-done-combined';
+      await ctx.storage.put(`pendingCommand/${mutationId}`, {
+        sessionId: 'ses-dc',
+        originalId: 'first-req-combined',
+        command: 'send_message',
+        targetConnectionId: 'cli-dc',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-dc',
+        state: 'done' as const,
+        result: { partial: 'data' },
+        error: 'partial error',
+      });
+
+      const cliWs = addCliSocket(mockCtx, 'cli-dc');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-dc', 'busy', 'Session DC')]);
+      const webWs = addWebSocket(mockCtx, 'web-dc');
+      cliWs.send.mockClear();
+
+      // Retry with the same mutationId but new wire id.
+      sendCommand(doInstance, webWs, {
+        id: 'retry-combined-id',
+        command: 'send_message',
+        sessionId: 'ses-dc',
+        connectionId: 'cli-dc',
+        mutationId,
+      });
+      await flushAsync();
+
+      const responses = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'retry-combined-id'
+      );
+      expect(responses).toHaveLength(1);
+      expect(responses[0].result).toEqual({ partial: 'data' });
+      expect(responses[0].error).toBe('partial error');
+
+      // No command must reach the CLI.
+      const cliCommands = allSent(cliWs).filter(m => m.type === 'command');
+      expect(cliCommands).toHaveLength(0);
+    });
+
     it('behaves identically without a mutationId (per-send random correlation id)', async () => {
       const { doInstance, mockCtx, ctx } = setup();
 
@@ -5020,7 +5064,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-5');
 
       cliWs.send.mockClear();
-      await sendCommand(doInstance, webWs, {
+      sendCommand(doInstance, webWs, {
         id: 'no-mut-req',
         command: 'send_message',
         sessionId: 'ses-e',
@@ -5041,7 +5085,7 @@ describe('UserConnectionDO', () => {
       expect(entry).toBeDefined();
 
       // Send CLI response to verify normal resolution.
-      await sendCliResponse(doInstance, cliWs, {
+      sendCliResponse(doInstance, cliWs, {
         id: correlationId,
         result: { normal: true },
       });
@@ -5059,7 +5103,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-6');
 
       cliWs.send.mockClear();
-      await sendCommand(doInstance, webWs, {
+      sendCommand(doInstance, webWs, {
         id: 'disconnect-req',
         command: 'send_message',
         sessionId: 'ses-f',
@@ -5077,7 +5121,7 @@ describe('UserConnectionDO', () => {
       expect(entry).toBeDefined();
 
       // Disconnect the web socket.
-      doInstance.webSocketClose(webWs as never, 1000, '', true);
+      await doInstance.webSocketClose(webWs as never, 1000, '', true);
       await flushAsync();
 
       // The durable entry must still exist.
@@ -5146,7 +5190,7 @@ describe('UserConnectionDO', () => {
       }
 
       // The first command (no mutationId) is just within the cap: 0 in-memory + 1 new = 1.
-      await sendCommand(doInstance, webWs, {
+      sendCommand(doInstance, webWs, {
         id: 'at-cap',
         command: 'send_message',
         sessionId: 'ses-h',
@@ -5161,7 +5205,7 @@ describe('UserConnectionDO', () => {
       // command's durable write + 1 in-memory = 129 ≥ 128. Rejected.
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      await sendCommand(doInstance, webWs, {
+      sendCommand(doInstance, webWs, {
         id: 'over-cap',
         command: 'send_message',
         sessionId: 'ses-h',
@@ -5196,7 +5240,7 @@ describe('UserConnectionDO', () => {
       const correlationId = getCorrelationId(cliWs);
       webWs.send.mockClear();
 
-      await sendCliResponse(doInstance, cliWs, {
+      sendCliResponse(doInstance, cliWs, {
         id: correlationId,
         error: 'unknown command: list_models',
       });
@@ -5227,7 +5271,7 @@ describe('UserConnectionDO', () => {
       const correlationId = getCorrelationId(cliWs);
       webWs.send.mockClear();
 
-      await sendCliResponse(doInstance, cliWs, {
+      sendCliResponse(doInstance, cliWs, {
         id: correlationId,
         error: 'unknown command: list_commands',
       });
@@ -5310,7 +5354,7 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       const oversized = createResultWithSerializedBytes(MAX_CATALOG_RESULT_BYTES + 1);
-      await sendCliResponse(doInstance, cliWs, {
+      sendCliResponse(doInstance, cliWs, {
         id: correlationId,
         result: oversized,
       });
@@ -5383,6 +5427,243 @@ describe('UserConnectionDO', () => {
       const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
       expect((entry as Record<string, unknown>).state).toBe('done');
       expect((entry as Record<string, unknown>).error).toBe('CLI disconnected');
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: D8 case 2 shaped terminal outcome
+    // -------------------------------------------------------------------------
+    it('shapes the error for a no-web D8 case 2 retry (CLI_UPGRADE_REQUIRED mapping)', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'mut-no-web-shaped';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-nw',
+        originalId: 'original-nw',
+        command: 'list_commands',
+        expectedOwnerConnectionId: undefined,
+        targetConnectionId: 'cli-nw',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-gone-shaped',
+        state: 'pending' as const,
+      });
+
+      // Set up a live CLI but NO web socket.
+      const cliWs = addCliSocket(mockCtx, 'cli-nw');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-nw', 'busy', 'Session NW')]);
+
+      // Send the CLI response with an upgrade-required error.
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: 'unknown command: list_commands',
+      });
+      await flushAsync();
+
+      // The durable entry must be marked 'done' with the shaped structured error.
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect(entry).toBeDefined();
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      // Must be the shaped CLI_UPGRADE_REQUIRED error, not the raw string.
+      expect((entry as Record<string, unknown>).error).toEqual({
+        source: 'relay',
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.',
+      });
+    });
+
+    it('shapes a non-allowlist CLI string error correctly for a no-web D8 case 2 retry', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'mut-no-web-string';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-nws',
+        originalId: 'original-nws',
+        command: 'list_models',
+        expectedOwnerConnectionId: undefined,
+        targetConnectionId: 'cli-nws',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-gone-string',
+        state: 'pending' as const,
+      });
+
+      const cliWs = addCliSocket(mockCtx, 'cli-nws');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-nws', 'busy', 'Session NWS')]);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: 'unknown command: list_models',
+      });
+      await flushAsync();
+
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      // list_models is not in CLI_UPGRADE_REQUIRED_COMMANDS, so the raw
+      // string is preserved verbatim.
+      expect((entry as Record<string, unknown>).error).toBe('unknown command: list_models');
+    });
+
+    it('does not persist raw oversized catalog data for a no-web D8 case 2 retry', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'mut-no-web-oversized';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-nwo',
+        originalId: 'original-nwo',
+        command: 'list_models',
+        expectedOwnerConnectionId: undefined,
+        targetConnectionId: 'cli-nwo',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-gone-oversized',
+        state: 'pending' as const,
+      });
+
+      const cliWs = addCliSocket(mockCtx, 'cli-nwo');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-nwo', 'busy', 'Session NWO')]);
+
+      const oversized = createResultWithSerializedBytes(MAX_CATALOG_RESULT_BYTES + 1);
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: oversized,
+      });
+      await flushAsync();
+
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      // Must store the CATALOG_TOO_LARGE error, not the raw oversized result.
+      expect((entry as Record<string, unknown>).error).toEqual({
+        source: 'relay',
+        code: 'CATALOG_TOO_LARGE',
+        message: 'Model catalog response is too large',
+      });
+      // Must NOT store the raw result.
+      expect((entry as Record<string, unknown>).result).toBeUndefined();
+    });
+
+    it('shapes a relay-object CLI error to CLI_COMMAND_ERROR for a no-web D8 case 2 retry', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'mut-no-web-relay';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-nwr',
+        originalId: 'original-nwr',
+        command: 'send_message',
+        expectedOwnerConnectionId: undefined,
+        targetConnectionId: 'cli-nwr',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-gone-relay',
+        state: 'pending' as const,
+      });
+
+      const cliWs = addCliSocket(mockCtx, 'cli-nwr');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-nwr', 'busy', 'Session NWR')]);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+      await flushAsync();
+
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      // Relay-shaped objects from the CLI are sanitized to CLI_COMMAND_ERROR.
+      expect((entry as Record<string, unknown>).error).toEqual({
+        source: 'cli',
+        message: 'Command failed',
+      });
+    });
+
+    it('persists both result and error for a no-web D8 case 2 combined response', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'mut-no-web-combined';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-nwc',
+        originalId: 'original-nwc',
+        command: 'send_message',
+        expectedOwnerConnectionId: undefined,
+        targetConnectionId: 'cli-nwc',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-gone-combined',
+        state: 'pending' as const,
+      });
+
+      const cliWs = addCliSocket(mockCtx, 'cli-nwc');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-nwc', 'busy', 'Session NWC')]);
+
+      // CLI sends both result and error.
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: { partial: 'data' },
+        error: 'something went wrong',
+      });
+      await flushAsync();
+
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      expect((entry as Record<string, unknown>).result).toEqual({ partial: 'data' });
+      expect((entry as Record<string, unknown>).error).toBe('something went wrong');
+    });
+
+    it('persists the terminal catalog-too-large outcome without a second durable read', async () => {
+      // Regression test: the rehydrated catalog-too-large branch must not
+      // do a second getDurablePendingCommand. It must use the value
+      // captured at the top of handleCliResponse instead.
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'cat-no-second-read';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-cat2',
+        originalId: 'original-cat2',
+        command: 'list_models',
+        expectedOwnerConnectionId: undefined,
+        targetConnectionId: 'cli-cat2',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-cat2',
+        state: 'pending' as const,
+      });
+
+      const cliWs = addCliSocket(mockCtx, 'cli-cat2');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-cat2', 'busy', 'Session Cat2')]);
+      const webWs = addWebSocket(mockCtx, 'web-cat2');
+      webWs.send.mockClear();
+
+      const oversized = createResultWithSerializedBytes(MAX_CATALOG_RESULT_BYTES + 1);
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: oversized,
+      });
+      await flushAsync();
+
+      // The live web socket must receive the oversized error.
+      const responses = allSent(webWs).filter(m => m.type === 'response');
+      expect(responses).toHaveLength(1);
+      expect(responses[0].error).toEqual({
+        source: 'relay',
+        code: 'CATALOG_TOO_LARGE',
+        message: 'Model catalog response is too large',
+      });
+
+      // The durable entry must be written with the terminal outcome.
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect(entry).toBeDefined();
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      expect((entry as Record<string, unknown>).error).toEqual({
+        source: 'relay',
+        code: 'CATALOG_TOO_LARGE',
+        message: 'Model catalog response is too large',
+      });
+
+      // Must not store the raw oversized result.
+      expect((entry as Record<string, unknown>).result).toBeUndefined();
     });
   });
 });

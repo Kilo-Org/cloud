@@ -13,7 +13,10 @@ catalog:
   '@cloudflare/vitest-pool-workers': 0.16.13
   '@cloudflare/workers-types': 4.20260605.1
   '@octokit/auth-app': 8.2.0
-  '@sentry/cli': 3.4.2
+  # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
+  # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
+  # @sentry/cli through its Node API, which v3 broke. See the note in `overrides`.
+  '@sentry/cli': 3.6.2
   '@tanstack/react-query': 5.100.10
   '@trpc/client': 11.17.0
   '@trpc/server': 11.17.0
@@ -66,8 +69,14 @@ minimumReleaseAgeExclude:
   # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.
   - openclaw
 overrides:
+  # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
+  # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)
+  # requires ^2.58.5 and calls @sentry/cli through its Node API. v3 replaced the
+  # CommonJS default class export with a named one, so forcing v3 makes every
+  # `new SentryCli()` throw "_sentry_cli.default is not a constructor". The plugin
+  # swallows that as a recoverable error, so builds stay green while silently
+  # uploading nothing. This previously broke apps/web source maps for months.
   '@babel/plugin-transform-modules-systemjs': 7.29.7
-  '@sentry/cli': 3.4.2
   mdast-util-to-hast: 13.2.1
   storybook: 10.4.6
   next: 16.2.6

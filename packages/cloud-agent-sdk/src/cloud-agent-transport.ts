@@ -149,12 +149,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           return null;
         }
         if (page.kind === 'success') {
-          // Seed lastEventId from the page's event-log watermark so the
-          // first WebSocket connect uses `fromId`. The DO replays any
-          // events persisted between the page snapshot and the socket
-          // open, closing the gap. On reconnect, wire events advance
-          // lastEventId and the live cursor takes over.
-          lastEventId = page.watermarkEventId ?? null;
+          // Seed lastEventId from the page's event-log watermark. A
+          // present watermark sets the cursor to 0 so the first
+          // WebSocket connect uses `fromId=0` — the DO replays every
+          // stored event, closing the gap when SessionIngest
+          // materialization lags behind the event-log high-water mark.
+          // On reconnect, wire events advance lastEventId past 0 and
+          // the live cursor takes over.
+          lastEventId = page.watermarkEventId != null ? 0 : null;
           config.onInitialPageLoaded?.(page);
           replayPage(page);
           return { ticket };

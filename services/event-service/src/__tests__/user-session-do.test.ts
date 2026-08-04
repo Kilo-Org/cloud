@@ -206,7 +206,7 @@ describe('UserSessionDO', () => {
 
   it(
     'closes socket with code 4002 when unacked gap exceeds threshold',
-    { timeout: 15000 },
+    { timeout: 30000 },
     async () => {
       const userId = 'user-zombie-close';
       const { ws, stub } = await connectWs(userId);
@@ -222,15 +222,16 @@ describe('UserSessionDO', () => {
         ws.addEventListener('close', resolve);
       });
 
-      // Push enough events to exceed UNACKED_THRESHOLD (50).
+      // Push enough events to exceed UNACKED_THRESHOLD (1000).
       // seq starts at 0, increments each push. After N pushes seq = N.
-      // Gap = seq - acked = N - 0. Need N > 50.
-      // Push 55 events for margin.
-      for (let i = 0; i < 55; i++) {
+      // Gap = seq - acked = N - 0. Need N > 1000.
+      // Push 1100 events for margin.
+      for (let i = 0; i < 1100; i++) {
         await stub.pushEvent('project:z', 'fill', {});
-        // Brief pause to let the DO process the message and potential close
-        await new Promise(r => setTimeout(r, 20));
-        // Check if we already closed
+        if (i % 100 === 0) {
+          // Periodically yield to let the DO process the close
+          await new Promise(r => setTimeout(r, 10));
+        }
         if (ws.readyState === 3 /* CLOSED */) break;
       }
 
@@ -241,7 +242,7 @@ describe('UserSessionDO', () => {
 
   it(
     'never closes a socket that has not acknowledged (old client compat)',
-    { timeout: 15000 },
+    { timeout: 25000 },
     async () => {
       const userId = 'user-no-ack-no-close';
       const { ws, stub } = await connectWs(userId);
@@ -254,12 +255,57 @@ describe('UserSessionDO', () => {
         closed = true;
       });
 
-      // Push many events without any ack — should never trigger zombie close
-      for (let i = 0; i < 60; i++) {
+      // Push events beyond the threshold without any ack — should never
+      // trigger zombie close because the socket has never acknowledged.
+      for (let i = 0; i < 1100; i++) {
         await stub.pushEvent('project:noack', 'fill', {});
-        await new Promise(r => setTimeout(r, 10));
+        if (i % 100 === 0) {
+          await new Promise(r => setTimeout(r, 10));
+        }
         if (closed) break;
       }
+
+      expect(closed).toBe(false);
+      ws.close();
+    }
+  );
+
+  it(
+    'healthy high-volume clients survive with periodic acks in a 15s cadence',
+    { timeout: 30000 },
+    async () => {
+      const userId = 'user-high-volume-ack';
+      const { ws, stub } = await connectWs(userId);
+
+      ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:hv'] }));
+      await new Promise(r => setTimeout(r, 100));
+
+      // Ack seq 0 — the socket is now eligible for zombie close
+      ws.send(JSON.stringify({ type: 'ack', seq: 0 }));
+      await new Promise(r => setTimeout(r, 100));
+
+      let closed = false;
+      ws.addEventListener('close', () => {
+        closed = true;
+      });
+
+      // Push 200 events — far more than the old threshold of 50 — with
+      // periodic acks that simulate a healthy 15s ack cadence. The high
+      // threshold (1000) must not close the socket.
+      for (let i = 0; i < 200; i++) {
+        await stub.pushEvent('project:hv', 'fill', {});
+        // Ack every 25 events to keep the gap well under 1000
+        if (i > 0 && i % 25 === 0) {
+          ws.send(JSON.stringify({ type: 'ack', seq: i }));
+          await new Promise(r => setTimeout(r, 10));
+        }
+        await new Promise(r => setTimeout(r, 2));
+        if (closed) break;
+      }
+
+      // Final ack to cover all remaining events
+      ws.send(JSON.stringify({ type: 'ack', seq: 200 }));
+      await new Promise(r => setTimeout(r, 50));
 
       expect(closed).toBe(false);
       ws.close();
@@ -280,7 +326,7 @@ describe('UserSessionDO', () => {
 
   it(
     'defaults counters to zero and emits sequence one with old attachment',
-    { timeout: 15000 },
+    { timeout: 25000 },
     async () => {
       // Load a WebSocket whose server-side attachment has only the old
       // shape: `{ contexts: ['project:old'] }`.  The DO fetches a new
@@ -324,9 +370,11 @@ describe('UserSessionDO', () => {
         closed = true;
       });
 
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 1100; i++) {
         await stub.pushEvent('project:old', 'fill', {});
-        await new Promise(r => setTimeout(r, 10));
+        if (i % 100 === 0) {
+          await new Promise(r => setTimeout(r, 10));
+        }
         if (closed) break;
       }
 

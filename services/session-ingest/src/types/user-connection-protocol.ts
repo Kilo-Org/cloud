@@ -83,7 +83,8 @@ export const CLIInboundMessageSchema = z.discriminatedUnion('type', [
     // interpret it; it is echoed back on the response for the DO's
     // durable dedupe to match against the stored entry. Absent when the
     // web client did not supply one.
-    mutationId: z.string().optional(),
+    // Bounded at 128 chars to keep storage keys safe.
+    mutationId: z.string().max(128).optional(),
   }),
   z.object({
     type: z.literal('system'),
@@ -117,7 +118,8 @@ export const WebOutboundMessageSchema = z.discriminatedUnion('type', [
     // correlation id so a retry with the same mutationId runs the command
     // once for the full TTL window (D8 dedupe). Absent on older clients;
     // the DO falls back to crypto.randomUUID() per D5.
-    mutationId: z.string().optional(),
+    // Bounded at 128 chars to keep storage keys safe.
+    mutationId: z.string().max(128).optional(),
   }),
   z.object({
     type: z.literal('ping'),

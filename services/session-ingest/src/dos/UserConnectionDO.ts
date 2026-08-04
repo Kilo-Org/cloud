@@ -75,6 +75,16 @@ export type ConnectedInstanceRow = {
 
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 
+// Maximum durable result size before truncation. Results larger than this are
+// replaced with a size-exceeded marker before the storage.put so the DO value
+// limit (128 KiB) is never hit. 120 KiB leaves generous headroom for the
+// serialized PendingCommandEntry framing overhead while preserving enough
+// payload for most retry scenarios.
+export const MAX_DURABLE_RESULT_BYTES = 120 * 1024;
+
+// Maximum allowed mutationId length used as a durable storage key prefix.
+const MAX_MUTATION_ID_LENGTH = 128;
+
 // Viewer command allowlist. Anything outside this set is rejected by the relay
 // before owner resolution, pending allocation, or CLI forwarding.
 export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
@@ -165,6 +175,12 @@ const CLI_COMMAND_ERROR = {
   message: 'Command failed',
 };
 
+const MUTATION_ID_TOO_LONG_ERROR = {
+  source: 'relay',
+  code: 'MUTATION_ID_TOO_LONG',
+  message: 'Mutation ID is too long',
+};
+
 type ReadyPushEntry = {
   kiloUserId: string;
   title: string;
@@ -242,6 +258,11 @@ export class UserConnectionDO extends DurableObject<Env> {
   // Synchronous reservation set for mutationId dedupe (prevents concurrent same-ID dispatch
   // across asynchronous storage reads in the mutationId path).
   private inflightMutations = new Set<string>();
+
+  // Synchronous completion set for CLI responses already delivered live.
+  // Prevents the rehydration path from delivering a duplicate response while the
+  // durable write to 'done' is still in-flight.
+  private completedCorrelationIds = new Set<string>();
 
   private stateReconstructed = false;
 
@@ -807,8 +828,28 @@ export class UserConnectionDO extends DurableObject<Env> {
     // Step 24: on in-memory miss, try to load the durable entry (D8 case 1).
     if (!entry) {
       const durable = await this.getDurablePendingCommand(id);
-      if (!durable || durable.state !== 'pending') return;
+      if (!durable || durable.state !== 'pending') {
+        // If the live path already delivered this response and the durable
+        // write is still in-flight, skip the rehydration delivery.
+        if (durable && this.completedCorrelationIds.has(id)) return;
+        return;
+      }
+      // Prevent duplicate delivery: a concurrently completed live response
+      // already sent the reply; the durable write will update the state soon.
+      if (this.completedCorrelationIds.has(id)) return;
       rehydratedDurable = durable;
+
+      // Guard: a rehydrated entry that has already expired must not deliver
+      // or persist a late success outcome. Write the terminal expiry error
+      // durably and return without delivering.
+      if (durable.expiresAt <= Date.now()) {
+        await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
+          ...durable,
+          state: 'done',
+          error: COMMAND_EXPIRED_ERROR,
+        });
+        return;
+      }
 
       // Validate the responding CLI by attachment connectionId.
       const respondingAttachment = respondingWs.deserializeAttachment() as WSAttachment | null;
@@ -827,10 +868,11 @@ export class UserConnectionDO extends DurableObject<Env> {
         // so a mutationId retry receives the same shaped outcome as
         // live delivery.
         const shaped = this.shapeCommandError(durable.command, result, error);
+        const shapedResult = this.boundDurableResult(shaped.result);
         await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
           ...durable,
           state: 'done',
-          ...(shaped.result !== undefined ? { result: shaped.result } : {}),
+          ...(shapedResult !== undefined ? { result: shapedResult } : {}),
           ...(shaped.error !== undefined ? { error: shaped.error } : {}),
         });
         return;
@@ -861,12 +903,19 @@ export class UserConnectionDO extends DurableObject<Env> {
         // For non-rehydrated entries, send the oversized error synchronously
         // before the durable write so the mock harness sees the send.
         if (!rehydrated) {
+          // Guard: do not override an already-expired terminal outcome.
+          const now = Date.now();
+          if (entry.expiresAt <= now) {
+            this.pendingCommands.delete(id);
+            return;
+          }
           this.pendingCommands.delete(id);
           this.sendToWeb(entry.ws, {
             type: 'response',
             id: entry.originalId,
             error: CATALOG_TOO_LARGE_ERROR,
           });
+          this.completedCorrelationIds.add(id);
         }
 
         // Persist the terminal outcome durably.
@@ -897,6 +946,9 @@ export class UserConnectionDO extends DurableObject<Env> {
           state: 'done',
           error: CATALOG_TOO_LARGE_ERROR,
         } satisfies PendingCommandEntry);
+
+        // Clean up the synchronous completion marker.
+        this.completedCorrelationIds.delete(id);
 
         // For a rehydrated entry, re-resolve and send now.
         if (rehydrated) {
@@ -943,7 +995,15 @@ export class UserConnectionDO extends DurableObject<Env> {
     // For non-rehydrated entries, send the live response synchronously
     // before the durable write so the response reaches the client without
     // yielding to an async storage put.
+    //
+    // Guard: a live entry that has already expired must not override the
+    // terminal outcome set by expirePendingCommands. Drop silently.
     if (!rehydrated) {
+      const now = Date.now();
+      if (entry.expiresAt <= now) {
+        this.pendingCommands.delete(id);
+        return;
+      }
       this.pendingCommands.delete(id);
       this.sendToWeb(entry.ws, {
         type: 'response',
@@ -957,11 +1017,16 @@ export class UserConnectionDO extends DurableObject<Env> {
               ? { error: CLI_COMMAND_ERROR }
               : {}),
       });
+      // Mark completed synchronously so a rehydration path does not
+      // deliver a duplicate response before the durable write lands.
+      this.completedCorrelationIds.add(id);
     }
 
     // Persist the durable entry. Storage write is extended by the
     // surrounding ctx.waitUntil; the live response has already been
     // delivered for the non-rehydrated case above.
+    // Bound the result so the durable put never exceeds the DO value limit.
+    const durableResult = this.boundDurableResult(result);
     const webConnectionId = rehydrated
       ? rehydratedDurable?.webConnectionId
       : (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
@@ -976,9 +1041,12 @@ export class UserConnectionDO extends DurableObject<Env> {
       expiresAt: entry.expiresAt,
       webConnectionId: webConnectionId ?? 'unknown',
       state: 'done',
-      ...(result !== undefined ? { result } : {}),
+      ...(durableResult !== undefined ? { result: durableResult } : {}),
       ...(terminalError !== undefined ? { error: terminalError } : {}),
     } satisfies PendingCommandEntry);
+
+    // Clean up the synchronous completion marker after the durable write.
+    this.completedCorrelationIds.delete(id);
 
     // For a rehydrated entry, re-resolve the web socket by the persisted
     // id and send the response now (the non-rehydrated path already sent
@@ -1214,6 +1282,15 @@ export class UserConnectionDO extends DurableObject<Env> {
     // same-ID dispatch across the async storage read below.
     if (msg.mutationId) {
       const mutationId = msg.mutationId;
+      // Reject oversized mutation IDs before they become unsafe storage keys.
+      if (mutationId.length > MAX_MUTATION_ID_LENGTH) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: msg.id,
+          error: MUTATION_ID_TOO_LONG_ERROR,
+        });
+        return;
+      }
       // Atomic reservation: check and set synchronously before any await.
       if (this.inflightMutations.has(mutationId)) {
         if (CATALOG_DEDUPE_COMMANDS.has(msg.command)) {
@@ -1925,6 +2002,19 @@ export class UserConnectionDO extends DurableObject<Env> {
       ...(result !== undefined ? { result } : {}),
       ...(terminalError !== undefined ? { error: terminalError } : {}),
     };
+  }
+
+  /**
+   * Bound a terminal result so the durable storage.put never exceeds the
+   * Cloudflare DO value limit. Returns the original result when under the
+   * threshold, or a size-exceeded error marker otherwise.
+   */
+  private boundDurableResult(result: unknown): unknown {
+    if (result === undefined) return undefined;
+    const serialized = JSON.stringify(result);
+    const byteCount = new TextEncoder().encode(serialized).byteLength;
+    if (byteCount <= MAX_DURABLE_RESULT_BYTES) return result;
+    return { _truncated: true, bytes: byteCount };
   }
 
   // ---------------------------------------------------------------------------

@@ -1005,7 +1005,7 @@ describe('CloudAgentTransport page-seam', () => {
   });
 
   describe('watermark cursor', () => {
-    it('uses fromId on first connect when the page carries a watermark', async () => {
+    it('uses fromId=0 on first connect when the page carries a watermark (closes materialization gap)', async () => {
       const page = {
         kind: 'success' as const,
         info: { id: 'ses-1' } as const,
@@ -1021,7 +1021,10 @@ describe('CloudAgentTransport page-seam', () => {
 
       expect(webSocketConstructor).toHaveBeenCalledTimes(1);
       const wsUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
-      expect(wsUrl).toContain('fromId=42');
+      // A present watermark seeds lastEventId=0 so the DO replays every
+      // stored event from the beginning — not fromId=42, which could skip
+      // events not yet materialized into the SessionIngest page.
+      expect(wsUrl).toContain('fromId=0');
       expect(wsUrl).not.toContain('replay=false');
 
       transport.destroy();
@@ -1087,9 +1090,10 @@ describe('CloudAgentTransport page-seam', () => {
         transport.connect();
         await flushMicrotasks();
 
-        // Verify first connect used the watermark
+        // Verify first connect used fromId=0 (the watermark seeds
+        // lastEventId=0 so the DO replays all stored events).
         const firstUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
-        expect(firstUrl).toContain('fromId=10');
+        expect(firstUrl).toContain('fromId=0');
 
         // Send a wire event with eventId > 0 to advance the live cursor
         const establish = {
@@ -1127,7 +1131,7 @@ describe('CloudAgentTransport page-seam', () => {
       }
     });
 
-    it('reconnect on a watermarked page with only sentinel events uses the original watermark and skips the page refetch', async () => {
+    it('reconnect on a watermarked page with only sentinel events uses fromId=0 to close the materialization gap', async () => {
       jest.useFakeTimers();
       try {
         async function flushMicrotasks(): Promise<void> {
@@ -1166,13 +1170,15 @@ describe('CloudAgentTransport page-seam', () => {
         transport.connect();
         await flushMicrotasks();
 
-        // Verify first connect used the watermark as fromId.
+        // Verify first connect used fromId=0 (the watermark seeds
+        // lastEventId=0 so the DO replays all stored events, closing
+        // the materialization gap).
         const firstUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
-        expect(firstUrl).toContain('fromId=42');
+        expect(firstUrl).toContain('fromId=0');
         expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
 
         // Send only sentinel events (eventId: 0) — they do NOT advance the
-        // live cursor, so lastEventId stays at the watermark value.
+        // live cursor, so lastEventId stays at 0.
         const sentinel: CloudAgentEvent = {
           eventId: 0,
           executionId: null,
@@ -1196,12 +1202,12 @@ describe('CloudAgentTransport page-seam', () => {
         await flushMicrotasks();
 
         const reconnectUrl = String(webSocketConstructor.mock.calls.at(-1)?.[0]);
-        // Reconnect must still use the watermark (42) because sentinel events
-        // never advance the cursor past the watermark.
-        expect(reconnectUrl).toContain('fromId=42');
+        // Reconnect uses fromId=0 because sentinel events never advance
+        // lastEventId past 0. The DO replays all stored events again.
+        expect(reconnectUrl).toContain('fromId=0');
         expect(reconnectUrl).not.toContain('replay=false');
 
-        // No second page fetch — lastEventId (watermark 42) is not null, so
+        // No second page fetch — lastEventId (0) is not null, so
         // onReconnected skips the snapshot fallback path entirely.
         expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
 
@@ -1209,6 +1215,77 @@ describe('CloudAgentTransport page-seam', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+
+    it('delivers all events when the watermark is ahead of the page materialization', async () => {
+      // Regression: when the Cloud Agent DO event-log watermark leads the
+      // SessionIngest history page, events between the page's last
+      // materialized event and the watermark must not be skipped.
+      //
+      // Setup: page with watermark=10, messages that represent content
+      // from events 1–5 only. The DO replays all events via fromId=0.
+      // Events 6–10 (the gap) must reach the sink.
+      const page = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' } as const,
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+        watermarkEventId: 10,
+      };
+      const { transport, serviceEvents } = createTransportWithPageFetch(page);
+
+      transport.connect();
+      await flushPromises();
+
+      // Verify the first connect uses fromId=0 so the DO replays all
+      // stored events from the beginning, covering the materialization gap.
+      const wsUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
+      expect(wsUrl).toContain('fromId=0');
+
+      const serviceCountBefore = serviceEvents.length;
+
+      // Simulate the DO replaying events 1–10 (fromId=0 replays everything).
+      // Each event has a unique observable tag so we can identify which
+      // events reached the sink.
+      for (let id = 1; id <= 10; id++) {
+        sendRaw({
+          eventId: id,
+          executionId: null,
+          sessionId: 'ses-1',
+          streamEventType: 'kilocode',
+          timestamp: new Date().toISOString(),
+          data: {
+            type: 'session.status',
+            properties: {
+              sessionID: 'ses-1',
+              status: { type: 'retry', attempt: id, message: `event-${id}`, next: id + 1 },
+            },
+          },
+        });
+      }
+
+      // Collect the observable IDs from session.status retry events.
+      const deliveredIds = serviceEvents
+        .slice(serviceCountBefore)
+        .filter(
+          (
+            e
+          ): e is {
+            type: 'session.status';
+            sessionId: string;
+            status: { type: 'retry'; attempt: number };
+          } => e.type === 'session.status' && (e.status as { type?: string }).type === 'retry'
+        )
+        .map(e => (e.status as { attempt: number }).attempt)
+        .sort((a, b) => a - b);
+
+      // Every event 1–10 must be delivered. The dedupe with lastEventId=0
+      // must not drop any of them. If the old watermark-as-cursor behavior
+      // were still in place, events 6–10 would be dropped (eventId ≤ 10).
+      expect(deliveredIds).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+      transport.destroy();
     });
   });
 });

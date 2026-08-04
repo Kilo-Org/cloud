@@ -4,7 +4,7 @@ import { configureDevLogging, logger, withLogTags } from '../util/logger';
 import type { ServerMessage } from '../types';
 
 /** Number of unacked events before a socket is closed as a zombie. */
-const UNACKED_THRESHOLD = 50;
+const UNACKED_THRESHOLD = 1000;
 
 /** Close code for a socket that fell too far behind on acknowledgements. */
 const ZOMBIE_CLOSE_CODE = 4002;

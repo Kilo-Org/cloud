@@ -22,7 +22,11 @@ vi.mock('./SessionIngestDO', () => ({
   getSessionIngestDO: sessionIngestMocks.getSessionIngestDO,
 }));
 
-import { MAX_CATALOG_RESULT_BYTES, UserConnectionDO } from './UserConnectionDO';
+import {
+  MAX_CATALOG_RESULT_BYTES,
+  MAX_DURABLE_RESULT_BYTES,
+  UserConnectionDO,
+} from './UserConnectionDO';
 
 // ---------------------------------------------------------------------------
 // Mock WebSocket
@@ -5664,6 +5668,314 @@ describe('UserConnectionDO', () => {
 
       // Must not store the raw oversized result.
       expect((entry as Record<string, unknown>).result).toBeUndefined();
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Durable result bounding (non-catalog commands)
+    // -------------------------------------------------------------------------
+    it('bounds non-catalog results over the durable limit before the durable write', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      sendCommand(doInstance, webWs, {
+        id: 'big-result',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Create a result just over the durable limit.
+      const oversized = createResultWithSerializedBytes(MAX_DURABLE_RESULT_BYTES + 1);
+
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: oversized });
+      await flushAsync();
+
+      // Live response must carry the full result unchanged.
+      const live = parseSent(webWs);
+      expect(live.result).toEqual(oversized);
+
+      // Durable entry must have the truncated marker, not the raw oversized result.
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      const durableResult = (entry as Record<string, unknown>).result;
+      expect(durableResult).toBeDefined();
+      expect(durableResult).toMatchObject({ _truncated: true });
+    });
+
+    it('stores non-catalog results at exactly the durable limit unchanged', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      sendCommand(doInstance, webWs, {
+        id: 'exact-result',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      const exact = createResultWithSerializedBytes(MAX_DURABLE_RESULT_BYTES);
+
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: exact });
+      await flushAsync();
+
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).result).toEqual(exact);
+    });
+
+    it('bounds the result in the D8 case 2 (no-web) durable write', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'mut-no-web-big';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-big',
+        originalId: 'original-big',
+        command: 'send_message',
+        expectedOwnerConnectionId: undefined,
+        targetConnectionId: 'cli-big',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-gone-big',
+        state: 'pending' as const,
+      });
+
+      const cliWs = addCliSocket(mockCtx, 'cli-big');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-big', 'busy', 'Session Big')]);
+
+      const oversized = createResultWithSerializedBytes(MAX_DURABLE_RESULT_BYTES + 1);
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: oversized });
+      await flushAsync();
+
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      expect((entry as Record<string, unknown>).result).toMatchObject({ _truncated: true });
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Duplicate CLI reply is idempotent
+    // -------------------------------------------------------------------------
+    it('delivers a CLI response exactly once when the same response arrives twice', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      sendCommand(doInstance, webWs, {
+        id: 'dedup-cmd',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // First response — delivered live.
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: { ok: true } });
+
+      const firstResponses = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'dedup-cmd'
+      );
+      expect(firstResponses).toHaveLength(1);
+      expect(firstResponses[0].result).toEqual({ ok: true });
+
+      // Second response with same correlationId — must NOT deliver again.
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: { ok: true } });
+      await flushAsync();
+
+      const allResponses = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'dedup-cmd'
+      );
+      expect(allResponses).toHaveLength(1);
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Late response cannot override expiry
+    // -------------------------------------------------------------------------
+    it('ignores a live CLI response that has already expired', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      const baseTime = 1_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(baseTime);
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      sendCommand(doInstance, webWs, {
+        id: 'expiry-cmd',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      // Advance time past the 35-second TTL.
+      vi.spyOn(Date, 'now').mockReturnValue(baseTime + 35_001);
+
+      // CLI sends response — should be dropped because it's expired.
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: { late: true } });
+      await flushAsync();
+
+      // No response for this command ID.
+      const responses = allSent(webWs).filter(m => m.type === 'response' && m.id === 'expiry-cmd');
+      expect(responses).toHaveLength(0);
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Oversized mutationId rejected
+    // -------------------------------------------------------------------------
+    it('rejects a mutationId longer than 128 characters via schema validation', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+
+      const longMutationId = 'x'.repeat(129);
+      sendCommand(doInstance, webWs, {
+        id: 'oversized-mut',
+        command: 'send_message',
+        sessionId: 's1',
+        mutationId: longMutationId,
+      });
+
+      // The Zod schema rejects the oversized mutationId. No response is sent
+      // (the invalid message is dropped with a warn log), and no command
+      // reaches the CLI.
+      const responses = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'oversized-mut'
+      );
+      expect(responses).toHaveLength(0);
+
+      // No command must reach the CLI.
+      const cliCommands = allSent(cliWs).filter(m => m.type === 'command');
+      expect(cliCommands).toHaveLength(0);
+    });
+
+    it('accepts a mutationId at exactly 128 characters', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+
+      const exactMutationId = 'x'.repeat(128);
+      sendCommand(doInstance, webWs, {
+        id: 'exact-mut',
+        command: 'send_message',
+        sessionId: 's1',
+        mutationId: exactMutationId,
+      });
+      await flushAsync();
+
+      // Command must be forwarded to CLI.
+      const cliCommands = allSent(cliWs).filter(m => m.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0].mutationId).toBe(exactMutationId);
+    });
+
+    it('rejects a mutationId longer than 128 characters in the web message schema', () => {
+      const { doInstance, mockCtx } = setup();
+      addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      const longMutationId = 'x'.repeat(129);
+      const msg = JSON.stringify({
+        type: 'command',
+        id: 'schema-mut',
+        command: 'send_message',
+        mutationId: longMutationId,
+      });
+
+      // Send raw — schema validation must reject it.
+      doInstance.webSocketMessage(webWs as never, msg);
+
+      // No response forwarded to CLI.
+      const cliCommands = allSent(mockCtx.sockets.find(s => s._tags.includes('cli'))!).filter(
+        m => m.type === 'command'
+      );
+      expect(cliCommands).toHaveLength(0);
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Rehydrated reply after expiry cannot deliver or persist a success outcome
+    // -------------------------------------------------------------------------
+    it('rejects a rehydrated CLI reply when the durable entry has expired', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const pastTime = Date.now() - 10_000;
+      const correlationId = 'rehydrated-expired';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-re',
+        originalId: 'original-re',
+        command: 'send_message',
+        expectedOwnerConnectionId: undefined,
+        targetConnectionId: 'cli-re',
+        expiresAt: pastTime,
+        webConnectionId: 'web-re',
+        state: 'pending' as const,
+      });
+
+      const cliWs = addCliSocket(mockCtx, 'cli-re');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-re', 'busy', 'Session RE')]);
+      const webWs = addWebSocket(mockCtx, 'web-re');
+      webWs.send.mockClear();
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: { late: true },
+      });
+      await flushAsync();
+
+      // No response must reach the web socket.
+      const responses = allSent(webWs).filter(m => m.type === 'response' && m.id === 'original-re');
+      expect(responses).toHaveLength(0);
+
+      // The durable entry must be marked done with COMMAND_EXPIRED_ERROR.
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      expect((entry as Record<string, unknown>).error).toEqual({
+        source: 'relay',
+        code: 'COMMAND_EXPIRED',
+        message: 'Command expired',
+      });
+      // Must not store the late result.
+      expect((entry as Record<string, unknown>).result).toBeUndefined();
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Total durable entry with result at limit stays under 128 KiB
+    // -------------------------------------------------------------------------
+    it('keeps the total serialized durable entry under 128 KiB when the result is at the bound', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      sendCommand(doInstance, webWs, {
+        id: 'safety-check',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      const result = createResultWithSerializedBytes(MAX_DURABLE_RESULT_BYTES);
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result });
+      await flushAsync();
+
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      expect((entry as Record<string, unknown>).result).toEqual(result);
+
+      // The total serialized entry must stay under 128 KiB (131,072 bytes).
+      const serialized = new TextEncoder().encode(JSON.stringify(entry)).byteLength;
+      expect(serialized).toBeLessThan(131_072);
     });
   });
 });

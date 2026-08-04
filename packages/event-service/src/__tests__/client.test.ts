@@ -914,6 +914,48 @@ describe('EventServiceClient', () => {
       expect(received).toHaveLength(5);
     });
 
+    it('throwing resync handler does not prevent seq state advance', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        await client.connect();
+        // Clear pings
+        lastMockWs.sent = [];
+
+        // Register a resync handler that throws on first call
+        let resyncCallCount = 0;
+        client.onResync(() => {
+          resyncCallCount++;
+          throw new Error('resync throws');
+        });
+
+        // Baseline: in-order events
+        lastMockWs.triggerMessage(eventWithSeq(1));
+        lastMockWs.triggerMessage(eventWithSeq(2));
+        expect(resyncCallCount).toBe(0);
+
+        // Trigger a gap (10 > 2 + 1), which fires the throwing resync handler.
+        // The seq state must still be advanced despite the throw.
+        expect(() => {
+          lastMockWs.triggerMessage(eventWithSeq(10));
+        }).toThrow('resync throws');
+
+        expect(resyncCallCount).toBe(1);
+
+        // Advance past the ping interval. The client should have advanced
+        // highestAckedSeq to 10 despite the throw.
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        const messages = lastMockWs.sent.map(s => {
+          if (s === 'ping') return s;
+          return JSON.parse(s) as unknown;
+        });
+        expect(messages).toContain('ping');
+        expect(messages).toContainEqual({ type: 'ack', seq: 10 });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
     it('multiple gaps each trigger their own resync', async () => {
       const client = makeClient();
       await client.connect();

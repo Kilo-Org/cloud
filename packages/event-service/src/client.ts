@@ -446,17 +446,20 @@ export class EventServiceClient {
     // Sequence gap detection: fire resync once when a seq skips ahead of
     // the expected next value, then continue from the received seq. Events
     // without seq are passed through unchanged (old-server compatibility).
+    // Advance lastKnownSeq and highestAckedSeq *before* invoking resync
+    // handlers so a throwing handler cannot stop state progress.
     if (message.seq !== undefined) {
-      if (message.seq > this.lastKnownSeq + 1) {
-        for (const handler of this.resyncHandlers) {
-          handler();
-        }
-      }
+      const oldLastKnownSeq = this.lastKnownSeq;
       if (message.seq > this.lastKnownSeq) {
         this.lastKnownSeq = message.seq;
       }
       if (message.seq > this.highestAckedSeq) {
         this.highestAckedSeq = message.seq;
+      }
+      if (message.seq > oldLastKnownSeq + 1) {
+        for (const handler of this.resyncHandlers) {
+          handler();
+        }
       }
     }
 

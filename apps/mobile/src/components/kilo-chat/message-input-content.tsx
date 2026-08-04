@@ -1,8 +1,12 @@
+/* eslint-disable max-lines -- pre-existing */
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type LayoutChangeEvent, Platform, type TextInput, View } from 'react-native';
 import { type AttachmentBlock, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
+import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
@@ -11,6 +15,7 @@ import {
   editableAttachmentToPreviewRow,
   resolveMessageInputSendDisabled,
 } from './message-input-content-state';
+import { buildAttachmentUnreadableToast } from './message-attachment-state';
 import {
   MESSAGE_INPUT_FONT_SIZE,
   MESSAGE_INPUT_LINE_HEIGHT,
@@ -139,6 +144,16 @@ export function MessageInputContent({
         maxLength: MESSAGE_TEXT_MAX_CHARS,
         onChangeText: handleChangeText,
       });
+    },
+  });
+
+  const pasteHint = useClipboardImageHint({
+    enabled: showAttachmentButton && !controlsDisabled && !voiceInput.isActive,
+    addFile: async file => {
+      await attachmentQueue?.addClipboardImage(file);
+    },
+    onUnreadable: () => {
+      toast.error(buildAttachmentUnreadableToast('the pasted image'));
     },
   });
 
@@ -290,6 +305,7 @@ export function MessageInputContent({
         }}
         onInputFocus={() => {
           inputFocusedRef.current = true;
+          pasteHint.refresh();
         }}
         onInputLayout={handleInputLayout}
         onOpenAttachmentPicker={handleOpenAttachmentPicker}
@@ -313,6 +329,9 @@ export function MessageInputContent({
         voiceInputAvailable={voiceInput.available}
         voiceInputDisabled={voiceDisabled}
         voiceInputStatus={voiceInput.status}
+        showPasteHint={pasteHint.visible}
+        // eslint-disable-next-line react/jsx-handler-names -- paste is a hook method, not a component handler
+        onPasteImage={pasteHint.paste}
       />
     </View>
   );

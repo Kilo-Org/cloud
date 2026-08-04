@@ -1433,8 +1433,10 @@ describe('database schema', () => {
     });
 
     it('runs migration 0204 against duplicates before creating its unique index', async () => {
-      const migrationPath = path.join(__dirname, 'migrations/0204_fantastic_loa.sql');
-      const migration = fs.readFileSync(migrationPath, 'utf8');
+      const migrationPath = path.join(__dirname, 'migrations/0204_brainy_baron_strucker.sql');
+      const fullMigration = fs.readFileSync(migrationPath, 'utf8');
+      const backfillStart = '-- Backfill:';
+      const migration = fullMigration.slice(fullMigration.indexOf(backfillStart));
       const rollback = new Error('rollback migration test');
 
       try {

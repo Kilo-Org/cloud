@@ -125,23 +125,35 @@ export async function countSlackConnections(teamId: string): Promise<number> {
 /**
  * Resolve the bot token for an integration.
  *
- * Reads the workspace record first and falls back to the legacy
- * `platform_integrations.metadata.access_token` copy. The fallback keeps this
- * safe during a rolling deploy, where an install served by older code writes only
- * to `metadata`. A follow-up removes the metadata copy and this fallback.
+ * `platform_integrations.metadata.access_token` is preferred while it still
+ * exists, with the workspace record as the fallback.
+ *
+ * That order looks backwards for a table introduced as the workspace-level store,
+ * but it is the only safe one until the previous release is fully rolled out.
+ * Every writer updates `metadata` — the previous release writes only there, and
+ * this release mirrors into it — so `metadata` is never staler than the workspace
+ * record. The reverse is not true: a disconnect and reconnect served by the
+ * previous release deletes and recreates `platform_integrations` without touching
+ * the workspace record, which would leave a revoked token here outranking the
+ * fresh one in `metadata`.
+ *
+ * The follow-up that removes the mirror also removes this preference, leaving the
+ * workspace record as the only source. Doing it in that order is what makes the
+ * rollout safe in both directions.
  */
 export async function getSlackBotToken(
   integration: PlatformIntegration
 ): Promise<string | undefined> {
-  const teamId = getSlackTeamIdFromInstallation(integration);
-
-  if (teamId) {
-    const workspaceInstallation = await getSlackWorkspaceInstallation(teamId);
-    if (workspaceInstallation?.bot_token) {
-      return workspaceInstallation.bot_token;
-    }
+  const metadata = integration.metadata as { access_token?: string } | null;
+  if (metadata?.access_token) {
+    return metadata.access_token;
   }
 
-  const metadata = integration.metadata as { access_token?: string } | null;
-  return metadata?.access_token;
+  const teamId = getSlackTeamIdFromInstallation(integration);
+  if (!teamId) {
+    return undefined;
+  }
+
+  const workspaceInstallation = await getSlackWorkspaceInstallation(teamId);
+  return workspaceInstallation?.bot_token ?? undefined;
 }

@@ -227,12 +227,13 @@ export async function upsertSlackInstallation({
       : DEFAULT_BOT_MODEL;
 
   // The bot token belongs to the workspace, not to this owner, so it is written to
-  // slack_workspace_installations first: that record is the read path, and a
-  // failure here must not leave an active integration pointing at a stale token.
+  // slack_workspace_installations first: a failure here must not leave an active
+  // integration behind with no durable record of its token.
   //
-  // `access_token` and `bot_user_id` are still mirrored into metadata below so a
-  // rollback to the previous release keeps working. A follow-up removes the
-  // mirror and the corresponding read fallback.
+  // `access_token` and `bot_user_id` are also mirrored into metadata below. The
+  // mirror is what the previous release reads, so it keeps a rolling deploy and a
+  // rollback working; see getSlackBotToken for why it is still the preferred read
+  // while it exists. A follow-up removes the mirror and that preference together.
   await upsertSlackWorkspaceInstallation({
     teamId,
     teamName,

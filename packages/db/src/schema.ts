@@ -4841,9 +4841,13 @@ export type NewPlatformAccessTokenCredential =
  *
  * Slack issues exactly one installation (and therefore one bot token) per
  * (app, workspace), so the bot token is a property of the workspace rather than
- * of any single Kilo owner. This table is the source of truth for it, keyed on
- * the Slack team ID and joined from
- * `platform_integrations.platform_installation_id`.
+ * of any single Kilo owner. This table holds it, keyed on the Slack team ID and
+ * joined from `platform_integrations.platform_installation_id`.
+ *
+ * It is written on every install. Reads still prefer the
+ * `platform_integrations.metadata.access_token` mirror while that mirror exists,
+ * because the previous release writes only there; removing the mirror is what
+ * makes this table the sole source. See `getSlackBotToken`.
  *
  * Today `UQ_platform_integrations_slack_platform_inst` still limits a workspace
  * to one owner, so this table holds one row per connected workspace. It exists

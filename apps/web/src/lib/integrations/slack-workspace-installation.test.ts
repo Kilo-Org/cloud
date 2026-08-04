@@ -57,38 +57,40 @@ describe('getSlackBotToken', () => {
     mockLimit.mockReset();
   });
 
-  it('returns the token from the workspace installation', async () => {
+  it('returns the token from the workspace installation when metadata has none', async () => {
     mockLimit.mockResolvedValue([{ team_id: 'T123', bot_token: 'xoxb-workspace' }]);
 
     await expect(getSlackBotToken(buildIntegration())).resolves.toBe('xoxb-workspace');
   });
 
-  it('prefers the workspace installation over the legacy metadata copy', async () => {
-    mockLimit.mockResolvedValue([{ team_id: 'T123', bot_token: 'xoxb-workspace' }]);
+  // The previous release writes only to metadata, so a disconnect and reconnect
+  // served by it leaves a revoked token on the workspace record. Metadata has to
+  // win for as long as the mirror exists.
+  it('prefers the metadata copy over the workspace installation', async () => {
+    mockLimit.mockResolvedValue([{ team_id: 'T123', bot_token: 'xoxb-stale-workspace' }]);
 
     await expect(
-      getSlackBotToken(buildIntegration({ metadata: { access_token: 'xoxb-metadata' } }))
-    ).resolves.toBe('xoxb-workspace');
+      getSlackBotToken(buildIntegration({ metadata: { access_token: 'xoxb-fresh-metadata' } }))
+    ).resolves.toBe('xoxb-fresh-metadata');
   });
 
-  it('falls back to the legacy metadata copy when no workspace installation exists', async () => {
-    mockLimit.mockResolvedValue([]);
-
+  it('does not query the workspace installation when metadata has a token', async () => {
     await expect(
       getSlackBotToken(buildIntegration({ metadata: { access_token: 'xoxb-metadata' } }))
     ).resolves.toBe('xoxb-metadata');
+    expect(mockLimit).not.toHaveBeenCalled();
   });
 
-  it('falls back to metadata when the integration has no team id', async () => {
+  it('returns undefined when metadata has no token and the integration has no team id', async () => {
     await expect(
       getSlackBotToken(
         buildIntegration({
           platform_installation_id: null,
           platform_account_id: null,
-          metadata: { access_token: 'xoxb-metadata' },
+          metadata: {},
         })
       )
-    ).resolves.toBe('xoxb-metadata');
+    ).resolves.toBeUndefined();
     expect(mockLimit).not.toHaveBeenCalled();
   });
 

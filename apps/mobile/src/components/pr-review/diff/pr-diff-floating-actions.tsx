@@ -12,7 +12,7 @@
 
 import { type Href, useRouter } from 'expo-router';
 import { MessageCirclePlus } from 'lucide-react-native';
-import { View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -36,6 +36,8 @@ type PrDiffFloatingActionsProps = Readonly<{
   selection: SelectionState | null;
   /** Setter for the parent's selection state — `null` clears. */
   onClearSelection: () => void;
+  /** Optional callback for the measured root layout height (points). */
+  onHeightChange?: (height: number) => void;
 }>;
 
 export function PrDiffFloatingActions({
@@ -45,6 +47,7 @@ export function PrDiffFloatingActions({
   viewMode,
   selection,
   onClearSelection,
+  onHeightChange,
 }: PrDiffFloatingActionsProps) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -85,6 +88,9 @@ export function PrDiffFloatingActions({
 
   return (
     <View
+      onLayout={(event: LayoutChangeEvent) => {
+        onHeightChange?.(event.nativeEvent.layout.height);
+      }}
       pointerEvents="box-none"
       className="absolute inset-x-0 bottom-0 items-center gap-2 px-4 pb-6 pt-3"
     >

@@ -198,20 +198,28 @@ test(
     // A forged TMUX env var alone does not steer break-pane — tmux requires
     // an actual attached client for the "current session" to differ from the
     // source pane's session.  script(1) provides the pty so tmux can attach.
+    //
+    // Strip TMUX and TMUX_PANE from the child environment.  When the test
+    // itself runs inside tmux, the child script inherits those variables and
+    // the nested tmux refuses to attach its decoy session.
+    const {
+      TMUX: _childTmux,
+      TMUX_PANE: _childTmuxPane,
+      ...childEnv
+    } = process.env as Record<string, string | undefined>;
+    childEnv.TERM = process.env.TERM ?? 'xterm-256color';
+
     const clientProc =
       process.platform === 'darwin'
         ? spawn(
             'script',
             ['-q', '/dev/null', 'tmux', 'new-session', '-s', decoySession, 'sleep', '999'],
-            { stdio: 'ignore' }
+            { stdio: 'ignore', env: childEnv }
           )
         : spawn(
             'script',
             ['-q', '-c', `tmux new-session -s ${decoySession} sleep 999`, '/dev/null'],
-            {
-              stdio: 'ignore',
-              env: { ...process.env, TERM: process.env.TERM ?? 'xterm-256color' },
-            }
+            { stdio: 'ignore', env: childEnv }
           );
 
     const savedTmux = process.env.TMUX;

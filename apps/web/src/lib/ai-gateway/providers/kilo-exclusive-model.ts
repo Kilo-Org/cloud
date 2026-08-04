@@ -13,6 +13,7 @@ export type KiloExclusiveModelFlag =
   | 'vision'
   | 'stealth'
   | 'vercel-routing'
+  | 'rate-limited'
   | 'requires-data-collection';
 
 export type Usage = {

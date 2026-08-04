@@ -41,6 +41,8 @@ export function ProvidersTab({
   onProviderLocationsFilterChange,
   onToggleProviderEnabled,
   onOpenProviderDetails,
+  scope = 'organization',
+  showDetails = true,
 }: {
   isLoading: boolean;
   canEdit: boolean;
@@ -60,11 +62,17 @@ export function ProvidersTab({
   onProviderLocationsFilterChange: (value: string[]) => void;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
   onOpenProviderDetails: (providerSlug: string) => void;
+  scope?: 'organization' | 'group';
+  showDetails?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-y-4">
       <div className="text-muted-foreground space-y-1 text-sm">
-        <p>Enable which providers organization members can use.</p>
+        <p>
+          {scope === 'organization'
+            ? 'Enable which providers organization members can use.'
+            : 'Grant models offered by selected providers through this policy.'}
+        </p>
         <p>
           Provider policy badges and filters reflect provider defaults. Training and prompt
           retention policies can differ for individual models.
@@ -87,7 +95,7 @@ export function ProvidersTab({
             </div>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={enabledOnly} onCheckedChange={onEnabledOnlyChange} />
-              Enabled
+              {scope === 'group' ? 'Selected' : 'Enabled'}
             </label>
           </div>
 
@@ -142,7 +150,8 @@ export function ProvidersTab({
                 <div className="bg-muted/50 flex items-center justify-between gap-4 border-b px-4 py-3">
                   <div className="text-sm font-medium">Providers</div>
                   <div className="text-muted-foreground text-xs">
-                    {enabledProviderSlugs.size} enabled • {filteredProviderRows.length} shown
+                    {enabledProviderSlugs.size} {scope === 'group' ? 'selected' : 'enabled'} •{' '}
+                    {filteredProviderRows.length} shown
                   </div>
                 </div>
 
@@ -152,6 +161,7 @@ export function ProvidersTab({
                     const modelLabel = row.modelCount === 1 ? 'model' : 'models';
                     const enabledModelCount =
                       enabledModelCountByProviderSlug.get(row.providerSlug) ?? 0;
+                    const unavailable = Boolean(row.unavailableReason);
 
                     return (
                       <label
@@ -160,7 +170,7 @@ export function ProvidersTab({
                       >
                         <Checkbox
                           checked={checked}
-                          disabled={!canEdit}
+                          disabled={!canEdit || (unavailable && !checked)}
                           onCheckedChange={nextChecked => {
                             onToggleProviderEnabled(row.providerSlug, Boolean(nextChecked));
                           }}
@@ -192,36 +202,48 @@ export function ProvidersTab({
                               <div className="text-muted-foreground mt-0.5 truncate text-xs">
                                 {row.providerSlug}
                               </div>
+                              {row.unavailableReason && (
+                                <div className="type-label text-status-warning mt-1">
+                                  {row.unavailableReason}
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5 shrink-0 p-0"
-                              aria-label="View provider details"
-                              onPointerDown={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                              onMouseDown={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onOpenProviderDetails(row.providerSlug);
-                              }}
-                            >
-                              <Info className="h-4 w-4" />
-                            </Button>
+                            {showDetails && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 shrink-0 p-0"
+                                aria-label="View provider details"
+                                onPointerDown={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                onMouseDown={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  onOpenProviderDetails(row.providerSlug);
+                                }}
+                              >
+                                <Info className="h-4 w-4" />
+                              </Button>
+                            )}
 
                             <span>
                               Offers {row.modelCount} {modelLabel}
-                              {enabledModelCount > 0 ? <> • {enabledModelCount} enabled</> : null}
+                              {enabledModelCount > 0 ? (
+                                <>
+                                  {' '}
+                                  • {enabledModelCount} {scope === 'group' ? 'selected' : 'enabled'}
+                                </>
+                              ) : null}
                             </span>
                           </div>
                         </div>

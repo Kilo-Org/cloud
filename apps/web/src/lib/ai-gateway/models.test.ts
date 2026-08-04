@@ -1,5 +1,10 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, findKiloExclusiveModel, kiloExclusiveModels } from './models';
+import {
+  autoFreeModels,
+  findKiloExclusiveModel,
+  isKiloExclusiveRateLimitedModel,
+  kiloExclusiveModels,
+} from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import { getAiSdkProvider } from './providers/model-settings';
@@ -10,6 +15,17 @@ import {
 } from './providers/anthropic.constants';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
 import { tencent_hy3_free_model } from './providers/tencent';
+import { gemma_4_26b_a4b_it_free_model } from './providers/google';
+
+describe('rate-limited Kilo-exclusive models', () => {
+  test('only includes free Gemma', () => {
+    expect(kiloExclusiveModels.filter(model => model.flags.includes('rate-limited'))).toEqual([
+      gemma_4_26b_a4b_it_free_model,
+    ]);
+    expect(isKiloExclusiveRateLimitedModel(gemma_4_26b_a4b_it_free_model.public_id)).toBe(true);
+    expect(isKiloExclusiveRateLimitedModel(tencent_hy3_free_model.public_id)).toBe(false);
+  });
+});
 
 describe('isFreeModel', () => {
   describe('free models', () => {

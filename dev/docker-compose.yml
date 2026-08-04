@@ -9,8 +9,10 @@ services:
     # microdollar_usage JOINs) don't fail with "could not resize shared
     # memory segment" on default 64M tmpfs.
     shm_size: '2gb'
+    # dev/.env sets these per worktree; see dev/local/infra-env.ts. Compose
+    # reads dev/.env by default because dev/ is this file's project directory.
     ports:
-      - '5432:5432'
+      - '${KILO_POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
@@ -23,7 +25,7 @@ services:
   redis:
     image: redis:7
     ports:
-      - '6379:6379'
+      - '${KILO_REDIS_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -31,7 +33,7 @@ services:
   redis-http:
     image: hiett/serverless-redis-http:latest
     ports:
-      - '8079:80'
+      - '${KILO_REDIS_HTTP_PORT:-8079}:80'
     environment:
       SRH_MODE: env
       SRH_TOKEN: example_token
@@ -42,7 +44,6 @@ services:
 
   grafana:
     image: grafana/grafana-oss:13.0.1
-    container_name: grafana
     restart: unless-stopped
     profiles: ['grafana']
     environment:
@@ -53,7 +54,7 @@ services:
       GRAFANA_CLICKHOUSE_SECURE: ${GRAFANA_CLICKHOUSE_SECURE:-true}
       GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY: ${GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY:-false}
     ports:
-      - '4000:3000'
+      - '${KILO_GRAFANA_PORT:-4000}:3000'
     volumes:
       - grafana_storage:/var/lib/grafana
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro

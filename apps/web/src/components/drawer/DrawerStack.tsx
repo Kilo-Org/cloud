@@ -16,6 +16,7 @@ import { ChevronLeft, X } from 'lucide-react';
 
 export type DrawerStackHelpers<T> = {
   push: (entry: T) => void;
+  replace: (entry: T) => void;
   pop: () => void;
   /** On the top layer this is `pop`; on deeper layers this is `closeAll`. */
   close: () => void;
@@ -48,6 +49,7 @@ function splitRenderResult(result: DrawerRenderResult): {
 export type DrawerStackApi<T> = {
   stack: readonly T[];
   push: (entry: T) => void;
+  replace: (entry: T) => void;
   pop: () => void;
   /** Replace the entire stack with a single entry (used when opening from a page). */
   open: (entry: T) => void;
@@ -105,6 +107,13 @@ export function createDrawerStack<T>() {
       setStack(prev => [...prev, { key: makeKey(), value }]);
     }, []);
 
+    const replace = useCallback((value: T) => {
+      setStack(prev => {
+        const next = { key: makeKey(), value };
+        return prev.length > 0 ? [...prev.slice(0, -1), next] : [next];
+      });
+    }, []);
+
     const pop = useCallback(() => {
       setStack(prev => (prev.length > 0 ? prev.slice(0, -1) : prev));
     }, []);
@@ -121,6 +130,7 @@ export function createDrawerStack<T>() {
     const api: DrawerStackApi<T> = {
       stack: stackValues,
       push,
+      replace,
       pop,
       open,
       closeAll,
@@ -134,6 +144,7 @@ export function createDrawerStack<T>() {
           pop={pop}
           closeAll={closeAll}
           push={push}
+          replace={replace}
           renderContent={renderContent}
           width={width}
           depthOffset={depthOffset}
@@ -148,6 +159,7 @@ export function createDrawerStack<T>() {
     pop,
     closeAll,
     push,
+    replace,
     renderContent,
     width,
     depthOffset,
@@ -157,18 +169,32 @@ export function createDrawerStack<T>() {
     pop: () => void;
     closeAll: () => void;
     push: (value: T) => void;
+    replace: (value: T) => void;
     renderContent: DrawerStackRenderContent<T>;
     width: number;
     depthOffset: number;
     rightOffset: number;
   }) {
     const isOpen = stack.length > 0;
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+    const wasOpenRef = useRef(false);
+
+    useEffect(() => {
+      if (isOpen && !wasOpenRef.current) {
+        previousFocusRef.current =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      } else if (!isOpen && wasOpenRef.current) {
+        previousFocusRef.current?.focus();
+        previousFocusRef.current = null;
+      }
+      wasOpenRef.current = isOpen;
+    }, [isOpen]);
 
     // ESC closes the top layer.
     useEffect(() => {
       if (!isOpen) return;
       const onKey = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') pop();
+        if (e.key === 'Escape' && !e.defaultPrevented) pop();
       };
       window.addEventListener('keydown', onKey);
       return () => window.removeEventListener('keydown', onKey);
@@ -205,6 +231,7 @@ export function createDrawerStack<T>() {
               const rendered = splitRenderResult(
                 renderContent(entry.value, {
                   push,
+                  replace,
                   pop,
                   close: isTop ? pop : closeAll,
                   closeAll,
@@ -280,6 +307,11 @@ function DrawerLayer({
     <motion.div
       ref={ref}
       tabIndex={-1}
+      role="dialog"
+      aria-modal={isTop}
+      aria-label="Drawer panel"
+      aria-hidden={!isTop}
+      inert={!isTop ? true : undefined}
       initial={{ x: width + 20 }}
       animate={{
         x: layerShift,
@@ -297,6 +329,24 @@ function DrawerLayer({
         if (!isTop) setHovered(true);
       }}
       onMouseLeave={() => setHovered(false)}
+      onKeyDown={event => {
+        if (!isTop || event.key !== 'Tab' || !ref.current) return;
+        const focusable = [
+          ...ref.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          ),
+        ];
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
       className="fixed top-0 bottom-0 flex flex-col outline-none"
       style={{
         right: rightOffset,
@@ -306,12 +356,13 @@ function DrawerLayer({
         pointerEvents: isTop ? 'auto' : hovered ? 'auto' : 'none',
       }}
     >
-      <div className="flex h-full flex-col overflow-hidden rounded-l-2xl border-l border-white/[0.08] bg-[oklch(0.12_0_0)] shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2">
+      <div className="flex h-full flex-col overflow-hidden rounded-l-xl border-l border-border bg-surface-raised shadow-2xl">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-2">
           {onBack && (
             <button
               onClick={onBack}
-              className="rounded-md p-1 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60"
+              aria-label="Back"
+              className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground pointer-coarse:size-control-touch"
             >
               <ChevronLeft className="size-4" />
             </button>
@@ -322,7 +373,8 @@ function DrawerLayer({
           {onClose && (
             <button
               onClick={onClose}
-              className="rounded-md p-1 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60"
+              aria-label="Close drawer"
+              className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground pointer-coarse:size-control-touch"
             >
               <X className="size-4" />
             </button>

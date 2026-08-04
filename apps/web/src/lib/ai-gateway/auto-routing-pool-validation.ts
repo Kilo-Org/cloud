@@ -134,7 +134,13 @@ export async function buildEligibleCatalog(params: {
 
   let ownerModels: OpenRouterModel[];
   if (organizationId) {
-    const orgCatalog = await getAvailableModelsForOrganization(organizationId);
+    // Pool membership is organization-level configuration, so it resolves against
+    // the organization's own policy rather than the configuring owner's group
+    // grants. A member subject would also require direct membership, which a
+    // parent-organization owner or platform admin may not have.
+    const orgCatalog = await getAvailableModelsForOrganization(organizationId, {
+      type: 'defaultAccess',
+    });
     ownerModels = orgCatalog?.data ?? [];
   } else {
     ownerModels = managedModels;

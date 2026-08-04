@@ -9,8 +9,8 @@ import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
-  type MiniMaxCodingPlanCredentialValidationInput,
-  validateMiniMaxCodingPlanCredential,
+  type CodingPlanCredentialValidationInput,
+  validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
 import { getCodingPlanPrice, type CodingPlanId } from '@/lib/coding-plans/pricing';
 import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
@@ -33,7 +33,7 @@ import {
 const logInfo = sentryLogger('coding-plans', 'info');
 const logError = sentryLogger('coding-plans', 'error');
 
-// Credential validation calls the live MiniMax API per key. Bound the fan-out so
+// Credential validation calls the live provider API per key. Bound the fan-out so
 // large inventory uploads finish within the request budget without overwhelming
 // the upstream provider with one unbounded burst of requests.
 const INVENTORY_VALIDATION_CONCURRENCY = 10;
@@ -364,7 +364,7 @@ export async function terminateCodingPlanImmediately(
 }
 
 type InventoryCredentialValidator = (
-  input: MiniMaxCodingPlanCredentialValidationInput
+  input: CodingPlanCredentialValidationInput
 ) => Promise<boolean>;
 
 type InventoryUploadOptions = {
@@ -379,18 +379,14 @@ type InventoryCredentialEntry = {
 function parseInventoryCredentialEntry(entry: string): InventoryCredentialEntry {
   const segments = entry.split('::');
   if (segments.length !== 2) {
-    throw new Error(
-      'Each MiniMax inventory entry must use the format <api key>::<upstream plan id>.'
-    );
+    throw new Error('Each inventory entry must use the format <api key>::<upstream plan id>.');
   }
 
   const [rawApiKey, rawUpstreamPlanId] = segments;
   const apiKey = rawApiKey?.trim();
   const upstreamPlanId = rawUpstreamPlanId?.trim();
   if (!apiKey || !upstreamPlanId) {
-    throw new Error(
-      'Each MiniMax inventory entry must use the format <api key>::<upstream plan id>.'
-    );
+    throw new Error('Each inventory entry must use the format <api key>::<upstream plan id>.');
   }
 
   return { apiKey, upstreamPlanId };
@@ -414,7 +410,7 @@ export async function uploadKeysToInventory(
   }
 
   const entries = rawEntries.map(parseInventoryCredentialEntry);
-  const validateCredential = options.validateCredential ?? validateMiniMaxCodingPlanCredential;
+  const validateCredential = options.validateCredential ?? validateCodingPlanCredential;
   const limit = pLimit(INVENTORY_VALIDATION_CONCURRENCY);
   const validationResults = await Promise.all(
     entries.map(entry =>
@@ -422,6 +418,7 @@ export async function uploadKeysToInventory(
         validateCredential({
           apiKey: entry.apiKey,
           planId: plan.planId,
+          providerId: plan.providerId,
           upstreamPlanId: entry.upstreamPlanId,
         })
       )
@@ -429,7 +426,7 @@ export async function uploadKeysToInventory(
   );
   if (validationResults.some(isValid => !isValid)) {
     throw new Error(
-      'One or more MiniMax credentials failed validation. Confirm plan access and supported model behavior, then try again.'
+      `One or more ${plan.providerName} credentials failed validation. Confirm plan access and supported model behavior, then try again.`
     );
   }
 

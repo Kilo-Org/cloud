@@ -20,6 +20,19 @@ async function seedMiniMaxKey(managementSource: 'user' | 'coding_plan', isEnable
   return user;
 }
 
+async function seedBytePlusKey(managementSource: 'user' | 'coding_plan', isEnabled = true) {
+  const user = await insertTestUser();
+  await db.insert(byok_api_keys).values({
+    kilo_user_id: user.id,
+    provider_id: 'byteplus-coding',
+    encrypted_api_key: encryptApiKey(`byteplus-${crypto.randomUUID()}`, BYOK_ENCRYPTION_KEY),
+    management_source: managementSource,
+    is_enabled: isEnabled,
+    created_by: user.id,
+  });
+  return user;
+}
+
 afterEach(async () => {
   await db.delete(byok_api_keys);
   await db.delete(kilocode_users);
@@ -55,5 +68,16 @@ describe('Coding Plan MiniMax BYOK routing', () => {
     await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, user.id));
 
     expect(await getBYOKforUser(db, user.id, ['minimax'])).toBeNull();
+  });
+});
+
+describe('Coding Plan BytePlus BYOK routing', () => {
+  it('loads a BytePlus Coding Plan-installed key through ordinary direct BYOK routing', async () => {
+    const user = await seedBytePlusKey('coding_plan');
+
+    const byok = await getBYOKforUser(db, user.id, ['byteplus-coding']);
+
+    expect(byok).toHaveLength(1);
+    expect(byok?.[0].providerId).toBe('byteplus-coding');
   });
 });

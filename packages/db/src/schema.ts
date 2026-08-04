@@ -137,6 +137,7 @@ import type {
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
   OrganizationModeConfig,
+  OrganizationGroupPolicies,
   OrganizationPlan,
   OrganizationRole,
   OrganizationSettings,
@@ -4193,6 +4194,106 @@ export const organization_memberships = pgTable(
 );
 
 export type OrganizationMembership = typeof organization_memberships.$inferSelect;
+
+export const organization_groups = pgTable(
+  'organization_groups',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    description: text(),
+    policies: jsonb().$type<OrganizationGroupPolicies>().default([]).notNull(),
+    created_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_groups_organization_id_id').on(table.organization_id, table.id),
+    uniqueIndex('UQ_organization_groups_organization_id_canonical_name').on(
+      table.organization_id,
+      sql`lower(btrim(${table.name}))`
+    ),
+    index('IDX_organization_groups_organization_id').on(table.organization_id),
+    check(
+      'organization_groups_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 80`
+    ),
+    check(
+      'organization_groups_description_check',
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= 500`
+    ),
+  ]
+);
+
+export type OrganizationGroup = typeof organization_groups.$inferSelect;
+export type NewOrganizationGroup = typeof organization_groups.$inferInsert;
+
+export const organization_group_memberships = pgTable(
+  'organization_group_memberships',
+  {
+    organization_id: uuid().notNull(),
+    group_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    assigned_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.organization_id, table.group_id, table.kilo_user_id],
+      name: 'PK_organization_group_memberships',
+    }),
+    foreignKey({
+      columns: [table.organization_id, table.group_id],
+      foreignColumns: [organization_groups.organization_id, organization_groups.id],
+      name: 'FK_organization_group_memberships_group',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organization_id, table.kilo_user_id],
+      foreignColumns: [
+        organization_memberships.organization_id,
+        organization_memberships.kilo_user_id,
+      ],
+      name: 'FK_organization_group_memberships_member',
+    }).onDelete('cascade'),
+    index('IDX_organization_group_memberships_organization_user').on(
+      table.organization_id,
+      table.kilo_user_id
+    ),
+  ]
+);
+
+export type OrganizationGroupMembership = typeof organization_group_memberships.$inferSelect;
+
+export const organization_group_policy_settings = pgTable(
+  'organization_group_policy_settings',
+  {
+    organization_id: uuid()
+      .primaryKey()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    default_policies: jsonb()
+      .$type<OrganizationGroupPolicies>()
+      .default([{ type: 'model_access', data: { mode: 'all' } }])
+      .notNull(),
+    policy_revision: integer().default(1).notNull(),
+    updated_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('organization_group_policy_settings_revision_check', sql`${table.policy_revision} >= 1`),
+  ]
+);
+
+export type OrganizationGroupPolicySettings =
+  typeof organization_group_policy_settings.$inferSelect;
 
 export const organization_membership_removals = pgTable(
   'organization_membership_removals',

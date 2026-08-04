@@ -1,7 +1,6 @@
 import { ChevronDown, ChevronRight } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
@@ -24,6 +23,10 @@ export function ReasoningPartRenderer({
   const colors = useThemeColors();
   const textSelectable = useTranscriptTextSelectable();
 
+  if (text.trim() === '') {
+    return null;
+  }
+
   return (
     <View className="rounded-xl border-[1.5px] border-dashed border-border p-3">
       <Pressable
@@ -44,12 +47,12 @@ export function ReasoningPartRenderer({
         )}
       </Pressable>
 
-      {isExpanded && text ? (
-        <Animated.View entering={FadeIn.duration(200)} className="mt-2">
+      {isExpanded ? (
+        <View className="mt-2">
           <Text selectable={textSelectable} className="text-sm leading-5 text-muted-foreground">
             {text}
           </Text>
-        </Animated.View>
+        </View>
       ) : null}
     </View>
   );

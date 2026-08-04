@@ -377,6 +377,14 @@ describe('agent LLM harness', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('Never do a real run to verify');
   });
 
+  it('tells the model that omitting pathPrefix or startUrl clears them when updating a workflow', () => {
+    const definitions = createWorkflowToolDefinitions({ mode: 'safe' });
+    const saveWorkflow = definitions.find(tool => tool.function.name === 'save_workflow');
+    expect(JSON.stringify(saveWorkflow?.function.parameters)).toContain(
+      'When updating, omitting pathPrefix or startUrl clears the stored value.'
+    );
+  });
+
   it('returns correct workflow tool definitions for safe mode without the toggle', () => {
     const definitions = createWorkflowToolDefinitions({ mode: 'safe' });
     const names = definitions.map(tool => tool.function.name);

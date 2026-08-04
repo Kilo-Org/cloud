@@ -247,7 +247,7 @@ export const createWorkflowToolDefinitions = ({
             },
             workflowId: {
               description:
-                'The workflow id when updating an existing workflow. Omit to create a new one.',
+                'The workflow id when updating an existing workflow. Omit to create a new one. When updating, omitting pathPrefix or startUrl clears the stored value.',
               type: 'string',
             },
           },

@@ -44,6 +44,41 @@ type SubscriptionOutcome = {
   charged: boolean;
 };
 
+export async function getAssignedCodingPlanApiKey(input: {
+  inventoryId: string;
+  userId: string;
+  planId: string;
+  providerId: string;
+}) {
+  const [assignment] = await db
+    .select({
+      planId: coding_plan_key_inventory.plan_id,
+      providerId: coding_plan_key_inventory.provider_id,
+      status: coding_plan_key_inventory.status,
+      assignedToUserId: coding_plan_key_inventory.assigned_to_user_id,
+      encryptedApiKey: coding_plan_key_inventory.encrypted_api_key,
+    })
+    .from(coding_plan_key_inventory)
+    .where(eq(coding_plan_key_inventory.id, input.inventoryId))
+    .limit(1);
+  if (
+    !assignment ||
+    assignment.status !== 'assigned' ||
+    assignment.assignedToUserId !== input.userId ||
+    assignment.planId !== input.planId ||
+    assignment.providerId !== input.providerId ||
+    !assignment.encryptedApiKey
+  ) {
+    return null;
+  }
+
+  try {
+    return decryptApiKey(assignment.encryptedApiKey, BYOK_ENCRYPTION_KEY);
+  } catch {
+    return null;
+  }
+}
+
 function idempotencyFingerprint(idempotencyKey: string): string {
   return createHash('sha256').update(idempotencyKey).digest('hex');
 }

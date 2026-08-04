@@ -13,6 +13,14 @@ import {
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
 import {
+  CodingPlanQuotaWindowsSchema,
+  CodingPlanUsageError,
+} from '@/lib/coding-plans/usage-contract';
+import {
+  CodingPlanUsageEligibilityError,
+  getCodingPlanUsageResponse,
+} from '@/lib/coding-plans/usage';
+import {
   listManualCredentialRevocations,
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
@@ -42,6 +50,18 @@ const SubscriptionIdSchema = z.string().uuid();
 const BillingHistoryInputSchema = z.object({
   subscriptionId: SubscriptionIdSchema,
   cursor: z.string().optional(),
+});
+const CodingPlanUsageOutputSchema = z.object({
+  schemaVersion: z.literal(1),
+  fetchedAt: z.iso.datetime(),
+  subscription: z.object({
+    id: SubscriptionIdSchema,
+    planId: CodingPlanIdSchema,
+    planName: z.string().min(1),
+    providerId: CodingPlanProviderIdSchema,
+    providerName: z.string().min(1),
+    windows: CodingPlanQuotaWindowsSchema,
+  }),
 });
 
 const codingPlanSubscriptionColumns = {
@@ -195,6 +215,28 @@ export const codingPlansRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const subscription = await getOwnedSubscription(ctx.user.id, input.subscriptionId);
       return toCodingPlanSubscriptionView(subscription);
+    }),
+
+  getUsage: baseProcedure
+    .input(z.object({ subscriptionId: SubscriptionIdSchema }))
+    .output(CodingPlanUsageOutputSchema)
+    .query(async ({ input, ctx }) => {
+      const subscription = await getOwnedSubscription(ctx.user.id, input.subscriptionId);
+      try {
+        return await getCodingPlanUsageResponse(ctx.user.id, subscription);
+      } catch (error) {
+        if (error instanceof CodingPlanUsageEligibilityError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
+        if (error instanceof CodingPlanUsageError) {
+          throw new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Coding Plan usage is unavailable.',
+          cause: error,
+        });
+      }
     }),
 
   getBillingHistory: baseProcedure

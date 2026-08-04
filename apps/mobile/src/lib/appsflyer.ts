@@ -13,6 +13,12 @@ import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 let initialized = false;
 /** Blocks re-entry into create() within one JS bundle (before initSdk succeeds). */
 let purchaseConnectorCreateStarted = false;
+/**
+ * Invalidation token for in-flight initSdk callbacks. Incremented by
+ * `resetAppsFlyerState()` so a late success after stop/optional revoke
+ * cannot re-arm the SDK even when generation is unchanged.
+ */
+let callbackToken = 0;
 type PendingEvent = {
   name: string;
   values: Record<string, string>;
@@ -141,6 +147,8 @@ export function initAppsFlyer(): void {
   // Resume the SDK if it was stopped by a prior reset.
   appsFlyer.stop(false);
 
+  const initGeneration = currentGeneration();
+  const initToken = callbackToken;
   appsFlyer.initSdk(
     {
       devKey: APPSFLYER_DEV_KEY,
@@ -150,6 +158,9 @@ export function initAppsFlyer(): void {
       timeToWaitForATTUserAuthorization: 10,
     },
     () => {
+      if (currentGeneration() !== initGeneration || callbackToken !== initToken) {
+        return;
+      }
       initialized = true;
       if (Platform.OS === 'ios') {
         AppsFlyerPurchaseConnector.startObservingTransactions();
@@ -207,6 +218,7 @@ export function resetAppsFlyerState(): void {
     AppsFlyerPurchaseConnector.stopObservingTransactions();
   }
 
+  callbackToken += 1;
   initialized = false;
   pendingEvents.length = 0;
 }

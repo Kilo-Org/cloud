@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 
-import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { discardPostHog, identifyUser, initPostHog, resumePostHog } from '@/lib/analytics/posthog';
 import { initAppsFlyer, resetAppsFlyerState } from '@/lib/appsflyer';
 import {
@@ -51,11 +50,11 @@ export function useAnalyticsConsentGate({
   optionalConsent,
 }: AnalyticsConsentGateState): void {
   useEffect(() => {
-    if (!shouldStartAnalytics({ hasToken, consentChecked, needsConsent }) || !accountId) {
+    if (!hasToken || !consentChecked || !accountId) {
       clearTelemetryDecision();
       return;
     }
-    if (!optionalConsent) {
+    if (needsConsent || !optionalConsent) {
       setTelemetryDecision(accountId, false);
       const epoch = currentEpoch();
       resetAppsFlyerState();

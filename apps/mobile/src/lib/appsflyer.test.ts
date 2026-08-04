@@ -491,3 +491,197 @@ describe('resetAppsFlyerState', () => {
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
   });
 });
+
+describe('stale initSdk callback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedPlatform.OS = 'ios';
+    mockedController.allowsOptional.mockReturnValue(true);
+    mockedController.currentGeneration.mockReturnValue(0);
+    mockedAppsFlyer.create.mockResolvedValue(undefined);
+  });
+
+  it('does not set initialized when the callback fires after reset', async () => {
+    const successHolders: ((result: string) => void)[] = [];
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        successHolders.push(onSuccess);
+      }
+    );
+
+    const module = await loadModule();
+    module.initAppsFlyer();
+    expect(successHolders).toHaveLength(1);
+
+    // Bump generation to simulate controller clear (signOut or reset).
+    mockedController.currentGeneration.mockReturnValue(1);
+
+    // Fire the stale callback — must be a no-op.
+    successHolders[0]?.('ok');
+
+    // initialized must still be false, so trackEvent queues instead of logging.
+    module.trackEvent('post-stale-event');
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
+  });
+
+  it('does not drain buffered events when the callback fires after reset', async () => {
+    const successHolders: ((result: string) => void)[] = [];
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        successHolders.push(onSuccess);
+      }
+    );
+
+    const module = await loadModule();
+
+    // Buffer an event while init is stalled.
+    module.trackEvent('buffered-event');
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+
+    // Start the stalled init.
+    module.initAppsFlyer();
+    expect(successHolders).toHaveLength(1);
+
+    // Bump generation before the callback fires.
+    mockedController.currentGeneration.mockReturnValue(1);
+
+    // Fire the stale callback — must not drain the buffered event.
+    successHolders[0]?.('ok');
+
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+  });
+
+  it('re-inits fully after a stale callback is ignored', async () => {
+    const successHolders: ((result: string) => void)[] = [];
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        successHolders.push(onSuccess);
+      }
+    );
+
+    const module = await loadModule();
+    module.initAppsFlyer();
+    expect(successHolders).toHaveLength(1);
+
+    // Bump generation to invalidate the pending callback.
+    mockedController.currentGeneration.mockReturnValue(1);
+
+    // Fire the stale callback.
+    successHolders[0]?.('ok');
+    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
+
+    // Re-init — generation now matches the controller.
+    mockedAppsFlyer.setConsentData.mockClear();
+    mockedAppsFlyer.stop.mockClear();
+    mockedAppsFlyer.startObservingTransactions.mockClear();
+
+    module.initAppsFlyer();
+    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(false);
+    expect(mockedAppsFlyer.initSdk).toHaveBeenCalledTimes(2);
+
+    // Fire the new callback.
+    expect(successHolders).toHaveLength(2);
+    successHolders[1]?.('ok');
+    expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('callback token revoke invalidation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedPlatform.OS = 'ios';
+    mockedController.allowsOptional.mockReturnValue(true);
+    mockedController.currentGeneration.mockReturnValue(0);
+    mockedAppsFlyer.create.mockResolvedValue(undefined);
+  });
+
+  it('does not set initialized when callback fires after same-account reset', async () => {
+    const successHolders: ((result: string) => void)[] = [];
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        successHolders.push(onSuccess);
+      }
+    );
+
+    const module = await loadModule();
+    module.initAppsFlyer();
+    expect(successHolders).toHaveLength(1);
+
+    // Same-account optional revoke — generation unchanged.
+    mockedController.currentGeneration.mockReturnValue(0);
+    module.resetAppsFlyerState();
+
+    // Fire the stale callback — token mismatch must block it.
+    successHolders[0]?.('ok');
+
+    // Track an event — must buffer because initialized was not set.
+    module.trackEvent('post-reset-event');
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not drain queued events when callback fires after same-account reset', async () => {
+    const successHolders: ((result: string) => void)[] = [];
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        successHolders.push(onSuccess);
+      }
+    );
+
+    const module = await loadModule();
+
+    // Buffer an event while init is stalled.
+    module.trackEvent('buffered-event');
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+
+    module.initAppsFlyer();
+    expect(successHolders).toHaveLength(1);
+
+    // Same-account optional revoke — generation unchanged.
+    mockedController.currentGeneration.mockReturnValue(0);
+    module.resetAppsFlyerState();
+
+    // Fire the stale callback.
+    successHolders[0]?.('ok');
+
+    // The buffered event must not drain — token mismatch blocked drainPendingEvents.
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+  });
+
+  it('re-inits fully after same-account reset invalidation', async () => {
+    const successHolders: ((result: string) => void)[] = [];
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        successHolders.push(onSuccess);
+      }
+    );
+
+    const module = await loadModule();
+    module.initAppsFlyer();
+    expect(successHolders).toHaveLength(1);
+
+    // Same-account optional revoke — generation unchanged.
+    mockedController.currentGeneration.mockReturnValue(0);
+    module.resetAppsFlyerState();
+
+    // Fire the stale callback.
+    successHolders[0]?.('ok');
+    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
+
+    // Re-init — token now matches because resetAppsFlyerState was already called.
+    mockedAppsFlyer.setConsentData.mockClear();
+    mockedAppsFlyer.stop.mockClear();
+    mockedAppsFlyer.startObservingTransactions.mockClear();
+
+    module.initAppsFlyer();
+    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(false);
+    expect(mockedAppsFlyer.initSdk).toHaveBeenCalledTimes(2);
+
+    // Fire the new callback — token matches, must succeed.
+    expect(successHolders).toHaveLength(2);
+    successHolders[1]?.('ok');
+    expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
+  });
+});

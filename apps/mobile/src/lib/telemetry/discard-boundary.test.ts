@@ -1,4 +1,8 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
+// oxlint-disable max-lines — gate teardown proof adds one mounted-hook test alongside existing module-level tests
+// oxlint-disable typescript-eslint/no-deprecated — react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); the React 19 deprecation points to DOM-based Testing Library, which cannot render this app's non-DOM tree
+import { createElement } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---- single shared hoisted mock shape ----
@@ -347,5 +351,107 @@ describe('optional telemetry lifecycle', () => {
     expect(hoisted.appsFlyer.initSdk).not.toHaveBeenCalled();
 
     vi.useRealTimers();
+  });
+});
+
+// ---- needsConsent gate teardown ----
+
+describe('needsConsent gate teardown', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.device.deviceType = 1;
+    hoisted.appsFlyer.create.mockResolvedValue(undefined);
+    hoisted.appsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        onSuccess('ok');
+      }
+    );
+  });
+
+  it('resets AppsFlyer and discards PostHog when consent is invalidated', async () => {
+    // Load gate + posthog + controller in one module registry.
+    const mod = await loadPostHogWithGate();
+    // Also load appsflyer in the same registry so controller is shared.
+    const appsflyerMod = await import('../appsflyer');
+
+    // Set up active optional decision with initialized state.
+    mod.ctrl.setTelemetryDecision('test-account', true);
+    mod.initPostHog();
+    appsflyerMod.initAppsFlyer();
+    expect(hoisted.appsFlyer.initSdk).toHaveBeenCalledTimes(1);
+
+    // Simulate consent invalidation while signed in — same sequence the gate
+    // hook now runs for needsConsent.
+    mod.ctrl.setTelemetryDecision('test-account', false);
+    const epoch = mod.ctrl.currentEpoch();
+
+    // Controller write is synchronous, teardown follows.
+    appsflyerMod.resetAppsFlyerState();
+    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith(true);
+
+    // PostHog discard initiated (not awaited).
+    await mod.discardOptionalTelemetry(epoch);
+
+    // sealPostHogStorage called synchronously inside discardPostHog.
+    expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
+    // optOut called as part of the discard.
+    expect(hoisted.client.optOut).toHaveBeenCalled();
+    // purgePostHogPersistence called after discard because epoch matched.
+    expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
+  });
+
+  it('gate hook tears down AppsFlyer and PostHog when needsConsent becomes true', async () => {
+    const gate = await loadPostHogWithGate();
+
+    // Arm telemetry first so the PostHog client exists when teardown runs.
+    gate.ctrl.setTelemetryDecision('test-account', true);
+    gate.initPostHog();
+
+    // Define a wrapper that drives the gate hook with the supplied state.
+    type GateState = Parameters<typeof gate.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      gate.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    // Mount with needsConsent=true while signed in — must trigger full teardown.
+    // Wrap in act so React flushes the useEffect synchronously.
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(GateWrapper, {
+          hasToken: true,
+          consentChecked: true,
+          needsConsent: true,
+          email: 'test@test.com',
+          accountId: 'test-account',
+          optionalConsent: true,
+        })
+      );
+      // Flush microtasks so effects scheduled inside act settle.
+      await Promise.resolve();
+    });
+
+    // The gate writes the controller decision synchronously.
+    expect(gate.ctrl.allowsOptional()).toBe(false);
+
+    // resetAppsFlyerState must be called — proves the needsConsent branch.
+    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith(true);
+
+    // discardPostHog runs sealPostHogStorage synchronously.
+    expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
+
+    // Flush the async discard chain (optOut is mockResolvedValue).
+    // Two flushes: one for optOut resolution, one for the chained
+    // discardOptionalTelemetry to reach the epoch check + purge.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(hoisted.client.optOut).toHaveBeenCalled();
+    expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
+
+    // Unmount the renderer so effects and subscriptions are torn down.
+    renderer!.unmount();
   });
 });

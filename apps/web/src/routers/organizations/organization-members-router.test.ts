@@ -210,10 +210,10 @@ describe('organizations members trpc router', () => {
       expect(result).toEqual({ success: true, updated: 'role and limit' });
     });
 
-    it('lets an organization admin grant the owner role, since admin is an owner peer', async () => {
+    it('lets an organization admin grant the admin role', async () => {
       const targetUser = await insertTestUser({
-        google_user_email: `${crypto.randomUUID()}@org-admin-promote.example.com`,
-        google_user_name: 'Org Admin Promote Target',
+        google_user_email: `${crypto.randomUUID()}@org-admin-grant-admin.example.com`,
+        google_user_name: 'Org Admin Grant Admin Target',
         is_admin: false,
       });
       await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
@@ -223,13 +223,32 @@ describe('organizations members trpc router', () => {
       const result = await caller.organizations.members.update({
         organizationId: testOrganization.id,
         memberId: targetUser.id,
-        role: 'owner',
+        role: 'admin',
       });
 
       expect(result).toEqual({ success: true, updated: 'role and limit' });
     });
 
-    it('lets an organization admin change an existing owner role', async () => {
+    it('rejects an organization admin granting the owner role', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@org-admin-promote.example.com`,
+        google_user_name: 'Org Admin Promote Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      await expect(
+        caller.organizations.members.update({
+          organizationId: testOrganization.id,
+          memberId: targetUser.id,
+          role: 'owner',
+        })
+      ).rejects.toThrow('Only an organization owner can manage owners');
+    });
+
+    it('rejects an organization admin changing an existing owner role', async () => {
       const targetUser = await insertTestUser({
         google_user_email: `${crypto.randomUUID()}@org-admin-demote.example.com`,
         google_user_name: 'Org Admin Demote Target',
@@ -239,13 +258,13 @@ describe('organizations members trpc router', () => {
 
       const caller = await createCallerForUser(orgAdminUser.id);
 
-      const result = await caller.organizations.members.update({
-        organizationId: testOrganization.id,
-        memberId: targetUser.id,
-        role: 'member',
-      });
-
-      expect(result).toEqual({ success: true, updated: 'role and limit' });
+      await expect(
+        caller.organizations.members.update({
+          organizationId: testOrganization.id,
+          memberId: targetUser.id,
+          role: 'member',
+        })
+      ).rejects.toThrow('Only an organization owner can manage owners');
     });
 
     it('should throw FORBIDDEN error when non-owner tries to assign owner role', async () => {
@@ -669,13 +688,13 @@ describe('organizations members trpc router', () => {
       ).rejects.toThrow('You do not have access to this organization');
     });
 
-    it('lets an organization admin remove an owner, matching owner authority', async () => {
+    it('lets an organization admin remove a non-owner member', async () => {
       const targetUser = await insertTestUser({
-        google_user_email: `${crypto.randomUUID()}@org-admin-remove-owner.example.com`,
-        google_user_name: 'Org Admin Remove Owner Target',
+        google_user_email: `${crypto.randomUUID()}@org-admin-remove-member.example.com`,
+        google_user_name: 'Org Admin Remove Member Target',
         is_admin: false,
       });
-      await addUserToOrganization(testOrganization.id, targetUser.id, 'owner');
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
 
       const caller = await createCallerForUser(orgAdminUser.id);
 
@@ -685,6 +704,24 @@ describe('organizations members trpc router', () => {
       });
 
       expect(result).toEqual({ success: true, updated: targetUser.id });
+    });
+
+    it('rejects an organization admin removing an owner', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@org-admin-remove-owner.example.com`,
+        google_user_name: 'Org Admin Remove Owner Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'owner');
+
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      await expect(
+        caller.organizations.members.remove({
+          organizationId: testOrganization.id,
+          memberId: targetUser.id,
+        })
+      ).rejects.toThrow('Only an organization owner can manage owners');
     });
 
     it('should reject billing managers removing owners', async () => {
@@ -736,6 +773,30 @@ describe('organizations members trpc router', () => {
 
       expect(result).toHaveProperty('acceptInviteUrl');
       expect(result.acceptInviteUrl).toMatch(/^https?:\/\/.+\/users\/accept-invite\/.+$/);
+    });
+
+    it('should allow an organization admin to invite an admin', async () => {
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email: `${crypto.randomUUID()}@org-admin-invite-admin.example.com`,
+        role: 'admin',
+      });
+
+      expect(result).toHaveProperty('acceptInviteUrl');
+    });
+
+    it('should reject an organization admin inviting an owner', async () => {
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      await expect(
+        caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email: `${crypto.randomUUID()}@org-admin-invite-owner.example.com`,
+          role: 'owner',
+        })
+      ).rejects.toThrow('Only an organization owner can manage owners');
     });
 
     it('should allow system admin to invite any role', async () => {

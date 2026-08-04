@@ -34,7 +34,6 @@ import {
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
 import { getLowerDomainFromEmail } from '@/lib/utils';
-import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 const emailSchema = z.email();
 
@@ -46,15 +45,17 @@ const ROLE_LABELS = {
 } as const;
 
 // Business rules for inviting members:
-// - Owners, admins and Kilo admins can invite anyone
+// - Owners and Kilo admins can invite anyone
+// - Admins can invite anyone except an owner
 // - Billing managers can invite members only
 // - Members cannot invite anyone
 const getAvailableInviteRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
-  if (isKiloAdmin || canManageOrganization(currentUserRole))
+  if (isKiloAdmin || currentUserRole === 'owner')
     return ['owner', 'admin', 'member', 'billing_manager'];
+  if (currentUserRole === 'admin') return ['admin', 'member', 'billing_manager'];
   if (currentUserRole === 'billing_manager') return ['member'];
 
   return [];

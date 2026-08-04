@@ -17,7 +17,6 @@ import {
 } from '@/components/organizations/OrganizationContext';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
-import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 const getRoleBadgeVariant = (role: string) => {
   switch (role) {
@@ -39,12 +38,22 @@ const ROLE_LABELS = {
 
 const ASSIGNABLE_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
 
-// Owners, admins and Kilo staff may assign any role; nobody else may change roles.
+/**
+ * Mirrors the server rules in organization-members-router: owners and Kilo
+ * staff may assign any role, admins may assign every role except owner, and
+ * nobody else may change roles.
+ */
 const getAvailableRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
-  return isKiloAdmin || canManageOrganization(currentUserRole) ? [...ASSIGNABLE_ROLES] : [];
+  if (isKiloAdmin || currentUserRole === 'owner') {
+    return [...ASSIGNABLE_ROLES];
+  }
+  if (currentUserRole === 'admin') {
+    return ['admin', 'member', 'billing_manager'];
+  }
+  return [];
 };
 
 type MemberRoleDropdownProps = {
@@ -89,7 +98,8 @@ export function MemberRoleDropdown({
   };
 
   const availableRoles = getAvailableRoles(currentUserRole, isKiloAdmin);
-  const canEditRole = availableRoles.length > 0;
+  // An admin may not act on an owner's membership, so show it as read-only.
+  const canEditRole = availableRoles.length > 0 && availableRoles.includes(member.role);
 
   // Check if this member is the current user by comparing both ID and email
   const isCurrentUser =

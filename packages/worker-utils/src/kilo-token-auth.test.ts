@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { SignJWT } from 'jose';
 
 import { clearSecretCacheForTest } from './cached-secret';
 import { signKiloToken } from './kilo-token';
@@ -95,6 +96,32 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     // Explicitly confirm null blockedReason + matching pepper passes.
     userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
     const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+  });
+});
+
+describe('C15 deviceSessionId compatibility', () => {
+  beforeEach(() => {
+    clearSecretCacheForTest();
+    userResultByUserId.clear();
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+  });
+
+  it('accepts a token carrying deviceSessionId claim', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({
+      version: 3,
+      kiloUserId: 'user-xyz-789',
+      apiTokenPepper: 'pepper-current',
+      env: 'production',
+      tokenSource: 'kilo-chat',
+      deviceSessionId: 'session-abc-123',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
 
     await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
   });

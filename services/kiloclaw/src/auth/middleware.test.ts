@@ -221,6 +221,33 @@ describe('authMiddleware', () => {
   });
 });
 
+describe('C15 deviceSessionId compatibility', () => {
+  let app: ReturnType<typeof createTestApp>;
+
+  beforeEach(() => {
+    app = createTestApp();
+  });
+
+  it('accepts a Bearer token carrying deviceSessionId claim', async () => {
+    const token = await signToken({
+      kiloUserId: 'user_123',
+      apiTokenPepper: pepperFor('user_123'),
+      version: KILO_TOKEN_VERSION,
+      deviceSessionId: 'session-abc-789',
+    });
+
+    const res = await app.request(
+      '/protected/whoami',
+      { headers: { Authorization: `Bearer ${token}` } },
+      ENV_WITH_HYPERDRIVE
+    );
+    expect(res.status).toBe(200);
+    const body = await jsonBody(res);
+    expect(body.userId).toBe('user_123');
+    expect(body.authToken).toBe(token);
+  });
+});
+
 describe('internalApiMiddleware', () => {
   let app: ReturnType<typeof createTestApp>;
 

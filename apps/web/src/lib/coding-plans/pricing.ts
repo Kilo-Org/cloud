@@ -1,4 +1,8 @@
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
+import {
+  BYTEPLUS_CODING_MODEL_IDS,
+  BYTEPLUS_CODING_PROVIDER_ID,
+} from '@/lib/ai-gateway/providers/direct-byok/byteplus-coding';
 
 export const CODING_PLAN_IDS = [
   'minimax-token-plan-plus',
@@ -71,19 +75,8 @@ export const CODING_PLAN_CATALOG = {
     planId: 'byteplus-coding-plan-team-lite',
     providerName: 'BytePlus',
     name: 'Coding Plan Lite',
-    providerId: 'byteplus-coding',
-    coveredModelIds: [
-      'byteplus-coding/dola-seed-2.0-pro',
-      'byteplus-coding/dola-seed-2.0-lite',
-      'byteplus-coding/dola-seed-2.0-code',
-      'byteplus-coding/bytedance-seed-code',
-      'byteplus-coding/kimi-k2.5',
-      'byteplus-coding/glm-5.1',
-      'byteplus-coding/glm-5.2',
-      'byteplus-coding/deepseek-v4-flash',
-      'byteplus-coding/deepseek-v4-pro',
-      'byteplus-coding/gpt-oss-120b',
-    ],
+    providerId: BYTEPLUS_CODING_PROVIDER_ID,
+    coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
     costMicrodollars: 20_000_000,
     billingPeriodDays: 30,
     features: [

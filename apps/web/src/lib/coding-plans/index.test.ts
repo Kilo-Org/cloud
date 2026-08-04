@@ -13,6 +13,7 @@ import {
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
 import { CODING_PLAN_CATALOG, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import { BYTEPLUS_CODING_MODEL_IDS } from '@/lib/ai-gateway/providers/direct-byok/byteplus-coding';
 import {
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
@@ -127,18 +128,7 @@ describe('coding plans', () => {
       providerName: 'BytePlus',
       name: 'Coding Plan Lite',
       providerId: BYTEPLUS_PROVIDER_ID,
-      coveredModelIds: [
-        'byteplus-coding/dola-seed-2.0-pro',
-        'byteplus-coding/dola-seed-2.0-lite',
-        'byteplus-coding/dola-seed-2.0-code',
-        'byteplus-coding/bytedance-seed-code',
-        'byteplus-coding/kimi-k2.5',
-        'byteplus-coding/glm-5.1',
-        'byteplus-coding/glm-5.2',
-        'byteplus-coding/deepseek-v4-flash',
-        'byteplus-coding/deepseek-v4-pro',
-        'byteplus-coding/gpt-oss-120b',
-      ],
+      coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
       costMicrodollars: COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining([

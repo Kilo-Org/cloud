@@ -16,7 +16,7 @@ import { CodeReviewUserSegmentation } from '@/app/admin/components/CodeReviewUse
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { RefreshCw, Download, X, Search, User, Building2 } from 'lucide-react';
+import { RefreshCw, Download } from 'lucide-react';
 import {
   useCodeReviewQueueHealthStats,
   useCodeReviewOverviewStats,
@@ -26,12 +26,16 @@ import {
   useCodeReviewCancellationAnalysis,
   useCodeReviewErrorAnalysis,
   useCodeReviewUserSegmentation,
-  useSearchUsers,
-  useSearchOrganizations,
   type FilterParams,
 } from '@/app/admin/api/code-reviews/hooks';
 import { exportCodeReviewsToCSV } from './utils/csvExport';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
+import {
+  ScopeFilters,
+  type OwnershipType,
+  type SelectedUser,
+  type SelectedOrg,
+} from './ScopeFilters';
 
 const breadcrumbs = (
   <BreadcrumbItem>
@@ -41,20 +45,7 @@ const breadcrumbs = (
 
 type PresetRangeType = '30m' | '1h' | '2h' | '7d';
 type RangeType = PresetRangeType | 'interval';
-type OwnershipType = 'all' | 'personal' | 'organization';
 type RetryAccountingModeType = 'final_outcome' | 'all_attempts';
-
-type SelectedUser = {
-  id: string;
-  email: string | null;
-  name: string | null;
-};
-
-type SelectedOrg = {
-  id: string;
-  name: string | null;
-  plan: string | null;
-};
 
 type ActiveDateInterval = {
   startDate: string;
@@ -172,16 +163,6 @@ export default function CodeReviewsPage() {
   const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const [selectedOrg, setSelectedOrg] = useState<SelectedOrg | null>(null);
 
-  // Search state
-  const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [orgSearchQuery, setOrgSearchQuery] = useState('');
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showOrgDropdown, setShowOrgDropdown] = useState(false);
-
-  // Search queries
-  const userSearchResults = useSearchUsers(userSearchQuery, showUserDropdown);
-  const orgSearchResults = useSearchOrganizations(orgSearchQuery, showOrgDropdown);
-
   const intervalValidation = useMemo(
     () => validateDateIntervalDraft(dateIntervalState.intervalDraft),
     [dateIntervalState.intervalDraft]
@@ -284,8 +265,6 @@ export default function CodeReviewsPage() {
     setSelectedUser(user);
     setSelectedOrg(null); // Clear org filter when user is selected
     setOwnershipType('all');
-    setUserSearchQuery('');
-    setShowUserDropdown(false);
   };
 
   // Handle selecting an org from search
@@ -293,8 +272,6 @@ export default function CodeReviewsPage() {
     setSelectedOrg(org);
     setSelectedUser(null); // Clear user filter when org is selected
     setOwnershipType('all');
-    setOrgSearchQuery('');
-    setShowOrgDropdown(false);
   };
 
   // Handle clicking on a user in segmentation
@@ -307,21 +284,14 @@ export default function CodeReviewsPage() {
     handleSelectOrg({ id: orgId, name, plan });
   };
 
-  // Clear all filters
-  const clearFilters = () => {
+  // Clear the ownership/user/org scope filters shared by both sections below.
+  const clearScopeFilters = () => {
     setSelectedUser(null);
     setSelectedOrg(null);
     setOwnershipType('all');
-    setRetryAccountingMode('final_outcome');
-    setUserSearchQuery('');
-    setOrgSearchQuery('');
   };
 
-  const hasActiveFilter =
-    selectedUser ||
-    selectedOrg ||
-    ownershipType !== 'all' ||
-    retryAccountingMode !== 'final_outcome';
+  const hasActiveScopeFilter = Boolean(selectedUser || selectedOrg || ownershipType !== 'all');
 
   const splitWaitTimeByOwnership = !selectedUser && !selectedOrg && ownershipType === 'all';
   const waitTimeSeriesLabel = selectedUser
@@ -351,8 +321,8 @@ export default function CodeReviewsPage() {
     }
   }, [trpcClient, filterParams, startDate, endDate, isExporting, isIntervalDraftInvalid]);
 
-  const isLoading =
-    queueHealthQuery.isLoading ||
+  const isQueueHealthLoading = queueHealthQuery.isLoading;
+  const isHistoricalLoading =
     overviewQuery.isLoading ||
     dailyQuery.isLoading ||
     performanceQuery.isLoading ||
@@ -393,7 +363,7 @@ export default function CodeReviewsPage() {
         </div>
       }
     >
-      <div className="flex w-full flex-col gap-y-6">
+      <div className="flex w-full flex-col gap-y-8">
         <div>
           <h2 className="text-2xl font-bold">Code Review Telemetry</h2>
           <p className="text-muted-foreground mt-1">
@@ -402,357 +372,250 @@ export default function CodeReviewsPage() {
           </p>
         </div>
 
-        {/* Date Range and Filters */}
-        <div className="bg-background flex flex-col gap-4 rounded-lg border p-4">
-          {/* Date Range Row */}
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="text-sm font-medium">Date Range:</span>
-            {dateRangeOptions.map(option => (
-              <label key={option.value} className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="rangeType"
-                  value={option.value}
-                  checked={rangeType === option.value}
-                  onChange={() => handleRangeTypeChange(option.value)}
-                  className="h-4 w-4"
-                />
-                {option.label}
-              </label>
-            ))}
-            <span className="text-muted-foreground text-xs sm:ml-4">
-              {formatDateIntervalLabel(startDate)} to {formatDateIntervalLabel(endDate)}
-            </span>
+        {/* Current Queue Health — live snapshot, not affected by the date range below */}
+        <section className="bg-background flex flex-col gap-4 rounded-lg border p-4">
+          <div>
+            <h3 className="text-lg font-semibold">Current queue health</h3>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Live dispatch snapshot. Respects the scope filters below. Not affected by the date
+              range or retry accounting in Historical Telemetry.
+            </p>
           </div>
 
-          {rangeType === 'interval' && (
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-end gap-4">
-                <div className="flex w-full flex-col gap-2 sm:w-[220px]">
-                  <label htmlFor="code-review-start-time" className="text-sm font-medium">
-                    Start datetime
-                  </label>
-                  <Input
-                    id="code-review-start-time"
-                    type="datetime-local"
-                    value={intervalDraft.startInput}
-                    onChange={event => handleIntervalDraftChange('startInput', event.target.value)}
-                    aria-describedby="code-review-date-interval-feedback"
-                    aria-invalid={isIntervalDraftInvalid}
-                  />
-                </div>
-                <div className="flex w-full flex-col gap-2 sm:w-[220px]">
-                  <label htmlFor="code-review-end-time" className="text-sm font-medium">
-                    End datetime
-                  </label>
-                  <Input
-                    id="code-review-end-time"
-                    type="datetime-local"
-                    value={intervalDraft.endInput}
-                    onChange={event => handleIntervalDraftChange('endInput', event.target.value)}
-                    aria-describedby="code-review-date-interval-feedback"
-                    aria-invalid={isIntervalDraftInvalid}
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleApplyInterval}
-                  disabled={!hasPendingIntervalDraft}
-                >
-                  Apply interval
-                </Button>
-              </div>
-              <p
-                id="code-review-date-interval-feedback"
-                aria-live="polite"
-                className={
-                  isIntervalDraftInvalid
-                    ? 'text-destructive text-xs'
-                    : 'text-muted-foreground text-xs'
-                }
-              >
-                {isIntervalDraftInvalid
-                  ? intervalValidation.error
-                  : hasPendingIntervalDraft
-                    ? "Apply the interval to update telemetry. Times use this browser's local timezone."
-                    : "Times use this browser's local timezone."}
+          <ScopeFilters
+            instanceId="queue-health-scope"
+            ownershipType={ownershipType}
+            onOwnershipTypeChange={setOwnershipType}
+            selectedUser={selectedUser}
+            onSelectUser={handleSelectUser}
+            onClearUser={() => setSelectedUser(null)}
+            selectedOrg={selectedOrg}
+            onSelectOrg={handleSelectOrg}
+            onClearOrg={() => setSelectedOrg(null)}
+            hasActiveFilter={hasActiveScopeFilter}
+            onClearFilters={clearScopeFilters}
+          />
+
+          {isQueueHealthLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-muted-foreground">Loading queue health...</div>
+            </div>
+          ) : queueHealthQuery.error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-800">
+                Error loading queue health: {queueHealthQuery.error.message}
               </p>
+            </div>
+          ) : (
+            queueHealthQuery.data && <CodeReviewQueueHealthSummary data={queueHealthQuery.data} />
+          )}
+        </section>
+
+        {/* Historical Telemetry — driven by the date range and retry accounting mode below */}
+        <section className="flex flex-col gap-6">
+          <div className="bg-background flex flex-col gap-4 rounded-lg border p-4">
+            <div>
+              <h3 className="text-lg font-semibold">Historical telemetry</h3>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Trends and analysis over the selected date range. Respects the scope filters below
+                and the retry accounting mode.
+              </p>
+            </div>
+
+            {/* Date Range Row */}
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-sm font-medium">Date Range:</span>
+              {dateRangeOptions.map(option => (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer items-center gap-2 text-sm"
+                >
+                  <input
+                    type="radio"
+                    name="rangeType"
+                    value={option.value}
+                    checked={rangeType === option.value}
+                    onChange={() => handleRangeTypeChange(option.value)}
+                    className="h-4 w-4"
+                  />
+                  {option.label}
+                </label>
+              ))}
+              <span className="text-muted-foreground text-xs sm:ml-4">
+                {formatDateIntervalLabel(startDate)} to {formatDateIntervalLabel(endDate)}
+              </span>
+            </div>
+
+            {rangeType === 'interval' && (
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex w-full flex-col gap-2 sm:w-[220px]">
+                    <label htmlFor="code-review-start-time" className="text-sm font-medium">
+                      Start datetime
+                    </label>
+                    <Input
+                      id="code-review-start-time"
+                      type="datetime-local"
+                      value={intervalDraft.startInput}
+                      onChange={event =>
+                        handleIntervalDraftChange('startInput', event.target.value)
+                      }
+                      aria-describedby="code-review-date-interval-feedback"
+                      aria-invalid={isIntervalDraftInvalid}
+                    />
+                  </div>
+                  <div className="flex w-full flex-col gap-2 sm:w-[220px]">
+                    <label htmlFor="code-review-end-time" className="text-sm font-medium">
+                      End datetime
+                    </label>
+                    <Input
+                      id="code-review-end-time"
+                      type="datetime-local"
+                      value={intervalDraft.endInput}
+                      onChange={event => handleIntervalDraftChange('endInput', event.target.value)}
+                      aria-describedby="code-review-date-interval-feedback"
+                      aria-invalid={isIntervalDraftInvalid}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleApplyInterval}
+                    disabled={!hasPendingIntervalDraft}
+                  >
+                    Apply interval
+                  </Button>
+                </div>
+                <p
+                  id="code-review-date-interval-feedback"
+                  aria-live="polite"
+                  className={
+                    isIntervalDraftInvalid
+                      ? 'text-destructive text-xs'
+                      : 'text-muted-foreground text-xs'
+                  }
+                >
+                  {isIntervalDraftInvalid
+                    ? intervalValidation.error
+                    : hasPendingIntervalDraft
+                      ? "Apply the interval to update telemetry. Times use this browser's local timezone."
+                      : "Times use this browser's local timezone."}
+                </p>
+              </div>
+            )}
+
+            {/* Retry Accounting Mode */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="retry-aware-metrics"
+                  checked={retryAccountingMode === 'final_outcome'}
+                  onCheckedChange={checked =>
+                    setRetryAccountingMode(checked ? 'final_outcome' : 'all_attempts')
+                  }
+                />
+                <label htmlFor="retry-aware-metrics" className="cursor-pointer text-sm font-medium">
+                  Retry-aware metrics
+                </label>
+              </div>
+              <span className="text-muted-foreground text-xs">
+                {retryAccountingMode === 'final_outcome'
+                  ? 'Recovered infra retries count as the final review outcome.'
+                  : 'Every session attempt is counted separately.'}
+              </span>
+            </div>
+
+            <ScopeFilters
+              instanceId="historical-scope"
+              ownershipType={ownershipType}
+              onOwnershipTypeChange={setOwnershipType}
+              selectedUser={selectedUser}
+              onSelectUser={handleSelectUser}
+              onClearUser={() => setSelectedUser(null)}
+              selectedOrg={selectedOrg}
+              onSelectOrg={handleSelectOrg}
+              onClearOrg={() => setSelectedOrg(null)}
+              hasActiveFilter={hasActiveScopeFilter}
+              onClearFilters={clearScopeFilters}
+            />
+          </div>
+
+          {isHistoricalLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-muted-foreground">Loading telemetry data...</div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {/* KPI Cards */}
+              {overviewQuery.data && <CodeReviewStats data={overviewQuery.data} />}
+
+              {/* Queue Wait Summary */}
+              {overviewQuery.data && <CodeReviewWaitTimeSummary data={overviewQuery.data} />}
+
+              {/* Daily Chart */}
+              {dailyQuery.data && <CodeReviewDailyChart data={dailyQuery.data} />}
+
+              {/* Queue Wait Trend */}
+              {waitTimeQuery.data && (
+                <CodeReviewWaitTimeChart
+                  data={waitTimeQuery.data}
+                  splitByOwnership={splitWaitTimeByOwnership}
+                  filteredSeriesLabel={waitTimeSeriesLabel}
+                />
+              )}
+
+              {/* Performance Trend */}
+              {performanceQuery.data && (
+                <CodeReviewPerformanceChart
+                  data={performanceQuery.data}
+                  retryAccountingMode={retryAccountingMode}
+                />
+              )}
+
+              {/* User Segmentation */}
+              {segmentationQuery.data && (
+                <CodeReviewUserSegmentation
+                  data={segmentationQuery.data}
+                  onUserClick={handleUserClick}
+                  onOrgClick={handleOrgClick}
+                />
+              )}
+
+              {/* Cancellation Reasons */}
+              {cancellationQuery.data && (
+                <CodeReviewCancellationAnalysis data={cancellationQuery.data} />
+              )}
+
+              {/* Error Analysis */}
+              {errorQuery.data && (
+                <CodeReviewErrorAnalysis data={errorQuery.data} filterParams={filterParams} />
+              )}
             </div>
           )}
 
-          {/* Ownership Type Filter */}
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="text-sm font-medium">Ownership:</span>
-            {(['all', 'personal', 'organization'] as OwnershipType[]).map(type => (
-              <label
-                key={type}
-                className={`flex cursor-pointer items-center gap-2 text-sm ${
-                  (selectedUser || selectedOrg) && type !== 'all'
-                    ? 'cursor-not-allowed opacity-50'
-                    : ''
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="ownershipType"
-                  value={type}
-                  checked={ownershipType === type && !selectedUser && !selectedOrg}
-                  onChange={() => {
-                    if (!selectedUser && !selectedOrg) {
-                      setOwnershipType(type);
-                    }
-                  }}
-                  disabled={!!(selectedUser || selectedOrg)}
-                  className="h-4 w-4"
-                />
-                {type === 'all' ? 'All' : type === 'personal' ? 'Personal' : 'Organizations'}
-              </label>
-            ))}
-          </div>
-
-          {/* Retry Accounting Mode */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="retry-aware-metrics"
-                checked={retryAccountingMode === 'final_outcome'}
-                onCheckedChange={checked =>
-                  setRetryAccountingMode(checked ? 'final_outcome' : 'all_attempts')
-                }
-              />
-              <label htmlFor="retry-aware-metrics" className="cursor-pointer text-sm font-medium">
-                Retry-aware metrics
-              </label>
+          {/* Historical Error State */}
+          {(overviewQuery.error ||
+            dailyQuery.error ||
+            performanceQuery.error ||
+            waitTimeQuery.error ||
+            cancellationQuery.error ||
+            errorQuery.error ||
+            segmentationQuery.error) && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-800">
+                Error loading data:{' '}
+                {overviewQuery.error?.message ||
+                  dailyQuery.error?.message ||
+                  performanceQuery.error?.message ||
+                  waitTimeQuery.error?.message ||
+                  cancellationQuery.error?.message ||
+                  errorQuery.error?.message ||
+                  segmentationQuery.error?.message ||
+                  'Unknown error'}
+              </p>
             </div>
-            <span className="text-muted-foreground text-xs">
-              {retryAccountingMode === 'final_outcome'
-                ? 'Recovered infra retries count as the final review outcome.'
-                : 'Every session attempt is counted separately.'}
-            </span>
-          </div>
-
-          {/* User/Org Search Filters */}
-          <div className="flex flex-wrap items-start gap-4">
-            {/* User Search */}
-            <div className="relative w-64">
-              <span className="mb-1 block text-sm font-medium">Filter by User:</span>
-              {selectedUser ? (
-                <div className="bg-primary/10 border-primary/30 flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                  <User className="text-primary h-4 w-4" />
-                  <span className="flex-1 truncate">
-                    {selectedUser.name || selectedUser.email || selectedUser.id}
-                  </span>
-                  <button
-                    onClick={() => setSelectedUser(null)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                  <Input
-                    placeholder="Search users..."
-                    value={userSearchQuery}
-                    onChange={e => {
-                      setUserSearchQuery(e.target.value);
-                      setShowUserDropdown(true);
-                    }}
-                    onFocus={() => setShowUserDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowUserDropdown(false), 200)}
-                    className="pl-9"
-                  />
-                  {showUserDropdown && userSearchQuery && (
-                    <div className="bg-popover text-popover-foreground absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border shadow-lg">
-                      {userSearchResults.isLoading ? (
-                        <div className="text-muted-foreground px-3 py-2 text-sm">Searching...</div>
-                      ) : userSearchResults.data?.length === 0 ? (
-                        <div className="text-muted-foreground px-3 py-2 text-sm">
-                          No users found
-                        </div>
-                      ) : (
-                        userSearchResults.data?.map(user => (
-                          <button
-                            key={user.id}
-                            onClick={() => handleSelectUser(user)}
-                            className="hover:bg-accent hover:text-accent-foreground flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-                          >
-                            <User className="text-muted-foreground h-4 w-4" />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate font-medium">{user.name || 'Unknown'}</div>
-                              <div className="text-muted-foreground truncate text-xs">
-                                {user.email}
-                              </div>
-                            </div>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Org Search */}
-            <div className="relative w-64">
-              <span className="mb-1 block text-sm font-medium">Filter by Organization:</span>
-              {selectedOrg ? (
-                <div className="flex items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-sm">
-                  <Building2 className="h-4 w-4 text-violet-500" />
-                  <span className="flex-1 truncate">{selectedOrg.name || selectedOrg.id}</span>
-                  {selectedOrg.plan && (
-                    <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-xs text-violet-400">
-                      {selectedOrg.plan}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => setSelectedOrg(null)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                  <Input
-                    placeholder="Search organizations..."
-                    value={orgSearchQuery}
-                    onChange={e => {
-                      setOrgSearchQuery(e.target.value);
-                      setShowOrgDropdown(true);
-                    }}
-                    onFocus={() => setShowOrgDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowOrgDropdown(false), 200)}
-                    className="pl-9"
-                  />
-                  {showOrgDropdown && orgSearchQuery && (
-                    <div className="bg-popover text-popover-foreground absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border shadow-lg">
-                      {orgSearchResults.isLoading ? (
-                        <div className="text-muted-foreground px-3 py-2 text-sm">Searching...</div>
-                      ) : orgSearchResults.data?.length === 0 ? (
-                        <div className="text-muted-foreground px-3 py-2 text-sm">
-                          No organizations found
-                        </div>
-                      ) : (
-                        orgSearchResults.data?.map(org => (
-                          <button
-                            key={org.id}
-                            onClick={() => handleSelectOrg(org)}
-                            className="hover:bg-accent hover:text-accent-foreground flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-                          >
-                            <Building2 className="text-muted-foreground h-4 w-4" />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate font-medium">{org.name || 'Unknown'}</div>
-                            </div>
-                            {org.plan && (
-                              <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
-                                {org.plan}
-                              </span>
-                            )}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Clear Filters Button */}
-            {hasActiveFilter && (
-              <div className="flex items-end">
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10">
-                  <X className="mr-1 h-4 w-4" />
-                  Clear filters
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-muted-foreground">Loading telemetry data...</div>
-          </div>
-        ) : (
-          <>
-            {/* Live Queue Health */}
-            {queueHealthQuery.data && <CodeReviewQueueHealthSummary data={queueHealthQuery.data} />}
-
-            {/* KPI Cards */}
-            {overviewQuery.data && <CodeReviewStats data={overviewQuery.data} />}
-
-            {/* Queue Wait Summary */}
-            {overviewQuery.data && <CodeReviewWaitTimeSummary data={overviewQuery.data} />}
-
-            {/* Daily Chart */}
-            {dailyQuery.data && <CodeReviewDailyChart data={dailyQuery.data} />}
-
-            {/* Queue Wait Trend */}
-            {waitTimeQuery.data && (
-              <CodeReviewWaitTimeChart
-                data={waitTimeQuery.data}
-                splitByOwnership={splitWaitTimeByOwnership}
-                filteredSeriesLabel={waitTimeSeriesLabel}
-              />
-            )}
-
-            {/* Performance Trend */}
-            {performanceQuery.data && (
-              <CodeReviewPerformanceChart
-                data={performanceQuery.data}
-                retryAccountingMode={retryAccountingMode}
-              />
-            )}
-
-            {/* User Segmentation */}
-            {segmentationQuery.data && (
-              <CodeReviewUserSegmentation
-                data={segmentationQuery.data}
-                onUserClick={handleUserClick}
-                onOrgClick={handleOrgClick}
-              />
-            )}
-
-            {/* Cancellation Reasons */}
-            {cancellationQuery.data && (
-              <CodeReviewCancellationAnalysis data={cancellationQuery.data} />
-            )}
-
-            {/* Error Analysis */}
-            {errorQuery.data && (
-              <CodeReviewErrorAnalysis data={errorQuery.data} filterParams={filterParams} />
-            )}
-          </>
-        )}
-
-        {/* Error State */}
-        {(queueHealthQuery.error ||
-          overviewQuery.error ||
-          dailyQuery.error ||
-          performanceQuery.error ||
-          waitTimeQuery.error ||
-          cancellationQuery.error ||
-          errorQuery.error ||
-          segmentationQuery.error) && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="text-sm text-red-800">
-              Error loading data:{' '}
-              {queueHealthQuery.error?.message ||
-                overviewQuery.error?.message ||
-                dailyQuery.error?.message ||
-                performanceQuery.error?.message ||
-                waitTimeQuery.error?.message ||
-                cancellationQuery.error?.message ||
-                errorQuery.error?.message ||
-                segmentationQuery.error?.message ||
-                'Unknown error'}
-            </p>
-          </div>
-        )}
+          )}
+        </section>
       </div>
     </AdminPage>
   );

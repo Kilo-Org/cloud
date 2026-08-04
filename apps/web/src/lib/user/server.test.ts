@@ -10,6 +10,8 @@ import {
   isEmailBlacklistedByDomain,
   isBlockedTLD,
   parseLinkedInProfileName,
+  parseAnacondaProfile,
+  authOptions,
   getUserUUID,
   uuidSchema,
   parseSignInRedirectContext,
@@ -213,6 +215,65 @@ describe('parseLinkedInProfileName', () => {
       expect(typeof result).toBe('string');
       expect(result).not.toBe(true);
       expect(result).not.toBe(false);
+    });
+  });
+});
+
+describe('Anaconda OAuth provider', () => {
+  test('maps a valid profile and uses sub as the stable account id', () => {
+    expect(
+      parseAnacondaProfile({
+        sub: 'anaconda-user-123',
+        iss: 'https://auth.anaconda.com/api/auth',
+        aud: 'kilo-client-id',
+        email: 'user@example.com',
+        email_verified: true,
+        given_name: 'Anaconda',
+        family_name: 'User',
+        picture: 'https://example.com/avatar.png',
+      })
+    ).toEqual({
+      id: 'anaconda-user-123',
+      email: 'user@example.com',
+      name: 'Anaconda User',
+      image: 'https://example.com/avatar.png',
+    });
+  });
+
+  test('uses the email local part when the profile omits a name', () => {
+    expect(
+      parseAnacondaProfile({
+        sub: 'anaconda-user-123',
+        email: 'local-part@example.com',
+        email_verified: true,
+      })
+    ).toMatchObject({ name: 'local-part' });
+  });
+
+  test.each([
+    [{ email: 'user@example.com', email_verified: true }, 'missing subject'],
+    [{ sub: 'anaconda-user-123', email_verified: true }, 'missing email'],
+    [{ sub: '', email: 'user@example.com', email_verified: true }, 'empty subject'],
+    [{ sub: 'anaconda-user-123', email: 'not-an-email', email_verified: true }, 'invalid email'],
+  ])('rejects a profile with %s (%s)', (profile, _reason) => {
+    expect(() => parseAnacondaProfile(profile)).toThrow();
+  });
+
+  test.each([
+    ['missing', { sub: 'anaconda-user-123', email: 'user@example.com' }],
+    ['false', { sub: 'anaconda-user-123', email: 'user@example.com', email_verified: false }],
+  ])('rejects an email_verified claim that is %s', (_claimState, profile) => {
+    expect(() => parseAnacondaProfile(profile)).toThrow();
+  });
+
+  test('registers discovery, ID tokens, OIDC checks, and client secret POST authentication', () => {
+    expect(authOptions.providers.find(provider => provider.id === 'anaconda')).toMatchObject({
+      issuer: 'https://auth.anaconda.com/api/auth',
+      wellKnown: 'https://anaconda.com/.well-known/openid-configuration',
+      authorization: { params: { scope: 'openid profile email' } },
+      idToken: true,
+      checks: ['pkce', 'state', 'nonce'],
+      client: { token_endpoint_auth_method: 'client_secret_post' },
     });
   });
 });

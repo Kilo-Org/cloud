@@ -1,0 +1,35 @@
+.anacondaButton {
+  position: relative;
+  transition:
+    box-shadow 200ms cubic-bezier(0.25, 1, 0.5, 1),
+    border-color 200ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.anacondaButton:not(:disabled):is(:hover, :focus-visible) {
+  border-color: rgb(68 168 51 / 80%);
+  animation: anaconda-outline-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes anaconda-outline-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgb(68 168 51 / 45%),
+      0 0 8px 0 rgb(68 168 51 / 20%);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 1px rgb(119 221 81 / 90%),
+      0 0 14px 2px rgb(68 168 51 / 35%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anacondaButton:not(:disabled):is(:hover, :focus-visible) {
+    animation: none;
+    box-shadow:
+      0 0 0 1px rgb(68 168 51 / 70%),
+      0 0 10px 0 rgb(68 168 51 / 25%);
+  }
+}

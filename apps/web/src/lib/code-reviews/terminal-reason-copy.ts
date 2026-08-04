@@ -26,7 +26,23 @@ export type CodeReviewTerminalReasonCopy = {
   checkTitle: string;
   /** GitHub check run summary and the GitLab commit status description. */
   checkSummary: string;
+  /**
+   * Markdown written into the PR summary comment in place of a review, so the
+   * run's outcome is recorded in the thread rather than only in the checks tab.
+   *
+   * MUST start with the `<!-- kilo-review -->` marker: that is how the summary
+   * comment is located for update, and writing a body without it would orphan
+   * the existing comment and create a duplicate on the next run.
+   *
+   * Because this is published to the pull request, which may be a public
+   * repository, it must never interpolate a raw `error_message`. Each entry is
+   * a deliberate, reviewed sentence.
+   */
+  summaryBody: string;
 };
+
+/** Identifies the Kilo summary comment for in-place updates. */
+const KILO_REVIEW_MARKER = '<!-- kilo-review -->';
 
 /**
  * A Map rather than an object literal. Callers pass the raw `terminal_reason`
@@ -43,6 +59,13 @@ const COPY_BY_TERMINAL_REASON = new Map<CodeReviewTerminalReason, CodeReviewTerm
       message: 'Your provider API key hit its rate limit.',
       checkTitle: 'Kilo Code Review rate limited',
       checkSummary: 'Your provider API key hit its rate limit.',
+      summaryBody: `${KILO_REVIEW_MARKER}
+## Code Review Summary
+
+**This review did not run.** Your provider API key hit its rate limit, so the
+request was rejected before the review started. Kilo does not retry
+automatically, because the quota is your provider's; push a new commit once it
+resets. Any inline comments below are from an earlier review.`,
     },
   ],
 ]);

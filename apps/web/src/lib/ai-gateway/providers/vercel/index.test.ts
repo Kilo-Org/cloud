@@ -194,6 +194,58 @@ describe('convertProviderOptions', () => {
   });
 });
 
+describe('applyVercelSettings BYOK pinning', () => {
+  function byokRequest(ignore: string[]): GatewayRequest {
+    return {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ignore },
+      },
+    };
+  }
+
+  // `userByok` is built from the providers that actually serve the requested
+  // model, so the realistic partial-ignore case is two endpoints for the same
+  // model: Anthropic direct and Bedrock both serve Claude.
+  const bedrockCredentials = JSON.stringify({
+    accessKeyId: 'AKIAEXAMPLE',
+    secretAccessKey: 'secret',
+    region: 'us-east-1',
+  });
+
+  it('drops a BYOK provider the caller ignored when another serving provider remains', async () => {
+    const request = byokRequest(['anthropic']);
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
+    });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
+  });
+
+  // Regression: an empty BYOK map sends `only: []` with no credential, so the
+  // request loses BYOK pinning and bills Kilo's Vercel account while still
+  // counting as BYOK downstream (which skips the zero-balance rejection).
+  it('keeps BYOK credentials when the caller ignores every provider it holds keys for', async () => {
+    const request = byokRequest(['anthropic']);
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      anthropic: [{ apiKey: 'sk-anthropic' }],
+    });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['anthropic']);
+  });
+});
+
 describe('passesVercelRoutingPercentage', () => {
   it('never passes at 0% and always passes at 100%', () => {
     for (let seed = 0; seed < 1_000; seed++) {

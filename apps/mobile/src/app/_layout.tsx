@@ -68,6 +68,7 @@ import {
 } from '@/lib/share-payload';
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
@@ -100,6 +101,11 @@ function initSentry(optionalConsented: boolean) {
 
     integrations: [navigationIntegration],
     enableNativeFramesTracking: false,
+
+    beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
+    beforeBreadcrumb: scrubBreadcrumb as NonNullable<
+      Parameters<typeof Sentry.init>[0]
+    >['beforeBreadcrumb'],
 
     spotlight: __DEV__,
   });
@@ -280,7 +286,10 @@ function RootLayoutNav() {
     return unsubscribe;
   }, [token, userId]);
 
-  useTrackingPermissionPrompt(!isLoading);
+  useTrackingPermissionPrompt(
+    optionalConsent &&
+      shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
+  );
   useAnalyticsConsentGate({
     hasToken: token != null,
     consentChecked,

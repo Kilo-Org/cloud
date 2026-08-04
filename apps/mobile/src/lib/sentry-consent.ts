@@ -60,6 +60,11 @@ export async function reinitSentryForConsent(
       await Sentry.close();
       init(consented);
     } catch {
+      try {
+        init(false);
+      } catch {
+        // init(false) failed — still report failure and keep chain alive
+      }
       onFailure?.();
     }
   })();

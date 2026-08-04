@@ -55,6 +55,45 @@ describe('reinitSentryForConsent', () => {
     expect(events).toEqual(['close', 'init:true']);
   });
 
+  it('re-initialises with init(false) when Sentry.close() throws (fail-closed)', async () => {
+    closeMock.mockRejectedValueOnce(new Error('close failed'));
+    const events: string[] = [];
+    const init = vi.fn((consented: boolean) => {
+      events.push(`init:${consented}`);
+    });
+    const onFailure = vi.fn(() => {
+      events.push('onFailure');
+    });
+
+    await reinitSentryForConsent(true, init, onFailure);
+
+    expect(init).toHaveBeenCalledWith(false);
+    expect(onFailure).toHaveBeenCalledOnce();
+    // init(false) must run before onFailure.
+    expect(events).toEqual(['init:false', 'onFailure']);
+  });
+
+  it('reports failure and keeps chain alive when init(false) throws', async () => {
+    closeMock.mockRejectedValueOnce(new Error('close failed'));
+    const init = vi.fn<(_: boolean) => void>().mockImplementationOnce(() => {
+      throw new Error('init(false) failed');
+    });
+    const onFailure = vi.fn<() => void>();
+
+    await reinitSentryForConsent(true, init, onFailure);
+
+    // onFailure must run even though init(false) threw.
+    expect(onFailure).toHaveBeenCalledOnce();
+    // init was called with false (fail-closed attempt).
+    expect(init).toHaveBeenCalledWith(false);
+
+    // A later consent transition must still run — the chain must not reject.
+    closeMock.mockResolvedValue(undefined);
+    await reinitSentryForConsent(false, init);
+    expect(init).toHaveBeenCalledWith(false);
+    expect(init).toHaveBeenCalledTimes(2);
+  });
+
   it('serializes overlapping consent transitions', async () => {
     const events: string[] = [];
     const firstCloseGate = Promise.withResolvers<null>();

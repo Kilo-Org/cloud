@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -335,7 +335,7 @@ test('conversation mode controls the selected conversation request tools', async
   try {
     await mockKiloApi(context, {
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Dangerous mode reply.' } }] }],
-      toolNames: [...safeToolNames, 'eval'],
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

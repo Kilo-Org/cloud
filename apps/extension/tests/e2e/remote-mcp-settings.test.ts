@@ -6,7 +6,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { z } from 'zod';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, workflowToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -214,6 +214,7 @@ const turnMockConfig = {
       'find_in_page',
       'search_memories',
       'get_memory',
+      ...workflowToolNames,
       MAPPED_TOOL_NAME,
     ],
     [
@@ -222,6 +223,7 @@ const turnMockConfig = {
       'find_in_page',
       'search_memories',
       'get_memory',
+      ...workflowToolNames,
       MAPPED_TOOL_NAME,
     ],
   ],

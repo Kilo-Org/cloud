@@ -6,6 +6,7 @@ import {
   createThinkingBlock,
   createToolResult,
   createUserMessage,
+  createWorkflowToolCall,
   groupConversationEvents,
   getConversationScrollKey,
 } from './agent-conversation';
@@ -152,5 +153,85 @@ describe('agent conversation events', () => {
       serverName: 'GitHub',
       type: 'tool-call',
     });
+  });
+
+  it('creates search_workflows and get_workflow tool-call events', () => {
+    const searchCall = createWorkflowToolCall({
+      arguments: { query: 'checkout' },
+      name: 'search_workflows',
+      providerToolCallId: 'call-search_workflows',
+      tabId: 7,
+    });
+    const getCall = createWorkflowToolCall({
+      arguments: { workflowId: 'wf-1' },
+      name: 'get_workflow',
+      providerToolCallId: 'call-get_workflow',
+      tabId: 7,
+    });
+
+    expectTypeOf(searchCall.id).toBeString();
+    expect(searchCall.name).toBe('search_workflows');
+    expect(searchCall.arguments).toStrictEqual({ query: 'checkout' });
+    expect(getCall.name).toBe('get_workflow');
+    expect(getCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
+  });
+
+  it('creates save_workflow and save_memory tool-call events', () => {
+    const saveCall = createWorkflowToolCall({
+      arguments: { workflowId: 'wf-1' },
+      name: 'save_workflow',
+      providerToolCallId: 'call-save_workflow',
+      tabId: 7,
+    });
+    const saveMemCall = createWorkflowToolCall({
+      arguments: { workflowId: 'wf-1' },
+      name: 'save_memory',
+      providerToolCallId: 'call-save_memory',
+      tabId: 7,
+    });
+
+    expect(saveCall.name).toBe('save_workflow');
+    expect(saveCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
+    expect(saveMemCall.name).toBe('save_memory');
+    expect(saveMemCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
+    expectTypeOf(saveMemCall.id).toBeString();
+  });
+
+  it('creates run_workflow and delete_workflow tool-call events', () => {
+    const runCall = createWorkflowToolCall({
+      arguments: { workflowId: 'wf-1' },
+      name: 'run_workflow',
+      providerToolCallId: 'call-run_workflow',
+      tabId: 7,
+    });
+    const deleteCall = createWorkflowToolCall({
+      arguments: { workflowId: 'wf-1' },
+      name: 'delete_workflow',
+      providerToolCallId: 'call-delete_workflow',
+      tabId: 7,
+    });
+
+    expect(runCall.name).toBe('run_workflow');
+    expect(runCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
+    expect(deleteCall.name).toBe('delete_workflow');
+    expect(deleteCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
+    expectTypeOf(deleteCall.id).toBeString();
+  });
+
+  it('groups workflow tool calls and results into one transcript item', () => {
+    const toolCall = createWorkflowToolCall({
+      arguments: { workflowId: 'wf-1' },
+      name: 'run_workflow',
+      tabId: 7,
+    });
+    const toolResult = createToolResult({
+      ok: true,
+      toolCallId: toolCall.id,
+      value: { done: true, result: 'Completed' },
+    });
+
+    expect(groupConversationEvents([toolCall, toolResult])).toStrictEqual([
+      { result: toolResult, toolCall, type: 'tool-exchange' },
+    ]);
   });
 });

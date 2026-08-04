@@ -29,6 +29,7 @@ const memory = (overrides: Partial<AgentMemory> = {}): AgentMemory => ({
 });
 
 const baseInput = {
+  fullOutcome: false,
   isLoaded: true,
   loadError: false,
   memories: [] as AgentMemory[],
@@ -97,6 +98,18 @@ describe('save card state machine', () => {
     ).toStrictEqual({ kind: 'full' });
   });
 
+  it('shows full from actual outcome when count is below max', () => {
+    // Memories count below max, but the persist layer reported full.
+    expect(
+      deriveSaveCardState({
+        ...baseInput,
+        fullOutcome: true,
+        memories: [],
+        pendingDraft: draft(),
+      })
+    ).toStrictEqual({ kind: 'full' });
+  });
+
   it('does not show full while loadError is set even if count is max', () => {
     expect(
       deriveSaveCardState({
@@ -108,7 +121,7 @@ describe('save card state machine', () => {
     ).toStrictEqual({ kind: 'loadError' });
   });
 
-  it('shows save error when draft and saveError are set (branch 5)', () => {
+  it('shows save error when draft and saveError are set (branch 6)', () => {
     expect(
       deriveSaveCardState({
         ...baseInput,
@@ -121,7 +134,7 @@ describe('save card state machine', () => {
     });
   });
 
-  it('shows draft form when draft exists (branch 6)', () => {
+  it('shows draft form when draft exists (branch 7)', () => {
     expect(
       deriveSaveCardState({
         ...baseInput,
@@ -130,7 +143,7 @@ describe('save card state machine', () => {
     ).toStrictEqual({ kind: 'draft' });
   });
 
-  it('shows confirmation when savedConfirmation is true and no draft (branch 7)', () => {
+  it('shows confirmation when savedConfirmation is true and no draft (fallthrough)', () => {
     expect(
       deriveSaveCardState({
         ...baseInput,
@@ -174,6 +187,17 @@ describe('save card state machine', () => {
 describe('save error classification', () => {
   it('classifies AgentMemoryStoreFullError as full', () => {
     expect(classifySaveError(new AgentMemoryStoreFullError())).toBe('full');
+  });
+
+  it('classifies a store-full error instance as full', () => {
+    // The card maps the exact store-full outcome reason to its full-state view.
+    expect(classifySaveError(new AgentMemoryStoreFullError('Memory store is full.'))).toBe('full');
+  });
+
+  it('classifies generic Error with full-error name as full', () => {
+    const error = new Error('Memory store is full.');
+    error.name = 'AgentMemoryStoreFullError';
+    expect(classifySaveError(error)).toBe('full');
   });
 
   it('classifies other errors as retryable', () => {

@@ -146,9 +146,19 @@ describe('ConsentCard', () => {
     expect(t).toContain('Decline');
   });
 
-  it('defaults the optional switch to off', () => {
+  it('defaults the optional switch to on', () => {
     const renderer = mountCard('onboarding');
-    expect(singleSwitch(renderer.root).props.value).toBe(false);
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('accepts with optional on when the switch is untouched', async () => {
+    const renderer = mountCard('onboarding');
+    const btn = findButton(renderer.root, 'Accept and continue');
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);
   });
 
   it('calls acceptConsent with optional value on primary action', async () => {
@@ -156,14 +166,14 @@ describe('ConsentCard', () => {
     const sw = singleSwitch(renderer.root);
     await act(async () => {
       await Promise.resolve();
-      (sw.props.onValueChange as (v: boolean) => void)(true);
+      (sw.props.onValueChange as (v: boolean) => void)(false);
     });
     const btn = findButton(renderer.root, 'Accept and continue');
     await act(async () => {
       await Promise.resolve();
       (btn.props.onPress as () => void)();
     });
-    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);
+    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', false);
   });
 
   it('shows error when acceptConsent fails and does not navigate', async () => {

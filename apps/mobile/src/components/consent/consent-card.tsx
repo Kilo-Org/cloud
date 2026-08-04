@@ -42,7 +42,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [optionalToggle, setOptionalToggle] = useState(false);
+  // Onboarding pre-selects optional telemetry. Review mode starts off and the
+  // stored value loads over it, so a stored decline never flashes as on.
+  const [optionalToggle, setOptionalToggle] = useState(mode === 'onboarding');
   const [savingOptional, setSavingOptional] = useState(false);
   const loadedRef = useRef(false);
   const userToggledRef = useRef(false);

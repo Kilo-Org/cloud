@@ -61,7 +61,7 @@ export function ConsentDetails() {
         />
 
         <Text className="mt-6 text-sm font-semibold text-foreground">
-          Optional — off unless you turn it on
+          Optional — on unless you turn it off
         </Text>
 
         <Section

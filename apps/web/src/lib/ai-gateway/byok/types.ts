@@ -1,4 +1,9 @@
 import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { ManualByokProviderDefinition } from '@kilocode/db/schema-types';
+import {
+  ManualByokProviderCodeSchema,
+  ValidatedManualByokProviderDefinitionSchema,
+} from '@/lib/ai-gateway/providers/direct-byok/manual-byok';
 import * as z from 'zod';
 
 // API response type (never includes decrypted key)
@@ -11,6 +16,7 @@ export type BYOKApiKeyResponse = {
   created_at: string;
   updated_at: string;
   created_by: string;
+  provider_settings: ManualByokProviderDefinition | null;
 };
 
 // Optional organization ID schema - when not provided, uses the authenticated user's ID
@@ -21,14 +27,22 @@ const OptionalOrganizationIdSchema = z.object({
 // Zod schemas for tRPC validation
 // Note: organizationId is optional - if provided, enforces org owner/billing access
 // If not provided, uses the authenticated user's kilo_user_id
-export const CreateBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
-  provider_id: UserByokProviderIdSchema,
-  api_key: z.string().min(1),
-});
+export const CreateBYOKKeyInputSchema = z.union([
+  OptionalOrganizationIdSchema.extend({
+    provider_id: UserByokProviderIdSchema,
+    api_key: z.string().min(1),
+  }),
+  OptionalOrganizationIdSchema.extend({
+    provider_code: ManualByokProviderCodeSchema,
+    provider_settings: ValidatedManualByokProviderDefinitionSchema,
+    api_key: z.string().min(1),
+  }),
+]);
 
 export const UpdateBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   id: z.string().uuid(),
-  api_key: z.string().min(1),
+  api_key: z.string().min(1).optional(),
+  provider_settings: ValidatedManualByokProviderDefinitionSchema.optional(),
 });
 
 export const DeleteBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
@@ -56,4 +70,11 @@ export const BYOKApiKeyResponseSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   created_by: z.string(),
+  provider_settings: ValidatedManualByokProviderDefinitionSchema.nullable(),
+});
+
+export const FetchManualByokModelsInputSchema = z.object({
+  base_url: z.url(),
+  api_key: z.string().min(1),
+  use_x_api_key: z.boolean(),
 });

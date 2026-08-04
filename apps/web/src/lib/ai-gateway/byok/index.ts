@@ -6,6 +6,7 @@ import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {
   UserByokProviderIdSchema,
+  StoredUserByokProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   type UserByokProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -46,7 +47,10 @@ export async function getUserByokProviderIds(
     .from(byok_api_keys)
     .where(and(eq(byok_api_keys.kilo_user_id, userId), eq(byok_api_keys.is_enabled, true)));
 
-  return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));
+  return rows.flatMap(row => {
+    const parsed = UserByokProviderIdSchema.safeParse(row.provider_id);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 export async function getOrganizationByokProviderIds(
@@ -60,7 +64,10 @@ export async function getOrganizationByokProviderIds(
       and(eq(byok_api_keys.organization_id, organizationId), eq(byok_api_keys.is_enabled, true))
     );
 
-  return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));
+  return rows.flatMap(row => {
+    const parsed = UserByokProviderIdSchema.safeParse(row.provider_id);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 export async function addUserByokAvailability(
@@ -89,7 +96,7 @@ export function decryptByokRow({
 }) {
   return {
     decryptedAPIKey: decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY),
-    providerId: UserByokProviderIdSchema.parse(provider_id),
+    providerId: StoredUserByokProviderIdSchema.parse(provider_id),
   };
 }
 

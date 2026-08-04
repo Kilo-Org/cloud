@@ -14,6 +14,23 @@ import { eq, and } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import type { ManualByokProviderDefinition } from '@kilocode/db/schema-types';
+
+const manualProviderSettings = {
+  name: 'Dedicated inference',
+  base_urls: { chat_completions: 'http://inference.internal/v1' },
+  use_x_api_key: false,
+  supported_apis: ['chat_completions'],
+  preferred_ai_sdk_provider: 'openai-compatible',
+  model_defaults: {
+    supports_image_input: true,
+    supports_reasoning: true,
+    add_cache_breakpoints: false,
+  },
+  models: [{ id: 'Org/Model' }],
+} satisfies ManualByokProviderDefinition;
+const originalVercel = process.env.VERCEL;
+const originalVercelEnv = process.env.VERCEL_ENV;
 
 describe('BYOK Router', () => {
   let ownerUser: User;
@@ -48,6 +65,10 @@ describe('BYOK Router', () => {
   });
 
   afterEach(async () => {
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
+    if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = originalVercelEnv;
     await db
       .delete(coding_plan_subscriptions)
       .where(eq(coding_plan_subscriptions.user_id, ownerUser.id));
@@ -144,6 +165,50 @@ describe('BYOK Router', () => {
   });
 
   describe('create', () => {
+    test('creates a manual provider with an automatic collision-safe prefix', async () => {
+      delete process.env.VERCEL;
+      delete process.env.VERCEL_ENV;
+      const caller = await createCallerForUser(ownerUser.id);
+      const result = await caller.byok.create({
+        provider_code: 'dedicated-inference',
+        provider_settings: manualProviderSettings,
+        api_key: 'manual-secret',
+      });
+
+      expect(result).toMatchObject({
+        provider_id: 'manual:dedicated-inference',
+        provider_name: 'Dedicated inference',
+        provider_settings: manualProviderSettings,
+      });
+      await expect(caller.byok.list({})).resolves.toEqual([
+        expect.objectContaining({
+          provider_id: 'manual:dedicated-inference',
+          provider_name: 'Dedicated inference',
+        }),
+      ]);
+    });
+
+    test('does not expose manual provider settings to ordinary organization members', async () => {
+      delete process.env.VERCEL;
+      delete process.env.VERCEL_ENV;
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      await ownerCaller.byok.create({
+        organizationId: organizationA.id,
+        provider_code: 'dedicated-inference',
+        provider_settings: manualProviderSettings,
+        api_key: 'manual-secret',
+      });
+
+      await expect(memberCaller.byok.list({ organizationId: organizationA.id })).resolves.toEqual([
+        expect.objectContaining({
+          provider_id: 'manual:dedicated-inference',
+          provider_name: 'Dedicated inference',
+          provider_settings: null,
+        }),
+      ]);
+    });
+
     test('should create a new BYOK key', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
@@ -247,6 +312,30 @@ describe('BYOK Router', () => {
   });
 
   describe('update', () => {
+    test('updates manual settings without replacing the encrypted API key', async () => {
+      delete process.env.VERCEL;
+      delete process.env.VERCEL_ENV;
+      const caller = await createCallerForUser(ownerUser.id);
+      const created = await caller.byok.create({
+        provider_code: 'dedicated-inference',
+        provider_settings: manualProviderSettings,
+        api_key: 'manual-secret',
+      });
+      const [before] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, created.id));
+
+      const updated = await caller.byok.update({
+        id: created.id,
+        provider_settings: { ...manualProviderSettings, name: 'Renamed inference' },
+      });
+      const [after] = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, created.id));
+
+      expect(updated.provider_name).toBe('Renamed inference');
+      expect(after.encrypted_api_key).toEqual(before.encrypted_api_key);
+    });
+
     test('should update an existing BYOK key', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 

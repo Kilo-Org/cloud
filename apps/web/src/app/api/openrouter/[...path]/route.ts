@@ -21,6 +21,7 @@ import {
 } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
+import { ManualByokProviderIdSchema } from '@/lib/ai-gateway/providers/direct-byok/manual-byok';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
@@ -685,9 +686,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {
       const directByokTarget = await getDirectByokModel(routingTarget);
-      if (directByokTarget.provider && effectiveProviderContext.provider.id !== 'direct-byok') {
+      const manualProvider = ManualByokProviderIdSchema.safeParse(routingTarget.split('/')[0]);
+      if (
+        (directByokTarget.provider || manualProvider.success) &&
+        effectiveProviderContext.provider.id !== 'direct-byok'
+      ) {
         return organizationAutoConfigurationResponse(
-          `Organization Auto route target '${routingTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
+          `Organization Auto route target '${routingTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider?.id ?? manualProvider.data}.`
         );
       }
     } catch {

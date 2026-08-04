@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 jest.mock('@/lib/drizzle', () => ({
-  readDb: {},
+  readDb: {
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({ where: jest.fn(async () => []) })),
+    })),
+  },
 }));
 
 jest.mock('@/lib/ai-gateway/byok', () => ({
   getBYOKforOrganization: jest.fn(),
   getBYOKforUser: jest.fn(),
+  decryptByokRow: jest.fn(),
 }));
 
 jest.mock('@/lib/ai-gateway/models', () => ({

@@ -9,7 +9,9 @@ import { CUSTOM_LLM_PREFIX, normalizeModelId } from '@/lib/ai-gateway/model-util
 import {
   formatDirectByokModelId,
   getDirectByokModel,
+  getManualByokCredential,
 } from '@/lib/ai-gateway/providers/direct-byok';
+import { ManualByokProviderIdSchema } from '@/lib/ai-gateway/providers/direct-byok/manual-byok';
 import { getBYOKforOrganization } from '@/lib/ai-gateway/byok';
 import { readDb, type DrizzleTransaction } from '@/lib/drizzle';
 import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
@@ -113,6 +115,26 @@ export async function validateOrganizationAutoTarget(
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' must be a Kilo-hosted model, supported auto tier, or organization-owned BYOK model.`,
     };
+  }
+
+  const manualProviderId = ManualByokProviderIdSchema.safeParse(rawModelId.split('/')[0]);
+  if (manualProviderId.success) {
+    const manualTarget = await getManualByokCredential(rawModelId, {
+      organizationId: organization.id,
+    });
+    if (!manualTarget) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have a matching enabled manual BYOK provider.`,
+      };
+    }
+    if (options.apiKind && !manualTarget.definition.supported_apis.includes(options.apiKind)) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
+      };
+    }
+    return { kind: 'ok', modelId: rawModelId };
   }
 
   const directByokTarget = await getDirectByokModel(rawModelId);

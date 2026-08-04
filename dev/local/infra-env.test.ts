@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
-import { applyAppEnv, buildAppEnv, buildComposeEnv, composeProjectName } from './infra-env';
+import {
+  applyAppEnv,
+  buildAppEnv,
+  buildComposeEnv,
+  composeProjectName,
+  syncInfraEnv,
+} from './infra-env';
+import { applyPortOffset, portOffset } from './services';
 
 const PORTS = { postgres: 5532, redis: 6479, 'redis-http': 8179, grafana: 4100 };
 
@@ -52,6 +62,36 @@ test('separates two worktrees whose basenames normalize to the same slug', () =>
     composeProjectName('/Users/dev/.worktrees/Checkout 9f1c', 500),
     composeProjectName('/Users/dev/.worktrees/checkout-9f1c', 600)
   );
+});
+
+test('publishes this worktree database to the Jest env file', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  fs.mkdirSync(path.join(root, 'dev'));
+  fs.mkdirSync(path.join(root, 'apps', 'web'), { recursive: true });
+  const testEnvPath = path.join(root, 'apps', 'web', '.env.test.local');
+  const original = portOffset;
+
+  try {
+    applyPortOffset(700);
+    syncInfraEnv(root);
+
+    const content = fs.readFileSync(testEnvPath, 'utf-8');
+    assert.match(
+      content,
+      /^POSTGRES_URL=postgres:\/\/postgres:postgres@localhost:6132\/postgres$/m
+    );
+    // Jest must not see a real development secret, and no test reads Redis.
+    assert.ok(!content.includes('REDIS'));
+
+    // The primary checkout keeps the default port that `.env.test` commits.
+    fs.rmSync(testEnvPath);
+    applyPortOffset(0);
+    syncInfraEnv(root);
+    assert.equal(fs.existsSync(testEnvPath), false);
+  } finally {
+    applyPortOffset(original);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('leaves a value that already names the target host and port', () => {

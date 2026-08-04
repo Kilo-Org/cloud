@@ -55,6 +55,22 @@ export function useOrganizationChildBalances(id: string) {
   );
 }
 
+export function useSubOrganizationsOverview(id: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subOrganizations.overview.queryOptions(
+      { organizationId: id },
+      {
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
 export function useDistributeFundsToChildren() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

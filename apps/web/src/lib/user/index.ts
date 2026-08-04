@@ -923,6 +923,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
  *   immediate cleanup scheduled)
  * - Recommendation dismissal actor references (nulled)
+ * - slack_workspace_installations.last_installed_by_user_id (nulled on rows that
+ *   survive, i.e. workspaces the user installed for an organization)
  * - platform_oauth_credentials (encrypted OAuth tokens and provider identity;
  *   authorizations created by the user are removed, including organization grants)
  * - Organization GitLab PAT credentials authorized by the user (parent integration suspended;
@@ -1197,6 +1199,14 @@ export async function softDeleteUser(userId: string) {
           )
       )
     );
+
+    // Workspaces the user installed for an organization survive their account, so
+    // the surviving rows must not keep pointing at them. The `set null` foreign key
+    // does not help: soft deletion retains the `kilocode_users` row.
+    await tx
+      .update(slack_workspace_installations)
+      .set({ last_installed_by_user_id: null })
+      .where(eq(slack_workspace_installations.last_installed_by_user_id, userId));
 
     await tx
       .delete(platform_integrations)

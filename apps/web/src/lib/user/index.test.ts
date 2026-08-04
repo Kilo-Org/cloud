@@ -730,6 +730,41 @@ describe('User', () => {
       ).toHaveLength(1);
     });
 
+    it('clears the installer reference on Slack workspaces that survive the deleted user', async () => {
+      const installer = await insertTestUser();
+      const organizationOwner = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Slack Installer Cleanup Org',
+        organizationOwner.id,
+        0
+      );
+      const teamId = `T-${randomUUID()}`;
+
+      await db.insert(platform_integrations).values({
+        owned_by_organization_id: organization.id,
+        created_by_user_id: installer.id,
+        platform: 'slack',
+        integration_type: 'oauth',
+        platform_installation_id: teamId,
+        platform_account_id: teamId,
+        integration_status: 'active',
+      });
+      await db.insert(slack_workspace_installations).values({
+        team_id: teamId,
+        bot_token: 'xoxb-org-token',
+        last_installed_by_user_id: installer.id,
+      });
+
+      await softDeleteUser(installer.id);
+
+      const [retained] = await db
+        .select()
+        .from(slack_workspace_installations)
+        .where(eq(slack_workspace_installations.team_id, teamId));
+      expect(retained).toBeDefined();
+      expect(retained?.last_installed_by_user_id).toBeNull();
+    });
+
     it('removes an organization GitLab PAT authorized by the deleted user without removing project tokens', async () => {
       const authorizer = await insertTestUser();
       const organizationOwner = await insertTestUser();

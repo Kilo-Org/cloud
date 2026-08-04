@@ -407,9 +407,6 @@ importers:
       expo-image-picker:
         specifier: ~57.0.7
         version: 57.0.7(expo@57.0.9)
-      expo-insights:
-        specifier: ~57.0.7
-        version: 57.0.7(expo@57.0.9)
       expo-keep-awake:
         specifier: ~57.0.1
         version: 57.0.1(expo@57.0.9)(react@19.2.3)
@@ -12553,9 +12550,6 @@ packages:
     peerDependencies:
       expo: '*'
 
-  expo-eas-client@57.0.1:
-    resolution: {integrity: sha512-4w51+zsl/ziUHQMJgLgUdgsNhRPAwHBfySpPB1hpWU21X74QS9T4SqDftaRnrDagn/DfcrXUMJvHbDQUxLPJNA==}
-
   expo-file-system@57.0.1:
     resolution: {integrity: sha512-w7/ERvQFrGP2apTO9lDtZ+O6JQIhfakL7+Xqzh+rfMO9B4LB4qwrz+YvLgir8KFRVX64JHBnRuYBVLY1oQZcqw==}
     peerDependencies:
@@ -12615,11 +12609,6 @@ packages:
     peerDependenciesMeta:
       react-native-web:
         optional: true
-
-  expo-insights@57.0.7:
-    resolution: {integrity: sha512-LOxsNu0C+6vSvqrXIcWt3zXE+QfrF+a6oR4PbaHT4qV7EUzlfPgzb2BaufAwscfjCUkUbnP7vRF1B+mK1d52Nw==}
-    peerDependencies:
-      expo: '*'
 
   expo-json-utils@57.0.1:
     resolution: {integrity: sha512-cgTe1NqzQdYs/WN+3nIY5IZg8s0pb0xaTUbhYvxQDn137GbwRfHoGM2se3m3Vsl4Qu+B9G4RPEK5WJDEU2Do7g==}
@@ -29721,8 +29710,6 @@ snapshots:
     dependencies:
       expo: 57.0.9(@babel/core@7.29.0)(@expo/metro-runtime@57.0.8)(bufferutil@4.1.0)(expo-router@57.0.9)(react-dom@19.2.6(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.0)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3)(utf-8-validate@6.0.6)
 
-  expo-eas-client@57.0.1: {}
-
   expo-file-system@57.0.1(expo@57.0.9)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)):
     dependencies:
       expo: 57.0.9(@babel/core@7.29.0)(@expo/metro-runtime@57.0.8)(bufferutil@4.1.0)(expo-router@57.0.9)(react-dom@19.2.6(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.0)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3)(utf-8-validate@6.0.6)
@@ -29766,11 +29753,6 @@ snapshots:
       react: 19.2.3
       react-native: 0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
       sf-symbols-typescript: 2.2.0
-
-  expo-insights@57.0.7(expo@57.0.9):
-    dependencies:
-      expo: 57.0.9(@babel/core@7.29.0)(@expo/metro-runtime@57.0.8)(bufferutil@4.1.0)(expo-router@57.0.9)(react-dom@19.2.6(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.0)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3)(utf-8-validate@6.0.6)
-      expo-eas-client: 57.0.1
 
   expo-json-utils@57.0.1: {}
 

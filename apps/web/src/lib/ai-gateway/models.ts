@@ -51,7 +51,7 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
 
   ...autoFreeModels,
-  tencent_hy3_free_model.public_id,
+  ...(tencent_hy3_free_model.status === 'public' ? [tencent_hy3_free_model.public_id] : []),
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,

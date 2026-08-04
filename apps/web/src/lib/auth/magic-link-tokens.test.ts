@@ -632,6 +632,28 @@ describe('Magic Link Tokens', () => {
         expect(verifyResult).toBe('ok');
       });
 
+      it('returns invalid for a challenge ID that matches no row', async () => {
+        const { code } = await createSignInCode(testEmail);
+
+        // Use a challenge ID that does not exist in the database.
+        const result = await reserveSignInCode(
+          testEmail,
+          code,
+          '00000000-0000-0000-0000-000000000000'
+        );
+        expect(result).toBe('invalid');
+
+        // The existing row must remain untouched (no attempts, not consumed).
+        const [row] = await db
+          .select({
+            attempts: magic_link_tokens.attempts,
+            consumed_at: magic_link_tokens.consumed_at,
+          })
+          .from(magic_link_tokens)
+          .where(eq(magic_link_tokens.email, testEmail));
+        expect(row?.attempts).toBe(0);
+        expect(row?.consumed_at).toBeNull();
+      });
       it('legacy null-challenge row: email-keyed path still increments attempts', async () => {
         // Manually insert a row without challenge_id to simulate a legacy rollout row.
         const code = '999999';

@@ -21,6 +21,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'DIFFERENT-OAUTH':
     "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
   SSO_ERROR: "Your organization requires SSO. Use 'More sign-in options'.",
+  // Only surfaced by Apple/Google paths; the email-OTP request returns opaque 200 for blocked domains
   BLOCKED: 'This account has been blocked. Please contact support.',
   'SIGNUP-RATE-LIMITED': 'Too many attempts. Please try again later.',
   INVALID_CODE: 'That code is incorrect. Please try again.',

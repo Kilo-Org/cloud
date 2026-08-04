@@ -445,6 +445,25 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
 
+    it('returns 401 INVALID_CODE for a challengeId from an ineligible OTP response', async () => {
+      // The OTP route returns a fake challengeId for blocked or invalid
+      // addresses. Token verification must treat it as INVALID_CODE.
+      mockReserveSignInCode.mockResolvedValue('invalid');
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'blocked@example.com',
+          code: '123456',
+          challengeId: 'a0000000-0000-4000-8000-000000000999',
+        })
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_CODE' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
     it('returns 429 TOO_MANY_ATTEMPTS when the attempt budget is exhausted', async () => {
       mockReserveSignInCode.mockResolvedValue('too_many_attempts');
 

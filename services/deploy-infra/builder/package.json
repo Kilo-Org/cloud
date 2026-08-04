@@ -24,7 +24,7 @@
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "zod": "catalog:",
-    "@sentry/cloudflare": "10.43.0",
+    "@sentry/cloudflare": "10.69.0",
     "hono": "catalog:",
     "tar-stream": "3.1.9"
   },

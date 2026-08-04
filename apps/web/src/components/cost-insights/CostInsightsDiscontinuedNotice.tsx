@@ -11,9 +11,7 @@ type CostInsightsDiscontinuedNoticeProps = {
  * Tombstone for the removed Cost Insights pages. It exists so bookmarks and
  * previously sent spend-alert emails land on an explanation instead of a 404.
  */
-export function CostInsightsDiscontinuedNotice({
-  usageHref,
-}: CostInsightsDiscontinuedNoticeProps) {
+export function CostInsightsDiscontinuedNotice({ usageHref }: CostInsightsDiscontinuedNoticeProps) {
   return (
     <Card>
       <CardHeader>

@@ -10,7 +10,9 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 jest.mock('@/lib/device-auth/device-auth', () => ({ cleanupExpiredDeviceAuthRequests: jest.fn() }));
 jest.mock('@/lib/auth/native-admission', () => ({ cleanupExpiredAdmissionChallenges: jest.fn() }));
 jest.mock('@/lib/kiloclaw/access-codes', () => ({ cleanupExpiredAccessCodes: jest.fn() }));
-jest.mock('@/lib/integrations/github/install-state', () => ({ cleanupExpiredInstallStates: jest.fn() }));
+jest.mock('@/lib/integrations/github/install-state', () => ({
+  cleanupExpiredInstallStates: jest.fn(),
+}));
 jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => jest.fn()) }));
 
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';

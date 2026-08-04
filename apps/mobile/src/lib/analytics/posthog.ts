@@ -69,8 +69,23 @@ let clientGeneration: number | null = null;
 // flags later load. init wires the client's single update into this registry.
 const flagListeners = new Set<() => void>();
 
-// Track the active discard so resumePostHog can await it before unsealing.
-let activeDiscard: Promise<void> | null = null;
+// Track every discard completion so resumePostHog can await all prior
+// work.  Each discard appends to this chain; resumePostHog captures the
+// tail at call time.  Discards that begin after resume are not waited on.
+// oxlint-disable-next-line promise/prefer-await-to-then -- seed value
+let discardChain: Promise<void> = Promise.resolve();
+
+/** Serialize a discard after the chain tail.  Always continues the chain
+ *  even when the prior step rejects, so one failed optOut cannot break
+ *  later discards or recovery. */
+async function chainDiscard(prev: Promise<void>, next: Promise<void>): Promise<void> {
+  try {
+    await prev;
+  } catch {
+    // previous discard failed — continue the chain.
+  }
+  await next;
+}
 
 // App version + build for PostHog. Both are strings; `app_build` is a monotonic
 // integer-as-string, so it's the reliable field for "release >= N" flag rules
@@ -197,9 +212,10 @@ export function resetAnalyticsUser(): void {
  *    callbacks cannot fire during the `optOut` gap and a concurrent
  *    `initPostHog()` registrations survive.
  * 5. `optOut` so a relaunch does not resume capture on the stored anonymous
- *    id. The returned promise is stored as `activeDiscard` so
- *    `resumePostHog()` can await it before unsealing storage.
+ *    id. The completion is appended to `discardChain` so `resumePostHog()`
+ *    can await every prior discard before unsealing storage.
  *
+
  * EV-01: An HTTP request already in flight when discard begins cannot be
  * recalled. The risk is bounded to one batch.
  */
@@ -207,7 +223,7 @@ export function resetAnalyticsUser(): void {
 export async function discardPostHog(): Promise<void> {
   sealPostHogStorage();
 
-  activeDiscard = (async () => {
+  const completion = (async () => {
     const c = client;
     if (typeof c?.setPersistedProperty !== 'function') {
       client = null;
@@ -233,21 +249,28 @@ export async function discardPostHog(): Promise<void> {
     }
   })();
 
-  return activeDiscard;
+  // Serialize: chain this completion after every prior discard so
+  // resumePostHog can await the tail and be certain every discard
+  // that began before it has finished.
+  // Memory: each discard creates one extra promise. The chain is at most
+  // the number of consent transitions in a session, which is bounded.
+  discardChain = chainDiscard(discardChain, completion);
+
+  return completion;
 }
 
 /**
- * Await active discard completion and the SDK's 100 ms persistence debounce
- * (`PERSIST_DEBOUNCE_MS` in `dist/storage.js`), then unseal storage so a
- * later `initPostHog()` can persist again.  Awaiting the discard guarantees
- * every pending debounced write from the old client has fired against the
- * sealed sink and been rejected before the new client is allowed to write.
+ * Await every discard that began before this call, then wait for the SDK's
+ * 100 ms persistence debounce (`PERSIST_DEBOUNCE_MS` in `dist/storage.js`),
+ * then unseal storage so a later `initPostHog()` can persist again.
+ * Capturing the chain tail at call time guarantees every pending debounced
+ * write from the old client has fired against the sealed sink and been
+ * rejected before the new client is allowed to write.
  */
 export async function resumePostHog(): Promise<void> {
-  if (activeDiscard) {
-    await activeDiscard;
-    activeDiscard = null;
-  }
+  // Capture the chain tail so a discard that begins after this call does
+  // not delay the upcoming init.
+  await discardChain;
   // Wait for the SDK's 100 ms persistence debounce. The sealed sink drops the
   // old client's scheduled write. Purge then removes its stale on-disk queue
   // before a new client can preload it.

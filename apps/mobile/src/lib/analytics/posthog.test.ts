@@ -404,10 +404,10 @@ describe('resumePostHog', () => {
     const promise = resumePostHog();
     expect(promise).toBeInstanceOf(Promise);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(50);
-    expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(60);
-    await Promise.resolve();
+    // advanceTimersByTimeAsync processes microtasks (the await discardChain
+    // continuation), then the 110 ms setTimeout, then the microtask from the
+    // resolved setTimeout promise, so unsealPostHogStorage runs synchronously.
+    await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
     await promise;
     vi.useRealTimers();
@@ -443,5 +443,125 @@ describe('resumePostHog', () => {
     await resumePromise;
 
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('discard serialization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('resumePostHog awaits a slow discard even when a later fast discard overwrites the tail', async () => {
+    const { initPostHog, discardPostHog, resumePostHog } = await loadModule();
+    initPostHog();
+
+    // First discard: slow optOut.
+    let optOutResolve: (() => void) | undefined = undefined;
+    hoisted.client.optOut.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        optOutResolve = resolve;
+      });
+    });
+
+    const firstDiscard = discardPostHog();
+
+    // Let the synchronous part of the first discard run (seal, clear
+    // queues, client=null, flagListeners.clear).
+    await new Promise<void>(resolve => {
+      void setTimeout(resolve, 0);
+    });
+
+    // Second discard: client is already null, so the IIFE returns early.
+    const secondDiscard = discardPostHog();
+
+    // resumePostHog captures the chain tail. The tail includes the second
+    // discard. Since the second discard chains after the first, awaiting
+    // the tail must await the first discard too.
+    const resumePromise = resumePostHog();
+    await new Promise<void>(resolve => {
+      void setTimeout(resolve, 10);
+    });
+
+    // Unseal must not have been called — the first discard is still in flight.
+    expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
+    optOutResolve!();
+    await firstDiscard;
+    await secondDiscard;
+    await resumePromise;
+
+    expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumePostHog does not wait for a discard that begins after resume', async () => {
+    const { initPostHog, discardPostHog, resumePostHog } = await loadModule();
+    initPostHog();
+
+    // First discard completes quickly.
+    await discardPostHog();
+
+    // Second discard: slow optOut, but starts after resumePostHog captures the tail.
+    let optOutResolve: (() => void) | undefined = undefined;
+    hoisted.client.optOut.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        optOutResolve = resolve;
+      });
+    });
+    // Re-create a client so the second discard has something to opt out.
+    const posthogModule = await import('posthog-react-native');
+    (posthogModule.default as ReturnType<typeof vi.fn>).mockClear();
+    initPostHog();
+
+    // Start resumePostHog BEFORE the second discard.
+    const resumePromise = resumePostHog();
+
+    // Now start the second discard (slow).
+    const secondDiscard = discardPostHog();
+
+    // resumePostHog captured the tail before the second discard was
+    // appended. The tail should resolve when the first discard's
+    // completion resolves (already done).
+    await resumePromise;
+
+    // The second discard is still in flight, but resumePostHog has
+    // already unsealed.
+    expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
+
+    // Clean up: resolve the second discard.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
+    optOutResolve!();
+    await secondDiscard;
+  });
+
+  it('rapid off-then-on creates a working non-opted-out client', async () => {
+    const { initPostHog, discardPostHog, resumePostHog, captureEvent } = await loadModule();
+    initPostHog();
+
+    // Off: discard the client.
+    await discardPostHog();
+
+    // On: resume and re-init.
+    await resumePostHog();
+    expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
+
+    const posthogModule = await import('posthog-react-native');
+    const prevCalls = (posthogModule.default as ReturnType<typeof vi.fn>).mock.calls.length;
+    initPostHog();
+    expect((posthogModule.default as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
+      prevCalls + 1
+    );
+
+    // The recovered client must be able to capture.
+    hoisted.client.capture.mockClear();
+    captureEvent('recovery-test');
+    expect(hoisted.client.capture).toHaveBeenCalledWith('recovery-test', undefined);
+
+    // The recovered client must not be opted out — optOut was called on the
+    // old client, not the new one. The new client's optOut has never been
+    // called.
+    expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
   });
 });

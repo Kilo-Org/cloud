@@ -695,4 +695,46 @@ describe('unsettled consent teardown', () => {
     renderer2Ref.current?.unmount();
     vi.useRealTimers();
   });
+
+  it('recovered client is not opted out after rapid off-then-on', async () => {
+    vi.useFakeTimers();
+    const mod = await loadPostHogWithGate();
+
+    // Arm telemetry and create a client.
+    mod.ctrl.setTelemetryDecision('test-account', true);
+    mod.initPostHog();
+    expect(hoisted.client.optOut).toHaveBeenCalledTimes(0);
+
+    // Off: discard the client. optOut is called on the old client.
+    mod.ctrl.setTelemetryDecision('test-account', false);
+    const epoch = mod.ctrl.currentEpoch();
+    const discardPromise = mod.discardOptionalTelemetry(epoch);
+    await vi.advanceTimersByTimeAsync(120);
+    await Promise.resolve();
+    await Promise.resolve();
+    await discardPromise;
+    expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
+
+    // Clear the optOut mock so we can assert the new client is NOT opted out.
+    hoisted.client.optOut.mockClear();
+
+    // On: recover — re-enable optional consent.
+    mod.ctrl.setTelemetryDecision('test-account', true);
+    const onEpoch = mod.ctrl.currentEpoch();
+    const startPromise = mod.startOptionalTelemetry(onEpoch, 'test@test.com');
+    await vi.advanceTimersByTimeAsync(120);
+    await Promise.resolve();
+    await Promise.resolve();
+    await startPromise;
+
+    // The new client must NOT have optOut called on it.
+    expect(hoisted.client.optOut).toHaveBeenCalledTimes(0);
+
+    // The new client must be able to capture.
+    hoisted.client.capture.mockClear();
+    mod.captureEvent('after-recovery');
+    expect(hoisted.client.capture).toHaveBeenCalledWith('after-recovery', undefined);
+
+    vi.useRealTimers();
+  });
 });

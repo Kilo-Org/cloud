@@ -12,19 +12,19 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 **Plan ID** - A stable identifier for a purchasable Coding Plan offering. A Plan ID is distinct from the upstream provider or routing identifier used to execute API traffic.
 
-**Upstream Plan ID** - The MiniMax-issued identifier paired with a Managed Plan Credential and used by support to deprovision that provider plan. It is operational metadata, not the Kilo Plan ID.
+**Upstream Plan ID** - The provider-issued identifier paired with a Managed Plan Credential and used by support to deprovision that provider plan. It is operational metadata, not the Kilo Plan ID.
 
 **Managed Plan Credential** - An upstream API key acquired or provisioned by Kilo for a Coding Plan. Kilo manages its assignment and revocation. It is paired with an Upstream Plan ID and is not exposed to the subscriber after it is installed in BYOK.
 
-**Installed BYOK Configuration** - A read-only personal BYOK entry that Kilo populates with a Managed Plan Credential. It identifies the subscriber's MiniMax token plan as its origin, may be tested without changing its configuration, and is deleted by Kilo at Effective Cancellation. A subscriber **MUST NOT** update, enable, disable, or delete it through ordinary BYOK operations.
+**Installed BYOK Configuration** - A read-only personal BYOK entry that Kilo populates with a Managed Plan Credential. It identifies the subscriber's Coding Plan as its origin, may be tested without changing its configuration, and is deleted by Kilo at Effective Cancellation. A subscriber **MUST NOT** update, enable, disable, or delete it through ordinary BYOK operations.
 
 **Availability Notification Intent** - A user's plan-scoped request to be notified when a sold-out Coding Plan has capacity again. It is not a reservation, purchase, subscription, or entitlement.
 
-**Manual Revocation Work Item** - Durable inventory remediation state requiring authorized support staff to deprovision an issued MiniMax plan using its stored Upstream Plan ID through the provider admin process and record its outcome in Kilo. The initial pilot represents this work on the inventory row and does not require a separate remediation audit-event history. MiniMax does not provide an automated revocation integration for the initial release.
+**Manual Revocation Work Item** - Durable inventory remediation state requiring authorized support staff to deprovision an issued provider plan using its stored Upstream Plan ID through the provider admin process and record its outcome in Kilo. The initial pilot represents this work on the inventory row and does not require a separate remediation audit-event history. Automated provider-side revocation is not part of the initial release.
 
 **Kilo Credits** - The unit of account used for Coding Plan billing. The pricing layer manages conversion to internal microdollar accounting; user-facing surfaces display `Credits` as the payment source and charged amounts in USD.
 
-**Upstream Provider** — An external API vendor whose plan access is offered through Kilo. The initial planned offering uses MiniMax.
+**Upstream Provider** — An external API vendor whose plan access is offered through Kilo.
 
 **Obfuscated Identity** — An irreversible, per-provider cryptographic hash of a user's internal identifier, used when Kilo must identify a subscriber to an upstream provider without sending personally identifiable information.
 
@@ -44,7 +44,9 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 1.5. The MiniMax token catalog **MUST** contain Token Plan Plus, Token Plan Max, and Token Plan Ultra. All MiniMax token offerings **MUST** share the ordinary MiniMax BYOK provider ID, `minimax`.
 
-1.6. When no assignable Managed Plan Credential exists for an offering, customer-facing catalog responses **MUST** identify the offering as sold out without exposing credential counts or credential metadata.
+1.6. The catalog **MUST** contain BytePlus Coding Plan Lite with Plan ID `byteplus-coding-plan-team-lite`, provider ID `byteplus-coding`, a price of $20 in Kilo Credits, and a 30-day billing period. Its displayed limits **MUST** be described as approximately 1,900 requests every 5 hours, 12,000 requests per week, and 24,000 requests per subscription period. The plan's supported model IDs are `dola-seed-2.0-pro`, `dola-seed-2.0-lite`, `dola-seed-2.0-code`, `bytedance-seed-code`, `kimi-k2.5`, `glm-5.1`, `glm-5.2`, `deepseek-v4-flash`, `deepseek-v4-pro`, and `gpt-oss-120b`. Upstream Auto, Kimi-K2-Thinking, and GLM-4.7 **MUST NOT** be exposed.
+
+1.7. When no assignable Managed Plan Credential exists for an offering, customer-facing catalog responses **MUST** identify the offering as sold out without exposing credential counts or credential metadata.
 
 ## 2. Subscription and billing
 
@@ -78,7 +80,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 4.1. Kilo **MUST** acquire or provision Managed Plan Credentials before accepting a purchase that depends on them. For an offering initially provisioned by operator upload, only authorized administrative tooling **MAY** insert credentials into inventory.
 
-4.2. Available and assigned credentials **MUST** be encrypted at rest. Raw credentials **MUST NOT** appear in logs, analytics, error messages, customer responses, ordinary BYOK responses, or administrative inventory and remediation responses. Authorized administrative remediation surfaces **MAY** display the stored Upstream Plan ID needed to revoke issued MiniMax access.
+4.2. Available and assigned credentials **MUST** be encrypted at rest. Raw credentials **MUST NOT** appear in logs, analytics, error messages, customer responses, ordinary BYOK responses, or administrative inventory and remediation responses. Authorized administrative remediation surfaces **MAY** display the stored Upstream Plan ID needed to revoke issued provider access.
 
 4.3. Inventory **MUST** distinguish at least these credential lifecycle states: available, assigned, revocation pending, revoked, and revocation failed.
 
@@ -90,11 +92,11 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 4.7. Kilo **MUST** retain the Upstream Plan ID and non-secret assignment and revocation disposition evidence on inventory records for the required operational and compliance retention period. When an issued credential enters manual revocation remediation, Kilo **MUST** remove retained encrypted credential material because support deprovisions it using the Upstream Plan ID. After the applicable retention period, terminal credential records **MAY** be deleted without deleting billing history.
 
-4.8. Administrative upload tooling **MUST** accept each MiniMax issued credential with its Upstream Plan ID, using the `<api key>::<upstream plan id>` input format or an equivalent structured input, and **MUST** persist the identifier on the inventory record without treating it as the Kilo Plan ID.
+4.8. Administrative upload tooling **MUST** accept each issued MiniMax or BytePlus credential with its Upstream Plan ID, using the `<api key>::<upstream plan id>` input format or an equivalent structured input, and **MUST** persist the identifier on the inventory record without treating it as the Kilo Plan ID.
 
 4.9. Administrative upload tooling **MUST** prevent accidental duplicate credential assignment without exposing raw credential values in list responses, for example through a secure, non-reversible fingerprint comparison.
 
-4.10. Before a MiniMax credential becomes `available` inventory, administrative upload tooling **MUST** validate that it can use the approved ordinary MiniMax routing and model behavior for the selected MiniMax token plan. An invalid or incompatible credential **MUST NOT** become assignable inventory.
+4.10. Before a credential becomes `available` inventory, administrative upload tooling **MUST** validate it through the selected provider's approved ordinary routing and test model. BytePlus credentials **MUST** be validated through the ordinary direct `byteplus-coding` provider with `bytedance-seed-code`. An invalid or incompatible credential **MUST NOT** become assignable inventory.
 
 ## 5. Subscription lifecycle
 
@@ -114,17 +116,19 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 5.8. When a user account is deleted, Kilo **MUST** immediately terminate any Coding Plan subscription, delete the user's BYOK configurations and Availability Notification Intents under the general deletion policy, create a Manual Revocation Work Item for each issued credential, and anonymize subscriber linkage in retained credential disposition records. Account deletion **MUST NOT** wait until the end of a prepaid period. Subscription and charged-term history **MAY** remain associated with the platform's anonymized user record when required for financial or compliance retention.
 
-5.9. Manual upstream revocation **MUST** be completed by authorized support through the MiniMax admin process using the stored Upstream Plan ID, and its outcome **MUST** be recorded on the inventory item in Kilo. Pending and failed work **MUST** remain visible in the admin console for remediation. Kilo **MUST** keep the Coding Plan terminated while revocation is pending or failed. An issued credential awaiting or failing revocation **MUST NOT** be reassigned; a separate user-managed provider key **MUST NOT** be removed because of revocation work.
+5.9. Manual upstream revocation **MUST** be completed by authorized support through the relevant provider process using the stored Upstream Plan ID, and its outcome **MUST** be recorded on the inventory item in Kilo. Pending and failed work **MUST** remain visible in the admin console for remediation. Kilo **MUST** keep the Coding Plan terminated while revocation is pending or failed. An issued credential awaiting or failing revocation **MUST NOT** be reassigned; a separate user-managed provider key **MUST NOT** be removed because of revocation work.
 
 5.10. The initial pilot **MAY** leave an unchanged Kilo-installed BYOK configuration routable between its paid-period or grace deadline and the next scheduled billing lifecycle sweep. Once that sweep processes termination, local Kilo-installed access **MUST** be deleted regardless of whether manual upstream revocation is complete.
 
 ## 6. Traffic routing
 
-6.1. Initial MiniMax Coding Plan setup **MUST** route through the Kilo Gateway using the existing ordinary personal MiniMax BYOK provider identity. The initial release **MUST NOT** expose saved raw credential values through Kilo UI or API responses.
+6.1. Coding Plan setup **MUST** route through the Kilo Gateway using the existing ordinary personal BYOK provider identity. MiniMax uses `minimax`; BytePlus uses `byteplus-coding`. The initial release **MUST NOT** expose saved raw credential values through Kilo UI or API responses.
 
-6.2. The system **MUST NOT** add a MiniMax Coding Plan-specific provider or model-routing namespace. The Kilo-installed MiniMax key **MUST** use ordinary MiniMax BYOK routing and model availability.
+6.2. The system **MUST NOT** add a Coding Plan-specific provider or model-routing namespace. Kilo-installed keys **MUST** use ordinary BYOK routing and model availability for their provider.
 
-6.3. Purchase **MUST** reject an occupied personal MiniMax BYOK slot before a charge or issued credential assignment commits. Once subscribed, the Installed BYOK Configuration **MUST** remain read-only until Kilo removes it at Effective Cancellation.
+6.3. Purchase **MUST** reject an occupied personal BYOK slot for the selected provider before a charge or issued credential assignment commits, including when the existing key is disabled. Once subscribed, the Installed BYOK Configuration **MUST** remain read-only until Kilo removes it at Effective Cancellation.
+
+6.4. While a live BytePlus subscription has its enabled managed key, Kilo Auto **MUST** prefer `byteplus-coding/bytedance-seed-code`. When both BytePlus and a recognized MiniMax Coding Plan are active, BytePlus takes precedence, followed by the MiniMax preference, followed by ordinary Kilo Auto routing. If the preferred model is denied or incompatible with request constraints, routing **MUST** continue through ordinary Kilo Auto rather than selecting another model from that provider.
 
 ## 7. User-facing behavior
 
@@ -132,11 +136,11 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 7.2. Coding Plan surfaces **MUST** display recurring prices and charged-term amounts in USD regardless of payment source. Kilo Credits are valued one-to-one with USD for display. Surfaces **MUST** identify `Credits` as the payment source for credit-funded subscriptions and **MUST NOT** expose internal microdollars.
 
-7.3. The BYOK surface **MUST** identify an Installed BYOK Configuration as managed by the subscriber's MiniMax token plan and read-only. It **MUST NOT** offer update, enable/disable, delete, saved raw-key view, or copy controls. Non-mutating credential testing **MAY** remain available. The surface **MUST** direct users to the Subscription Center to cancel the plan and remove the configuration at Effective Cancellation.
+7.3. The BYOK surface **MUST** identify an Installed BYOK Configuration as managed by the subscriber's provider Coding Plan and read-only. It **MUST NOT** offer update, enable/disable, delete, saved raw-key view, or copy controls. Non-mutating credential testing **MAY** remain available. The surface **MUST** direct users to the Subscription Center to cancel the plan and remove the configuration at Effective Cancellation.
 
-7.4. Purchase messaging **MUST** state that Kilo configures MiniMax in BYOK and **MUST** tell users with an existing user-managed MiniMax key to delete it before subscribing. Cancellation messaging **MUST** state when billing ends, that Kilo deletes only its unchanged installed configuration, and that Kilo revokes its issued credential when plan access ends.
+7.4. Purchase messaging **MUST** state that Kilo configures the selected provider in BYOK and **MUST** tell users with an existing user-managed key for that provider to delete it before subscribing. Cancellation messaging **MUST** state when billing ends, that Kilo deletes only its unchanged installed configuration, and that Kilo revokes its issued credential when plan access ends.
 
-7.5. A `past_due` subscription **MUST** communicate its grace deadline with date and local time, the consequence of unsuccessful payment recovery, and that a separate user-created MiniMax BYOK key is not deleted by Coding Plan termination.
+7.5. A `past_due` subscription **MUST** communicate its grace deadline with date and local time, the consequence of unsuccessful payment recovery, and that a separate user-created provider BYOK key is not deleted by Coding Plan termination.
 
 7.6. A sold-out offering **MUST** display its unavailable state and **MUST** offer an authenticated user a way to record an Availability Notification Intent. Recording the same intent again **MUST** be idempotent, **MUST NOT** reserve capacity or initiate billing, and **MUST** show the saved intent state. A successful activation **MUST** clear the activated user's intent for that Plan ID.
 

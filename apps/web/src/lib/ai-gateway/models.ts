@@ -85,6 +85,12 @@ export function isKiloExclusiveModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.status !== 'disabled');
 }
 
+export function isKiloExclusiveRateLimitedModel(model: string): boolean {
+  return kiloExclusiveModels.some(
+    m => m.public_id === model && m.status !== 'disabled' && m.flags.includes('rate-limited')
+  );
+}
+
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   ...deepseekDiscountedModels,

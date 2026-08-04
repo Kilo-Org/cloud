@@ -391,6 +391,9 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SNOWFLAKE_MAX_POLL_ATTEMPTS` - Max poll attempts for Snowflake job completion in `services/kiloclaw-billing/src/snowflake.ts`. [SERVER]
 - `CF_AE_TOKEN` - Cloudflare Account/Enterprise API token for the local dev CLI (`dev/local/cli.ts`). `[SECRET]`
 - `KILO_PORT_OFFSET` - Port offset for the local dev tmux dashboard; applied by `dev/local/cli.ts` and `dev/local/services.ts` to prevent port conflicts. [SERVER]
+- `COMPOSE_PROJECT_NAME` - Docker Compose project for the local infrastructure; written to `dev/.env` by `dev/local/infra-env.ts` so a worktree with a port offset owns its own containers and volumes. [SERVER]
+- `KILO_POSTGRES_PORT`, `KILO_REDIS_PORT`, `KILO_REDIS_HTTP_PORT`, `KILO_GRAFANA_PORT` - Host ports for the local infrastructure containers; written to `dev/.env` by `dev/local/infra-env.ts`, read by `dev/docker-compose.yml`. Default to 5432, 6379, 8079, and 4000. [SERVER]
+- `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` - Overrides the `localConnectionString` each `wrangler.jsonc` commits, so a worktree's workers reach that worktree's database; set on every worker command by `dev/local/services.ts`. [SERVER]
 
 ## E2E
 

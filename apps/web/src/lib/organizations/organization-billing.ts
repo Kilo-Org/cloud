@@ -208,7 +208,15 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
   }
 
   let sentEmails = 0;
-  let retryableFailures = 0;
+  // Known-safe failures: the provider API was never called for this
+  // recipient (e.g. `provider_not_configured`), so retrying cannot
+  // duplicate anything already delivered.
+  let knownSafeFailures = 0;
+  // Ambiguous failures: `sendCreditsTopUpEmail` threw (network timeout,
+  // provider 5xx, etc). We cannot tell whether the provider already
+  // accepted/delivered the message before the exception surfaced, so these
+  // must NOT be treated as safe to retry.
+  let ambiguousFailures = 0;
 
   for (const [recipientIndex, recipient] of recipients.entries()) {
     try {
@@ -242,7 +250,7 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
           },
         });
       } else {
-        retryableFailures += 1;
+        knownSafeFailures += 1;
         captureMessage('Organization top-up confirmation email send failed', {
           level: 'warning',
           tags: {
@@ -260,7 +268,7 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
         });
       }
     } catch (error) {
-      retryableFailures += 1;
+      ambiguousFailures += 1;
       captureException(error, {
         tags: { source: 'organization_credits_topup_email', failure_type: 'recipient_send' },
         extra: {
@@ -275,7 +283,12 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
     }
   }
 
-  if (sentEmails === 0 && retryableFailures > 0) {
+  // Only roll back the marker when every failure is known to be safe to
+  // retry. If even one recipient hit an ambiguous failure, leave the marker
+  // in place: a retry (webhook redelivery or the recovery path) could
+  // otherwise re-send to a recipient who already received the email,
+  // producing the duplicate top-up emails this dedupe exists to prevent.
+  if (sentEmails === 0 && knownSafeFailures > 0 && ambiguousFailures === 0) {
     await deleteOrganizationTopUpEmailMarkerBestEffort({
       stripeChargeOrInvoiceId,
       userId,

@@ -67,10 +67,6 @@ export function costInsightOwnerIsSameKind(
     : isNotNull(columns.owned_by_organization_id);
 }
 
-export function costInsightOwnerBasePath(owner: CostInsightSpendOwner): string {
-  return owner.type === 'user' ? '/cost-insights' : `/organizations/${owner.id}/cost-insights`;
-}
-
 export function costInsightOwnerDisplayType(
   owner: CostInsightSpendOwner
 ): 'personal' | 'organization' {

@@ -24,8 +24,15 @@ describe('sentryOptionsForConsent', () => {
     expect(options.attachViewHierarchy).toBe(false);
     expect(options.replaysSessionSampleRate).toBe(0);
     expect(options.replaysOnErrorSampleRate).toBe(0);
-    // Tracing remains consent-gated (step 12).
-    expect(options.tracesSampleRate).toBeGreaterThan(0);
+    expect(options.tracesSampleRate).toBe(0.1);
+  });
+
+  it('sets tracesSampleRate to 0 when optional consent is declined', () => {
+    expect(sentryOptionsForConsent(false).tracesSampleRate).toBe(0);
+  });
+
+  it('sets tracesSampleRate to 0.1 when optional consent is accepted', () => {
+    expect(sentryOptionsForConsent(true).tracesSampleRate).toBe(0.1);
   });
 });
 

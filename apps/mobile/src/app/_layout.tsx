@@ -82,7 +82,12 @@ installE2EWebSocketLatency();
 // `initSentry(false)` runs at module scope — a crash during bootstrap
 // must still be reported. The optional group is `tracesSampleRate`
 // only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
-function initSentry(consented: boolean) {
+//
+// In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
+// — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
+//   integration). The authoritative per-launch timing metric is the PostHog
+//   `app_startup` event in src/lib/startup-timing.ts.
+function initSentry(optionalConsented: boolean) {
   Sentry.init({
     dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
 
@@ -91,7 +96,7 @@ function initSentry(consented: boolean) {
     sendDefaultPii: false,
 
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
-    ...sentryOptionsForConsent(consented),
+    ...sentryOptionsForConsent(optionalConsented),
 
     integrations: [navigationIntegration],
     enableNativeFramesTracking: false,
@@ -141,7 +146,7 @@ function RootLayoutNav() {
     }
   }, [fontsError]);
 
-  useSentryConsentSync(consentChecked && !needsConsent, initSentry);
+  useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
   // The force-update check is deliberately absent: it is a live network round

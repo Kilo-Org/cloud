@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { getDefaultStore } from 'jotai';
 import { LEGACY_CONVERSATION_GREETING } from '@/src/shared/agent-conversation-tabs';
+import { runningConversationIdsAtom } from './agent-chat-atoms';
+import { workflowRunRequestAtom } from './workflow-settings-state';
 
 // Agent-chat-panel transitively imports the WXT '#imports' virtual module; stub it so the graph loads under vitest.
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
@@ -164,5 +167,134 @@ describe('system environment builder', () => {
     expect(context).toContain('<memories count="1">');
     expect(context).toContain('[memory-1]');
     expect(context).toContain('</system_environment>');
+  });
+
+  it('includes the workflows index when workflows and a tab are present', () => {
+    const context = formatSystemEnvironment({
+      memories: [],
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+      workflows: [
+        {
+          createdAt: 1_700_000_000_000,
+          description: 'Test workflow',
+          id: 'wf-1',
+          name: 'Test Workflow',
+          scopeOrigin: 'https://example.com',
+          script: 'return { done: true };',
+          updatedAt: 1_700_000_000_000,
+        },
+      ],
+    });
+
+    expect(context).toContain('<workflows count="1">');
+    expect(context).toContain('[wf-1]');
+    expect(context).toContain('Test Workflow');
+    expect(context).toContain('</system_environment>');
+  });
+
+  it('omits the workflows block when no workflows match the tab scope', () => {
+    const context = formatSystemEnvironment({
+      memories: [],
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+      workflows: [
+        {
+          createdAt: 1_700_000_000_000,
+          description: 'Test',
+          id: 'wf-1',
+          name: 'Test',
+          scopeOrigin: 'https://other.example.com',
+          script: 'return { done: true };',
+          updatedAt: 1_700_000_000_000,
+        },
+      ],
+    });
+
+    expect(context).not.toContain('<workflows');
+  });
+
+  it('omits the workflows block when workflows param is undefined', () => {
+    const context = formatSystemEnvironment({
+      memories: [],
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+    });
+
+    expect(context).not.toContain('<workflows');
+  });
+
+  it('includes both memories and workflows indices together', () => {
+    const context = formatSystemEnvironment({
+      memories: [
+        {
+          createdAt: 1_700_000_000_000,
+          id: 'memory-1',
+          pageTitle: 'Example',
+          pageUrl: 'https://example.com/',
+          text: 'saved',
+        },
+      ],
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+      workflows: [
+        {
+          createdAt: 1_700_000_000_000,
+          description: 'Test workflow',
+          id: 'wf-1',
+          name: 'Test Workflow',
+          scopeOrigin: 'https://example.com',
+          script: 'return { done: true };',
+          updatedAt: 1_700_000_000_000,
+        },
+      ],
+    });
+
+    expect(context).toContain('<memories count="1">');
+    expect(context).toContain('<workflows count="1">');
+    expect(context).toContain('</system_environment>');
+  });
+});
+
+describe('workflow run request', () => {
+  it('imports workflowRunRequestAtom from the canonical workflow-settings-state module', () => {
+    // The agent-chat-panel module must import the canonical atom, not a local duplicate.
+    const store = getDefaultStore();
+    expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+    store.set(workflowRunRequestAtom, { workflowId: 'wf-test' });
+    expect(store.get(workflowRunRequestAtom)).toStrictEqual({ workflowId: 'wf-test' });
+    store.set(workflowRunRequestAtom, undefined);
+  });
+
+  it('returns undefined tab id when inspectable tabs list is empty (no-tab guard)', () => {
+    const selectedTabId = getSelectedInspectableTabId({
+      activeTabId: 1,
+      inspectableTabs: [],
+      selectedTabId: undefined,
+    });
+    expect(selectedTabId).toBeUndefined();
+  });
+});
+
+describe('workflow run abort cleanup', () => {
+  it('clears running conversation id when an unstarted run is aborted', () => {
+    const store = getDefaultStore();
+    store.set(runningConversationIdsAtom, ['conv-1', 'conv-2']);
+
+    // Simulate cleanupUnstartedRun: remove conversation from running set.
+    store.set(runningConversationIdsAtom, currentIds => currentIds.filter(id => id !== 'conv-1'));
+
+    expect(store.get(runningConversationIdsAtom)).toStrictEqual(['conv-2']);
+  });
+
+  it('does not leak running ids when the last run is cleaned up or multiple aborts fire', () => {
+    const store = getDefaultStore();
+
+    // Single running conversation removed.
+    store.set(runningConversationIdsAtom, ['conv-1']);
+    store.set(runningConversationIdsAtom, currentIds => currentIds.filter(id => id !== 'conv-1'));
+    expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
+
+    // Multiple running conversations removed in sequence.
+    store.set(runningConversationIdsAtom, ['conv-a', 'conv-b']);
+    store.set(runningConversationIdsAtom, currentIds => currentIds.filter(id => id !== 'conv-a'));
+    store.set(runningConversationIdsAtom, currentIds => currentIds.filter(id => id !== 'conv-b'));
+    expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
   });
 });

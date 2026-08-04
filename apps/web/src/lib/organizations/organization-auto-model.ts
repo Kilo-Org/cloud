@@ -119,9 +119,13 @@ export async function validateOrganizationAutoTarget(
 
   const manualProviderId = ManualByokProviderIdSchema.safeParse(rawModelId.split('/')[0]);
   if (manualProviderId.success) {
-    const manualTarget = await getManualByokCredential(rawModelId, {
-      organizationId: organization.id,
-    });
+    const manualTarget = await getManualByokCredential(
+      rawModelId,
+      {
+        organizationId: organization.id,
+      },
+      options.dbClient ?? readDb
+    );
     if (!manualTarget) {
       return {
         kind: 'error',

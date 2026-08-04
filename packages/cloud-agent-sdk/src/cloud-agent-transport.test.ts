@@ -5,6 +5,7 @@
 import type { CloudAgentEvent } from './event-types';
 import { createEventHelpers } from './__fixtures__/helpers';
 import type { ChatEvent, ServiceEvent } from './normalizer';
+import type { SessionStatus } from './schemas';
 import { createCloudAgentTransport } from './cloud-agent-transport';
 import type { SessionSnapshotPageOutcome } from './types';
 import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
@@ -1271,13 +1272,14 @@ describe('CloudAgentTransport page-seam', () => {
         .filter(
           (
             e
-          ): e is {
-            type: 'session.status';
-            sessionId: string;
-            status: { type: 'retry'; attempt: number };
-          } => e.type === 'session.status' && (e.status as { type?: string }).type === 'retry'
+          ): e is Extract<ServiceEvent, { type: 'session.status' }> & {
+            status: Extract<SessionStatus, { type: 'retry' }>;
+          } => {
+            if (e.type !== 'session.status') return false;
+            return e.status.type === 'retry';
+          }
         )
-        .map(e => (e.status as { attempt: number }).attempt)
+        .map(e => e.status.attempt)
         .sort((a, b) => a - b);
 
       // Every event 1–10 must be delivered. The dedupe with lastEventId=0
@@ -1456,16 +1458,12 @@ describe('CloudAgentTransport exactly-once event replay', () => {
         .filter(
           (
             e
-          ): e is {
-            type: 'session.status';
-            sessionId: string;
-            status: {
-              type: 'retry';
-              attempt: number;
-              message: string;
-              next: number;
-            };
-          } => e.type === 'session.status' && e.status.type === 'retry'
+          ): e is Extract<ServiceEvent, { type: 'session.status' }> & {
+            status: Extract<SessionStatus, { type: 'retry' }>;
+          } => {
+            if (e.type !== 'session.status') return false;
+            return e.status.type === 'retry';
+          }
         )
         .map(e => e.status.attempt)
         .sort((a, b) => a - b);

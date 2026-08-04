@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UsersRound,
+  Sitemap,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -129,6 +130,21 @@ export default function OrganizationAppSidebar({
       url: `/organizations/${organizationId}/usage-details`,
     },
   ];
+
+  // The sub-organizations surface is parent-only: a child organization has no
+  // children of its own (single-level hierarchy), and only parent
+  // owner/billing_manager inherit access to children. Hide the entry for plain
+  // members and for orgs without any (non-deleted) children. withMembers
+  // already excludes soft-deleted children, so childCount reflects the real
+  // list a parent admin can administer.
+  const childCount = organizationData?.childOrganizations?.length ?? 0;
+  if (hasOwnerLevelAccess && childCount > 0) {
+    dashboardItems.push({
+      title: 'Sub-organizations',
+      icon: Sitemap,
+      url: `/organizations/${organizationId}/sub-organizations`,
+    });
+  }
 
   // KiloClaw group
   const kiloClawItems: Array<{

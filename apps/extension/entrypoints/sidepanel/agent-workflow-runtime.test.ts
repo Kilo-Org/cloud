@@ -287,6 +287,12 @@ describe('workflow navigateTab', () => {
     // Fire a non-complete event (e.g. "loading" for an intermediate redirect).
     mocks._fireOnUpdated(7, { status: 'loading' });
 
+    // The non-complete guard must have prevented tabs.get: only the initial
+    // Fast-path check and the post-update re-read consumed mocks so far.
+    // If the guard were missing, the loading event would consume the next
+    // TabsGet mock meant for the complete event below, causing a timeout.
+    expect(mocks.tabsGet).toHaveBeenCalledTimes(2);
+
     // Fire the complete event.
     mocks._fireOnUpdated(7, { status: 'complete' });
 

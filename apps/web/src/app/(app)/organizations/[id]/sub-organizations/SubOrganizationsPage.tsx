@@ -83,7 +83,7 @@ export function SubOrganizationsPage({ organizationId }: Props) {
             <CardHeader>
               <CardTitle>Child organizations</CardTitle>
               <CardDescription>
-                {children.length} child organization{children.length === 1 ? '' : 's'} belong to
+                {children.length} child organization{children.length === 1 ? ' belongs' : 's belong'} to
                 this organization
               </CardDescription>
             </CardHeader>

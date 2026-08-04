@@ -1,21 +1,16 @@
-/* eslint-disable max-lines -- pre-existing */
-
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, type LayoutChangeEvent, Platform, type TextInput, View } from 'react-native';
+import { type LayoutChangeEvent, Platform, type TextInput, View } from 'react-native';
 import { type AttachmentBlock, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
-
-import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
 import { useTextHeight } from '@/components/agents/use-text-height';
+import { useMessageInputClipboardImageHint } from './use-message-input-clipboard-image-hint';
+import { useMessageInputAppStateFocus } from './use-message-input-app-state-focus';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
-import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import {
   editableAttachmentToPreviewRow,
   resolveMessageInputSendDisabled,
 } from './message-input-content-state';
-import { buildAttachmentUnreadableToast } from './message-attachment-state';
 import {
   MESSAGE_INPUT_FONT_SIZE,
   MESSAGE_INPUT_LINE_HEIGHT,
@@ -43,7 +38,6 @@ import {
 import { MessageInputView } from './message-input-view';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
-const MESSAGE_INPUT_FOCUS_RESTORE_DELAY_MS = 100;
 const EMPTY_READY_ATTACHMENT_BLOCKS: readonly AttachmentBlock[] = [];
 
 export function MessageInputContent({
@@ -84,8 +78,6 @@ export function MessageInputContent({
   const inputRef = useRef<TextInput>(null);
   const submissionLockRef = useRef(false);
   const inputFocusedRef = useRef(false);
-  const restoreFocusOnActiveRef = useRef(false);
-  const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentReplyingToRef = useRef<string | undefined>(replyingTo?.id);
   currentReplyingToRef.current = replyingTo?.id;
   const queuedReadyAttachmentBlocks = attachmentQueue?.readyBlocks ?? EMPTY_READY_ATTACHMENT_BLOCKS;
@@ -147,51 +139,19 @@ export function MessageInputContent({
     },
   });
 
-  const pasteHint = useClipboardImageHint({
-    enabled: showAttachmentButton && !controlsDisabled && !voiceInput.isActive,
-    addFile: async file => {
-      await attachmentQueue?.addClipboardImage(file);
-    },
-    onUnreadable: () => {
-      toast.error(buildAttachmentUnreadableToast('the pasted image'));
-    },
+  const pasteHint = useMessageInputClipboardImageHint({
+    showAttachmentButton,
+    controlsDisabled,
+    voiceInputActive: voiceInput.isActive,
+    attachmentQueue,
   });
 
-  useEffect(() => {
-    const clearRestoreFocusTimeout = () => {
-      if (restoreFocusTimeoutRef.current !== null) {
-        clearTimeout(restoreFocusTimeoutRef.current);
-        restoreFocusTimeoutRef.current = null;
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      const transition = resolveMessageInputAppStateTransition({
-        nextAppState,
-        restoreFocusOnActive: restoreFocusOnActiveRef.current,
-        wasFocused: inputFocusedRef.current,
-      });
-      restoreFocusOnActiveRef.current = transition.restoreFocusOnActive;
-
-      if (transition.shouldBlur) {
-        clearRestoreFocusTimeout();
-        inputRef.current?.blur();
-      }
-
-      if (transition.shouldFocus && disabled !== true && submitDisabled !== true) {
-        clearRestoreFocusTimeout();
-        restoreFocusTimeoutRef.current = setTimeout(() => {
-          restoreFocusTimeoutRef.current = null;
-          inputRef.current?.focus();
-        }, MESSAGE_INPUT_FOCUS_RESTORE_DELAY_MS);
-      }
-    });
-
-    return () => {
-      subscription.remove();
-      clearRestoreFocusTimeout();
-    };
-  }, [disabled, submitDisabled]);
+  useMessageInputAppStateFocus({
+    inputRef,
+    inputFocusedRef,
+    disabled,
+    submitDisabled,
+  });
 
   useEffect(() => {
     setCanSend(

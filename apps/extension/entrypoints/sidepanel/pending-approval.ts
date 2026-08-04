@@ -150,14 +150,29 @@ export const applyApprovalDecision = async (
   }
   const workflowDraft = draft;
   const approvedScriptHash = await hashWorkflowScript(workflowDraft.script);
-  const input = {
+  const input: {
+    approvedScriptHash: string;
+    description: string;
+    name: string;
+    pathPrefix?: string | undefined;
+    scopeOrigin: string;
+    script: string;
+    startUrl?: string | undefined;
+  } = {
     approvedScriptHash,
     description: workflowDraft.description,
     name: workflowDraft.name,
     scopeOrigin: workflowDraft.scopeOrigin,
     script: workflowDraft.script,
-    ...(workflowDraft.pathPrefix === undefined ? {} : { pathPrefix: workflowDraft.pathPrefix }),
-    ...(workflowDraft.startUrl === undefined ? {} : { startUrl: workflowDraft.startUrl }),
+    // Empty string is the "cleared" sentinel (survives JSON, never a valid real value).
+    // Map it to undefined so updateAgentWorkflow detects the key via Object.hasOwn
+    // And removes the field from storage.
+    ...(workflowDraft.pathPrefix === undefined || workflowDraft.pathPrefix === null
+      ? {}
+      : { pathPrefix: workflowDraft.pathPrefix === '' ? undefined : workflowDraft.pathPrefix }),
+    ...(workflowDraft.startUrl === undefined || workflowDraft.startUrl === null
+      ? {}
+      : { startUrl: workflowDraft.startUrl === '' ? undefined : workflowDraft.startUrl }),
   };
 
   try {

@@ -365,6 +365,22 @@ describe('runWorkflow function', () => {
     expect(deps.navigateUrls).toStrictEqual([]);
   });
 
+  it('does not navigate when startUrl is empty string (clear sentinel)', async () => {
+    const workflow = await buildApprovedWorkflow({
+      startUrl: '',
+    });
+    const deps = createDeps({
+      evalResponses: [
+        { ok: true, value: { dryRunActions: [], ok: true, value: { done: true, result: 42 } } },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { tabId: 1, workflow });
+    expect(result.ok).toBe(true);
+    // Empty string must NOT trigger navigation.
+    expect(deps.navigateUrls).toStrictEqual([]);
+  });
+
   it('stops on abort signal between pages', async () => {
     const workflow = await buildApprovedWorkflow({
       script: `

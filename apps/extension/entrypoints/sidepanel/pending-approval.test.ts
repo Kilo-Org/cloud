@@ -9,6 +9,10 @@ import {
   applyApprovalDecision,
   requestApproval,
 } from './pending-approval';
+import {
+  loadPendingWorkflowDraft,
+  savePendingWorkflowDraft,
+} from '@/src/shared/agent-workflows-storage';
 
 // ---------- helpers ----------
 
@@ -238,6 +242,154 @@ describe(applyApprovalDecision, () => {
       reason: 'Workflow not found.',
       status: 'failed',
     });
+  });
+
+  it('approve update clears pathPrefix when draft has empty-string sentinel', async () => {
+    const storage = createStorage();
+    const existing: Record<string, unknown> = {
+      approvedScriptHash: undefined,
+      createdAt: 100,
+      description: 'old desc',
+      id: 'wf-existing',
+      name: 'Old',
+      pathPrefix: '/old-prefix',
+      scopeOrigin: 'https://example.com',
+      script: 'return 1;',
+      startUrl: 'https://example.com/start',
+      updatedAt: 100,
+    };
+    storage.values.set('local:kiloAgentWorkflows', [existing]);
+
+    // Draft with pathPrefix: '' — the empty-string sentinel for "explicitly cleared".
+    const draft = workflowDraft({
+      description: 'new desc',
+      name: 'Updated',
+      pathPrefix: '',
+      scopeOrigin: 'https://example.com',
+      script: 'return { done: true, result: 2 };',
+      startUrl: 'https://example.com/start',
+      workflowId: 'wf-existing',
+    });
+
+    const outcome = await applyApprovalDecision(storage, 'workflow', draft, true);
+    expect(outcome.status).toBe('approved');
+
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    // PathPrefix must be cleared — not present on the stored workflow.
+    expect(workflows[0]).not.toHaveProperty('pathPrefix');
+    // StartUrl was provided as a real value, so keep it.
+    expect(workflows[0]?.['startUrl']).toBe('https://example.com/start');
+  });
+
+  it('approve update clears startUrl when draft has empty-string sentinel', async () => {
+    const storage = createStorage();
+    const existing: Record<string, unknown> = {
+      approvedScriptHash: undefined,
+      createdAt: 100,
+      description: 'old desc',
+      id: 'wf-existing',
+      name: 'Old',
+      pathPrefix: '/old-prefix',
+      scopeOrigin: 'https://example.com',
+      script: 'return 1;',
+      startUrl: 'https://example.com/start',
+      updatedAt: 100,
+    };
+    storage.values.set('local:kiloAgentWorkflows', [existing]);
+
+    // Draft with startUrl: '' — the sentinel for "explicitly cleared".
+    const draft = workflowDraft({
+      description: 'new desc',
+      name: 'Updated',
+      pathPrefix: '/old-prefix',
+      scopeOrigin: 'https://example.com',
+      script: 'return { done: true, result: 2 };',
+      startUrl: '',
+      workflowId: 'wf-existing',
+    });
+
+    const outcome = await applyApprovalDecision(storage, 'workflow', draft, true);
+    expect(outcome.status).toBe('approved');
+
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    // StartUrl must be cleared.
+    expect(workflows[0]).not.toHaveProperty('startUrl');
+    // PathPrefix was not explicitly cleared, so keep existing.
+    expect(workflows[0]?.['pathPrefix']).toBe('/old-prefix');
+  });
+
+  it('save-and-reload preserves empty-string clear sentinel', async () => {
+    const storage = createStorage();
+    const existing: Record<string, unknown> = {
+      approvedScriptHash: undefined,
+      createdAt: 100,
+      description: 'old desc',
+      id: 'wf-existing',
+      name: 'Old',
+      pathPrefix: '/old-prefix',
+      scopeOrigin: 'https://example.com',
+      script: 'return 1;',
+      startUrl: 'https://example.com/start',
+      updatedAt: 100,
+    };
+    storage.values.set('local:kiloAgentWorkflows', [existing]);
+
+    // Save a pending draft that clears both pathPrefix and startUrl.
+    const draft = workflowDraft({
+      description: 'new desc',
+      name: 'Updated',
+      pathPrefix: '',
+      scopeOrigin: 'https://example.com',
+      script: 'return { done: true, result: 2 };',
+      startUrl: '',
+      workflowId: 'wf-existing',
+    });
+    await savePendingWorkflowDraft(storage, draft);
+
+    // Reload — simulates panel close / reopen.
+    const reloaded = await loadPendingWorkflowDraft(storage);
+    expect(reloaded).toBeDefined();
+    // Empty string must survive the round-trip without becoming null.
+    expect(reloaded?.pathPrefix).toBe('');
+    expect(reloaded?.startUrl).toBe('');
+  });
+
+  it('reloaded clear-intent draft clears stored fields on approve', async () => {
+    const storage = createStorage();
+    const existing: Record<string, unknown> = {
+      approvedScriptHash: undefined,
+      createdAt: 100,
+      description: 'old desc',
+      id: 'wf-existing',
+      name: 'Old',
+      pathPrefix: '/old-prefix',
+      scopeOrigin: 'https://example.com',
+      script: 'return 1;',
+      startUrl: 'https://example.com/start',
+      updatedAt: 100,
+    };
+    storage.values.set('local:kiloAgentWorkflows', [existing]);
+
+    const draft = workflowDraft({
+      description: 'new desc',
+      name: 'Updated',
+      pathPrefix: '',
+      scopeOrigin: 'https://example.com',
+      script: 'return { done: true, result: 2 };',
+      startUrl: '',
+      workflowId: 'wf-existing',
+    });
+    await savePendingWorkflowDraft(storage, draft);
+
+    const reloaded = await loadPendingWorkflowDraft(storage);
+    const outcome = await applyApprovalDecision(storage, 'workflow', reloaded!, true);
+    expect(outcome.status).toBe('approved');
+
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    expect(workflows[0]?.['pathPrefix']).toBeUndefined();
+    expect(workflows[0]?.['startUrl']).toBeUndefined();
+    // Draft must be cleared after approval.
+    expect(storage.values.has('local:kiloPendingWorkflowSave')).toBe(false);
   });
 
   it('memory store-full failed outcome is distinct from generic failed', async () => {

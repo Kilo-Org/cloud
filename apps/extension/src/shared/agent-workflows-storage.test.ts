@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Contract review repairs added tests for pathPrefix/startUrl clearing; splitting would obscure coverage. */
 import { describe, expect, it } from 'vitest';
 import { MAX_WORKFLOW_COUNT, MAX_WORKFLOW_SCRIPT_LENGTH } from './agent-workflows';
 import type {
@@ -264,6 +265,104 @@ describe('agent workflows storage', () => {
 
     await clearPendingWorkflowDraft(storage);
     await expect(loadPendingWorkflowDraft(storage)).resolves.toBeUndefined();
+  });
+
+  it('round-trips empty-string sentinel for clear intent', async () => {
+    const storage = createStorage();
+
+    // Save a draft with '' pathPrefix/startUrl — the clear sentinel.
+    const draft: PendingAgentWorkflowDraft = {
+      createdAt: 200,
+      description: 'Clear fields',
+      name: 'Cleared',
+      pathPrefix: '',
+      scopeOrigin: 'https://example.com',
+      script: 'return 1;',
+      startUrl: '',
+      workflowId: 'wf-update',
+    };
+    await savePendingWorkflowDraft(storage, draft);
+
+    const loaded = await loadPendingWorkflowDraft(storage);
+    expect(loaded).toBeDefined();
+    // Empty string is the clear sentinel — must survive the round-trip.
+    expect(loaded?.pathPrefix).toBe('');
+    expect(loaded?.startUrl).toBe('');
+  });
+
+  it('converts legacy null sentinel to empty string on load', async () => {
+    const storage = createStorage();
+
+    // Write a stored draft with null pathPrefix/startUrl (legacy format).
+    storage.values.set(PENDING_WORKFLOW_SAVE_STORAGE_KEY, {
+      createdAt: 200,
+      description: 'Clear fields',
+      name: 'Cleared',
+      pathPrefix: null,
+      scopeOrigin: 'https://example.com',
+      script: 'return 1;',
+      startUrl: null,
+      workflowId: 'wf-update',
+    });
+
+    const loaded = await loadPendingWorkflowDraft(storage);
+    expect(loaded).toBeDefined();
+    // Legacy null must be converted to '' — never expose null to the card.
+    expect(loaded?.pathPrefix).toBe('');
+    expect(loaded?.startUrl).toBe('');
+  });
+
+  it('updateAgentWorkflow clears pathPrefix when value is undefined via Object.hasOwn', async () => {
+    const storage = createStorage();
+    const created = await baseCreate(storage, {
+      name: 'With Path',
+      pathPrefix: '/test',
+    });
+    expect(created.pathPrefix).toBe('/test');
+
+    // Passing pathPrefix explicitly as undefined must clear it.
+    const updated = await updateAgentWorkflow(storage, created.id, {
+      name: 'Cleared',
+      pathPrefix: undefined,
+    });
+    expect(updated.pathPrefix).toBeUndefined();
+
+    const loaded = await loadAgentWorkflows(storage);
+    expect(loaded[0]?.pathPrefix).toBeUndefined();
+  });
+
+  it('updateAgentWorkflow clears startUrl when value is undefined via Object.hasOwn', async () => {
+    const storage = createStorage();
+    const created = await baseCreate(storage, {
+      name: 'With Start',
+      startUrl: 'https://example.com/start',
+    });
+    expect(created.startUrl).toBe('https://example.com/start');
+
+    // Passing startUrl explicitly as undefined must clear it.
+    const updated = await updateAgentWorkflow(storage, created.id, {
+      name: 'Cleared',
+      startUrl: undefined,
+    });
+    expect(updated.startUrl).toBeUndefined();
+
+    const loaded = await loadAgentWorkflows(storage);
+    expect(loaded[0]?.startUrl).toBeUndefined();
+  });
+
+  it('updateAgentWorkflow keeps existing pathPrefix when key is absent', async () => {
+    const storage = createStorage();
+    const created = await baseCreate(storage, {
+      name: 'With Path',
+      pathPrefix: '/test',
+    });
+    expect(created.pathPrefix).toBe('/test');
+
+    // When pathPrefix is not in the updates object, keep existing.
+    const updated = await updateAgentWorkflow(storage, created.id, {
+      name: 'Renamed',
+    });
+    expect(updated.pathPrefix).toBe('/test');
   });
 
   it('returns undefined and clears an invalid pending draft', async () => {

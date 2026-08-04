@@ -229,7 +229,7 @@ export const runWorkflow = async (
   }
 
   // 2. Optional startUrl navigation.
-  if (workflow.startUrl !== undefined) {
+  if (workflow.startUrl !== undefined && workflow.startUrl !== '') {
     if (!matchesWorkflowScope(workflow, workflow.startUrl)) {
       return resultWithActions(
         { error: 'Workflow startUrl is outside the workflow scope.', ok: false },

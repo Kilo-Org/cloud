@@ -265,9 +265,19 @@ const executeSaveWorkflow = async (
     name,
     scopeOrigin,
     script,
-    ...(pathPrefix === undefined ? {} : { pathPrefix }),
-    ...(startUrl === undefined ? {} : { startUrl }),
-    ...(workflowId === undefined ? {} : { workflowId }),
+    ...(workflowId === undefined
+      ? {
+          ...(pathPrefix === undefined ? {} : { pathPrefix }),
+          ...(startUrl === undefined ? {} : { startUrl }),
+        }
+      : {
+          // Update: always include so the card and storage can carry a clear intent.
+          // Empty string is the "cleared" sentinel — it survives JSON serialization
+          // (unlike undefined) but is never a valid real value.
+          pathPrefix: pathPrefix ?? '',
+          startUrl: startUrl ?? '',
+          workflowId,
+        }),
   };
 
   const outcome = await ctx.requestApproval('workflow', draft);

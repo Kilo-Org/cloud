@@ -53,16 +53,29 @@ const toAgentWorkflow = (value: z.infer<typeof agentWorkflowSchema>): AgentWorkf
 
 const toPendingDraft = (
   value: z.infer<typeof pendingAgentWorkflowDraftSchema>
-): PendingAgentWorkflowDraft => ({
-  createdAt: value.createdAt,
-  description: value.description,
-  name: value.name,
-  scopeOrigin: value.scopeOrigin,
-  script: value.script,
-  ...(value.pathPrefix === undefined ? {} : { pathPrefix: value.pathPrefix }),
-  ...(value.startUrl === undefined ? {} : { startUrl: value.startUrl }),
-  ...(value.workflowId === undefined ? {} : { workflowId: value.workflowId }),
-});
+): PendingAgentWorkflowDraft => {
+  const draft: PendingAgentWorkflowDraft = {
+    createdAt: value.createdAt,
+    description: value.description,
+    name: value.name,
+    scopeOrigin: value.scopeOrigin,
+    script: value.script,
+  };
+
+  // Preserve clear intent: null becomes '' (empty string sentinel) so
+  // Object.hasOwn detects the key and the card never renders raw null.
+  if (Object.hasOwn(value, 'pathPrefix')) {
+    draft.pathPrefix = value.pathPrefix === null ? '' : value.pathPrefix;
+  }
+  if (Object.hasOwn(value, 'startUrl')) {
+    draft.startUrl = value.startUrl === null ? '' : value.startUrl;
+  }
+  if (Object.hasOwn(value, 'workflowId')) {
+    draft.workflowId = value.workflowId;
+  }
+
+  return draft;
+};
 
 export const normalizeAgentWorkflows = (value: unknown): AgentWorkflow[] => {
   const parsed = storedAgentWorkflowsSchema.safeParse(value);
@@ -135,8 +148,10 @@ export const updateAgentWorkflow = async (
     ? (updates.approvedScriptHash ?? undefined)
     : (updates.approvedScriptHash ?? existing.approvedScriptHash);
 
-  const resolvedPathPrefix = updates.pathPrefix ?? existing.pathPrefix;
-  const resolvedStartUrl = updates.startUrl ?? existing.startUrl;
+  const pathPrefixProvided = Object.hasOwn(updates, 'pathPrefix');
+  const resolvedPathPrefix = pathPrefixProvided ? updates.pathPrefix : existing.pathPrefix;
+  const startUrlProvided = Object.hasOwn(updates, 'startUrl');
+  const resolvedStartUrl = startUrlProvided ? updates.startUrl : existing.startUrl;
 
   const updated: AgentWorkflow = {
     approvedScriptHash,

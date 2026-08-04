@@ -376,6 +376,69 @@ describe('save_workflow', () => {
       ok: false,
     });
   });
+
+  it('update draft carries empty-string sentinel for cleared pathPrefix/startUrl', async () => {
+    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'wf-1', status: 'approved' });
+    const ctx = createBaseCtx({ requestApproval });
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        createdAt: 100,
+        description: 'desc',
+        id: 'wf-1',
+        name: 'Existing',
+        pathPrefix: '/old-prefix',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+        startUrl: 'https://example.com/old-start',
+        updatedAt: 200,
+      },
+    ]);
+
+    await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'Updated',
+        scopeOrigin: 'https://example.com',
+        script: 'return 2;',
+        workflowId: 'wf-1',
+      }),
+      ctx
+    );
+
+    const draftArg = (requestApproval as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as Record<
+      string,
+      unknown
+    >;
+    expect(draftArg).toBeDefined();
+    // Empty string is the clear sentinel — survives JSON, never null in the card.
+    expect(Object.hasOwn(draftArg, 'pathPrefix')).toBe(true);
+    expect(draftArg['pathPrefix']).toBe('');
+    expect(Object.hasOwn(draftArg, 'startUrl')).toBe(true);
+    expect(draftArg['startUrl']).toBe('');
+  });
+
+  it('create draft omits undefined pathPrefix/startUrl', async () => {
+    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'new-wf', status: 'approved' });
+    const ctx = createBaseCtx({ requestApproval });
+
+    await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+
+    const draftArg = (requestApproval as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as Record<
+      string,
+      unknown
+    >;
+    expect(draftArg).toBeDefined();
+    expect(Object.hasOwn(draftArg, 'pathPrefix')).toBe(false);
+    expect(Object.hasOwn(draftArg, 'startUrl')).toBe(false);
+  });
 });
 
 // ---------- run_workflow ----------

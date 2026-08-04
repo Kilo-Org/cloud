@@ -39,8 +39,8 @@ export interface PendingAgentWorkflowDraft {
   name: string;
   description: string;
   scopeOrigin: string;
-  pathPrefix?: string | undefined;
-  startUrl?: string | undefined;
+  pathPrefix?: string | null | undefined;
+  startUrl?: string | null | undefined;
   script: string;
   createdAt: number;
 }
@@ -83,10 +83,10 @@ export const pendingAgentWorkflowDraftSchema = z
     createdAt: z.number(),
     description: z.string().max(MAX_WORKFLOW_DESCRIPTION_LENGTH),
     name: z.string().max(MAX_WORKFLOW_NAME_LENGTH),
-    pathPrefix: z.string().optional(),
+    pathPrefix: z.string().nullable().optional(),
     scopeOrigin: z.string(),
     script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
-    startUrl: z.string().optional(),
+    startUrl: z.string().nullable().optional(),
     workflowId: z.string().optional(),
   })
   .strip();

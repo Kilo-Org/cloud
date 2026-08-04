@@ -34,6 +34,8 @@ import {
   magic_link_tokens,
   device_sessions,
   device_refresh_tokens,
+  native_attested_keys,
+  native_admission_challenges,
   stytch_fingerprints,
   kiloclaw_instances,
   kiloclaw_google_oauth_connections,
@@ -4301,6 +4303,57 @@ describe('User', () => {
           .where(eq(device_refresh_tokens.device_session_id, otherSession.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should delete native attested keys and admission challenges', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      // Insert a native attested key for the user
+      await db.insert(native_attested_keys).values({
+        key_id: 'test-key-1',
+        kilo_user_id: user.id,
+        platform: 'ios',
+        public_key: 'base64pubkey1',
+        sign_count: 5,
+        attested_at: new Date().toISOString(),
+      });
+
+      // Insert a native attested key for the other user
+      await db.insert(native_attested_keys).values({
+        key_id: 'test-key-2',
+        kilo_user_id: otherUser.id,
+        platform: 'android',
+        public_key: 'base64pubkey2',
+        sign_count: 3,
+        attested_at: new Date().toISOString(),
+      });
+
+      // Insert an admission challenge (ephemeral, no user FK)
+      await db.insert(native_admission_challenges).values({
+        challenge: 'test-challenge-1',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      // User's key must be gone
+      const userKey = await db.query.native_attested_keys.findFirst({
+        where: eq(native_attested_keys.key_id, 'test-key-1'),
+      });
+      expect(userKey).toBeUndefined();
+
+      // Other user's key must remain
+      const otherKey = await db.query.native_attested_keys.findFirst({
+        where: eq(native_attested_keys.key_id, 'test-key-2'),
+      });
+      expect(otherKey).toBeDefined();
+
+      // Challenge persists (cleaned by cron, not by soft-delete)
+      const challenge = await db.query.native_admission_challenges.findFirst({
+        where: eq(native_admission_challenges.challenge, 'test-challenge-1'),
+      });
+      expect(challenge).toBeDefined();
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw instance even without live subscription', async () => {

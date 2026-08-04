@@ -33,7 +33,14 @@ jest.mock('@/lib/auth/magic-link-tokens');
 jest.mock('@/lib/user');
 jest.mock('@/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
-jest.mock('@/lib/auth/native-admission');
+jest.mock('@/lib/auth/native-admission', () => ({
+  ...jest.requireActual('@/lib/auth/native-admission'),
+  checkNativeAdmission: jest.fn(),
+  validateAdmissionPayload: jest.fn(),
+  verifyAdmissionAsync: jest.fn(),
+  persistAttestedKey: jest.fn(),
+  shouldRefuseAsyncFailure: jest.fn(),
+}));
 jest.mock('@/lib/auth/device-sessions');
 jest.mock('@/lib/config.server', () => ({
   GOOGLE_CLIENT_ID: 'web-client-id',
@@ -60,8 +67,19 @@ jest.mock('@/lib/posthog', () => {
 });
 
 import { POST } from './route';
-import { checkNativeAdmission } from '@/lib/auth/native-admission';
-import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import {
+  checkNativeAdmission,
+  validateAdmissionPayload,
+  verifyAdmissionAsync,
+  persistAttestedKey,
+  shouldRefuseAsyncFailure,
+  KeyCollisionError,
+} from '@/lib/auth/native-admission';
+import {
+  createDeviceSession,
+  issueSessionCredentials,
+  createDeviceSessionWithAttestedKey,
+} from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
@@ -78,8 +96,13 @@ const mockFindUserIdByAuthProvider = jest.mocked(findUserIdByAuthProvider);
 const mockGenerateApiToken = jest.mocked(generateApiToken);
 const mockCheckDomainSignInEligibility = jest.mocked(checkDomainSignInEligibility);
 const mockCheckNativeAdmission = jest.mocked(checkNativeAdmission);
+const mockValidateAdmissionPayload = jest.mocked(validateAdmissionPayload);
+const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
+const mockPersistAttestedKey = jest.mocked(persistAttestedKey);
+const mockShouldRefuseAsyncFailure = jest.mocked(shouldRefuseAsyncFailure);
 const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
+const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
 const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
@@ -111,7 +134,17 @@ describe('POST /api/auth/native/token', () => {
     mockFindUserById.mockResolvedValue(undefined);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
     mockFindUserIdByAuthProvider.mockResolvedValue(null);
-    mockCheckNativeAdmission.mockReturnValue({ ok: true });
+    mockCheckNativeAdmission.mockReturnValue({ admission: { ok: true }, verifyAsync: true });
+    mockValidateAdmissionPayload.mockReturnValue(undefined);
+    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'ios', keyId: 'key1' });
+    mockPersistAttestedKey.mockResolvedValue(undefined);
+    mockShouldRefuseAsyncFailure.mockReturnValue(false);
+    mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
+      token: 'short-jwt',
+      refreshToken: 'refresh-xyz',
+      expiresIn: 3600,
+      sessionId: 'session-1',
+    });
     mockReserveSignInCode.mockResolvedValue('ok');
     mockCommitSignInCode.mockResolvedValue(true);
     mockReleaseSignInCode.mockResolvedValue(undefined);
@@ -943,8 +976,11 @@ describe('POST /api/auth/native/token', () => {
   describe('admission', () => {
     it('returns 403 ADMISSION_REQUIRED when admission check fails', async () => {
       mockCheckNativeAdmission.mockReturnValue({
-        ok: false,
-        errorCode: 'ADMISSION_REQUIRED',
+        admission: {
+          ok: false,
+          errorCode: 'ADMISSION_REQUIRED',
+        },
+        verifyAsync: false,
       });
 
       const response = await POST(
@@ -969,6 +1005,315 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(200);
       expect(mockCheckNativeAdmission).toHaveBeenCalled();
       expect(mockVerifyNativeGoogleIdToken).toHaveBeenCalled();
+    });
+
+    // ── Fix 3: ownership check before code commit (email path) ─────────
+
+    it('refuses ownership mismatch WITHOUT consuming the sign-in code (enforce, email path)', async () => {
+      mockShouldRefuseAsyncFailure.mockReturnValue(true);
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'assertion',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        signCount: 11,
+        existingKeyUserId: 'other-user',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'emailuser@example.com',
+          code: '123456',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      // Code must NOT be committed — ownership check happens before commit.
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+    });
+
+    // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
+
+    // ── C14 repair: report mode logs mismatch and issues credentials ─
+
+    it('logs ownership mismatch and issues credentials in report mode (email path)', async () => {
+      // shouldRefuseAsyncFailure defaults to false (report mode)
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'assertion',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        signCount: 11,
+        existingKeyUserId: 'other-user',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'emailuser@example.com',
+          code: '123456',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      // Ownership mismatch is logged before code commit.
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
+      // Code is committed and credentials are issued.
+      expect(mockCommitSignInCode).toHaveBeenCalled();
+      expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+      // Key persistence is skipped — mismatch was detected pre-commit.
+      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
+    });
+
+    it('refuses attestation key collision before code commit (enforce, email path)', async () => {
+      mockShouldRefuseAsyncFailure.mockReturnValue(true);
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+        existingKeyUserId: 'other-user',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'emailuser@example.com',
+          code: '123456',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      // Code must NOT be committed — attestation ownership is checked pre-commit.
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+    });
+
+    it('logs ownership mismatch and issues token in report mode (apple/google)', async () => {
+      // shouldRefuseAsyncFailure defaults to false (report mode)
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'assertion',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        signCount: 11,
+        existingKeyUserId: 'other-user',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
+      // Key persistence is skipped.
+      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
+    });
+
+    it('logs KeyCollisionError and issues token in report mode (apple/google, no supportsRefresh)', async () => {
+      // shouldRefuseAsyncFailure defaults to false (report mode)
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+      });
+      mockPersistAttestedKey.mockRejectedValue(new KeyCollisionError());
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+    });
+
+    // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
+
+    it('returns 403 ADMISSION_REQUIRED when persistAttestedKey throws KeyCollisionError (enforce, apple/google, no supportsRefresh)', async () => {
+      mockShouldRefuseAsyncFailure.mockReturnValue(true);
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+      });
+      mockPersistAttestedKey.mockRejectedValue(new KeyCollisionError());
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      // Must not issue credentials after collision.
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 ADMISSION_REQUIRED when createDeviceSessionWithAttestedKey throws KeyCollisionError (enforce, apple/google, supportsRefresh)', async () => {
+      mockShouldRefuseAsyncFailure.mockReturnValue(true);
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+      });
+      mockCreateDeviceSessionWithAttestedKey.mockRejectedValue(new KeyCollisionError());
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          supportsRefresh: true,
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    // ── Fix 6: attestation key + session in one transaction ────────────
+
+    it('uses createDeviceSessionWithAttestedKey when attestation and supportsRefresh', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+      });
+      mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
+        token: 'short-jwt',
+        refreshToken: 'refresh-abc',
+        expiresIn: 3600,
+        sessionId: 'session-1',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          supportsRefresh: true,
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        token: 'short-jwt',
+        refreshToken: 'refresh-abc',
+        expiresIn: 3600,
+      });
+      // Must use the transactional combined function, not separate calls.
+      expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+        user: fakeUser,
+        verification: expect.objectContaining({
+          platform: 'ios',
+          keyId: 'key1',
+          publicKey: 'base64pubkey',
+        }),
+      });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
     });
   });
 

@@ -24,8 +24,21 @@ import {
 } from '@/lib/user';
 import { generateApiToken } from '@/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
-import { checkNativeAdmission } from '@/lib/auth/native-admission';
-import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import {
+  checkNativeAdmission,
+  validateAdmissionPayload,
+  verifyAdmissionAsync,
+  persistAttestedKey,
+  shouldRefuseAsyncFailure,
+  KeyCollisionError,
+  type AdmissionPayload,
+  type VerifyAdmissionOk,
+} from '@/lib/auth/native-admission';
+import {
+  createDeviceSession,
+  issueSessionCredentials,
+  createDeviceSessionWithAttestedKey,
+} from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
 
@@ -101,19 +114,24 @@ const requestSchema = z.discriminatedUnion('provider', [
  * Native (mobile) sign-in token exchange. Verifies an Apple/Google ID token or an
  * email sign-in code, creates or updates the user, and mints an API token.
  *
+ * Verification order per plan:
+ *   1. Sync admission gate (checkNativeAdmission).
+ *   2. Provider identity verification.
+ *   3. Async admission verification (BEFORE user settlement).
+ *   4. User settlement (createOrUpdateUser).
+ *   5. Key persistence (after settlement, binds key to user id).
+ *
  * Response contract (frozen — mobile client is built against it):
- *   200 { token, refreshToken?, expiresIn? }  — refreshToken+expiresIn only when
- *                                                   the client opts into refresh
- *                                                   (supportsRefresh: true)
- *   401 { error: 'INVALID_TOKEN' }        — bad apple/google ID token
- *   401 { error: 'INVALID_CODE' }         — bad email sign-in code
- *   425 { error: 'CODE_IN_PROGRESS' }     — another request is processing this code
- *   429 { error: 'TOO_MANY_ATTEMPTS' }    — email code attempt budget exhausted
- *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? } — apple/google domain
- *                                            blacklisted or SSO-enforced (checkDomainSignInEligibility)
- *   403 { error: AuthErrorType }          — createOrUpdateUser rejected the sign-in
- *   403 { error: 'ADMISSION_REQUIRED' }   — admission check failed under enforce mode
- *   400                                   — invalid request body
+ *   200 { token, refreshToken?, expiresIn? }
+ *   401 { error: 'INVALID_TOKEN' }
+ *   401 { error: 'INVALID_CODE' }
+ *   425 { error: 'CODE_IN_PROGRESS' }
+ *   429 { error: 'TOO_MANY_ATTEMPTS' }
+ *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? }
+ *   403 { error: AuthErrorType }
+ *   403 { error: 'ADMISSION_REQUIRED' }
+ *   400 invalid request body
+ *   500 provider infrastructure error
  */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => undefined);
@@ -125,12 +143,20 @@ export async function POST(request: NextRequest) {
 
   const data = validation.data;
 
-  // Admission check: must run before any provider verification.
-  const admission = checkNativeAdmission(body);
-  if (!admission.ok) {
-    return NextResponse.json({ error: admission.errorCode }, { status: 403 });
+  // ── Step 1: Sync admission gate ──────────────────────────────────────────
+  const admissionGate = checkNativeAdmission(body);
+  if (!admissionGate.admission.ok) {
+    return NextResponse.json({ error: admissionGate.admission.errorCode }, { status: 403 });
   }
 
+  // ── Step 2: Extract and validate admission payload ───────────────────────
+  // Only extract when async verification is needed (enforce or report mode).
+  let admissionPayload: AdmissionPayload | undefined;
+  if (admissionGate.verifyAsync && body['admission'] && typeof body['admission'] === 'object') {
+    admissionPayload = validateAdmissionPayload(body['admission']);
+  }
+
+  // ── Step 3: Provider identity verification ───────────────────────────────
   let args: CreateOrUpdateUserArgs;
   let autoLinkToExistingUser: boolean;
 
@@ -209,7 +235,6 @@ export async function POST(request: NextRequest) {
     autoLinkToExistingUser = false;
   } else {
     // Email sign-in code path: reserve → settle → commit.
-    // A failed settlement must release the reservation so the code stays usable.
     const existingUser = await findUserByNormalizedEmail(data.email);
     const email = existingUser?.google_user_email ?? data.email.toLowerCase();
 
@@ -245,8 +270,28 @@ export async function POST(request: NextRequest) {
       };
       autoLinkToExistingUser = true;
 
-      // createOrUpdateUser is idempotent for existing users:
-      // findAndSyncExistingUser returns the existing row and isNew: false.
+      // ── Step 3b: Async admission verification BEFORE settlement ────────
+      let admissionVerification: VerifyAdmissionOk | undefined;
+      if (admissionPayload) {
+        try {
+          const verified = await verifyAdmissionAsync(admissionPayload);
+          if (!verified.ok) {
+            // Under report mode, evaluate but still admit.
+            if (shouldRefuseAsyncFailure()) {
+              phase = 'release';
+              return NextResponse.json({ error: verified.errorCode }, { status: 403 });
+            }
+          } else {
+            admissionVerification = verified;
+          }
+        } catch {
+          // Provider infrastructure failure — surface as 5xx.
+          phase = 'release';
+          return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
+        }
+      }
+
+      // ── Step 4: User settlement ──────────────────────────────────────
       const result = await createOrUpdateUser(
         args,
         undefined,
@@ -272,36 +317,110 @@ export async function POST(request: NextRequest) {
         return eligibilityResponse(resolvedEligibility);
       }
 
+      // ── Step 4.5: Key ownership check BEFORE code commit ─────────────
+      // For assertion (existing key) and attestation (keyId already bound to
+      // another user): enforce → refuse without consuming the code so a
+      // legitimate retry remains possible. Report → log, skip persistence,
+      // and issue credentials.
+      if (admissionVerification) {
+        const hasOwnershipMismatch =
+          admissionVerification.existingKeyUserId &&
+          admissionVerification.existingKeyUserId !== result.user.id;
+        if (hasOwnershipMismatch) {
+          captureMessage('native_attested_key_ownership_mismatch');
+          if (shouldRefuseAsyncFailure()) {
+            phase = 'release';
+            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+          }
+          // Report mode: skip key persistence, admit, and issue credentials.
+          admissionVerification = undefined;
+        }
+      }
+
       // Consume the code BEFORE issuing any credential.
-      // If the reservation lapsed (commit returns false), the user is legitimately
-      // settled — consume the code unconditionally and log the lapse window.
       const committed = await commitSignInCode(data.email, data.code, data.challengeId);
       if (!committed) {
-        // Unconditional consume: set consumed_at even without a live reservation
-        // so this code cannot settle again and create a second session.
         const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
         if (!consumed) {
-          // Another request already consumed the code — do NOT issue credentials.
           return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
         }
         captureMessage('native_token_code_reservation_lapsed');
       }
       phase = 'committed';
 
+      // ── Step 5: Persist attested key after settlement ─────────────────
+      let sessionId: string | undefined;
+      let refreshCredentials:
+        | { token: string; refreshToken: string; expiresIn: number }
+        | undefined;
+
+      if (admissionVerification && data.supportsRefresh) {
+        // Bind key persistence and session creation in one transaction.
+        try {
+          const combined = await createDeviceSessionWithAttestedKey({
+            userId: result.user.id,
+            userAgent: request.headers.get('user-agent') ?? undefined,
+            user: result.user,
+            verification: admissionVerification,
+          });
+          sessionId = combined.sessionId;
+          refreshCredentials = {
+            token: combined.token,
+            refreshToken: combined.refreshToken,
+            expiresIn: combined.expiresIn,
+          };
+        } catch (err) {
+          if (err instanceof KeyCollisionError) {
+            captureMessage('native_attested_key_cross_user_collision');
+            if (shouldRefuseAsyncFailure()) {
+              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+            }
+            // Report mode: log, admit, and issue credentials without binding the key.
+          } else {
+            // Bookkeeping failure — log and fall through to legacy token.
+            captureMessage('native_attested_key_persist_failed_after_settlement');
+          }
+        }
+      } else if (admissionVerification) {
+        try {
+          await persistAttestedKey(result.user.id, admissionVerification);
+        } catch (err) {
+          if (err instanceof KeyCollisionError) {
+            captureMessage('native_attested_key_cross_user_collision');
+            if (shouldRefuseAsyncFailure()) {
+              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+            }
+            // Report mode: log, admit, and issue credentials without binding the key.
+          } else {
+            captureMessage('native_attested_key_persist_failed_after_settlement');
+          }
+        }
+      }
+
       // Emit deferred sign-in analytics after all gates pass.
       if (result.deferredSignInEvent) {
         posthogClient.capture(result.deferredSignInEvent);
       }
 
-      // Only now issue credentials — consumption is confirmed.
-      // ponytail: remove legacy long-lived path after all shipped clients have
-      // refreshed their token at least once and the legacy counter has drained.
+      if (refreshCredentials) {
+        return NextResponse.json(
+          {
+            token: refreshCredentials.token,
+            refreshToken: refreshCredentials.refreshToken,
+            expiresIn: refreshCredentials.expiresIn,
+          },
+          { status: 200 }
+        );
+      }
+
       if (data.supportsRefresh) {
-        const sessionId = await createDeviceSession({
-          userId: result.user.id,
-          userAgent: request.headers.get('user-agent') ?? undefined,
-        });
-        const pair = await issueSessionCredentials(result.user, sessionId);
+        const sid =
+          sessionId ??
+          (await createDeviceSession({
+            userId: result.user.id,
+            userAgent: request.headers.get('user-agent') ?? undefined,
+          }));
+        const pair = await issueSessionCredentials(result.user, sid);
         return NextResponse.json(
           { token: pair.token, refreshToken: pair.refreshToken, expiresIn: pair.expiresIn },
           { status: 200 }
@@ -321,7 +440,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Apple/Google path: settlement without reservation (no code to release).
+  // Apple/Google path.
+
+  // ── Step 3c: Async admission verification BEFORE settlement ──────────────
+  let admissionVerification: VerifyAdmissionOk | undefined;
+  if (admissionPayload) {
+    try {
+      const verified = await verifyAdmissionAsync(admissionPayload);
+      if (!verified.ok) {
+        if (shouldRefuseAsyncFailure()) {
+          return NextResponse.json({ error: verified.errorCode }, { status: 403 });
+        }
+      } else {
+        admissionVerification = verified;
+      }
+    } catch {
+      // Provider infrastructure failure — surface as 5xx.
+      return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
+    }
+  }
+
+  // ── Step 4: User settlement ──────────────────────────────────────────────
   const result = await createOrUpdateUser(
     args,
     undefined,
@@ -339,6 +478,69 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
 
+  // ── Step 5: Persist attested key after settlement ────────────────────────
+  let sessionId: string | undefined;
+  let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
+
+  if (admissionVerification) {
+    // Cross-user ownership: enforce → refuse, report → log and skip persistence.
+    if (
+      admissionVerification.existingKeyUserId &&
+      admissionVerification.existingKeyUserId !== result.user.id
+    ) {
+      captureMessage('native_attested_key_ownership_mismatch');
+      if (shouldRefuseAsyncFailure()) {
+        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+      }
+      // Report mode: skip key persistence, admit, and issue credentials.
+      admissionVerification = undefined;
+    }
+
+    if (admissionVerification) {
+      if (data.supportsRefresh) {
+        // Bind key persistence and session creation in one transaction.
+        try {
+          const combined = await createDeviceSessionWithAttestedKey({
+            userId: result.user.id,
+            userAgent: request.headers.get('user-agent') ?? undefined,
+            user: result.user,
+            verification: admissionVerification,
+          });
+          sessionId = combined.sessionId;
+          refreshCredentials = {
+            token: combined.token,
+            refreshToken: combined.refreshToken,
+            expiresIn: combined.expiresIn,
+          };
+        } catch (err) {
+          if (err instanceof KeyCollisionError) {
+            captureMessage('native_attested_key_cross_user_collision');
+            if (shouldRefuseAsyncFailure()) {
+              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+            }
+            // Report mode: log, admit, and issue credentials without binding the key.
+          } else {
+            captureMessage('native_attested_key_persist_failed_after_settlement');
+          }
+        }
+      } else {
+        try {
+          await persistAttestedKey(result.user.id, admissionVerification);
+        } catch (err) {
+          if (err instanceof KeyCollisionError) {
+            captureMessage('native_attested_key_cross_user_collision');
+            if (shouldRefuseAsyncFailure()) {
+              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+            }
+            // Report mode: log, admit, and issue credentials without binding the key.
+          } else {
+            captureMessage('native_attested_key_persist_failed_after_settlement');
+          }
+        }
+      }
+    }
+  }
+
   const resolvedEligibility = await checkDomainSignInEligibility(result.user.google_user_email);
   if (!resolvedEligibility.ok) {
     return eligibilityResponse(resolvedEligibility);
@@ -349,14 +551,25 @@ export async function POST(request: NextRequest) {
     posthogClient.capture(result.deferredSignInEvent);
   }
 
-  // ponytail: remove legacy long-lived path after all shipped clients have
-  // refreshed their token at least once and the legacy counter has drained.
+  if (refreshCredentials) {
+    return NextResponse.json(
+      {
+        token: refreshCredentials.token,
+        refreshToken: refreshCredentials.refreshToken,
+        expiresIn: refreshCredentials.expiresIn,
+      },
+      { status: 200 }
+    );
+  }
+
   if (data.supportsRefresh) {
-    const sessionId = await createDeviceSession({
-      userId: result.user.id,
-      userAgent: request.headers.get('user-agent') ?? undefined,
-    });
-    const pair = await issueSessionCredentials(result.user, sessionId);
+    const sid =
+      sessionId ??
+      (await createDeviceSession({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      }));
+    const pair = await issueSessionCredentials(result.user, sid);
     return NextResponse.json(
       { token: pair.token, refreshToken: pair.refreshToken, expiresIn: pair.expiresIn },
       { status: 200 }

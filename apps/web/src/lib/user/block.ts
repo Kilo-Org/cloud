@@ -5,6 +5,7 @@ import {
   device_auth_requests,
   device_sessions,
   device_refresh_tokens,
+  native_attested_keys,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
@@ -90,6 +91,11 @@ export async function blockUser(params: BlockUserParams): Promise<boolean> {
           isNull(device_refresh_tokens.consumed_at)
         )
       );
+
+    // Delete every native attested key for this user.
+    await tx
+      .delete(native_attested_keys)
+      .where(eq(native_attested_keys.kilo_user_id, params.kiloUserId));
 
     return true;
   }

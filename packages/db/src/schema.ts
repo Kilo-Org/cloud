@@ -10894,4 +10894,42 @@ export const github_install_states = pgTable(
 );
 
 export type GitHubInstallState = typeof github_install_states.$inferSelect;
+
+// C14: native admission attestation
+export const native_admission_challenges = pgTable(
+  'native_admission_challenges',
+  {
+    challenge: text().primaryKey().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_native_admission_challenges_expires_at').on(table.expires_at),
+  ]
+);
+
+export type NativeAdmissionChallenge = typeof native_admission_challenges.$inferSelect;
+
+export const native_attested_keys = pgTable(
+  'native_attested_keys',
+  {
+    key_id: text().primaryKey().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text().notNull().$type<'ios' | 'android'>(),
+    public_key: text().notNull(),
+    sign_count: integer().notNull().default(0),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    attested_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_native_attested_keys_kilo_user_id').on(table.kilo_user_id),
+    check('native_attested_keys_platform_check', sql`${table.platform} IN ('ios', 'android')`),
+  ]
+);
+
+export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;

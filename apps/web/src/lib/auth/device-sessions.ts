@@ -5,6 +5,7 @@ import type { User } from '@kilocode/db/schema';
 import { eq, and, isNull, gt } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
+import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
 
 const REFRESH_TOKEN_BYTES = 32;
 
@@ -191,6 +192,64 @@ export async function rotateRefreshToken(
   const newPair = await issueSessionCredentials(fullUser, session.id);
 
   return { ok: true, ...newPair };
+}
+
+/**
+ * Create a device session and persist the attested key in a single transaction.
+ *
+ * Bind key persistence and session creation atomically so that a partial failure
+ * never leaves one committed without the other when supportsRefresh is true.
+ *
+ * Returns the session ID and credential pair on success.
+ * Throws KeyCollisionError if the key already belongs to a different user.
+ */
+export async function createDeviceSessionWithAttestedKey(params: {
+  userId: string;
+  userAgent?: string;
+  user: User;
+  verification: VerifyAdmissionOk;
+}): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
+  return await db.transaction(async tx => {
+    // Persist the attested key inside the transaction
+    await persistAttestedKeyTx(tx, params.userId, params.verification);
+
+    // Create the device session
+    const [session] = await tx
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: params.userId,
+        user_agent: params.userAgent,
+      })
+      .returning({ id: device_sessions.id });
+
+    if (!session) {
+      throw new Error('Failed to create device session');
+    }
+
+    // Issue credentials
+    const accessToken = generateApiToken(
+      params.user,
+      { deviceSessionId: session.id },
+      { expiresIn: TOKEN_EXPIRY.oneHour }
+    );
+
+    const refreshToken = generateRefreshToken();
+    const tokenHash = hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString();
+
+    await tx.insert(device_refresh_tokens).values({
+      token_hash: tokenHash,
+      device_session_id: session.id,
+      expires_at: expiresAt,
+    });
+
+    return {
+      token: accessToken,
+      refreshToken,
+      expiresIn: TOKEN_EXPIRY.oneHour,
+      sessionId: session.id,
+    };
+  });
 }
 
 /**

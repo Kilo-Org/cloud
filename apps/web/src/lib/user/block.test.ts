@@ -5,6 +5,7 @@ import {
   device_auth_requests,
   device_sessions,
   device_refresh_tokens,
+  native_attested_keys,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -183,6 +184,29 @@ describe('blockUser (integration)', () => {
       where: eq(device_refresh_tokens.token_hash, tokenHash),
     });
     expect(afterToken).toBeUndefined();
+  });
+
+  test('deletes native attested keys for a blocked user', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'initial-pepper' });
+
+    // Insert a native attested key
+    await db.insert(native_attested_keys).values({
+      key_id: 'test-key-block',
+      kilo_user_id: user.id,
+      platform: 'ios',
+      public_key: 'base64pubkey',
+      sign_count: 0,
+      attested_at: new Date().toISOString(),
+    });
+
+    const didBlock = await blockUser({ kiloUserId: user.id, reason: 'device block' });
+
+    expect(didBlock).toBe(true);
+
+    const afterKey = await db.query.native_attested_keys.findFirst({
+      where: eq(native_attested_keys.key_id, 'test-key-block'),
+    });
+    expect(afterKey).toBeUndefined();
   });
 
   test('does not revoke an already-revoked session', async () => {

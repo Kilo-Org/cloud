@@ -1,10 +1,10 @@
-import { organization_memberships } from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import { organizationBillingProcedure } from '@/routers/organizations/utils';
 import { getDirectChildOrganizations } from '@/lib/organizations/organizations';
 import { OrganizationPlanSchema } from '@/lib/organizations/organization-types';
-import { count, inArray } from 'drizzle-orm';
+import { and, count, eq, inArray, ne } from 'drizzle-orm';
 import * as z from 'zod';
 
 const SubOrganizationOverviewChildSchema = z.object({
@@ -32,16 +32,34 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
 
       // Single batched query for member counts across every child, so the
       // query count is independent of the number of children (no N+1 fan-out).
+      // Match the surfaced member-count convention in organization-admin-router
+      // (and getUserOrganizationsWithSeats): count kilocode_users.id so
+      // billing-manager seats (filtered on the membership join condition) and
+      // bot users (filtered on the user join condition) drop out of the count.
+      // Without this, the same child would show a higher memberCount here than
+      // the member count surfaced elsewhere for it.
       const childIds = children.map(child => child.id);
       const memberCountRows =
         childIds.length > 0
           ? await db
               .select({
                 organizationId: organization_memberships.organization_id,
-                memberCount: count(),
+                memberCount: count(kilocode_users.id),
               })
               .from(organization_memberships)
-              .where(inArray(organization_memberships.organization_id, childIds))
+              .innerJoin(
+                kilocode_users,
+                and(
+                  eq(kilocode_users.id, organization_memberships.kilo_user_id),
+                  eq(kilocode_users.is_bot, false)
+                )
+              )
+              .where(
+                and(
+                  inArray(organization_memberships.organization_id, childIds),
+                  ne(organization_memberships.role, 'billing_manager')
+                )
+              )
               .groupBy(organization_memberships.organization_id)
           : [];
       const memberCountByOrg = new Map(

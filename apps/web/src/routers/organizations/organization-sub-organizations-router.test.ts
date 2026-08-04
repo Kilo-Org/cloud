@@ -16,6 +16,8 @@ let parentBillingManager: User;
 let parentMember: User;
 let childOwner: User;
 let childAExtraMember: User;
+let childABillingManager: User;
+let childABotMember: User;
 let parentOrg: Organization;
 let childA: Organization;
 let childB: Organization;
@@ -69,15 +71,31 @@ describe('organization sub-organizations router', () => {
       google_user_name: 'Suborg Child A Extra Member',
       is_admin: false,
     });
+    childABillingManager = await insertTestUser({
+      google_user_email: 'suborg-overview-child-a-billing@example.com',
+      google_user_name: 'Suborg Child A Billing Manager',
+      is_admin: false,
+    });
+    childABotMember = await insertTestUser({
+      google_user_email: 'suborg-overview-child-a-bot@example.com',
+      google_user_name: 'Suborg Child A Bot Member',
+      is_admin: false,
+      is_bot: true,
+    });
 
     parentOrg = await createOrganization('Suborg Overview Parent', parentOwner.id);
     await addUserToOrganization(parentOrg.id, parentBillingManager.id, 'billing_manager');
     await addUserToOrganization(parentOrg.id, parentMember.id, 'member');
 
     // childA is owned by childOwner (who is NOT a member of the parent), with an
-    // extra member so its member count is distinguishable from childB.
+    // extra member so its member count is distinguishable from childB. It also
+    // has a billing_manager and a bot member, which must NOT count toward
+    // memberCount (matches the surfaced member-count convention in
+    // organization-admin-router, which excludes billing-manager seats and bots).
     childA = await createOrganization('Suborg Overview Child A', childOwner.id);
     await addUserToOrganization(childA.id, childAExtraMember.id, 'member');
+    await addUserToOrganization(childA.id, childABillingManager.id, 'billing_manager');
+    await addUserToOrganization(childA.id, childABotMember.id, 'member');
 
     // childB is on the 'enterprise' plan so the plan field is exercised.
     childB = await createOrganization(
@@ -150,6 +168,20 @@ describe('organization sub-organizations router', () => {
         expect(child.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/);
         expect(new Date(child.createdAt).toISOString()).toBe(child.createdAt);
       }
+    });
+
+    it('excludes billing-manager seats and bot users from memberCount', async () => {
+      // childA has four raw memberships: owner, a plain member, a billing
+      // manager, and a bot member. The surfaced memberCount must exclude the
+      // billing-manager seat and the bot user, matching the convention in
+      // organization-admin-router (and getUserOrganizationsWithSeats).
+      const caller = await createCallerForUser(parentOwner.id);
+      const result = await caller.organizations.subOrganizations.overview({
+        organizationId: parentOrg.id,
+      });
+
+      const childAResult = result.children.find(child => child.id === childA.id);
+      expect(childAResult?.memberCount).toBe(2);
     });
 
     it('returns all non-deleted children for the parent billing_manager', async () => {

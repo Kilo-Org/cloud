@@ -3,6 +3,23 @@ import { type Href, router } from 'expo-router';
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
 import { setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
+import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
+
+/** Target app path for the /cloud/sessions universal-link route. */
+const AGENTS_TAB_HREF = '/(app)/(tabs)/(2_agents)';
+
+/**
+ * Extract the query portion of a raw URL so C13 return-outcome params can be
+ * stored before `resolveIncomingUrl` strips them.
+ */
+function getQueryFromRaw(raw: string): string | null {
+  const q = raw.indexOf('?');
+  if (q < 0) return null;
+  let end = raw.length;
+  const h = raw.indexOf('#');
+  if (h >= 0 && h < end) end = h;
+  return raw.slice(q, end);
+}
 
 /**
  * expo-router `+native-intent` `redirectSystemPath` implementation.
@@ -29,6 +46,19 @@ export function redirectSystemPath({
     if (href == null) {
       return path;
     }
+
+    // C13 return-outcome: extract query params before resolveIncomingUrl
+    // strips them.  Store so the agents tab can show the outcome state.
+    if (href === AGENTS_TAB_HREF) {
+      const query = getQueryFromRaw(path);
+      if (query) {
+        const outcome = parseGitHubReturnParams(query);
+        if (outcome) {
+          setGitHubInstallReturnOutcome(outcome);
+        }
+      }
+    }
+
     if (initial) {
       // COLD: stash only. Never navigate — router isn't mounted.
       // Skip when the synchronous launch capture already stashed this launch

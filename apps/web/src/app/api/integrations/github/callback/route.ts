@@ -235,7 +235,18 @@ async function handleNewInstallFlow(
         installationId,
       },
     });
-    return NextResponse.redirect(new URL('/', APP_URL));
+    // Redirect to the integration page with a specific error so the UI can
+    // display the corrective message.  If the flow was started from the app
+    // (return_to is set to an app route like /cloud/sessions) include fromApp=1
+    // so the /github-app fallback triggers.
+    const returnTo = installRow.return_to;
+    const isAppInitiated = returnTo?.startsWith('/cloud/') === true;
+    const organizationId =
+      installRow.owner_type === 'org' ? `&organizationId=${installRow.owner_id}` : '';
+    const mismatchQuery = isAppInitiated
+      ? `error=install_state_user_mismatch&fromApp=1${organizationId}`
+      : 'error=install_state_user_mismatch';
+    return NextResponse.redirect(new URL(appendQueryParam('/github-app', mismatchQuery), APP_URL));
   }
 
   const ownerType = installRow.owner_type as Owner['type'];
@@ -334,6 +345,17 @@ async function handleCoreInstallFlow(params: {
       : `/integrations/github`;
   const redirectPath = returnTo || integrationPath;
 
+  // App-initiated flows carry returnTo="/cloud/sessions".  A server redirect
+  // does not always open the app, so redirect to /github-app where the
+  // fallback card renders the outcome and a user-initiated "Return to Kilo
+  // App" link that reliably triggers the universal link.
+  const isAppInitiated = returnTo?.startsWith('/cloud/') === true;
+  const appFallbackPath = (query: string) => {
+    const organizationParam =
+      owner.type === 'org' ? `&organizationId=${encodeURIComponent(ownerId)}` : '';
+    return `/github-app?fromApp=1&${query}${organizationParam}`;
+  };
+
   const credentials = getGitHubAppCredentials(githubAppType);
 
   // Handle uninstall/suspend actions
@@ -386,7 +408,12 @@ async function handleCoreInstallFlow(params: {
               : 'error=pending_installation_exists';
 
           return NextResponse.redirect(
-            new URL(appendQueryParam(redirectPath, queryParam), APP_URL)
+            new URL(
+              isAppInitiated
+                ? appFallbackPath(queryParam)
+                : appendQueryParam(redirectPath, queryParam),
+              APP_URL
+            )
           );
         }
       }
@@ -404,13 +431,29 @@ async function handleCoreInstallFlow(params: {
         githubAppType,
       });
 
-      const queryParam = returnTo ? 'github_pending_approval=true' : 'pending_approval=true';
+      const orgParam =
+        isAppInitiated && owner.type === 'org'
+          ? `&organizationId=${encodeURIComponent(ownerId)}`
+          : '';
+      const queryParam = isAppInitiated
+        ? `fromApp=1&github_pending_approval=true${orgParam}`
+        : returnTo
+          ? 'github_pending_approval=true'
+          : 'pending_approval=true';
 
-      return NextResponse.redirect(new URL(appendQueryParam(redirectPath, queryParam), APP_URL));
+      const pendingRedirectPath = isAppInitiated ? '/github-app' : redirectPath;
+      return NextResponse.redirect(
+        new URL(appendQueryParam(pendingRedirectPath, queryParam), APP_URL)
+      );
     } catch (error) {
       console.error('Error creating pending installation:', error);
       captureException(error);
 
+      if (isAppInitiated) {
+        return NextResponse.redirect(
+          new URL(appFallbackPath('error=pending_setup_failed'), APP_URL)
+        );
+      }
       return NextResponse.redirect(
         new URL(appendQueryParam(redirectPath, 'error=pending_setup_failed'), APP_URL)
       );
@@ -429,6 +472,11 @@ async function handleCoreInstallFlow(params: {
       },
     });
 
+    if (isAppInitiated) {
+      return NextResponse.redirect(
+        new URL(appFallbackPath('error=missing_installation_id'), APP_URL)
+      );
+    }
     return NextResponse.redirect(
       new URL(appendQueryParam(redirectPath, 'error=missing_installation_id'), APP_URL)
     );
@@ -524,6 +572,11 @@ async function handleCoreInstallFlow(params: {
     if (err.status === 404) {
       const encodedInstallationId = encodeURIComponent(installationId);
 
+      if (isAppInitiated) {
+        return NextResponse.redirect(
+          new URL(appFallbackPath('error=installation_not_found'), APP_URL)
+        );
+      }
       return NextResponse.redirect(
         new URL(
           appendQueryParam(
@@ -535,6 +588,9 @@ async function handleCoreInstallFlow(params: {
       );
     }
 
+    if (isAppInitiated) {
+      return NextResponse.redirect(new URL(appFallbackPath('error=installation_failed'), APP_URL));
+    }
     throw error;
   }
 
@@ -587,6 +643,11 @@ async function handleCoreInstallFlow(params: {
     });
 
     if (!upsertResult.ok) {
+      if (isAppInitiated) {
+        return NextResponse.redirect(
+          new URL(appFallbackPath('error=installation_already_claimed'), APP_URL)
+        );
+      }
       return NextResponse.redirect(
         new URL(appendQueryParam(redirectPath, 'error=installation_already_claimed'), APP_URL)
       );
@@ -594,6 +655,9 @@ async function handleCoreInstallFlow(params: {
   }
 
   // Redirect to success page
+  if (isAppInitiated) {
+    return NextResponse.redirect(new URL(appFallbackPath('github_install=success'), APP_URL));
+  }
   const successQueryParam = returnTo ? 'github_install=success' : 'success=installed';
 
   return NextResponse.redirect(new URL(appendQueryParam(redirectPath, successQueryParam), APP_URL));

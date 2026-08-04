@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { FolderGit2 } from 'lucide-react-native';
 import { View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -15,6 +16,7 @@ import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
+import { trpcClient } from '@/lib/trpc';
 import {
   PERSONAL_SCOPE,
   useBitbucketReadiness,
@@ -81,11 +83,11 @@ export default function ReposRoute() {
   const confirmedEmpty =
     !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
   const orgScope = scope === PERSONAL_SCOPE ? undefined : scope;
-  const manageRepoAccessUrlByPlatform: Partial<Record<ReviewerPlatform, string>> = {
-    github: getGitHubIntegrationUrl(WEB_BASE_URL, orgScope),
-    gitlab: getGitLabIntegrationUrl(WEB_BASE_URL, orgScope),
+  const manageRepoAccessLabelByPlatform: Partial<Record<ReviewerPlatform, string>> = {
+    github: 'repository access',
+    gitlab: 'repository access',
   };
-  const manageRepoAccessUrl = manageRepoAccessUrlByPlatform[platform];
+  const manageRepoAccessLabel = manageRepoAccessLabelByPlatform[platform];
   const emptyStateCopyByPlatform: Record<ReviewerPlatform, { title: string; description: string }> =
     {
       github: {
@@ -184,11 +186,32 @@ export default function ReposRoute() {
                 title={emptyStateCopy.title}
                 description={emptyStateCopy.description}
                 action={
-                  manageRepoAccessUrl ? (
+                  manageRepoAccessLabel ? (
                     <Button
                       variant="outline"
                       onPress={() => {
-                        void openExternalUrl(manageRepoAccessUrl, { label: 'repository access' });
+                        void (async () => {
+                          if (platform === 'github') {
+                            try {
+                              const { token } = await trpcClient.githubApps.mintInstallState.mutate(
+                                {
+                                  organizationId: orgScope ?? undefined,
+                                  returnTo: '/cloud/sessions',
+                                }
+                              );
+                              await openExternalUrl(
+                                getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token),
+                                { label: 'repository access' }
+                              );
+                            } catch {
+                              toast.error('Could not open GitHub App settings');
+                            }
+                          } else if (platform === 'gitlab') {
+                            await openExternalUrl(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope), {
+                              label: 'repository access',
+                            });
+                          }
+                        })();
                       }}
                     >
                       <Text>Manage access</Text>

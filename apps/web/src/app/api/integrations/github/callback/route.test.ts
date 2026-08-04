@@ -420,7 +420,34 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
+    expectRedirectLocation(response, '/github-app?error=install_state_user_mismatch');
+    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN);
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+  });
+
+  test('redirects with fromApp=1 when user mismatch on app-initiated state', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: OTHER_USER_ID,
+      owner_type: 'user',
+      owner_id: OTHER_USER_ID,
+      github_app_type: 'standard',
+      // App-initiated: return_to is /cloud/sessions (starts with /cloud/)
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?error=install_state_user_mismatch&fromApp=1');
     expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
@@ -473,12 +500,319 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       '/organizations/org-456/integrations/github?github_install=success'
     );
   });
+
+  test('redirects to /github-app fallback (not /cloud/sessions) for app-initiated success', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      // App-initiated: return_to is /cloud/sessions — claimed UL route.
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    // Must redirect to /github-app fallback page, not /cloud/sessions.
+    expectRedirectLocation(response, '/github-app?fromApp=1&github_install=success');
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+  });
+
+  test('redirects to /github-app fallback for app-initiated pending approval', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    const { createPendingIntegration } =
+      await import('@/lib/integrations/db/platform-integrations');
+    const mockedCreatePending = jest.mocked(createPendingIntegration);
+    mockedCreatePending.mockResolvedValue(undefined as never);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=request&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&github_pending_approval=true');
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+  });
+
+  test('rejects non-/cloud/ returnTo as non-app (no fallback redirect)', async () => {
+    // A non-app returnTo must not trigger the /github-app fallback.
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: 'org-attacker',
+      github_app_type: 'standard',
+      return_to: '/organizations/org-attacker/integrations/github',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    jest.doMock('@/routers/organizations/utils', () => ({
+      ensureOrganizationAccess: jest.fn(),
+    }));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    // Non-app returnTo: redirect to integration path, not /github-app.
+    expectRedirectLocation(
+      response,
+      '/organizations/org-attacker/integrations/github?github_install=success'
+    );
+  });
+
+  test('app-initiated installation_already_claimed redirects to /github-app fallback', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({
+      ok: false,
+      reason: 'claimed_by_other_owner',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&error=installation_already_claimed');
+  });
+
+  test('app-initiated missing_installation_id redirects to /github-app fallback', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&error=missing_installation_id');
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+  });
+
+  test('app-initiated installation_not_found redirects to /github-app fallback', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => {
+              const err = Object.assign(new Error('Not Found'), { status: 404 });
+              throw err;
+            }),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&error=installation_not_found');
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+  });
+
+  test('app-initiated pending_setup_failed redirects to /github-app fallback', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    const { createPendingIntegration } =
+      await import('@/lib/integrations/db/platform-integrations');
+    const mockedCreatePending = jest.mocked(createPendingIntegration);
+    mockedCreatePending.mockRejectedValue(new Error('DB error') as never);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=request&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&error=pending_setup_failed');
+  });
+
+  test('app-initiated org success preserves organizationId on redirect', async () => {
+    const ORG_ID = 'org-789';
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: ORG_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    jest.doMock('@/routers/organizations/utils', () => ({
+      ensureOrganizationAccess: jest.fn(),
+    }));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(
+      response,
+      `/github-app?fromApp=1&github_install=success&organizationId=${ORG_ID}`
+    );
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+  });
+
+  test('app-initiated user success omits organizationId', async () => {
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    // No organizationId for user-scoped install.
+    expectRedirectLocation(response, '/github-app?fromApp=1&github_install=success');
+  });
+
+  test('app-initiated org pending approval preserves organizationId', async () => {
+    const ORG_ID = 'org-pending';
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: ORG_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    const { createPendingIntegration } =
+      await import('@/lib/integrations/db/platform-integrations');
+    const mockedCreatePending = jest.mocked(createPendingIntegration);
+    mockedCreatePending.mockResolvedValue(undefined as never);
+
+    jest.doMock('@/routers/organizations/utils', () => ({
+      ensureOrganizationAccess: jest.fn(),
+    }));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=request&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(
+      response,
+      `/github-app?fromApp=1&github_pending_approval=true&organizationId=${ORG_ID}`
+    );
+  });
 });
 
 describe('GET /api/integrations/github/callback legacy flag gating', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: USER_ID,

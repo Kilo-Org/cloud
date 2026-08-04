@@ -1,5 +1,6 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
@@ -12,6 +13,7 @@ import { SettingsOverviewScreen } from '@/components/security-agent/settings-ove
 import { Skeleton } from '@/components/ui/skeleton';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
+import { trpcClient } from '@/lib/trpc';
 import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -50,6 +52,46 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const hasIntegration = permission.data?.hasIntegration ?? false;
   const hasPermissions = permission.data?.hasPermissions ?? false;
   const isEnabled = config.data?.isEnabled ?? false;
+
+  // Pre-mint a C1 install state token so the web /github-app page
+  // receives it and does not mint a second token.  The return path is
+  // /cloud/sessions — a claimed universal-link route that maps to the
+  // agents tab.
+  const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
+  const [mintUrl, setMintUrl] = useState<string | null>(null);
+  const [mintFailed, setMintFailed] = useState(false);
+  const cancelledRef = useRef(false);
+
+  const performMint = useCallback(async () => {
+    if (cancelledRef.current) return;
+    setMintFailed(false);
+    setMintUrl(null);
+    try {
+      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+        organizationId: orgId ?? undefined,
+        returnTo: '/cloud/sessions',
+      });
+      if (!cancelledRef.current) {
+        setMintUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
+      }
+    } catch {
+      if (!cancelledRef.current) {
+        setMintFailed(true);
+      }
+    }
+  }, [scope, orgId]);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    void performMint();
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, [performMint]);
+
+  // Never fall back to an unminted URL — an app-initiated open must carry a
+  // pre-minted token or the connect action must fail closed.
+  const connectUrl = mintUrl;
 
   const view = selectScopeEntryView({
     isLoading,
@@ -95,6 +137,30 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   switch (view) {
     case 'connect-github': {
+      if (mintFailed) {
+        return (
+          <View className="flex-1 bg-background">
+            <ScreenHeader title="Security Agent" headerRight={auditAction} />
+            <PlatformErrorScreen
+              title="Security Agent"
+              variant="offline"
+              message="Could not start GitHub setup. Please try again."
+              onRetry={() => void performMint()}
+            />
+          </View>
+        );
+      }
+      if (!connectUrl) {
+        return (
+          <View className="flex-1 bg-background">
+            <ScreenHeader title="Security Agent" headerRight={auditAction} />
+            <View className="gap-3 px-6 pt-4">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-32 w-full rounded-lg" />
+            </View>
+          </View>
+        );
+      }
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader title="Security Agent" headerRight={auditAction} />
@@ -102,16 +168,38 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
             title="Connect GitHub to get started"
             description="Install the Kilo GitHub App to automatically sync Dependabot alerts and manage security findings across your repositories."
             buttonLabel="Install GitHub App"
-            url={getGitHubIntegrationUrl(
-              WEB_BASE_URL,
-              isPersonalSecurityScope(scope) ? undefined : scope
-            )}
+            url={connectUrl}
             onConnected={refetchAll}
           />
         </View>
       );
     }
     case 'reauthorize': {
+      const reauthUrl = permission.data?.reauthorizeUrl;
+      if (!reauthUrl && mintFailed) {
+        return (
+          <View className="flex-1 bg-background">
+            <ScreenHeader title="Security Agent" headerRight={auditAction} />
+            <PlatformErrorScreen
+              title="Security Agent"
+              variant="offline"
+              message="Could not start re-authorization. Please try again."
+              onRetry={() => void performMint()}
+            />
+          </View>
+        );
+      }
+      if (!reauthUrl && !connectUrl) {
+        return (
+          <View className="flex-1 bg-background">
+            <ScreenHeader title="Security Agent" headerRight={auditAction} />
+            <View className="gap-3 px-6 pt-4">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-32 w-full rounded-lg" />
+            </View>
+          </View>
+        );
+      }
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader title="Security Agent" headerRight={auditAction} />
@@ -119,13 +207,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
             title="Additional permissions required"
             description="Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission."
             buttonLabel="Re-authorize GitHub App"
-            url={
-              permission.data?.reauthorizeUrl ??
-              getGitHubIntegrationUrl(
-                WEB_BASE_URL,
-                isPersonalSecurityScope(scope) ? undefined : scope
-              )
-            }
+            url={reauthUrl ?? connectUrl}
             onConnected={refetchAll}
           />
         </View>

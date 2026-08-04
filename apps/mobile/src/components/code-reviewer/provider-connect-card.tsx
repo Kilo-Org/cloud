@@ -11,6 +11,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { trpcClient } from '@/lib/trpc';
 
 const PLATFORM_CONFIG = {
   github: {
@@ -45,9 +46,16 @@ export function ProviderConnectCard({
   const connect = async () => {
     setConnecting(true);
     try {
-      await WebBrowser.openAuthSessionAsync(
-        getUrl(WEB_BASE_URL, scope === PERSONAL_SCOPE ? undefined : scope)
-      );
+      const orgId = scope === PERSONAL_SCOPE ? undefined : scope;
+      let url = getUrl(WEB_BASE_URL, orgId);
+      if (platform === 'github') {
+        const result = await trpcClient.githubApps.mintInstallState.mutate({
+          organizationId: orgId ?? undefined,
+          returnTo: '/cloud/sessions',
+        });
+        url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, result.token);
+      }
+      await WebBrowser.openAuthSessionAsync(url);
       await onConnected();
     } catch {
       toast.error(errorMessage);

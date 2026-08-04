@@ -37,6 +37,23 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
+// eslint-disable-next-line no-var
+var mockPosthogCapture: jest.Mock;
+jest.mock('@/lib/posthog', () => {
+  const capture = jest.fn();
+  mockPosthogCapture = capture;
+  return {
+    __esModule: true,
+    default: jest.fn(() => ({
+      capture,
+      isFeatureEnabled: jest.fn(),
+      getFeatureFlag: jest.fn(),
+      debug: jest.fn(),
+      alias: jest.fn(),
+    })),
+  };
+});
+
 import { POST } from './route';
 import { checkNativeAdmission } from '@/lib/auth/native-admission';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
@@ -120,7 +137,10 @@ describe('POST /api/auth/native/token', () => {
         }),
         undefined,
         false,
-        expect.any(Headers)
+        expect.any(Headers),
+        undefined,
+        undefined,
+        true
       );
       expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
     });
@@ -137,7 +157,10 @@ describe('POST /api/auth/native/token', () => {
         expect.objectContaining({ google_user_name: 'appleuser' }),
         undefined,
         false,
-        expect.any(Headers)
+        expect.any(Headers),
+        undefined,
+        undefined,
+        true
       );
     });
 
@@ -230,7 +253,10 @@ describe('POST /api/auth/native/token', () => {
         }),
         undefined,
         false,
-        expect.any(Headers)
+        expect.any(Headers),
+        undefined,
+        undefined,
+        true
       );
     });
 
@@ -246,7 +272,10 @@ describe('POST /api/auth/native/token', () => {
         expect.objectContaining({ hosted_domain: '@@personal@@' }),
         undefined,
         false,
-        expect.any(Headers)
+        expect.any(Headers),
+        undefined,
+        undefined,
+        true
       );
     });
 
@@ -360,7 +389,10 @@ describe('POST /api/auth/native/token', () => {
         }),
         undefined,
         true,
-        expect.any(Headers)
+        expect.any(Headers),
+        undefined,
+        undefined,
+        true
       );
       expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith('emailuser@example.com');
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();
@@ -428,7 +460,10 @@ describe('POST /api/auth/native/token', () => {
         }),
         undefined,
         true,
-        expect.any(Headers)
+        expect.any(Headers),
+        undefined,
+        undefined,
+        true
       );
     });
 
@@ -876,6 +911,112 @@ describe('POST /api/auth/native/token', () => {
       expect(await response.json()).toEqual({ token: 'minted-jwt' });
       expect(mockCreateDeviceSession).not.toHaveBeenCalled();
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
+    });
+  });
+
+  describe('deferred sign-in analytics', () => {
+    const deferredEvent = {
+      distinctId: 'googleuser@example.com',
+      event: 'user_signed_in',
+      properties: { name: 'Google User', id: 'user-1' },
+    };
+
+    beforeEach(() => {
+      mockPosthogCapture.mockClear();
+    });
+
+    it('does not emit deferred sign-in event when user is blocked at post-settlement gate', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: { ...fakeUser, blocked_reason: 'manual block' },
+        isNew: false,
+        deferredSignInEvent: deferredEvent,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'BLOCKED' });
+      expect(mockPosthogCapture).not.toHaveBeenCalled();
+    });
+
+    it('does not emit deferred sign-in event when SSO is required', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: { ...fakeUser, google_user_email: 'user@sso-required.com' },
+        isNew: false,
+        deferredSignInEvent: deferredEvent,
+      } as never);
+      mockCheckDomainSignInEligibility
+        .mockResolvedValueOnce({ ok: true, existingUser: false })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          errorCode: 'SSO_ERROR',
+          ssoOrganizationId: 'workos-organization-id',
+        });
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+      expect(mockPosthogCapture).not.toHaveBeenCalled();
+    });
+
+    it('emits deferred sign-in event after all gates pass for successful native sign-in', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: fakeUser,
+        isNew: false,
+        deferredSignInEvent: deferredEvent,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPosthogCapture).toHaveBeenCalledWith(deferredEvent);
+      expect(mockPosthogCapture).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not emit when createOrUpdateUser returns success without deferred event (new user sign-up)', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: fakeUser,
+        isNew: true,
+        // no deferredSignInEvent — new user sign-up, not a sign-in
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPosthogCapture).not.toHaveBeenCalled();
     });
   });
 });

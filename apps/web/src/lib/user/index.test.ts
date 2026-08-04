@@ -125,7 +125,7 @@ import {
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
@@ -529,6 +529,115 @@ describe('User', () => {
       expect(updatedUser?.api_token_pepper).toBe('api-pepper-before-workos');
       expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
+    });
+
+    it('returns deferredSignInEvent when deferSignInAnalytics is true and user is existing', async () => {
+      const user = await insertTestUserAndGoogleAuth({
+        google_user_email: 'existing-defer@example.com',
+        google_user_name: 'Deferred Existing',
+        hosted_domain: 'test.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'existing-defer@example.com',
+          google_user_name: 'Deferred Existing',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+        },
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.deferredSignInEvent).toEqual({
+        distinctId: 'existing-defer@example.com',
+        event: 'user_signed_in',
+        properties: {
+          name: 'Deferred Existing',
+          hosted_domain: null, // synced from user row by findAndSyncExistingUser
+          provider: 'google',
+          id: user.id,
+        },
+      });
+      expect(result.user.id).toBe(user.id);
+      expect(result.isNew).toBe(false);
+    });
+
+    it('skips deferredSignInEvent when deferSignInAnalytics is not passed (backward compat)', async () => {
+      const user = await insertTestUserAndGoogleAuth({
+        google_user_email: 'no-defer@example.com',
+        google_user_name: 'No Defer',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'no-defer@example.com',
+          google_user_name: 'No Defer',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.deferredSignInEvent).toBeUndefined();
+    });
+
+    it('returns deferredSignInEvent for auto-linked user when deferSignInAnalytics is true', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'autolink-defer@example.com',
+        google_user_name: 'Original Name',
+        hosted_domain: 'original.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'autolink-defer@example.com',
+          google_user_name: 'New Name',
+          google_user_image_url: 'https://example.com/new.png',
+          hosted_domain: 'new.com',
+          provider: 'google',
+          provider_account_id: 'google-autolink-new',
+        },
+        undefined,
+        true, // autoLinkToExistingUser
+        undefined,
+        undefined,
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.deferredSignInEvent).toEqual({
+        distinctId: 'autolink-defer@example.com',
+        event: 'user_signed_in_with_different_id_and_auto_linked',
+        properties: {
+          existing_name: 'Original Name',
+          existing_hosted_domain: 'original.com',
+          existing_id: existing.id,
+          new_provider: 'google',
+          new_provider_account_id: 'google-autolink-new',
+          new_name: 'New Name',
+          new_email: 'autolink-defer@example.com',
+          new_image_url: 'https://example.com/new.png',
+          new_hosted_domain: 'new.com',
+        },
+      });
+      expect(result.user.id).toBe(existing.id);
+      expect(result.isNew).toBe(false);
     });
   });
 

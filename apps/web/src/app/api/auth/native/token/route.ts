@@ -26,6 +26,9 @@ import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibilit
 import { checkNativeAdmission } from '@/lib/auth/native-admission';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
+import PostHogClient from '@/lib/posthog';
+
+const posthogClient = PostHogClient();
 
 // Bad/expired ID tokens are a 401; JWKS-fetch or network failures during verification are
 // server faults and must surface as 500, not be misreported as an invalid token.
@@ -231,7 +234,10 @@ export async function POST(request: NextRequest) {
         args,
         undefined,
         autoLinkToExistingUser,
-        request.headers
+        request.headers,
+        undefined,
+        undefined,
+        true
       );
       if (!result.success) {
         phase = 'release';
@@ -265,6 +271,11 @@ export async function POST(request: NextRequest) {
       }
       phase = 'committed';
 
+      // Emit deferred sign-in analytics after all gates pass.
+      if (result.deferredSignInEvent) {
+        posthogClient.capture(result.deferredSignInEvent);
+      }
+
       // Only now issue credentials — consumption is confirmed.
       // ponytail: remove legacy long-lived path after all shipped clients have
       // refreshed their token at least once and the legacy counter has drained.
@@ -294,7 +305,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Apple/Google path: settlement without reservation (no code to release).
-  const result = await createOrUpdateUser(args, undefined, autoLinkToExistingUser, request.headers);
+  const result = await createOrUpdateUser(
+    args,
+    undefined,
+    autoLinkToExistingUser,
+    request.headers,
+    undefined,
+    undefined,
+    true
+  );
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 403 });
   }
@@ -306,6 +325,11 @@ export async function POST(request: NextRequest) {
   const resolvedEligibility = await checkDomainSignInEligibility(result.user.google_user_email);
   if (!resolvedEligibility.ok) {
     return eligibilityResponse(resolvedEligibility);
+  }
+
+  // Emit deferred sign-in analytics after all gates pass.
+  if (result.deferredSignInEvent) {
+    posthogClient.capture(result.deferredSignInEvent);
   }
 
   // ponytail: remove legacy long-lived path after all shipped clients have

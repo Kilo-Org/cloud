@@ -34,9 +34,6 @@ export function buildChallengeEntry(
   return null;
 }
 
-export function selectChallengeId(
-  entry: ChallengeEntry | null,
-  email: string
-): string | undefined {
+export function selectChallengeId(entry: ChallengeEntry | null, email: string): string | undefined {
   return entry?.email === email ? entry.challengeId : undefined;
 }

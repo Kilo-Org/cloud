@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createDeviceAuthRequest, DeviceAuthPendingLimitError } from '@/lib/device-auth/device-auth';
+import {
+  createDeviceAuthRequest,
+  DeviceAuthPendingLimitError,
+} from '@/lib/device-auth/device-auth';
 import { headers } from 'next/headers';
 import { APP_URL } from '@/lib/constants';
 import {
@@ -31,10 +34,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof DeviceAuthPendingLimitError) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 429 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 429 });
     }
     throw error;
   }

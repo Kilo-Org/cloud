@@ -52,15 +52,15 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import {
-  getValidGitLabProjectAccessToken,
-  getValidGitLabToken,
-} from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
+import {
+  getGitLabInstanceUrl,
+  resolveGitLabAccessToken,
+} from '@/lib/code-reviews/platform/gitlab-access';
 import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
@@ -992,42 +992,6 @@ async function upsertFailureSummaryComment(
       `[code-review-status] Upserted failure summary on GitLab MR ${review.repo_full_name}!${review.pr_number}`
     );
   }
-}
-
-/**
- * Resolves a GitLab access token for a review's project.
- * Uses the exact project credential when a project ID is present.
- */
-async function resolveGitLabAccessToken(
-  integration: PlatformIntegration,
-  projectId: number | null
-): Promise<string> {
-  let userId: string;
-  let organizationId: string | undefined;
-  if (integration.owned_by_organization_id) {
-    organizationId = integration.owned_by_organization_id;
-    const botUserId = await getBotUserId(organizationId, 'code-review');
-    if (!botUserId) throw new Error('GitLab organization has no configured acting user');
-    userId = botUserId;
-  } else if (integration.owned_by_user_id) {
-    userId = integration.owned_by_user_id;
-  } else {
-    throw new Error('GitLab integration has no owner');
-  }
-  const actor = { userId, ...(organizationId ? { organizationId } : {}) };
-  return projectId
-    ? await getValidGitLabProjectAccessToken(integration, projectId, actor)
-    : await getValidGitLabToken(integration, actor);
-}
-
-/**
- * Extracts the GitLab instance URL from an integration's metadata.
- */
-function getGitLabInstanceUrl(integration: PlatformIntegration): string {
-  const metadata = integration.metadata as {
-    gitlab_instance_url?: string;
-  } | null;
-  return metadata?.gitlab_instance_url || 'https://gitlab.com';
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   buildChallengeEntry,
   parseAuthErrorCode,
   parseEmailCodeResponse,
-  parseTokenResponse,
+  parseTokenPair,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
 
@@ -155,16 +155,21 @@ export function useNativeAuth(): NativeAuthResult {
       const result = await postAuth('/api/auth/native/token', {
         provider: 'apple',
         idToken: credential.identityToken,
+        supportsRefresh: true,
         ...(fullName ? { fullName } : {}),
       });
 
       if (result.ok) {
-        const parsed = parseTokenResponse(result.data);
+        const parsed = parseTokenPair(result.data);
         if (!parsed) {
           toast.error(DEFAULT_ERROR_MESSAGE);
           return;
         }
-        await signIn(parsed.token);
+        await signIn(
+          parsed.token,
+          'refreshToken' in parsed ? parsed.refreshToken : undefined,
+          'expiresIn' in parsed ? parsed.expiresIn : undefined
+        );
       } else {
         toast.error(mapError(result.errorCode));
       }
@@ -201,15 +206,20 @@ export function useNativeAuth(): NativeAuthResult {
       const result = await postAuth('/api/auth/native/token', {
         provider: 'google',
         idToken,
+        supportsRefresh: true,
       });
 
       if (result.ok) {
-        const parsed = parseTokenResponse(result.data);
+        const parsed = parseTokenPair(result.data);
         if (!parsed) {
           toast.error(DEFAULT_ERROR_MESSAGE);
           return;
         }
-        await signIn(parsed.token);
+        await signIn(
+          parsed.token,
+          'refreshToken' in parsed ? parsed.refreshToken : undefined,
+          'expiresIn' in parsed ? parsed.expiresIn : undefined
+        );
       } else {
         toast.error(mapError(result.errorCode));
       }
@@ -270,18 +280,23 @@ export function useNativeAuth(): NativeAuthResult {
           provider: 'email',
           email,
           code,
+          supportsRefresh: true,
           ...(challengeId ? { challengeId } : {}),
         });
         if (!result.ok) {
           toast.error(mapError(result.errorCode));
           return false;
         }
-        const parsed = parseTokenResponse(result.data);
+        const parsed = parseTokenPair(result.data);
         if (!parsed) {
           toast.error(DEFAULT_ERROR_MESSAGE);
           return false;
         }
-        await signIn(parsed.token);
+        await signIn(
+          parsed.token,
+          'refreshToken' in parsed ? parsed.refreshToken : undefined,
+          'expiresIn' in parsed ? parsed.expiresIn : undefined
+        );
         return true;
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry

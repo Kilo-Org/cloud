@@ -6,11 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import { resetAnalyticsUser } from '@/lib/analytics/posthog';
 import { trackEvent } from '@/lib/appsflyer';
+import { API_BASE_URL } from '@/lib/config';
+import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
@@ -21,32 +24,249 @@ import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
   AUTH_TOKEN_KEY,
+  LEGACY_EXCHANGE_DONE_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
   ORGANIZATION_STORAGE_KEY,
+  REFRESH_TOKEN_KEY,
   SESSION_FILTERS_KEY,
+  TOKEN_EXPIRES_AT_KEY,
 } from '@/lib/storage-keys';
+import { AppState } from 'react-native';
 
-// Pre-load token at module level so it's available before React mounts
+// Pre-load tokens at module level so they're available before React mounts
 const preloadedToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
 
 type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;
-  signIn: (token: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  sessionEnded: boolean;
+  signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
+  signOut: (ended?: boolean) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// Single-flight refresh lock. Only the first caller initiates the rotation;
+// concurrent callers await the same promise.
+let refreshPromise: Promise<RefreshOutcome> | null = null;
+let refreshSessionVersion = 0;
+let credentialWrite = Promise.resolve();
+
+export type RefreshSuccess = {
+  ok: true;
+  token: string;
+  refreshToken: string;
+  expiresIn: number;
+  sessionVersion: number;
+};
+export type RefreshRefused = { ok: false; refused: true; superseded?: false };
+export type RefreshTransient = { ok: false; refused: false; superseded?: false };
+export type RefreshSuperseded = { ok: false; refused: false; superseded: true };
+export type RefreshOutcome = RefreshSuccess | RefreshRefused | RefreshTransient | RefreshSuperseded;
+
+// Proactive refresh window: refresh when the token expires within 5 minutes.
+export const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+
+export function invalidateRefreshSession(): void {
+  refreshSessionVersion += 1;
+}
+
+function isRefreshSessionCurrent(sessionVersion: number): boolean {
+  return sessionVersion === refreshSessionVersion;
+}
+
+async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
+  const previous = credentialWrite;
+  let release: (() => void) | undefined;
+  credentialWrite = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await write();
+  } finally {
+    release?.();
+  }
+}
+
+export async function persistSignInCredentials(
+  token: string,
+  refreshToken?: string,
+  expiresIn?: number
+): Promise<void> {
+  await writeCredentials(async () => {
+    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+    if (refreshToken && expiresIn) {
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+      await SecureStore.setItemAsync(TOKEN_EXPIRES_AT_KEY, String(Date.now() + expiresIn * 1000));
+      return;
+    }
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY);
+  });
+}
+
+export async function performRefresh(): Promise<RefreshOutcome> {
+  // Single-flight: if a refresh is already in progress, await that outcome.
+  if (refreshPromise) {
+    const outcome = await refreshPromise;
+    return outcome;
+  }
+
+  refreshPromise = doRefresh();
+  try {
+    const outcome = await refreshPromise;
+    return outcome;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+async function doRefresh(): Promise<RefreshOutcome> {
+  const sessionVersion = refreshSessionVersion;
+  try {
+    const storedRefreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    if (!isRefreshSessionCurrent(sessionVersion)) {
+      return { ok: false, refused: false, superseded: true };
+    }
+    if (!storedRefreshToken) {
+      // No refresh token: cannot recover from this 401 — sign out.
+      return { ok: false, refused: true };
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/auth/native/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: storedRefreshToken }),
+    });
+
+    if (!isRefreshSessionCurrent(sessionVersion)) {
+      return { ok: false, refused: false, superseded: true };
+    }
+
+    // 401 means the refresh token is expired or revoked — permanent failure.
+    if (response.status === 401) {
+      return { ok: false, refused: true };
+    }
+
+    if (!response.ok) {
+      return { ok: false, refused: false };
+    }
+
+    const body: unknown = await response.json();
+    const parsed = parseTokenPair(body);
+
+    // A refresh response must include a full token pair with expiry.
+    if (!parsed?.refreshToken || !parsed.expiresIn) {
+      return { ok: false, refused: false };
+    }
+
+    return writeCredentials(async () => {
+      if (!isRefreshSessionCurrent(sessionVersion)) {
+        return { ok: false, refused: false, superseded: true };
+      }
+
+      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, parsed.token);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, parsed.refreshToken);
+      await SecureStore.setItemAsync(
+        TOKEN_EXPIRES_AT_KEY,
+        String(Date.now() + parsed.expiresIn * 1000)
+      );
+
+      return {
+        ok: true,
+        token: parsed.token,
+        refreshToken: parsed.refreshToken,
+        expiresIn: parsed.expiresIn,
+        sessionVersion,
+      };
+    });
+  } catch {
+    return { ok: false, refused: false };
+  }
+}
+
+export async function exchangeLegacyToken(): Promise<{
+  token: string;
+  refreshToken: string;
+  expiresIn: number;
+} | null> {
+  try {
+    // Guard: run at most once. If the marker is already set the exchange succeeded
+    // (or was deliberately skipped) in a past launch.
+    const alreadyExchanged = await SecureStore.getItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+    if (alreadyExchanged) {
+      return null;
+    }
+
+    const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+    if (!token) {
+      return null;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/auth/native/exchange`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      // One-time exchange failure: retain old token, do not set the done
+      // marker. Retry on the next app launch.
+      return null;
+    }
+
+    const body: unknown = await response.json();
+    const parsed = parseTokenPair(body);
+
+    // An exchange response must include a full token pair with expiry.
+    if (!parsed?.refreshToken || !parsed.expiresIn) {
+      return null;
+    }
+
+    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, parsed.token);
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, parsed.refreshToken);
+    await SecureStore.setItemAsync(
+      TOKEN_EXPIRES_AT_KEY,
+      String(Date.now() + parsed.expiresIn * 1000)
+    );
+    // Persist the marker so we never exchange again.
+    await SecureStore.setItemAsync(LEGACY_EXCHANGE_DONE_KEY, '1');
+
+    return { token: parsed.token, refreshToken: parsed.refreshToken, expiresIn: parsed.expiresIn };
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [token, setToken] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const isSignedOutReference = useRef(false);
 
   useEffect(() => {
     const load = async () => {
       try {
         const stored = await preloadedToken;
-        setToken(stored ?? undefined);
+        const storedRefresh = await preloadedRefreshToken;
+
+        if (stored) {
+          // Legacy exchange: if we have a token but no refresh token, upgrade once.
+          if (!storedRefresh) {
+            const pair = await exchangeLegacyToken();
+            if (pair) {
+              setToken(pair.token);
+              setIsLoading(false);
+              return;
+            }
+          }
+
+          setToken(stored);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -54,15 +274,29 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     void load();
   }, []);
 
-  const signIn = useCallback(async (tokenValue: string) => {
-    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, tokenValue);
-    trackEvent('login');
-    resetPurchaseErrorToastDedup();
-    setToken(tokenValue);
-  }, []);
+  const signIn = useCallback(
+    async (tokenValue: string, refreshTokenValue?: string, expiresIn?: number) => {
+      invalidateRefreshSession();
+      await persistSignInCredentials(tokenValue, refreshTokenValue, expiresIn);
+      // Clear the guard so a later refused refresh can sign out again.
+      isSignedOutReference.current = false;
+      setSessionEnded(false);
+      trackEvent('login');
+      resetPurchaseErrorToastDedup();
+      setToken(tokenValue);
+    },
+    []
+  );
 
-  const signOut = useCallback(async () => {
-    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+  const signOut = useCallback(async (ended = false) => {
+    isSignedOutReference.current = true;
+    invalidateRefreshSession();
+    await writeCredentials(async () => {
+      await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY);
+      await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+    });
     // Clear per-user preferences so they don't leak to the next signed-in account
     await SecureStore.deleteItemAsync(ORGANIZATION_STORAGE_KEY);
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
@@ -78,14 +312,73 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     clearReasoningPreference();
     resetAnalyticsUser();
     queryClient.clear();
+    setSessionEnded(ended);
     setToken(undefined);
   }, []);
 
-  useEffect(() => setTrpcUnauthorizedHandler(signOut), [signOut]);
+  // Unauthorized handler: try refresh first, sign out only on a refused 401.
+  // A transient failure (network error, 5xx) keeps the active token.
+  // performRefresh handles concurrent callers via its own single-flight lock.
+  useEffect(() => {
+    const handler = async () => {
+      const outcome = await performRefresh();
+
+      if (outcome.ok && isRefreshSessionCurrent(outcome.sessionVersion)) {
+        setToken(outcome.token);
+        // Invalidate all queries so failed authenticated work recovers
+        // with the new token. UNAUTHORIZED errors have retry=0, so a
+        // concurrent 401 will not auto-refetch without explicit invalidation.
+        queryClient.invalidateQueries();
+        return;
+      }
+
+      if (!outcome.ok && outcome.refused && !isSignedOutReference.current) {
+        await signOut(true);
+      }
+    };
+
+    return setTrpcUnauthorizedHandler(handler);
+  }, [signOut]);
+
+  const REFRESH_MARGIN = REFRESH_MARGIN_MS;
+
+  // Proactive refresh: when the app returns to foreground and the token is
+  // expiring within the margin, rotate before the next request hits a 401.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState !== 'active' || !token) {
+        return;
+      }
+
+      void (async () => {
+        const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+        if (!expiresAtStr) {
+          return;
+        }
+
+        const expiresAt = Number(expiresAtStr);
+        if (Date.now() <= expiresAt - REFRESH_MARGIN) {
+          return;
+        }
+
+        const outcome = await performRefresh();
+
+        if (outcome.ok && isRefreshSessionCurrent(outcome.sessionVersion)) {
+          setToken(outcome.token);
+        }
+        // Transient or refused: do not sign out — the user did not trigger
+        // an authenticated request. Let the next real 401 handle it.
+      })();
+    });
+    return () => {
+      subscription.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- REFRESH_MARGIN_MS is module-level constant
+  }, [token]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ token, isLoading, signIn, signOut }),
-    [token, isLoading, signIn, signOut]
+    () => ({ token, isLoading, sessionEnded, signIn, signOut }),
+    [token, isLoading, sessionEnded, signIn, signOut]
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

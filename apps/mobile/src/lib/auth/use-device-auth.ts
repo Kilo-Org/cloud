@@ -4,6 +4,11 @@ import { Platform } from 'react-native';
 
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 import { classifyPollResponse, getDeviceAuth429Message } from '@/lib/auth/poll-response';
+import {
+  buildDeviceAuthPollRequest,
+  parseDeviceAuthCodeResponse,
+  parseDeviceAuthTokenResponse,
+} from '@/lib/auth/native-auth-contract';
 
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
 
@@ -11,6 +16,8 @@ type DeviceAuthState = {
   status: DeviceAuthStatus;
   code: string | undefined;
   token: string | undefined;
+  refreshToken: string | undefined;
+  expiresIn: number | undefined;
   error: string | undefined;
   verificationUrl: string | undefined;
 };
@@ -46,12 +53,17 @@ export function useDeviceAuth(): DeviceAuthResult {
     status: 'idle',
     code: undefined,
     token: undefined,
+    refreshToken: undefined,
+    expiresIn: undefined,
     error: undefined,
     verificationUrl: undefined,
   });
 
   const timeoutReference = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const abortReference = useRef<AbortController | undefined>(undefined);
+  // The device secret is stored ONLY in a ref — never in React state, never in
+  // a URL, never in the clipboard. It is consumed in the POST body only.
+  const deviceCodeReference = useRef<string | undefined>(undefined);
 
   const cleanup = useCallback(() => {
     if (timeoutReference.current) {
@@ -62,6 +74,7 @@ export function useDeviceAuth(): DeviceAuthResult {
       abortReference.current.abort();
       abortReference.current = undefined;
     }
+    deviceCodeReference.current = undefined;
   }, []);
 
   // Cleanup on unmount
@@ -69,6 +82,21 @@ export function useDeviceAuth(): DeviceAuthResult {
 
   const poll = useCallback(
     (code: string, abort: AbortController) => {
+      const deviceCode = deviceCodeReference.current;
+      if (!deviceCode) {
+        cleanup();
+        setState(previous => ({
+          status: 'error',
+          code,
+          token: undefined,
+          refreshToken: undefined,
+          expiresIn: undefined,
+          error: 'Sign-in failed. Please try again.',
+          verificationUrl: previous.verificationUrl,
+        }));
+        return;
+      }
+
       const startedAt = Date.now();
       let retryDelay = POLL_BASE_INTERVAL_MS;
 
@@ -85,6 +113,8 @@ export function useDeviceAuth(): DeviceAuthResult {
             status: 'error',
             code,
             token: undefined,
+            refreshToken: undefined,
+            expiresIn: undefined,
             error: 'Sign-in timed out. Please try again.',
             verificationUrl: previous.verificationUrl,
           }));
@@ -92,41 +122,79 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         try {
-          const response = await fetch(`${API_BASE_URL}/api/device-auth/codes/${code}`, {
+          const response = await fetch(`${API_BASE_URL}/api/device-auth/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(buildDeviceAuthPollRequest(deviceCode)),
             signal: abort.signal,
           });
+
+          const parsed = await (async () => {
+            if (response.status === 429 || response.status >= 500) {
+              return null;
+            }
+            const json = await response.json().catch(() => undefined);
+            return parseDeviceAuthTokenResponse(json);
+          })();
+
+          if (parsed?.status === 'approved') {
+            cleanup();
+            if (Platform.OS !== 'android') {
+              WebBrowser.dismissAuthSession();
+            }
+            setState(previous => ({
+              status: 'approved',
+              code,
+              token: parsed.token,
+              refreshToken: parsed.refreshToken,
+              expiresIn: parsed.expiresIn,
+              error: undefined,
+              verificationUrl: previous.verificationUrl,
+            }));
+            return;
+          }
+
+          if (parsed && (parsed.status === 'denied' || parsed.status === 'expired')) {
+            cleanup();
+            const message = parsed.status === 'denied' ? 'Access denied by user' : 'Code expired';
+            setState(previous => ({
+              status: parsed.status,
+              code,
+              token: undefined,
+              refreshToken: undefined,
+              expiresIn: undefined,
+              error: message,
+              verificationUrl: previous.verificationUrl,
+            }));
+            return;
+          }
+
+          // Use the existing classifyPollResponse for the status code to handle
+          // retry/error classification the same way as before.
           const outcome = classifyPollResponse(response.status);
 
+          // approved/denied/expired are already handled above (lines 134-166).
+          // If they reach here, parsing failed — produce a visible terminal error.
+          // eslint-disable-next-line typescript-eslint/switch-exhaustiveness-check
           switch (outcome.status) {
-            case 'approved': {
-              const data = (await response.json()) as { token: string };
+            case 'approved':
+            case 'denied':
+            case 'expired': {
               cleanup();
-              // dismissAuthSession closes the iOS ASWebAuthenticationSession sheet. On
-              // Android we open a plain custom tab (no auth session) and the native module
-              // has no dismissBrowser, so calling it there is at best a no-op and can throw.
-              if (Platform.OS !== 'android') {
-                WebBrowser.dismissAuthSession();
-              }
               setState(previous => ({
-                status: 'approved',
+                status: 'error',
                 code,
-                token: data.token,
-                error: undefined,
+                token: undefined,
+                refreshToken: undefined,
+                expiresIn: undefined,
+                error: 'Sign-in failed. Please try again.',
                 verificationUrl: previous.verificationUrl,
               }));
               return;
             }
-            case 'denied':
-            case 'expired':
-            case 'error': {
-              cleanup();
-              setState(previous => ({
-                status: outcome.status,
-                code,
-                token: undefined,
-                error: outcome.message,
-                verificationUrl: previous.verificationUrl,
-              }));
+            case 'pending': {
+              retryDelay = POLL_BASE_INTERVAL_MS;
+              scheduleNext(retryDelay);
               return;
             }
             case 'retry': {
@@ -134,9 +202,17 @@ export function useDeviceAuth(): DeviceAuthResult {
               scheduleNext(retryDelay);
               return;
             }
-            case 'pending': {
-              retryDelay = POLL_BASE_INTERVAL_MS;
-              scheduleNext(retryDelay);
+            case 'error': {
+              cleanup();
+              setState(previous => ({
+                status: 'error',
+                code,
+                token: undefined,
+                refreshToken: undefined,
+                expiresIn: undefined,
+                error: outcome.message,
+                verificationUrl: previous.verificationUrl,
+              }));
               break;
             }
             // No default
@@ -150,6 +226,8 @@ export function useDeviceAuth(): DeviceAuthResult {
             status: 'error',
             code,
             token: undefined,
+            refreshToken: undefined,
+            expiresIn: undefined,
             error: 'Network error. Please try again.',
             verificationUrl: previous.verificationUrl,
           }));
@@ -168,6 +246,8 @@ export function useDeviceAuth(): DeviceAuthResult {
         status: 'pending',
         code: undefined,
         token: undefined,
+        refreshToken: undefined,
+        expiresIn: undefined,
         error: undefined,
         verificationUrl: undefined,
       });
@@ -183,6 +263,8 @@ export function useDeviceAuth(): DeviceAuthResult {
           status: 'error',
           code: undefined,
           token: undefined,
+          refreshToken: undefined,
+          expiresIn: undefined,
           error: 'Failed to start sign in. Please try again.',
           verificationUrl: undefined,
         });
@@ -216,6 +298,8 @@ export function useDeviceAuth(): DeviceAuthResult {
               status: 'error',
               code: undefined,
               token: undefined,
+              refreshToken: undefined,
+              expiresIn: undefined,
               error: message,
               verificationUrl: undefined,
             });
@@ -225,16 +309,31 @@ export function useDeviceAuth(): DeviceAuthResult {
             status: 'error',
             code: undefined,
             token: undefined,
+            refreshToken: undefined,
+            expiresIn: undefined,
             error: 'Failed to start sign in. Please try again.',
             verificationUrl: undefined,
           });
           return;
         }
 
-        const data = (await response.json()) as {
-          code: string;
-          verificationUrl: string;
-        };
+        const data = parseDeviceAuthCodeResponse(await response.json());
+        if (!data) {
+          setState({
+            status: 'error',
+            code: undefined,
+            token: undefined,
+            refreshToken: undefined,
+            expiresIn: undefined,
+            error: 'Failed to start sign in. Please try again.',
+            verificationUrl: undefined,
+          });
+          return;
+        }
+
+        const { userCode, deviceCode } = data;
+
+        deviceCodeReference.current = deviceCode;
 
         // Sign-in uses the server-provided verificationUrl which points directly
         // at /device-auth?code=... Sign-up instead routes through the sign-in
@@ -244,22 +343,24 @@ export function useDeviceAuth(): DeviceAuthResult {
         const browserUrl =
           mode === 'signup'
             ? `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
-                callbackPath: `/device-auth?code=${data.code}&app=1`,
+                callbackPath: `/device-auth?code=${userCode}&app=1`,
                 signup: 'true',
               }).toString()}`
             : data.verificationUrl;
 
         setState({
           status: 'pending',
-          code: data.code,
+          code: userCode,
           token: undefined,
+          refreshToken: undefined,
+          expiresIn: undefined,
           error: undefined,
           verificationUrl: browserUrl,
         });
 
         const abort = new AbortController();
         abortReference.current = abort;
-        poll(data.code, abort);
+        poll(userCode, abort);
 
         await openAuthBrowser(browserUrl);
       } catch (error: unknown) {
@@ -273,6 +374,8 @@ export function useDeviceAuth(): DeviceAuthResult {
           status: 'error',
           code: undefined,
           token: undefined,
+          refreshToken: undefined,
+          expiresIn: undefined,
           error: 'Failed to start sign in. Please try again.',
           verificationUrl: undefined,
         });
@@ -289,6 +392,8 @@ export function useDeviceAuth(): DeviceAuthResult {
       status: 'idle',
       code: undefined,
       token: undefined,
+      refreshToken: undefined,
+      expiresIn: undefined,
       error: undefined,
       verificationUrl: undefined,
     });
@@ -303,6 +408,8 @@ export function useDeviceAuth(): DeviceAuthResult {
           status: 'error',
           code: previous.code,
           token: undefined,
+          refreshToken: undefined,
+          expiresIn: undefined,
           error: 'Could not open browser. Please try again.',
           verificationUrl: previous.verificationUrl,
         }));

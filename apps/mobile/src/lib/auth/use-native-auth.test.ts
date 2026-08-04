@@ -5,6 +5,7 @@ import {
   type ChallengeEntry,
   parseAuthErrorCode,
   parseEmailCodeResponse,
+  parseTokenPair,
   parseTokenResponse,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
@@ -55,6 +56,27 @@ describe('native-auth-contract (used by use-native-auth)', () => {
 
     it('rejects null', () => {
       expect(parseTokenResponse(null)).toBeNull();
+    });
+  });
+
+  describe('parseTokenPair', () => {
+    it('parses a full token pair with refresh (Apple/Google/Email after supportsRefresh:true)', () => {
+      const result = parseTokenPair({ token: 'at', refreshToken: 'rt', expiresIn: 3600 });
+      expect(result).toEqual({ token: 'at', refreshToken: 'rt', expiresIn: 3600 });
+    });
+
+    it('parses a token-only response (legacy server without refresh)', () => {
+      const result = parseTokenPair({ token: 'at' });
+      expect(result).toEqual({ token: 'at' });
+    });
+
+    it('returns null when token is missing', () => {
+      expect(parseTokenPair({ refreshToken: 'rt' })).toBeNull();
+    });
+
+    it('returns null for non-objects', () => {
+      expect(parseTokenPair(null)).toBeNull();
+      expect(parseTokenPair(undefined)).toBeNull();
     });
   });
 

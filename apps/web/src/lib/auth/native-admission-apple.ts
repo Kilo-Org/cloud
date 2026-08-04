@@ -96,9 +96,7 @@ function decodeCBOR(buf: Buffer, offset: number): [CBORValue, number] {
         } else if (keyVal instanceof Buffer) {
           map.set(keyVal.toString('hex'), val);
         } else {
-          throw new CBORDecodeError(
-            `map key must be string or number, got ${typeof keyVal}`
-          );
+          throw new CBORDecodeError(`map key must be string or number, got ${typeof keyVal}`);
         }
         cursor = valEnd;
       }
@@ -214,9 +212,7 @@ export async function verifyAppleAttestation(
   // App Attest: clientDataHash = SHA256(challenge).
   // The server challenge is base64url-encoded random bytes. The mobile client
   // hashes the raw challenge bytes to produce clientDataHash.
-  const clientDataHash = createHash('sha256')
-    .update(Buffer.from(challenge, 'base64url'))
-    .digest();
+  const clientDataHash = createHash('sha256').update(Buffer.from(challenge, 'base64url')).digest();
 
   // Apple nonce = SHA256(authData || clientDataHash)
   const expectedNonce = createHash('sha256')

@@ -10904,9 +10904,7 @@ export const native_admission_challenges = pgTable(
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
-  table => [
-    index('IDX_native_admission_challenges_expires_at').on(table.expires_at),
-  ]
+  table => [index('IDX_native_admission_challenges_expires_at').on(table.expires_at)]
 );
 
 export type NativeAdmissionChallenge = typeof native_admission_challenges.$inferSelect;

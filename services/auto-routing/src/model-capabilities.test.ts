@@ -348,9 +348,10 @@ describe('getModelCapabilities', () => {
     expect(capabilities?.inputModalities.has('file')).toBe(false);
     expect(capabilities?.contextLength).toBe(262_144);
     expect(capabilities?.isActive).toBe(true);
+    expect(dbWhere).not.toHaveBeenCalled();
   });
 
-  it('lets a database capability row override the static BytePlus fallback', async () => {
+  it('does not query model_stats for the static BytePlus coding-plan default', async () => {
     dbWhere.mockResolvedValue([
       {
         openrouterId: 'byteplus-coding/bytedance-seed-code',
@@ -369,10 +370,11 @@ describe('getModelCapabilities', () => {
       codingPlanModelId: 'byteplus-coding/bytedance-seed-code',
     });
     const capabilities = result.get('byteplus-coding/bytedance-seed-code');
-    expect(capabilities?.inputModalities.has('image')).toBe(false);
-    expect(capabilities?.inputModalities.has('file')).toBe(true);
-    expect(capabilities?.contextLength).toBe(4096);
-    expect(capabilities?.isActive).toBe(false);
+    expect(capabilities?.inputModalities.has('image')).toBe(true);
+    expect(capabilities?.inputModalities.has('file')).toBe(false);
+    expect(capabilities?.contextLength).toBe(262_144);
+    expect(capabilities?.isActive).toBe(true);
+    expect(dbWhere).not.toHaveBeenCalled();
   });
 
   it('does not synthesize capabilities when BytePlus is not the coding-plan model', async () => {

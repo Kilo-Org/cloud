@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { hashIdentifierForTelemetry } from './conversation-identity';
 import { kvReadThrough } from './kv-read-through';
 
-const CODING_PLAN_PREFERENCE_KEY_PREFIX = 'coding_plan_preference:';
+const CODING_PLAN_PREFERENCE_KEY_PREFIX = 'coding_plan_preference:v2:';
 const CODING_PLAN_PREFERENCE_TTL_SECONDS = 60;
 const BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID = 'byteplus-coding/bytedance-seed-code';
 const MINIMAX_CODING_PLAN_DEFAULT_MODEL_ID = 'minimax/minimax-m3';

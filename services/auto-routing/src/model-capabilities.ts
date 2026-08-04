@@ -258,6 +258,12 @@ export async function getModelCapabilities(
     const result = new Map<string, ModelCapabilities>();
     const all = await cache.get(env);
     mergeInto(result, all);
+    if (
+      options.codingPlanModelId === BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID &&
+      !result.has(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID)
+    ) {
+      result.set(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID, BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES);
+    }
     // The cache stores the union of all ids ever requested; fill the
     // remainder from the DB. We don't write the partial-fill back to KV —
     // a true cache miss above already wrote the full union, and a partial
@@ -266,12 +272,6 @@ export async function getModelCapabilities(
     if (missing.length > 0) {
       const fromDb = await queryModelCapabilities(env, missing);
       mergeInto(result, fromDb);
-    }
-    if (
-      options.codingPlanModelId === BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID &&
-      !result.has(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID)
-    ) {
-      result.set(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID, BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES);
     }
     return result;
   };

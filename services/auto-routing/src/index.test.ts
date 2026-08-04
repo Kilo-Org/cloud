@@ -435,7 +435,7 @@ describe('auto routing worker', () => {
 
     it('falls through the coding-plan short-circuit when the model lacks a required modality', async () => {
       configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:')
+        key.startsWith('coding_plan_preference:v2:')
           ? JSON.stringify({
               active: true,
               planId: 'minimax-token-plan-plus',
@@ -476,7 +476,7 @@ describe('auto routing worker', () => {
 
     it('falls through the coding-plan short-circuit when the estimate exceeds the model context', async () => {
       configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:')
+        key.startsWith('coding_plan_preference:v2:')
           ? JSON.stringify({
               active: true,
               planId: 'minimax-token-plan-plus',
@@ -513,7 +513,7 @@ describe('auto routing worker', () => {
 
     it('takes the coding-plan short-circuit when the model context is unknown', async () => {
       configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:')
+        key.startsWith('coding_plan_preference:v2:')
           ? JSON.stringify({
               active: true,
               planId: 'minimax-token-plan-plus',
@@ -545,7 +545,7 @@ describe('auto routing worker', () => {
 
     it('takes the BytePlus coding-plan short-circuit for image requests using static capabilities', async () => {
       configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:')
+        key.startsWith('coding_plan_preference:v2:')
           ? JSON.stringify({
               active: true,
               planId: 'byteplus-coding-plan-team-lite',
@@ -569,7 +569,7 @@ describe('auto routing worker', () => {
 
     it('falls through the BytePlus coding-plan short-circuit for file input', async () => {
       configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:')
+        key.startsWith('coding_plan_preference:v2:')
           ? JSON.stringify({
               active: true,
               planId: 'byteplus-coding-plan-team-lite',
@@ -599,7 +599,7 @@ describe('auto routing worker', () => {
 
     it('falls through the BytePlus coding-plan short-circuit above its context limit', async () => {
       configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:')
+        key.startsWith('coding_plan_preference:v2:')
           ? JSON.stringify({
               active: true,
               planId: 'byteplus-coding-plan-team-lite',
@@ -625,7 +625,7 @@ describe('auto routing worker', () => {
 
     it('returns null when capability lookup fails on the coding-plan path with an image requirement', async () => {
       configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:')
+        key.startsWith('coding_plan_preference:v2:')
           ? JSON.stringify({
               active: true,
               planId: 'minimax-token-plan-plus',
@@ -1389,7 +1389,7 @@ describe('auto routing worker', () => {
     it('takes coding-plan short-circuit from the single pool-aware capability load', async () => {
       setOwnerPool(pool);
       configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:')
+        key.startsWith('coding_plan_preference:v2:')
           ? JSON.stringify({
               active: true,
               planId: 'minimax-token-plan-plus',
@@ -1456,7 +1456,7 @@ describe('auto routing worker', () => {
 
   it('serves a coding-plan default decision without classifying', async () => {
     configGet.mockImplementation(async (key: string) =>
-      key.startsWith('coding_plan_preference:')
+      key.startsWith('coding_plan_preference:v2:')
         ? JSON.stringify({
             active: true,
             planId: 'minimax-token-plan-plus',
@@ -1504,7 +1504,7 @@ describe('auto routing worker', () => {
 
   it('falls back to benchmark routing when the coding-plan default model is denied', async () => {
     configGet.mockImplementation(async (key: string) =>
-      key.startsWith('coding_plan_preference:')
+      key.startsWith('coding_plan_preference:v2:')
         ? JSON.stringify({
             active: true,
             planId: 'minimax-token-plan-plus',
@@ -1537,7 +1537,7 @@ describe('auto routing worker', () => {
 
   it('falls back to benchmark routing when the BytePlus coding-plan default model is denied', async () => {
     configGet.mockImplementation(async (key: string) =>
-      key.startsWith('coding_plan_preference:')
+      key.startsWith('coding_plan_preference:v2:')
         ? JSON.stringify({
             active: true,
             planId: 'byteplus-coding-plan-team-lite',
@@ -1587,7 +1587,7 @@ describe('auto routing worker', () => {
     expect(dbOrderBy).toHaveBeenCalledTimes(1);
     expect(dbLimit).toHaveBeenCalledWith(1);
     expect(configPut).toHaveBeenCalledWith(
-      expect.stringMatching(/^coding_plan_preference:[0-9a-f]{16}$/),
+      expect.stringMatching(/^coding_plan_preference:v2:[0-9a-f]{16}$/),
       JSON.stringify({
         active: true,
         planId: 'minimax-token-plan-plus',
@@ -1614,7 +1614,7 @@ describe('auto routing worker', () => {
       },
     });
     expect(configPut).toHaveBeenCalledWith(
-      expect.stringMatching(/^coding_plan_preference:[0-9a-f]{16}$/),
+      expect.stringMatching(/^coding_plan_preference:v2:[0-9a-f]{16}$/),
       JSON.stringify({
         active: true,
         planId: 'byteplus-coding-plan-team-lite',

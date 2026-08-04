@@ -321,6 +321,61 @@ describe('save_workflow', () => {
     );
     expect(result.ok).toBe(false);
   });
+
+  it('rejects startUrl outside pathPrefix', async () => {
+    const ctx = createBaseCtx();
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        pathPrefix: '/products',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+        startUrl: 'https://example.com/about',
+      }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      error: 'startUrl must match the workflow scope (origin and pathPrefix, if set).',
+      ok: false,
+    });
+  });
+
+  it('rejects startUrl with spoofed origin prefix', async () => {
+    const ctx = createBaseCtx();
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+        startUrl: 'https://example.com.evil.tld',
+      }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      error: 'startUrl must match the workflow scope (origin and pathPrefix, if set).',
+      ok: false,
+    });
+  });
+
+  it('rejects startUrl that is not a valid URL', async () => {
+    const ctx = createBaseCtx();
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+        startUrl: 'not-a-valid-url',
+      }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      error: 'startUrl is not a valid URL.',
+      ok: false,
+    });
+  });
 });
 
 // ---------- run_workflow ----------
@@ -387,6 +442,36 @@ describe('run_workflow', () => {
         tabId: ctx.selectedTabId,
         workflow: expect.objectContaining({ id: 'wf-1' }),
       })
+    );
+  });
+
+  it('passes input to runWorkflow', async () => {
+    const mockedRunWorkflow = runWorkflow as ReturnType<typeof vi.fn>;
+    mockedRunWorkflow.mockResolvedValue({ ok: true, pagesVisited: 1, result: 'success' });
+
+    const ctx = createBaseCtx({ mode: 'dangerous' });
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        approvedScriptHash: 'hash',
+        createdAt: 100,
+        description: 'desc',
+        id: 'wf-1',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+        updatedAt: 200,
+      },
+    ]);
+
+    const input = { filter: 'active', page: 1 };
+    await executeWorkflowToolCall(
+      createToolCall('run_workflow', { input, workflowId: 'wf-1' }),
+      ctx
+    );
+
+    expect(mockedRunWorkflow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ input })
     );
   });
 

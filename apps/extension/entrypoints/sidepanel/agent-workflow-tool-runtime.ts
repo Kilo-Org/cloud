@@ -7,6 +7,7 @@ import {
   MAX_WORKFLOW_NAME_LENGTH,
   MAX_WORKFLOW_SCRIPT_LENGTH,
   searchAgentWorkflows,
+  matchesWorkflowScope,
 } from '@/src/shared/agent-workflows';
 import { loadAgentWorkflows, deleteAgentWorkflow } from '@/src/shared/agent-workflows-storage';
 import { runWorkflow } from '@/src/shared/agent-workflow-runner';
@@ -58,6 +59,7 @@ const getWorkflowArgsSchema = z.object({
 
 const runWorkflowArgsSchema = z.object({
   dryRun: z.boolean().optional(),
+  input: z.unknown().optional(),
   workflowId: z.string(),
 });
 
@@ -100,8 +102,13 @@ const validateWorkflowInput = (
     if (!URL.canParse(args.startUrl)) {
       return 'startUrl is not a valid URL.';
     }
-    if (!args.startUrl.startsWith(args.scopeOrigin)) {
-      return 'startUrl must match the scope origin.';
+    if (
+      !matchesWorkflowScope(
+        { pathPrefix: args.pathPrefix, scopeOrigin: args.scopeOrigin },
+        args.startUrl
+      )
+    ) {
+      return 'startUrl must match the workflow scope (origin and pathPrefix, if set).';
     }
   }
 
@@ -284,7 +291,7 @@ const executeRunWorkflow = async (
     return { error: 'Invalid arguments for run_workflow.', ok: false };
   }
 
-  const { workflowId, dryRun = false } = parsed.data;
+  const { workflowId, dryRun = false, input } = parsed.data;
 
   const workflows = await loadAgentWorkflows(ctx.storage);
   const workflow = workflows.find(item => item.id === workflowId);
@@ -304,6 +311,7 @@ const executeRunWorkflow = async (
     } as Parameters<typeof runWorkflow>[0],
     {
       dryRun,
+      input,
       signal: ctx.signal,
       tabId: ctx.selectedTabId,
       workflow,

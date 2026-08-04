@@ -42,6 +42,21 @@ jest.mock('@/lib/drizzle', () => ({
         },
       }),
     }),
+    // The claim runs inside a transaction; the callback receives a tx with the
+    // same update chain as the db object above.
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        update: () => ({
+          set: () => ({
+            where: () => {
+              const thenable = Object.assign(Promise.resolve([] as unknown[]), {
+                returning: () => mockClaim(),
+              });
+              return thenable;
+            },
+          }),
+        }),
+      }),
   },
 }));
 

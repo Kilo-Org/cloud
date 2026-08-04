@@ -118,44 +118,49 @@ async function countRemainingStaleReviews(): Promise<number> {
  */
 async function terminalizeReview(review: CloudAgentCodeReview): Promise<boolean> {
   const now = new Date().toISOString();
-  const claimed = await db
-    .update(cloud_agent_code_reviews)
-    .set({
-      status: 'failed',
-      terminal_reason: REAP_TERMINAL_REASON,
-      error_message: REAP_ERROR_MESSAGE,
-      dispatch_reservation_id: null,
-      completed_at: now,
-      updated_at: now,
-    })
-    .where(
-      and(
-        eq(cloud_agent_code_reviews.id, review.id),
-        inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES]),
-        eq(cloud_agent_code_reviews.updated_at, review.updated_at)
+  // One transaction: a crash between the two writes would otherwise leave the
+  // review terminal with its attempts still running, permanently, because the
+  // parent is no longer selectable so nothing would ever revisit them.
+  return await db.transaction(async tx => {
+    const claimed = await tx
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'failed',
+        terminal_reason: REAP_TERMINAL_REASON,
+        error_message: REAP_ERROR_MESSAGE,
+        dispatch_reservation_id: null,
+        completed_at: now,
+        updated_at: now,
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, review.id),
+          inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES]),
+          eq(cloud_agent_code_reviews.updated_at, review.updated_at)
+        )
       )
-    )
-    .returning({ id: cloud_agent_code_reviews.id });
+      .returning({ id: cloud_agent_code_reviews.id });
 
-  if (claimed.length === 0) return false;
+    if (claimed.length === 0) return false;
 
-  await db
-    .update(cloud_agent_code_review_attempts)
-    .set({
-      status: 'failed',
-      terminal_reason: REAP_TERMINAL_REASON,
-      error_message: REAP_ERROR_MESSAGE,
-      completed_at: now,
-      updated_at: now,
-    })
-    .where(
-      and(
-        eq(cloud_agent_code_review_attempts.code_review_id, review.id),
-        inArray(cloud_agent_code_review_attempts.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES])
-      )
-    );
+    await tx
+      .update(cloud_agent_code_review_attempts)
+      .set({
+        status: 'failed',
+        terminal_reason: REAP_TERMINAL_REASON,
+        error_message: REAP_ERROR_MESSAGE,
+        completed_at: now,
+        updated_at: now,
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_review_attempts.code_review_id, review.id),
+          inArray(cloud_agent_code_review_attempts.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES])
+        )
+      );
 
-  return true;
+    return true;
+  });
 }
 
 /**

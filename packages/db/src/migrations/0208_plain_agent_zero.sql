@@ -1,0 +1,2 @@
+ALTER TABLE "magic_link_tokens" ADD COLUMN "challenge_id" uuid;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_magic_link_tokens_challenge_id" ON "magic_link_tokens" USING btree ("challenge_id") WHERE "magic_link_tokens"."challenge_id" IS NOT NULL;

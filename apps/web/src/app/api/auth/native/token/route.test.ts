@@ -340,8 +340,16 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ token: 'minted-jwt' });
-      expect(mockReserveSignInCode).toHaveBeenCalledWith('emailuser@example.com', '123456');
-      expect(mockCommitSignInCode).toHaveBeenCalledWith('emailuser@example.com', '123456');
+      expect(mockReserveSignInCode).toHaveBeenCalledWith(
+        'emailuser@example.com',
+        '123456',
+        undefined
+      );
+      expect(mockCommitSignInCode).toHaveBeenCalledWith(
+        'emailuser@example.com',
+        '123456',
+        undefined
+      );
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           google_user_email: 'emailuser@example.com',
@@ -357,6 +365,32 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith('emailuser@example.com');
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+    });
+
+    it('passes challengeId through to reserve/commit when the client sends it', async () => {
+      const challengeId = 'c0000000-0000-4000-8000-000000000001';
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'emailuser@example.com',
+          code: '123456',
+          challengeId,
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(mockReserveSignInCode).toHaveBeenCalledWith(
+        'emailuser@example.com',
+        '123456',
+        challengeId
+      );
+      expect(mockCommitSignInCode).toHaveBeenCalledWith(
+        'emailuser@example.com',
+        '123456',
+        challengeId
+      );
     });
 
     it('rechecks domain eligibility when redeeming an issued code', async () => {
@@ -492,7 +526,7 @@ describe('POST /api/auth/native/token', () => {
       const first = await POST(createRequest({ provider: 'email', email, code }));
       expect(first.status).toBe(403);
       expect(await first.json()).toEqual({ error: 'DIFFERENT-OAUTH' });
-      expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code);
+      expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
 
@@ -505,7 +539,7 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(2);
       expect(mockGenerateApiToken).toHaveBeenCalledTimes(1);
       expect(mockCommitSignInCode).toHaveBeenCalledTimes(1);
-      expect(mockCommitSignInCode).toHaveBeenCalledWith(email, code);
+      expect(mockCommitSignInCode).toHaveBeenCalledWith(email, code, undefined);
       // releaseSignInCode was only called once (on the first failure).
       expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
     });
@@ -527,7 +561,11 @@ describe('POST /api/auth/native/token', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockConsumeSignInCode).toHaveBeenCalledWith('emailuser@example.com', '123456');
+      expect(mockConsumeSignInCode).toHaveBeenCalledWith(
+        'emailuser@example.com',
+        '123456',
+        undefined
+      );
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_code_reservation_lapsed');
     });
 
@@ -577,7 +615,7 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
       expect(mockCreateDeviceSession).toHaveBeenCalledTimes(1);
       expect(mockIssueSessionCredentials).toHaveBeenCalledTimes(1);
-      expect(mockConsumeSignInCode).toHaveBeenCalledWith('lapse@example.com', '123456');
+      expect(mockConsumeSignInCode).toHaveBeenCalledWith('lapse@example.com', '123456', undefined);
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_code_reservation_lapsed');
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();

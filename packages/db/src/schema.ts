@@ -5247,10 +5247,14 @@ export const magic_link_tokens = pgTable(
     attempts: integer().default(0).notNull(),
     reserved_until: timestamp({ withTimezone: true, mode: 'string' }),
     purpose: text().default('magic_link').notNull().$type<'magic_link' | 'sign_in_code'>(),
+    challenge_id: uuid(),
   },
   table => [
     index('idx_magic_link_tokens_email').on(table.email),
     index('idx_magic_link_tokens_expires_at').on(table.expires_at),
+    uniqueIndex('UQ_magic_link_tokens_challenge_id')
+      .on(table.challenge_id)
+      .where(sql`${table.challenge_id} IS NOT NULL`),
     check('check_expires_at_future', sql`${table.expires_at} > ${table.created_at}`),
   ]
 );

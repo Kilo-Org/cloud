@@ -4,8 +4,9 @@ import { magic_link_tokens } from '@kilocode/db/schema';
 import * as z from 'zod';
 import 'server-only';
 import { NEXTAUTH_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
-import { randomBytes, randomInt, createHash, createHmac } from 'crypto';
+import { randomBytes, randomInt, randomUUID, createHash, createHmac } from 'crypto';
 import { normalizeEmail } from '@/lib/utils';
+import { captureMessage } from '@sentry/nextjs';
 
 const SIGN_IN_CODE_EXPIRY_MINUTES = 10;
 const SIGN_IN_CODE_MAX_ATTEMPTS = 5;
@@ -104,13 +105,20 @@ export async function verifyAndConsumeMagicLinkToken(
  * The stored hash is an HMAC keyed by the server secret, so a database leak
  * does not permit offline enumeration of the six-digit code space.
  *
+ * A random opaque challenge_id is generated alongside the code. The client
+ * must present it when verifying, so that attempts against challenge A do
+ * not spend challenge B's budget.
+ *
  * @param email - The email address to send the code to (case-insensitive)
- * @returns The plaintext 6-digit code (for sending in email)
+ * @returns The plaintext 6-digit code and an opaque challenge identifier
  */
-export async function createSignInCode(email: string): Promise<string> {
+export async function createSignInCode(
+  email: string
+): Promise<{ code: string; challengeId: string }> {
   const normalizedEmail = normalizeEmail(email);
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const token_hash = hashSignInCode(normalizedEmail, code);
+  const challengeId = randomUUID();
   const expires_at = new Date(Date.now() + SIGN_IN_CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
   await db.transaction(async tx => {
@@ -126,12 +134,16 @@ export async function createSignInCode(email: string): Promise<string> {
           isNull(magic_link_tokens.consumed_at)
         )
       );
-    await tx
-      .insert(magic_link_tokens)
-      .values({ token_hash, email: normalizedEmail, expires_at, purpose: 'sign_in_code' });
+    await tx.insert(magic_link_tokens).values({
+      token_hash,
+      email: normalizedEmail,
+      expires_at,
+      purpose: 'sign_in_code',
+      challenge_id: challengeId,
+    });
   });
 
-  return code;
+  return { code, challengeId };
 }
 
 export type ReserveSignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts' | 'in_progress';
@@ -142,28 +154,40 @@ export type VerifySignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts';
  * A live reservation blocks concurrent callers, who receive 'in_progress'.
  * A failed settlement must call releaseSignInCode so the code stays usable.
  *
+ * When challengeId is supplied, all lookups, the pre-check, and the increment
+ * are keyed by challenge_id instead of email. This isolates attempt budgets:
+ * guesses against challenge A do not spend challenge B's budget.
+ *
+ * When challengeId is absent, the legacy email-keyed path is used for
+ * shipped clients that do not yet send a challenge.
+ *
  * Returns 'ok' when the code is reserved, 'invalid' for a wrong/expired/consumed
  * code, 'too_many_attempts' when the attempt budget is exhausted, and
  * 'in_progress' when another caller already holds the reservation.
  */
 export async function reserveSignInCode(
   email: string,
-  code: string
+  code: string,
+  challengeId?: string
 ): Promise<ReserveSignInCodeResult> {
   const normalizedEmail = normalizeEmail(email);
 
-  const [row] = await db
-    .select()
-    .from(magic_link_tokens)
-    .where(
-      and(
-        eq(magic_link_tokens.email, normalizedEmail),
+  const lookupWhere = challengeId
+    ? and(
+        eq(magic_link_tokens.challenge_id, challengeId),
         eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at),
         sql`${magic_link_tokens.expires_at} > NOW()`
       )
-    )
-    .limit(1);
+    : and(
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at),
+        isNull(magic_link_tokens.challenge_id),
+        sql`${magic_link_tokens.expires_at} > NOW()`
+      );
+
+  const [row] = await db.select().from(magic_link_tokens).where(lookupWhere).limit(1);
 
   if (!row) {
     return 'invalid';
@@ -225,17 +249,35 @@ export async function reserveSignInCode(
     return 'invalid';
   }
 
-  await db
-    .update(magic_link_tokens)
-    .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
-    .where(
-      and(
-        eq(magic_link_tokens.email, normalizedEmail),
+  // Increment attempts: key by challenge_id when available, otherwise by email.
+  // Legacy path only targets rows with null challenge_id so a no-challenge caller
+  // cannot spend a challenge-bound row's budget.
+  const incrementWhere = challengeId
+    ? and(
+        eq(magic_link_tokens.challenge_id, challengeId),
         eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at),
         sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
       )
-    );
+    : and(
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at),
+        isNull(magic_link_tokens.challenge_id),
+        sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+      );
+
+  await db
+    .update(magic_link_tokens)
+    .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
+    .where(incrementWhere);
+
+  // ponytail: remove legacy counter and no-challenge path when
+  // native_signin_code_legacy_no_challenge_count drains to 0 for
+  // 7 consecutive days — all shipped clients must send a challengeId.
+  if (!challengeId) {
+    captureMessage('native_signin_code_legacy_no_challenge_count: 1');
+  }
 
   return 'invalid';
 }
@@ -245,25 +287,34 @@ export async function reserveSignInCode(
  * Must be called only after a successful settlement.
  * The reservation must still be live (reserved_until > NOW()).
  *
+ * When challengeId is supplied, the commit is scoped to the challenge.
+ *
  * Returns true when the code was committed, false when the reservation
  * lapsed or the row was already consumed.
  */
-export async function commitSignInCode(email: string, code: string): Promise<boolean> {
+export async function commitSignInCode(
+  email: string,
+  code: string,
+  challengeId?: string
+): Promise<boolean> {
   const normalizedEmail = normalizeEmail(email);
   const token_hash = hashSignInCode(normalizedEmail, code);
+
+  const whereClauses = [
+    eq(magic_link_tokens.token_hash, token_hash),
+    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.purpose, 'sign_in_code'),
+    isNull(magic_link_tokens.consumed_at),
+    sql`${magic_link_tokens.reserved_until} > NOW()`,
+  ];
+  if (challengeId) {
+    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
+  }
 
   const committed = await db
     .update(magic_link_tokens)
     .set({ consumed_at: sql`NOW()`, reserved_until: null })
-    .where(
-      and(
-        eq(magic_link_tokens.token_hash, token_hash),
-        eq(magic_link_tokens.email, normalizedEmail),
-        eq(magic_link_tokens.purpose, 'sign_in_code'),
-        isNull(magic_link_tokens.consumed_at),
-        sql`${magic_link_tokens.reserved_until} > NOW()`
-      )
-    )
+    .where(and(...whereClauses))
     .returning();
 
   return committed.length > 0;
@@ -272,44 +323,62 @@ export async function commitSignInCode(email: string, code: string): Promise<boo
 /**
  * Release a reserved sign-in code without consuming it or incrementing attempts.
  * A settlement failure is not a wrong guess — it must not cost the user an attempt.
+ *
+ * When challengeId is supplied, the release is scoped to the challenge.
  */
-export async function releaseSignInCode(email: string, code: string): Promise<void> {
+export async function releaseSignInCode(
+  email: string,
+  code: string,
+  challengeId?: string
+): Promise<void> {
   const normalizedEmail = normalizeEmail(email);
   const token_hash = hashSignInCode(normalizedEmail, code);
+
+  const whereClauses = [
+    eq(magic_link_tokens.token_hash, token_hash),
+    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.purpose, 'sign_in_code'),
+    isNull(magic_link_tokens.consumed_at),
+  ];
+  if (challengeId) {
+    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
+  }
 
   await db
     .update(magic_link_tokens)
     .set({ reserved_until: null })
-    .where(
-      and(
-        eq(magic_link_tokens.token_hash, token_hash),
-        eq(magic_link_tokens.email, normalizedEmail),
-        eq(magic_link_tokens.purpose, 'sign_in_code'),
-        isNull(magic_link_tokens.consumed_at)
-      )
-    );
+    .where(and(...whereClauses));
 }
 
 /**
  * Consume a sign-in code unconditionally, regardless of reservation status.
  * Used when the reservation lapsed between settlement and commit — the user
  * is legitimately settled and this prevents a second settlement with the same code.
+ *
+ * When challengeId is supplied, the consume is scoped to the challenge.
  */
-export async function consumeSignInCode(email: string, code: string): Promise<boolean> {
+export async function consumeSignInCode(
+  email: string,
+  code: string,
+  challengeId?: string
+): Promise<boolean> {
   const normalizedEmail = normalizeEmail(email);
   const token_hash = hashSignInCode(normalizedEmail, code);
+
+  const whereClauses = [
+    eq(magic_link_tokens.token_hash, token_hash),
+    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.purpose, 'sign_in_code'),
+    isNull(magic_link_tokens.consumed_at),
+  ];
+  if (challengeId) {
+    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
+  }
 
   const consumed = await db
     .update(magic_link_tokens)
     .set({ consumed_at: sql`NOW()`, reserved_until: null })
-    .where(
-      and(
-        eq(magic_link_tokens.token_hash, token_hash),
-        eq(magic_link_tokens.email, normalizedEmail),
-        eq(magic_link_tokens.purpose, 'sign_in_code'),
-        isNull(magic_link_tokens.consumed_at)
-      )
-    )
+    .where(and(...whereClauses))
     .returning();
 
   return consumed.length > 0;
@@ -325,19 +394,20 @@ export async function consumeSignInCode(email: string, code: string): Promise<bo
  */
 export async function verifyAndConsumeSignInCode(
   email: string,
-  code: string
+  code: string,
+  challengeId?: string
 ): Promise<VerifySignInCodeResult> {
-  const result = await reserveSignInCode(email, code);
+  const result = await reserveSignInCode(email, code, challengeId);
   if (result !== 'ok') {
     // Map 'in_progress' to 'invalid' — the wrapper has no settlement phase
     // so a reservation conflict is a bug, not a retryable state.
     return result === 'in_progress' ? 'invalid' : result;
   }
-  const committed = await commitSignInCode(email, code);
+  const committed = await commitSignInCode(email, code, challengeId);
   if (!committed) {
     // Reservation expired between reserve and commit — release so the code
     // stays usable and the user can retry.
-    await releaseSignInCode(email, code);
+    await releaseSignInCode(email, code, challengeId);
     return 'invalid';
   }
   return 'ok';

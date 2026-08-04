@@ -8,9 +8,11 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { API_BASE_URL, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
+  buildChallengeEntry,
   parseAuthErrorCode,
   parseEmailCodeResponse,
   parseTokenResponse,
+  selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -106,6 +108,7 @@ export function useNativeAuth(): NativeAuthResult {
   const { signIn } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(undefined);
   const busyRef = useRef<BusyAction>(undefined);
+  const challengeRef = useRef<{ email: string; challengeId: string } | null>(null);
 
   const startAction = useCallback((action: Exclude<BusyAction, undefined>) => {
     if (busyRef.current) {
@@ -233,10 +236,16 @@ export function useNativeAuth(): NativeAuthResult {
           toast.error(mapError(result.errorCode));
           return false;
         }
-        if (!parseEmailCodeResponse(result.data)) {
+        const parsed = parseEmailCodeResponse(result.data);
+        if (!parsed) {
           toast.error(DEFAULT_ERROR_MESSAGE);
           return false;
         }
+        // Hold the challenge for the current email so verifyEmailCode can
+        // send it back. Discard a stale challenge when the email changes:
+        // a code requested for one address must never be verified against
+        // another's challenge.
+        challengeRef.current = buildChallengeEntry(parsed, email);
         return true;
       } finally {
         finishAction('otp-send');
@@ -252,10 +261,15 @@ export function useNativeAuth(): NativeAuthResult {
         return false;
       }
       try {
+        // Only send a challengeId when the email matches. A mismatched
+        // email means the challenge was generated for a different address.
+        const challengeId = selectChallengeId(challengeRef.current, email);
+
         const result = await postAuth('/api/auth/native/token', {
           provider: 'email',
           email,
           code,
+          ...(challengeId ? { challengeId } : {}),
         });
         if (!result.ok) {
           toast.error(mapError(result.errorCode));

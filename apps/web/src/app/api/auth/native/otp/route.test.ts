@@ -33,16 +33,20 @@ describe('POST /api/auth/native/otp', () => {
     jest.clearAllMocks();
 
     mockCheckEmailSignInEligibility.mockResolvedValue({ ok: true });
-    mockCreateSignInCode.mockResolvedValue('123456');
+    mockCreateSignInCode.mockResolvedValue({
+      code: '123456',
+      challengeId: 'c0000000-0000-0000-0000-000000000001',
+    });
     mockSendSignInCodeEmail.mockResolvedValue({ sent: true });
   });
 
-  it('returns 200 { success: true } and sends the code by email', async () => {
+  it('returns 200 { success: true, challengeId } and sends the code by email', async () => {
     const response = await POST(createRequest({ email: 'user@example.com' }));
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toEqual({ success: true });
+    expect(data.success).toBe(true);
+    expect(data.challengeId).toBe('c0000000-0000-0000-0000-000000000001');
     expect(mockCreateSignInCode).toHaveBeenCalledWith('user@example.com');
     expect(mockSendSignInCodeEmail).toHaveBeenCalledWith('user@example.com', '123456');
   });

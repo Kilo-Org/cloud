@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const code = await createSignInCode(email);
+  const { code, challengeId } = await createSignInCode(email);
   const result = await sendSignInCodeEmail(email, code);
   if (!result.sent) {
     await deleteSignInCode(email, code);
@@ -57,5 +57,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, challengeId });
 }

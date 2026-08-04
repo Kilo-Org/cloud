@@ -84,6 +84,7 @@ const requestSchema = z.discriminatedUnion('provider', [
     provider: z.literal('email'),
     email: z.string().email(),
     code: z.string(),
+    challengeId: z.string().uuid().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
   }),
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
     const existingUser = await findUserByNormalizedEmail(data.email);
     const email = existingUser?.google_user_email ?? data.email.toLowerCase();
 
-    const reserveResult = await reserveSignInCode(data.email, data.code);
+    const reserveResult = await reserveSignInCode(data.email, data.code, data.challengeId);
     if (reserveResult === 'invalid') {
       return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
     }
@@ -251,11 +252,11 @@ export async function POST(request: NextRequest) {
       // Consume the code BEFORE issuing any credential.
       // If the reservation lapsed (commit returns false), the user is legitimately
       // settled — consume the code unconditionally and log the lapse window.
-      const committed = await commitSignInCode(data.email, data.code);
+      const committed = await commitSignInCode(data.email, data.code, data.challengeId);
       if (!committed) {
         // Unconditional consume: set consumed_at even without a live reservation
         // so this code cannot settle again and create a second session.
-        const consumed = await consumeSignInCode(data.email, data.code);
+        const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
         if (!consumed) {
           // Another request already consumed the code — do NOT issue credentials.
           return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
@@ -287,7 +288,7 @@ export async function POST(request: NextRequest) {
       throw error;
     } finally {
       if (phase === 'release') {
-        await releaseSignInCode(data.email, data.code);
+        await releaseSignInCode(data.email, data.code, data.challengeId);
       }
     }
   }

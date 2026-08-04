@@ -17,6 +17,8 @@ export function ModelsTab({
   filteredModelRows,
   onToggleModelAllowed,
   onOpenModelDetails,
+  scope = 'organization',
+  showDetails = true,
 }: {
   isLoading: boolean;
   canEdit: boolean;
@@ -29,12 +31,15 @@ export function ModelsTab({
   filteredModelRows: ReadonlyArray<ModelRow>;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
   onOpenModelDetails: (modelId: string) => void;
+  scope?: 'organization' | 'group';
+  showDetails?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-y-4">
       <p className="text-muted-foreground text-sm">
-        Disable specific models for organization members. New models from enabled providers are
-        allowed by default.
+        {scope === 'organization'
+          ? 'Disable specific models for organization members. New models from enabled providers are allowed by default.'
+          : 'Grant specific models through this policy. Organization-wide restrictions still apply.'}
       </p>
 
       {isLoading ? (
@@ -61,7 +66,8 @@ export function ModelsTab({
             <div className="bg-muted/50 flex items-center justify-between gap-4 border-b px-4 py-3">
               <div className="text-sm font-medium">Models</div>
               <div className="text-muted-foreground text-xs">
-                {allowedModelIds.size} allowed • {filteredModelRows.length} shown
+                {allowedModelIds.size} {scope === 'group' ? 'selected' : 'allowed'} •{' '}
+                {filteredModelRows.length} shown
               </div>
             </div>
 
@@ -74,6 +80,7 @@ export function ModelsTab({
                   enabledProviderSlugs.has(slug)
                 ).length;
                 const enabledProviderEmoji = enabledProviderCount === 0 ? '⚠️' : '✅';
+                const unavailable = Boolean(row.unavailableReason);
                 return (
                   <label
                     key={row.modelId}
@@ -81,7 +88,7 @@ export function ModelsTab({
                   >
                     <Checkbox
                       checked={checked}
-                      disabled={!canEdit}
+                      disabled={!canEdit || (unavailable && !checked)}
                       onCheckedChange={nextChecked => {
                         onToggleModelAllowed(row.modelId, Boolean(nextChecked));
                       }}
@@ -90,32 +97,39 @@ export function ModelsTab({
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{row.modelName}</div>
                       <div className="text-muted-foreground mt-0.5 text-xs">{row.modelId}</div>
+                      {row.unavailableReason && (
+                        <div className="type-label text-status-warning mt-1">
+                          {row.unavailableReason}
+                        </div>
+                      )}
                       <div className="text-muted-foreground mt-1 flex items-center gap-2 text-xs">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 shrink-0 p-0"
-                          aria-label="View model details"
-                          onPointerDown={e => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                          onMouseDown={e => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                          onClick={e => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onOpenModelDetails(row.modelId);
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
+                        {showDetails && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 shrink-0 p-0"
+                            aria-label="View model details"
+                            onPointerDown={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onMouseDown={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onOpenModelDetails(row.modelId);
+                            }}
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        )}
                         <span>
                           Available from {providerCount} {providerLabel}
-                          {checked ? (
+                          {scope === 'organization' && checked ? (
                             <>
                               {' '}
                               • {enabledProviderEmoji} {enabledProviderCount} enabled

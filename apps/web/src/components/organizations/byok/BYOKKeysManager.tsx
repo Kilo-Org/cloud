@@ -47,6 +47,7 @@ import {
   type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import * as z from 'zod';
 
 // Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
@@ -93,8 +94,8 @@ function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: 
       <p>Keys you create here use provider billing instead of your Kilo balance.</p>
       {showsCodingPlanKey ? (
         <p>
-          The MiniMax Coding Plan configured your MiniMax key using Kilo Credits. This managed key
-          is read-only. Cancel the plan in Subscriptions to remove it when the plan ends.
+          A Coding Plan configured one or more of your keys using Kilo Credits. Managed keys are
+          read-only. Cancel the plan in Subscriptions to remove a managed key when the plan ends.
         </p>
       ) : null}
     </div>
@@ -193,9 +194,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const { data: supportedModels } = useQuery(trpc.byok.listSupportedModels.queryOptions());
   const showsCodingPlanKey =
-    !organizationId &&
-    (keys?.some(key => key.provider_id === 'minimax' && key.management_source === 'coding_plan') ??
-      false);
+    !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
 
   const createMutation = useMutation(
     trpc.byok.create.mutationOptions({
@@ -431,11 +430,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         >
                           <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
                             <div>{getProviderDisplayName(key.provider_id)}</div>
-                            {!organizationId &&
-                            key.provider_id === 'minimax' &&
-                            key.management_source === 'coding_plan' ? (
+                            {isManaged ? (
                               <p className="text-muted-foreground mt-1 text-xs">
-                                Managed by MiniMax Coding Plan. This key is read-only.
+                                {getCodingPlanManagedKeyLabel(
+                                  getProviderDisplayName(key.provider_id)
+                                )}
                               </p>
                             ) : null}
                             <SupportedModelsList models={getProviderModels(key.provider_id)} />

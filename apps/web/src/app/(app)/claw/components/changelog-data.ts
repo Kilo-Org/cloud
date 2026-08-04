@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-08-03',
+    description:
+      'OpenClaw 2026.7.1 is available now as an Early Access upgrade. Known issue: images attached in chat do not reach the agent, so it replies as though nothing was attached. This is an OpenClaw bug that also affects earlier versions, not a regression in 2026.7.1, and it is being tracked upstream. Everything else in the release is unaffected.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
     date: '2026-07-07',
     description:
       'Fixed KiloClaw instances that appeared to be running but left the agent unavailable. Instances provisioned on an older OpenClaw version could write a configuration that referenced a model provider plugin that version does not include, which stopped the agent gateway from starting. Redeploy your instance to pick up the fix.',

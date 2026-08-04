@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { getOpenRouterTranscriptionModels } from '@/lib/ai-gateway/providers/openrouter';
+import { getUserFromAuth } from '@/lib/user/server';
+import {
+  getEffectiveModelDecision,
+  resolveOrganizationMemberModelPolicy,
+} from '@/lib/organizations/effective-model-access.server';
 
 /**
  * Test using:
@@ -12,6 +17,19 @@ export async function GET(): Promise<
 > {
   try {
     const data = await getOpenRouterTranscriptionModels();
+    const auth = await getUserFromAuth({ adminOnly: false }).catch(() => null);
+    if (auth?.organizationId && auth.user && Array.isArray(data.data)) {
+      // Resolve the member's policy once, then evaluate each catalog model.
+      const policy = await resolveOrganizationMemberModelPolicy({
+        organizationId: auth.organizationId,
+        kiloUserId: auth.user.id,
+      });
+      const models = [];
+      for (const model of data.data) {
+        if ((await getEffectiveModelDecision(policy, model.id)).allowed) models.push(model);
+      }
+      return NextResponse.json({ ...data, data: models });
+    }
     return NextResponse.json(data);
   } catch (error) {
     captureException(error, {

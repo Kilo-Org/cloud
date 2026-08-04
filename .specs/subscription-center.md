@@ -299,8 +299,8 @@ historical Commit names, prices, invoices, and credit deductions.
     - Payment source (Credits)
     - API Key Configuration summary identifying configuration in BYOK and
       linking to `/byok` when a managed key is installed
-    - Traffic routing information (Kilo Gateway through the ordinary
-      MiniMax BYOK provider setup)
+    - Traffic routing information (Kilo Gateway through the ordinary BYOK
+      setup for the subscription's provider)
     - Current Upstream Provider quota for an `active` or `past_due` Coding Plan
       when available, authorized through the retained Managed Plan Credential
       without exposing it to the client
@@ -322,7 +322,7 @@ historical Commit names, prices, invoices, and credit deductions.
     direct users to cancel the plan in Subscription Center to remove the key at
     Effective Cancellation.
 
-31. Coding Plan cancellation, installed MiniMax configuration cleanup,
+31. Coding Plan cancellation, installed provider configuration cleanup,
     and issued-credential revocation MUST follow `.specs/coding-plans.md`.
     Cancellation messaging MUST communicate the paid-through date, that
     only Kilo's unchanged installed configuration is removed, and that
@@ -331,16 +331,19 @@ historical Commit names, prices, invoices, and credit deductions.
 32. When the user views Coding Plans, the system MUST show each configured
     offering with provider name, plan name, recurring USD price, billing
     period, payment source, and catalog feature copy. MiniMax token offerings
-    MUST include Token Plan Plus, Token Plan Max, and Token Plan Ultra. An
+    MUST include Token Plan Plus, Token Plan Max, and Token Plan Ultra.
+    BytePlus offerings MUST include Coding Plan Lite at $20 per 30 days. An
     offering with assignable credential capacity MUST show a subscribe action.
-    Purchase messaging for MiniMax token plans MUST explain automatic MiniMax
-    BYOK setup and purchase MUST be blocked when any personal MiniMax BYOK key
-    exists, including a disabled key. In that state, the system MUST direct
+    Purchase messaging MUST explain automatic BYOK setup for the selected
+    provider, and purchase MUST be blocked when any personal BYOK key for that
+    provider exists, including a disabled key. In that state, the system MUST direct
     the user to delete the existing key in `/byok` first. Purchase MUST also
-    be blocked when the user already has any non-terminal MiniMax Coding Plan,
+    be blocked when the user already has any non-terminal Coding Plan for that provider,
     including a subscription pending cancellation. In that state, the system
     MUST explain that the user must cancel the current plan and wait until
-    access ends before subscribing to another MiniMax Coding Plan. An offering
+    access ends before subscribing to another plan from that provider. Managed
+    keys MUST use provider-specific read-only labels, cancellation copy, and
+    routing copy. An offering
     without assignable credential capacity MUST display a sold-out state and a
     `Notify me when available` action. The action MUST persist one
     notification intent per user and Plan ID without charging credits or

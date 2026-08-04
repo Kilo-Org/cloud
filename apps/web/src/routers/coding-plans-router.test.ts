@@ -25,6 +25,7 @@ jest.mock('ai', () => ({
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
 const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
+const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
 const mockedGenerateText = jest.mocked(generateText);
@@ -112,6 +113,19 @@ describe('coding plans router', () => {
         availabilityStatus: 'sold_out',
         notificationRequested: false,
       },
+      {
+        planId: BYTEPLUS_PLAN_ID,
+        providerName: 'BytePlus',
+        name: 'Coding Plan Lite',
+        providerId: 'byteplus-coding',
+        costKiloCredits: 20,
+        billingPeriodDays: 30,
+        features: expect.arrayContaining([
+          'Kilo automatically configures BytePlus in your BYOK settings.',
+        ]),
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      },
     ]);
   });
 
@@ -140,6 +154,11 @@ describe('coding plans router', () => {
       }),
       expect.objectContaining({
         planId: ULTRA_PLAN_ID,
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      }),
+      expect.objectContaining({
+        planId: BYTEPLUS_PLAN_ID,
         availabilityStatus: 'sold_out',
         notificationRequested: false,
       }),
@@ -176,6 +195,11 @@ describe('coding plans router', () => {
       }),
       expect.objectContaining({
         planId: ULTRA_PLAN_ID,
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      }),
+      expect.objectContaining({
+        planId: BYTEPLUS_PLAN_ID,
         availabilityStatus: 'sold_out',
         notificationRequested: false,
       }),

@@ -6,8 +6,15 @@ export type SafeToolName =
   | 'get_page_snapshot'
   | 'get_viewport_screenshot'
   | 'search_memories';
+export type WorkflowToolName =
+  | 'delete_workflow'
+  | 'get_workflow'
+  | 'run_workflow'
+  | 'save_memory'
+  | 'save_workflow'
+  | 'search_workflows';
 export type RemoteMcpAgentToolName = `mcp_${string}`;
-export type AgentToolName = 'eval' | RemoteMcpAgentToolName | SafeToolName;
+export type AgentToolName = 'eval' | RemoteMcpAgentToolName | SafeToolName | WorkflowToolName;
 
 export type AgentConversationEvent =
   | {
@@ -55,6 +62,15 @@ export type AgentConversationEvent =
       readonly type: 'tool-call';
     }
   | {
+      readonly arguments: Record<string, unknown>;
+      readonly id: string;
+      readonly name: WorkflowToolName;
+      readonly providerToolCallId?: string;
+      readonly reasoningDetails?: readonly unknown[];
+      readonly tabId: number;
+      readonly type: 'tool-call';
+    }
+  | {
       readonly error?: string;
       readonly id: string;
       readonly ok: boolean;
@@ -68,6 +84,10 @@ type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval'
 export type RemoteMcpToolCallEvent = Extract<
   AgentConversationEvent,
   { readonly name: RemoteMcpAgentToolName }
+>;
+export type WorkflowToolCallEvent = Extract<
+  AgentConversationEvent,
+  { readonly name: WorkflowToolName }
 >;
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
@@ -106,6 +126,13 @@ interface CreateRemoteMcpToolCallOptions {
   readonly remoteToolName: string;
   readonly serverId: string;
   readonly serverName: string;
+}
+
+interface CreateWorkflowToolCallOptions {
+  readonly arguments: Record<string, unknown>;
+  readonly name: WorkflowToolName;
+  readonly providerToolCallId?: string;
+  readonly tabId: number;
 }
 
 interface CreateToolResultOptions {
@@ -199,6 +226,20 @@ export const createRemoteMcpToolCall = ({
   type: 'tool-call',
 });
 
+export const createWorkflowToolCall = ({
+  arguments: toolArguments,
+  name,
+  providerToolCallId,
+  tabId,
+}: CreateWorkflowToolCallOptions): WorkflowToolCallEvent => ({
+  arguments: toolArguments,
+  id: createEventId(),
+  name,
+  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+  tabId,
+  type: 'tool-call',
+});
+
 export const createToolResult = ({
   error,
   ok,
@@ -244,6 +285,7 @@ export const groupConversationEvents = (
   return groupedItems;
 };
 
+/* eslint-disable max-lines */
 export const getConversationScrollKey = (items: GroupedConversationItem[]): string =>
   items
     .map(item => {

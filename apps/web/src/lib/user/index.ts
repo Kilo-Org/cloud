@@ -27,6 +27,9 @@ import {
   referral_codes,
   organizations,
   organization_memberships,
+  organization_groups,
+  organization_group_memberships,
+  organization_group_policy_settings,
   organization_user_limits,
   organization_user_usage,
   organization_invitations,
@@ -836,7 +839,7 @@ async function assertNoLiveSubscriptionsForSoftDelete(
     );
   }
 
-  // Block soft-delete for any live KiloClaw subscription. This includes
+  // Block soft-delete for any current live KiloClaw subscription. This includes
   // trialing — the user may have a running Fly instance, and deleting the
   // row without destroying the instance would orphan it.
   const liveClawSubscriptions = await executor
@@ -848,6 +851,7 @@ async function assertNoLiveSubscriptionsForSoftDelete(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing'])
       )
     );
@@ -874,7 +878,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *
  * Preconditions (will throw SoftDeletePreconditionError if violated):
  * - User must not have an active, non-cancelling Kilo Pass subscription
- * - User must not have a live KiloClaw subscription (active, past_due, unpaid, or trialing)
+ * - User must not have a current live KiloClaw subscription (active, past_due, unpaid, or trialing)
  *
  * What is kept:
  * - The kilocode_users row (anonymized)
@@ -1366,6 +1370,19 @@ export async function softDeleteUser(userId: string) {
       .update(organization_audit_logs)
       .set({ actor_email: null, actor_name: null })
       .where(eq(organization_audit_logs.actor_id, userId));
+
+    await tx
+      .update(organization_groups)
+      .set({ created_by_kilo_user_id: null })
+      .where(eq(organization_groups.created_by_kilo_user_id, userId));
+    await tx
+      .update(organization_group_memberships)
+      .set({ assigned_by_kilo_user_id: null })
+      .where(eq(organization_group_memberships.assigned_by_kilo_user_id, userId));
+    await tx
+      .update(organization_group_policy_settings)
+      .set({ updated_by_kilo_user_id: null })
+      .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
 
     // Security audit logs: keep org-owned entries, strip actor PII
     // (user-owned entries are cascade-deleted via owned_by_user_id FK)

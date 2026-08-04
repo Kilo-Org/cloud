@@ -40,6 +40,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { SubscriptionStatusBadge } from '@/components/subscriptions/SubscriptionStatusBadge';
 import {
+  getCodingPlanProviderDisplayName,
+  getReplacementCompleteToast,
+  getReplacementDialogCopy,
+  getRevocationCompleteToast,
+  getRevocationDialogCopy,
+} from '@/app/admin/coding-plans/coding-plan-operations';
+import {
   formatCodingPlanPrice,
   formatDateLabel,
   formatLocalDateTimeLabel,
@@ -54,8 +61,8 @@ type OperationsState = {
   providerId: UserByokProviderId;
   planId: CodingPlanId;
   entriesText: string;
-  completeInventoryId: string | null;
-  replacementInventoryId: string | null;
+  completeSelection: RevocationSelection | null;
+  replacementSelection: RevocationSelection | null;
   replacementApiKey: string;
 };
 
@@ -63,8 +70,8 @@ const INITIAL_OPERATIONS_STATE: OperationsState = {
   providerId: 'minimax',
   planId: 'minimax-token-plan-plus',
   entriesText: '',
-  completeInventoryId: null,
-  replacementInventoryId: null,
+  completeSelection: null,
+  replacementSelection: null,
   replacementApiKey: '',
 };
 
@@ -80,17 +87,17 @@ export function CodingPlansOperationsContent() {
     providerId,
     planId,
     entriesText,
-    completeInventoryId,
-    replacementInventoryId,
+    completeSelection,
+    replacementSelection,
     replacementApiKey,
   } = state;
   const setProviderId = (providerId: UserByokProviderId) => updateState({ providerId });
   const setPlanId = (planId: CodingPlanId) => updateState({ planId });
   const setEntriesText = (entriesText: string) => updateState({ entriesText });
-  const setCompleteInventoryId = (completeInventoryId: string | null) =>
-    updateState({ completeInventoryId });
-  const setReplacementInventoryId = (replacementInventoryId: string | null) =>
-    updateState({ replacementInventoryId });
+  const setCompleteSelection = (completeSelection: RevocationSelection | null) =>
+    updateState({ completeSelection });
+  const setReplacementSelection = (replacementSelection: RevocationSelection | null) =>
+    updateState({ replacementSelection });
   const setReplacementApiKey = (replacementApiKey: string) => updateState({ replacementApiKey });
 
   const countsQuery = useQuery(trpc.codingPlans.adminKeyInventory.queryOptions({}));
@@ -125,8 +132,9 @@ export function CodingPlansOperationsContent() {
   const completeMutation = useMutation(
     trpc.codingPlans.adminMarkRevocationComplete.mutationOptions({
       onSuccess: async () => {
-        setCompleteInventoryId(null);
-        toast.success('MiniMax credential removed from stock.');
+        const providerDisplayName = completeSelection?.providerDisplayName ?? null;
+        setCompleteSelection(null);
+        toast.success(getRevocationCompleteToast(providerDisplayName));
         await refreshOperations();
       },
       onError: error => toast.error(error.message || 'Unable to mark credential revoked.'),
@@ -135,9 +143,10 @@ export function CodingPlansOperationsContent() {
   const replacementMutation = useMutation(
     trpc.codingPlans.adminReplaceRevocationCredential.mutationOptions({
       onSuccess: async () => {
-        setReplacementInventoryId(null);
+        const providerDisplayName = replacementSelection?.providerDisplayName ?? null;
+        setReplacementSelection(null);
         setReplacementApiKey('');
-        toast.success('MiniMax credential replaced and returned to stock.');
+        toast.success(getReplacementCompleteToast(providerDisplayName));
         await refreshOperations();
       },
       onError: error => toast.error(error.message || 'Unable to replace credential.'),
@@ -245,7 +254,7 @@ export function CodingPlansOperationsContent() {
             target="_blank"
             rel="noreferrer"
           >
-            View support runbook
+            MiniMax support runbook
             <ExternalLink className="size-4" />
           </a>
         </Button>
@@ -312,8 +321,24 @@ export function CodingPlansOperationsContent() {
             submittedEntries={submittedEntries}
             uploadPending={uploadMutation.isPending}
             onRefresh={() => void refreshOperations()}
-            onComplete={setCompleteInventoryId}
-            onReplace={setReplacementInventoryId}
+            onComplete={workItem =>
+              setCompleteSelection({
+                workItem,
+                providerDisplayName: getCodingPlanProviderDisplayName(
+                  providerOptions,
+                  workItem.providerId
+                ),
+              })
+            }
+            onReplace={workItem =>
+              setReplacementSelection({
+                workItem,
+                providerDisplayName: getCodingPlanProviderDisplayName(
+                  providerOptions,
+                  workItem.providerId
+                ),
+              })
+            }
             onProviderChange={value => setProviderId(value as UserByokProviderId)}
             onPlanChange={value => setPlanId(value as CodingPlanId)}
             onEntriesTextChange={setEntriesText}
@@ -333,15 +358,15 @@ export function CodingPlansOperationsContent() {
       </Tabs>
 
       <OperationsDialogs
-        completeInventoryId={completeInventoryId}
+        completeSelection={completeSelection}
         completePending={completeMutation.isPending}
-        replacementInventoryId={replacementInventoryId}
+        replacementSelection={replacementSelection}
         replacementApiKey={replacementApiKey}
         replacementPending={replacementMutation.isPending}
-        onCloseComplete={() => setCompleteInventoryId(null)}
+        onCloseComplete={() => setCompleteSelection(null)}
         onComplete={inventoryKeyId => completeMutation.mutate({ inventoryKeyId })}
         onCloseReplacement={() => {
-          setReplacementInventoryId(null);
+          setReplacementSelection(null);
           setReplacementApiKey('');
         }}
         onReplacementApiKeyChange={setReplacementApiKey}
@@ -443,6 +468,14 @@ type RevocationWorkItem = {
   status: string;
   revocationRequestedAt: string | null;
   subscriptionExpiresAt: string | null;
+};
+
+// The queue row selected for revocation or replacement, kept whole so dialogs
+// and toasts can name the work item's provider instead of assuming MiniMax.
+// The provider display name is resolved from the catalog at selection time.
+type RevocationSelection = {
+  workItem: RevocationWorkItem;
+  providerDisplayName: string;
 };
 
 function SummaryCards({
@@ -1127,8 +1160,8 @@ function OperationsTabs({
   submittedEntries: string[];
   uploadPending: boolean;
   onRefresh: () => void;
-  onComplete: (inventoryKeyId: string) => void;
-  onReplace: (inventoryKeyId: string) => void;
+  onComplete: (workItem: RevocationWorkItem) => void;
+  onReplace: (workItem: RevocationWorkItem) => void;
   onProviderChange: (providerId: string) => void;
   onPlanChange: (planId: string) => void;
   onEntriesTextChange: (entriesText: string) => void;
@@ -1165,8 +1198,9 @@ function OperationsTabs({
             <div className="space-y-1.5">
               <CardTitle>Pending Key Rotation</CardTitle>
               <CardDescription>
-                Pending and failed issued credentials requiring MiniMax admin action. Revoke removes
-                stock permanently; Replace validates a newly generated key for the same plan ID.
+                Pending and failed issued credentials requiring action in the provider&apos;s admin
+                console. Revoke removes stock permanently; Replace validates a newly generated key
+                for the same upstream plan ID.
               </CardDescription>
             </div>
             <Button variant="secondary" size="sm" onClick={onRefresh}>
@@ -1208,7 +1242,9 @@ function OperationsTabs({
                           {item.inventoryKeyId}
                         </TableCell>
                         <TableCell className="min-w-56 font-mono text-xs">
-                          <div>{item.providerId}</div>
+                          <div>
+                            {getCodingPlanProviderDisplayName(providerOptions, item.providerId)}
+                          </div>
                           <div className="text-muted-foreground mt-1">{item.planId}</div>
                         </TableCell>
                         <TableCell className="min-w-44 font-mono text-xs">
@@ -1237,15 +1273,11 @@ function OperationsTabs({
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => onComplete(item.inventoryKeyId)}
+                              onClick={() => onComplete(item)}
                             >
                               Revoke
                             </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => onReplace(item.inventoryKeyId)}
-                            >
+                            <Button variant="secondary" size="sm" onClick={() => onReplace(item)}>
                               Replace
                             </Button>
                           </div>
@@ -1265,8 +1297,8 @@ function OperationsTabs({
           <CardHeader>
             <CardTitle>Upload validated inventory</CardTitle>
             <CardDescription>
-              Choose the BYOK provider ID and Kilo plan for this batch. Enter one API key and
-              upstream plan ID pair per line.
+              Choose the BYOK provider ID and Kilo plan for this batch. Enter one{' '}
+              <code>{'<api key>::<upstream plan id>'}</code> pair per line.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1331,8 +1363,9 @@ function OperationsTabs({
             <Alert>
               <ShieldAlert className="size-4" />
               <AlertDescription>
-                API keys are encrypted after validation and never returned. MiniMax plan IDs are
-                stored for deprovisioning and shown in the manual revocation queue.
+                API keys are encrypted after validation and are never returned or displayed. The
+                upstream plan ID is retained for provider-side deprovisioning and appears in the
+                Pending Key Rotation queue.
               </AlertDescription>
             </Alert>
             <Button
@@ -1351,9 +1384,9 @@ function OperationsTabs({
 }
 
 function OperationsDialogs({
-  completeInventoryId,
+  completeSelection,
   completePending,
-  replacementInventoryId,
+  replacementSelection,
   replacementApiKey,
   replacementPending,
   onCloseComplete,
@@ -1362,9 +1395,9 @@ function OperationsDialogs({
   onReplacementApiKeyChange,
   onReplace,
 }: {
-  completeInventoryId: string | null;
+  completeSelection: RevocationSelection | null;
   completePending: boolean;
-  replacementInventoryId: string | null;
+  replacementSelection: RevocationSelection | null;
   replacementApiKey: string;
   replacementPending: boolean;
   onCloseComplete: () => void;
@@ -1373,16 +1406,22 @@ function OperationsDialogs({
   onReplacementApiKeyChange: (apiKey: string) => void;
   onReplace: (inventoryKeyId: string, apiKey: string) => void;
 }) {
+  // Copy derives from the retained selection. The null fallback only applies
+  // while a dialog is closed or animating out, so it is never visible.
+  const revocationCopy = getRevocationDialogCopy(
+    completeSelection?.providerDisplayName ?? 'the provider'
+  );
+  const replacementCopy = getReplacementDialogCopy(
+    replacementSelection?.providerDisplayName ?? 'the provider'
+  );
+
   return (
     <>
-      <Dialog open={completeInventoryId !== null} onOpenChange={open => !open && onCloseComplete()}>
+      <Dialog open={completeSelection !== null} onOpenChange={open => !open && onCloseComplete()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Revoke credential?</DialogTitle>
-            <DialogDescription>
-              Use this only when MiniMax access should be completely removed from stock. Kilo
-              records the plan ID as revoked and keeps this credential unavailable for reuse.
-            </DialogDescription>
+            <DialogTitle>{revocationCopy.title}</DialogTitle>
+            <DialogDescription>{revocationCopy.description}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="secondary" onClick={onCloseComplete}>
@@ -1390,7 +1429,9 @@ function OperationsDialogs({
             </Button>
             <Button
               variant="destructive"
-              onClick={() => completeInventoryId && onComplete(completeInventoryId)}
+              onClick={() =>
+                completeSelection && onComplete(completeSelection.workItem.inventoryKeyId)
+              }
               disabled={completePending}
             >
               {completePending ? 'Revoking...' : 'Revoke'}
@@ -1400,16 +1441,13 @@ function OperationsDialogs({
       </Dialog>
 
       <Dialog
-        open={replacementInventoryId !== null}
+        open={replacementSelection !== null}
         onOpenChange={open => !open && onCloseReplacement()}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Replace MiniMax API key</DialogTitle>
-            <DialogDescription>
-              Paste the newly generated MiniMax API key for this same upstream plan ID. Kilo
-              validates the key before returning this plan to available inventory.
-            </DialogDescription>
+            <DialogTitle>{replacementCopy.title}</DialogTitle>
+            <DialogDescription>{replacementCopy.description}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="replacement-api-key">Replacement API key</Label>
@@ -1419,7 +1457,7 @@ function OperationsDialogs({
               value={replacementApiKey}
               onChange={event => onReplacementApiKeyChange(event.target.value)}
               autoComplete="off"
-              placeholder="Paste new MiniMax API key"
+              placeholder={replacementCopy.placeholder}
             />
           </div>
           <DialogFooter>
@@ -1428,7 +1466,8 @@ function OperationsDialogs({
             </Button>
             <Button
               onClick={() =>
-                replacementInventoryId && onReplace(replacementInventoryId, replacementApiKey)
+                replacementSelection &&
+                onReplace(replacementSelection.workItem.inventoryKeyId, replacementApiKey)
               }
               disabled={replacementApiKey.trim().length === 0 || replacementPending}
             >

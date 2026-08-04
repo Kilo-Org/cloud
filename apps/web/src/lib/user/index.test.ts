@@ -20,6 +20,9 @@ import {
   organization_user_limits,
   organization_user_usage,
   organization_audit_logs,
+  organization_groups,
+  organization_group_memberships,
+  organization_group_policy_settings,
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
@@ -2058,6 +2061,55 @@ describe('User', () => {
       expect(logs[0].message).toBe('User joined org'); // message preserved
     });
 
+    it('should clear organization group attribution fields', async () => {
+      const actor = await insertTestUser();
+      const member = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Group attribution org', plan: 'enterprise' })
+        .returning();
+      await db.insert(organization_memberships).values([
+        { organization_id: organization.id, kilo_user_id: actor.id, role: 'member' },
+        { organization_id: organization.id, kilo_user_id: member.id, role: 'member' },
+      ]);
+      const [group] = await db
+        .insert(organization_groups)
+        .values({
+          organization_id: organization.id,
+          name: 'Engineering',
+          created_by_kilo_user_id: actor.id,
+        })
+        .returning();
+      await db.insert(organization_group_memberships).values({
+        organization_id: organization.id,
+        group_id: group.id,
+        kilo_user_id: member.id,
+        assigned_by_kilo_user_id: actor.id,
+      });
+      await db.insert(organization_group_policy_settings).values({
+        organization_id: organization.id,
+        updated_by_kilo_user_id: actor.id,
+      });
+
+      await softDeleteUser(actor.id);
+
+      const [storedGroup] = await db
+        .select()
+        .from(organization_groups)
+        .where(eq(organization_groups.id, group.id));
+      const [storedAssignment] = await db
+        .select()
+        .from(organization_group_memberships)
+        .where(eq(organization_group_memberships.group_id, group.id));
+      const [storedSettings] = await db
+        .select()
+        .from(organization_group_policy_settings)
+        .where(eq(organization_group_policy_settings.organization_id, organization.id));
+      expect(storedGroup.created_by_kilo_user_id).toBeNull();
+      expect(storedAssignment.assigned_by_kilo_user_id).toBeNull();
+      expect(storedSettings.updated_by_kilo_user_id).toBeNull();
+    });
+
     it('should anonymize security audit logs where user is actor', async () => {
       const user = await insertTestUser();
       const orgId = randomUUID();
@@ -3868,6 +3920,46 @@ describe('User', () => {
         .where(eq(transactional_email_log.user_id, user.id));
       expect(retainedLogs).toHaveLength(1);
       expect(retainedLogs[0].organization_id).toBe(orgId);
+    });
+
+    it('should allow soft-delete when a transferred past-due KiloClaw predecessor has a canceled current successor', async () => {
+      const user = await insertTestUser();
+      const successorId = randomUUID();
+      await db.insert(kiloclaw_subscriptions).values({
+        id: successorId,
+        user_id: user.id,
+        plan: 'standard',
+        status: 'canceled',
+      });
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        plan: 'standard',
+        status: 'past_due',
+        transferred_to_subscription_id: successorId,
+      });
+
+      await expect(assertUserCanBeSoftDeleted(user.id)).resolves.toBeUndefined();
+      await expect(softDeleteUser(user.id)).resolves.toBeUndefined();
+
+      const softDeleted = await findUserById(user.id);
+      expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
+    });
+
+    it('should throw SoftDeletePreconditionError for a current past-due KiloClaw subscription', async () => {
+      const user = await insertTestUser();
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        plan: 'standard',
+        status: 'past_due',
+        transferred_to_subscription_id: null,
+      });
+
+      await expect(assertUserCanBeSoftDeleted(user.id)).rejects.toThrow(
+        SoftDeletePreconditionError
+      );
+      await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
+      const userAfter = await findUserById(user.id);
+      expect(userAfter!.google_user_email).toBe(user.google_user_email);
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw subscription', async () => {

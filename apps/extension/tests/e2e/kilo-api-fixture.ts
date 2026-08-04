@@ -49,14 +49,31 @@ const chatCompletionStreamResponse = (events: unknown[]): string =>
 const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
 const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
 const chatCompletionsPath = '/api/gateway/v1/chat/completions';
+export const workflowToolNames = [
+  'search_workflows',
+  'get_workflow',
+  'save_workflow',
+  'save_memory',
+];
 export const safeToolNames = [
   'get_page_snapshot',
   'get_element_details',
   'find_in_page',
   'search_memories',
   'get_memory',
+  ...workflowToolNames,
 ];
-export const dangerousToolNames = [...safeToolNames, 'eval'];
+export const dangerousToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
+  'eval',
+  ...workflowToolNames,
+  'run_workflow',
+  'delete_workflow',
+];
 interface MockGatewayModel {
   readonly contextLength?: number;
   readonly hasUserByokAvailable?: boolean;

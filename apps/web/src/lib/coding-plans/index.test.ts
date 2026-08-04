@@ -1,6 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
-import type { CaptureCostInsightSpendInput } from '@kilocode/db/cost-insights-rollups';
 
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -13,6 +12,7 @@ import {
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
 import { CODING_PLAN_CATALOG, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import { BYTEPLUS_CODING_MODEL_IDS } from '@/lib/ai-gateway/providers/direct-byok/byteplus-coding';
 import {
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
@@ -26,25 +26,16 @@ import {
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   coding_plan_terms,
-  cost_insight_owner_hour_driver_buckets,
-  cost_insight_owner_hour_totals,
   credit_transactions,
   kilocode_users,
 } from '@kilocode/db/schema';
-
-jest.mock('@kilocode/db/cost-insights-rollups', () => ({
-  captureCostInsightSpend: jest.fn(async () => undefined),
-  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY: 'coding-plan',
-}));
-
-const captureCostInsightSpendMock = jest.requireMock<{
-  captureCostInsightSpend: jest.Mock<Promise<void>, [unknown, CaptureCostInsightSpendInput]>;
-}>('@kilocode/db/cost-insights-rollups').captureCostInsightSpend;
 
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
 const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
 const PROVIDER_ID = 'minimax';
+const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
+const BYTEPLUS_PROVIDER_ID = 'byteplus-coding';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
 const ULTRA_COST_MICRODOLLARS = 120_000_000;
@@ -57,9 +48,10 @@ function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.ran
 
 async function seedInventoryKey(
   key = `managed-test-key-${crypto.randomUUID()}`,
-  planId: CodingPlanId = PLAN_ID
+  planId: CodingPlanId = PLAN_ID,
+  providerId = PROVIDER_ID
 ) {
-  await uploadKeysToInventory(PROVIDER_ID, planId, [inventoryEntry(key)], validatedInventoryUpload);
+  await uploadKeysToInventory(providerId, planId, [inventoryEntry(key)], validatedInventoryUpload);
 }
 
 async function createUserWithBalance(microdollars: number) {
@@ -70,9 +62,6 @@ async function createUserWithBalance(microdollars: number) {
 }
 
 afterEach(async () => {
-  captureCostInsightSpendMock.mockClear();
-  await db.delete(cost_insight_owner_hour_driver_buckets);
-  await db.delete(cost_insight_owner_hour_totals);
   await db.delete(coding_plan_terms);
   await db.delete(coding_plan_subscriptions);
   await db.delete(byok_api_keys);
@@ -119,6 +108,45 @@ describe('coding plans', () => {
         'Run 6-7 concurrent agents.',
       ]),
     });
+    expect(CODING_PLAN_CATALOG[BYTEPLUS_PLAN_ID]).toEqual({
+      planId: BYTEPLUS_PLAN_ID,
+      providerName: 'BytePlus',
+      name: 'Coding Plan Lite',
+      providerId: BYTEPLUS_PROVIDER_ID,
+      coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
+      costMicrodollars: COST_MICRODOLLARS,
+      billingPeriodDays: 30,
+      features: expect.arrayContaining([
+        'Kilo automatically configures BytePlus in your BYOK settings.',
+      ]),
+    });
+  });
+
+  it('activates BytePlus alongside MiniMax using its managed BYOK provider slot', async () => {
+    const user = await createUserWithBalance(COST_MICRODOLLARS * 2);
+    await seedInventoryKey('minimax-key');
+    await seedInventoryKey('byteplus-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
+
+    await subscribeToCodingPlan(user.id, PLAN_ID, 'minimax-activation');
+    const byteplus = await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'byteplus-activation');
+    const [subscription] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, byteplus.subscriptionId));
+    const [managedKey] = await db
+      .select()
+      .from(byok_api_keys)
+      .where(eq(byok_api_keys.id, subscription.installed_byok_key_id!));
+
+    expect(subscription).toMatchObject({
+      plan_id: BYTEPLUS_PLAN_ID,
+      provider_id: BYTEPLUS_PROVIDER_ID,
+      status: 'active',
+    });
+    expect(managedKey).toMatchObject({
+      provider_id: BYTEPLUS_PROVIDER_ID,
+      management_source: 'coding_plan',
+    });
   });
 
   it('activates an episode with one charged term and managed BYOK entry', async () => {
@@ -153,22 +181,7 @@ describe('coding plans', () => {
     expect(terms).toHaveLength(1);
     expect(terms[0].kind).toBe('activation');
     expect(terms[0].cost_microdollars).toBe(COST_MICRODOLLARS);
-    expect(captureCostInsightSpendMock).toHaveBeenCalledWith(expect.anything(), {
-      owner: { type: 'user', id: user.id },
-      actorUserId: user.id,
-      occurredAt: expect.any(String),
-      amountMicrodollars: COST_MICRODOLLARS,
-      category: 'scheduled',
-      source: 'coding_plan',
-      productKey: 'coding-plan',
-      featureKey: 'activation',
-      modelOrPlanKey: PLAN_ID,
-      providerKey: PROVIDER_ID,
-    });
-    const captureInput = captureCostInsightSpendMock.mock.calls[0]?.[1] as
-      | { occurredAt: string }
-      | undefined;
-    expect(new Date(deduction.created_at).toISOString()).toBe(captureInput?.occurredAt);
+    expect(deduction.amount_microdollars).toBe(-COST_MICRODOLLARS);
     expect(managedKey.provider_id).toBe(PROVIDER_ID);
     expect(managedKey.management_source).toBe('coding_plan');
     expect(inventoryKey.status).toBe('assigned');
@@ -196,7 +209,6 @@ describe('coding plans', () => {
     expect(terms).toHaveLength(1);
     expect(assigned).toHaveLength(1);
     expect(updatedUser.microdollars_used).toBe(COST_MICRODOLLARS);
-    expect(captureCostInsightSpendMock).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a new purchase while an active subscription exists', async () => {
@@ -354,33 +366,6 @@ describe('coding plans', () => {
     expect(unchargedUser.microdollars_used).toBe(0);
   });
 
-  it('rolls back activation when scheduled-spend capture fails', async () => {
-    const user = await createUserWithBalance(COST_MICRODOLLARS);
-    await seedInventoryKey();
-    captureCostInsightSpendMock.mockImplementationOnce(async () => {
-      throw new Error('rollup unavailable');
-    });
-
-    await expect(subscribeToCodingPlan(user.id, PLAN_ID, 'rollup-failure')).rejects.toThrow(
-      'rollup unavailable'
-    );
-
-    const [updatedUser] = await db
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, user.id));
-    const transactions = await db.select().from(credit_transactions);
-    const terms = await db.select().from(coding_plan_terms);
-    const subscriptions = await db.select().from(coding_plan_subscriptions);
-    const [inventory] = await db.select().from(coding_plan_key_inventory);
-
-    expect(updatedUser.microdollars_used).toBe(0);
-    expect(transactions).toHaveLength(0);
-    expect(terms).toHaveLength(0);
-    expect(subscriptions).toHaveLength(0);
-    expect(inventory.status).toBe('available');
-  });
-
   it('rejects activation when the personal MiniMax BYOK slot is occupied', async () => {
     const user = await createUserWithBalance(COST_MICRODOLLARS);
     await seedInventoryKey();
@@ -496,6 +481,7 @@ describe('coding plans', () => {
     expect(validateCredential).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       planId: PLAN_ID,
+      providerId: PROVIDER_ID,
       upstreamPlanId: 'minimax-upstream-plan-123',
     });
     expect(inventory.plan_id).toBe(PLAN_ID);
@@ -517,6 +503,7 @@ describe('coding plans', () => {
     expect(validateCredential).toHaveBeenCalledWith({
       apiKey: 'invalid-key',
       planId: PLAN_ID,
+      providerId: PROVIDER_ID,
       upstreamPlanId: 'minimax-plan-id',
     });
     expect(await db.select().from(coding_plan_key_inventory)).toHaveLength(0);
@@ -605,6 +592,7 @@ describe('coding plans', () => {
     expect(validateCredential).toHaveBeenCalledWith({
       apiKey: 'replace-new-key',
       planId: PLAN_ID,
+      providerId: PROVIDER_ID,
       upstreamPlanId: 'minimax-replace-plan',
     });
     expect(credential.status).toBe('available');

@@ -65,6 +65,14 @@ const nextConfig = {
               destination: 'https://global-api.kilo.ai/api/edit/completions',
             },
             {
+              source: '/api/gateway/:path*',
+              destination: 'https://global-api.kilo.ai/api/gateway/:path*',
+            },
+            {
+              source: '/api/openrouter/:path*',
+              destination: 'https://global-api.kilo.ai/api/openrouter/:path*',
+            },
+            {
               source: '/api/exa/:path*',
               destination: 'https://global-api.kilo.ai/api/exa/:path*',
             },

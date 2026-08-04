@@ -323,8 +323,9 @@ function sendPing(doInstance: UserConnectionDO, webWs: MockWS, nonce: string) {
   doInstance.webSocketMessage(webWs as never, msg);
 }
 
-/** Send a command from a web ws */
-function sendCommand(
+/** Send a command from a web ws. Auto-flushes so durable-before-send
+ * dispatch completes before callers inspect CLI state. */
+async function sendCommand(
   doInstance: UserConnectionDO,
   webWs: MockWS,
   opts: {
@@ -335,9 +336,10 @@ function sendCommand(
     data?: unknown;
     mutationId?: string;
   }
-) {
+): Promise<void> {
   const msg = JSON.stringify({ type: 'command', ...opts });
-  return doInstance.webSocketMessage(webWs as never, msg);
+  doInstance.webSocketMessage(webWs as never, msg);
+  await flushAsync();
 }
 
 /** Send a response from a CLI ws. Durable-before-send means the live
@@ -474,7 +476,7 @@ describe('UserConnectionDO', () => {
       expect(doInstance.hasActiveCliSession('ses_1')).toBe(false);
     });
 
-    it('reconstructs live session ownership from a hibernated CLI attachment', () => {
+    it('reconstructs live session ownership from a hibernated CLI attachment', async () => {
       const { doInstance, mockCtx } = setup();
       addCliSocket(mockCtx, 'cli-1', [makeSession('ses_1')]);
 
@@ -487,7 +489,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('heartbeat processing', () => {
-    it('updates session ownership and persists attachment', () => {
+    it('updates session ownership and persists attachment', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       addWebSocket(mockCtx, 'web-1');
@@ -500,7 +502,7 @@ describe('UserConnectionDO', () => {
       expect(att.sessions).toEqual(sessions);
     });
 
-    it('removes session ownership when session disappears from heartbeat', () => {
+    it('removes session ownership when session disappears from heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       addWebSocket(mockCtx, 'web-1');
@@ -513,7 +515,7 @@ describe('UserConnectionDO', () => {
 
       // Verify via command routing: command to s2 should fail (no owner)
       const webWs2 = addWebSocket(mockCtx, 'web-2');
-      sendCommand(doInstance, webWs2, {
+      await sendCommand(doInstance, webWs2, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's2',
@@ -536,7 +538,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, nextOwner, []);
       firstOwner.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -546,6 +548,9 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+      // Settle the asynchronous durable sweep (finishDurablePendingCommands
+      // runs inside waitUntil) before asserting the response count.
+      await flushAsync();
 
       // The owner-change heartbeat broadcasts sessions.heartbeat and also fires
       // the SESSION_OWNER_CHANGED error response for the in-flight command. The
@@ -570,7 +575,7 @@ describe('UserConnectionDO', () => {
       expect(webWs.send).toHaveBeenCalledTimes(2);
     });
 
-    it('replays existing web subscriptions when a session gets a new CLI owner', () => {
+    it('replays existing web subscriptions when a session gets a new CLI owner', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const cli2 = addCliSocket(mockCtx, 'cli-2');
@@ -594,7 +599,7 @@ describe('UserConnectionDO', () => {
       expect(cli2Msgs).toContainEqual({ type: 'subscribe', sessionId: 's1' });
     });
 
-    it('broadcasts heartbeat to every web socket regardless of subscription', () => {
+    it('broadcasts heartbeat to every web socket regardless of subscription', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const cli2 = addCliSocket(mockCtx, 'cli-2');
@@ -629,7 +634,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('delivers one heartbeat per web socket (delivery count equals ws count)', () => {
+    it('delivers one heartbeat per web socket (delivery count equals ws count)', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const web1 = addWebSocket(mockCtx, 'web-1');
@@ -661,7 +666,7 @@ describe('UserConnectionDO', () => {
       }
     });
 
-    it('forwards the CLI-reported protocolVersion to every web socket', () => {
+    it('forwards the CLI-reported protocolVersion to every web socket', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -683,7 +688,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('omits protocolVersion for a legacy CLI that never reports one', () => {
+    it('omits protocolVersion for a legacy CLI that never reports one', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -698,7 +703,7 @@ describe('UserConnectionDO', () => {
       expect(sent.data).not.toHaveProperty('protocolVersion');
     });
 
-    it('broadcasts removed-session information to every web socket (no subscriber special-case)', () => {
+    it('broadcasts removed-session information to every web socket (no subscriber special-case)', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       // subWeb subscribed to s1, otherWeb is unrelated — both must learn s1 is gone.
@@ -728,7 +733,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('delivers heartbeat to web sockets that are not subscribed to anything', () => {
+    it('delivers heartbeat to web sockets that are not subscribed to anything', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -744,7 +749,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('schedules stale alarm on heartbeat', () => {
+    it('schedules stale alarm on heartbeat', async () => {
       const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -752,7 +757,7 @@ describe('UserConnectionDO', () => {
       expect(ctx.storage.setAlarm).toHaveBeenCalled();
     });
 
-    it('sends heartbeat_ack to CLI socket', () => {
+    it('sends heartbeat_ack to CLI socket', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -770,7 +775,7 @@ describe('UserConnectionDO', () => {
     // capabilities.
     // -----------------------------------------------------------------------
 
-    it('projects capabilities.attachments=true on every aggregateSessions row when the owning CLI advertises it', () => {
+    it('projects capabilities.attachments=true on every aggregateSessions row when the owning CLI advertises it', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -785,7 +790,7 @@ describe('UserConnectionDO', () => {
       }
     });
 
-    it('projects the latest connection capabilities onto every sessions.heartbeat row', () => {
+    it('projects the latest connection capabilities onto every sessions.heartbeat row', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -832,7 +837,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('omits capabilities from aggregateSessions rows when the latest heartbeat omits the field (legacy CLI)', () => {
+    it('omits capabilities from aggregateSessions rows when the latest heartbeat omits the field (legacy CLI)', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -848,7 +853,7 @@ describe('UserConnectionDO', () => {
       expect(rows[0]).not.toHaveProperty('capabilities');
     });
 
-    it('omits capabilities from sessions.heartbeat event envelope when the latest heartbeat omits the field', () => {
+    it('omits capabilities from sessions.heartbeat event envelope when the latest heartbeat omits the field', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -866,7 +871,7 @@ describe('UserConnectionDO', () => {
       expect(sent.data).not.toHaveProperty('capabilities');
     });
 
-    it('flips capabilities.attachments from true to false on the next heartbeat (CLI revocation)', () => {
+    it('flips capabilities.attachments from true to false on the next heartbeat (CLI revocation)', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -887,7 +892,7 @@ describe('UserConnectionDO', () => {
       expect(rows[0].capabilities).toEqual({ attachments: false });
     });
 
-    it('flips capabilities.attachments from absent to true when a legacy CLI starts advertising it', () => {
+    it('flips capabilities.attachments from absent to true when a legacy CLI starts advertising it', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -905,7 +910,7 @@ describe('UserConnectionDO', () => {
       expect(upgraded[0].capabilities).toEqual({ attachments: true });
     });
 
-    it('flips capabilities.attachments from false to true on the next heartbeat', () => {
+    it('flips capabilities.attachments from false to true on the next heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -925,7 +930,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('projects the same owning-connection capabilities on every session row of a multi-session heartbeat', () => {
+    it('projects the same owning-connection capabilities on every session row of a multi-session heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -939,7 +944,7 @@ describe('UserConnectionDO', () => {
       expect(rows[1].capabilities).toEqual({ attachments: false });
     });
 
-    it('reconstructs capabilities from a hibernated CLI attachment', () => {
+    it('reconstructs capabilities from a hibernated CLI attachment', async () => {
       const { doInstance, mockCtx } = setup();
       // Pre-existing attachment with capabilities — simulates a socket that
       // was accepted before the DO was evicted.
@@ -1031,7 +1036,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('subscribe/unsubscribe', () => {
-    it('sends subscribe to owning CLI when web subscribes', () => {
+    it('sends subscribe to owning CLI when web subscribes', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1047,7 +1052,7 @@ describe('UserConnectionDO', () => {
       expect(parseSent(cliWs)).toEqual({ type: 'subscribe', sessionId: 's1' });
     });
 
-    it('sends the active session list when web subscribes after the socket is open', () => {
+    it('sends the active session list when web subscribes after the socket is open', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1072,7 +1077,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('broadcasts subscribe to all CLIs when no owner found', () => {
+    it('broadcasts subscribe to all CLIs when no owner found', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const cli2 = addCliSocket(mockCtx, 'cli-2');
@@ -1089,7 +1094,7 @@ describe('UserConnectionDO', () => {
       expect(parseSent(cli2)).toEqual({ type: 'subscribe', sessionId: 's1' });
     });
 
-    it('duplicate subscribe is idempotent for attachment', () => {
+    it('duplicate subscribe is idempotent for attachment', async () => {
       const { doInstance, mockCtx } = setup();
       addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1103,7 +1108,7 @@ describe('UserConnectionDO', () => {
       expect(att.subscribedSessions).toEqual(['s1']);
     });
 
-    it('unsubscribe sends to CLI when last subscriber leaves', () => {
+    it('unsubscribe sends to CLI when last subscriber leaves', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1123,7 +1128,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('unsubscribe does not send to CLI when other subscribers remain', () => {
+    it('unsubscribe does not send to CLI when other subscribers remain', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const web1 = addWebSocket(mockCtx, 'web-1');
@@ -1155,7 +1160,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('viewer liveness', () => {
-    it('replies to a viewer ping with the matching nonce only', () => {
+    it('replies to a viewer ping with the matching nonce only', async () => {
       const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'viewer-1');
@@ -1212,7 +1217,7 @@ describe('UserConnectionDO', () => {
       expect(mockCtx.sockets.filter(socket => socket._tags.includes('web'))).toHaveLength(2);
     });
 
-    it('does not migrate old subscriptions when replacing a viewer', () => {
+    it('does not migrate old subscriptions when replacing a viewer', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
@@ -1236,7 +1241,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('ignores messages from a viewer that has been replaced', () => {
+    it('ignores messages from a viewer that has been replaced', async () => {
       const { doInstance } = setup();
       const oldWeb = connectWebSocket(doInstance, 'viewer-1');
       connectWebSocket(doInstance, 'viewer-1');
@@ -1273,7 +1278,7 @@ describe('UserConnectionDO', () => {
       expect(secondWeb.send).toHaveBeenCalledTimes(1);
     });
 
-    it('does not replace a CLI socket when a viewer connectionId collides', () => {
+    it('does not replace a CLI socket when a viewer connectionId collides', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'shared-id');
 
@@ -1314,7 +1319,7 @@ describe('UserConnectionDO', () => {
 
       // Session no longer routable
       const web2 = addWebSocket(mockCtx, 'web-2');
-      sendCommand(doInstance, web2, {
+      await sendCommand(doInstance, web2, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -1333,7 +1338,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
 
       // Send command from web
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -1362,7 +1367,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -1384,14 +1389,14 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('fails pending commands as soon as their target socket is replaced', () => {
+    it('fails pending commands as soon as their target socket is replaced', async () => {
       const { doInstance, mockCtx } = setup();
       const firstCli = connectCliSocket(doInstance, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, firstCli, [makeSession('s1')]);
       firstCli.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -1421,7 +1426,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, []);
 
       // Send command routed by connectionId (no sessionId)
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-conn',
         command: 'send_message',
         connectionId: 'cli-1',
@@ -1451,7 +1456,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, []);
 
       // Send command with no sessionId or connectionId (fallback routing)
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-fallback',
         command: 'send_message',
       });
@@ -1514,7 +1519,7 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       // Web sends a command targeting s1 — should route to cli2 (the replacement)
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-new',
         command: 'send_message',
         sessionId: 's1',
@@ -1553,7 +1558,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cli1, [makeSession('s1')]);
 
       // Web sends a command that gets forwarded to cli1
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -1751,7 +1756,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('web disconnect', () => {
-    it('removes from all subscription sets', () => {
+    it('removes from all subscription sets', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1774,7 +1779,7 @@ describe('UserConnectionDO', () => {
       // No web sockets to receive the event — no crash = success
     });
 
-    it('sends unsubscribe to CLI when last subscriber leaves', () => {
+    it('sends unsubscribe to CLI when last subscriber leaves', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1799,7 +1804,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -1819,7 +1824,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('command routing', () => {
-    it('routes web command to correct CLI by sessionId', () => {
+    it('routes web command to correct CLI by sessionId', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1827,7 +1832,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -1853,7 +1858,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -1882,7 +1887,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -1916,7 +1921,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -1945,7 +1950,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, targetCli, [makeSession('s1')]);
       sendHeartbeat(doInstance, otherCli, []);
       targetCli.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -1970,7 +1975,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('rejects a duplicate in-flight list_models request for the same viewer session and owner', () => {
+    it('rejects a duplicate in-flight list_models request for the same viewer session and owner', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1978,13 +1983,13 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
         connectionId: 'cli-1',
       });
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-2',
         command: 'list_models',
         sessionId: 's1',
@@ -2003,7 +2008,7 @@ describe('UserConnectionDO', () => {
       expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(1);
     });
 
-    it('expires pending commands before handling another command', () => {
+    it('expires pending commands before handling another command', async () => {
       const now = 1_000_000;
       vi.spyOn(Date, 'now').mockReturnValue(now);
       const { doInstance, mockCtx } = setup();
@@ -2013,7 +2018,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -2021,7 +2026,7 @@ describe('UserConnectionDO', () => {
       });
 
       vi.mocked(Date.now).mockReturnValue(now + 35_001);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-2',
         command: 'list_models',
         sessionId: 's1',
@@ -2040,7 +2045,7 @@ describe('UserConnectionDO', () => {
       expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(2);
     });
 
-    it('does not postpone pending-command expiry when heartbeats reschedule the alarm', () => {
+    it('does not postpone pending-command expiry when heartbeats reschedule the alarm', async () => {
       const now = 1_000_000;
       vi.spyOn(Date, 'now').mockReturnValue(now);
       const { doInstance, mockCtx, ctx } = setup();
@@ -2048,7 +2053,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -2070,7 +2075,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -2097,7 +2102,7 @@ describe('UserConnectionDO', () => {
       expect(webWs.send).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects commands after reaching the global pending-command cap', () => {
+    it('rejects commands after reaching the global pending-command cap', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -2106,14 +2111,14 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
       webWs.send.mockClear();
       for (let index = 0; index < 128; index++) {
-        sendCommand(doInstance, webWs, {
+        await sendCommand(doInstance, webWs, {
           id: `cmd-${index}`,
           command: 'send_message',
           sessionId: 's1',
         });
       }
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-over-cap',
         command: 'send_message',
         sessionId: 's1',
@@ -2138,7 +2143,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -2164,7 +2169,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -2196,7 +2201,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -2221,11 +2226,11 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('returns error when CLI not found for session', () => {
+    it('returns error when CLI not found for session', async () => {
       const { doInstance, mockCtx } = setup();
       const webWs = addWebSocket(mockCtx, 'web-1');
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 'unknown-session',
@@ -2239,7 +2244,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('rejects a stale expected session owner without forwarding', () => {
+    it('rejects a stale expected session owner without forwarding', async () => {
       const { doInstance, mockCtx } = setup();
       const currentOwner = addCliSocket(mockCtx, 'cli-1');
       const staleOwner = addCliSocket(mockCtx, 'cli-2');
@@ -2251,7 +2256,7 @@ describe('UserConnectionDO', () => {
       staleOwner.send.mockClear();
       webWs.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -2271,7 +2276,7 @@ describe('UserConnectionDO', () => {
       expect(staleOwner.send).not.toHaveBeenCalled();
     });
 
-    it('routes command by connectionId to specific CLI', () => {
+    it('routes command by connectionId to specific CLI', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const cli2 = addCliSocket(mockCtx, 'cli-2');
@@ -2283,7 +2288,7 @@ describe('UserConnectionDO', () => {
       cli1.send.mockClear();
       cli2.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         connectionId: 'cli-2',
@@ -2303,14 +2308,14 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       // Both web sockets send commands with the same id
-      sendCommand(doInstance, web1, {
+      await sendCommand(doInstance, web1, {
         id: 'dup-id',
         command: 'send_message',
         sessionId: 's1',
       });
       const corr1 = getCorrelationId(cliWs, 0);
 
-      sendCommand(doInstance, web2, {
+      await sendCommand(doInstance, web2, {
         id: 'dup-id',
         command: 'send_message',
         sessionId: 's1',
@@ -2337,7 +2342,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('routes to first CLI when no sessionId or connectionId given', () => {
+    it('routes to first CLI when no sessionId or connectionId given', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -2345,7 +2350,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, []);
       cliWs.send.mockClear();
 
-      sendCommand(doInstance, webWs, { id: 'cmd-1', command: 'send_message' });
+      await sendCommand(doInstance, webWs, { id: 'cmd-1', command: 'send_message' });
       expect(cliWs.send).toHaveBeenCalledTimes(1);
     });
   });
@@ -2370,7 +2375,7 @@ describe('UserConnectionDO', () => {
       'exit_cli',
     ];
 
-    it('forwards every allowed viewer command to the owning CLI', () => {
+    it('forwards every allowed viewer command to the owning CLI', async () => {
       for (const command of ALLOWED) {
         const { doInstance, mockCtx } = setup();
         const cliWs = addCliSocket(mockCtx, 'cli-1');
@@ -2379,7 +2384,7 @@ describe('UserConnectionDO', () => {
         sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
         cliWs.send.mockClear();
 
-        sendCommand(doInstance, webWs, {
+        await sendCommand(doInstance, webWs, {
           id: 'cmd-1',
           command,
           sessionId: 's1',
@@ -2398,7 +2403,7 @@ describe('UserConnectionDO', () => {
       }
     });
 
-    it('rejects a non-allowlisted command with structured COMMAND_NOT_ALLOWED', () => {
+    it('rejects a non-allowlisted command with structured COMMAND_NOT_ALLOWED', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -2407,7 +2412,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
       webWs.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'eval',
         sessionId: 's1',
@@ -2425,7 +2430,7 @@ describe('UserConnectionDO', () => {
       expect(cliWs.send).not.toHaveBeenCalled();
     });
 
-    it('rejects a non-allowlisted command even when targeting a known session owner via connectionId', () => {
+    it('rejects a non-allowlisted command even when targeting a known session owner via connectionId', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -2434,7 +2439,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
       webWs.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'shell',
         sessionId: 's1',
@@ -2454,11 +2459,11 @@ describe('UserConnectionDO', () => {
       expect(cliWs.send).not.toHaveBeenCalled();
     });
 
-    it('rejects a non-allowlisted command with an unknown session before owner resolution', () => {
+    it('rejects a non-allowlisted command with an unknown session before owner resolution', async () => {
       const { doInstance, mockCtx } = setup();
       const webWs = addWebSocket(mockCtx, 'web-1');
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'eval',
         sessionId: 'unknown-session',
@@ -2485,7 +2490,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
       webWs.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'eval',
         sessionId: 's1',
@@ -2502,7 +2507,7 @@ describe('UserConnectionDO', () => {
       expect(webWs.send).toHaveBeenCalledTimes(1);
     });
 
-    it('still rejects an owner-fenced allowed command with SESSION_OWNER_CHANGED', () => {
+    it('still rejects an owner-fenced allowed command with SESSION_OWNER_CHANGED', async () => {
       const { doInstance, mockCtx } = setup();
       const currentOwner = addCliSocket(mockCtx, 'cli-1');
       const staleOwner = addCliSocket(mockCtx, 'cli-2');
@@ -2514,7 +2519,7 @@ describe('UserConnectionDO', () => {
       staleOwner.send.mockClear();
       webWs.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -2540,7 +2545,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('list_commands dedupe and size cap', () => {
-    it('rejects a duplicate in-flight list_commands request for the same viewer session and owner', () => {
+    it('rejects a duplicate in-flight list_commands request for the same viewer session and owner', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -2548,13 +2553,13 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_commands',
         sessionId: 's1',
         connectionId: 'cli-1',
       });
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-2',
         command: 'list_commands',
         sessionId: 's1',
@@ -2573,20 +2578,20 @@ describe('UserConnectionDO', () => {
       expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(1);
     });
 
-    it('treats list_models and list_commands as distinct for dedupe purposes', () => {
+    it('treats list_models and list_commands as distinct for dedupe purposes', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
         connectionId: 'cli-1',
       });
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-2',
         command: 'list_commands',
         sessionId: 's1',
@@ -2603,7 +2608,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_commands',
         sessionId: 's1',
@@ -2629,7 +2634,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_commands',
         sessionId: 's1',
@@ -2661,7 +2666,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_commands',
         sessionId: 's1',
@@ -2699,7 +2704,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_commands',
         sessionId: 's1',
@@ -2731,7 +2736,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_command',
         sessionId: 's1',
@@ -2764,7 +2769,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -2797,7 +2802,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, []);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'create_session',
         connectionId: 'cli-1',
@@ -2830,7 +2835,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
         sessionId: 's1',
@@ -2857,7 +2862,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_command',
         sessionId: 's1',
@@ -2885,7 +2890,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_commands',
         sessionId: 's1',
@@ -2914,7 +2919,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -2944,7 +2949,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('send_command / create_session negative coverage', () => {
-    it('forwards two in-flight same-owner/same-session send_command requests without deduping', () => {
+    it('forwards two in-flight same-owner/same-session send_command requests without deduping', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -2952,14 +2957,14 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_command',
         sessionId: 's1',
         connectionId: 'cli-1',
         data: { command: 'init' },
       });
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-2',
         command: 'send_command',
         sessionId: 's1',
@@ -2985,7 +2990,7 @@ describe('UserConnectionDO', () => {
       expect(webWs.send).not.toHaveBeenCalled();
     });
 
-    it('forwards two in-flight create_session requests without deduping', () => {
+    it('forwards two in-flight create_session requests without deduping', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -2993,13 +2998,13 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, []);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'create_session',
         connectionId: 'cli-1',
         data: { title: 'First session' },
       });
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-2',
         command: 'create_session',
         connectionId: 'cli-1',
@@ -3029,7 +3034,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_command',
         sessionId: 's1',
@@ -3056,7 +3061,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, []);
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'create_session',
         connectionId: 'cli-1',
@@ -3101,7 +3106,7 @@ describe('UserConnectionDO', () => {
         label: 'primitive data',
         input: { sessionId: 's1', data: 'protocolVersion=1' },
       },
-    ])('rejects $label before routing or pending allocation', ({ input }) => {
+    ])('rejects $label before routing or pending allocation', async ({ input }) => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3109,7 +3114,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         ...input,
@@ -3128,7 +3133,7 @@ describe('UserConnectionDO', () => {
       expect(Reflect.get(doInstance, 'pendingCommands')).toEqual(new Map());
     });
 
-    it('routes exit_cli to the selected session owner with its data unchanged', () => {
+    it('routes exit_cli to the selected session owner with its data unchanged', async () => {
       const { doInstance, mockCtx } = setup();
       const selectedOwner = addCliSocket(mockCtx, 'cli-1');
       const otherCli = addCliSocket(mockCtx, 'cli-2');
@@ -3139,7 +3144,7 @@ describe('UserConnectionDO', () => {
       selectedOwner.send.mockClear();
       otherCli.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3158,7 +3163,7 @@ describe('UserConnectionDO', () => {
       expect(otherCli.send).not.toHaveBeenCalled();
     });
 
-    it('rejects exit_cli when the selected owner snapshot is stale', () => {
+    it('rejects exit_cli when the selected owner snapshot is stale', async () => {
       const { doInstance, mockCtx } = setup();
       const currentOwner = addCliSocket(mockCtx, 'cli-1');
       const staleOwner = addCliSocket(mockCtx, 'cli-2');
@@ -3170,7 +3175,7 @@ describe('UserConnectionDO', () => {
       staleOwner.send.mockClear();
       webWs.send.mockClear();
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3191,11 +3196,11 @@ describe('UserConnectionDO', () => {
       expect(staleOwner.send).not.toHaveBeenCalled();
     });
 
-    it('rejects exit_cli when the session has no owner', () => {
+    it('rejects exit_cli when the session has no owner', async () => {
       const { doInstance, mockCtx } = setup();
       const webWs = addWebSocket(mockCtx, 'web-1');
 
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3209,7 +3214,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('does not dedupe concurrent exit_cli requests', () => {
+    it('does not dedupe concurrent exit_cli requests', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3217,14 +3222,14 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
         connectionId: 'cli-1',
         data: { protocolVersion: 1 },
       });
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-2',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3246,7 +3251,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3273,7 +3278,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3317,7 +3322,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3338,7 +3343,7 @@ describe('UserConnectionDO', () => {
 
     it.each(['list_models', 'send_message'] as const)(
       'still fails %s with SESSION_OWNER_CHANGED when heartbeat drops the session',
-      command => {
+      async command => {
         const { doInstance, mockCtx } = setup();
         const cliWs = addCliSocket(mockCtx, 'cli-1');
         const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3346,7 +3351,7 @@ describe('UserConnectionDO', () => {
         sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
         cliWs.send.mockClear();
         webWs.send.mockClear();
-        sendCommand(doInstance, webWs, {
+        await sendCommand(doInstance, webWs, {
           id: 'cmd-1',
           command,
           sessionId: 's1',
@@ -3368,7 +3373,7 @@ describe('UserConnectionDO', () => {
       }
     );
 
-    it('still fails exit_cli with SESSION_OWNER_CHANGED on genuine takeover', () => {
+    it('still fails exit_cli with SESSION_OWNER_CHANGED on genuine takeover', async () => {
       const { doInstance, mockCtx } = setup();
       const firstOwner = addCliSocket(mockCtx, 'cli-1');
       const nextOwner = addCliSocket(mockCtx, 'cli-2');
@@ -3378,7 +3383,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, nextOwner, []);
       firstOwner.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3400,14 +3405,14 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('still fails exit_cli with SESSION_OWNER_CHANGED when socket is replaced by reconnect', () => {
+    it('still fails exit_cli with SESSION_OWNER_CHANGED when socket is replaced by reconnect', async () => {
       const { doInstance, mockCtx } = setup();
       const firstCli = connectCliSocket(doInstance, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, firstCli, [makeSession('s1')]);
       firstCli.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
         sessionId: 's1',
@@ -3436,7 +3441,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('CLI event forwarding', () => {
-    it('forwards events to subscribed web sockets only', () => {
+    it('forwards events to subscribed web sockets only', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const subWeb = addWebSocket(mockCtx, 'web-sub');
@@ -3466,7 +3471,7 @@ describe('UserConnectionDO', () => {
       expect(otherWeb.send).not.toHaveBeenCalled();
     });
 
-    it('sends child events to both direct child subscribers and parent subscribers', () => {
+    it('sends child events to both direct child subscribers and parent subscribers', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const parentWeb = addWebSocket(mockCtx, 'web-parent');
@@ -3500,7 +3505,7 @@ describe('UserConnectionDO', () => {
       expect(parseSent(childWeb)).toEqual(expected);
     });
 
-    it('deduplicates when same socket subscribes to both child and parent', () => {
+    it('deduplicates when same socket subscribes to both child and parent', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3523,7 +3528,7 @@ describe('UserConnectionDO', () => {
       expect(webWs.send).toHaveBeenCalledTimes(1);
     });
 
-    it('routes child event to parent session subscribers via parentSessionId', () => {
+    it('routes child event to parent session subscribers via parentSessionId', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3552,7 +3557,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('drops child event when neither sessionId nor parentSessionId has subscribers', () => {
+    it('drops child event when neither sessionId nor parentSessionId has subscribers', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3574,7 +3579,7 @@ describe('UserConnectionDO', () => {
       expect(webWs.send).not.toHaveBeenCalled();
     });
 
-    it('events without parentSessionId still route normally (backward compat)', () => {
+    it('events without parentSessionId still route normally (backward compat)', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3600,7 +3605,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('child event does not include parentSessionId when not set', () => {
+    it('child event does not include parentSessionId when not set', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3627,7 +3632,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('broadcast resilience', () => {
-    it('one closed socket does not abort send to other web sockets', () => {
+    it('one closed socket does not abort send to other web sockets', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const failWeb = addWebSocket(mockCtx, 'web-fail');
@@ -3658,7 +3663,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('ensureState (hibernation recovery)', () => {
-    it('reconstructs sessionOwners and connectionSessions from CLI attachments', () => {
+    it('reconstructs sessionOwners and connectionSessions from CLI attachments', async () => {
       const { doInstance, mockCtx } = setup();
 
       // Simulate hibernation: sockets exist with pre-set attachments
@@ -3671,7 +3676,7 @@ describe('UserConnectionDO', () => {
 
       // Verify state was reconstructed by routing a command
       const web2 = addWebSocket(mockCtx, 'web-2');
-      sendCommand(doInstance, web2, {
+      await sendCommand(doInstance, web2, {
         id: 'cmd-1',
         command: 'send_message',
         sessionId: 's1',
@@ -3688,7 +3693,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('reconstructs webSubscriptions from web attachments', () => {
+    it('reconstructs webSubscriptions from web attachments', async () => {
       const { doInstance, mockCtx } = setup();
 
       const cliWs = addCliSocket(mockCtx, 'cli-1', [makeSession('s1')]);
@@ -3712,7 +3717,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('does not restore subscriptions from a viewer already replaced before hibernation', () => {
+    it('does not restore subscriptions from a viewer already replaced before hibernation', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [makeSession('s1')]);
       const replacedWeb = addWebSocket(mockCtx, 'web-old', ['s1']);
@@ -3742,7 +3747,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('getActiveSessions', () => {
-    it('returns sessions from live CLI connections', () => {
+    it('returns sessions from live CLI connections', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -3758,7 +3763,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('includes the CLI-reported protocolVersion on each session row', () => {
+    it('includes the CLI-reported protocolVersion on each session row', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -3778,7 +3783,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('excludes sessions from stale connections without live sockets', () => {
+    it('excludes sessions from stale connections without live sockets', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
@@ -3790,7 +3795,7 @@ describe('UserConnectionDO', () => {
       expect(result).toEqual([]);
     });
 
-    it('excludes child sessions reported with parentSessionId in heartbeat', () => {
+    it('excludes child sessions reported with parentSessionId in heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -3810,7 +3815,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('cleans up child tracking when session disappears from heartbeat', () => {
+    it('cleans up child tracking when session disappears from heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -3834,7 +3839,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('forwards the per-session platform when the CLI reports it (newer CLIs)', () => {
+    it('forwards the per-session platform when the CLI reports it (newer CLIs)', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -3856,7 +3861,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('omits the platform key entirely for legacy CLIs (byte-identical response)', () => {
+    it('omits the platform key entirely for legacy CLIs (byte-identical response)', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -3876,7 +3881,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('getConnectedInstances', () => {
-    it('returns one row per CLI socket that has an `instance` attachment', () => {
+    it('returns one row per CLI socket that has an `instance` attachment', async () => {
       const { doInstance, mockCtx } = setup();
       // Use the hibernated-attachment pattern (no heartbeat) — the live
       // scan reads the `instance` directly from the attachment, which is
@@ -3907,7 +3912,7 @@ describe('UserConnectionDO', () => {
       );
     });
 
-    it('omits the `version` key when the CLI did not report one', () => {
+    it('omits the `version` key when the CLI did not report one', async () => {
       const { doInstance, mockCtx } = setup();
       addCliSocket(mockCtx, 'cli-1', [], {
         name: 'laptop-1',
@@ -3919,7 +3924,7 @@ describe('UserConnectionDO', () => {
       expect(instances[0]).not.toHaveProperty('version');
     });
 
-    it('excludes legacy CLIs that never reported an `instance`', () => {
+    it('excludes legacy CLIs that never reported an `instance`', async () => {
       const { doInstance, mockCtx } = setup();
       // Legacy CLI: pre-spawner heartbeat has no `instance`.
       const cliWs = addCliSocket(mockCtx, 'legacy-1');
@@ -3929,7 +3934,7 @@ describe('UserConnectionDO', () => {
       expect(instances).toEqual([]);
     });
 
-    it('excludes web sockets', () => {
+    it('excludes web sockets', async () => {
       const { doInstance, mockCtx } = setup();
       addWebSocket(mockCtx);
       // A web socket with an `instance`-shaped attachment must still be skipped.
@@ -3944,7 +3949,7 @@ describe('UserConnectionDO', () => {
       expect(instances).toEqual([]);
     });
 
-    it('reads `instance` directly from the live socket (no in-memory map)', () => {
+    it('reads `instance` directly from the live socket (no in-memory map)', async () => {
       const { doInstance, mockCtx } = setup();
       // Simulate a hibernated attach: socket exists, attachment has `instance`
       // set, but no heartbeat has been processed through the in-memory state.
@@ -3965,7 +3970,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('includes capabilities when the CLI attachment advertises them', () => {
+    it('includes capabilities when the CLI attachment advertises them', async () => {
       const { doInstance, mockCtx } = setup();
       // Hibernated attachment carries capabilities — same source
       // getConnectedInstances already uses for instance/version.
@@ -3989,7 +3994,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('omits capabilities when the CLI attachment has none (legacy CLI)', () => {
+    it('omits capabilities when the CLI attachment has none (legacy CLI)', async () => {
       const { doInstance, mockCtx } = setup();
       addCliSocket(mockCtx, 'cli-legacy-cap', [], {
         name: 'laptop-legacy',
@@ -4007,7 +4012,7 @@ describe('UserConnectionDO', () => {
       expect(instances[0]).not.toHaveProperty('capabilities');
     });
 
-    it('persists `instance` in the WS attachment across heartbeats', () => {
+    it('persists `instance` in the WS attachment across heartbeats', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       sendHeartbeat(doInstance, cliWs, [], {
@@ -4025,7 +4030,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('drops `instance` from the attachment on a subsequent heartbeat that omits it', () => {
+    it('drops `instance` from the attachment on a subsequent heartbeat that omits it', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       // First heartbeat: with instance.
@@ -4057,7 +4062,7 @@ describe('UserConnectionDO', () => {
     // attachment budget.
     const INSTANCE_HEADROOM = 250;
 
-    it('keeps the combined CLI attachment comfortably under 2 KiB with a worst-case instance', () => {
+    it('keeps the combined CLI attachment comfortably under 2 KiB with a worst-case instance', async () => {
       const worstCaseInstance = {
         name: 'x'.repeat(64),
         projectName: 'x'.repeat(64),
@@ -4098,7 +4103,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('owner-unique active sessions', () => {
-    it('emits owner-unique rows: ownership transfer with both CLIs live yields exactly one row under the new owner', () => {
+    it('emits owner-unique rows: ownership transfer with both CLIs live yields exactly one row under the new owner', async () => {
       const { doInstance, ctx, mockCtx } = setup();
       const oldOwner = addCliSocket(mockCtx, 'cli-old');
       const newOwner = addCliSocket(mockCtx, 'cli-new');
@@ -4135,7 +4140,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('edge cases', () => {
-    it('ignores non-JSON messages', () => {
+    it('ignores non-JSON messages', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -4143,7 +4148,7 @@ describe('UserConnectionDO', () => {
       doInstance.webSocketMessage(cliWs as never, 'not-json');
     });
 
-    it('logs invalid CLI JSON metadata without raw payload content', () => {
+    it('logs invalid CLI JSON metadata without raw payload content', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -4159,7 +4164,7 @@ describe('UserConnectionDO', () => {
       expect(JSON.stringify(warn.mock.calls)).not.toContain('raw-secret-must-not-be-logged');
     });
 
-    it('ignores messages from socket with no attachment', () => {
+    it('ignores messages from socket with no attachment', async () => {
       const { doInstance, mockCtx } = setup();
       const ws = createMockWs(['cli'], null);
       mockCtx.addSocket(ws);
@@ -4169,7 +4174,7 @@ describe('UserConnectionDO', () => {
       // Should not throw
     });
 
-    it('ignores messages that fail Zod validation', () => {
+    it('ignores messages that fail Zod validation', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       sendHeartbeat(doInstance, cliWs, []); // trigger ensureState
@@ -4185,7 +4190,7 @@ describe('UserConnectionDO', () => {
       // Should not throw
     });
 
-    it('logs malformed CLI message metadata without raw payload content', () => {
+    it('logs malformed CLI message metadata without raw payload content', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -4660,7 +4665,7 @@ describe('UserConnectionDO', () => {
       expect(ctx.storage.store.has('readyPush:ses_kv_only')).toBe(false);
     });
 
-    it('stores the kiloUserId from the connection URL on the attachment', () => {
+    it('stores the kiloUserId from the connection URL on the attachment', async () => {
       const { doInstance } = setupWithIngestDO();
       const client = createMockWs();
       const server = createMockWs();
@@ -4949,7 +4954,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       // Send a second command with the same mutationId.
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'second-req',
         command: 'send_message',
         sessionId: 'ses-c',
@@ -4992,7 +4997,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       // Send a retry with the same mutationId but new wire id.
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'retry-req-id',
         command: 'send_message',
         sessionId: 'ses-d',
@@ -5040,7 +5045,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       // Retry with the same mutationId but new wire id.
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'retry-combined-id',
         command: 'send_message',
         sessionId: 'ses-dc',
@@ -5069,7 +5074,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-5');
 
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'no-mut-req',
         command: 'send_message',
         sessionId: 'ses-e',
@@ -5107,7 +5112,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-6');
 
       cliWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'disconnect-req',
         command: 'send_message',
         sessionId: 'ses-f',
@@ -5194,7 +5199,7 @@ describe('UserConnectionDO', () => {
       }
 
       // The first command (no mutationId) is just within the cap: 0 in-memory + 1 new = 1.
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'at-cap',
         command: 'send_message',
         sessionId: 'ses-h',
@@ -5209,7 +5214,7 @@ describe('UserConnectionDO', () => {
       // command's durable write + 1 in-memory = 129 ≥ 128. Rejected.
       cliWs.send.mockClear();
       webWs.send.mockClear();
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'over-cap',
         command: 'send_message',
         sessionId: 'ses-h',
@@ -5236,7 +5241,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'err-1',
         command: 'list_models',
         sessionId: 's1',
@@ -5265,7 +5270,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'err-2',
         command: 'list_commands',
         sessionId: 's1',
@@ -5306,7 +5311,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'dur-1',
         command: 'send_message',
         sessionId: 's1',
@@ -5388,7 +5393,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-disco',
         command: 'send_message',
         sessionId: 's1',
@@ -5411,7 +5416,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-dur-disco',
         command: 'send_message',
         sessionId: 's1',
@@ -5669,7 +5674,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'big-result',
         command: 'send_message',
         sessionId: 's1',
@@ -5686,12 +5691,15 @@ describe('UserConnectionDO', () => {
       const live = parseSent(webWs) as { id: string; result: unknown };
       expect(live.result).toEqual(oversized);
 
-      // Durable entry must have the truncated marker, not the raw oversized result.
+      // Durable entry must carry an error, not the truncated marker as a result.
       const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
       expect((entry as Record<string, unknown>).state).toBe('done');
-      const durableResult = (entry as Record<string, unknown>).result;
-      expect(durableResult).toBeDefined();
-      expect(durableResult).toMatchObject({ _truncated: true });
+      expect((entry as Record<string, unknown>).result).toBeUndefined();
+      expect((entry as Record<string, unknown>).error).toEqual({
+        source: 'relay',
+        code: 'DURABLE_RESULT_TOO_LARGE',
+        message: 'Result is too large to store for retries',
+      });
     });
 
     it('stores non-catalog results at exactly the durable limit unchanged', async () => {
@@ -5700,7 +5708,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'exact-result',
         command: 'send_message',
         sessionId: 's1',
@@ -5740,7 +5748,13 @@ describe('UserConnectionDO', () => {
 
       const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
       expect((entry as Record<string, unknown>).state).toBe('done');
-      expect((entry as Record<string, unknown>).result).toMatchObject({ _truncated: true });
+      // Durable entry must carry an error, not the truncated marker as a result.
+      expect((entry as Record<string, unknown>).result).toBeUndefined();
+      expect((entry as Record<string, unknown>).error).toEqual({
+        source: 'relay',
+        code: 'DURABLE_RESULT_TOO_LARGE',
+        message: 'Result is too large to store for retries',
+      });
     });
 
     // -------------------------------------------------------------------------
@@ -5752,7 +5766,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'dedup-cmd',
         command: 'send_message',
         sessionId: 's1',
@@ -5790,7 +5804,7 @@ describe('UserConnectionDO', () => {
       vi.spyOn(Date, 'now').mockReturnValue(baseTime);
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'expiry-cmd',
         command: 'send_message',
         sessionId: 's1',
@@ -5812,7 +5826,7 @@ describe('UserConnectionDO', () => {
     // -------------------------------------------------------------------------
     // Fix: Oversized mutationId rejected
     // -------------------------------------------------------------------------
-    it('rejects a mutationId longer than 128 characters via schema validation', () => {
+    it('rejects a mutationId longer than 128 characters via schema validation', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -5821,7 +5835,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       const longMutationId = 'x'.repeat(129);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'oversized-mut',
         command: 'send_message',
         sessionId: 's1',
@@ -5850,7 +5864,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       const exactMutationId = 'x'.repeat(128);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'exact-mut',
         command: 'send_message',
         sessionId: 's1',
@@ -5864,7 +5878,7 @@ describe('UserConnectionDO', () => {
       expect(cliCommands[0].mutationId).toBe(exactMutationId);
     });
 
-    it('rejects a mutationId longer than 128 characters in the web message schema', () => {
+    it('rejects a mutationId longer than 128 characters in the web message schema', async () => {
       const { doInstance, mockCtx } = setup();
       addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -5941,7 +5955,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'safety-check',
         command: 'send_message',
         sessionId: 's1',
@@ -6045,7 +6059,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-fail-write',
         command: 'send_message',
         sessionId: 's1',
@@ -6086,7 +6100,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-catalog',
         command: 'list_models',
         sessionId: 's1',
@@ -6123,7 +6137,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'retry-after-fail',
         command: 'send_message',
         sessionId: 's1',
@@ -6177,7 +6191,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'cmd-clear',
         command: 'send_message',
         sessionId: 's1',
@@ -6213,7 +6227,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendCommand(doInstance, webWs, {
+      await sendCommand(doInstance, webWs, {
         id: 'order-cmd',
         command: 'send_message',
         sessionId: 's1',
@@ -6359,6 +6373,362 @@ describe('UserConnectionDO', () => {
       const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
       expect((entry as Record<string, unknown>).state).toBe('done');
       expect((entry as Record<string, unknown>).result).toEqual({ second: true });
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Terminal delivery to reattached web sockets
+    // -------------------------------------------------------------------------
+    it('delivers COMMAND_EXPIRED_ERROR to a live web socket when a durable entry expires', async () => {
+      const { mockCtx, ctx } = setup();
+
+      const pastTime = Date.now() - 10_000;
+      const correlationId = 'expired-delivery';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-exp',
+        originalId: 'expired-original',
+        command: 'send_message',
+        targetConnectionId: 'cli-exp',
+        expiresAt: pastTime,
+        webConnectionId: 'web-exp',
+        state: 'pending' as const,
+      });
+
+      // Create a fresh DO to simulate a wake with the durable entry.
+      const doInstance2 = new UserConnectionDO(ctx as never, {} as never);
+
+      // Set up a live CLI and a live web socket with the matching webConnectionId.
+      const cliWs = addCliSocket(mockCtx, 'cli-exp');
+      sendHeartbeat(doInstance2, cliWs, [makeSession('ses-exp', 'busy', 'Session Exp')]);
+      // Web socket connects after the entry was created (simulates reattach).
+      const webWs = addWebSocket(mockCtx, 'web-exp');
+
+      // Trigger alarm which calls expirePendingCommands.
+      await doInstance2.alarm();
+      await flushAsync();
+
+      // The reattached web socket must receive the expired error via originalId.
+      const responses = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'expired-original'
+      );
+      expect(responses).toHaveLength(1);
+      expect(responses[0].error).toEqual({
+        source: 'relay',
+        code: 'COMMAND_EXPIRED',
+        message: 'Command expired',
+      });
+
+      // The durable entry must be marked done.
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+    });
+
+    it('delivers CLI-disconnect error to a reattached web socket via finishDurablePendingCommands', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'disco-delivery';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-disco',
+        originalId: 'disco-original',
+        command: 'send_message',
+        targetConnectionId: 'cli-disco',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-disco',
+        state: 'pending' as const,
+      });
+
+      // Set up a live CLI.
+      const cliWs = addCliSocket(mockCtx, 'cli-disco');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-disco', 'busy', 'Session Disco')]);
+
+      // Web socket connects after the entry was created (simulates reattach).
+      const webWs = addWebSocket(mockCtx, 'web-disco');
+
+      // Disconnect the CLI — finishDurablePendingCommands handles the
+      // durable-only entries that were never in-memory.
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+      await flushAsync();
+
+      // The reattached web socket must receive the disconnect error.
+      const responses = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'disco-original'
+      );
+      expect(responses).toHaveLength(1);
+      expect(responses[0].error).toBe('CLI disconnected');
+
+      // The durable entry must be marked done.
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+      expect((entry as Record<string, unknown>).error).toBe('CLI disconnected');
+    });
+
+    it('does not deliver terminal response when no live web socket matches webConnectionId', async () => {
+      const { mockCtx, ctx } = setup();
+
+      const pastTime = Date.now() - 10_000;
+      const correlationId = 'no-web-delivery';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-nwd',
+        originalId: 'no-web-original',
+        command: 'send_message',
+        targetConnectionId: 'cli-nwd',
+        expiresAt: pastTime,
+        webConnectionId: 'web-missing',
+        state: 'pending' as const,
+      });
+
+      const doInstance2 = new UserConnectionDO(ctx as never, {} as never);
+
+      const cliWs = addCliSocket(mockCtx, 'cli-nwd');
+      sendHeartbeat(doInstance2, cliWs, [makeSession('ses-nwd', 'busy', 'Session NWD')]);
+      // No web socket with connectionId 'web-missing'.
+
+      // Alarm must not throw — storage-only behavior when no socket matches.
+      await doInstance2.alarm();
+      await flushAsync();
+
+      // The durable entry must be marked done (storage-only).
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Oversized durable result returns error on mutationId retry
+    // -------------------------------------------------------------------------
+    it('returns DURABLE_RESULT_TOO_LARGE on a mutationId retry of an oversized result', async () => {
+      const { doInstance, mockCtx } = setup();
+
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'oversized-mut',
+        command: 'send_message',
+        sessionId: 's1',
+        mutationId: 'mut-oversized',
+        data: { hello: 'world' },
+      });
+      await flushAsync();
+
+      // CLI sends an oversized result.
+      const cliCommands = allSent(cliWs).filter(m => m.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      const correlationId = cliCommands[0].id as string;
+      webWs.send.mockClear();
+
+      const oversized = createResultWithSerializedBytes(MAX_DURABLE_RESULT_BYTES + 1);
+      await sendCliResponse(doInstance, cliWs, { id: correlationId, result: oversized });
+
+      // Live response must carry the full result.
+      const live = parseSent(webWs) as { id: string; result: unknown };
+      expect(live.id).toBe('oversized-mut');
+      expect(live.result).toEqual(oversized);
+
+      // Now retry with the same mutationId.
+      webWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'retry-mut',
+        command: 'send_message',
+        sessionId: 's1',
+        mutationId: 'mut-oversized',
+      });
+      await flushAsync();
+
+      // The retry must receive the error, not the truncated marker as a result.
+      const retry = parseSent(webWs) as { id: string; error?: unknown; result?: unknown };
+      expect(retry.id).toBe('retry-mut');
+      expect(retry.result).toBeUndefined();
+      expect(retry.error).toEqual({
+        source: 'relay',
+        code: 'DURABLE_RESULT_TOO_LARGE',
+        message: 'Result is too large to store for retries',
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // Fix: Default dispatch awaits durable persistence before forwarding
+    // -------------------------------------------------------------------------
+    it('persists durably before forwarding a default (non-mutationId) command to the CLI', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+
+      // Track the order of storage.put vs send calls.
+      const callOrder: string[] = [];
+      const originalPut = ctx.storage.put;
+      ctx.storage.put = vi.fn(async (...args: unknown[]) => {
+        callOrder.push('put');
+        return originalPut(...args);
+      });
+      // Spy on cliWs.send to track order.
+      const originalSend = cliWs.send;
+      cliWs.send = vi.fn((...args: unknown[]) => {
+        callOrder.push('send');
+        return originalSend.apply(cliWs, args);
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'order-cmd',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+
+      // Storage.put must be called before sendToCli.
+      // Since sendToCli is now chained via .then() inside waitUntil,
+      // the put call is registered first (promise creation), but the
+      // actual send happens after put resolves.
+      await flushAsync();
+
+      // Storage.put must have been called.
+      expect(ctx.storage.put).toHaveBeenCalled();
+
+      // The command must have been forwarded to the CLI.
+      const cliCommands = allSent(cliWs).filter(m => m.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+
+      // Verify that put was called before send by checking that both
+      // operations completed and the call order is correct.
+      const putIdx = callOrder.indexOf('put');
+      const sendIdx = callOrder.indexOf('send');
+      expect(putIdx).toBeGreaterThanOrEqual(0);
+      expect(sendIdx).toBeGreaterThanOrEqual(0);
+      expect(putIdx).toBeLessThan(sendIdx);
+    });
+
+    // -------------------------------------------------------------------------
+    // Race repair: at-most-once terminal delivery on CLI disconnect
+    // -------------------------------------------------------------------------
+    it('delivers exactly one CLI-disconnect error when entry exists in both memory and durable storage', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendCommand(doInstance, webWs, {
+        id: 'race-disco',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      webWs.send.mockClear();
+
+      // Disconnect CLI — failPendingCommandsForSocket processes the in-memory
+      // entry, then finishDurablePendingCommands scans durable entries.
+      // The fix passes handledIds to skip the duplicate.
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+      await flushAsync();
+
+      // Exactly one CLI-disconnect error, not two.
+      const errors = allSent(webWs).filter(m => m.type === 'response' && m.id === 'race-disco');
+      expect(errors).toHaveLength(1);
+      expect(errors[0].error).toBe('CLI disconnected');
+    });
+
+    // -------------------------------------------------------------------------
+    // Race repair: at-most-once terminal delivery on owner change
+    // -------------------------------------------------------------------------
+    it('delivers exactly one SESSION_OWNER_CHANGED error when entry exists in both memory and durable storage', async () => {
+      const { doInstance, mockCtx } = setup();
+      const firstOwner = addCliSocket(mockCtx, 'cli-1');
+      const nextOwner = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, firstOwner, [makeSession('s1')]);
+      sendHeartbeat(doInstance, nextOwner, []);
+      firstOwner.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'race-owner',
+        command: 'list_models',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+      });
+      webWs.send.mockClear();
+
+      // Ownership change via heartbeat — failPendingCommandsForOwnerChange
+      // processes the in-memory entry, then finishDurablePendingCommands
+      // scans durable entries. The fix passes handledIds to skip the duplicate.
+      sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+
+      // Exactly one SESSION_OWNER_CHANGED error.
+      const errors = allSent(webWs).filter(m => m.type === 'response' && m.id === 'race-owner');
+      expect(errors).toHaveLength(1);
+      expect(errors[0].error).toEqual({
+        source: 'relay',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // Race repair: durable persisted before live send in finishDurablePendingCommands
+    // -------------------------------------------------------------------------
+    it('persists the durable entry before delivering to a reattached web socket in finishDurablePendingCommands', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+
+      const now = Date.now();
+      const correlationId = 'disco-reorder';
+      await ctx.storage.put(`pendingCommand/${correlationId}`, {
+        sessionId: 'ses-reorder',
+        originalId: 'reorder-original',
+        command: 'send_message',
+        targetConnectionId: 'cli-reorder',
+        expiresAt: now + 35_000,
+        webConnectionId: 'web-reorder',
+        state: 'pending' as const,
+      });
+
+      // Set up a live CLI and a reattached web socket.
+      const cliWs = addCliSocket(mockCtx, 'cli-reorder');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses-reorder', 'busy', 'Session Reorder')]);
+      const webWs = addWebSocket(mockCtx, 'web-reorder');
+
+      // Track call order: storage.put vs ws.send inside finishDurablePendingCommands.
+      const callOrder: string[] = [];
+      const originalPut = ctx.storage.put;
+      ctx.storage.put = vi.fn(async (...args: unknown[]) => {
+        callOrder.push('put');
+        return originalPut(...args);
+      });
+      const originalSend = webWs.send;
+      webWs.send = vi.fn((...args: unknown[]) => {
+        callOrder.push('send');
+        return originalSend.apply(webWs, args);
+      });
+
+      // Disconnect the CLI — finishDurablePendingCommands handles the
+      // durable-only entry.
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+      await flushAsync();
+
+      // The reattached web socket must receive the error.
+      const responses = allSent(webWs).filter(
+        m => m.type === 'response' && m.id === 'reorder-original'
+      );
+      expect(responses).toHaveLength(1);
+      expect(responses[0].error).toBe('CLI disconnected');
+
+      // The durable entry must be marked done.
+      const entry = await ctx.storage.get(`pendingCommand/${correlationId}`);
+      expect((entry as Record<string, unknown>).state).toBe('done');
+
+      // The durable put must happen before the web socket send.
+      const putIdx = callOrder.indexOf('put');
+      const sendIdx = callOrder.indexOf('send');
+      expect(putIdx).toBeGreaterThanOrEqual(0);
+      expect(sendIdx).toBeGreaterThanOrEqual(0);
+      expect(putIdx).toBeLessThan(sendIdx);
     });
   });
 });

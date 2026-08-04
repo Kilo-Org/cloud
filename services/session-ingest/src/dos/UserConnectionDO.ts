@@ -175,6 +175,12 @@ const CLI_COMMAND_ERROR = {
   message: 'Command failed',
 };
 
+const DURABLE_RESULT_TOO_LARGE_ERROR = {
+  source: 'relay',
+  code: 'DURABLE_RESULT_TOO_LARGE',
+  message: 'Result is too large to store for retries',
+};
+
 const MUTATION_ID_TOO_LONG_ERROR = {
   source: 'relay',
   code: 'MUTATION_ID_TOO_LONG',
@@ -887,12 +893,19 @@ export class UserConnectionDO extends DurableObject<Env> {
           // so a mutationId retry receives the same shaped outcome as
           // live delivery.
           const shaped = this.shapeCommandError(durable.command, result, error);
-          const shapedResult = this.boundDurableResult(shaped.result);
+          let shapedResult = this.boundDurableResult(shaped.result);
+          let shapedError = shaped.error;
+          // When the durable result is truncated, a mutationId retry must
+          // receive an error — not a false-success truncated marker.
+          if (this.isTruncatedResult(shapedResult)) {
+            shapedResult = undefined;
+            shapedError = shapedError ?? DURABLE_RESULT_TOO_LARGE_ERROR;
+          }
           await this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${id}`, {
             ...durable,
             state: 'done',
             ...(shapedResult !== undefined ? { result: shapedResult } : {}),
-            ...(shaped.error !== undefined ? { error: shaped.error } : {}),
+            ...(shapedError !== undefined ? { error: shapedError } : {}),
           });
           // Reservation held through the terminal write; clear after success.
           this.completedCorrelationIds.delete(id);
@@ -1071,6 +1084,15 @@ export class UserConnectionDO extends DurableObject<Env> {
       let webConnectionId: string;
       try {
         durableResult = this.boundDurableResult(result);
+        // When the durable result is truncated, a mutationId retry must
+        // receive an error — not a false-success truncated marker. The live
+        // response still carries the original full result via the `result`
+        // variable (not `durableResult`).
+        let durableError = terminalError;
+        if (this.isTruncatedResult(durableResult)) {
+          durableResult = undefined;
+          durableError = durableError ?? DURABLE_RESULT_TOO_LARGE_ERROR;
+        }
         webConnectionId = rehydrated
           ? (rehydratedDurable?.webConnectionId ?? 'unknown')
           : (entry.ws.deserializeAttachment() as WSAttachment | null)?.role === 'web'
@@ -1087,7 +1109,7 @@ export class UserConnectionDO extends DurableObject<Env> {
           webConnectionId: webConnectionId ?? 'unknown',
           state: 'done',
           ...(durableResult !== undefined ? { result: durableResult } : {}),
-          ...(terminalError !== undefined ? { error: terminalError } : {}),
+          ...(durableError !== undefined ? { error: durableError } : {}),
         } satisfies PendingCommandEntry);
       } catch (_error: unknown) {
         // Clean the synchronous reservation on storage failure — the error
@@ -1556,26 +1578,35 @@ export class UserConnectionDO extends DurableObject<Env> {
       targetCliWs: targetCli,
     });
     this.ctx.waitUntil(
-      this.ctx.storage.put(`${PENDING_COMMAND_KEY_PREFIX}${correlationId}`, {
-        sessionId: msg.sessionId,
-        originalId: msg.id,
-        command: msg.command,
-        expectedOwnerConnectionId,
-        targetConnectionId,
-        expiresAt: now + UserConnectionDO.PENDING_COMMAND_TTL_MS,
-        webConnectionId,
-        state: 'pending' as const,
-      } satisfies PendingCommandEntry)
+      this.ctx.storage
+        .put(`${PENDING_COMMAND_KEY_PREFIX}${correlationId}`, {
+          sessionId: msg.sessionId,
+          originalId: msg.id,
+          command: msg.command,
+          expectedOwnerConnectionId,
+          targetConnectionId,
+          expiresAt: now + UserConnectionDO.PENDING_COMMAND_TTL_MS,
+          webConnectionId,
+          state: 'pending' as const,
+        } satisfies PendingCommandEntry)
+        .then(() => {
+          this.scheduleNextAlarm(now);
+          this.scheduleDurablePendingAlarm();
+          this.sendToCli(targetCli, {
+            type: 'command',
+            id: correlationId,
+            command: msg.command,
+            data: msg.data,
+            ...(msg.sessionId ? { sessionId: msg.sessionId } : {}),
+          });
+        })
+        .catch((error: unknown) => {
+          console.error('Failed to persist durable pending command before forwarding', {
+            correlationId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
     );
-    this.scheduleNextAlarm(now);
-    this.scheduleDurablePendingAlarm();
-    this.sendToCli(targetCli, {
-      type: 'command',
-      id: correlationId,
-      command: msg.command,
-      data: msg.data,
-      ...(msg.sessionId ? { sessionId: msg.sessionId } : {}),
-    });
   }
 
   // ---------------------------------------------------------------------------
@@ -1920,8 +1951,12 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   private failPendingCommandsForSocket(targetWs: WebSocket, cliGone: boolean): void {
+    // Collect correlationIds handled in the in-memory sweep so the durable
+    // sweep in finishDurablePendingCommands does not double-deliver.
+    const handledIds = new Set<string>();
     for (const [id, entry] of this.pendingCommands) {
       if (entry.targetCliWs !== targetWs) continue;
+      handledIds.add(id);
       // The owning CLI is really gone, so a forwarded `exit_cli` got what it
       // asked for: this session is no longer owned by anyone.
       const exited = cliGone && entry.command === 'exit_cli';
@@ -1968,7 +2003,8 @@ export class UserConnectionDO extends DurableObject<Env> {
       this.ctx.waitUntil(
         this.finishDurablePendingCommands(
           entry => entry.targetConnectionId === attachment.connectionId,
-          'CLI disconnected'
+          'CLI disconnected',
+          handledIds
         )
       );
     }
@@ -1978,10 +2014,12 @@ export class UserConnectionDO extends DurableObject<Env> {
     sessionId: string,
     nextOwnerConnectionId: string | undefined
   ): void {
+    const handledIds = new Set<string>();
     for (const [id, entry] of this.pendingCommands) {
       if (entry.sessionId !== sessionId || entry.targetConnectionId === nextOwnerConnectionId) {
         continue;
       }
+      handledIds.add(id);
       this.pendingCommands.delete(id);
       // `exit_cli` asked for exactly this: the session is no longer owned.
       // Ownership moving to another CLI is a genuine owner change and still fails.
@@ -2018,7 +2056,8 @@ export class UserConnectionDO extends DurableObject<Env> {
       this.finishDurablePendingCommands(
         entry =>
           entry.sessionId === sessionId && entry.targetConnectionId !== nextOwnerConnectionId,
-        SESSION_OWNER_CHANGED_ERROR
+        SESSION_OWNER_CHANGED_ERROR,
+        handledIds
       )
     );
   }
@@ -2081,7 +2120,7 @@ export class UserConnectionDO extends DurableObject<Env> {
   /**
    * Bound a terminal result so the durable storage.put never exceeds the
    * Cloudflare DO value limit. Returns the original result when under the
-   * threshold, or a size-exceeded error marker otherwise.
+   * threshold, or a size-exceeded marker otherwise.
    */
   private boundDurableResult(result: unknown): unknown {
     if (result === undefined) return undefined;
@@ -2089,6 +2128,21 @@ export class UserConnectionDO extends DurableObject<Env> {
     const byteCount = new TextEncoder().encode(serialized).byteLength;
     if (byteCount <= MAX_DURABLE_RESULT_BYTES) return result;
     return { _truncated: true, bytes: byteCount };
+  }
+
+  /**
+   * Detect the truncated marker returned by boundDurableResult.
+   * Callers must use this to route a durable-sized result to an error
+   * field so a mutationId retry does not return a false success.
+   */
+  private isTruncatedResult(value: unknown): boolean {
+    return (
+      value !== undefined &&
+      value !== null &&
+      typeof value === 'object' &&
+      '_truncated' in value &&
+      (value as Record<string, unknown>)._truncated === true
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -2122,17 +2176,46 @@ export class UserConnectionDO extends DurableObject<Env> {
 
   private async finishDurablePendingCommands(
     matches: (entry: PendingCommandEntry) => boolean,
-    error: unknown
+    error: unknown,
+    skipIds?: ReadonlySet<string>
   ): Promise<void> {
     const entries = await this.ctx.storage.list<PendingCommandEntry>({
       prefix: PENDING_COMMAND_KEY_PREFIX,
     });
     await Promise.all(
-      [...entries].flatMap(([key, entry]) =>
-        entry.state === 'pending' && matches(entry)
-          ? [this.ctx.storage.put(key, { ...entry, state: 'done', error })]
-          : []
-      )
+      [...entries].flatMap(([key, entry]) => {
+        if (entry.state !== 'pending' || !matches(entry)) return [];
+        const correlationId = key.slice(PENDING_COMMAND_KEY_PREFIX.length);
+        // Skip entries already delivered live by the in-memory sweep.
+        // Prevents a duplicate delivery when the in-memory storage.put and
+        // finishDurablePendingCommands race within separate waitUntil tasks.
+        if (skipIds?.has(correlationId)) return [];
+        // Persist the terminal outcome durably BEFORE any live delivery.
+        // If storage.put fails, no live send occurs — the error propagates
+        // to the waitUntil boundary and the caller handles the rejection.
+        const putPromise = this.ctx.storage.put(key, {
+          ...entry,
+          state: 'done',
+          error,
+        });
+        // After the durable write succeeds, deliver to a reattached web
+        // socket (D8 case 3). The in-memory sweep already delivered to the
+        // original socket; this path covers a socket that reconnected after
+        // the original disconnected (different webConnectionId path).
+        const webWs = this.findWebByConnectionId(entry.webConnectionId);
+        if (webWs) {
+          return [
+            putPromise.then(() => {
+              this.sendToWeb(webWs, {
+                type: 'response',
+                id: entry.originalId,
+                error,
+              });
+            }),
+          ];
+        }
+        return [putPromise];
+      })
     );
   }
 
@@ -2160,9 +2243,13 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   private expirePendingCommands(now: number): void {
+    // Track correlationIds already delivered in-memory so the durable
+    // sweep does not double-deliver to the same web socket.
+    const deliveredInMemory = new Set<string>();
     for (const [id, entry] of this.pendingCommands) {
       if (entry.expiresAt > now) continue;
       this.pendingCommands.delete(id);
+      deliveredInMemory.add(id);
       this.sendToWeb(entry.ws, {
         type: 'response',
         id: entry.originalId,
@@ -2189,6 +2276,19 @@ export class UserConnectionDO extends DurableObject<Env> {
               state: 'done',
               error: COMMAND_EXPIRED_ERROR,
             });
+            // Deliver the terminal response to a live matching web socket
+            // that reconnected after the original socket disconnected (D8 case 3).
+            // Skip entries already delivered in the in-memory sweep above.
+            const correlationId = key.slice(PENDING_COMMAND_KEY_PREFIX.length);
+            if (deliveredInMemory.has(correlationId)) continue;
+            const webWs = this.findWebByConnectionId(durable.webConnectionId);
+            if (webWs) {
+              this.sendToWeb(webWs, {
+                type: 'response',
+                id: durable.originalId,
+                error: COMMAND_EXPIRED_ERROR,
+              });
+            }
           } else {
             // Already done and past TTL: clean up.
             await this.ctx.storage.delete(key);

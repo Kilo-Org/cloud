@@ -215,20 +215,29 @@ async function runPostTopUpBestEffortStep(params: {
  * (email_type, idempotency_key) with `onConflictDoNothing()`. A rowCount of 0
  * means an earlier attempt already claimed this payment, so we bail without
  * sending again. If the provider was not configured (e.g. Mailgun env missing
- * in preview/test), the marker is cleared so a future retry can re-attempt.
+ * in preview/test), the marker is cleared so a future retry can re-attempt,
+ * since we know for certain no send was attempted.
  *
- * Known gaps shared with the other insert-before-send email paths in this
+ * IMPORTANT: once the marker is inserted, it is only ever rolled back for
+ * *known-safe* reasons (`provider_not_configured`, i.e. the provider API was
+ * never called). If `sendCreditsTopUpEmail` throws — e.g. a network timeout
+ * or an ambiguous 5xx from Mailgun — we do NOT know whether the provider
+ * actually accepted/delivered the message before the exception surfaced.
+ * Deleting the marker in that case previously caused duplicate top-up emails:
+ * a Stripe webhook retry (or `recoverTopUpConfirmationEmailIfMissing`) would
+ * see the marker gone, re-insert it, and re-send an email that may have
+ * already gone out. We intentionally leave the marker in place for any
+ * ambiguous failure and accept the (rarer, less harmful) risk of a missed
+ * email over a duplicate one.
+ *
+ * Known gap shared with the other insert-before-send email paths in this
  * codebase (`services/kiloclaw-billing/src/lifecycle.ts` ~L850 and the
  * `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
- * 1. A crash between the marker insert and the provider send permanently
- *    suppresses the email on retry; the marker looks "already sent".
- * 2. Rolling the marker back in the catch block after an ambiguous provider
- *    exception can duplicate the email if the provider actually accepted it.
- *
- * Fixing either properly requires a real outbox (pending/sent/terminal state
- * + provider idempotency keys) applied uniformly across all of the above
- * call sites. Tracked as follow-up tech debt; intentionally NOT fixed in
- * isolation here so the new email paths stay uniform with the existing ones.
+ * a crash between the marker insert and the provider send permanently
+ * suppresses the email on retry; the marker looks "already sent". Fixing
+ * that properly requires a real outbox (pending/sent/terminal state +
+ * provider idempotency keys) applied uniformly across all of the above call
+ * sites. Tracked as follow-up tech debt.
  *
  * @param params User, top-up amount, Stripe payment identity, and auto-top-up flag.
  * @returns A promise that resolves after the idempotency check and best-effort send attempt.
@@ -277,12 +286,11 @@ async function maybeSendTopUpConfirmationEmail(params: {
       tags: { source: 'credits_topup_email' },
       extra: { kilo_user_id: user.id, stripeChargeOrInvoiceId, isAutoTopUp },
     });
-    // Best-effort rollback so a retry can re-attempt.
-    try {
-      await deleteTopUpEmailMarker(stripeChargeOrInvoiceId);
-    } catch {
-      // Leave the marker in place; we prefer missing one email over duplicate sends.
-    }
+    // Do NOT delete the marker here: the exception may have surfaced after
+    // the provider already accepted/delivered the email (ambiguous
+    // failure), and rolling the marker back would let a webhook retry or
+    // the recovery path re-send a duplicate. We prefer missing one email
+    // over duplicate sends.
   }
 }
 

@@ -17,7 +17,7 @@
  */
 
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import * as z from 'zod';
 import {
   updateCodeReviewStatus,
@@ -1690,17 +1690,23 @@ export async function POST(
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
       const ownerResolution = await getTerminalOwnerResolution();
       if (ownerResolution?.canDispatch) {
-        // Trigger dispatch in background (don't await - fire and forget)
-        tryDispatchPendingReviews(ownerResolution.owner).catch(dispatchError => {
-          errorExceptInTest(
-            '[code-review-status] Error dispatching pending reviews:',
-            dispatchError
-          );
-          captureException(dispatchError, {
-            tags: { source: 'code-review-status-dispatch' },
-            extra: { reviewId, owner: ownerResolution.owner },
-          });
-        });
+        // Trigger dispatch in the background. `after()` keeps the serverless
+        // invocation alive for this work instead of leaving it as an
+        // unawaited promise that Vercel can freeze once the response is
+        // sent, which was causing spurious worker-call/status-probe
+        // timeouts (fetches stall while the function is suspended).
+        after(() =>
+          tryDispatchPendingReviews(ownerResolution.owner).catch(dispatchError => {
+            errorExceptInTest(
+              '[code-review-status] Error dispatching pending reviews:',
+              dispatchError
+            );
+            captureException(dispatchError, {
+              tags: { source: 'code-review-status-dispatch' },
+              extra: { reviewId, owner: ownerResolution.owner },
+            });
+          })
+        );
 
         logExceptInTest('[code-review-status] Triggered dispatch for pending reviews', {
           reviewId,

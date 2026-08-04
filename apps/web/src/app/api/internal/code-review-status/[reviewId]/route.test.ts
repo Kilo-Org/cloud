@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
+import type * as nextServerModule from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
 import type * as analyticsDbModule from '@/lib/code-reviews/analytics/db';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
@@ -95,6 +96,20 @@ const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
 const mockDisableCodeReviewForRepeatedCloneTimeoutsToday = jest.fn<any>();
 
 // --- Module mocks ---
+
+jest.mock('next/server', () => {
+  const actual = jest.requireActual<typeof nextServerModule>('next/server');
+  return {
+    ...actual,
+    // Route handlers here fire the dispatch off in the background via
+    // `after()`. Outside a real request scope `after()` throws, so invoke
+    // the callback immediately (without awaiting) to preserve the existing
+    // fire-and-forget semantics under test.
+    after: (fn: () => Promise<void> | void) => {
+      void fn();
+    },
+  };
+});
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',

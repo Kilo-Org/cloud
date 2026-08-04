@@ -1,6 +1,12 @@
 // Single review-thread card: anchor header + optional quoted diff +
 // comments list + reply input.
 //
+//   - COLLAPSED: the full card root is a pressable expand target
+//     (a11y: "Discussion thread <anchor>", role button, collapsed
+//     state). Tapping anywhere on the card expands the thread.
+//   - EXPANDED: the root is a plain view. Only the header label row
+//     is pressable (collapse). The resolve toggle is its own nested
+//     pressable in both states.
 //   - The thread header shows the anchor label ("src/a.ts L10 (RIGHT)"
 //     or "File comment on src/a.ts" or "Outdated on ...") and the
 //     "Outdated" / "Resolved" badges when applicable. The "Resolved"
@@ -10,9 +16,9 @@
 //   - Expanded LINE-anchored threads render a capped quoted diff
 //     snippet (from thread.diffHunk) above the comments list. File-
 //     level / empty / unparseable hunks show no snippet.
-//   - Resolved threads are COLLAPSED by default (tapping the header
-//     expands them). The repo's UI/UX rule for compact product rhythm
-//     is to keep the noise level down on the happy path, so an
+//   - Resolved threads are COLLAPSED by default (tapping the card
+//     root expands them). The repo's UI/UX rule for compact product
+//     rhythm is to keep the noise level down on the happy path, so an
 //     accepted PR's collapsed thread pile shouldn't dominate the tab.
 //   - The reply input is uncontrolled (iOS ref pattern) per the
 //     repo's iOS rule and per the comment-composer reference
@@ -105,54 +111,64 @@ export function DiscussionThread({
     }
   };
 
+  const cardClassName = cn(
+    'gap-3 rounded-xl border border-border bg-card p-3.5',
+    thread.isResolved && 'bg-secondary'
+  );
+  const headerCommonProps = {
+    anchorLabel,
+    resolved: badges.resolved,
+    outdated: badges.outdated,
+    fileLevel: badges.fileLevel,
+    commentCount: thread.comments.length,
+    firstTimestamp: firstComment?.createdAt ?? null,
+    expanded,
+    onToggleResolve,
+    resolveDisabled: isResolving,
+    onToggleExpand,
+  } as const;
+
+  if (expanded) {
+    return (
+      <View accessibilityLabel={`Discussion thread ${anchorLabel}`} className={cardClassName}>
+        <ThreadHeader {...headerCommonProps} />
+        {diffSnippet ? <ThreadDiffSnippet snippet={diffSnippet} /> : null}
+        <View className="gap-4">
+          {thread.comments.map((comment, index) => (
+            <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-4')}>
+              <CommentRow
+                comment={comment}
+                reactionsDisabled={isReacting}
+                onToggleReaction={content => {
+                  onToggleReaction(comment, content);
+                }}
+              />
+            </View>
+          ))}
+        </View>
+        {firstComment ? (
+          <ReplyInput
+            owner={owner}
+            repo={repo}
+            number={number}
+            commentId={firstComment.commentId}
+            reply={reply}
+          />
+        ) : null}
+      </View>
+    );
+  }
+
   return (
-    <View
+    <Pressable
+      accessibilityRole="button"
       accessibilityLabel={`Discussion thread ${anchorLabel}`}
-      className={cn(
-        'gap-3 rounded-xl border border-border bg-card p-3.5',
-        thread.isResolved && 'bg-secondary'
-      )}
+      accessibilityState={{ expanded: false }}
+      onPress={onToggleExpand}
+      className={cn(cardClassName, 'active:opacity-70')}
     >
-      <ThreadHeader
-        anchorLabel={anchorLabel}
-        resolved={badges.resolved}
-        outdated={badges.outdated}
-        fileLevel={badges.fileLevel}
-        commentCount={thread.comments.length}
-        firstTimestamp={firstComment?.createdAt ?? null}
-        expanded={expanded}
-        onToggleExpand={onToggleExpand}
-        onToggleResolve={onToggleResolve}
-        resolveDisabled={isResolving}
-      />
-      {expanded ? (
-        <>
-          {diffSnippet ? <ThreadDiffSnippet snippet={diffSnippet} /> : null}
-          <View className="gap-4">
-            {thread.comments.map((comment, index) => (
-              <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-4')}>
-                <CommentRow
-                  comment={comment}
-                  reactionsDisabled={isReacting}
-                  onToggleReaction={content => {
-                    onToggleReaction(comment, content);
-                  }}
-                />
-              </View>
-            ))}
-          </View>
-          {firstComment ? (
-            <ReplyInput
-              owner={owner}
-              repo={repo}
-              number={number}
-              commentId={firstComment.commentId}
-              reply={reply}
-            />
-          ) : null}
-        </>
-      ) : null}
-    </View>
+      <ThreadHeader {...headerCommonProps} />
+    </Pressable>
   );
 }
 
@@ -185,24 +201,30 @@ function ThreadHeader({
 }: Readonly<ThreadHeaderProps>) {
   const colors = useThemeColors();
   const relative = firstTimestamp ? timeAgo(parseTimestamp(firstTimestamp)) : null;
+  const LabelRow = (expanded ? Pressable : View) as typeof View;
+  const labelRowA11y = expanded
+    ? ({
+        accessibilityRole: 'button',
+        accessibilityLabel: 'Collapse thread',
+        onPress: onToggleExpand,
+      } as const)
+    : ({} as const);
   return (
     <View className="gap-2">
       <View className="flex-row items-start justify-between gap-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={expanded ? 'Collapse thread' : 'Expand thread'}
-          onPress={onToggleExpand}
-          className="flex-1 flex-row items-center gap-2"
+        <LabelRow
+          {...labelRowA11y}
+          className={cn('flex-1 flex-row items-center gap-2', expanded && 'active:opacity-70')}
         >
           {expanded ? (
             <ChevronUp size={16} color={colors.mutedForeground} />
           ) : (
             <ChevronDown size={16} color={colors.mutedForeground} />
           )}
-          <Text className="font-mono-medium text-[12px] text-foreground" numberOfLines={1}>
+          <Text className="flex-1 font-mono-medium text-[12px] text-foreground" numberOfLines={1}>
             {anchorLabel}
           </Text>
-        </Pressable>
+        </LabelRow>
         <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">

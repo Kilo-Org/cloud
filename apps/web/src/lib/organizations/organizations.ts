@@ -63,6 +63,33 @@ export async function findOrganizationByStripeCustomerId(
   );
 }
 
+/**
+ * Direct, non-deleted child organizations parented by `parentOrganizationId`.
+ * The org hierarchy is strictly single-level, so this returns only immediate
+ * children — never descendants — and excludes soft-deleted children
+ * (`deleted_at IS NOT NULL`). Ordered by name for stable display.
+ *
+ * Shared by the parent-facing sub-organizations surface and the
+ * `organizations.childOrganizations` procedure so the child-selection logic
+ * lives in exactly one place. Authorization is the caller's responsibility:
+ * only parent `owner`/`billing_manager` may invoke the procedures that use it.
+ */
+export async function getDirectChildOrganizations(
+  parentOrganizationId: Organization['id'],
+  txn?: DrizzleTransaction
+): Promise<Organization[]> {
+  return await (txn || db)
+    .select()
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.parent_organization_id, parentOrganizationId),
+        isNull(organizations.deleted_at)
+      )
+    )
+    .orderBy(asc(organizations.name));
+}
+
 export async function getUserOrganizationsWithSeats(
   userId: User['id']
 ): Promise<UserOrganizationWithSeats[]> {

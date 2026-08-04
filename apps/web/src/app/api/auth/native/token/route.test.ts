@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import {
   verifyNativeAppleIdToken,
   verifyNativeGoogleIdToken,
+  exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
 } from '@/lib/auth/native-id-tokens';
 import {
@@ -26,6 +27,7 @@ jest.mock('@/lib/auth/native-id-tokens', () => ({
   ...jest.requireActual('@/lib/auth/native-id-tokens'),
   verifyNativeAppleIdToken: jest.fn(),
   verifyNativeGoogleIdToken: jest.fn(),
+  exchangeNativeGoogleAuthCode: jest.fn(),
 }));
 jest.mock('@/lib/auth/magic-link-tokens');
 jest.mock('@/lib/user');
@@ -33,6 +35,9 @@ jest.mock('@/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
 jest.mock('@/lib/auth/native-admission');
 jest.mock('@/lib/auth/device-sessions');
+jest.mock('@/lib/config.server', () => ({
+  GOOGLE_CLIENT_ID: 'web-client-id',
+}));
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
@@ -61,6 +66,7 @@ import { captureMessage } from '@sentry/nextjs';
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
+const mockExchangeNativeGoogleAuthCode = jest.mocked(exchangeNativeGoogleAuthCode);
 const mockReserveSignInCode = jest.mocked(reserveSignInCode);
 const mockCommitSignInCode = jest.mocked(commitSignInCode);
 const mockReleaseSignInCode = jest.mocked(releaseSignInCode);
@@ -126,7 +132,7 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ token: 'minted-jwt' });
-      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token');
+      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', undefined);
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           google_user_email: 'appleuser@example.com',
@@ -222,6 +228,40 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(403);
       expect(data).toEqual({ error: 'BLOCKED' });
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    // C12: nonce forwarding
+    it('passes the raw nonce to verifyNativeAppleIdToken', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          nonce: 'raw-nonce-from-client',
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith(
+        'apple-id-token',
+        'raw-nonce-from-client'
+      );
+    });
+
+    it('provides no nonce when the client sends none (legacy)', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+
+      expect(response.status).toBe(200);
+      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', undefined);
     });
   });
 
@@ -357,6 +397,99 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(200);
       expect(data).toEqual({ token: 'minted-jwt' });
       expect(mockCreateOrUpdateUser).toHaveBeenCalled();
+    });
+
+    // C12: Google serverAuthCode flow
+    it('uses exchangeNativeGoogleAuthCode when serverAuthCode is present', async () => {
+      mockExchangeNativeGoogleAuthCode.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+        name: 'Google User',
+        picture: 'https://example.com/pic.png',
+        hd: 'example.com',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'google',
+          serverAuthCode: 'auth-code-123',
+          googleClientId: 'web-client-id',
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockExchangeNativeGoogleAuthCode).toHaveBeenCalledWith('auth-code-123');
+      expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith('native_google_idtoken_legacy_count: 1');
+    });
+
+    it('falls back to verifyNativeGoogleIdToken when only idToken is present and counts legacy', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockVerifyNativeGoogleIdToken).toHaveBeenCalledWith('google-id-token');
+      expect(mockExchangeNativeGoogleAuthCode).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_google_idtoken_legacy_count: 1');
+    });
+
+    it('returns 400 INVALID_REQUEST when neither serverAuthCode nor idToken is provided', async () => {
+      const response = await POST(createRequest({ provider: 'google' }));
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ error: 'INVALID_REQUEST' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 INVALID_TOKEN when serverAuthCode exchange fails with NativeIdTokenError', async () => {
+      mockExchangeNativeGoogleAuthCode.mockRejectedValue(new NativeIdTokenError('exchange failed'));
+
+      const response = await POST(
+        createRequest({
+          provider: 'google',
+          serverAuthCode: 'replayed-code',
+          googleClientId: 'web-client-id',
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'INVALID_TOKEN' });
+    });
+
+    it('rethrows (500) when serverAuthCode exchange fails with a non-token error (network failure)', async () => {
+      const networkError = new Error('connect ETIMEDOUT');
+      mockExchangeNativeGoogleAuthCode.mockRejectedValue(networkError);
+
+      await expect(
+        POST(
+          createRequest({
+            provider: 'google',
+            serverAuthCode: 'auth-code',
+            googleClientId: 'web-client-id',
+          })
+        )
+      ).rejects.toBe(networkError);
+    });
+
+    it('rejects a serverAuthCode from a different mobile web client', async () => {
+      await expect(
+        POST(
+          createRequest({
+            provider: 'google',
+            serverAuthCode: 'auth-code',
+            googleClientId: 'wrong-client-id',
+          })
+        )
+      ).rejects.toThrow('Mobile Google client ID does not match the server OAuth client');
+      expect(mockExchangeNativeGoogleAuthCode).not.toHaveBeenCalled();
     });
   });
 
@@ -872,7 +1005,8 @@ describe('POST /api/auth/native/token', () => {
       });
       expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1');
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
-      expect(mockCaptureMessage).not.toHaveBeenCalled();
+      // idToken path records legacy use even with supportsRefresh.
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_google_idtoken_legacy_count: 1');
     });
 
     it('returns long-lived token when supportsRefresh is absent', async () => {

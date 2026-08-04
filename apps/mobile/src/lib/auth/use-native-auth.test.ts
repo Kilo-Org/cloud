@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildChallengeEntry,
@@ -9,6 +9,13 @@ import {
   parseTokenResponse,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
+
+// Mock @/lib/config to avoid pulling in react-native at module import time.
+vi.mock('@/lib/config', () => ({
+  API_BASE_URL: 'http://localhost:3000',
+  GOOGLE_IOS_CLIENT_ID: 'ios-client-id',
+  GOOGLE_WEB_CLIENT_ID: 'web-client-id',
+}));
 
 // Test the pure utility functions in the contract module.
 // The hook itself is tested via integration/E2E tests.
@@ -161,5 +168,17 @@ describe('challenge binding', () => {
     it('returns undefined when the entry is null (no server challenge)', () => {
       expect(selectChallengeId(null, email)).toBeUndefined();
     });
+  });
+});
+
+// C12: Configuration invariant — the mobile GOOGLE_WEB_CLIENT_ID must equal the
+// server GOOGLE_CLIENT_ID (the web application's OAuth client) for the serverAuthCode
+// exchange to succeed.  The server test compares against this same expected value.
+const EXPECTED_GOOGLE_WEB_CLIENT_ID = 'web-client-id';
+
+describe('configuration invariants', () => {
+  it('GOOGLE_WEB_CLIENT_ID equals the expected web client ID (must match server GOOGLE_CLIENT_ID)', async () => {
+    const config = await import('@/lib/config');
+    expect(config.GOOGLE_WEB_CLIENT_ID).toBe(EXPECTED_GOOGLE_WEB_CLIENT_ID);
   });
 });

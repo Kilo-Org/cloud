@@ -4,6 +4,7 @@ import * as z from 'zod';
 import {
   verifyNativeAppleIdToken,
   verifyNativeGoogleIdToken,
+  exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
 } from '@/lib/auth/native-id-tokens';
 import { AppleJwtClientError } from '@/lib/auth/apple-jwks';
@@ -74,12 +75,15 @@ const requestSchema = z.discriminatedUnion('provider', [
     provider: z.literal('apple'),
     idToken: z.string(),
     fullName: z.string().optional(),
+    nonce: z.string().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
   }),
   z.object({
     provider: z.literal('google'),
-    idToken: z.string(),
+    idToken: z.string().optional(),
+    serverAuthCode: z.string().optional(),
+    googleClientId: z.string().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
   }),
@@ -133,7 +137,7 @@ export async function POST(request: NextRequest) {
   if (data.provider === 'apple') {
     let verified;
     try {
-      verified = await verifyNativeAppleIdToken(data.idToken);
+      verified = await verifyNativeAppleIdToken(data.idToken, data.nonce);
     } catch (error) {
       if (!isInvalidNativeTokenError(error)) {
         throw error;
@@ -163,7 +167,20 @@ export async function POST(request: NextRequest) {
   } else if (data.provider === 'google') {
     let verified;
     try {
-      verified = await verifyNativeGoogleIdToken(data.idToken);
+      if (data.serverAuthCode) {
+        const { GOOGLE_CLIENT_ID } = await import('@/lib/config.server');
+        if (!data.googleClientId || data.googleClientId !== GOOGLE_CLIENT_ID) {
+          throw new Error('Mobile Google client ID does not match the server OAuth client');
+        }
+        verified = await exchangeNativeGoogleAuthCode(data.serverAuthCode);
+      } else if (data.idToken) {
+        // ponytail: remove legacy idToken-only path after all shipped clients send
+        // serverAuthCode and the legacy counter has drained.
+        captureMessage('native_google_idtoken_legacy_count: 1');
+        verified = await verifyNativeGoogleIdToken(data.idToken);
+      } else {
+        return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
+      }
     } catch (error) {
       if (!isInvalidNativeTokenError(error)) {
         throw error;

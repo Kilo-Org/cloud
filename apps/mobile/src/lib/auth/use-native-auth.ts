@@ -1,4 +1,5 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { CryptoDigestAlgorithm, digestStringAsync, getRandomBytesAsync } from 'expo-crypto';
 import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
@@ -90,6 +91,7 @@ function ensureGoogleConfigured() {
   GoogleSignin.configure({
     webClientId: GOOGLE_WEB_CLIENT_ID,
     iosClientId: GOOGLE_IOS_CLIENT_ID,
+    offlineAccess: true,
   });
   googleSignInConfigured = true;
 }
@@ -135,11 +137,22 @@ export function useNativeAuth(): NativeAuthResult {
       return;
     }
     try {
+      // Generate a raw nonce and its SHA-256 digest.  The digest is passed to
+      // AppleAuthentication.signInAsync.  Apple embeds the digest in the identity
+      // token payload as-is.  The server must compute SHA-256 of the raw nonce
+      // and compare against payload.nonce.
+      const rawNonceBytes = await getRandomBytesAsync(32);
+      const rawNonce = Array.from(rawNonceBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      const nonceDigest = await digestStringAsync(CryptoDigestAlgorithm.SHA256, rawNonce);
+
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce: nonceDigest,
       });
 
       if (!credential.identityToken) {
@@ -155,6 +168,7 @@ export function useNativeAuth(): NativeAuthResult {
       const result = await postAuth('/api/auth/native/token', {
         provider: 'apple',
         idToken: credential.identityToken,
+        nonce: rawNonce,
         supportsRefresh: true,
         ...(fullName ? { fullName } : {}),
       });
@@ -197,17 +211,27 @@ export function useNativeAuth(): NativeAuthResult {
         return;
       }
 
+      const serverAuthCode = response.data.serverAuthCode;
       const idToken = response.data.idToken;
-      if (!idToken) {
+
+      if (!serverAuthCode && !idToken) {
         toast.error(DEFAULT_ERROR_MESSAGE);
         return;
       }
 
-      const result = await postAuth('/api/auth/native/token', {
+      const body: Record<string, unknown> = {
         provider: 'google',
-        idToken,
         supportsRefresh: true,
-      });
+      };
+
+      if (serverAuthCode) {
+        body.serverAuthCode = serverAuthCode;
+        body.googleClientId = GOOGLE_WEB_CLIENT_ID;
+      } else {
+        body.idToken = idToken;
+      }
+
+      const result = await postAuth('/api/auth/native/token', body);
 
       if (result.ok) {
         const parsed = parseTokenPair(result.data);

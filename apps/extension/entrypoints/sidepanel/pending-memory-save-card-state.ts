@@ -63,6 +63,7 @@ export const deriveSaveCardState = ({
   pendingDraft,
   savedConfirmation,
   saveError,
+  fullOutcome,
 }: {
   isLoaded: boolean;
   loadError: boolean;
@@ -70,6 +71,7 @@ export const deriveSaveCardState = ({
   pendingDraft: PendingAgentMemoryDraft | undefined;
   savedConfirmation: boolean;
   saveError: string | undefined;
+  fullOutcome: boolean;
 }): SaveCardView => {
   if (!isLoaded) {
     return { kind: 'hidden' };
@@ -84,6 +86,10 @@ export const deriveSaveCardState = ({
   }
 
   if (!loadError && pendingDraft !== undefined && memories.length >= MAX_MEMORY_COUNT) {
+    return { kind: 'full' };
+  }
+
+  if (!loadError && pendingDraft !== undefined && fullOutcome) {
     return { kind: 'full' };
   }
 

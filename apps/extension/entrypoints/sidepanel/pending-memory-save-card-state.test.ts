@@ -29,6 +29,7 @@ const memory = (overrides: Partial<AgentMemory> = {}): AgentMemory => ({
 });
 
 const baseInput = {
+  fullOutcome: false,
   isLoaded: true,
   loadError: false,
   memories: [] as AgentMemory[],
@@ -93,6 +94,18 @@ describe('save card state machine', () => {
         memories: fullMemories(),
         pendingDraft: draft(),
         saveError: "Couldn't save memory. Try again.",
+      })
+    ).toStrictEqual({ kind: 'full' });
+  });
+
+  it('shows full from actual outcome when count is below max', () => {
+    // Memories count below max, but the persist layer reported full.
+    expect(
+      deriveSaveCardState({
+        ...baseInput,
+        fullOutcome: true,
+        memories: [],
+        pendingDraft: draft(),
       })
     ).toStrictEqual({ kind: 'full' });
   });

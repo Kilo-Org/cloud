@@ -207,11 +207,17 @@ async function deductFromBalance(
     return result.organizationUsage;
   }
 
-  await tx
+  const updated = await tx
     .update(kilocode_users)
     .set({
       microdollars_used: sql`${kilocode_users.microdollars_used} + ${costMicrodollars}`,
     })
     .where(eq(kilocode_users.id, userId));
+  // Charged usage must never commit without its balance debit. The organization
+  // branch already fails when its row disappears; this keeps the personal branch
+  // atomic now that it no longer depends on a mandatory Cost Insights capture.
+  if ((updated.rowCount ?? 0) === 0) {
+    throw new Error('user disappeared during Exa consumption');
+  }
   return null;
 }

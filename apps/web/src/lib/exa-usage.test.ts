@@ -253,6 +253,32 @@ describe('Exa Usage Tracking', () => {
       });
     });
 
+    test('rolls back charged Exa source and monthly rows when the user row is missing', async () => {
+      const missingUserId = `missing-exa-user-${crypto.randomUUID()}`;
+
+      await expect(
+        recordExaUsage({
+          userId: missingUserId,
+          organizationId: undefined,
+          path: '/search',
+          costMicrodollars: 1000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).rejects.toThrow('user disappeared during Exa consumption');
+
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.kilo_user_id, missingUserId));
+      const monthlyRows = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, missingUserId));
+      expect(sourceRows).toHaveLength(0);
+      expect(monthlyRows).toHaveLength(0);
+    });
+
     test('does not deduct from balance when chargedToBalance is false', async () => {
       const user = await insertTestUser({ microdollars_used: 0 });
 

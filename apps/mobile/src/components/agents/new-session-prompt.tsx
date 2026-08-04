@@ -9,8 +9,10 @@ import {
   View,
 } from 'react-native';
 import { Paperclip } from 'lucide-react-native';
+import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { AttachmentPasteHint } from '@/components/agents/attachment-paste-hint';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -27,6 +29,8 @@ import {
   type AgentAttachment,
   type AgentAttachmentCandidate,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
+import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -170,6 +174,16 @@ export function NewSessionPrompt({
 
   const paperclipDisabled = control.paperclipDisabled;
 
+  const hint = useClipboardImageHint({
+    enabled: !paperclipDisabled,
+    addFile: async file => {
+      await onPrefillAttachments([file]);
+    },
+    onUnreadable: () => {
+      toast.error(describeClassificationFailure('unreadable'));
+    },
+  });
+
   function handlePromptInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
@@ -190,6 +204,13 @@ export function NewSessionPrompt({
         onRemove={onRemoveAttachment}
         onRetry={onRetryAttachment}
       />
+      {hint.visible ? (
+        <AttachmentPasteHint
+          onPress={() => {
+            hint.paste();
+          }}
+        />
+      ) : null}
       <View className="px-2 pt-2">
         {promptMeasure.measureElement}
         <RNTextInput
@@ -216,6 +237,9 @@ export function NewSessionPrompt({
           maxLength={PROMPT_INPUT_MAX_CHARS}
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           autoFocus
+          onFocus={() => {
+            hint.refresh();
+          }}
         />
         <View className="flex-row items-center justify-between pb-2">
           <Pressable

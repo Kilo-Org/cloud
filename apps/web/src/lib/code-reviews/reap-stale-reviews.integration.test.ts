@@ -85,6 +85,9 @@ describe('reapStaleCodeReviews against the database', () => {
     expect(freshRow.terminal_reason).toBeNull();
 
     expect(summary.terminalized).toBeGreaterThanOrEqual(1);
+    // The fresh row is under the threshold, so it must not appear in the
+    // remaining-depth count either.
+    expect(summary.remaining).toBe(0);
   });
 
   it('closes the review’s own non-terminal attempts with it', async () => {

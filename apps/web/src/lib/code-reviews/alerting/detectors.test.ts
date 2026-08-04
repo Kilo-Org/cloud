@@ -196,6 +196,35 @@ describe('code review alert detectors', () => {
     });
   });
 
+  // A reaped review that never started has no started_at, so its effective
+  // start collapses to the reap-stamped updated_at. Without the CTE exclusion,
+  // each reaper run would inject days-old rows into the live window as fresh
+  // starts, diluting the rate below threshold and masking a real spike.
+  it('excludes reaped reviews from the error-spike denominator', async () => {
+    await insertReviews([
+      // A genuine 20% spike: 1 failure among 5 recent starts.
+      reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+      ...Array.from({ length: 4 }, () => reviewValues()),
+      // Five reaped rows, shaped like the reaper leaves them: never started,
+      // terminalized just now. Counting these would dilute the rate to 1/10.
+      ...Array.from({ length: 5 }, () =>
+        reviewValues({
+          status: 'failed',
+          terminal_reason: 'abandoned',
+          started_at: null,
+          created_at: minutesAgo(72 * 60),
+          updated_at: minutesAgo(0),
+          completed_at: minutesAgo(0),
+        })
+      ),
+    ]);
+
+    await expect(evaluateErrorSpike(db)).resolves.toMatchObject({
+      tripped: true,
+      details: { rate: 0.2, startedCount: 5, errorCount: 1 },
+    });
+  });
+
   it('does not trip error-spike alerts with no recent errors', async () => {
     await insertReviews(Array.from({ length: 20 }, () => reviewValues()));
 

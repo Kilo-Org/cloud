@@ -3,7 +3,7 @@ import {
   cloud_agent_code_reviews,
   type CloudAgentCodeReview,
 } from '@kilocode/db/schema';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 
 import { db } from '@/lib/drizzle';
@@ -50,6 +50,13 @@ export type ReapStaleReviewsSummary = {
   terminalized: number;
   checksClosed: number;
   providerFailures: number;
+  /**
+   * Stale rows still waiting after this run. A saturated batch alone cannot
+   * distinguish a backlog of dozens from one of thousands; this is the number
+   * to watch while the initial drain runs (visible in the Completed log line
+   * and the cron response).
+   */
+  remaining: number;
 };
 
 /**
@@ -62,22 +69,33 @@ export type ReapStaleReviewsSummary = {
  * window to protect, and the rows that have been spinning a provider-side check
  * the longest are the most useful ones to close first.
  */
+function staleReviewCondition() {
+  return and(
+    inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES]),
+    sql`COALESCE(
+      ${cloud_agent_code_reviews.started_at},
+      ${cloud_agent_code_reviews.updated_at},
+      ${cloud_agent_code_reviews.created_at}
+    ) < now() - interval '${sql.raw(String(REAP_STALE_REVIEW_HOURS))} hours'`
+  );
+}
+
 function selectStaleReviews(limit: number) {
   return db
     .select()
     .from(cloud_agent_code_reviews)
-    .where(
-      and(
-        inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES]),
-        sql`COALESCE(
-          ${cloud_agent_code_reviews.started_at},
-          ${cloud_agent_code_reviews.updated_at},
-          ${cloud_agent_code_reviews.created_at}
-        ) < now() - interval '${sql.raw(String(REAP_STALE_REVIEW_HOURS))} hours'`
-      )
-    )
+    .where(staleReviewCondition())
     .orderBy(asc(cloud_agent_code_reviews.created_at))
     .limit(limit);
+}
+
+/** Shares the selection predicate so the depth count cannot drift from it. */
+async function countRemainingStaleReviews(): Promise<number> {
+  const [row] = await db
+    .select({ remaining: count() })
+    .from(cloud_agent_code_reviews)
+    .where(staleReviewCondition());
+  return Number(row?.remaining) || 0;
 }
 
 /**
@@ -210,6 +228,7 @@ export async function reapStaleCodeReviews(
     terminalized: 0,
     checksClosed: 0,
     providerFailures: 0,
+    remaining: 0,
   };
 
   for (const review of stale) {
@@ -229,6 +248,8 @@ export async function reapStaleCodeReviews(
       });
     }
   }
+
+  summary.remaining = await countRemainingStaleReviews();
 
   if (summary.providerFailures > 0) {
     captureException(new Error('Stale code review reap completed with provider failures'), {

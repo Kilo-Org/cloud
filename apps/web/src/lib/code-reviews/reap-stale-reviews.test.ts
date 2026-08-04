@@ -5,6 +5,7 @@ import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 // the assertions here are about call shape, not argument types.
 const mockSelectStale = jest.fn() as jest.MockedFunction<(limit: number) => Promise<any[]>>;
 const mockClaim = jest.fn() as jest.MockedFunction<() => Promise<unknown[]>>;
+const mockRemaining = jest.fn() as jest.MockedFunction<() => number>;
 const mockGetIntegrationById = jest.fn() as jest.MockedFunction<(id: string) => Promise<any>>;
 const mockUpdateCheckRun = jest.fn() as jest.MockedFunction<(...args: any[]) => Promise<void>>;
 const mockSetCommitStatus = jest.fn() as jest.MockedFunction<(...args: any[]) => Promise<void>>;
@@ -21,11 +22,14 @@ jest.mock('@/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: () => ({
-          orderBy: () => ({
-            limit: (n: number) => mockSelectStale(n),
+        // Awaited directly by the remaining-depth count, chained through
+        // orderBy/limit by the batch selection.
+        where: () =>
+          Object.assign(Promise.resolve([{ remaining: mockRemaining() }]), {
+            orderBy: () => ({
+              limit: (n: number) => mockSelectStale(n),
+            }),
           }),
-        }),
       }),
     }),
     update: () => ({
@@ -136,6 +140,7 @@ const githubIntegration = {
 beforeEach(() => {
   jest.clearAllMocks();
   mockClaim.mockResolvedValue([{ id: 'claimed' }]);
+  mockRemaining.mockReturnValue(0);
   mockGetIntegrationById.mockResolvedValue(githubIntegration);
   mockUpdateCheckRun.mockResolvedValue(undefined);
   mockSetCommitStatus.mockResolvedValue(undefined);
@@ -173,6 +178,17 @@ describe('reapStaleCodeReviews', () => {
       'standard'
     );
     expect(summary).toMatchObject({ terminalized: 1, checksClosed: 1, providerFailures: 0 });
+  });
+
+  // A saturated batch alone says nothing about depth; the summary must carry
+  // how much is still waiting so the drain is observable.
+  it('reports the remaining stale backlog after the run', async () => {
+    mockSelectStale.mockResolvedValue([makeReview()]);
+    mockRemaining.mockReturnValue(1575);
+
+    const summary = await reapStaleCodeReviews();
+
+    expect(summary.remaining).toBe(1575);
   });
 
   it('cancels the commit status for a GitLab review', async () => {

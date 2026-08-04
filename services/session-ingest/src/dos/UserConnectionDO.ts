@@ -2487,8 +2487,12 @@ export class UserConnectionDO extends DurableObject<Env> {
               });
             }
           } else {
-            // Already done and past TTL: clean up.
+            // Already done and past TTL: clean up. Release the completion
+            // marker so cross-sweep dedupe state does not accumulate through
+            // repeated TTL cleanup.
+            const correlationId = key.slice(PENDING_COMMAND_KEY_PREFIX.length);
             await this.ctx.storage.delete(key);
+            this.completedCorrelationIds.delete(correlationId);
           }
         }
       })().catch((error: unknown) => {

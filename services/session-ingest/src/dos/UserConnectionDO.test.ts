@@ -7465,7 +7465,7 @@ describe('UserConnectionDO', () => {
           terminalDuringInitialWrite: Map<string, unknown>;
         }
       ).terminalDuringInitialWrite;
-      expect(terminalStash.size).toBeGreaterThanOrEqual(0);
+      expect(terminalStash.size).toBe(1);
 
       // Now reject the initial write.
       rejectInitialWrite!(new Error('simulated write failure'));

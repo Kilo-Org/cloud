@@ -6564,13 +6564,13 @@ describe('UserConnectionDO', () => {
       const originalPut = ctx.storage.put;
       ctx.storage.put = vi.fn(async (...args: unknown[]) => {
         callOrder.push('put');
-        return originalPut(...args);
+        return (originalPut as any)(...args);
       });
       // Spy on cliWs.send to track order.
       const originalSend = cliWs.send;
       cliWs.send = vi.fn((...args: unknown[]) => {
         callOrder.push('send');
-        return originalSend.apply(cliWs, args);
+        return (originalSend as any).apply(cliWs, args);
       });
 
       await sendCommand(doInstance, webWs, {
@@ -6698,12 +6698,12 @@ describe('UserConnectionDO', () => {
       const originalPut = ctx.storage.put;
       ctx.storage.put = vi.fn(async (...args: unknown[]) => {
         callOrder.push('put');
-        return originalPut(...args);
+        return (originalPut as any)(...args);
       });
       const originalSend = webWs.send;
       webWs.send = vi.fn((...args: unknown[]) => {
         callOrder.push('send');
-        return originalSend.apply(webWs, args);
+        return (originalSend as any).apply(webWs, args);
       });
 
       // Disconnect the CLI — finishDurablePendingCommands handles the

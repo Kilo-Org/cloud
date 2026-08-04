@@ -172,14 +172,14 @@ describe('performRefresh', () => {
 
   it('single-flights concurrent refresh calls', async () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      Response.json(
-        { token: 'shared', refreshToken: 'shared-ref', expiresIn: 3600 },
-        {
-          status: 200,
-        }
-      )
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        Response.json(
+          { token: 'shared', refreshToken: 'shared-ref', expiresIn: 3600 },
+          { status: 200 }
+        )
+      );
 
     // Start two concurrent refresh calls.
     const p1 = performRefresh();
@@ -198,13 +198,15 @@ describe('performRefresh', () => {
 
   it('does not restore credentials after sign-out invalidates a refresh', async () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
-    let resolveResponse: ((response: Response) => void) | undefined;
-    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
-      async () =>
-        new Promise<Response>(resolve => {
-          resolveResponse = resolve;
-        })
-    );
+    let resolveResponse: ((response: Response) => void) | undefined = undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        resolve();
+      });
+      return new Promise<Response>(resolve => {
+        resolveResponse = resolve;
+      });
+    });
 
     const refresh = performRefresh();
     await vi.waitFor(() => {
@@ -222,13 +224,15 @@ describe('performRefresh', () => {
 
   it('does not overwrite a newer sign-in when refresh completes later', async () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
-    let resolveResponse: ((response: Response) => void) | undefined;
-    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
-      async () =>
-        new Promise<Response>(resolve => {
-          resolveResponse = resolve;
-        })
-    );
+    let resolveResponse: ((response: Response) => void) | undefined = undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        resolve();
+      });
+      return new Promise<Response>(resolve => {
+        resolveResponse = resolve;
+      });
+    });
 
     const refresh = performRefresh();
     await vi.waitFor(() => {
@@ -248,13 +252,15 @@ describe('performRefresh', () => {
 
   it('does not refuse a newer session after an old refresh receives 401', async () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
-    let resolveResponse: ((response: Response) => void) | undefined;
-    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
-      async () =>
-        new Promise<Response>(resolve => {
-          resolveResponse = resolve;
-        })
-    );
+    let resolveResponse: ((response: Response) => void) | undefined = undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        resolve();
+      });
+      return new Promise<Response>(resolve => {
+        resolveResponse = resolve;
+      });
+    });
 
     const refresh = performRefresh();
     await vi.waitFor(() => {

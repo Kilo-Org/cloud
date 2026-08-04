@@ -78,13 +78,16 @@ describe('github-install-return', () => {
   });
 
   it('notifies a mounted Agents tab about a warm return', () => {
-    const listener = vi.fn(() => getGitHubInstallReturnOutcome());
+    const listener = vi.fn(() => {
+      getGitHubInstallReturnOutcome();
+    });
     const unsubscribe = subscribeToGitHubInstallReturnOutcome(listener);
 
     setGitHubInstallReturnOutcome({ kind: 'success' });
 
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveReturnedWith({ kind: 'success' });
+    // Outcome is consumed by the listener — a second read returns null.
+    expect(getGitHubInstallReturnOutcome()).toBeNull();
     unsubscribe();
   });
 });

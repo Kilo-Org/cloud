@@ -16,6 +16,7 @@ import { API_BASE_URL } from '@/lib/config';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
+import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
@@ -51,7 +52,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 // concurrent callers await the same promise.
 let refreshPromise: Promise<RefreshOutcome> | null = null;
 let refreshSessionVersion = 0;
-let credentialWrite = Promise.resolve();
+let credentialWrite: Promise<void> = new Promise<void>(resolve => {
+  resolve();
+});
 
 export type RefreshSuccess = {
   ok: true;
@@ -78,7 +81,7 @@ function isRefreshSessionCurrent(sessionVersion: number): boolean {
 
 async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
   const previous = credentialWrite;
-  let release: (() => void) | undefined;
+  let release: (() => void) | undefined = undefined;
   credentialWrite = new Promise<void>(resolve => {
     release = resolve;
   });
@@ -162,7 +165,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
       return { ok: false, refused: false };
     }
 
-    return writeCredentials(async () => {
+    return await writeCredentials(async () => {
       if (!isRefreshSessionCurrent(sessionVersion)) {
         return { ok: false, refused: false, superseded: true };
       }
@@ -187,60 +190,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
   }
 }
 
-export async function exchangeLegacyToken(): Promise<{
-  token: string;
-  refreshToken: string;
-  expiresIn: number;
-} | null> {
-  try {
-    // Guard: run at most once. If the marker is already set the exchange succeeded
-    // (or was deliberately skipped) in a past launch.
-    const alreadyExchanged = await SecureStore.getItemAsync(LEGACY_EXCHANGE_DONE_KEY);
-    if (alreadyExchanged) {
-      return null;
-    }
-
-    const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-    if (!token) {
-      return null;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/auth/native/exchange`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      // One-time exchange failure: retain old token, do not set the done
-      // marker. Retry on the next app launch.
-      return null;
-    }
-
-    const body: unknown = await response.json();
-    const parsed = parseTokenPair(body);
-
-    // An exchange response must include a full token pair with expiry.
-    if (!parsed?.refreshToken || !parsed.expiresIn) {
-      return null;
-    }
-
-    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, parsed.token);
-    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, parsed.refreshToken);
-    await SecureStore.setItemAsync(
-      TOKEN_EXPIRES_AT_KEY,
-      String(Date.now() + parsed.expiresIn * 1000)
-    );
-    // Persist the marker so we never exchange again.
-    await SecureStore.setItemAsync(LEGACY_EXCHANGE_DONE_KEY, '1');
-
-    return { token: parsed.token, refreshToken: parsed.refreshToken, expiresIn: parsed.expiresIn };
-  } catch {
-    return null;
-  }
-}
+export { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 
 export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [token, setToken] = useState<string | undefined>();
@@ -328,7 +278,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // Invalidate all queries so failed authenticated work recovers
         // with the new token. UNAUTHORIZED errors have retry=0, so a
         // concurrent 401 will not auto-refetch without explicit invalidation.
-        queryClient.invalidateQueries();
+        void queryClient.invalidateQueries();
         return;
       }
 

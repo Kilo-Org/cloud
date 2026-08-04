@@ -5,7 +5,6 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useUser } from '@/hooks/useUser';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, GitBranch } from 'lucide-react';
@@ -15,7 +14,6 @@ import { buildGitHubInstallState } from '@/components/integrations/github-instal
 
 export function OnboardingStepRepo() {
   const { state, setRepo, setTownName } = useOnboarding();
-  const { data: user } = useUser();
   const mainTrpc = useTRPC();
 
   const mintInstallState = useMutation(mainTrpc.githubApps.mintInstallState.mutationOptions());

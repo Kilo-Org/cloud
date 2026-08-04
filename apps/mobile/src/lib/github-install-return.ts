@@ -32,7 +32,9 @@ export function getGitHubInstallReturnOutcome(): GitHubInstallReturnOutcome {
 /** Subscribe to outcomes delivered while the Agents tab is already focused. */
 export function subscribeToGitHubInstallReturnOutcome(listener: () => void): () => void {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /** Extract C13 return outcome params from a raw URL query string. */

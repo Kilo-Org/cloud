@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Platform } from 'react-native';
 
+import { ADMISSION_CHALLENGE_FAILED, getAdmission } from './admission';
+
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'http://localhost:3000',
   GOOGLE_IOS_CLIENT_ID: 'ios-client-id',
@@ -11,8 +13,6 @@ vi.mock('@/lib/config', () => ({
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
-
-import { ADMISSION_CHALLENGE_FAILED, getAdmission } from './admission';
 
 // Re-spy on global fetch for each test-controlled mock.
 const originalFetch = globalThis.fetch;
@@ -61,7 +61,7 @@ describe('getAdmission', () => {
     // This test verifies the contract: a build without attestation packages
     // sends no admission field. The server's legacy path admits the request.
     vi.mocked(Platform).OS = 'ios';
-    setupFetch(async () => Promise.resolve(new Response(null, { status: 200 })));
+    setupFetch(() => new Response(null, { status: 200 }));
 
     const result = await getAdmission();
 

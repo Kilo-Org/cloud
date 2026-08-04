@@ -6,8 +6,9 @@ import { toast } from 'sonner-native';
 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
-import { API_BASE_URL, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
+import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { useAuth } from '@/lib/auth/auth-context';
+import { hasStringCode, postAuth } from '@/lib/auth/auth-fetch';
 import {
   ADMISSION_CHALLENGE_FAILED,
   type AdmissionPayload,
@@ -15,7 +16,6 @@ import {
 } from '@/lib/auth/admission';
 import {
   buildChallengeEntry,
-  parseAuthErrorCode,
   parseEmailCodeResponse,
   parseTokenPair,
   selectChallengeId,
@@ -48,45 +48,6 @@ export const RETRYABLE_ADMISSION_ERROR =
 
 export function mapError(errorCode: string | undefined): string {
   return (errorCode && AUTH_ERROR_MESSAGES[errorCode]) ?? DEFAULT_ERROR_MESSAGE;
-}
-
-// Only the callers we have need the error code + parsed body; a generic
-// fetch client would be speculative for two endpoints.
-async function postAuth(
-  path: string,
-  body: unknown
-): Promise<{ ok: true; data: unknown } | { ok: false; errorCode: string | undefined }> {
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    let json: unknown = undefined;
-    try {
-      json = await response.json();
-    } catch {
-      json = undefined;
-    }
-
-    if (!response.ok) {
-      return { ok: false, errorCode: parseAuthErrorCode(json) };
-    }
-
-    return { ok: true, data: json };
-  } catch {
-    return { ok: false, errorCode: undefined };
-  }
-}
-
-function hasStringCode(error: unknown): error is { code: string } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof (error as { code: unknown }).code === 'string'
-  );
 }
 
 export async function resolveAdmission(): Promise<

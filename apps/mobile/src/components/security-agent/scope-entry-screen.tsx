@@ -63,9 +63,6 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const cancelledRef = useRef(false);
 
   const performMint = useCallback(async () => {
-    if (cancelledRef.current) {
-      return;
-    }
     setMintFailed(false);
     setMintUrl(null);
     try {
@@ -81,7 +78,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         setMintFailed(true);
       }
     }
-  }, [scope, orgId]);
+  }, [orgId]);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -202,6 +199,10 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         );
       }
+      const url = reauthUrl ?? connectUrl;
+      if (!url) {
+        return null;
+      }
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader title="Security Agent" headerRight={auditAction} />
@@ -209,7 +210,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
             title="Additional permissions required"
             description="Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission."
             buttonLabel="Re-authorize GitHub App"
-            url={(reauthUrl ?? connectUrl)!}
+            url={url}
             onConnected={refetchAll}
           />
         </View>

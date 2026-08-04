@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
+import type * as AdmissionTypes from '@/lib/auth/admission';
+
 import {
   buildChallengeEntry,
   type ChallengeEntry,
@@ -50,7 +53,7 @@ vi.mock('@/lib/auth/auth-context', () => ({
 // Mock getAdmission so resolveAdmission tests can control the three paths:
 // success with payload, success with undefined, and throw.
 vi.mock('@/lib/auth/admission', async importOriginal => {
-  const mod = await importOriginal<typeof import('@/lib/auth/admission')>();
+  const mod = await importOriginal<typeof AdmissionTypes>();
   return {
     ...mod,
     getAdmission: vi.fn(),
@@ -58,8 +61,6 @@ vi.mock('@/lib/auth/admission', async importOriginal => {
 });
 
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
-
-import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
 
 const {
   AUTH_ERROR_MESSAGES,

@@ -71,7 +71,7 @@ async function getAuthHeaders() {
   if (expiresAtStr) {
     const expiresAt = Number(expiresAtStr);
     if (shouldRefreshBeforeRequest(expiresAt, Date.now(), REFRESH_MARGIN_MS)) {
-      const outcome = await performRefresh();
+      await performRefresh();
       const currentToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
       return buildAuthHeaders(currentToken);
     }

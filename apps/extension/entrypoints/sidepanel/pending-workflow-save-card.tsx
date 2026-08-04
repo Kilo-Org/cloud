@@ -170,7 +170,7 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
           </div>
         ) : null}
 
-        {pendingDraft && (
+        {pendingDraft && view.kind !== 'loadError' && (
           <div className="flex flex-col gap-3">
             <div className="space-y-1">
               <p className="type-label text-foreground-muted">Name</p>

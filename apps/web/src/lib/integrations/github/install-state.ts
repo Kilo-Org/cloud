@@ -69,5 +69,5 @@ export async function cleanupExpiredInstallStates(): Promise<number> {
     .delete(github_install_states)
     .where(sql`${github_install_states.expires_at} <= NOW()`);
 
-  return result.rowCount ?? result.length;
+  return result.rowCount ?? 0;
 }

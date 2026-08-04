@@ -1,21 +1,8 @@
-import type { CostInsightSpendOwner } from '@kilocode/db/cost-insights-rollups';
-import {
-  cost_insight_notification_deliveries,
-  type CostInsightEventSnapshot,
-} from '@kilocode/db/schema';
+import { cost_insight_notification_deliveries } from '@kilocode/db/schema';
 import type { CostInsightAlertKind } from '@kilocode/db/schema-types';
 import { eq, sql } from 'drizzle-orm';
 
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { sendCostInsightSpendAlertEmail } from '@/lib/email';
-import {
-  getCostInsightOwnerName,
-  hasCurrentCostInsightAccess,
-  parsePersistedCostInsightEventSnapshot,
-  type CostInsightDatabase,
-} from './repository';
-import { costInsightOwnerBasePath } from './owner';
-import { MICRODOLLARS_PER_USD, microdollarsToUsd } from './policy';
+import type { CostInsightDatabase } from './repository';
 
 const COST_INSIGHT_NOTIFICATION_MAX_ATTEMPTS = 5;
 const COST_INSIGHT_NOTIFICATION_LEASE_MINUTES = 15;
@@ -33,10 +20,6 @@ export type CostInsightClaimedDeliveryRow = {
   snapshot: unknown;
 };
 
-type ParsedCostInsightClaimedDeliveryRow = Omit<CostInsightClaimedDeliveryRow, 'snapshot'> & {
-  snapshot: CostInsightEventSnapshot;
-};
-
 export type CostInsightNotificationDispatchSummary = {
   claimed: number;
   sent: number;
@@ -44,57 +27,6 @@ export type CostInsightNotificationDispatchSummary = {
   terminalized: number;
   failed: number;
 };
-
-function ownerFromDelivery(row: CostInsightClaimedDeliveryRow): CostInsightSpendOwner {
-  if (row.owned_by_user_id) return { type: 'user', id: row.owned_by_user_id };
-  if (row.owned_by_organization_id) {
-    return { type: 'organization', id: row.owned_by_organization_id };
-  }
-  throw new Error('Cost Insights notification delivery event has no owner.');
-}
-
-function money(value: number | null | undefined): string {
-  if (value === null || value === undefined) return 'Unavailable';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value >= 100 * MICRODOLLARS_PER_USD ? 0 : 2,
-  }).format(microdollarsToUsd(value));
-}
-
-function amountLabels(row: ParsedCostInsightClaimedDeliveryRow): {
-  primaryAmountLabel: string;
-  secondaryAmountLabel: string;
-} {
-  if (
-    row.alert_kind === 'threshold' ||
-    row.alert_kind === 'threshold_7d' ||
-    row.alert_kind === 'threshold_30d'
-  ) {
-    const windowLabel =
-      row.alert_kind === 'threshold_7d'
-        ? '7-day'
-        : row.alert_kind === 'threshold_30d'
-          ? '30-day'
-          : '24-hour';
-    const rollingMicrodollars =
-      row.alert_kind === 'threshold_7d'
-        ? row.snapshot.rolling7DayMicrodollars
-        : row.alert_kind === 'threshold_30d'
-          ? row.snapshot.rolling30DayMicrodollars
-          : row.snapshot.rolling24HourMicrodollars;
-    return {
-      primaryAmountLabel: `Rolling ${windowLabel} spend: ${money(rollingMicrodollars)}`,
-      secondaryAmountLabel: `Spend threshold: ${money(row.snapshot.thresholdMicrodollars)}`,
-    };
-  }
-  return {
-    primaryAmountLabel: `Current-hour usage-based spend: ${money(
-      row.snapshot.currentHourVariableMicrodollars
-    )}`,
-    secondaryAmountLabel: `Alert level: ${money(row.snapshot.anomalyThresholdMicrodollars)}`,
-  };
-}
 
 async function terminalizeExhaustedDeliveryClaims(database: CostInsightDatabase): Promise<number> {
   const result = await database.execute<{ id: string }>(sql`
@@ -178,18 +110,6 @@ export async function claimPendingCostInsightNotificationDeliveries(
   return { rows: result.rows, terminalized };
 }
 
-async function markDeliverySent(database: CostInsightDatabase, deliveryId: string): Promise<void> {
-  await database
-    .update(cost_insight_notification_deliveries)
-    .set({
-      status: 'sent',
-      sent_at: sql`now()`,
-      failed_at: null,
-      updated_at: sql`now()`,
-    })
-    .where(eq(cost_insight_notification_deliveries.id, deliveryId));
-}
-
 async function markDeliverySkipped(
   database: CostInsightDatabase,
   deliveryId: string,
@@ -202,24 +122,6 @@ async function markDeliverySkipped(
       last_error_redacted: reason,
       failed_at: null,
       sent_at: null,
-      updated_at: sql`now()`,
-    })
-    .where(eq(cost_insight_notification_deliveries.id, deliveryId));
-}
-
-async function markDeliveryFailed(
-  database: CostInsightDatabase,
-  deliveryId: string,
-  reason: string
-): Promise<void> {
-  await database
-    .update(cost_insight_notification_deliveries)
-    .set({
-      status: 'failed',
-      failed_at: sql`now()`,
-      sent_at: null,
-      last_error_redacted: reason.slice(0, 500),
-      next_attempt_at: sql`now() + INTERVAL '15 minutes'`,
       updated_at: sql`now()`,
     })
     .where(eq(cost_insight_notification_deliveries.id, deliveryId));
@@ -239,51 +141,11 @@ export async function dispatchPendingCostInsightNotifications(
     failed: 0,
   };
 
+  // Cost Insights is discontinued, so nothing is delivered. Claimed rows are
+  // drained to 'skipped' instead of being retried until attempts run out.
   for (const row of rows) {
-    const snapshot = parsePersistedCostInsightEventSnapshot(row.snapshot);
-    if (!snapshot) {
-      await markDeliverySkipped(database, row.delivery_id, 'invalid_event_snapshot');
-      summary.skipped += 1;
-      continue;
-    }
-    const parsedRow = { ...row, snapshot };
-    const owner = ownerFromDelivery(parsedRow);
-    const hasAccess = await hasCurrentCostInsightAccess(
-      database,
-      owner,
-      parsedRow.recipient_user_id
-    );
-    if (!hasAccess) {
-      await markDeliverySkipped(database, parsedRow.delivery_id, 'recipient_not_authorized');
-      summary.skipped += 1;
-      continue;
-    }
-
-    try {
-      const labels = amountLabels(parsedRow);
-      const result = await sendCostInsightSpendAlertEmail(parsedRow.recipient_email, {
-        ownerLabel: await getCostInsightOwnerName(database, owner),
-        alertTitle: parsedRow.title,
-        alertDescription: parsedRow.description,
-        primaryAmountLabel: labels.primaryAmountLabel,
-        secondaryAmountLabel: labels.secondaryAmountLabel,
-        reviewUrl: `${NEXTAUTH_URL}${costInsightOwnerBasePath(owner)}`,
-      });
-      if (!result.sent) {
-        await markDeliveryFailed(database, parsedRow.delivery_id, result.reason);
-        summary.failed += 1;
-        continue;
-      }
-      await markDeliverySent(database, parsedRow.delivery_id);
-      summary.sent += 1;
-    } catch (error) {
-      await markDeliveryFailed(
-        database,
-        parsedRow.delivery_id,
-        error instanceof Error ? error.message : String(error)
-      );
-      summary.failed += 1;
-    }
+    await markDeliverySkipped(database, row.delivery_id, 'feature_discontinued');
+    summary.skipped += 1;
   }
 
   return summary;

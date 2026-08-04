@@ -8,7 +8,6 @@ import {
   CostInsightEventSnapshotSchema,
   kilocode_users,
   organization_memberships,
-  organizations,
   type CostInsightEventSnapshot,
   type CostInsightOwnerConfig,
   type CostInsightOwnerState,
@@ -1035,54 +1034,6 @@ export async function dismissCostInsightSuggestion(
   return await database.transaction(async transaction =>
     dismissCostInsightSuggestionInTransaction(transaction, params, createCostInsightEvent)
   );
-}
-
-export async function hasCurrentCostInsightAccess(
-  database: CostInsightDatabase,
-  owner: CostInsightSpendOwner,
-  userId: string
-): Promise<boolean> {
-  if (owner.type === 'user') {
-    if (owner.id !== userId) return false;
-    const [admin] = await database
-      .select({ id: kilocode_users.id })
-      .from(kilocode_users)
-      .where(and(eq(kilocode_users.id, userId), eq(kilocode_users.is_admin, true)))
-      .limit(1);
-    return Boolean(admin);
-  }
-  const [row] = await database
-    .select({ id: organization_memberships.id })
-    .from(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.organization_id, owner.id),
-        eq(organization_memberships.kilo_user_id, userId),
-        inArray(organization_memberships.role, ['owner', 'billing_manager'])
-      )
-    )
-    .limit(1);
-  return Boolean(row);
-}
-
-export async function getCostInsightOwnerName(
-  database: CostInsightDatabase,
-  owner: CostInsightSpendOwner
-): Promise<string> {
-  if (owner.type === 'user') {
-    const [user] = await database
-      .select({ name: kilocode_users.google_user_name })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, owner.id))
-      .limit(1);
-    return user?.name ?? 'Personal account';
-  }
-  const [organization] = await database
-    .select({ name: organizations.name })
-    .from(organizations)
-    .where(eq(organizations.id, owner.id))
-    .limit(1);
-  return organization?.name ?? 'Organization';
 }
 
 export async function deleteExpiredCostInsightEvents(

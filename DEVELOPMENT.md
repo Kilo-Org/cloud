@@ -186,6 +186,8 @@ This starts a PostgreSQL container on port 5432 with:
 - Password: `postgres`
 - Database: `postgres`
 
+A worktree with a port offset runs its own container on its own port; see [Multi-worktree support](#multi-worktree-support).
+
 ### 5. Run database migrations
 
 ```bash
@@ -457,7 +459,7 @@ One-time setup:
    ```
 3. `pnpm dev:start observability` — Grafana is available at http://localhost:4000 (default `admin`/`admin`).
 
-The dev runner passes `--env-file .env.local` to `docker compose` when starting infra, so the token reaches the Grafana container via env substitution without being loaded into the runner's `process.env`. Shell exports still override file values.
+The dev runner passes `--env-file dev/.env --env-file .env.local` to `docker compose` when starting infra, so the token reaches the Grafana container via env substitution without being loaded into the runner's `process.env`. Naming any file replaces Compose's default lookup, which is why `dev/.env` — this worktree's Compose project and infra ports — is named too. Shell exports still override file values.
 
 If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries fail. The runner prints an advisory warning at startup. See [dev/grafana/README.md](./dev/grafana/README.md) for full provisioning details and dashboard coverage.
 
@@ -488,9 +490,15 @@ With `auto`, the primary worktree gets offset 0 (default ports), and secondary w
 
 `pnpm dev:start` also passes a worktree-local Wrangler service-discovery registry at `.wrangler/dev-registry` into its tmux session. For worktrees with distinct `kilo-dev-*` session names, this allows concurrent offset Worker stacks such as `agents` to use the same local Worker names without resolving bindings to Workers running from sibling worktrees. The absolute registry path is recorded in `dev/logs/manifest.json` for diagnostics.
 
-Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 8079, `grafana` on 4000) always bind to their fixed host ports regardless of the offset - they are shared services, not per-worktree instances. Concurrent worktrees reuse those containers, and `pnpm dev:stop` leaves them running while another `kilo-dev-*` session remains active.
+Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 8079, `grafana` on 4000) follow the offset too, and a worktree with an offset runs them in its own Docker Compose project. It therefore has its own database, its own volume, and its own container lifecycle: `pnpm dev:stop` tears down only that worktree's containers, and no sibling worktree loses its connections. Run `pnpm drizzle migrate` and seed the data you need in each worktree — a new worktree starts with an empty database. The primary checkout keeps the default project and the default ports.
 
-The Next.js dev script exports local Redis defaults before `next dev` starts: `UPSTASH_REDIS_REST_URL=http://localhost:8079` and `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper, plus `REDIS_URL=redis://localhost:6379` for Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.
+`pnpm dev:infra-env` publishes the endpoints, and `pnpm dev:start`, `pnpm dev:env`, and `pnpm test:db` call it for you:
+
+- `dev/.env` carries `COMPOSE_PROJECT_NAME` and one `KILO_*_PORT` per container. Docker Compose reads that file by default, so a plain `docker compose -f dev/docker-compose.yml …` in a terminal uses the same project and ports.
+- `.env.local` gets this worktree's `POSTGRES_URL`, `REDIS_URL`, and `UPSTASH_REDIS_REST_URL`, which is what Next.js, drizzle-kit, `pnpm dev:seed`, and the tests read. A value that names another host (a remote database, a tunnel) is left alone.
+- Every worker command gets `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`, because each `wrangler.jsonc` commits a `localConnectionString` on the default port.
+
+The Next.js dev script reads `REDIS_URL` and `UPSTASH_REDIS_REST_URL` from the shell, then from the env files, and falls back to `redis://localhost:6379` and `http://localhost:8079`. It also exports `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper; `REDIS_URL` serves Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.
 
 ## Troubleshooting
 
@@ -512,7 +520,7 @@ docker compose -f dev/docker-compose.yml up -d
 docker ps | grep postgres
 ```
 
-The connection string used by the app is `postgres://postgres:postgres@localhost:5432/postgres`.
+The connection string used by the app is `postgres://postgres:postgres@localhost:5432/postgres`, or the `POSTGRES_URL` in `.env.local` when the worktree runs on a port offset.
 
 ### Missing `.env.local`
 

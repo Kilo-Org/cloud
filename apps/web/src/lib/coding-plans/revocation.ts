@@ -6,17 +6,17 @@ import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
-  type MiniMaxCodingPlanCredentialValidationInput,
-  validateMiniMaxCodingPlanCredential,
+  type CodingPlanCredentialValidationInput,
+  validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
-import { isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import { getCodingPlanPrice, isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
 import { coding_plan_key_inventory, coding_plan_subscriptions } from '@kilocode/db/schema';
 
 export type ManualRevocationStatus = 'revocation_pending' | 'revocation_failed';
 
 type InventoryCredentialValidator = (
-  input: MiniMaxCodingPlanCredentialValidationInput
+  input: CodingPlanCredentialValidationInput
 ) => Promise<boolean>;
 
 type ManualCredentialReplacementOptions = {
@@ -107,14 +107,10 @@ export async function replaceManualCredentialRevocation(
     throw new Error('BYOK encryption is not configured');
   }
 
-  const normalizedApiKey = apiKey.trim();
-  if (!normalizedApiKey) {
-    throw new Error('A replacement MiniMax API key is required.');
-  }
-
   const [credential] = await db
     .select({
       planId: coding_plan_key_inventory.plan_id,
+      providerId: coding_plan_key_inventory.provider_id,
       upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
       credentialFingerprint: coding_plan_key_inventory.credential_fingerprint,
     })
@@ -132,10 +128,18 @@ export async function replaceManualCredentialRevocation(
   if (!isCodingPlanId(credential.planId)) {
     throw new Error('Credential has an unsupported Coding Plan ID.');
   }
+  const plan = getCodingPlanPrice(credential.planId);
+  if (!plan || plan.providerId !== credential.providerId) {
+    throw new Error('Credential has an unsupported Coding Plan provider.');
+  }
+  const normalizedApiKey = apiKey.trim();
+  if (!normalizedApiKey) {
+    throw new Error(`A replacement ${plan.providerName} API key is required.`);
+  }
   const replacementFingerprint = codingPlanCredentialFingerprint(normalizedApiKey);
   if (replacementFingerprint === credential.credentialFingerprint) {
     throw new Error(
-      'Replacement MiniMax credential must be different from the current credential.'
+      `Replacement ${plan.providerName} credential must be different from the current credential.`
     );
   }
 
@@ -150,18 +154,19 @@ export async function replaceManualCredentialRevocation(
     )
     .limit(1);
   if (duplicateCredential) {
-    throw new Error('Replacement MiniMax credential is already present in inventory.');
+    throw new Error(`Replacement ${plan.providerName} credential is already present in inventory.`);
   }
 
-  const validateCredential = options.validateCredential ?? validateMiniMaxCodingPlanCredential;
+  const validateCredential = options.validateCredential ?? validateCodingPlanCredential;
   const isValid = await validateCredential({
     apiKey: normalizedApiKey,
     planId: credential.planId,
+    providerId: plan.providerId,
     upstreamPlanId: credential.upstreamPlanId,
   });
   if (!isValid) {
     throw new Error(
-      'Replacement MiniMax credential failed validation. Confirm plan access and supported model behavior, then try again.'
+      `Replacement ${plan.providerName} credential failed validation. Confirm plan access and supported model behavior, then try again.`
     );
   }
 

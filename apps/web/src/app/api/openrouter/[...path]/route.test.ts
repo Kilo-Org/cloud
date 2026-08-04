@@ -16,6 +16,14 @@ import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
 import { readDb } from '@/lib/drizzle';
+import {
+  checkFreeModelRateLimit,
+  checkFreeModelRateLimitByUser,
+  checkPromotionLimit,
+  logFreeModelRequest,
+} from '@/lib/free-model-rate-limiter';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
+import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 
 jest.mock('next/server', () => {
   return {
@@ -36,6 +44,7 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
 jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@/lib/free-model-rate-limiter');
 jest.mock('@/lib/organizations/organization-group-policy-context.server', () => ({
   getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
 }));
@@ -113,6 +122,10 @@ const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
+const mockedCheckFreeModelRateLimit = jest.mocked(checkFreeModelRateLimit);
+const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitByUser);
+const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
+const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 
 const provider = {
   id: 'openrouter',
@@ -303,6 +316,43 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       message: 'Rate limit exceeded. Please try again later.',
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('applies free-model rate limiting to flagged Kilo-exclusive models', async () => {
+    mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: false, requestCount: 200 });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id)) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({
+      error_type: 'rate_limit_exceeded',
+      message: 'Model usage limit reached. Please try again later.',
+    });
+    expect(mockedCheckFreeModelRateLimit).toHaveBeenCalledWith('127.0.0.1');
+    expect(mockedCheckFreeModelRateLimitByUser).not.toHaveBeenCalled();
+    expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not apply free-model rate limiting to unflagged free models', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody(tencent_hy3_free_model.public_id)) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedCheckFreeModelRateLimit).not.toHaveBeenCalled();
+    expect(mockedCheckFreeModelRateLimitByUser).not.toHaveBeenCalled();
+    expect(mockedCheckPromotionLimit).not.toHaveBeenCalled();
+    expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
   it('adds latency and rewrites quarantine-3 non-BYOK requests to a free model', async () => {

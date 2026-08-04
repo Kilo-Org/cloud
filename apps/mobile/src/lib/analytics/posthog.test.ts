@@ -350,7 +350,7 @@ describe('discardPostHog', () => {
     const discardPromise = discardPostHog();
 
     // Let the synchronous part of discardPostHog run: seal, clear queues,
-    // client = null, flagListeners.clear(), then it awaits optOut.
+    // client = null, then it awaits optOut.
     await new Promise<void>(resolve => {
       void setTimeout(resolve, 0);
     });
@@ -709,5 +709,68 @@ describe('isPostHogReady and subscribeToPostHogReady', () => {
     expect(isPostHogReady()).toBe(true);
 
     unsubscribe();
+  });
+});
+
+describe('flag listener persistence through off-on', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('onFeatureFlags callback is re-registered after discardPostHog + initPostHog', async () => {
+    const { initPostHog, discardPostHog } = await loadModule();
+    initPostHog();
+    expect(hoisted.client.onFeatureFlags).toHaveBeenCalledTimes(1);
+
+    await discardPostHog();
+
+    // Re-init must register the onFeatureFlags callback on the new client.
+    initPostHog();
+    expect(hoisted.client.onFeatureFlags).toHaveBeenCalledTimes(2);
+
+    const callback = hoisted.client.onFeatureFlags.mock.calls[1]?.[0];
+    expect(callback).toEqual(expect.any(Function));
+  });
+
+  it('onFeatureFlags callback survives concurrent re-init during async discard', async () => {
+    const { initPostHog, discardPostHog } = await loadModule();
+    initPostHog();
+
+    let optOutResolve: (() => void) | undefined = undefined;
+    hoisted.client.optOut.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        optOutResolve = resolve;
+      });
+    });
+
+    const discardPromise = discardPostHog();
+
+    // Let the synchronous part of discardPostHog run (seal, clear queues,
+    // client = null), then it awaits optOut. After our fix, flagListeners
+    // is NOT cleared here.
+    await new Promise<void>(resolve => {
+      void setTimeout(resolve, 0);
+    });
+
+    // Concurrent re-init while optOut is still pending.
+    initPostHog();
+    expect(hoisted.client.onFeatureFlags).toHaveBeenCalledTimes(2);
+
+    // The second onFeatureFlags callback must be registered and callable.
+    const callback = hoisted.client.onFeatureFlags.mock.calls[1]?.[0];
+    expect(callback).toEqual(expect.any(Function));
+    // Invoking the callback must not throw — flagListeners may be empty or
+    // contain stale entries, but iteration must be safe.
+    expect(() => {
+      // oxlint-disable-next-line promise/prefer-await-to-callbacks -- direct invocation in a test assertion
+      (callback as () => void)();
+    }).not.toThrow();
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
+    optOutResolve!();
+    await discardPromise;
   });
 });

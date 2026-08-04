@@ -134,8 +134,8 @@ async function loadPostHogModule() {
   return import('@/lib/analytics/posthog');
 }
 
-/** Load posthog, the gate helpers, and the controller from a single
- *  module registry so production gate helpers and SDK modules share
+/** Load posthog, the gate hook, and the controller from a single
+ *  module registry so the production hook and SDK modules share
  *  the same controller instance. */
 // oxlint-disable-next-line require-await -- async required by promise-function-async
 async function loadPostHogWithGate() {
@@ -144,17 +144,6 @@ async function loadPostHogWithGate() {
   const gate = await import('@/lib/hooks/use-analytics-consent-gate');
   const ctrl = await import('@/lib/telemetry/controller');
   return { ...posthog, ...gate, ctrl };
-}
-
-/** Load appsflyer, the gate helpers, and the controller from a single
- *  module registry.  Used by the AppsFlyer buffer-isolation test. */
-// oxlint-disable-next-line require-await -- async required by promise-function-async
-async function loadAppsFlyerWithGate() {
-  vi.resetModules();
-  const appsflyer = await import('../appsflyer');
-  const gate = await import('@/lib/hooks/use-analytics-consent-gate');
-  const ctrl = await import('@/lib/telemetry/controller');
-  return { ...appsflyer, ...gate, ctrl };
 }
 
 // ---- AppsFlyer buffer test ----
@@ -170,32 +159,49 @@ describe('buffer isolation between accounts', () => {
   it('drops account A buffered events after switch to account B', async () => {
     vi.useFakeTimers();
 
-    const mod = await loadAppsFlyerWithGate();
+    // Load posthog + gate + controller in a fresh module registry.
+    const mod = await loadPostHogWithGate();
+    // Import appsflyer in the same registry so controller is shared.
+    const appsflyerMod = await import('../appsflyer');
 
-    // 1. Start optional telemetry for account A.
-    mod.ctrl.setTelemetryDecision('account-a', true);
-    const epochA = mod.ctrl.currentEpoch();
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
 
-    // Stall initSdk — initialized stays false.
+    // 1. Stall initSdk — initialized stays false, callback never fires.
     hoisted.appsFlyer.initSdk.mockImplementation(() => {
       // deliberate no-op
     });
 
-    const startA = mod.startOptionalTelemetry(epochA, 'account-a@test.com');
-    // resumePostHog has a 110 ms timer.
+    // Mount hook for account A (optionalConsent: true triggers start path).
+    const rendererA = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'account-a@test.com',
+        accountId: 'account-a',
+        optionalConsent: true,
+      })
+    );
+    // Flush synchronous effects.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // startOptionalTelemetry calls resumePostHog (110 ms timer).
     await vi.advanceTimersByTimeAsync(110);
-    await startA;
 
     // 2. Buffer a login event while init is stalled.
-    mod.trackEvent('login');
+    appsflyerMod.trackEvent('login');
     expect(hoisted.appsFlyer.logEvent).not.toHaveBeenCalled();
 
-    // 3. Switch to account B — bump generation via clear + set.
-    mod.ctrl.clearTelemetryDecision();
-    mod.ctrl.setTelemetryDecision('account-b', true);
-    const epochB = mod.ctrl.currentEpoch();
+    // 3. Unmount account A.
+    rendererA.unmount();
 
-    // 4. Let initSdk succeed for account B and track the callback.
+    // 4. Now let initSdk succeed for account B.
     let accountBOnSuccessCalled = false;
     hoisted.appsFlyer.initSdk.mockImplementation(
       (_options: unknown, onSuccess: (result: string) => void) => {
@@ -204,16 +210,34 @@ describe('buffer isolation between accounts', () => {
       }
     );
 
-    const startB = mod.startOptionalTelemetry(epochB, 'account-b@test.com');
-    await vi.advanceTimersByTimeAsync(110);
-    await startB;
+    // Mount hook for account B. The hook calls setTelemetryDecision, which
+    // bumps generation because accountId changed from 'account-a' to
+    // 'account-b'. startOptionalTelemetry → initAppsFlyer → initSdk fires
+    // onSuccess, drainPendingEvents only sends events for the current
+    // generation — account A's buffered event is dropped.
+    const rendererB = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'account-b@test.com',
+        accountId: 'account-b',
+        optionalConsent: true,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-    // 5. Prove account B's drain path ran (init callback fired).
+    await vi.advanceTimersByTimeAsync(110);
+
+    // 5. Prove account B's init callback ran.
     expect(accountBOnSuccessCalled).toBe(true);
 
     // 6. Account A's buffered event must not drain.
     expect(hoisted.appsFlyer.logEvent).toHaveBeenCalledTimes(0);
 
+    rendererB.unmount();
     vi.useRealTimers();
   });
 });
@@ -279,23 +303,36 @@ describe('optional telemetry lifecycle', () => {
     mod.ctrl.setTelemetryDecision('test', true);
     mod.initPostHog();
 
-    // Switch to optional=false — same account, generation stays.
-    mod.ctrl.setTelemetryDecision('test', false);
-    const epoch = mod.ctrl.currentEpoch();
-
-    // Stall optOut so the epoch can change before it resolves.
+    // Stall optOut so the discard chain doesn't complete.
     let optOutResolve: (() => void) | undefined = undefined;
     hoisted.client.optOut.mockImplementationOnce(
-      // oxlint-disable-next-line @typescript-eslint/promise-function-async -- mock returns pending promise
-      () =>
-        new Promise<void>(resolve => {
+      async () => {
+        await new Promise<void>(resolve => {
           optOutResolve = resolve;
-        })
+        });
+      }
     );
 
-    // discardOptionalTelemetry calls discardPostHog() internally — let it
-    // await the stalled optOut while we bump the epoch.
-    const optionalOff = mod.discardOptionalTelemetry(epoch);
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    // Mount the hook with optionalConsent=false — triggers discard path.
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'test@test.com',
+        accountId: 'test',
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     // Let the synchronous part of discardPostHog run (seal, clear queues,
     // client=null) so the stalled optOut is now the only pending work.
@@ -308,9 +345,13 @@ describe('optional telemetry lifecycle', () => {
 
     // oxlint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
     optOutResolve!();
-    await optionalOff;
+    // Flush the async discard chain.
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(hoisted.storage.purgePostHogPersistence).not.toHaveBeenCalled();
+
+    renderer.unmount();
   });
 
   it('purges when the epoch remains unchanged after discard', async () => {
@@ -318,38 +359,79 @@ describe('optional telemetry lifecycle', () => {
     mod.ctrl.setTelemetryDecision('test', true);
     mod.initPostHog();
 
-    // Switch to optional=false.
-    mod.ctrl.setTelemetryDecision('test', false);
-    const epoch = mod.ctrl.currentEpoch();
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
 
-    // discardOptionalTelemetry calls the real discardPostHog, which calls
-    // optOut (mockResolvedValue) → resolves → checks epoch → matches → purges.
-    await mod.discardOptionalTelemetry(epoch);
+    // Mount with optionalConsent=false — discardPostHog runs, optOut resolves,
+    // epoch matches → purgePostHogPersistence called.
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'test@test.com',
+        accountId: 'test',
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Flush the async discard chain.
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
   });
 
   it('does not initialize SDKs when resume is superseded', async () => {
     const mod = await loadPostHogWithGate();
     vi.useFakeTimers();
 
+    // Pre-set the decision so allowsOptional() returns true.
     mod.ctrl.setTelemetryDecision('test', true);
-    const epoch = mod.ctrl.currentEpoch();
 
-    // Bump the epoch — newer decision supersedes the one epoch was captured for.
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    // Mount with optionalConsent=true — triggers start path.
+    // setTelemetryDecision runs synchronously, then startOptionalTelemetry
+    // calls resumePostHog which schedules a 110 ms setTimeout.
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'test@example.com',
+        accountId: 'test',
+        optionalConsent: true,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Bump the epoch while resumePostHog is waiting on its 110 ms timer.
     mod.ctrl.setTelemetryDecision('test', false);
 
-    const startPromise = mod.startOptionalTelemetry(epoch, 'test@example.com');
-
-    // resumePostHog has a 110 ms timer. Advance past it so startOptionalTelemetry
-    // can reach the epoch check.
+    // Advance past the 110 ms debounce in resumePostHog.
     await vi.advanceTimersByTimeAsync(110);
-    await startPromise;
 
-    // Epoch mismatch → initAppsFlyer, initPostHog, identifyUser never called.
+    // Epoch mismatch after resume → initAppsFlyer, initPostHog, identifyUser
+    // never called.
     expect(hoisted.holder.options).toBeUndefined();
     expect(hoisted.appsFlyer.initSdk).not.toHaveBeenCalled();
 
+    renderer.unmount();
     vi.useRealTimers();
   });
 });
@@ -367,38 +449,6 @@ describe('needsConsent gate teardown', () => {
         onSuccess('ok');
       }
     );
-  });
-
-  it('resets AppsFlyer and discards PostHog when consent is invalidated', async () => {
-    // Load gate + posthog + controller in one module registry.
-    const mod = await loadPostHogWithGate();
-    // Also load appsflyer in the same registry so controller is shared.
-    const appsflyerMod = await import('../appsflyer');
-
-    // Set up active optional decision with initialized state.
-    mod.ctrl.setTelemetryDecision('test-account', true);
-    mod.initPostHog();
-    appsflyerMod.initAppsFlyer();
-    expect(hoisted.appsFlyer.initSdk).toHaveBeenCalledTimes(1);
-
-    // Simulate consent invalidation while signed in — same sequence the gate
-    // hook now runs for needsConsent.
-    mod.ctrl.setTelemetryDecision('test-account', false);
-    const epoch = mod.ctrl.currentEpoch();
-
-    // Controller write is synchronous, teardown follows.
-    appsflyerMod.resetAppsFlyerState();
-    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith(true);
-
-    // PostHog discard initiated (not awaited).
-    await mod.discardOptionalTelemetry(epoch);
-
-    // sealPostHogStorage called synchronously inside discardPostHog.
-    expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
-    // optOut called as part of the discard.
-    expect(hoisted.client.optOut).toHaveBeenCalled();
-    // purgePostHogPersistence called after discard because epoch matched.
-    expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
   });
 
   it('gate hook tears down AppsFlyer and PostHog when needsConsent becomes true', async () => {
@@ -700,32 +750,63 @@ describe('unsettled consent teardown', () => {
     vi.useFakeTimers();
     const mod = await loadPostHogWithGate();
 
-    // Arm telemetry and create a client.
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    // Step 1: arm telemetry.
     mod.ctrl.setTelemetryDecision('test-account', true);
     mod.initPostHog();
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(0);
 
-    // Off: discard the client. optOut is called on the old client.
-    mod.ctrl.setTelemetryDecision('test-account', false);
-    const epoch = mod.ctrl.currentEpoch();
-    const discardPromise = mod.discardOptionalTelemetry(epoch);
+    // Step 2: off — mount with optionalConsent=false triggers discard.
+    const rendererOff = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'test@test.com',
+        accountId: 'test-account',
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Flush the async discard chain.
     await vi.advanceTimersByTimeAsync(120);
     await Promise.resolve();
     await Promise.resolve();
-    await discardPromise;
+
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
+
+    rendererOff.unmount();
 
     // Clear the optOut mock so we can assert the new client is NOT opted out.
     hoisted.client.optOut.mockClear();
 
-    // On: recover — re-enable optional consent.
-    mod.ctrl.setTelemetryDecision('test-account', true);
-    const onEpoch = mod.ctrl.currentEpoch();
-    const startPromise = mod.startOptionalTelemetry(onEpoch, 'test@test.com');
+    // Step 3: on — mount with optionalConsent=true triggers recovery.
+    const rendererOn = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'test@test.com',
+        accountId: 'test-account',
+        optionalConsent: true,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Advance past the 110 ms debounce in resumePostHog.
     await vi.advanceTimersByTimeAsync(120);
     await Promise.resolve();
     await Promise.resolve();
-    await startPromise;
 
     // The new client must NOT have optOut called on it.
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(0);
@@ -735,6 +816,7 @@ describe('unsettled consent teardown', () => {
     mod.captureEvent('after-recovery');
     expect(hoisted.client.capture).toHaveBeenCalledWith('after-recovery', undefined);
 
+    rendererOn.unmount();
     vi.useRealTimers();
   });
 });

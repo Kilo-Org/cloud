@@ -255,7 +255,6 @@ export async function discardPostHog(): Promise<void> {
     if (typeof c?.setPersistedProperty !== 'function') {
       client = null;
       notifyPostHogReady();
-      flagListeners.clear();
       return;
     }
 
@@ -263,15 +262,15 @@ export async function discardPostHog(): Promise<void> {
     c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
     c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
 
-    // Drop the live reference and clear flag listeners before any async work
-    // so concurrent code cannot capture through the stale instance, stale
-    // flag callbacks cannot fire, and a concurrent initPostHog() can create a
-    // fresh client whose listeners survive.
+    // Drop the live reference before any async work so concurrent code
+    // cannot capture through the stale instance. Flag listeners persist —
+    // like ready listeners, they must survive the discard so mounted
+    // useFeatureFlag subscribers receive updates when the client is
+    // re-created by a later initPostHog.
     // Ready listeners persist — they must observe both the false transition
     // now and a true transition from a later initPostHog.
     client = null;
     notifyPostHogReady();
-    flagListeners.clear();
 
     try {
       await c.optOut();

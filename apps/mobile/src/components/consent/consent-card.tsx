@@ -45,6 +45,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const [optionalToggle, setOptionalToggle] = useState(false);
   const [savingOptional, setSavingOptional] = useState(false);
   const loadedRef = useRef(false);
+  const userToggledRef = useRef(false);
 
   // Load the stored optional value in review mode only.  The active flag
   // stops a late resolve from overwriting a value the user just toggled.
@@ -53,13 +54,21 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       return undefined;
     }
     let active = true;
-    // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- the plan prescribes a void .then() pattern with an active guard; async/await would allow the promise to settle after unmount.
-    void readConsent(userId).then(stored => {
-      if (active) {
-        setOptionalToggle(stored.optional);
-        loadedRef.current = true;
+    // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- async/await would allow the promise to settle after unmount.
+    void readConsent(userId).then(
+      // eslint-disable-next-line promise/always-return
+      stored => {
+        if (active && !userToggledRef.current) {
+          setOptionalToggle(stored.optional);
+          loadedRef.current = true;
+        }
+      },
+      () => {
+        if (active) {
+          setError('Could not load your consent settings. Please try again.');
+        }
       }
-    });
+    );
     return () => {
       active = false;
     };
@@ -145,12 +154,13 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     (next: boolean) => {
       setOptionalToggle(next);
       setError(null);
+      userToggledRef.current = true;
 
       if (mode === 'review' && userId) {
         setSavingOptional(true);
-        // eslint-disable-next-line promise/prefer-await-to-then
+        // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- fire-and-forget toggle revert pattern.
         void setOptionalConsent(userId, next).then(
-          // eslint-disable-next-line promise/always-return -- fire-and-forget toggle revert pattern.
+          // eslint-disable-next-line promise/always-return
           () => {
             setSavingOptional(false);
           },
@@ -160,6 +170,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             setSavingOptional(false);
           }
         );
+      } else if (mode === 'review') {
+        setOptionalToggle(!next);
+        setError('Could not load your account. Please try again.');
       }
     },
     [mode, userId]

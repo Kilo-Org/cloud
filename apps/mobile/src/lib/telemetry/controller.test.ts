@@ -68,6 +68,7 @@ describe('generation', () => {
     // From undefined to a defined decision is not an account change.
     setTelemetryDecision('acct-1', true);
     const afterFirst = currentGeneration();
+    expect(afterFirst).toBe(0);
 
     setTelemetryDecision('acct-2', true);
     expect(currentGeneration()).toBe(afterFirst + 1);

@@ -77,7 +77,7 @@ const batchLink = httpBatchLink({
   methodOverride: 'POST',
 });
 
-export const trpcLinks = [
+const trpcLinks = [
   splitLink({
     condition: op => op.context.skipBatch === true,
     true: singleLink,

@@ -144,8 +144,15 @@ export function initAppsFlyer(): void {
     new AppsFlyerConsent(undefined, allowsOptional(), allowsOptional(), allowsOptional())
   );
 
-  // Resume the SDK if it was stopped by a prior reset.
-  appsFlyer.stop(false);
+  // Resume the SDK if it was stopped by a prior reset. Native stop may throw
+  // synchronously — catch it so initSdk still proceeds.
+  try {
+    if (typeof (appsFlyer as Record<string, unknown>).stop === 'function') {
+      appsFlyer.stop(false);
+    }
+  } catch {
+    // Native stop threw; JS invalidation (if any) already ran in resetAppsFlyerState.
+  }
 
   const initGeneration = currentGeneration();
   const initToken = callbackToken;

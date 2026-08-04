@@ -31,8 +31,12 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
+const mockedReplace = vi.hoisted(() => vi.fn());
+const mockedPush = vi.hoisted(() => vi.fn());
+const mockedBack = vi.hoisted(() => vi.fn());
+
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ replace: mockedReplace, push: mockedPush, back: mockedBack }),
 }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
 vi.mock('lucide-react-native', () => ({
@@ -42,22 +46,6 @@ vi.mock('lucide-react-native', () => ({
   Shield: 'Shield',
   Smartphone: 'Smartphone',
   User: 'User',
-}));
-vi.mock('@/components/consent/consent-mode', () => ({
-  getConsentActions: (mode: string) =>
-    mode === 'review'
-      ? {
-          primaryLabel: 'Back',
-          secondaryLabel: 'Revoke consent',
-          destructiveLabel: 'Revoke consent',
-          destructiveTitle: 'Revoke consent?',
-        }
-      : {
-          primaryLabel: 'Accept and continue',
-          secondaryLabel: 'Decline',
-          destructiveLabel: 'Decline and sign out',
-          destructiveTitle: 'Decline?',
-        },
 }));
 vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -186,6 +174,7 @@ describe('ConsentCard', () => {
     });
     await act(flush);
     expect(texts(renderer.root)).toContain('Could not save your consent. Please try again.');
+    expect(mockedReplace).not.toHaveBeenCalled();
   });
 
   it('renders the consent card in onboarding mode without crashing', () => {

@@ -500,25 +500,37 @@ describe('resetAppsFlyerState', () => {
     mockedAppsFlyer.stop.mockReset();
   });
 
-  it('clears initialized and pending events', async () => {
+  it('clears pending events so pre-reset events cannot drain on re-init', async () => {
     mockedController.currentGeneration.mockReturnValue(0);
+    const successHolders: ((result: string) => void)[] = [];
+    mockedAppsFlyer.initSdk.mockImplementation(
+      (_options: unknown, onSuccess: (result: string) => void) => {
+        successHolders.push(onSuccess);
+      }
+    );
+
+    const module = await loadModule();
+    // Start init but hold the success callback — the SDK is not yet initialized.
+    module.initAppsFlyer();
+    expect(successHolders).toHaveLength(1);
+
+    // Queue an event while init is pending — goes to pendingEvents, not sent.
+    module.trackEvent('pre-reset-event');
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+
+    // Reset clears initialized, pendingEvents, and increments callbackToken.
+    module.resetAppsFlyerState();
+
+    // Fire the stale callback — token mismatch blocks drainPendingEvents.
+    successHolders[0]?.('ok');
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+
+    // Re-init with a fresh callback that fires synchronously.
     mockedAppsFlyer.initSdk.mockImplementation(
       (_options: unknown, onSuccess: (result: string) => void) => {
         onSuccess('ok');
       }
     );
-
-    const module = await loadModule();
-    module.initAppsFlyer();
-    // Queue one event before reset.
-    module.trackEvent('pre-reset-event');
-    expect(mockedAppsFlyer.logEvent).toHaveBeenCalledTimes(1);
-
-    module.resetAppsFlyerState();
-
-    // After reset, trackEvent queues because initialized is false.
-    // But reset also cleared pendingEvents, so the pre-reset event is gone.
-    // initAppsFlyer again and verify no previous event drains.
     mockedAppsFlyer.logEvent.mockClear();
     module.initAppsFlyer();
 

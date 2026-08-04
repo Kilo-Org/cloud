@@ -18,7 +18,7 @@ type AnalyticsConsentGateState = {
   readonly optionalConsent: boolean;
 };
 
-export async function discardOptionalTelemetry(epoch: number): Promise<void> {
+async function discardOptionalTelemetry(epoch: number): Promise<void> {
   await discardPostHog();
   if (currentEpoch() !== epoch) {
     return;
@@ -26,10 +26,13 @@ export async function discardOptionalTelemetry(epoch: number): Promise<void> {
   purgePostHogPersistence();
 }
 
-export async function startOptionalTelemetry(
+async function startOptionalTelemetry(
   epoch: number,
   email: string | undefined
 ): Promise<void> {
+  if (currentEpoch() !== epoch) {
+    return;
+  }
   await resumePostHog();
   if (currentEpoch() !== epoch) {
     return;

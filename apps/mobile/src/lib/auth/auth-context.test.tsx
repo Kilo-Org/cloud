@@ -156,9 +156,7 @@ async function mountAndGetContext(): Promise<{ ctx: AuthContextValue; unmount: (
 
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   await act(async () => {
-    renderer = TestRenderer.create(
-      createElement(mod.AuthProvider, null, createElement(Consumer))
-    );
+    renderer = TestRenderer.create(createElement(mod.AuthProvider, null, createElement(Consumer)));
     await Promise.resolve();
   });
 
@@ -190,7 +188,6 @@ describe('sign-out teardown ordering', () => {
     vi.clearAllMocks();
     hoisted.callOrder.length = 0;
     hoisted.secureStore.getItemAsync.mockResolvedValue(null);
-    hoisted.secureStore.deleteItemAsync.mockResolvedValue(undefined);
   });
 
   it('calls clearTelemetryDecision and Sentry.setUser first, synchronously', async () => {

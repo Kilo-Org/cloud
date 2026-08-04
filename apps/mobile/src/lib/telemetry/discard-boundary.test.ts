@@ -417,9 +417,11 @@ describe('needsConsent gate teardown', () => {
 
     // Mount with needsConsent=true while signed in — must trigger full teardown.
     // Wrap in act so React flushes the useEffect synchronously.
-    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
     await act(async () => {
-      renderer = TestRenderer.create(
+      rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
           consentChecked: true,
@@ -452,6 +454,6 @@ describe('needsConsent gate teardown', () => {
     expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
 
     // Unmount the renderer so effects and subscriptions are torn down.
-    renderer?.unmount();
+    rendererRef.current?.unmount();
   });
 });

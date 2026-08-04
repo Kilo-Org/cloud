@@ -38,6 +38,12 @@ export const REASONING_VARIANTS_MAX_HIGH_LOW = {
   low: { reasoning: { enabled: true, effort: 'low' } },
 } as const;
 
+export const REASONING_VARIANTS_XHIGH_MEDIUM_LOW = {
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+} as const;
+
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
   minimal: { reasoning: { enabled: true, effort: 'minimal' } },
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
@@ -97,6 +103,9 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   }
   if (isKimiModel(model)) {
     return REASONING_VARIANTS_MAX_HIGH_LOW;
+  }
+  if (model.includes('qwen3.8') && (model.includes('plus') || model.includes('max'))) {
+    return REASONING_VARIANTS_XHIGH_MEDIUM_LOW;
   }
   if (
     isMinimaxModel(model) ||

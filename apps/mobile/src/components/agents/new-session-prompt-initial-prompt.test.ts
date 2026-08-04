@@ -41,9 +41,20 @@ vi.mock('lucide-react-native', () => ({
   Paperclip: () => null,
 }));
 
+vi.mock('sonner-native', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
 // ── sub-components ─────────────────────────────────────────────────
 vi.mock('@/components/agents/attachment-preview-strip', () => ({
   AttachmentPreviewStrip: () => null,
+}));
+
+vi.mock('@/components/agents/attachment-paste-hint', () => ({
+  AttachmentPasteHint: () => null,
 }));
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
@@ -85,6 +96,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     foreground: '#000',
     mutedForeground: '#666',
     primaryForeground: '#fff',
+  }),
+}));
+
+vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
+  useClipboardImageHint: () => ({
+    visible: false,
+    refresh: vi.fn(),
+    paste: vi.fn(),
   }),
 }));
 

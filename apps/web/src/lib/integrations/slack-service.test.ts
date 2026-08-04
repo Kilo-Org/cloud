@@ -385,6 +385,76 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
+  it('removes the previous workspace installation when an owner switches workspaces', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({ platform_installation_id: 'T_OLD', platform_account_id: 'T_OLD' }),
+    ]);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner, teamId: 'T_NEW', installation });
+
+    expect(mockUpsertWorkspaceInstallation).toHaveBeenCalledWith(
+      expect.objectContaining({ teamId: 'T_NEW' })
+    );
+    expect(mockCountSlackConnections).toHaveBeenCalledWith('T_OLD');
+    expect(mockDeleteWorkspaceInstallation).toHaveBeenCalledWith('T_OLD');
+  });
+
+  it('keeps the previous workspace installation when the workspace is unchanged', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({ platform_installation_id: 'T123', platform_account_id: 'T123' }),
+    ]);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner, teamId: 'T123', installation });
+
+    expect(mockDeleteWorkspaceInstallation).not.toHaveBeenCalled();
+  });
+
+  it('keeps the previous workspace installation while something still references it', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({ platform_installation_id: 'T_OLD', platform_account_id: 'T_OLD' }),
+    ]);
+    mockCountSlackConnections.mockResolvedValue(1);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner, teamId: 'T_NEW', installation });
+
+    expect(mockDeleteWorkspaceInstallation).not.toHaveBeenCalled();
+  });
+
+  it('removes the new workspace installation when persisting the integration fails', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockInsertReturning.mockRejectedValue(new Error('insert exploded'));
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await expect(upsertSlackInstallation({ owner, teamId: 'T123', installation })).rejects.toThrow(
+      'insert exploded'
+    );
+
+    expect(mockDeleteWorkspaceInstallation).toHaveBeenCalledWith('T123');
+  });
+
   it('clears an earlier suspension when refreshing an existing installation', async () => {
     mockLimit.mockResolvedValue([
       buildSlackIntegration({

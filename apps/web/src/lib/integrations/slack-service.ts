@@ -255,9 +255,16 @@ export async function upsertSlackInstallation({
         : defaultModel,
   };
 
-  if (existing) {
-    try {
-      const [updated] = await db
+  // An owner holds at most one Slack integration, so installing a different
+  // workspace repoints the existing row. Remember the workspace it used to point
+  // at: once the row moves, nothing references the old workspace any more and its
+  // stored token has to go with it.
+  const previousTeamId = existing?.platform_installation_id ?? null;
+
+  let integration: PlatformIntegration;
+  try {
+    if (existing) {
+      [integration] = await db
         .update(platform_integrations)
         .set({
           platform_installation_id: teamId,
@@ -274,41 +281,42 @@ export async function upsertSlackInstallation({
         })
         .where(eq(platform_integrations.id, existing.id))
         .returning();
-
-      return updated;
-    } catch (error) {
-      if (isSlackWorkspaceUniqueViolation(error)) {
-        throw new SlackWorkspaceAlreadyConnectedError(teamName);
-      }
-      throw error;
+    } else {
+      [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          platform: PLATFORM.SLACK,
+          integration_type: 'oauth',
+          platform_installation_id: teamId,
+          platform_account_id: teamId,
+          platform_account_login: teamName,
+          scopes: SLACK_SCOPES,
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata,
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
     }
-  }
-
-  try {
-    const [created] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        platform: PLATFORM.SLACK,
-        integration_type: 'oauth',
-        platform_installation_id: teamId,
-        platform_account_id: teamId,
-        platform_account_login: teamName,
-        scopes: SLACK_SCOPES,
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata,
-        installed_at: new Date().toISOString(),
-      })
-      .returning();
-
-    return created;
   } catch (error) {
+    // The workspace record was written above, so a failed integration write would
+    // otherwise leave it with nothing pointing at it. The helper only deletes when
+    // the workspace is unreferenced, so a row another owner legitimately claimed
+    // in the meantime is left alone.
+    await deleteWorkspaceInstallationIfUnused(teamId);
+
     if (isSlackWorkspaceUniqueViolation(error)) {
       throw new SlackWorkspaceAlreadyConnectedError(teamName);
     }
     throw error;
   }
+
+  if (previousTeamId && previousTeamId !== teamId) {
+    await deleteWorkspaceInstallationIfUnused(previousTeamId);
+  }
+
+  return integration;
 }
 
 /**

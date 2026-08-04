@@ -205,10 +205,14 @@ test(
             ['-q', '/dev/null', 'tmux', 'new-session', '-s', decoySession, 'sleep', '999'],
             { stdio: 'ignore' }
           )
-        : spawn('script', ['-q', '-c', `tmux new-session -s ${decoySession} sleep 999`, '/dev/null'], {
-            stdio: 'ignore',
-            env: { ...process.env, TERM: process.env.TERM ?? 'xterm-256color' },
-          });
+        : spawn(
+            'script',
+            ['-q', '-c', `tmux new-session -s ${decoySession} sleep 999`, '/dev/null'],
+            {
+              stdio: 'ignore',
+              env: { ...process.env, TERM: process.env.TERM ?? 'xterm-256color' },
+            }
+          );
 
     const savedTmux = process.env.TMUX;
     try {

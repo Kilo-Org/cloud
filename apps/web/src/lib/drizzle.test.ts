@@ -33,7 +33,6 @@ describe('drizzle', () => {
         consoleSpy.mockRestore();
       }
     });
-
   });
 
   describe('replica selection', () => {

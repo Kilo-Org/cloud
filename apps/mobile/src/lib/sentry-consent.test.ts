@@ -17,13 +17,14 @@ describe('sentryOptionsForConsent', () => {
     });
   });
 
-  it('enables replay, screenshots, view-hierarchy, and tracing when consent is accepted', () => {
+  it('disables replay, screenshots, and view-hierarchy even when consent is accepted', () => {
     const options = sentryOptionsForConsent(true);
 
-    expect(options.attachScreenshot).toBe(true);
-    expect(options.attachViewHierarchy).toBe(true);
-    expect(options.replaysSessionSampleRate).toBeGreaterThan(0);
-    expect(options.replaysOnErrorSampleRate).toBeGreaterThan(0);
+    expect(options.attachScreenshot).toBe(false);
+    expect(options.attachViewHierarchy).toBe(false);
+    expect(options.replaysSessionSampleRate).toBe(0);
+    expect(options.replaysOnErrorSampleRate).toBe(0);
+    // Tracing remains consent-gated (step 12).
     expect(options.tracesSampleRate).toBeGreaterThan(0);
   });
 });

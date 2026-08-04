@@ -78,14 +78,10 @@ const navigationIntegration = Sentry.reactNavigationIntegration({
 // No-op unless E2E_LATENCY_WS_MS is set at bundle time (see lib/e2e-ws-latency).
 installE2EWebSocketLatency();
 
-// Session replay, screenshots, and view-hierarchy capture are gated on
-// stored consent (see src/lib/sentry-consent.ts) — the consent copy only
-// promises anonymous performance/crash data. The RN SDK reads all of these
-// options only at Sentry.init() time (Mobile Replay has no runtime
-// start/stop API in 7.x), so `consented` starts `false` and every consent
-// transition goes through reinitSentryForConsent, which awaits
-// Sentry.close() first — the only way to stop an in-flight native replay
-// recording and dispose the previous client — before calling this again.
+// DEC-02 consent rule: crash and error reporting is mandatory, so
+// `initSentry(false)` runs at module scope — a crash during bootstrap
+// must still be reported. The optional group is `tracesSampleRate`
+// only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
 function initSentry(consented: boolean) {
   Sentry.init({
     dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
@@ -94,11 +90,10 @@ function initSentry(consented: boolean) {
 
     sendDefaultPii: false,
 
-    enableLogs: true,
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(consented),
 
-    integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
+    integrations: [navigationIntegration],
     enableNativeFramesTracking: false,
 
     spotlight: __DEV__,

@@ -26,10 +26,7 @@ async function discardOptionalTelemetry(epoch: number): Promise<void> {
   purgePostHogPersistence();
 }
 
-async function startOptionalTelemetry(
-  epoch: number,
-  email: string | undefined
-): Promise<void> {
+async function startOptionalTelemetry(epoch: number, email: string | undefined): Promise<void> {
   if (currentEpoch() !== epoch) {
     return;
   }

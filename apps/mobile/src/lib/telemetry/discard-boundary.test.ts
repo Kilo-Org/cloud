@@ -305,13 +305,11 @@ describe('optional telemetry lifecycle', () => {
 
     // Stall optOut so the discard chain doesn't complete.
     let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(
-      async () => {
-        await new Promise<void>(resolve => {
-          optOutResolve = resolve;
-        });
-      }
-    );
+    hoisted.client.optOut.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        optOutResolve = resolve;
+      });
+    });
 
     type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
     function GateWrapper(props: GateState): null {

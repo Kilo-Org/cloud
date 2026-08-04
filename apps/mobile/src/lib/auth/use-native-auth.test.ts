@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildChallengeEntry,
@@ -17,8 +17,72 @@ vi.mock('@/lib/config', () => ({
   GOOGLE_WEB_CLIENT_ID: 'web-client-id',
 }));
 
-// Test the pure utility functions in the contract module.
-// The hook itself is tested via integration/E2E tests.
+// Mock react-native Platform for admission module import.
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+}));
+
+// Mock dependencies of use-native-auth.ts so we can import production helpers.
+vi.mock('expo-apple-authentication', () => ({
+  AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
+  formatFullName: vi.fn(),
+  signInAsync: vi.fn(),
+}));
+
+vi.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: { configure: vi.fn(), hasPlayServices: vi.fn(), signIn: vi.fn() },
+}));
+
+vi.mock('sonner-native', () => ({
+  toast: { error: vi.fn() },
+}));
+
+vi.mock('expo-crypto', () => ({
+  CryptoDigestAlgorithm: { SHA256: 1 },
+  digestStringAsync: vi.fn(),
+  getRandomBytesAsync: vi.fn(),
+}));
+
+vi.mock('@/lib/auth/auth-context', () => ({
+  useAuth: vi.fn(() => ({ signIn: vi.fn() })),
+}));
+
+// Mock getAdmission so resolveAdmission tests can control the three paths:
+// success with payload, success with undefined, and throw.
+vi.mock('@/lib/auth/admission', async importOriginal => {
+  const mod = await importOriginal<typeof import('@/lib/auth/admission')>();
+  return {
+    ...mod,
+    getAdmission: vi.fn(),
+  };
+});
+
+// ── Imports (all after vi.mock hoisting) ───────────────────────────────
+
+import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
+
+const {
+  AUTH_ERROR_MESSAGES,
+  DEFAULT_ERROR_MESSAGE,
+  mapError,
+  RETRYABLE_ADMISSION_ERROR,
+  resolveAdmission,
+} = await import('@/lib/auth/use-native-auth');
+
+const { GOOGLE_WEB_CLIENT_ID } = await import('@/lib/config');
+const { toast } = await import('sonner-native');
+
+const mockGetAdmission = vi.mocked(getAdmission);
+
+// ── C12: Config invariant ────────────────────────────────────────────────
+
+describe('Google sign-in configuration', () => {
+  it('GOOGLE_WEB_CLIENT_ID equals the expected web client ID', () => {
+    expect(GOOGLE_WEB_CLIENT_ID).toBe('web-client-id');
+  });
+});
+
+// ── Contract utility tests ───────────────────────────────────────────────
 
 describe('native-auth-contract (used by use-native-auth)', () => {
   describe('parseEmailCodeResponse', () => {
@@ -103,9 +167,13 @@ describe('native-auth-contract (used by use-native-auth)', () => {
   });
 });
 
-// Verify the module-level mapError utility is correct about the challengeId
-// flow: the error mapper never leaks challengeId strings.
+// ── Production error mapping ────────────────────────────────────────────
+
 describe('use-native-auth error mapping', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it.each([
     ['INVALID_CODE', 'That code is incorrect. Please try again.'],
     ['TOO_MANY_ATTEMPTS', 'Too many attempts. Please request a new code.'],
@@ -113,30 +181,84 @@ describe('use-native-auth error mapping', () => {
     ['INVALID_EMAIL', 'Unable to deliver email to this address. Please use a different email.'],
     ['EMAIL_DELIVERY_FAILED', 'Email delivery is temporarily unavailable. Please try again later.'],
   ] as const)('maps %s to a user-facing message', (code, message) => {
-    // The mapError function in use-native-auth.ts maps error codes to messages.
-    // This test verifies the contract: error messages contain no internal identifiers.
-    const AUTH_ERROR_MESSAGES: Record<string, string> = {
-      'EMAIL-ALREADY-USED':
-        "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-      'DIFFERENT-OAUTH':
-        "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-      SSO_ERROR: "Your organization requires SSO. Use 'More sign-in options'.",
-      BLOCKED: 'This account has been blocked. Please contact support.',
-      'SIGNUP-RATE-LIMITED': 'Too many attempts. Please try again later.',
-      INVALID_CODE: 'That code is incorrect. Please try again.',
-      CODE_IN_PROGRESS: 'Your code is being processed. Wait a moment and try again.',
-      TOO_MANY_ATTEMPTS: 'Too many attempts. Please request a new code.',
-      INVALID_TOKEN: 'Sign-in failed. Please try again.',
-      INVALID_EMAIL: 'Unable to deliver email to this address. Please use a different email.',
-      INVALID_REQUEST: 'Check your email address and try again.',
-      EMAIL_DELIVERY_FAILED: 'Email delivery is temporarily unavailable. Please try again later.',
-    };
+    // Exercise production mapError against the production AUTH_ERROR_MESSAGES map.
+    const result = mapError(code);
+    expect(result).toBe(message);
 
-    expect(AUTH_ERROR_MESSAGES[code]).toBe(message);
     // Error messages must never contain words like "uuid" or "challenge".
-    expect(message).not.toMatch(/uuid|challenge/i);
+    expect(result).not.toMatch(/uuid|challenge/i);
+  });
+
+  it('returns the default error message for an undefined code', () => {
+    expect(mapError(undefined)).toBe(DEFAULT_ERROR_MESSAGE);
+  });
+
+  it('returns the default error message for an unknown code', () => {
+    expect(mapError('NONEXISTENT_CODE')).toBe(DEFAULT_ERROR_MESSAGE);
+  });
+
+  it('has a retryable admission error constant', () => {
+    expect(RETRYABLE_ADMISSION_ERROR).toBe(
+      'We could not verify this device. Check your connection and try again.'
+    );
+    expect(RETRYABLE_ADMISSION_ERROR).toMatch(/try again/i);
+  });
+
+  it('ADMISSION_REQUIRED message includes the More sign-in options CTA', () => {
+    const message = AUTH_ERROR_MESSAGES.ADMISSION_REQUIRED;
+    expect(message).toContain('More sign-in options');
+    // Non-retryable: must not suggest trying again.
+    expect(message).not.toMatch(/try again|retry/i);
+  });
+
+  it('ADMISSION_CHALLENGE_FAILED sentinel exists for catch blocks', () => {
+    expect(ADMISSION_CHALLENGE_FAILED).toBe('admission_challenge_failed');
   });
 });
+
+// ── Production resolveAdmission ─────────────────────────────────────────
+
+describe('resolveAdmission', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns { admission } when getAdmission yields a payload', async () => {
+    const payload = {
+      platform: 'ios' as const,
+      kind: 'attestation' as const,
+      challenge: 'server-challenge',
+      payload: '',
+    };
+    mockGetAdmission.mockResolvedValue(payload);
+
+    const result = await resolveAdmission();
+    expect(result).toEqual({ admission: payload });
+  });
+
+  it('returns { admission: undefined } when getAdmission returns undefined', async () => {
+    mockGetAdmission.mockResolvedValue(undefined);
+
+    const result = await resolveAdmission();
+    expect(result).toEqual({ admission: undefined });
+  });
+
+  it('shows retryable toast and throws ADMISSION_CHALLENGE_FAILED on any error', async () => {
+    mockGetAdmission.mockRejectedValue(new Error('Network error'));
+
+    await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
+    expect(toast.error).toHaveBeenCalledWith(RETRYABLE_ADMISSION_ERROR);
+  });
+
+  it('shows retryable toast and throws on JSON parse failure', async () => {
+    mockGetAdmission.mockRejectedValue(new SyntaxError('Unexpected token'));
+
+    await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
+    expect(toast.error).toHaveBeenCalledWith(RETRYABLE_ADMISSION_ERROR);
+  });
+});
+
+// ── Challenge binding ───────────────────────────────────────────────────
 
 describe('challenge binding', () => {
   const email = 'user@example.com';
@@ -168,17 +290,5 @@ describe('challenge binding', () => {
     it('returns undefined when the entry is null (no server challenge)', () => {
       expect(selectChallengeId(null, email)).toBeUndefined();
     });
-  });
-});
-
-// C12: Configuration invariant — the mobile GOOGLE_WEB_CLIENT_ID must equal the
-// server GOOGLE_CLIENT_ID (the web application's OAuth client) for the serverAuthCode
-// exchange to succeed.  The server test compares against this same expected value.
-const EXPECTED_GOOGLE_WEB_CLIENT_ID = 'web-client-id';
-
-describe('configuration invariants', () => {
-  it('GOOGLE_WEB_CLIENT_ID equals the expected web client ID (must match server GOOGLE_CLIENT_ID)', async () => {
-    const config = await import('@/lib/config');
-    expect(config.GOOGLE_WEB_CLIENT_ID).toBe(EXPECTED_GOOGLE_WEB_CLIENT_ID);
   });
 });

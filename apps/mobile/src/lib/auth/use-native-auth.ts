@@ -9,6 +9,11 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { API_BASE_URL, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
+  ADMISSION_CHALLENGE_FAILED,
+  type AdmissionPayload,
+  getAdmission,
+} from '@/lib/auth/admission';
+import {
   buildChallengeEntry,
   parseAuthErrorCode,
   parseEmailCodeResponse,
@@ -16,7 +21,7 @@ import {
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
 
-const AUTH_ERROR_MESSAGES: Record<string, string> = {
+export const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'EMAIL-ALREADY-USED':
     "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
   'DIFFERENT-OAUTH':
@@ -32,11 +37,16 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   INVALID_EMAIL: 'Unable to deliver email to this address. Please use a different email.',
   INVALID_REQUEST: 'Check your email address and try again.',
   EMAIL_DELIVERY_FAILED: 'Email delivery is temporarily unavailable. Please try again later.',
+  // Admission: server refuses the device under enforce mode — non-retryable.
+  ADMISSION_REQUIRED:
+    "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
 };
 
-const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
+export const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
+export const RETRYABLE_ADMISSION_ERROR =
+  'We could not verify this device. Check your connection and try again.';
 
-function mapError(errorCode: string | undefined): string {
+export function mapError(errorCode: string | undefined): string {
   return (errorCode && AUTH_ERROR_MESSAGES[errorCode]) ?? DEFAULT_ERROR_MESSAGE;
 }
 
@@ -77,6 +87,24 @@ function hasStringCode(error: unknown): error is { code: string } {
     'code' in error &&
     typeof (error as { code: unknown }).code === 'string'
   );
+}
+
+export async function resolveAdmission(): Promise<
+  { admission: AdmissionPayload } | { admission: undefined }
+> {
+  try {
+    const admission = await getAdmission();
+    if (admission) {
+      return { admission };
+    }
+    return { admission: undefined };
+  } catch {
+    // Normalize every challenge/provider failure to the retryable message.
+    // Network errors, JSON parse failures, and !response.ok all abort sign-in;
+    // every path must show the retryable toast and throw a consistent sentinel.
+    toast.error(RETRYABLE_ADMISSION_ERROR);
+    throw new Error(ADMISSION_CHALLENGE_FAILED);
+  }
 }
 
 // Module-level guard — GoogleSignin.configure() is cheap but re-calling it
@@ -165,8 +193,16 @@ export function useNativeAuth(): NativeAuthResult {
         ? AppleAuthentication.formatFullName(credential.fullName) || undefined
         : undefined;
 
+      let admissionBody: Record<string, unknown> = {};
+      try {
+        admissionBody = await resolveAdmission();
+      } catch {
+        return;
+      }
+
       const result = await postAuth('/api/auth/native/token', {
         provider: 'apple',
+        ...admissionBody,
         idToken: credential.identityToken,
         nonce: rawNonce,
         supportsRefresh: true,
@@ -230,6 +266,14 @@ export function useNativeAuth(): NativeAuthResult {
       } else {
         body.idToken = idToken;
       }
+
+      let admissionBody: Record<string, unknown> = {};
+      try {
+        admissionBody = await resolveAdmission();
+      } catch {
+        return;
+      }
+      Object.assign(body, admissionBody);
 
       const result = await postAuth('/api/auth/native/token', body);
 
@@ -300,8 +344,16 @@ export function useNativeAuth(): NativeAuthResult {
         // email means the challenge was generated for a different address.
         const challengeId = selectChallengeId(challengeRef.current, email);
 
+        let admissionBody: Record<string, unknown> = {};
+        try {
+          admissionBody = await resolveAdmission();
+        } catch {
+          return false;
+        }
+
         const result = await postAuth('/api/auth/native/token', {
           provider: 'email',
+          ...admissionBody,
           email,
           code,
           supportsRefresh: true,

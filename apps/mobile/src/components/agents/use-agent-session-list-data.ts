@@ -90,6 +90,33 @@ export function useAgentSessionListData(options: {
     isPending: search.isPending,
     searchQuery,
   });
+
+  const paging = useMemo(
+    () =>
+      effectiveSearchQuery
+        ? {
+            hasNextPage: search.hasNextPage,
+            isFetchingNextPage: search.isFetchingNextPage,
+            isPlaceholderData: search.isPlaceholderData,
+            fetchNextPage: search.fetchNextPage,
+          }
+        : {
+            hasNextPage,
+            isFetchingNextPage,
+            isPlaceholderData: false,
+            fetchNextPage,
+          },
+    [
+      effectiveSearchQuery,
+      hasNextPage,
+      isFetchingNextPage,
+      fetchNextPage,
+      search.hasNextPage,
+      search.isFetchingNextPage,
+      search.isPlaceholderData,
+      search.fetchNextPage,
+    ]
+  );
   const pinnedActive = useMemo(
     () =>
       selectPinnedActiveSessions({
@@ -131,9 +158,7 @@ export function useAgentSessionListData(options: {
     activeSessions,
     activeIsError,
     isLoading,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
+    paging,
     refetch,
     handleRetry,
     handleRefetch,
@@ -143,5 +168,6 @@ export function useAgentSessionListData(options: {
     contentIsError,
     pinnedActive,
     sections,
+    effectiveSearchQuery,
   };
 }

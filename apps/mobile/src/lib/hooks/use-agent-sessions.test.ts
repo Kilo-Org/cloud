@@ -90,7 +90,7 @@ describe('buildAgentSessionSearchInput', () => {
     expect(buildAgentSessionSearchInput({ searchQuery: 'hello' })).toMatchObject({
       search_string: 'hello',
       orderBy: 'updated_at',
-      limit: 50,
+      limit: 30,
       includeChildren: false,
     });
   });
@@ -101,7 +101,7 @@ describe('buildAgentSessionSearchInput', () => {
     ).toMatchObject({
       search_string: 'hello',
       orderBy: 'created_at',
-      limit: 50,
+      limit: 30,
     });
   });
 
@@ -125,12 +125,20 @@ describe('buildAgentSessionSearchInput', () => {
       })
     ).toEqual({
       search_string: 'hello',
-      limit: 50,
+      limit: 30,
       orderBy: 'created_at',
       includeChildren: false,
       createdOnPlatform: 'cli',
       gitUrl: 'https://github.com/foo/bar',
       organizationId: 'org-1',
     });
+  });
+
+  it('has no cursor key — the query framework injects it', () => {
+    const input = buildAgentSessionSearchInput({
+      searchQuery: 'hello',
+      organizationId: 'org-1',
+    });
+    expect(input).not.toHaveProperty('cursor');
   });
 });

@@ -19,6 +19,7 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
+import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { ScreenHeader } from '@/components/screen-header';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { useOrganization } from '@/lib/organization-context';
@@ -68,9 +69,7 @@ export function AgentSessionListScreen() {
     activeSessions,
     activeIsError,
     isLoading,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
+    paging,
     refetch,
     handleRetry,
     handleRefetch,
@@ -114,10 +113,10 @@ export function AgentSessionListScreen() {
   const navigateToSession = useAgentSessionNavigator();
 
   const handleEndReached = useCallback(() => {
-    if (!isSearching && hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage();
+    if (shouldLoadMoreSessions(paging)) {
+      void paging.fetchNextPage();
     }
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isSearching]);
+  }, [paging]);
 
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
   const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
@@ -203,7 +202,7 @@ export function AgentSessionListScreen() {
           isLoading={isLoading || !ready}
           isError={contentIsError}
           activeIsError={activeIsError}
-          isFetchingNextPage={isFetchingNextPage}
+          isFetchingNextPage={paging.isFetchingNextPage}
           refetch={handleRefetch}
           onRetry={handleRetry}
           onEndReached={handleEndReached}

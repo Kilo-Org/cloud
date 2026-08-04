@@ -15,7 +15,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Security Sync** | Dependabot synchronization, finding persistence, notification eligibility, recipient intent materialization, and durable notification state | `services/security-sync/` | Event state remains owner-scoped; email sending does not occur inside finding persistence transactions |
 | **Security Agent Email Delivery** | Dispatch-time revalidation, email rendering, owner-aware links, and Mailgun delivery | `apps/web/src/app/api/internal/security-agent/`, `apps/web/src/lib/email.ts`, `apps/web/src/emails/` | Accepts notification identity only and loads current data before sending |
 | **Shared Security Notification Policy** | Canonical config parsing, defaults, severity thresholds, and pure event eligibility rules | `packages/worker-utils/src/security-notification-policy.ts` | Web and Worker must use same policy contract |
-| **Cost Insights** | Spend evidence dashboard, Spend Alerts policy, alert history, and owner-scoped spend alerting | Billing, usage ingestion, usage analytics, and subscription-management surfaces | Applies to both personal users and organizations |
+| **Cost Insights** | Retiring. Spend Alerts policy, alert history, and owner-scoped spend alerting | `apps/web/src/lib/cost-insights/`, `apps/web/src/app/api/cron/cost-insights-*` | All Cost Insights UI, routes, and tRPC procedures are removed; remaining evaluation, rollup, and retention code is being retired next |
 | **Auto Routing** | Efficient model-pool settings, shared benchmark profiles, and per-request model selection | `packages/auto-routing-contracts/`, `services/auto-routing/`, `services/auto-routing-benchmark/`, `apps/web/src/components/auto-routing/` | Personal and organization settings constrain the existing `kilo-auto/efficient` model |
 | **Kilo Pass for Organizations** | Organization-owned Kilo Pass agreements, term versions, purchased pass capacity, sub-org allocation, and pooled bonus unlock behavior | Organization billing, seats, credits, sub-orgs, and Kilo Pass org administration surfaces | Separate source of truth from personal Kilo Pass subscriptions |
 
@@ -41,7 +41,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Email Delivery** | Attempt to render and send one Security Agent Notification through Mailgun | Referring to provider side effect, retry, or acceptance | Notification event |
 | **Security Finding Activity Event** | Immutable record of one material user, system-policy, or source-driven action or outcome that changes or explains a Security Finding | Referring to evidence included in a Security Agent Audit Report | Page view, unchanged sync observation, queue claim, heartbeat |
 | **Security Agent Audit Report** | Owner-scoped, period-bounded audit view of Security Finding Activity Events grouped by Security Finding | Referring to the interactive audit report | Generic audit-log export, activity dump |
-| **Cost Insights** | Dedicated Usage-adjacent surface for viewing spend evidence, configuring Spend Alerts, and acting on Cost Suggestions | Naming the product surface, dashboard, settings, routes, or sidebar item | Spend Protection, Cost Controls |
+| **Cost Insights** | Retired product surface for viewing spend evidence, configuring Spend Alerts, and acting on Cost Suggestions | Referring to the removed surface or to remaining server-side spend-alert code awaiting removal | Spend Protection, Cost Controls, new Cost Insights UI work |
 | **Spend Alerts** | Owner-scoped alerting capability for unusual or excessive Credit spend | Referring to alert evaluation, emails, banners, settings, or notification policy | Spend Protection, hard limit, spend blocker |
 | **Cost Suggestion** | Optional owner-scoped recommendation based on observed Credit spend that may improve cost efficiency through an eligible Coding Plan or Kilo Pass | Referring to recommendation evaluation, dashboard cards, emails, CTA destinations, dismissal, or settings | Alert, warning, guaranteed savings, automatic optimization |
 | **Suggestion dismissal** | Authorized owner action that hides one Cost Suggestion without changing billing or future suggestion eligibility | Referring to dismissing a recommendation | Alert acknowledgment, unsubscribe, disable suggestions |
@@ -167,13 +167,13 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - **Kilo Pass processing runs** use leased idempotent retries, metrics, and manual replay. Blocked window shows persistent subscription-page status and sends one deduplicated email to current parent organization owners and billing managers.
 - The product does not support creating new custom or manual agreements. Platform admins may maintain imported legacy agreements by setting paid-through intervals, designating manual processing, scheduling commercial transitions, issuing audited compensation, or manually retrying; each mutation records actor, reason, before/after values, and timestamp.
 - Organization subscription page supports initial direct-child distribution before first issuance, then separates current immutable issuance snapshot from next **Kilo Pass allocation plan** and effective date; it shows purchased, parent-default, direct-child allocated, paid-through, pending-cancellation, blocked, and overallocated state.
+- **Cost Insights is being retired.** Its UI is removed: no Cost Insights routes, sidebar entries, dashboards, settings screens, banners, or tRPC procedures exist, and none may be added. Remaining server-side spend-alert evaluation, rollup maintenance, notification, and event-retention code is scheduled for removal, so treat the rules below as describing code awaiting deletion rather than a live product surface.
 - All Credit spend charged to a **Spend owner** counts toward that owner's Spend Alerts and Cost Suggestion evaluation.
 - **Cost Suggestions** are enabled by default, independent from Spend Alerts, and recommend an eligible Coding Plan or Kilo Pass when observed Credit spend indicates potential cost-efficiency benefit.
 - Cost Suggestions are advisory. They do not guarantee savings, automatically purchase or change subscriptions, or alter spend behavior.
 - Every active Cost Suggestion provides one destination CTA and a **Suggestion dismissal** action.
 - Suggestion dismissal hides that specific recommendation, creates a **Cost Insight Event**, and does not disable future materially different Cost Suggestions.
 - Disabling Cost Suggestions suppresses new suggestion emails and active dashboard suggestions but preserves prior suggestion activity history.
-- During initial rollout, Cost Insights v1 is available only to users whose current Kilo platform user record has `is_admin` set to `true`; access does not depend on a release-toggle gate.
 - **Spend Alerts** are inactive until a **Spend owner** explicitly enables them.
 - **Spend Anomaly Alerts** are enabled by default whenever **Spend Alerts** are enabled, and Spend owners may opt out independently.
 - First enable immediately evaluates each enabled alert sub-option: anomaly state plus configured rolling 24-hour, rolling 7-day, and rolling 30-day **Spend threshold** state.
@@ -196,15 +196,13 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - Each **Spend Threshold Alert** evaluates all owner Credit spend in its configured rolling window, including **Variable Credit spend** and **Scheduled Credit spend**.
 - Each threshold window maintains separate crossing, review, recovery, and notification identity; it fires once per below-to-above crossing and may fire again only after spend in that window drops below its threshold and later crosses it again.
 - **Alert acknowledgment** reviews the current anomaly or threshold episode without requiring settings changes.
-- Threshold review offers acknowledge and Manage threshold; management opens the matching 24-hour, 7-day, or 30-day Cost Insights setting where authorized managers can adjust or disable it.
 - Active threshold alerts expose snapshotted top drivers from the exact evaluated rolling window across Variable and Scheduled Credit spend.
-- **Spend Alerts** are sent only to Kilo platform admins: the admin personal user's email for personal owners, and active organization owners or billing managers who are also platform admins for organization owners.
+- Spend Alert emails are no longer sent. Recipient rows are still created and are drained to `skipped`. Historically, recipient selection was admin-gated for personal owners only; organization recipients were any membership with role `owner` or `billing_manager`, without a platform-admin or active-status filter.
 - Spend Alerts store owner-scoped **Cost Insight Events** separately from per-recipient notification delivery rows.
 - Spend Alerts snapshot intended notification recipients at event creation and revalidate recipient access before delivery.
 - Spend Alerts notification delivery rows are deleted with their parent **Cost Insight Event** after 90 days.
-- **Spend Alerts** v1 sends email and shows an owner-scoped in-app banner until **Alert acknowledgment**. It does not send mobile or push notifications in v1.
-- Active Spend Alert banners and review actions are visible to all current authorized managers, regardless of original email recipient snapshot.
-- Spend Alert emails deep-link to the Cost Insights dashboard review context, not settings-first flow.
+- **Spend Alerts** produce no user-visible output. Email sending and the in-app banner were both removed, and no mobile or push notifications exist.
+- The removed Cost Insights routes serve a discontinued notice so old bookmarks and previously sent alert emails do not land on a 404.
 - Cost Insights retains and displays 90 days of **Cost Insight Events**.
 - **Cost Insight Events** include configuration changes, anomaly alerts, threshold alerts, reviews, and disablement.
 - Cost Insight Event history remains fixed to 90 days even though hourly rollups are retained indefinitely.
@@ -214,25 +212,16 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - Alert **Cost Insight Events** snapshot top 5 spend drivers at event creation time.
 - Cost Insight Events store direct evaluated settings in snapshots and do not require config version tracking in v1.
 - Spend Alert config events store changed fields plus resulting key settings, not full config snapshots.
-- **Cost Insights** is the dedicated Usage-adjacent surface for Spend Alerts: `/cost-insights` and `/organizations/[id]/cost-insights` are dashboard routes; `/cost-insights/config` and `/organizations/[id]/cost-insights/config` are settings routes.
-- Cost Insights dashboard shows current alert state, review actions, and spend evidence. Cost Insights settings owns Spend Alerts policy.
-- Cost Insights appears directly below Usage in the personal and organization sidebars and shows attention state for unreviewed Spend Alerts and active Cost Suggestions.
-- Organization Cost Insights identifies member spend drivers and links to existing organization member daily limit controls; v1 does not add per-member Spend Alert policy.
-- Personal and organization Cost Insights routes, navigation, attention queries, and API procedures are visible only to users whose current Kilo platform user record has `is_admin` set to `true`.
 - Kilo platform admins may inspect organization Spend Alerts under existing admin patterns, but v1 disable and settings changes require owner or billing-manager authority.
 - Spend Alert config and review actions do not require reason text in v1; events record actor, action, old and new values where applicable, and timestamp.
 - Disabling Spend Alerts keeps the owner config row disabled rather than deleting it.
 - Re-enabling Spend Alerts reuses existing saved settings unless an authorized manager changes them.
 - Re-enabling Spend Alerts immediately evaluates each enabled sub-option: current-hour anomaly state and all three configured rolling spend threshold windows.
 - While Spend Alerts are disabled, settings changes save only and do not evaluate controls, create events, or send emails.
-- Cost Insights dashboard shows read-only recent spend evidence even when Spend Alerts are disabled.
-- Cost Insights dashboard default evidence shows a 24-hour spend summary plus a 7-day hourly chart.
-- Cost Insights dashboard supports preset evidence ranges: current UTC hour, 24h, 7d, 30d, and 90d; the current-hour preset updates both spend evidence and top drivers.
 - Active Spend Anomaly Alerts snapshot and expose the top current-hour Variable Credit spend drivers with their UTC-hour evidence window.
 - Spend Alerts owner state stores active episode dedupe and review state separately from 90-day event history.
 - Spend Alerts owner state stores minimal current episode markers for anomaly hour, threshold crossing state, and review status.
 - Spend Alerts use dedicated normalized storage for owner configuration, owner state, hourly spend rollups, and **Cost Insight Events**.
-- Cost Insights settings show Spend Anomaly Alerts, rolling 24-hour, rolling 7-day, and rolling 30-day **Spend thresholds** in that order as sub-options of Spend Alerts.
 - Enabling Spend Alerts uses already-maintained owner hourly rollups for baseline data, with Postgres source-of-truth backfill or repair when rollups are missing.
 - Threshold evaluation falls back to exact canonical Postgres source data when rolling 7-day or rolling 30-day rollup coverage is incomplete.
 - Spend Alerts store owner-hour totals separately from compact owner-hour driver buckets.
@@ -369,10 +358,8 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - Org seat purchases may determine eligible seat counts for Kilo Pass for Organizations, but seat purchase rows are not the Kilo Pass agreement source of truth.
 - Do not assume Spend Alerts apply to owners who have not opted in.
 - Do not make Spend Alerts block, pause, throttle, suppress auto-top-up, reject paid requests, or emit Spend Alerts-specific HTTP 402 responses.
-- Do not hide v1 Cost Insights behind a release-toggle gate unless a later product decision supersedes public opt-in.
 - Do not make Spend Alerts depend on Snowflake-only usage analytics for detection.
 - During initial rollout, treat organization owners and billing managers as authorized managers for organization Spend Alerts only when they are also Kilo platform admins.
-- Surface Spend Alerts through **Cost Insights** dashboard and settings routes, not as only an embedded usage, credits, or subscriptions control.
 
 ## Decision References
 

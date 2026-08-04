@@ -54,6 +54,7 @@ import {
   auto_triage_tickets,
   auto_fix_tickets,
   slack_bot_requests,
+  slack_workspace_installations,
   bot_requests,
   cloud_agent_code_reviews,
   code_review_feedback_events,
@@ -935,6 +936,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   security_finding_notifications addressed to the user,
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
+ *   slack_workspace_installations for workspaces the user owned (holds the
+ *   workspace bot token),
  *   cloud_agent_code_reviews, review memory feedback/proposals,
  *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
@@ -1174,6 +1177,26 @@ export async function softDeleteUser(userId: string) {
           isNull(platform_access_token_credentials.provider_resource_id)
         )
       );
+
+    // The Slack bot token lives on the workspace record rather than on the
+    // integration row, so delete it for every workspace this user owned before
+    // their integrations disappear. Deleting the integration first would lose the
+    // team IDs needed to find these rows, orphaning the stored tokens.
+    await tx.delete(slack_workspace_installations).where(
+      inArray(
+        slack_workspace_installations.team_id,
+        tx
+          .select({ teamId: sql<string>`${platform_integrations.platform_installation_id}` })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, userId),
+              eq(platform_integrations.platform, 'slack'),
+              isNotNull(platform_integrations.platform_installation_id)
+            )
+          )
+      )
+    );
 
     await tx
       .delete(platform_integrations)

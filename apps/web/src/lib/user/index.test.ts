@@ -83,6 +83,7 @@ import {
   platform_oauth_credentials,
   platform_access_token_credentials,
   platform_integrations,
+  slack_workspace_installations,
   model_eval_ingestions,
   microdollar_usage,
   model_experiment,
@@ -681,6 +682,51 @@ describe('User', () => {
           .select()
           .from(platform_integrations)
           .where(eq(platform_integrations.id, otherIntegration.id))
+      ).toHaveLength(1);
+    });
+
+    it('deletes the Slack workspace installation for a deleted user without touching other workspaces', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const teamId = `T-${randomUUID()}`;
+      const otherTeamId = `T-${randomUUID()}`;
+
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_user_id: user.id,
+          platform: 'slack',
+          integration_type: 'oauth',
+          platform_installation_id: teamId,
+          platform_account_id: teamId,
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          platform: 'slack',
+          integration_type: 'oauth',
+          platform_installation_id: otherTeamId,
+          platform_account_id: otherTeamId,
+          integration_status: 'active',
+        },
+      ]);
+      await db.insert(slack_workspace_installations).values([
+        { team_id: teamId, bot_token: 'xoxb-user-token' },
+        { team_id: otherTeamId, bot_token: 'xoxb-other-token' },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(slack_workspace_installations)
+          .where(eq(slack_workspace_installations.team_id, teamId))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(slack_workspace_installations)
+          .where(eq(slack_workspace_installations.team_id, otherTeamId))
       ).toHaveLength(1);
     });
 

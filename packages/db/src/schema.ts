@@ -4836,6 +4836,57 @@ export type PlatformAccessTokenCredential = typeof platform_access_token_credent
 export type NewPlatformAccessTokenCredential =
   typeof platform_access_token_credentials.$inferInsert;
 
+/**
+ * Slack workspace-level installation state.
+ *
+ * Slack issues exactly one installation (and therefore one bot token) per
+ * (app, workspace), so the bot token is a property of the workspace rather than
+ * of any single Kilo owner. This table is the source of truth for it, keyed on
+ * the Slack team ID and joined from
+ * `platform_integrations.platform_installation_id`.
+ *
+ * Today `UQ_platform_integrations_slack_platform_inst` still limits a workspace
+ * to one owner, so this table holds one row per connected workspace. It exists
+ * separately because allowing several owners per workspace would otherwise mean
+ * several copies of the same token in `platform_integrations.metadata`, drifting
+ * apart on re-install.
+ *
+ * `bot_token` is stored unencrypted, at parity with the
+ * `platform_integrations.metadata.access_token` copy it replaces. Moving Slack
+ * onto the keyed envelope encryption used by GitLab/Bitbucket is tracked
+ * separately.
+ */
+export const slack_workspace_installations = pgTable(
+  'slack_workspace_installations',
+  {
+    id: idPrimaryKeyColumn,
+
+    // Slack team ID (matches platform_integrations.platform_installation_id)
+    team_id: text().notNull(),
+    team_name: text(),
+
+    // Workspace-wide bot credentials, shared by every connected owner
+    bot_user_id: text(),
+    bot_token: text().notNull(),
+    scopes: text().array(),
+
+    last_installed_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
+
+    installed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [uniqueIndex('UQ_slack_workspace_installations_team_id').on(table.team_id)]
+);
+
+export type SlackWorkspaceInstallation = typeof slack_workspace_installations.$inferSelect;
+export type NewSlackWorkspaceInstallation = typeof slack_workspace_installations.$inferInsert;
+
 // User Deployments
 
 export const deployments = pgTable(

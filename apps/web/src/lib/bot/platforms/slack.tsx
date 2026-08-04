@@ -13,7 +13,7 @@ import {
 import type { BotPlatform, RequesterInfo } from '@/lib/bot/platforms/types';
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
 import { APP_URL } from '@/lib/constants';
-import { getAccessTokenFromInstallation } from '@/lib/integrations/slack-service';
+import { getSlackBotToken } from '@/lib/integrations/slack-workspace-installation';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getSlackMessagePermalink } from '@/lib/slack-bot/slack-utils';
 import { captureException } from '@sentry/nextjs';
@@ -219,7 +219,7 @@ async function getSlackRequesterInfo(
   platformIntegration: PlatformIntegration,
   displayName: string
 ): Promise<RequesterInfo> {
-  const accessToken = getAccessTokenFromInstallation(platformIntegration);
+  const accessToken = await getSlackBotToken(platformIntegration);
   if (!accessToken) {
     return { displayName, platform: PLATFORM.SLACK };
   }

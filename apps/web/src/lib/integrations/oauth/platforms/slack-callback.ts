@@ -129,7 +129,12 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     // 8. Store installation in database
     try {
-      await upsertSlackInstallation({ owner, teamId, installation });
+      await upsertSlackInstallation({
+        owner,
+        teamId,
+        installation,
+        installedByUserId: user.id,
+      });
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(

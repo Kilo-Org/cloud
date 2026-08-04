@@ -13,6 +13,12 @@ import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
+import {
+  countSlackConnections,
+  deleteSlackWorkspaceInstallation,
+  getSlackBotToken,
+  upsertSlackWorkspaceInstallation,
+} from '@/lib/integrations/slack-workspace-installation';
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
   constructor(teamName: string) {
@@ -198,10 +204,12 @@ export async function upsertSlackInstallation({
   owner,
   teamId,
   installation,
+  installedByUserId,
 }: {
   owner: Owner;
   teamId: string;
   installation: SlackInstallation;
+  installedByUserId?: string | null;
 }): Promise<PlatformIntegration> {
   const existing = await getInstallation(owner);
   const teamName = installation.teamName || 'Unknown Team';
@@ -217,6 +225,22 @@ export async function upsertSlackInstallation({
     owner.type === 'org'
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
       : DEFAULT_BOT_MODEL;
+
+  // The bot token belongs to the workspace, not to this owner, so it is written to
+  // slack_workspace_installations first: that record is the read path, and a
+  // failure here must not leave an active integration pointing at a stale token.
+  //
+  // `access_token` and `bot_user_id` are still mirrored into metadata below so a
+  // rollback to the previous release keeps working. A follow-up removes the
+  // mirror and the corresponding read fallback.
+  await upsertSlackWorkspaceInstallation({
+    teamId,
+    teamName,
+    botToken: installation.botToken,
+    botUserId: installation.botUserId,
+    scopes: SLACK_SCOPES,
+    installedByUserId,
+  });
 
   const metadata = {
     ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
@@ -241,6 +265,10 @@ export async function upsertSlackInstallation({
           platform_account_login: teamName,
           scopes: SLACK_SCOPES,
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          // A successful install clears any earlier suspension, including rows
+          // detached by the 0108 duplicate-workspace migration.
+          suspended_at: null,
+          suspended_by: null,
           metadata,
           updated_at: new Date().toISOString(),
         })
@@ -296,16 +324,20 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
     });
   }
 
+  // A suspended row no longer holds a claim on the workspace (0108 detached its
+  // platform_installation_id), so shared workspace state must be left alone.
   const shouldDeleteSlackInstallation =
     integration.integration_status === INTEGRATION_STATUS.ACTIVE;
 
   // Revoke the token if we have one
-  const metadata = integration.metadata as { access_token?: string } | null;
-  if (shouldDeleteSlackInstallation && metadata?.access_token) {
-    try {
-      await revokeSlackToken(metadata.access_token);
-    } catch (error) {
-      console.error('Failed to revoke Slack token:', error);
+  if (shouldDeleteSlackInstallation) {
+    const botToken = await getSlackBotToken(integration);
+    if (botToken) {
+      try {
+        await revokeSlackToken(botToken);
+      } catch (error) {
+        console.error('Failed to revoke Slack token:', error);
+      }
     }
   }
 
@@ -327,17 +359,42 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
+  // Drop the workspace record once nothing is connected to the workspace any
+  // more, so the stored bot token does not outlive the integrations that used it.
+  if (shouldDeleteSlackInstallation && integration.platform_installation_id) {
+    await deleteWorkspaceInstallationIfUnused(integration.platform_installation_id);
+  }
+
   return { success: true };
 }
 
+/**
+ * Remove the workspace record when no platform integration references the
+ * workspace any more.
+ */
+async function deleteWorkspaceInstallationIfUnused(teamId: string): Promise<void> {
+  if ((await countSlackConnections(teamId)) > 0) {
+    return;
+  }
+
+  await deleteSlackWorkspaceInstallation(teamId);
+}
+
+/**
+ * Handle Slack's `app_uninstalled` event, which applies to the whole workspace.
+ */
 export async function deleteInstallationByTeamId(teamId: string) {
   const integration = await getInstallationByTeamId(teamId);
 
   if (!integration) {
+    // The integration may already be gone while the workspace record lingers, so
+    // still clear the shared state for this workspace.
+    await deleteSlackWorkspaceInstallation(teamId);
     return { success: true, deleted: false };
   }
 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+  await deleteWorkspaceInstallationIfUnused(teamId);
 
   return { success: true, deleted: true };
 }
@@ -359,6 +416,12 @@ export async function removeDbRowOnly(owner: Owner) {
 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
+  // Also drop the workspace record, otherwise re-running the OAuth flow would
+  // resolve the previous token instead of the freshly issued one.
+  if (integration.platform_installation_id) {
+    await deleteWorkspaceInstallationIfUnused(integration.platform_installation_id);
+  }
+
   return { success: true };
 }
 
@@ -372,14 +435,14 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
     return { success: false, error: 'No Slack installation found' };
   }
 
-  const metadata = integration.metadata as { access_token?: string } | null;
+  const botToken = await getSlackBotToken(integration);
 
-  if (!metadata?.access_token) {
+  if (!botToken) {
     return { success: false, error: 'No access token found' };
   }
 
   try {
-    const client = new WebClient(metadata.access_token);
+    const client = new WebClient(botToken);
     const result = await client.auth.test();
 
     if (!result.ok) {
@@ -407,14 +470,14 @@ export async function sendMessage(
     return { success: false, error: 'No Slack installation found' };
   }
 
-  const metadata = integration.metadata as { access_token?: string } | null;
+  const botToken = await getSlackBotToken(integration);
 
-  if (!metadata?.access_token) {
+  if (!botToken) {
     return { success: false, error: 'No access token found' };
   }
 
   try {
-    const client = new WebClient(metadata.access_token);
+    const client = new WebClient(botToken);
     const result = await client.chat.postMessage({
       channel,
       text,
@@ -500,16 +563,6 @@ export type SlackPostMessageResponse = {
   ts?: string;
   error?: string;
 };
-
-/**
- * Extract access token from installation metadata
- */
-export function getAccessTokenFromInstallation(
-  integration: PlatformIntegration
-): string | undefined {
-  const metadata = integration.metadata as { access_token?: string } | null;
-  return metadata?.access_token;
-}
 
 /**
  * Post a message to Slack using an access token directly

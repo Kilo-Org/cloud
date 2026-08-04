@@ -44,17 +44,42 @@ export function ConsentDetails() {
           who="Kilo (kilo.ai)."
         />
         <Section
-          title="Analytics & attribution"
-          what="App events (opens, screens viewed, feature use), device type, app version, install source."
-          why="Measure app performance and understand which channels bring new users."
-          who="The analytics provider named in our privacy policy."
+          title="Crash reporting"
+          what="Crash and error reports, with app content scrubbed."
+          why="Identify and fix crashes."
+          who="Sentry."
           footer={
-            <View className="mt-3 rounded-md bg-warn-tile-bg p-3">
-              <Text className="text-xs text-warn">
-                No prompt or conversation content is sent to analytics.
-              </Text>
+            <View className="mt-3 gap-3">
+              <View className="rounded-md bg-warn-tile-bg p-3">
+                <Text className="text-xs text-warn">
+                  We do not capture session replay, screenshots of your screen, or your
+                  screen&apos;s view hierarchy.
+                </Text>
+              </View>
+              <View className="rounded-md bg-warn-tile-bg p-3">
+                <Text className="text-xs text-warn">
+                  No prompt or conversation content is sent to analytics.
+                </Text>
+              </View>
             </View>
           }
+        />
+
+        <Text className="mt-6 text-sm font-semibold text-foreground">
+          Optional — off unless you turn it on
+        </Text>
+
+        <Section
+          title="Product analytics"
+          what="App events (opens, screens viewed, feature use), device type, app version."
+          why="Measure app performance and understand how features are used."
+          who="PostHog."
+        />
+        <Section
+          title="Install attribution"
+          what="Install source and campaign identifiers."
+          why="Understand which channels bring new users."
+          who="AppsFlyer."
         />
 
         <Text className="mt-6 text-xs text-muted-foreground">

@@ -169,7 +169,7 @@ describe('workflow navigateTab', () => {
     expect(mocks.tabsUpdate).not.toHaveBeenCalled();
   });
 
-  it('calls tabs.update and waits for a matching complete event', async () => {
+  it('resolves via the onUpdated listener when a matching complete event arrives', async () => {
     resetMocks();
     mocks.tabsGet.mockResolvedValueOnce({
       id: 7,
@@ -179,7 +179,14 @@ describe('workflow navigateTab', () => {
 
     mocks.tabsUpdate.mockResolvedValueOnce({ id: 7 });
 
-    // Tabs.get inside the listener returns the target URL.
+    // Post-update re-read: tab is still loading, not at the target URL.
+    mocks.tabsGet.mockResolvedValueOnce({
+      id: 7,
+      status: 'loading',
+      url: 'https://other.example/',
+    });
+
+    // Listener tabs.get returns the completed target URL.
     mocks.tabsGet.mockResolvedValueOnce({
       id: 7,
       status: 'complete',
@@ -201,7 +208,7 @@ describe('workflow navigateTab', () => {
     expect(mocks.removeListener).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores onUpdated events for other tabs', async () => {
+  it('ignores onUpdated events for other tabs and prevents tabs.get calls', async () => {
     resetMocks();
     mocks.tabsGet.mockResolvedValueOnce({
       id: 7,
@@ -211,7 +218,14 @@ describe('workflow navigateTab', () => {
 
     mocks.tabsUpdate.mockResolvedValueOnce({ id: 7 });
 
-    // The matching URL arrives after an irrelevant event.
+    // Post-update re-read: tab is still at the wrong URL, not complete.
+    mocks.tabsGet.mockResolvedValueOnce({
+      id: 7,
+      status: 'loading',
+      url: 'https://other.example/',
+    });
+
+    // Listener tabs.get returns the completed target URL.
     mocks.tabsGet.mockResolvedValueOnce({
       id: 7,
       status: 'complete',
@@ -224,8 +238,14 @@ describe('workflow navigateTab', () => {
       expect(mocks.addListener).toHaveBeenCalledTimes(1);
     });
 
-    // Fire event for a different tab — must be ignored.
+    // Fire event for a different tab — the guard must prevent tabs.get.
     mocks._fireOnUpdated(9, { status: 'complete' });
+
+    // The guard must have filtered the event: tabs.get was called only twice before
+    // (initial fast-path check and post-update re-read). If the guard were missing,
+    // TabsGet would have been called a third time, consuming the mock meant for the
+    // Matching event below and causing a timeout.
+    expect(mocks.tabsGet).toHaveBeenCalledTimes(2);
 
     // Fire the matching event.
     mocks._fireOnUpdated(7, { status: 'complete' });
@@ -244,6 +264,14 @@ describe('workflow navigateTab', () => {
 
     mocks.tabsUpdate.mockResolvedValueOnce({ id: 7 });
 
+    // Post-update re-read: tab is still loading, not complete.
+    mocks.tabsGet.mockResolvedValueOnce({
+      id: 7,
+      status: 'loading',
+      url: 'https://other.example/',
+    });
+
+    // Listener tabs.get returns the completed target URL.
     mocks.tabsGet.mockResolvedValueOnce({
       id: 7,
       status: 'complete',
@@ -275,8 +303,15 @@ describe('workflow navigateTab', () => {
 
     mocks.tabsUpdate.mockResolvedValueOnce({ id: 7 });
 
-    // The first onUpdated fires but tabs.get returns a non-matching URL.
-    // The second onUpdated returns the matching URL.
+    // Post-update re-read: tab is still loading, not at the target URL.
+    mocks.tabsGet.mockResolvedValueOnce({
+      id: 7,
+      status: 'loading',
+      url: 'https://other.example/',
+    });
+
+    // First onUpdated event: listener tabs.get returns an intermediate non-matching URL.
+    // Second onUpdated event: listener tabs.get returns the matching URL.
     mocks.tabsGet
       .mockResolvedValueOnce({
         id: 7,
@@ -314,7 +349,14 @@ describe('workflow navigateTab', () => {
 
     mocks.tabsUpdate.mockResolvedValueOnce({ id: 7 });
 
-    // Tabs.get returns a URL that differs only in the hash fragment.
+    // Post-update re-read: tab is still loading, not at the target URL.
+    mocks.tabsGet.mockResolvedValueOnce({
+      id: 7,
+      status: 'loading',
+      url: 'https://other.example/',
+    });
+
+    // Listener tabs.get returns a URL that differs only in the hash fragment.
     mocks.tabsGet.mockResolvedValueOnce({
       id: 7,
       status: 'complete',

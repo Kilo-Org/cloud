@@ -335,6 +335,18 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
 
   // A suspended row no longer holds a claim on the workspace (0108 detached its
   // platform_installation_id), so shared workspace state must be left alone.
+  //
+  // Everything below this point tears down state shared by the whole workspace:
+  // the bot token, the Chat SDK installation, and the cached identities. That is
+  // safe only because `UQ_platform_integrations_slack_platform_inst` limits a
+  // workspace to a single owner, so removing this integration always leaves the
+  // workspace unreferenced.
+  //
+  // Whoever drops that index to allow several owners per workspace must reorder
+  // this: establish that no other integration references the workspace *before*
+  // revoking the token or deleting Chat SDK state, not just before deleting the
+  // slack_workspace_installations row. Otherwise disconnecting one owner revokes
+  // the token the remaining owners are still using.
   const shouldDeleteSlackInstallation =
     integration.integration_status === INTEGRATION_STATUS.ACTIVE;
 

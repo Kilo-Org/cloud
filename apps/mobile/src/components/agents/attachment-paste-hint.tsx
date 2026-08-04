@@ -21,7 +21,7 @@ export function AttachmentPasteHint({ onPress }: Props) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Paste image from clipboard"
-      className="flex-row items-center gap-1.5 px-3 pb-1 active:opacity-70"
+      className="flex-row items-center gap-1.5 px-3 py-1.5 active:opacity-70"
     >
       <ClipboardPaste size={14} color={colors.mutedForeground} />
       <Text className="text-xs text-muted-foreground">Image detected, tap to paste</Text>

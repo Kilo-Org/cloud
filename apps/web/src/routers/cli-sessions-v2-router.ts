@@ -355,6 +355,12 @@ const SearchInputSchema = z.object({
   search_string: z.string().min(1),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   offset: z.number().min(0).optional().default(0),
+  /**
+   * Row offset for `useInfiniteQuery`. The tRPC TanStack integration injects
+   * the page param under `cursor` and no other key, so offset paging has to
+   * name it that. Takes precedence over `offset` when both arrive.
+   */
+  cursor: z.number().int().min(0).optional(),
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
@@ -608,12 +614,15 @@ export const cliSessionsV2Router = createTRPCRouter({
       search_string,
       limit,
       offset,
+      cursor,
       orderBy,
       createdOnPlatform,
       organizationId,
       includeChildren,
       gitUrl,
     } = input;
+
+    const pageOffset = cursor ?? offset;
 
     const orderColumn =
       orderBy === 'updated_at' ? cli_sessions_v2.updated_at : cli_sessions_v2.created_at;
@@ -650,7 +659,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         .where(baseWhere)
         .orderBy(desc(orderColumn))
         .limit(limit)
-        .offset(offset),
+        .offset(pageOffset),
       db
         .select({ count: sql<string>`COUNT(*)` })
         .from(cli_sessions_v2)
@@ -659,12 +668,16 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     const results = rawResults.map(projectAssociatedPr);
     const total = countResult.length > 0 ? Number(countResult[0].count) : 0;
+    const nextOffset = pageOffset + results.length;
 
     return {
       results,
       total,
       limit,
-      offset,
+      offset: pageOffset,
+      // `null` on the last page. Derived from the row count actually returned,
+      // so a short page cannot leave a cursor pointing past the end.
+      nextCursor: nextOffset < total ? nextOffset : null,
     };
   }),
 

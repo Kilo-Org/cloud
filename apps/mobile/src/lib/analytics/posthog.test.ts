@@ -303,10 +303,37 @@ describe('discardPostHog', () => {
   });
 
   it('handles a bare mock with no setPersistedProperty gracefully', async () => {
-    const { discardPostHog } = await loadModule();
-    await expect(discardPostHog()).resolves.toBeUndefined();
-    expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
-    expect(hoisted.client.optOut).not.toHaveBeenCalled();
+    const { initPostHog, discardPostHog, subscribeToPostHogReady, isPostHogReady } =
+      await loadModule();
+
+    // Create a live client first so the early branch proves a true→false
+    // readiness transition, not a no-op null clear.
+    initPostHog();
+    expect(isPostHogReady()).toBe(true);
+
+    // Subscribe after init so the listener only observes the false transition.
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToPostHogReady(listener);
+
+    // Save and remove setPersistedProperty from the live mock to trigger the
+    // bare-mock early discard branch.  Restore after the test so other tests
+    // still see the full mock.
+    const originalSPP = (hoisted.client as Record<string, unknown>).setPersistedProperty;
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- temporary removal to trigger bare-mock path
+    delete (hoisted.client as Record<string, unknown>).setPersistedProperty;
+
+    try {
+      await expect(discardPostHog()).resolves.toBeUndefined();
+      expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
+      expect(hoisted.client.optOut).not.toHaveBeenCalled();
+      // The bare-mock path clears client and must notify readiness subscribers.
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(isPostHogReady()).toBe(false);
+    } finally {
+      (hoisted.client as Record<string, unknown>).setPersistedProperty = originalSPP;
+    }
+
+    unsubscribe();
   });
 
   it('allows concurrent re-init to create a fresh client', async () => {
@@ -565,5 +592,122 @@ describe('discard serialization', () => {
     // old client, not the new one. The new client's optOut has never been
     // called.
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('isPostHogReady and subscribeToPostHogReady', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('isPostHogReady returns false before init', async () => {
+    const { isPostHogReady } = await loadModule();
+    expect(isPostHogReady()).toBe(false);
+  });
+
+  it('isPostHogReady returns true after init', async () => {
+    const { initPostHog, isPostHogReady } = await loadModule();
+    expect(isPostHogReady()).toBe(false);
+    initPostHog();
+    expect(isPostHogReady()).toBe(true);
+  });
+
+  it('notifies ready subscribers when the client is created', async () => {
+    const { initPostHog, subscribeToPostHogReady } = await loadModule();
+
+    const listener = vi.fn() as () => void;
+    const unsubscribe = subscribeToPostHogReady(listener);
+    expect(listener).not.toHaveBeenCalled();
+
+    initPostHog();
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('unsubscribe removes the listener — no further notifications', async () => {
+    const { initPostHog, subscribeToPostHogReady } = await loadModule();
+
+    const listener = vi.fn() as () => void;
+    const unsubscribe = subscribeToPostHogReady(listener);
+    unsubscribe();
+
+    initPostHog();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('isPostHogReady returns false when consent is not allowed', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog, isPostHogReady } = await loadModule();
+    initPostHog();
+    // initPostHog returns early when consent is not allowed.
+    expect(isPostHogReady()).toBe(false);
+  });
+
+  it('isPostHogReady stays true after a second initPostHog call', async () => {
+    const { initPostHog, isPostHogReady } = await loadModule();
+    initPostHog();
+    expect(isPostHogReady()).toBe(true);
+
+    // Second init is a no-op (client already exists).
+    initPostHog();
+    expect(isPostHogReady()).toBe(true);
+  });
+
+  it('isPostHogReady returns false after discardPostHog', async () => {
+    const { initPostHog, discardPostHog, isPostHogReady } = await loadModule();
+    initPostHog();
+    expect(isPostHogReady()).toBe(true);
+
+    await discardPostHog();
+    expect(isPostHogReady()).toBe(false);
+  });
+
+  it('notifies ready subscribers when discardPostHog clears the client', async () => {
+    const { initPostHog, discardPostHog, subscribeToPostHogReady } = await loadModule();
+    initPostHog();
+
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToPostHogReady(listener);
+    expect(listener).not.toHaveBeenCalled();
+
+    await discardPostHog();
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    // After unsubscribe, no further notifications.
+    unsubscribe();
+    listener.mockClear();
+
+    initPostHog();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('keeps a subscriber live across discard and re-init, notifying both transitions', async () => {
+    const { initPostHog, discardPostHog, subscribeToPostHogReady, isPostHogReady } =
+      await loadModule();
+
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToPostHogReady(listener);
+    expect(listener).not.toHaveBeenCalled();
+
+    // Initial init: ready becomes true.
+    initPostHog();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(isPostHogReady()).toBe(true);
+
+    // Discard: ready becomes false. Same listener fires again.
+    await discardPostHog();
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(isPostHogReady()).toBe(false);
+
+    // Re-init: ready becomes true. Same listener fires again.
+    initPostHog();
+    expect(listener).toHaveBeenCalledTimes(3);
+    expect(isPostHogReady()).toBe(true);
+
+    unsubscribe();
   });
 });

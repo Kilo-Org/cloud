@@ -20,6 +20,7 @@ export default defineProject({
       'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
+      'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
       'src/lib/hooks/**/*.test.ts',
@@ -32,6 +33,7 @@ export default defineProject({
       'src/components/pr-review/**/*.test.tsx',
       'src/components/kiloclaw/**/*.test.tsx',
       'src/lib/telemetry/**/*.test.ts',
+      'src/app/**/*.test.tsx',
     ],
   },
 });

@@ -69,6 +69,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     // is denied for the entire async teardown window.
     clearTelemetryDecision();
     Sentry.setUser(null);
+    // SDK teardown — drop queues, do not flush them. Must happen before
+    // any SecureStore or cache awaits so optional analytics cannot transmit
+    // during the teardown window.
+    resetAppsFlyerState();
+    await discardPostHog();
+    purgePostHogPersistence();
 
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     // Clear per-user preferences so they don't leak to the next signed-in account
@@ -80,10 +86,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await clearViewedFiles();
     clearAgentModelPreference();
     clearReasoningPreference();
-    // SDK teardown — drop queues, do not flush them.
-    resetAppsFlyerState();
-    await discardPostHog();
-    purgePostHogPersistence();
     queryClient.clear();
     setToken(undefined);
   }, []);

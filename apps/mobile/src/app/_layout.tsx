@@ -26,7 +26,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -37,8 +37,9 @@ import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
 import { shouldStartAnalytics } from '@/lib/analytics-consent';
-import { APP_STARTUP_EVENT, captureEvent } from '@/lib/analytics/posthog';
-import { markStartup, markStartupComplete, takeStartupTimings } from '@/lib/startup-timing';
+import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
+import { drainStartupTimings } from '@/lib/startup-drain';
+import { markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -145,6 +146,9 @@ function RootLayoutNav() {
   // Flipped by every splash-hide site below, so the app_startup drain can
   // depend on "startup finished" as an ordinary dependency.
   const [startupFinished, setStartupFinished] = useState(false);
+  // Reactive snapshot so the drain effect re-triggers when the PostHog
+  // client becomes ready after async init.
+  const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);
 
   useEffect(() => {
     if (fontsError) {
@@ -466,30 +470,26 @@ function RootLayoutNav() {
     setPendingShareId(null);
   }, [pendingShareId, isShellReady, onGateRoute, router]);
 
-  // One `app_startup` event per launch. It needs BOTH "startup finished" and
-  // "analytics is allowed to run", and neither implies the other — a
-  // consent-settled launch can still be waiting on fonts, and a splash hidden
-  // at the consent screen has no analytics client yet. So both are
-  // dependencies, and whichever settles last triggers the send.
+  // One `app_startup` event per launch, delegated to a drain helper so
+  // tests can drive the real guard logic without mounting the full layout.
+  // Whichever gate settles last triggers the send. Because
+  // `useSyncExternalStore` re-renders when the PostHog client becomes ready,
+  // this effect re-triggers even after consent/startup has already resolved.
   //
-  // Must stay the LAST effect here: `takeStartupTimings()` consumes the payload
-  // and `captureEvent` no-ops while the PostHog client is null, so this has to
-  // run after useAnalyticsConsentGate's initPostHog().
-  //
-  // Signed-out launches are never reported — PostHog does not start without
-  // consent, and that is the intended trade.
+  // Must stay the LAST effect here — `takeStartupTimings()` is one-shot.
+  // Signed-out launches are never reported.
   useEffect(() => {
-    if (
-      !startupFinished ||
-      !shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
-    ) {
+    if (!startupFinished) {
       return;
     }
-    const timings = takeStartupTimings();
-    if (timings) {
-      captureEvent(APP_STARTUP_EVENT, timings);
-    }
-  }, [startupFinished, token, consentChecked, needsConsent]);
+    drainStartupTimings({
+      hasToken: token != null,
+      consentChecked,
+      needsConsent,
+      optionalConsent,
+      postHogReady,
+    });
+  }, [startupFinished, token, consentChecked, needsConsent, optionalConsent, postHogReady]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;

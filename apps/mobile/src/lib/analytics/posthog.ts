@@ -69,11 +69,37 @@ let clientGeneration: number | null = null;
 // flags later load. init wires the client's single update into this registry.
 const flagListeners = new Set<() => void>();
 
+// Subscriber registry so layout-drain can re-trigger once the client is
+// created or cleared.  `initPostHog` and `discardPostHog` fire these
+// after the client reference changes.
+const readyListeners = new Set<() => void>();
+
 // Track every discard completion so resumePostHog can await all prior
 // work.  Each discard appends to this chain; resumePostHog captures the
 // tail at call time.  Discards that begin after resume are not waited on.
 // oxlint-disable-next-line promise/prefer-await-to-then -- seed value
 let discardChain: Promise<void> = Promise.resolve();
+
+/** True when `initPostHog` has created the client.  Layout-drain uses
+ *  this to defer `takeStartupTimings` until capture can succeed. */
+export function isPostHogReady(): boolean {
+  return client !== null;
+}
+
+/** Register a listener that fires when the client becomes ready (after
+ *  `initPostHog`) or not ready (after `discardPostHog`). */
+export function subscribeToPostHogReady(listener: () => void): () => void {
+  readyListeners.add(listener);
+  return () => {
+    readyListeners.delete(listener);
+  };
+}
+
+function notifyPostHogReady(): void {
+  for (const listener of readyListeners) {
+    listener();
+  }
+}
 
 /** Serialize a discard after the chain tail.  Always continues the chain
  *  even when the prior step rejects, so one failed optOut cannot break
@@ -150,6 +176,7 @@ export function initPostHog(): void {
     customStorage: posthogCustomStorage,
   });
   clientGeneration = currentGeneration();
+  notifyPostHogReady();
   // Super property on every event so dashboards can filter mobile vs web
   // without relying on $lib.
   void client.register({ platform: 'mobile' });
@@ -227,6 +254,7 @@ export async function discardPostHog(): Promise<void> {
     const c = client;
     if (typeof c?.setPersistedProperty !== 'function') {
       client = null;
+      notifyPostHogReady();
       flagListeners.clear();
       return;
     }
@@ -235,11 +263,14 @@ export async function discardPostHog(): Promise<void> {
     c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
     c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
 
-    // Drop the live reference and clear listeners before any async work so
-    // concurrent code cannot capture through the stale instance, stale flag
-    // callbacks cannot fire, and a concurrent initPostHog() can create a
+    // Drop the live reference and clear flag listeners before any async work
+    // so concurrent code cannot capture through the stale instance, stale
+    // flag callbacks cannot fire, and a concurrent initPostHog() can create a
     // fresh client whose listeners survive.
+    // Ready listeners persist — they must observe both the false transition
+    // now and a true transition from a later initPostHog.
     client = null;
+    notifyPostHogReady();
     flagListeners.clear();
 
     try {

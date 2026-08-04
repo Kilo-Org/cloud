@@ -56,11 +56,6 @@ export function ConsentDetails() {
                   screen&apos;s view hierarchy.
                 </Text>
               </View>
-              <View className="rounded-md bg-warn-tile-bg p-3">
-                <Text className="text-xs text-warn">
-                  No prompt or conversation content is sent to analytics.
-                </Text>
-              </View>
             </View>
           }
         />
@@ -74,6 +69,15 @@ export function ConsentDetails() {
           what="App events (opens, screens viewed, feature use), device type, app version."
           why="Measure app performance and understand how features are used."
           who="PostHog."
+          footer={
+            <View className="mt-3">
+              <View className="rounded-md bg-warn-tile-bg p-3">
+                <Text className="text-xs text-warn">
+                  No prompt or conversation content is sent to product analytics.
+                </Text>
+              </View>
+            </View>
+          }
         />
         <Section
           title="Install attribution"

@@ -101,12 +101,15 @@ jest.mock('next/server', () => {
   const actual = jest.requireActual<typeof nextServerModule>('next/server');
   return {
     ...actual,
-    // Route handlers here fire the dispatch off in the background via
-    // `after()`. Outside a real request scope `after()` throws, so invoke
-    // the callback immediately (without awaiting) to preserve the existing
-    // fire-and-forget semantics under test.
-    after: (fn: () => Promise<void> | void) => {
-      void fn();
+    // The route hands `after()` an already-started promise (dispatch is
+    // kicked off immediately, not deferred behind it) so it can keep the
+    // serverless invocation alive until the promise settles. Outside a real
+    // request scope `after()` throws, so just swallow the task here; the
+    // dispatch call itself already ran by the time this is invoked.
+    after: (task: Promise<unknown> | (() => Promise<void> | void)) => {
+      if (typeof task === 'function') {
+        void task();
+      }
     },
   };
 });

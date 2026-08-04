@@ -1654,13 +1654,14 @@ export async function POST(
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
       const ownerResolution = await getTerminalOwnerResolution();
       if (ownerResolution?.canDispatch) {
-        // Trigger dispatch in the background. `after()` keeps the serverless
-        // invocation alive for this work instead of leaving it as an
-        // unawaited promise that Vercel can freeze once the response is
-        // sent, which was causing spurious worker-call/status-probe
-        // timeouts (fetches stall while the function is suspended).
-        after(() =>
-          tryDispatchPendingReviews(ownerResolution.owner).catch(dispatchError => {
+        // Start dispatch immediately (don't wait behind the remaining
+        // provider work below), but hand the promise to `after()` so Vercel
+        // keeps the serverless invocation alive until it settles instead of
+        // freezing it once the response is sent. That freeze is what
+        // produced spurious worker-call/status-probe timeouts (in-flight
+        // fetches stall while the function is suspended).
+        const dispatchPromise = tryDispatchPendingReviews(ownerResolution.owner).catch(
+          dispatchError => {
             errorExceptInTest(
               '[code-review-status] Error dispatching pending reviews:',
               dispatchError
@@ -1669,8 +1670,9 @@ export async function POST(
               tags: { source: 'code-review-status-dispatch' },
               extra: { reviewId, owner: ownerResolution.owner },
             });
-          })
+          }
         );
+        after(dispatchPromise);
 
         logExceptInTest('[code-review-status] Triggered dispatch for pending reviews', {
           reviewId,

@@ -427,10 +427,12 @@ export async function startInfra(repoRoot: string, serviceNames: string[]): Prom
 
   // Pass --env-file so docker compose substitution sees secrets like
   // CF_AE_TOKEN without polluting the runner's process.env or exposing
-  // every .env.local value to sibling child processes.
-  const envFileArg = fs.existsSync(path.join(repoRoot, '.env.local'))
-    ? ['--env-file', '.env.local']
-    : [];
+  // every .env.local value to sibling child processes. Naming any file
+  // replaces Compose's default lookup, so name dev/.env too — it carries this
+  // worktree's Compose project and its infra ports.
+  const envFileArg = ['dev/.env', '.env.local'].flatMap(file =>
+    fs.existsSync(path.join(repoRoot, file)) ? ['--env-file', file] : []
+  );
 
   const args = ['compose', ...envFileArg, '-f', 'dev/docker-compose.yml'];
   args.push(...profileArgs, 'up', '-d');

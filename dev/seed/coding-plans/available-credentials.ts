@@ -7,12 +7,17 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
 
-const PLAN_ID = 'minimax-token-plan-plus';
-const PROVIDER_ID = 'minimax';
+const PROVIDERS = {
+  minimax: { planId: 'minimax-token-plan-plus', providerId: 'minimax' },
+  byteplus: {
+    planId: 'byteplus-coding-plan-team-lite',
+    providerId: 'byteplus-coding',
+  },
+} as const;
 const KEY_PREFIX = 'dev-seed:coding-plans';
 const MAX_CREDENTIAL_COUNT = 20;
 
-export const usage = '<scenario> [count]';
+export const usage = '<scenario> [count] [minimax|byteplus]';
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed coding-plans:available-credentials ${usage}`);
@@ -21,12 +26,12 @@ function printUsage(): void {
     'Creates encrypted placeholder inventory credentials for local subscription UI testing.'
   );
   console.log(
-    'These credentials bypass MiniMax validation and must not be used for provider traffic.'
+    'These credentials bypass provider validation and must not be used for provider traffic.'
   );
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed coding-plans:available-credentials subscription-smoke 1');
-  console.log('  pnpm dev:seed coding-plans:available-credentials byok-permutations 4');
+  console.log('  pnpm dev:seed coding-plans:available-credentials byteplus-smoke 1 byteplus');
 }
 
 function parseCount(rawCount: string | undefined): number {
@@ -89,7 +94,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     return;
   }
 
-  const [rawScenario, rawCount, ...rest] = args;
+  const [rawScenario, rawCount, rawProvider = 'minimax', ...rest] = args;
   if (rest.length > 0) {
     printUsage();
     throw new Error(`Unexpected extra arguments: ${rest.join(' ')}`);
@@ -97,11 +102,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const scenario = requireScenario(rawScenario);
   const count = parseCount(rawCount);
+  if (rawProvider !== 'minimax' && rawProvider !== 'byteplus') {
+    throw new Error('provider must be minimax or byteplus');
+  }
+  const provider = PROVIDERS[rawProvider];
   const key = requireEncryptionKey();
   const credentials = Array.from({ length: count }, (_, index) => {
     const plaintext = `${KEY_PREFIX}:${scenario}:${index + 1}`;
     return {
-      upstreamPlanId: `${KEY_PREFIX}:minimax-plan:${scenario}:${index + 1}`,
+      upstreamPlanId: `${KEY_PREFIX}:${rawProvider}-plan:${scenario}:${index + 1}`,
       fingerprint: credentialFingerprint(plaintext, key),
       encrypted: encryptCredential(plaintext, key),
     };
@@ -132,8 +141,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         credentials.map(
           credential =>
             ({
-              plan_id: PLAN_ID,
-              provider_id: PROVIDER_ID,
+              plan_id: provider.planId,
+              provider_id: provider.providerId,
               upstream_plan_id: credential.upstreamPlanId,
               encrypted_api_key: credential.encrypted,
               credential_fingerprint: credential.fingerprint,
@@ -150,8 +159,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   return {
     scenario,
-    planId: PLAN_ID,
-    providerId: PROVIDER_ID,
+    planId: provider.planId,
+    providerId: provider.providerId,
     availableCredentials: inserted,
     providerTrafficValid: false,
   };

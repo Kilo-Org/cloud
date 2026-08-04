@@ -488,7 +488,7 @@ describe('BYOK Router', () => {
     });
   });
 
-  describe('MiniMax Coding Plan-installed credentials', () => {
+  describe('Coding Plan-installed credentials', () => {
     test('rejects removed dedicated provider identity in manual creation requests', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
@@ -531,6 +531,50 @@ describe('BYOK Router', () => {
           user_id: ownerUser.id,
           plan_id: 'minimax-token-plan-plus',
           provider_id: 'minimax',
+          key_inventory_id: inventory.id,
+          installed_byok_key_id: key.id,
+          status: 'active',
+          cost_microdollars: 20_000_000,
+          billing_period_days: 30,
+          current_period_start: now,
+          current_period_end: now,
+          credit_renewal_at: now,
+        })
+        .returning();
+      return { key, subscription };
+    }
+
+    async function createInstalledBytePlusKey() {
+      const encrypted = encryptApiKey('installed-byteplus-key', BYOK_ENCRYPTION_KEY);
+      const [inventory] = await db
+        .insert(coding_plan_key_inventory)
+        .values({
+          plan_id: 'byteplus-coding-plan-team-lite',
+          provider_id: 'byteplus-coding',
+          upstream_plan_id: 'byteplus-installed-plan',
+          encrypted_api_key: encrypted,
+          credential_fingerprint: crypto.randomUUID(),
+          status: 'assigned',
+          assigned_to_user_id: ownerUser.id,
+        })
+        .returning();
+      const [key] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: ownerUser.id,
+          provider_id: 'byteplus-coding',
+          encrypted_api_key: encrypted,
+          management_source: 'coding_plan',
+          created_by: ownerUser.id,
+        })
+        .returning();
+      const now = new Date().toISOString();
+      const [subscription] = await db
+        .insert(coding_plan_subscriptions)
+        .values({
+          user_id: ownerUser.id,
+          plan_id: 'byteplus-coding-plan-team-lite',
+          provider_id: 'byteplus-coding',
           key_inventory_id: inventory.id,
           installed_byok_key_id: key.id,
           status: 'active',
@@ -605,6 +649,28 @@ describe('BYOK Router', () => {
 
       expect(updatedSubscription.status).toBe('active');
       expect(updatedSubscription.installed_byok_key_id).toBe(key.id);
+    });
+
+    test('blocks mutations to an installed BytePlus key while allowing it to remain listed', async () => {
+      const { key } = await createInstalledBytePlusKey();
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.setEnabled({ id: key.id, is_enabled: false })).rejects.toThrow(
+        /read-only/i
+      );
+      await expect(caller.byok.update({ id: key.id, api_key: 'replacement-key' })).rejects.toThrow(
+        /read-only/i
+      );
+      await expect(caller.byok.delete({ id: key.id })).rejects.toThrow(/read-only/i);
+      await expect(caller.byok.list({})).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: key.id,
+            provider_id: 'byteplus-coding',
+            management_source: 'coding_plan',
+          }),
+        ])
+      );
     });
 
     test('still deletes a user-owned key', async () => {

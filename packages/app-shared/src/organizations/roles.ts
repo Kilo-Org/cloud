@@ -1,20 +1,19 @@
 // Canonical organization role values. Matches apps/web's
 // OrganizationRoleSchema (lib/organizations/organization-types.ts, a
 // z.enum(ORGANIZATION_ROLES)) and packages/db's OrganizationRole type.
-// Mobile's local string-union copies (e.g. lib/security-agent.ts) do not yet
-// include 'admin'; mobile support for the admin role is tracked separately.
 export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
 export type OrganizationRole = (typeof ORGANIZATION_ROLES)[number];
 
 /**
- * Roles with full organization-management authority. `admin` is an exact peer
- * of `owner`: there is no action an owner can take that an admin cannot.
+ * Roles with organization-management authority. `admin` matches `owner`
+ * everywhere except owner management, which {@link canManageOrganizationOwners}
+ * reserves for owners.
  */
 export const ORGANIZATION_MANAGE_ROLES = ['owner', 'admin'] satisfies OrganizationRole[];
 
 /**
  * Roles that may manage organization billing. Admins are included because they
- * hold the same authority as owners.
+ * hold the same authority as owners here.
  */
 export const ORGANIZATION_BILLING_ROLES = [
   'owner',
@@ -24,6 +23,19 @@ export const ORGANIZATION_BILLING_ROLES = [
 
 export function canManageOrganization(role: string | undefined): boolean {
   return ORGANIZATION_MANAGE_ROLES.some(allowed => allowed === role);
+}
+
+/**
+ * Owner management — granting the owner role, or acting on an existing owner's
+ * membership or pending owner invitation — is reserved for owners. Admins are
+ * excluded so they can neither appoint an owner nor strip the last one.
+ *
+ * Mirrors `assertOwnerAuthority` in
+ * apps/web/src/routers/organizations/organization-members-router.ts; keep the
+ * two in sync so the UI does not offer actions the server rejects.
+ */
+export function canManageOrganizationOwners(role: string | undefined): boolean {
+  return role === 'owner';
 }
 
 /**

@@ -45,7 +45,10 @@ import { toast } from 'sonner';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  canManageOrganizationOwners,
+} from '@kilocode/app-shared/organizations';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -83,14 +86,27 @@ const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean
 const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
   canManageMembers(role, isKiloAdmin) || role === 'billing_manager';
 
+/**
+ * True when the viewer may act on `targetRole`'s membership or invitation.
+ * Owner management is reserved for owners, so an admin must not be offered
+ * controls the server rejects with FORBIDDEN.
+ */
+const canActOnMemberRole = (
+  currentUserRole: OrganizationRole,
+  isKiloAdmin: boolean,
+  targetRole: OrganizationRole
+): boolean => isKiloAdmin || targetRole !== 'owner' || canManageOrganizationOwners(currentUserRole);
+
 // Business rules for member removal:
 // - Kilo admins can remove anyone
 // - Owners can remove anyone except themselves
-// - Members cannot remove anyone
+// - Admins can remove anyone except themselves and owners
+// - Billing managers and members cannot remove anyone
 const canRemoveMember = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean,
-  isCurrentUser: boolean
+  isCurrentUser: boolean,
+  targetRole: OrganizationRole
 ): boolean => {
   // Kilo admin can remove anyone including themselves
   if (isKiloAdmin) return true;
@@ -98,9 +114,11 @@ const canRemoveMember = (
   // Cannot remove yourself
   if (isCurrentUser) return false;
 
+  if (!canActOnMemberRole(currentUserRole, isKiloAdmin, targetRole)) return false;
+
   if (canManageMembers(currentUserRole, isKiloAdmin)) return true;
 
-  // Members cannot remove anyone
+  // Billing managers and members cannot remove anyone
   return false;
 };
 
@@ -122,7 +140,7 @@ function DeleteMemberButton({ organizationId, member }: DeleteMemberButtonProps)
     (member.status === 'active' && member.id === kiloUserId) || member.email === kiloUserEmail;
 
   // Only show delete button for active members and if user has permission to remove
-  const canRemove = canRemoveMember(currentUserRole, isKiloAdmin, isCurrentUser);
+  const canRemove = canRemoveMember(currentUserRole, isKiloAdmin, isCurrentUser, member.role);
 
   if (member.status !== 'active' || !canRemove) {
     return null;
@@ -160,7 +178,10 @@ function DeleteInvitationButton({ organizationId, member }: DeleteInvitationButt
     return null;
   }
 
-  const canDelete = canManageMembers(currentUserRole, isKiloAdmin);
+  // An admin cannot revoke a pending owner invitation, so don't offer the control.
+  const canDelete =
+    canManageMembers(currentUserRole, isKiloAdmin) &&
+    canActOnMemberRole(currentUserRole, isKiloAdmin, member.role);
 
   if (!canDelete) {
     return null;

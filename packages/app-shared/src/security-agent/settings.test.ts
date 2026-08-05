@@ -21,7 +21,7 @@ describe('Security Agent helpers', () => {
     );
   });
 
-  it('allows only personal, owner, and billing manager policy changes', () => {
+  it('allows only personal, owner, admin, and billing manager policy changes', () => {
     expect(canManageSecurityAgent('personal', undefined)).toBe(true);
     expect(canManageSecurityAgent('org_123', 'owner')).toBe(true);
     expect(canManageSecurityAgent('org_123', 'admin')).toBe(true);

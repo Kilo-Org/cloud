@@ -3,7 +3,7 @@ import { getAvailableThinkingEfforts } from '@/lib/code-reviews/core/model-varia
 describe('getAvailableThinkingEfforts', () => {
   const modelSlug = 'anthropic/claude-sonnet-4.5';
 
-  it('prefers variants discovered through the models endpoint', () => {
+  it('returns variants discovered through the models endpoint', () => {
     expect(
       getAvailableThinkingEfforts(modelSlug, [{ id: modelSlug, variants: ['low', 'high'] }])
     ).toEqual(['low', 'high']);
@@ -13,14 +13,7 @@ describe('getAvailableThinkingEfforts', () => {
     expect(getAvailableThinkingEfforts(modelSlug, [{ id: modelSlug, variants: [] }])).toEqual([]);
   });
 
-  it('falls back when the model was not discovered', () => {
-    expect(getAvailableThinkingEfforts(modelSlug, [])).toEqual([
-      'max',
-      'xhigh',
-      'high',
-      'medium',
-      'low',
-      'none',
-    ]);
+  it('returns no variants when the model was not discovered', () => {
+    expect(getAvailableThinkingEfforts(modelSlug, [])).toEqual([]);
   });
 });

@@ -8,7 +8,7 @@ const ROUTING_TABLE_TTL_MS = 5 * 60 * 1000;
  * listing (org endpoint and the tRPC settings query), so an uncached admin-worker
  * round-trip per request is wasteful. `createCachedFetch` also serves the
  * last-known-good table when a refresh throws, so a transient worker outage does
- * not blank the Auto Efficient choices shown in the UI.
+ * not blank the Auto Balanced and Auto Efficient choices shown in the UI.
  */
 export const getCachedRoutingTable = createCachedFetch(
   async () => {

@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
-  claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -33,8 +32,6 @@ export type ResolvedAutoModel = {
   reasoning?: OpenRouterReasoningConfig;
   verbosity?: Verbosity;
 };
-
-export const KILO_AUTO_LEGACY_MODEL = 'kilo/auto'; // hardcoded in upstream OpenClaw
 
 export const modeSchema = z.enum([
   'claw',
@@ -79,12 +76,6 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   build: SONNET_FRONTIER,
   explore: SONNET_FRONTIER,
   code: SONNET_FRONTIER,
-};
-
-export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
-  model: claude_sonnet_clawsetup_model.public_id,
-  reasoning: { enabled: true, effort: 'high' },
-  verbosity: 'high',
 };
 
 // INVARIANT: the efficient static fallback must remain image-capable.
@@ -195,9 +186,5 @@ export const AUTO_MODELS = [
 ];
 
 export function isKiloAutoModel(model: string) {
-  return (
-    AUTO_MODELS.some(m => m.id === model) ||
-    model === ORG_AUTO_MODEL.id ||
-    model === KILO_AUTO_LEGACY_MODEL
-  );
+  return AUTO_MODELS.some(m => m.id === model) || model === ORG_AUTO_MODEL.id;
 }

@@ -8289,11 +8289,10 @@ export const kiloclaw_instances = pgTable(
       .on(table.organization_id, table.created_at)
       .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
     // Non-partial index over all rows (including destroyed) so we can answer
-    // "what is this user's earliest instance" without a sequential scan. Used
-    // by `userIsWithinFirstKiloClawInstanceWindow` on the AI gateway hot path;
-    // the existing partial-by-user indexes can't serve it because they exclude
-    // destroyed rows, and destroyed rows must still count for "first instance"
-    // semantics.
+    // "what is this user's earliest instance" and user-instance listings that
+    // include destroyed rows without a sequential scan. The existing
+    // partial-by-user indexes can't serve these because they exclude destroyed
+    // rows.
     index('IDX_kiloclaw_instances_user_id_created_at').on(table.user_id, table.created_at),
     // Powers admin "instances on version X" filter; partial since destroyed rows are excluded.
     index('IDX_kiloclaw_instances_tracked_image_tag')

@@ -13,7 +13,6 @@ import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
-  claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
@@ -115,7 +114,6 @@ export const kiloExclusiveModels = [
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
   gpt_5_6_sol_stealth_model,
-  claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,

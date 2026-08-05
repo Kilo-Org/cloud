@@ -1,5 +1,9 @@
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FREE_MODEL,
+} from '@/lib/ai-gateway/auto-model';
 import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
 import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
@@ -15,6 +19,7 @@ export async function addAutoRoutingModels(
 ): Promise<OpenRouterModelsResponse['data']> {
   const availableModelIds = new Set(models.map(model => model.id));
   if (
+    !availableModelIds.has(KILO_AUTO_BALANCED_MODEL.id) &&
     !availableModelIds.has(KILO_AUTO_EFFICIENT_MODEL.id) &&
     !availableModelIds.has(KILO_AUTO_FREE_MODEL.id)
   ) {
@@ -34,6 +39,7 @@ export async function addAutoRoutingModels(
   );
   const freeModelIds = visibleConcreteModelIds(autoFreeCandidates, availableModelIds);
   const autoRoutingChoices = new Map([
+    [KILO_AUTO_BALANCED_MODEL.id, efficientModelIds],
     [KILO_AUTO_EFFICIENT_MODEL.id, efficientModelIds],
     [KILO_AUTO_FREE_MODEL.id, freeModelIds],
   ]);

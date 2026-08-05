@@ -1347,6 +1347,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.eventQueries.getLatestAssistantMessage(sessionId, metadata.auth.kiloSessionId);
   }
 
+  /**
+   * Get the latest persisted event ID from the event log.
+   *
+   * Returns `null` when the DO has a pending deletion intent or when no
+   * events have been persisted yet.
+   */
+  async getLatestEventId(): Promise<number | null> {
+    if (await this.hasDeletionIntent()) return null;
+    return this.eventQueries.getLatestEventId();
+  }
+
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
     const metadata = await this.getMetadata();
     if (!metadata) return { type: 'session-not-found' };

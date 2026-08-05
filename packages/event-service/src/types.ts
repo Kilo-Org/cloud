@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type {
   contextSubscribeMessageSchema,
   contextUnsubscribeMessageSchema,
+  ackMessageSchema,
   clientMessageSchema,
   errorMessageSchema,
   eventMessageSchema,
@@ -14,6 +15,7 @@ import type {
 
 export type ContextSubscribeMessage = z.infer<typeof contextSubscribeMessageSchema>;
 export type ContextUnsubscribeMessage = z.infer<typeof contextUnsubscribeMessageSchema>;
+export type AckMessage = z.infer<typeof ackMessageSchema>;
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
 // ── Server → Client ────────────────────────────────────────────────

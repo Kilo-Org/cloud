@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { withDeadline, CONTROL_PLANE_DEADLINE_MS, SEND_DEADLINE_MS } from '@kilocode/event-service';
 import { KiloChatApiError } from './errors';
 import {
   conversationListResponseSchema,
@@ -98,6 +99,14 @@ export class KiloChatClient {
 
   // ── Mutations via HTTP ────────────────────────────────────────────────────
 
+  /**
+   * Send a message into a conversation. The send is queued per conversation so
+   * concurrent callers cannot race ahead and get a lower server-assigned ULID.
+   *
+   * **Timeout is uncertain.** When the deadline fires the server may already
+   * have accepted the message. Callers must reconcile the conversation state
+   * via `listMessages` (or event-service events) before retrying the send.
+   */
   async sendMessage(req: CreateMessageRequest): Promise<CreateMessageResponse> {
     const body = req satisfies CreateMessageRequest;
     const prev = this.sendQueues.get(req.conversationId) ?? Promise.resolve();
@@ -107,6 +116,7 @@ export class KiloChatClient {
           method: 'POST',
           body,
           schema: createMessageResponseSchema,
+          deadlineMs: SEND_DEADLINE_MS,
         }),
       // A failed prior send must not block subsequent sends — swallow the
       // rejection on the chain; the original caller already received it.
@@ -115,6 +125,7 @@ export class KiloChatClient {
           method: 'POST',
           body,
           schema: createMessageResponseSchema,
+          deadlineMs: SEND_DEADLINE_MS,
         })
     );
     this.sendQueues.set(req.conversationId, next);
@@ -435,21 +446,31 @@ export class KiloChatClient {
       body?: unknown;
       query?: Record<string, unknown>;
       schema: z.ZodType<T>;
+      signal?: AbortSignal;
+      deadlineMs?: number;
     }
   ): Promise<T> {
-    try {
-      return await this.httpRequestOnce(path, opts);
-    } catch (err) {
-      const onUnauthorized = this.onUnauthorized;
-      if (!this.shouldRecoverFromUnauthorized(err) || onUnauthorized === undefined) {
-        throw err;
-      }
-      const decision = await onUnauthorized();
-      if (decision !== 'retry') {
-        throw err;
-      }
-      return this.httpRequestOnce(path, opts);
-    }
+    const deadline = opts.deadlineMs ?? CONTROL_PLANE_DEADLINE_MS;
+    return withDeadline(
+      deadline,
+      async signal => {
+        try {
+          return await this.httpRequestOnce(path, { ...opts, signal });
+        } catch (err) {
+          // Deadline/timeout errors must NOT trigger unauthorized recovery.
+          const onUnauthorized = this.onUnauthorized;
+          if (!this.shouldRecoverFromUnauthorized(err) || onUnauthorized === undefined) {
+            throw err;
+          }
+          const decision = await onUnauthorized();
+          if (decision !== 'retry') {
+            throw err;
+          }
+          return this.httpRequestOnce(path, { ...opts, signal });
+        }
+      },
+      opts.signal
+    );
   }
 
   private shouldRecoverFromUnauthorized(err: unknown): err is KiloChatApiError {
@@ -467,6 +488,7 @@ export class KiloChatClient {
       body?: unknown;
       query?: Record<string, unknown>;
       schema: z.ZodType<T>;
+      signal?: AbortSignal;
     }
   ): Promise<T> {
     const token = await this.getToken();
@@ -489,6 +511,7 @@ export class KiloChatClient {
       method: opts.method ?? 'GET',
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: opts.signal,
     });
 
     if (!res.ok) {

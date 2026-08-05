@@ -6,6 +6,7 @@ import { KiloChatHooksProvider } from '@kilocode/kilo-chat-hooks';
 
 import { EVENT_SERVICE_URL, KILO_CHAT_URL } from '@/lib/config';
 
+import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
 import {
   clearKiloChatTokenCache,
   subscribeToKiloChatTokenResponses,
@@ -41,6 +42,7 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const activeAndFocused = useAppActiveAndFocused();
 
   const [value] = useState(() => {
     const eventService = new EventServiceClient({
@@ -64,11 +66,17 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
   });
 
   useEffect(() => {
-    void value.eventService.connect();
+    let holding = false;
+    if (activeAndFocused) {
+      void value.eventService.acquire();
+      holding = true;
+    }
     return () => {
-      value.eventService.disconnect();
+      if (holding) {
+        value.eventService.release();
+      }
     };
-  }, [value]);
+  }, [value, activeAndFocused]);
 
   useEffect(() => {
     let cancelled = false;

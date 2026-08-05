@@ -80,6 +80,11 @@ export const kiloExtras = {
       type: 'boolean',
       default: false,
     },
+    privacy_mode: {
+      description:
+        'Blur personally identifiable information (account email, balance, team name, etc.) in the TUI and require confirmation before showing profile details',
+      type: 'boolean',
+    },
     commit_message: {
       description: 'Configuration for AI-generated commit messages',
       type: 'object',

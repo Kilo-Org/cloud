@@ -13,6 +13,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -38,6 +39,11 @@ const autoFreeConstituents = autoFreeModels.map(model => {
     isVercelRoutingEnabled: exclusiveModel === null || hasVercelRoutingFlag === true,
   };
 });
+
+const totalVercelEligibleAutoFreeWeight = autoFreeConstituents.reduce(
+  (total, model) => total + (model.isVercelRoutingEnabled ? model.weight : 0),
+  0
+);
 
 export function RoutingContent() {
   const trpc = useTRPC();
@@ -119,6 +125,8 @@ export function RoutingContent() {
   const currentFreeOverride = data?.vercel_routing_percentage_free;
   const effectiveFreeRoutingPercentage =
     currentFreeOverride ?? DEFAULT_VERCEL_PERCENTAGE_FREE;
+  const totalEffectiveAutoFreeVercelPercentage =
+    effectiveFreeRoutingPercentage * (totalVercelEligibleAutoFreeWeight / totalAutoFreeWeight);
   const isOverrideActive =
     (currentOverride !== null && currentOverride !== undefined) ||
     (currentFreeOverride !== null && currentFreeOverride !== undefined);
@@ -297,6 +305,16 @@ export function RoutingContent() {
                     }
                   )}
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={4} className="font-medium">
+                      Total effective Auto Free Vercel routing
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {percentageFormatter.format(totalEffectiveAutoFreeVercelPercentage)}%
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
               </Table>
             </div>
           </div>

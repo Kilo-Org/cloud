@@ -37,7 +37,7 @@ export function isDataCollectionExplicitlyDisallowed(
 }
 
 export type OpenRouterReasoningConfig = {
-  effort?: OpenAI.Chat.Completions.ChatCompletionReasoningEffort | 'none';
+  effort?: OpenAI.Chat.Completions.ChatCompletionReasoningEffort;
   max_tokens?: number;
   exclude?: boolean;
   enabled?: boolean;

@@ -18,7 +18,7 @@ import type { Span } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
 import { hasPaymentMethod } from '@/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
@@ -615,6 +615,52 @@ function scheduleKiloPassBonusIfNeeded(
   });
 }
 
+/**
+ * Identity of an already-persisted usage row, or null if it is not there.
+ *
+ * The same record can reach this write twice: `recordUsageInPrimaryRegion`
+ * retries when an attempt exceeds its 10s timeout while the first delivery is
+ * still committing, and after exhausting its retries the caller falls back to
+ * writing locally with the same `core.id`. The losing transaction then collides
+ * on the `microdollar_usage` primary key and rolls back in full, so the usage is
+ * billed exactly once. Reporting that as a failure would make callers treat
+ * billed usage as unrecorded and skip dependent writes.
+ *
+ * The row's presence under this user is the proof, not the PostgreSQL error code:
+ * `id` is generated per delivery by `toInsertableDbUsageRecord`, and the row can
+ * only be visible if a delivery of this exact record committed its whole
+ * transaction. A deadlock victim that is retried into the collision therefore
+ * recovers the same way a plain primary-key violation does.
+ *
+ * `newMicrodollarsUsed` is not reconstructable here and is only consumed by
+ * best-effort PostHog attribution and the Kilo Pass threshold, both of which run
+ * on the delivery that committed.
+ */
+async function findAlreadyRecordedUsage(
+  coreUsageFields: MicrodollarUsage
+): Promise<UsageRecordInsertResult | null> {
+  const existing = await db
+    .select({ id: microdollar_usage.id })
+    .from(microdollar_usage)
+    .where(
+      and(
+        eq(microdollar_usage.id, coreUsageFields.id),
+        eq(microdollar_usage.kilo_user_id, coreUsageFields.kilo_user_id)
+      )
+    )
+    .limit(1);
+  if (existing.length === 0) return null;
+
+  // Report the JS-side identity, not the DB-returned timestamp: PostgreSQL
+  // renders `created_at` as "2026-04-29 01:16:12.945+00", which is not strict
+  // ISO 8601 and fails downstream datetime validators.
+  return {
+    usageId: coreUsageFields.id,
+    createdAt: coreUsageFields.created_at,
+    newMicrodollarsUsed: null,
+  };
+}
+
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
@@ -653,6 +699,17 @@ export async function insertUsageRecord(
       newMicrodollarsUsed: result.inserted.newMicrodollarsUsed,
     };
   } catch (error) {
+    // The lookup itself is best-effort: it must never mask the original failure,
+    // and it throws for a malformed `id`, which is a genuine failed write.
+    const alreadyRecorded = await findAlreadyRecordedUsage(coreUsageFields).catch(() => null);
+    if (alreadyRecorded) {
+      // Not an exception: this is the designed outcome of a redelivered write.
+      sentryLogger('insertUsageRecord', 'warning')(
+        'insertUsageRecord received a redelivery of an already-recorded usage id',
+        { usageId: coreUsageFields.id }
+      );
+      return alreadyRecorded;
+    }
     console.error('insertUsageRecord failed', error);
     captureException(error, {
       tags: {

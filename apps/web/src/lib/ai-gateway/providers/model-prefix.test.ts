@@ -1,6 +1,5 @@
 import { isClaudeModel } from './anthropic.constants';
 import { isOpenAiModel, isGptOssModel } from './openai';
-import { isGemmaModel, isGemini3Model } from './google';
 import { isKimiModel } from './moonshotai';
 import { isGrokModel } from './xai';
 import { isGlmModel } from './zai';
@@ -26,13 +25,6 @@ describe('provider predicates match substrings, regardless of prefix', () => {
     expect(isOpenAiModel('~openai/gpt-oss')).toBe(false);
     expect(isGptOssModel('~openai/gpt-oss')).toBe(true);
     expect(isGptOssModel('gpt-oss-20b')).toBe(true);
-  });
-
-  test('google helpers', () => {
-    expect(isGemmaModel('~google/gemma-4-31b-it')).toBe(true);
-    expect(isGemini3Model('~google/gemini-3-pro')).toBe(true);
-    expect(isGemini3Model('gemini-3-pro')).toBe(true);
-    expect(isGemini3Model('gemini-2.5-flash-lite')).toBe(false);
   });
 
   test('isKimiModel', () => {

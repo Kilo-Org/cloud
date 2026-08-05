@@ -1,13 +1,14 @@
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
+import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import { isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
-import { isGrok42Model, isGrok45Model } from '@/lib/ai-gateway/providers/xai';
+import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { type OpenCodeSettings, ReasoningEffortSchema } from '@kilocode/db/schema-types';
 
@@ -17,67 +18,108 @@ export const REASONING_VARIANTS_THINKING_ONLY = {
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
-  ...REASONING_VARIANTS_THINKING_ONLY,
+  thinking: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
-  low: { reasoning: { enabled: true, effort: 'low' } },
-  medium: { reasoning: { enabled: true, effort: 'medium' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
 } as const;
 
-export const REASONING_VARIANTS_MAX_HIGH_LOW = {
+export const REASONING_VARIANTS_MAX_HIGH_LOW_NONE = {
   max: { reasoning: { enabled: true, effort: 'max' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
   low: { reasoning: { enabled: true, effort: 'low' } },
+  none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
-export const REASONING_VARIANTS_XHIGH_MEDIUM_LOW = {
+export const REASONING_VARIANTS_XHIGH_HIGH_MEDIUM_LOW_MINIMAL = {
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
   medium: { reasoning: { enabled: true, effort: 'medium' } },
   low: { reasoning: { enabled: true, effort: 'low' } },
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
 } as const;
 
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
   minimal: { reasoning: { enabled: true, effort: 'minimal' } },
-  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
 } as const;
 
-export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH = {
+export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH = {
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
   none: { reasoning: { enabled: false, effort: 'none' } },
-  ...REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
 } as const;
 
 export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  none: { reasoning: { enabled: false, effort: 'none' } },
+} as const;
+
+export const REASONING_VARIANTS_NONE_LOW_HIGH_MAX = {
+  max: { reasoning: { enabled: true, effort: 'max' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
 const REASONING_VARIANTS_CLAUDE = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
-  low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-  medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-  high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-  xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
   max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
+  high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+  medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+  low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+  none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
 export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
-  instant: REASONING_VARIANTS_BINARY.instant,
-  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+  instant: { reasoning: { enabled: false, effort: 'none' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
 } as const;
 
 export function getFallbackModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isClaudeModel(model)) {
     return REASONING_VARIANTS_CLAUDE;
   }
-  if (model.includes('codex') || isGemini3Model(model)) {
-    return Object.fromEntries(
-      ReasoningEffortSchema.options
-        .filter(e => e !== 'none' && e !== 'minimal' && e !== 'max')
-        .map(effort => [effort, { reasoning: { enabled: true, effort } }])
-    );
+  if (isDeepseekModel(model)) {
+    return REASONING_VARIANTS_NONE_LOW_HIGH_MAX;
+  }
+  if (isGeminiModel(model)) {
+    return REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH;
+  }
+  if (isGlmModel(model)) {
+    return REASONING_VARIANTS_NONE_HIGH_XHIGH;
+  }
+  if (isGrokModel(model)) {
+    return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
+  }
+  if (isKimiModel(model)) {
+    return REASONING_VARIANTS_MAX_HIGH_LOW_NONE;
+  }
+  if (model.includes('mercury')) {
+    return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
+  }
+  if (isMinimaxModel(model)) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (model.includes('mimo')) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (isMistralModel(model)) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (isMuseModel(model)) {
+    return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH;
   }
   if (isOpenAiModel(model)) {
     return Object.fromEntries(
@@ -86,41 +128,11 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (model.includes('mistral-medium-3-5')) {
-    return REASONING_VARIANTS_BINARY;
+  if (isQwenModel(model)) {
+    return REASONING_VARIANTS_XHIGH_HIGH_MEDIUM_LOW_MINIMAL;
   }
-  if (model.includes('kimi-k2.7-code')) {
-    return REASONING_VARIANTS_THINKING_ONLY;
-  }
-  if (model.includes('kimi-k2')) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  if (isKimiModel(model)) {
-    return REASONING_VARIANTS_MAX_HIGH_LOW;
-  }
-  if (model.includes('qwen3.8') && (model.includes('plus') || model.includes('max'))) {
-    return REASONING_VARIANTS_XHIGH_MEDIUM_LOW;
-  }
-  if (
-    isMinimaxModel(model) ||
-    isGrok42Model(model) ||
-    isQwenModel(model) ||
-    isGemmaModel(model) ||
-    model.includes('mimo')
-  ) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  if (model.startsWith('inception/mercury-2')) {
-    return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
-  }
-  if (isStepModel(model) || isGrok45Model(model)) {
+  if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
-  }
-  if (isDeepseekModel(model) || isGlmModel(model)) {
-    return REASONING_VARIANTS_NONE_HIGH_XHIGH;
-  }
-  if (isMuseModel(model)) {
-    return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH;
   }
   return undefined;
 }

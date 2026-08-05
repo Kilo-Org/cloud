@@ -20,15 +20,12 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
-  BALANCED_CLAW_SETUP_MODEL,
   BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
-  KILO_AUTO_LEGACY_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
-import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import {
   autoFreeModels,
   findKiloExclusiveModel,
@@ -322,16 +319,6 @@ export async function resolveAutoModel(
     return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
   }
   const mode = resolveMode(modeHeader, featureHeader);
-  if (model === KILO_AUTO_LEGACY_MODEL) {
-    if (mode === 'claw' && featureHeader === 'kiloclaw') {
-      const user = await userPromise;
-      if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
-        return { kind: 'ok', resolved: BALANCED_CLAW_SETUP_MODEL };
-      }
-    }
-
-    return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
-  }
   return {
     kind: 'ok',
     resolved: (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL,

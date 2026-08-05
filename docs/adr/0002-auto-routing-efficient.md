@@ -10,6 +10,12 @@ Accepted
 behalf. The `balanced` and `efficient` IDs now use the same benchmark-driven
 decision engine. The `balanced` ID remains as a compatibility alias.
 
+This change retires two legacy behaviors. The `kilo/auto` compatibility ID is
+no longer treated as an auto model (upstream OpenClaw stopped hardcoding it),
+and the KiloClaw first-instance setup promo (the free `:clawsetup` Sonnet
+variant served from the legacy balanced branch) is removed; balanced requests
+resolve through the benchmark classifier like efficient ones.
+
 This requires three capabilities the codebase did not have: a way to benchmark
 candidate models reproducibly, a way to turn benchmark results into a routing
 decision per request, and a way to bill the routing overhead honestly. The

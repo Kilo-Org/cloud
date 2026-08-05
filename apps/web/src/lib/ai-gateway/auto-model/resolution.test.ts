@@ -4,10 +4,6 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsFromRedis: jest.fn(async () => new Set<string>()),
 }));
 
-jest.mock('@/lib/kiloclaw/setup-promo', () => ({
-  userIsWithinFirstKiloClawInstanceWindow: jest.fn(async () => false),
-}));
-
 import { resolveAutoModel } from './resolution';
 import {
   BALANCED_QWEN_MODEL,

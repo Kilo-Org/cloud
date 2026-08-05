@@ -44,8 +44,9 @@ export async function addAutoRoutingModels(
     [KILO_AUTO_FREE_MODEL.id, freeModelIds],
   ]);
 
-  return models.map(model => {
+  return models.flatMap(model => {
     const modelIds = autoRoutingChoices.get(model.id);
-    return modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model;
+    if (model.id === KILO_AUTO_FREE_MODEL.id && !modelIds?.length) return [];
+    return [modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model];
   });
 }

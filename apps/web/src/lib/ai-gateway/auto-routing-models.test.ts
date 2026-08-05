@@ -128,6 +128,16 @@ describe('addAutoRoutingModels', () => {
     ]);
   });
 
+  test('hides the free auto model when no candidates are visible', async () => {
+    const freeModel = makeModel('kilo-auto/free');
+    const paidModel = makeModel('openai/gpt-5.4-mini');
+    mockedGetAutoFreeCandidates.mockResolvedValue(['denied/free-model']);
+
+    const result = await addAutoRoutingModels([freeModel, paidModel]);
+
+    expect(result).toEqual([paidModel]);
+  });
+
   test('leaves the auto model unannotated when no candidates are visible', async () => {
     const efficientModel = makeModel('kilo-auto/efficient');
     mockedGetCachedRoutingTable.mockResolvedValue(routingTable(['denied/model']));

@@ -50,6 +50,7 @@ type ResolveAutoModelParams = {
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
+  isAutoFreeCandidateAllowed?: (modelId: string) => Promise<boolean>;
   // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   organizationContext?: Promise<{
@@ -274,7 +275,19 @@ export async function resolveAutoModel(
     return await resolveOrganizationAutoModel(params, userPromise, balancePromise);
   }
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    const candidates = await getAutoFreeCandidates(apiKind);
+    let candidates = await getAutoFreeCandidates(apiKind);
+    const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
+    if (isCandidateAllowed) {
+      const decisions = await Promise.all(
+        candidates.map(async candidate => ({
+          candidate,
+          allowed: await isCandidateAllowed(candidate),
+        }))
+      );
+      candidates = decisions
+        .filter(decision => decision.allowed)
+        .map(decision => decision.candidate);
+    }
     if (candidates.length === 0) {
       return { kind: 'no_free_models_available' };
     }

@@ -24,6 +24,7 @@ import {
 } from '@/lib/free-model-rate-limiter';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
+import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 jest.mock('next/server', () => {
   return {
@@ -126,6 +127,7 @@ const mockedCheckFreeModelRateLimit = jest.mocked(checkFreeModelRateLimit);
 const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitByUser);
 const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
+const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 
 const provider = {
   id: 'openrouter',
@@ -539,6 +541,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedLogMicrodollarUsage.mockResolvedValue(null);
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     // Mock applyResolvedAutoModel to resolve the virtual model and invoke the efficientDecision thunk
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
@@ -591,6 +594,43 @@ describe('kilo-auto/efficient classifier billing', () => {
       error_type: 'organization_auto_configuration',
       message: expect.stringContaining('does not have an enabled BYOK credential for martian'),
     });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('applies effective organization policy while selecting an Auto Free candidate', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {},
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: false,
+      denialSource: 'group_model',
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async params => {
+      const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
+      expect(isCandidateAllowed).toBeDefined();
+      expect(await isCandidateAllowed?.('stepfun/step-3.7-flash:free')).toBe(false);
+      return { kind: 'no_free_models_available' };
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/free')) as never);
+
+    expect(response.status).toBe(503);
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      'stepfun/step-3.7-flash:free'
+    );
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 

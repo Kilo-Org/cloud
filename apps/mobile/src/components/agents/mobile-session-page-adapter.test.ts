@@ -93,6 +93,7 @@ describe('fetchMobileSessionSnapshotPage', () => {
     mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
       kiloSessionId: 'ses_123',
       history: page,
+      watermarkEventId: 42,
     });
 
     const { fetchMobileSessionSnapshotPage } = await importAdapter();
@@ -104,6 +105,7 @@ describe('fetchMobileSessionSnapshotPage', () => {
       messages: page.messages,
       nextCursor: 'opaque-cursor',
       omittedItemCount: 2,
+      watermarkEventId: 42,
     });
     // No `cursor` was supplied, so the tRPC layer must see only `session_id`
     // and let its input schema default the bounded page size to 50.
@@ -238,5 +240,31 @@ describe('fetchMobileSessionSnapshotPage', () => {
     const call = mocks.getSessionMessagesPageQuery.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(call).toBeDefined();
     expect(call.limit).toBeUndefined();
+  });
+
+  it('carries watermarkEventId through when the web router includes it', async () => {
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_123',
+      history: historyPage({ nextCursor: null }),
+      watermarkEventId: 77,
+    });
+
+    const { fetchMobileSessionSnapshotPage } = await importAdapter();
+    const result = await fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {});
+
+    expect(result).toMatchObject({ kind: 'success', watermarkEventId: 77 });
+  });
+
+  it('omits watermarkEventId from the page when the web router does not include it', async () => {
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_123',
+      history: historyPage({ nextCursor: null }),
+    });
+
+    const { fetchMobileSessionSnapshotPage } = await importAdapter();
+    const result = await fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {});
+
+    expect(result).toMatchObject({ kind: 'success' });
+    expect((result as Record<string, unknown>).watermarkEventId).toBeUndefined();
   });
 });

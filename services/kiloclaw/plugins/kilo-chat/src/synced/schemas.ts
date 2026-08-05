@@ -165,6 +165,10 @@ export const memberKindSchema = z.enum(['user', 'bot']);
 export const capabilitySchema = z.enum(['attachments']);
 export type Capability = z.infer<typeof capabilitySchema>;
 
+export const capabilityListSchema = z
+  .array(z.string())
+  .transform(arr => arr.filter((c): c is Capability => capabilitySchema.safeParse(c).success));
+
 export const conversationMemberSchema = z.object({
   id: z.string(),
   kind: memberKindSchema,
@@ -335,7 +339,7 @@ export const listMessagesQuerySchema = z.object({
 export const botStatusRequestSchema = z.object({
   online: z.boolean(),
   at: nonNegativeIntegerSchema,
-  capabilities: z.array(capabilitySchema).optional(),
+  capabilities: capabilityListSchema.optional(),
 });
 
 export const conversationStatusRequestSchema = z.object({
@@ -350,7 +354,7 @@ export const botStatusRecordSchema = z.object({
   online: z.boolean(),
   at: nonNegativeIntegerSchema,
   updatedAt: nonNegativeIntegerSchema,
-  capabilities: z.array(capabilitySchema).optional(),
+  capabilities: capabilityListSchema.optional(),
 });
 
 export const conversationStatusRecordSchema = z.object({

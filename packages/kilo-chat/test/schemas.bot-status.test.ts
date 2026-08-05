@@ -14,13 +14,28 @@ describe('botStatusRequestSchema with capabilities', () => {
     const parsed = botStatusRequestSchema.parse({ online: true, at: 1000 });
     expect(parsed.capabilities).toBeUndefined();
   });
-  it('rejects unknown capability', () => {
+  it('filters unknown capabilities, keeping known ones', () => {
     const r = botStatusRequestSchema.safeParse({
       online: true,
       at: 1,
       capabilities: ['foo'],
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.capabilities).toEqual([]);
+    }
+  });
+
+  it('filters mixed known and unknown capabilities', () => {
+    const r = botStatusRequestSchema.safeParse({
+      online: true,
+      at: 1,
+      capabilities: ['attachments', 'foo'],
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.capabilities).toEqual(['attachments']);
+    }
   });
 });
 
@@ -31,6 +46,16 @@ describe('botStatusRecordSchema with capabilities', () => {
       at: 1,
       updatedAt: 2,
       capabilities: ['attachments'],
+    });
+    expect(parsed.capabilities).toEqual(['attachments']);
+  });
+
+  it('filters unknown capabilities from record', () => {
+    const parsed = botStatusRecordSchema.parse({
+      online: true,
+      at: 1,
+      updatedAt: 2,
+      capabilities: ['attachments', 'unknown'],
     });
     expect(parsed.capabilities).toEqual(['attachments']);
   });

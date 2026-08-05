@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { KiloChatClient } from '../src/client';
 import { KiloChatApiError } from '../src/errors';
+import { RequestDeadlineError } from '@kilocode/event-service';
 import type { KiloChatClientConfig } from '../src/types';
 
 function createMockConfig(fetchFn: typeof globalThis.fetch): KiloChatClientConfig {
@@ -373,6 +374,275 @@ describe('KiloChatClient', () => {
       const fetch = mockFetch(200, { conversations: 'not-an-array' });
       const client = new KiloChatClient(createMockConfig(fetch));
       await expect(client.listConversations()).rejects.toThrow();
+    });
+  });
+
+  describe('request deadlines', () => {
+    const sentMessage = {
+      id: 'm1',
+      senderId: 'user-1',
+      content: [{ type: 'text' as const, text: 'hi' }],
+      inReplyToMessageId: null,
+      replyTo: null,
+      updatedAt: null,
+      clientUpdatedAt: null,
+      deleted: false,
+      deliveryFailed: false,
+      reactions: [],
+    };
+
+    it('timed-out send releases the conversation queue for the next send', async () => {
+      vi.useFakeTimers();
+      try {
+        // First fetch hangs and respects the abort signal. Second fetch resolves.
+        const fetch = vi
+          .fn<typeof globalThis.fetch>()
+          .mockImplementationOnce((_url, init) => {
+            return new Promise<Response>((_resolve, reject) => {
+              const signal = init?.signal;
+              if (signal) {
+                signal.addEventListener('abort', () => {
+                  reject(signal.reason);
+                });
+              }
+            });
+          })
+          .mockResolvedValueOnce(
+            new Response(
+              JSON.stringify({ messageId: 'm2', message: { ...sentMessage, id: 'm2' } }),
+              {
+                status: 201,
+              }
+            )
+          );
+
+        const client = new KiloChatClient(createMockConfig(fetch));
+
+        // Queue send 1 — it will hang on fetch.
+        const send1Promise = client.sendMessage({
+          conversationId: 'c1',
+          content: [{ type: 'text', text: 'first' }],
+        });
+
+        // Queue send 2 immediately — chained after send 1's promise.
+        const send2Promise = client.sendMessage({
+          conversationId: 'c1',
+          content: [{ type: 'text', text: 'second' }],
+        });
+
+        // Suppress unhandled rejections during fake-timer advance.
+        send1Promise.catch(() => {});
+
+        // Advance past the 30s send deadline.
+        await vi.advanceTimersByTimeAsync(30_001);
+
+        // Send 1 rejects with RequestDeadlineError.
+        await expect(send1Promise).rejects.toThrow(RequestDeadlineError);
+
+        // Send 2 goes through — the queue was not blocked.
+        await expect(send2Promise).resolves.toEqual({
+          messageId: 'm2',
+          message: { ...sentMessage, id: 'm2' },
+        });
+
+        expect(fetch).toHaveBeenCalledTimes(2);
+        // First fetch: timed-out POST
+        expect(fetch).toHaveBeenNthCalledWith(
+          1,
+          'https://chat.example.com/v1/messages',
+          expect.objectContaining({ method: 'POST' })
+        );
+        // Second fetch: successful POST after queue release
+        expect(fetch).toHaveBeenNthCalledWith(
+          2,
+          'https://chat.example.com/v1/messages',
+          expect.objectContaining({ method: 'POST' })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('control-plane deadline applies to listConversations', async () => {
+      vi.useFakeTimers();
+      try {
+        const fetch = vi.fn<typeof globalThis.fetch>().mockImplementationOnce((_url, init) => {
+          return new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              signal.addEventListener('abort', () => {
+                reject(signal.reason);
+              });
+            }
+          });
+        });
+
+        const client = new KiloChatClient(createMockConfig(fetch));
+        const promise = client.listConversations();
+        promise.catch(() => {}); // suppress unhandled rejection
+
+        // Advance past 15s control-plane deadline.
+        await vi.advanceTimersByTimeAsync(15_001);
+
+        await expect(promise).rejects.toThrow(RequestDeadlineError);
+        await expect(promise).rejects.toThrow('timed out after 15000ms');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('successful send completes within deadline', async () => {
+      vi.useFakeTimers();
+      try {
+        const fetch = vi
+          .fn<typeof globalThis.fetch>()
+          .mockResolvedValueOnce(
+            new Response(JSON.stringify({ messageId: 'm1', message: sentMessage }), { status: 201 })
+          );
+
+        const client = new KiloChatClient(createMockConfig(fetch));
+        const promise = client.sendMessage({
+          conversationId: 'c1',
+          content: [{ type: 'text', text: 'hi' }],
+        });
+
+        // Advance a small amount — well under the 30s deadline.
+        await vi.advanceTimersByTimeAsync(100);
+        await expect(promise).resolves.toEqual({ messageId: 'm1', message: sentMessage });
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('timeout does not trigger unauthorized recovery', async () => {
+      vi.useFakeTimers();
+      try {
+        const fetch = vi.fn<typeof globalThis.fetch>().mockImplementationOnce((_url, init) => {
+          return new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              signal.addEventListener('abort', () => {
+                reject(signal.reason);
+              });
+            }
+          });
+        });
+
+        const onUnauthorized = vi.fn<() => 'retry'>(() => 'retry');
+        const client = new KiloChatClient({
+          ...createMockConfig(fetch),
+          onUnauthorized,
+        });
+
+        const promise = client.listConversations();
+        promise.catch(() => {}); // suppress unhandled rejection
+
+        await vi.advanceTimersByTimeAsync(15_001);
+
+        // Rejects with a deadline error, NOT an auth error.
+        await expect(promise).rejects.toThrow(RequestDeadlineError);
+
+        // onUnauthorized must NOT be called — timeouts are not auth failures.
+        expect(onUnauthorized).not.toHaveBeenCalled();
+        expect(fetch).toHaveBeenCalledTimes(1); // no retry
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('ABORT: no automatic resend after a timed-out send', async () => {
+      vi.useFakeTimers();
+      try {
+        const fetch = vi.fn<typeof globalThis.fetch>().mockImplementationOnce((_url, init) => {
+          return new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              signal.addEventListener('abort', () => {
+                reject(signal.reason);
+              });
+            }
+          });
+        });
+
+        const client = new KiloChatClient(createMockConfig(fetch));
+        const promise = client.sendMessage({
+          conversationId: 'c1',
+          content: [{ type: 'text', text: 'timeout' }],
+        });
+        promise.catch(() => {}); // suppress unhandled rejection
+
+        // Advance past the 30s send deadline.
+        await vi.advanceTimersByTimeAsync(30_001);
+
+        await expect(promise).rejects.toThrow(RequestDeadlineError);
+
+        // No automatic resend: fetch called exactly once (not retried).
+        expect(fetch).toHaveBeenCalledTimes(1);
+
+        // Advance further — still no additional fetch calls.
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('ABORT: send deadline is 30s', async () => {
+      vi.useFakeTimers();
+      try {
+        const fetch = vi.fn<typeof globalThis.fetch>().mockImplementationOnce((_url, init) => {
+          return new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              signal.addEventListener('abort', () => {
+                reject(signal.reason);
+              });
+            }
+          });
+        });
+
+        const client = new KiloChatClient(createMockConfig(fetch));
+        const sendPromise = client.sendMessage({
+          conversationId: 'c1',
+          content: [{ type: 'text', text: 'hi' }],
+        });
+        sendPromise.catch(() => {}); // suppress unhandled rejection
+
+        // At 15s, the send should still be alive (send deadline is 30s).
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        // At 30s, it should reject.
+        await vi.advanceTimersByTimeAsync(15_001);
+        await expect(sendPromise).rejects.toThrow('timed out after 30000ms');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('ABORT: control-plane deadline is 15s', async () => {
+      vi.useFakeTimers();
+      try {
+        const fetch = vi.fn<typeof globalThis.fetch>().mockImplementationOnce((_url, init) => {
+          return new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              signal.addEventListener('abort', () => {
+                reject(signal.reason);
+              });
+            }
+          });
+        });
+
+        const client = new KiloChatClient(createMockConfig(fetch));
+        const promise = client.listConversations();
+        promise.catch(() => {}); // suppress unhandled rejection
+
+        await vi.advanceTimersByTimeAsync(15_001);
+        await expect(promise).rejects.toThrow('timed out after 15000ms');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

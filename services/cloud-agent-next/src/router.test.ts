@@ -913,6 +913,7 @@ describe('router sessionId validation', () => {
                 getMetadata: mockGetMetadata,
                 getCurrentRuntimeExecution: mockGetCurrentRuntimeExecution,
                 getCurrentMessageWork: mockGetCurrentMessageWork,
+                getLatestEventId: vi.fn().mockResolvedValue(null),
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
@@ -1181,6 +1182,115 @@ describe('router sessionId validation', () => {
               cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
             })
           ).rejects.toThrow('Authentication required');
+        });
+      });
+
+      describe('latestEventId', () => {
+        let mockContext: TRPCContext;
+        let caller: ReturnType<typeof appRouter.createCaller>;
+        let mockGetMetadata: ReturnType<typeof vi.fn>;
+        let mockGetLatestEventId: ReturnType<typeof vi.fn>;
+
+        beforeEach(() => {
+          vi.clearAllMocks();
+
+          mockGetMetadata = vi.fn();
+          mockGetLatestEventId = vi.fn().mockResolvedValue(null);
+
+          mockContext = {
+            userId: 'test-user-123',
+            authToken: 'test-token',
+            botId: undefined,
+            request: {} as Request,
+            env: {
+              Sandbox: {} as TRPCContext['env']['Sandbox'],
+              SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
+              SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
+              SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+              SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+              SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+              SandboxCodeReviewContainment:
+                {} as TRPCContext['env']['SandboxCodeReviewContainment'],
+              CLOUD_AGENT_SESSION: {
+                idFromName: vi.fn((id: string) => ({ id })),
+                get: vi.fn(() => ({
+                  getMetadata: mockGetMetadata,
+                  getCurrentRuntimeExecution: vi.fn().mockResolvedValue(null),
+                  getCurrentMessageWork: vi.fn().mockResolvedValue(null),
+                  getLatestEventId: mockGetLatestEventId,
+                })),
+              } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+              USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+              SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
+              SESSION_INGEST: { fetch: vi.fn() } as unknown as TRPCContext['env']['SESSION_INGEST'],
+              CONTAINER_USAGE_METER: {} as TRPCContext['env']['CONTAINER_USAGE_METER'],
+              R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+              CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
+              GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
+              NEXTAUTH_SECRET: 'test-secret',
+              INTERNAL_API_SECRET_PROD: {
+                get: vi.fn().mockResolvedValue('test-secret'),
+              } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+              HYPERDRIVE: {
+                connectionString: 'postgresql://test',
+              } as unknown as TRPCContext['env']['HYPERDRIVE'],
+              NOTIFICATIONS: {} as TRPCContext['env']['NOTIFICATIONS'],
+            },
+          };
+          caller = appRouter.createCaller(mockContext);
+        });
+
+        it('returns latestEventId when events have been persisted', async () => {
+          const sessionId: SessionId = 'agent_a1b2c3d4-0000-0000-0000-000000000001';
+          mockGetMetadata.mockResolvedValue(
+            legacySessionMetadata({
+              version: 123456789,
+              sessionId,
+              userId: 'test-user-123',
+              timestamp: 123456789,
+            })
+          );
+          mockGetLatestEventId.mockResolvedValue(42);
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.latestEventId).toBe(42);
+        });
+
+        it('returns null latestEventId when no events exist', async () => {
+          const sessionId: SessionId = 'agent_a1b2c3d4-0000-0000-0000-000000000002';
+          mockGetMetadata.mockResolvedValue(
+            legacySessionMetadata({
+              version: 123456789,
+              sessionId,
+              userId: 'test-user-123',
+              timestamp: 123456789,
+            })
+          );
+          mockGetLatestEventId.mockResolvedValue(null);
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.latestEventId).toBeNull();
+        });
+
+        it('fails open: swallows getLatestEventId failure and returns null', async () => {
+          const sessionId: SessionId = 'agent_a1b2c3d4-0000-0000-0000-000000000003';
+          mockGetMetadata.mockResolvedValue(
+            legacySessionMetadata({
+              version: 123456789,
+              sessionId,
+              userId: 'test-user-123',
+              timestamp: 123456789,
+            })
+          );
+          mockGetLatestEventId.mockRejectedValue(new Error('DO unreachable'));
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          // Session must still resolve successfully with null latestEventId.
+          expect(result.sessionId).toBe(sessionId);
+          expect(result.latestEventId).toBeNull();
         });
       });
     });
@@ -1639,6 +1749,17 @@ describe('router sessionId validation', () => {
           })
         ).rejects.toThrow('Authentication required');
       });
+    });
+  });
+
+  describe('getWatermarkEventId procedure', () => {
+    // Removed — the standalone getWatermarkEventId tRPC procedure has been
+    // replaced by getSession(...).latestEventId. The watermark is now an
+    // optional field on the existing getSession response.
+    it('has been replaced by getSession(...).latestEventId', () => {
+      // Placeholder to keep the describe block from being empty and to
+      // document the removal. Actual watermark coverage lives in the
+      // getSession procedure tests below.
     });
   });
 });

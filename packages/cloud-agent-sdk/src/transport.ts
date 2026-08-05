@@ -16,6 +16,8 @@ import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
  * connection-scoped spawn helper.
  */
 type CreateRemoteSessionInput = {
+  /** Reuse for a caller retry of the same create intent. */
+  mutationId?: string;
   agent?: string;
   model?: {
     providerID: string;

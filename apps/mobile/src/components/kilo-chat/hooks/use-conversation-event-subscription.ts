@@ -29,7 +29,7 @@ export function useConversationEventSubscription(
     if (!conversationId) {
       return undefined;
     }
-    return eventService.onReconnect(() => {
+    return eventService.onResync(() => {
       void queryClient.invalidateQueries({ queryKey: messagesKey(conversationId) });
     });
   }, [eventService, queryClient, conversationId]);

@@ -160,6 +160,17 @@ describe('isFreeModel', () => {
       }
     });
 
+    test('weights non-Laguna auto-free models higher than Laguna', () => {
+      const lagunaModel = autoFreeModels.find(({ model }) => model.includes('laguna'));
+      expect(lagunaModel?.weight).toBe(1);
+
+      for (const candidate of autoFreeModels) {
+        if (!candidate.model.includes('laguna')) {
+          expect(candidate.weight).toBe(2);
+        }
+      }
+    });
+
     test('uses autoFreeModels weights when selecting a model', () => {
       const candidates = [
         { model: 'preferred/model', weight: 3 },

@@ -13,7 +13,7 @@ export const lightColors = {
   secondaryForeground: '#14130F',
   muted: '#F0EEE6',
   mutedForeground: '#6F6A61',
-  destructive: '#BE4E3F',
+  destructive: '#B0483A',
   destructiveForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
   card: '#FFFFFF',
@@ -24,9 +24,9 @@ export const lightColors = {
   hairSoft: 'rgba(20, 15, 10, 0.05)',
   accentSoft: '#E8F27A',
   accentSoftForeground: '#1A1A10',
-  good: '#278150',
-  warn: '#9F6612',
-  info: '#2563EB',
+  good: '#24784A',
+  warn: '#956011',
+  info: '#2260EB',
 
   // Per-agent hues (full-opacity only — tile bg/border live in CSS tokens)
   agentYuki: '#6B4FD6',

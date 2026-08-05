@@ -54,6 +54,23 @@ function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+// Blend an 8-digit hex (RRGGBBAA) over an opaque background. NativeWind v5
+// cannot decompose theme colors, so `global.css` ships pre-baked alpha tiles
+// like `--good-tile-bg: <hex>1a`; the diff text actually renders on the
+// resulting tinted surface, so assertions must use this composite, not the
+// raw token.
+function compositeHex(tile: string, background: string): string {
+  const alpha = Number.parseInt(tile.slice(7, 9), 16) / 255;
+  const [r, g, b] = expandHex(tile.slice(0, 7));
+  const [bgR, bgG, bgB] = expandHex(background);
+  const channels = [
+    Math.round(r * alpha + bgR * (1 - alpha)),
+    Math.round(g * alpha + bgG * (1 - alpha)),
+    Math.round(b * alpha + bgB * (1 - alpha)),
+  ];
+  return `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
 describe('muted-foreground token contrast (WCAG AA text)', () => {
   it('light theme: >= 4.5:1 against background and card', () => {
     const surfaces = { background: lightColors.background, card: lightColors.card } as const;
@@ -69,5 +86,39 @@ describe('muted-foreground token contrast (WCAG AA text)', () => {
       const ratio = contrastRatio(darkColors.mutedForeground, surface);
       expect(ratio, `muted-foreground vs ${name} (dark)`).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
     }
+  });
+});
+
+describe('status token contrast on light surfaces (WCAG AA text)', () => {
+  // Status tokens are read as text on the app background (screens) and on
+  // `secondary` (status chips/cards). `global.css` keeps `--good` /
+  // `--warn` / `--destructive` / `--info` in lockstep with these TS values.
+  const statusTokens = {
+    good: lightColors.good,
+    warn: lightColors.warn,
+    destructive: lightColors.destructive,
+    info: lightColors.info,
+  } as const;
+  const surfaces = {
+    background: lightColors.background,
+    secondary: lightColors.secondary,
+  } as const;
+
+  it('light theme: >= 4.5:1 for every status token on background and secondary', () => {
+    for (const [token, color] of Object.entries(statusTokens)) {
+      for (const [surfaceName, surface] of Object.entries(surfaces)) {
+        const ratio = contrastRatio(color, surface);
+        expect(ratio, `${token} vs ${surfaceName} (light)`).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+      }
+    }
+  });
+
+  it('composite helper follows the global.css tile convention', () => {
+    // The tile tokens in global.css are the status hex with a `1a` (10%)
+    // alpha suffix, e.g. `--good-tile-bg: #24784a1a`. Asserting the derived
+    // composite keeps the diff-token assertions in syntax-colors.test.ts on
+    // the same surfaces the renderer actually paints.
+    expect(compositeHex(`${lightColors.good}1a`, lightColors.background)).toBe('#e5ede4');
+    expect(compositeHex(`${lightColors.destructive}1a`, lightColors.background)).toBe('#f3e8e2');
   });
 });

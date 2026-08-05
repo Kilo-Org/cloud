@@ -8564,6 +8564,23 @@ describe('getBillingStatus with credits', () => {
     expect(result.hasActiveKiloPass).toBe(true);
   });
 
+  it('includes detached canonical history in the personal billing summary', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: null,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getPersonalBillingSummary();
+
+    expect(result.hasExistingPersonalSubscription).toBe(true);
+    expect(result.hasActiveInstance).toBe(false);
+  });
+
   it('reports legacy recurring Standard upsell cost when prior paid history removes intro eligibility', async () => {
     const trialInstance = await createKiloclawInstance(user.id);
     const canceledPaidInstance = await createKiloclawInstance(user.id, '2026-04-01T00:00:00.000Z');

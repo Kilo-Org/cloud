@@ -58,6 +58,11 @@ export function KiloClawGroup({
   const subscriptions = query.data?.subscriptions ?? [];
   const commitPlanAvailable =
     query.data?.commitPlanAvailable ?? summaryQuery.data?.commitPlanAvailable ?? false;
+  const hasExistingPersonalSubscription =
+    summaryQuery.data?.hasExistingPersonalSubscription === true;
+  const isLoading = query.isLoading || summaryQuery.isLoading;
+  const isError = query.isError || summaryQuery.isError;
+  const error = query.error ?? summaryQuery.error;
 
   const visibleSubscriptions = subscriptions.filter(
     subscription => !isKiloclawTerminal(subscription.status) || showTerminal
@@ -100,10 +105,12 @@ export function KiloClawGroup({
       title="KiloClaw"
       description="View hosting subscriptions for your personal KiloClaw instances."
       headerIcon={<KiloCrabIcon className="size-5" />}
-      isLoading={query.isLoading}
-      isError={query.isError}
-      error={query.error}
-      onRetry={() => void query.refetch()}
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
+      onRetry={() => {
+        void Promise.all([query.refetch(), summaryQuery.refetch()]);
+      }}
       accordionValue={accordionValue}
       hideHeader={hideHeader}
       unframed={hideHeader}
@@ -196,9 +203,9 @@ export function KiloClawGroup({
             );
           })}
         </div>
-      ) : subscriptions.length === 0 ? (
+      ) : subscriptions.length === 0 && !hasExistingPersonalSubscription ? (
         <KiloClawSignupUnavailable />
-      ) : nonTerminalSubscriptions.length === 0 ? (
+      ) : subscriptions.length === 0 || nonTerminalSubscriptions.length === 0 ? (
         <KiloClawSubscribeCard
           standardCostMicrodollars={
             summaryQuery.data?.creditEnrollmentPreview.standard.costMicrodollars

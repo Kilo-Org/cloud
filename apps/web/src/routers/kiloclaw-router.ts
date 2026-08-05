@@ -2173,6 +2173,7 @@ function summarizePersonalBillingStatus(billing: ClawBillingStatus) {
   return {
     hasActiveInstance,
     activeInstanceHasAccess: hasActiveInstance && billing.hasAccess,
+    hasExistingPersonalSubscription: billing.hasExistingPersonalSubscription,
     activeInstanceId,
     creditBalanceMicrodollars: billing.creditBalanceMicrodollars,
     creditIntroEligible: billing.creditIntroEligible,

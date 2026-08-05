@@ -28,12 +28,12 @@ export function createKiloAppQueryClient(): QueryClient {
     },
     queryCache: new QueryCache({
       onError: error => {
-        handleTrpcQueryError(error);
+        void handleTrpcQueryError(error);
       },
     }),
     mutationCache: new MutationCache({
       onError: error => {
-        handleTrpcQueryError(error);
+        void handleTrpcQueryError(error);
       },
     }),
   });

@@ -1,5 +1,6 @@
 // Pure classification of a device-auth poll response's HTTP status. Kept
 // free of any react-native/expo imports so it can be unit tested directly.
+
 type PollOutcome =
   | { readonly status: 'approved' }
   | { readonly status: 'pending' }
@@ -28,4 +29,10 @@ export function classifyPollResponse(httpStatus: number): PollOutcome {
   // Any other 4xx (400, 401, ...) is not something retrying will fix — and
   // 1xx/3xx are statuses this endpoint never returns, so treat them the same.
   return { status: 'error', message: 'Sign-in failed. Please try again.' };
+}
+
+/** Extract the user-facing message from a device-auth start 429 JSON body. */
+export function getDeviceAuth429Message(body: { error?: string } | undefined): string {
+  const fallback = 'Too many sign-in attempts. Please wait and try again.';
+  return body?.error ?? fallback;
 }

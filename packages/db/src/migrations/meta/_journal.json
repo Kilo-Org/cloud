@@ -1429,6 +1429,20 @@
       "when": 1785763924825,
       "tag": "0203_organization_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1785918385796,
+      "tag": "0204_drop_cost_insight_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 205,
+      "version": "7",
+      "when": 1785934676925,
+      "tag": "0205_device_auth_hardening",
+      "breakpoints": true
     }
   ]
 }

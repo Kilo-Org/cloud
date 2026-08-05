@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { PageContainer } from '@/components/layouts/PageContainer';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -98,10 +98,9 @@ export function TownListPageClient() {
 
             <div className="ml-auto">
               <Button
-                variant="primary"
-                size="md"
+                variant="default"
                 onClick={() => router.push('/gastown/onboarding')}
-                className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+                className="gap-2"
               >
                 <Plus className="size-5" />
                 New Town
@@ -134,10 +133,9 @@ export function TownListPageClient() {
               command center for every rig.
             </p>
             <Button
-              variant="primary"
-              size="md"
+              variant="default"
               onClick={() => router.push('/gastown/onboarding')}
-              className="mt-5 gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              className="mt-5 gap-2"
             >
               <Plus className="size-5" />
               Create your first town

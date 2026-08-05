@@ -35,10 +35,12 @@ const MAX_PLAN_ID = 'minimax-token-plan-max';
 const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
 const PROVIDER_ID = 'minimax';
 const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
+const BYTEPLUS_PRO_PLAN_ID = 'byteplus-coding-plan-team-pro';
 const BYTEPLUS_PROVIDER_ID = 'byteplus-coding';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
 const ULTRA_COST_MICRODOLLARS = 120_000_000;
+const BYTEPLUS_PRO_COST_MICRODOLLARS = 100_000_000;
 
 const validatedInventoryUpload = { validateCredential: async () => true };
 
@@ -118,6 +120,19 @@ describe('coding plans', () => {
       billingPeriodDays: 30,
       features: expect.arrayContaining([
         'Kilo automatically configures BytePlus in your BYOK settings.',
+      ]),
+    });
+    expect(CODING_PLAN_CATALOG[BYTEPLUS_PRO_PLAN_ID]).toEqual({
+      planId: BYTEPLUS_PRO_PLAN_ID,
+      providerName: 'BytePlus',
+      name: 'Coding Plan Pro',
+      providerId: BYTEPLUS_PROVIDER_ID,
+      coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
+      costMicrodollars: BYTEPLUS_PRO_COST_MICRODOLLARS,
+      billingPeriodDays: 30,
+      features: expect.arrayContaining([
+        'For complex, high-intensity development use.',
+        'Approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per 30-day subscription period.',
       ]),
     });
   });

@@ -13,23 +13,29 @@ export type KiloSecretBinding = {
   get(): Promise<string | null>;
 };
 
+export type KiloUserPepperResult = { pepper: string | null; blockedReason: string | null };
+
 export type GetKiloUserPepper = (
   connectionString: string,
   userId: string
-) => Promise<string | null | undefined>;
+) => Promise<KiloUserPepperResult | null | undefined>;
 
 export async function findKiloUserPepper(
   connectionString: string,
   userId: string
-): Promise<string | null | undefined> {
+): Promise<KiloUserPepperResult | null | undefined> {
   const db = getWorkerDb(connectionString);
   const rows = await db
-    .select({ api_token_pepper: kilocode_users.api_token_pepper })
+    .select({
+      api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_reason: kilocode_users.blocked_reason,
+    })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, userId))
     .limit(1);
   const row = rows[0];
-  return row ? (row.api_token_pepper ?? null) : undefined;
+  if (!row) return undefined;
+  return { pepper: row.api_token_pepper ?? null, blockedReason: row.blocked_reason };
 }
 
 export async function verifyKiloBearerAgainstCurrentPepper(params: {
@@ -50,11 +56,20 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
       return null;
     }
 
-    const currentPepper = await getUserPepper(params.connectionString, payload.kiloUserId);
-    const tokenPepper = payload.apiTokenPepper ?? null;
-    if (currentPepper === undefined || currentPepper !== tokenPepper) {
+    const result = await getUserPepper(params.connectionString, payload.kiloUserId);
+    if (!result) {
       return null;
     }
+
+    const tokenPepper = payload.apiTokenPepper ?? null;
+    if (result.pepper !== tokenPepper) {
+      return null;
+    }
+
+    if (result.blockedReason !== null) {
+      return null;
+    }
+
     return { userId: payload.kiloUserId };
   } catch {
     return null;

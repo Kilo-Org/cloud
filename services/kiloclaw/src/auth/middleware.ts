@@ -13,7 +13,8 @@ import { getWorkerDb, findPepperByUserId } from '../db';
  * 2. Fallback: extract from kilo-worker-auth cookie
  * 3. Verify HS256 with NEXTAUTH_SECRET; check version and env
  * 4. Validate apiTokenPepper against DB via Hyperdrive
- * 5. Set ctx.userId, ctx.authToken on context
+ * 5. Reject the request when the user is blocked
+ * 6. Set ctx.userId, ctx.authToken on context
  */
 export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   const secret = c.env.NEXTAUTH_SECRET;
@@ -63,6 +64,11 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
     const dbPepper = user.api_token_pepper ?? null;
     if (dbPepper !== result.pepper) {
       console.warn('[auth] Pepper mismatch for user:', result.userId);
+      return c.json({ error: 'Token revoked' }, 401);
+    }
+    // A blocked user must not keep access through an unrotated token.
+    if (user.blocked_reason) {
+      console.warn('[auth] Blocked user rejected:', result.userId);
       return c.json({ error: 'Token revoked' }, 401);
     }
   } catch (err) {

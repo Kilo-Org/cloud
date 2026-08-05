@@ -98,8 +98,9 @@ export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
 
           <Button
             onClick={handleConnectSlack}
+            variant="default"
             size="lg"
-            className="w-full bg-[#4A154B] text-white hover:bg-[#3a1039]"
+            className="w-full"
             disabled={isStartingSlackConnection}
           >
             <MessageSquare className="mr-2 h-5 w-5" />

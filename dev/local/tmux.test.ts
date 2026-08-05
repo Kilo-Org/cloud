@@ -10,6 +10,9 @@ import {
   buildInteractiveShellCommand,
   captureServicePane,
   listWindows,
+  createSession,
+  createWindow,
+  killSession,
   pipeServicePane,
   setPaneServiceIdentity,
 } from './tmux';
@@ -19,6 +22,15 @@ import {
   buildStartCommand,
   restartServiceInTmux,
 } from './runner';
+
+const hasTmux = (() => {
+  try {
+    execFileSync('tmux', ['-V'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
   const startupCommand =
@@ -30,16 +42,87 @@ test('buildInteractiveShellCommand wraps quoted startup commands in parseable sh
   assert.match(wrapped, /exec/);
   assert.match(wrapped, /PATH/);
   execFileSync('/bin/sh', ['-n', '-c', wrapped]);
+
+  const rooted = buildInteractiveShellCommand(startupCommand, '/bin/sh', '/tmp/worktree root');
+  assert.match(rooted, /^'\/bin\/sh' -c /);
+  assert.match(rooted, /cd .*tmp\/worktree root/);
+  execFileSync('/bin/sh', ['-n', '-c', rooted]);
 });
 
-const hasTmux = (() => {
-  try {
-    execFileSync('tmux', ['-V'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
+test(
+  'new tmux sessions and service windows ignore stale global worktree environment',
+  { skip: !hasTmux },
+  async () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf8',
+    }).trim();
+    const marker = path.join(os.tmpdir(), `${sessionName}-pwd`);
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+    const tmuxOutput = (...args: string[]) =>
+      execFileSync('tmux', args, { encoding: 'utf8' }).trim();
+    const savedGlobalEnvironment = new Map<string, string | undefined>();
+    for (const key of ['PWD', 'OLDPWD']) {
+      try {
+        savedGlobalEnvironment.set(
+          key,
+          tmuxOutput('show-environment', '-g', key).slice(key.length + 1)
+        );
+      } catch {
+        savedGlobalEnvironment.set(key, undefined);
+      }
+    }
+
+    try {
+      const staleWorktree = path.join(os.tmpdir(), 'deleted-sibling-worktree');
+      tmux('set-environment', '-g', 'PWD', staleWorktree);
+      tmux('set-environment', '-g', 'OLDPWD', staleWorktree);
+      createSession(sessionName);
+
+      assert.equal(
+        tmuxOutput('display-message', '-p', '-t', `${sessionName}:0.0`, '#{pane_current_path}'),
+        repoRoot
+      );
+      const windowIndex = createWindow(
+        sessionName,
+        'service',
+        undefined,
+        `pwd > ${JSON.stringify(marker)}`
+      );
+      for (let i = 0; i < 20 && !fs.existsSync(marker); i++) await sleep(50);
+      assert.equal(fs.readFileSync(marker, 'utf8').trim(), repoRoot);
+      assert.doesNotMatch(
+        tmuxOutput('capture-pane', '-p', '-J', '-t', `${sessionName}:${windowIndex}.0`),
+        /shell-init: error retrieving current directory/
+      );
+      assert.equal(
+        tmuxOutput(
+          'display-message',
+          '-p',
+          '-t',
+          `${sessionName}:${windowIndex}.0`,
+          '#{pane_current_path}'
+        ),
+        repoRoot
+      );
+    } finally {
+      fs.rmSync(marker, { force: true });
+      try {
+        killSession(sessionName);
+      } catch {
+        // Session may already be gone if setup fails.
+      }
+      for (const [key, value] of savedGlobalEnvironment) {
+        try {
+          if (value === undefined) tmux('set-environment', '-gu', key);
+          else tmux('set-environment', '-g', key, value);
+        } catch {
+          // The variable may not exist in this tmux version's environment.
+        }
+      }
+    }
   }
-})();
+);
 
 const hasScript = (() => {
   try {
@@ -130,6 +213,7 @@ test(
   { skip: !hasTmux },
   () => {
     const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const otherSessionName = `${sessionName}-other`;
     const serviceName = 'nextjs';
     const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
     const tmuxOutput = (...args: string[]) =>
@@ -159,6 +243,12 @@ test(
         `${sessionName}:0.0`
       );
 
+      // A second active session makes the tmux current session ambiguous. The
+      // old unqualified break-pane created the new window in the current
+      // session, which could be the other session; the session-qualified
+      // production fix always targets the requested source session.
+      tmux('new-session', '-d', '-s', otherSessionName, '-n', 'other', 'sleep 120');
+
       const newWindowIndex = breakPane(sessionName, 0, 1, serviceName);
       const window = listWindows(sessionName).find(entry => entry.index === newWindowIndex);
 
@@ -173,9 +263,18 @@ test(
         ),
         '0'
       );
+      assert.ok(
+        listWindows(otherSessionName).every(entry => entry.name !== serviceName),
+        'broken-out window must not land in the other active session'
+      );
     } finally {
       try {
         tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+      try {
+        tmux('kill-session', '-t', otherSessionName);
       } catch {
         // Session may already be gone if tmux fails during setup.
       }

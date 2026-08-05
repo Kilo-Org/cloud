@@ -6,7 +6,7 @@ import { toast } from 'sonner-native';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
 import {
   shouldClearConnectCheckFailed,
   shouldSetConnectCheckFailed,
@@ -126,9 +126,13 @@ export function useGitHubReposRefresh({
     void (async () => {
       try {
         launchedAt.current = Date.now();
+        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+          organizationId: organizationId ?? undefined,
+          returnTo: '/cloud/sessions',
+        });
         const trigger = await openAuthorizationAndWaitForReturn(
           Platform.OS,
-          getGitHubIntegrationUrl(WEB_BASE_URL, organizationId)
+          getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token)
         );
         if (trigger === 'sheet-close') {
           // iOS: refetch immediately. Clear the sentinel so the AppState

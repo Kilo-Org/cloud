@@ -4,7 +4,10 @@ import { createTRPCContext } from '@trpc/tanstack-react-query';
 import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL, E2E_LATENCY_MESSAGES_MS, E2E_LATENCY_SESSION_MS } from '@/lib/config';
-import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { performRefresh, REFRESH_MARGIN_MS } from '@/lib/auth/auth-context';
+import { buildAuthHeaders } from '@/lib/auth/auth-header';
+import { shouldRefreshBeforeRequest } from '@/lib/auth/native-auth-contract';
+import { AUTH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
 
@@ -58,9 +61,23 @@ const e2eFetch =
 async function getAuthHeaders() {
   const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
   if (!token) {
-    return {};
+    return buildAuthHeaders(token);
   }
-  return { Authorization: `Bearer ${token}` };
+
+  // Proactive refresh: if the token is expiring within the margin, rotate
+  // before this request hits a 401. performRefresh handles single-flight
+  // so concurrent requests share one rotation.
+  const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+  if (expiresAtStr) {
+    const expiresAt = Number(expiresAtStr);
+    if (shouldRefreshBeforeRequest(expiresAt, Date.now(), REFRESH_MARGIN_MS)) {
+      await performRefresh();
+      const currentToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+      return buildAuthHeaders(currentToken);
+    }
+  }
+
+  return buildAuthHeaders(token);
 }
 
 const singleLink = httpLink({

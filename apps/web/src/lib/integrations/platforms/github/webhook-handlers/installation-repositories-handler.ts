@@ -10,18 +10,23 @@ import {
 import type { InstallationRepositoriesPayload } from '../webhook-schemas';
 import { PLATFORM, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
+import type { GitHubAppType } from '../app-selector';
 
 /**
  * GitHub Installation Repositories Event Handler
  * Handles: repositories added/removed
  */
 
-export async function handleInstallationRepositories(payload: InstallationRepositoriesPayload) {
+export async function handleInstallationRepositories(
+  payload: InstallationRepositoriesPayload,
+  appType: GitHubAppType
+) {
   const { installation, action, repositories_added, repositories_removed } = payload;
 
   const integration = await findIntegrationByInstallationId(
     PLATFORM.GITHUB,
-    installation.id.toString()
+    installation.id.toString(),
+    appType
   );
 
   if (!integration) {
@@ -46,7 +51,12 @@ export async function handleInstallationRepositories(payload: InstallationReposi
     updatedRepos = currentRepos.filter((repo: PlatformRepository) => !removedIds.includes(repo.id));
   }
 
-  await updateIntegrationRepositories(PLATFORM.GITHUB, installation.id.toString(), updatedRepos);
+  await updateIntegrationRepositories(
+    PLATFORM.GITHUB,
+    installation.id.toString(),
+    updatedRepos,
+    appType
+  );
 
   logExceptInTest('Installation repositories updated:', {
     installation_id: installation.id,

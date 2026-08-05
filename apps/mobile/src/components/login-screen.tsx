@@ -20,6 +20,7 @@ import {
   resolveKeyboardPaddingEventsForPlatform,
 } from '@/components/kilo-chat/app-aware-keyboard-padding-state';
 import { IdleAuth } from '@/components/login/idle-auth';
+import { errorMessage } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -27,38 +28,34 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-function errorMessage(status: string, fallback: string | undefined) {
-  switch (status) {
-    case 'expired': {
-      return 'Your sign-in code has expired. Please try again.';
-    }
-    case 'denied': {
-      return 'Access was denied.';
-    }
-    default: {
-      return fallback ?? 'Something went wrong. Please try again.';
-    }
-  }
-}
-
 function keyboardHeightFromEvent(event: KeyboardEvent): number {
   return event.endCoordinates.height;
 }
 
 export function LoginScreen() {
-  const { signIn } = useAuth();
-  const { status, token, code, error, verificationUrl, start, cancel, openBrowser } =
-    useDeviceAuth();
+  const { sessionEnded, signIn } = useAuth();
+  const {
+    status,
+    token,
+    code,
+    refreshToken,
+    expiresIn,
+    error,
+    verificationUrl,
+    start,
+    cancel,
+    openBrowser,
+  } = useDeviceAuth();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
   const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
 
   const persistToken = useCallback(
-    async (tokenValue: string) => {
+    async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
       setPersistError(undefined);
       try {
-        await signIn(tokenValue);
+        await signIn(tokenValue, refreshTokenValue, expiresInValue);
       } catch {
         setPersistError('Could not complete sign in. Please try again.');
       }
@@ -68,7 +65,7 @@ export function LoginScreen() {
 
   useEffect(() => {
     if (status === 'approved' && token) {
-      void persistToken(token);
+      void persistToken(token, refreshToken, expiresIn);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
@@ -131,7 +128,7 @@ export function LoginScreen() {
           <Button
             onPress={() => {
               if (token) {
-                void persistToken(token);
+                void persistToken(token, refreshToken, expiresIn);
               }
             }}
             accessibilityLabel="Retry sign in"
@@ -191,6 +188,11 @@ export function LoginScreen() {
           <View className="w-full max-w-sm gap-3">
             {status === 'idle' && (
               <View className="w-full gap-3">
+                {sessionEnded && (
+                  <Text className="text-center text-sm text-muted-foreground">
+                    Your session ended. Please sign in again.
+                  </Text>
+                )}
                 <IdleAuth start={start} />
               </View>
             )}

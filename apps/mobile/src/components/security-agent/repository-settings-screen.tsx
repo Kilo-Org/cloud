@@ -5,6 +5,7 @@ import {
 import { FolderGit2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { EmptyState } from '@/components/empty-state';
@@ -20,6 +21,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
+import { trpcClient } from '@/lib/trpc';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -180,13 +182,23 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                   <Button
                     variant="outline"
                     onPress={() => {
-                      void openExternalUrl(
-                        getGitHubIntegrationUrl(
-                          WEB_BASE_URL,
-                          isPersonalSecurityScope(scope) ? undefined : scope
-                        ),
-                        { label: 'GitHub App settings' }
-                      );
+                      void (async () => {
+                        const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
+                        try {
+                          const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+                            organizationId: orgId ?? undefined,
+                            returnTo: '/cloud/sessions',
+                          });
+                          await openExternalUrl(
+                            getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token),
+                            {
+                              label: 'GitHub App settings',
+                            }
+                          );
+                        } catch {
+                          toast.error('Could not open GitHub App settings');
+                        }
+                      })();
                     }}
                   >
                     <Text>Manage GitHub App access</Text>

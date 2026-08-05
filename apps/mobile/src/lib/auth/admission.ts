@@ -145,6 +145,21 @@ async function getAndroidAdmission(challenge: string): Promise<AdmissionPayload>
 }
 
 /**
+ * Drop the stored key id when the server refuses admission.
+ *
+ * The client stores the key id as soon as `attestKeyAsync` resolves, which says
+ * nothing about whether the server accepted and persisted the key. When it did
+ * not, every later sign-in asserts against a key the server has never seen and
+ * is refused forever. Clearing the id makes the next attempt re-attest, which
+ * Apple still has to sign, so this weakens nothing.
+ */
+export async function clearAttestKeyOnRefusal(errorCode: string | undefined): Promise<void> {
+  if (errorCode === 'ADMISSION_REQUIRED' && Platform.OS === 'ios') {
+    await SecureStore.deleteItemAsync(ATTEST_KEY_ID_KEY);
+  }
+}
+
+/**
  * Request a server admission challenge and produce a platform-specific
  * attestation or assertion.
  *

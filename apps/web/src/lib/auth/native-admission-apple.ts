@@ -181,6 +181,31 @@ export async function verifyAppleAttestation(
     return { ok: false, error: 'RP_ID_MISMATCH' };
   }
 
+  // Extract credential ID from authData
+  const flagsByte = authData[32];
+  if (flagsByte === undefined) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
+  const flags = flagsByte;
+  if (!(flags & 0x40)) return { ok: false, error: 'INVALID_ATTEST_FORMAT' }; // AT flag
+
+  let pos = 37; // rpIdHash(32) + flags(1) + signCount(4)
+  pos += 16; // aaguid
+  const credIdLen = authData.readUInt16BE(pos);
+  pos += 2;
+  const credentialId = authData.subarray(pos, pos + credIdLen);
+  pos += credIdLen;
+
+  // Verify keyId matches credential ID. Runs before the nonce hash because it
+  // is a byte comparison on data already parsed.
+  //
+  // `DCAppAttestService.generateKey` hands back standard base64 (padded, `+`
+  // and `/`), which the client forwards verbatim. Compare the decoded bytes,
+  // never the re-encoded string: base64url of the same 32 bytes drops the
+  // padding, so a string comparison against Apple's keyId never matches.
+  // Node's base64 decoder accepts both alphabets, so either form works here.
+  if (!credentialId.equals(Buffer.from(expectedKeyId, 'base64'))) {
+    return { ok: false, error: 'KEY_ID_MISMATCH' };
+  }
+
   // Nonce check. Apple's nonce is SHA256(authData || clientDataHash).
   // `@expo/app-integrity` computes clientDataHash as SHA256 over the UTF-8
   // bytes of the challenge string it was handed, so hash the same bytes here.
@@ -198,24 +223,6 @@ export async function verifyAppleAttestation(
       `apple_attest_nonce_mismatch: expected=${expectedNonce.substring(0, 16)}... got=${nonceExt?.toString('hex').substring(0, 16) ?? 'null'}...`
     );
     return { ok: false, error: 'NONCE_MISMATCH' };
-  }
-
-  // Extract credential ID from authData
-  const flagsByte = authData[32];
-  if (flagsByte === undefined) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
-  const flags = flagsByte;
-  if (!(flags & 0x40)) return { ok: false, error: 'INVALID_ATTEST_FORMAT' }; // AT flag
-
-  let pos = 37; // rpIdHash(32) + flags(1) + signCount(4)
-  pos += 16; // aaguid
-  const credIdLen = authData.readUInt16BE(pos);
-  pos += 2;
-  const credentialId = authData.subarray(pos, pos + credIdLen);
-  pos += credIdLen;
-
-  // Verify keyId matches credential ID
-  if (credentialId.toString('base64url') !== expectedKeyId) {
-    return { ok: false, error: 'KEY_ID_MISMATCH' };
   }
 
   // Extract COSE public key and export it as SPKI DER

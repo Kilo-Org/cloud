@@ -159,8 +159,11 @@ describe('verifyAppleAttestation certificate chain', () => {
   const teamId = 'WRPHYY66V6';
   const bundleId = 'com.reelreel.app.dev';
   const rpIdHash = createHash('sha256').update(`${teamId}.${bundleId}`).digest();
-  const credentialId = Buffer.from('0123456789abcdef');
-  const keyId = credentialId.toString('base64url');
+  // Apple's keyId is the SHA-256 of the public key in standard base64, so 32
+  // bytes and a `=` pad. Build the fixture the way the device does; base64url
+  // here would hide the padding mismatch that broke every real attestation.
+  const credentialId = createHash('sha256').update('device-key').digest();
+  const keyId = credentialId.toString('base64');
   const challenge = 'c2VydmVyLWNoYWxsZW5nZQ'; // arbitrary base64url bytes
 
   function attestationFor(x5c: Buffer[]): string {
@@ -201,6 +204,41 @@ describe('verifyAppleAttestation certificate chain', () => {
       bundleId
     );
     expect(result).toEqual({ ok: false, error: 'CERT_CHAIN_INVALID' });
+  });
+
+  test('accepts the standard-base64 keyId the device sends', async () => {
+    // Regression: comparing `credentialId.toString('base64url')` against
+    // Apple's padded standard-base64 keyId never matched, so every first-time
+    // attestation was refused with ADMISSION_REQUIRED. Reaching NONCE_MISMATCH
+    // proves the credential-ID check passed.
+    expect(keyId).toMatch(/=$/);
+    const result = await verifyAppleAttestation(
+      attestationFor([REAL_LEAF_DER, REAL_INTERMEDIATE_DER]),
+      challenge,
+      keyId,
+      bundleId
+    );
+    expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
+  });
+
+  test('accepts the same key id in base64url form', async () => {
+    const result = await verifyAppleAttestation(
+      attestationFor([REAL_LEAF_DER, REAL_INTERMEDIATE_DER]),
+      challenge,
+      credentialId.toString('base64url'),
+      bundleId
+    );
+    expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
+  });
+
+  test('rejects a key id that is not the credential id', async () => {
+    const result = await verifyAppleAttestation(
+      attestationFor([REAL_LEAF_DER, REAL_INTERMEDIATE_DER]),
+      challenge,
+      createHash('sha256').update('other-key').digest('base64'),
+      bundleId
+    );
+    expect(result).toEqual({ ok: false, error: 'KEY_ID_MISMATCH' });
   });
 
   test('rejects a chain whose signatures do not verify', async () => {

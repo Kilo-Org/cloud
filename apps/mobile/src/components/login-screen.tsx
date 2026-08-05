@@ -24,6 +24,7 @@ import { errorMessage } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -66,7 +67,7 @@ export function LoginScreen() {
   useEffect(() => {
     if (sessionEnded) {
       // id dedupes the toast if the login route remounts while still signed out
-      toast('Your session ended. Please sign in again.', { id: 'session-ended' });
+      announcingToast.warning('Your session ended. Please sign in again.', { id: 'session-ended' });
     }
   }, [sessionEnded]);
 

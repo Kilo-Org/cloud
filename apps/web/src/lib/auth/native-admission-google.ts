@@ -82,7 +82,6 @@ async function getAccessToken(
  * Required server-side environment variables for Play Integrity.
  */
 interface PlayIntegrityConfig {
-  projectNumber: string;
   serviceAccountKey: string;
   expectedPackageName: string;
   expectedCertDigests: string[];
@@ -103,7 +102,6 @@ function getPlayIntegrityConfig(): PlayIntegrityConfig | null {
     : [];
 
   return {
-    projectNumber,
     serviceAccountKey,
     expectedPackageName: GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME,
     expectedCertDigests,
@@ -155,8 +153,10 @@ export async function verifyPlayIntegrity(
     throw new Error('Failed to obtain Play Integrity access token', { cause: err });
   }
 
+  // Google requires the app's package name as the resource path on the decode
+  // endpoint; the project number alone is rejected.
   const response = await fetch(
-    `${PLAY_INTEGRITY_API_BASE}/${encodeURIComponent(config.projectNumber)}:decodeIntegrityToken`,
+    `${PLAY_INTEGRITY_API_BASE}/${encodeURIComponent(config.expectedPackageName)}:decodeIntegrityToken`,
     {
       method: 'POST',
       headers: {

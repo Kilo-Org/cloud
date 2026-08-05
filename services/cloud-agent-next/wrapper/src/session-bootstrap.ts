@@ -178,6 +178,10 @@ const GIT_FAILURE_PATTERNS = [
     pattern: /authentication failed|could not read username|http 401|http 403/i,
   },
   {
+    subtype: 'git_rate_limited',
+    pattern: /\b429\b|too many requests|rate limit(?:ed)?/i,
+  },
+  {
     subtype: 'git_network_failed',
     pattern:
       /remote end hung up|connection (?:reset|timed out)|could not resolve host|failed to connect/i,

@@ -1025,6 +1025,27 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       subtype: 'git_authentication_failed',
     },
     {
+      name: 'clone HTTP 429 rate limit',
+      stage: 'clone',
+      result: {
+        stdout: '',
+        stderr:
+          "fatal: unable to access 'https://github.com/org/repo.git/': The requested URL returned error: 429",
+        exitCode: 128,
+      },
+      subtype: 'git_rate_limited',
+    },
+    {
+      name: 'clone too many requests rate limit',
+      stage: 'clone',
+      result: {
+        stdout: '',
+        stderr: 'fatal: unable to access repository: too many requests',
+        exitCode: 128,
+      },
+      subtype: 'git_rate_limited',
+    },
+    {
       name: 'clone network failure',
       stage: 'clone',
       result: { stdout: '', stderr: 'fatal: the remote end hung up unexpectedly', exitCode: 128 },

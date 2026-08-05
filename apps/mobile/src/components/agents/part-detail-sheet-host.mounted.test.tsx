@@ -5,16 +5,20 @@ import {
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
-import { type ReactElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { useOpenPartDetail } from './open-part-detail-context';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
+// Real block, imported before the host: the hoisted body-mock factory runs
+// while the sheet module loads, so its binding must already be initialized.
+import { MonoScrollBlock } from './mono-scroll-block';
 
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   ScrollView: 'ScrollView',
+  Pressable: 'Pressable',
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -26,9 +30,29 @@ vi.mock('@/components/sheet-header', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
-vi.mock('./tool-part-detail-body', () => ({
-  ToolPartDetailBody: 'ToolPartDetailBody',
+// RNGH ships Flow source that the node project cannot parse; the horizontal
+// ScrollView becomes a string element. The real SegmentedControl imports
+// expo-haptics, which is stubbed below.
+vi.mock('react-native-gesture-handler', () => ({
+  ScrollView: 'ScrollView',
 }));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+}));
+// Same-named string element carrying the props so existing assertions keep
+// working, with a real MonoScrollBlock child so presence registration fires
+// and the real SegmentedControl renders under the host lifecycle.
+vi.mock('./tool-part-detail-body', () => ({
+  ToolPartDetailBody: (props: { part: ToolPart }) =>
+    createElement(
+      'ToolPartDetailBody',
+      props,
+      createElement(MonoScrollBlock, { content: LONG_LINE })
+    ),
+}));
+
+/** 300+ char single-line payload, like a long tool output line. */
+const LONG_LINE = `${'x'.repeat(300)} tail`;
 
 let capturedOpener: ((partId: string) => void) | null = null;
 function Opener() {
@@ -104,6 +128,21 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+function radio(
+  root: TestRenderer.ReactTestInstance,
+  label: string
+): TestRenderer.ReactTestInstance | undefined {
+  return findByType(root, 'Pressable').find(
+    node =>
+      propOf(node, 'accessibilityRole') === 'radio' && propOf(node, 'accessibilityLabel') === label
+  );
+}
+
+function pressRadio(root: TestRenderer.ReactTestInstance, label: string): void {
+  const onPress = propOf(radio(root, label), 'onPress');
+  (onPress as () => void)();
 }
 
 function sheetTitle(renderer: TestRenderer.ReactTestRenderer): unknown {
@@ -193,5 +232,45 @@ describe('PartDetailSheetHost mounted', () => {
         propOf(node, 'selectable') === true
     );
     expect(reasoningTexts).toHaveLength(1);
+  });
+
+  it('resets the text mode to wrap when the sheet closes through the host', async () => {
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+
+    // Opens wrapped by default.
+    expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({ selected: true });
+    expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
+      selected: false,
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      pressRadio(renderer.root, 'Scroll');
+    });
+    expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
+      selected: true,
+    });
+
+    // Close through the real host boundary: the SheetHeader Done button's
+    // onDone is the host's `close`, which flips visible -> false.
+    await act(async () => {
+      await Promise.resolve();
+      (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
+    });
+    expect(propOf(findByType(renderer.root, 'Modal')[0], 'visible')).toBe(false);
+
+    // Reopen the same part: the sheet resets to Wrap.
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({ selected: true });
   });
 });

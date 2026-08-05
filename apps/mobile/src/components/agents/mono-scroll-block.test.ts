@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MONO_SCROLL_GESTURE_OFFSETS,
+  MONO_SCROLL_TEXT_MODE_OPTIONS,
   MONO_SCROLL_VIEW_PROPS,
   nextMonoScrollHeightPin,
   prepareMonoScrollContent,
@@ -70,6 +71,15 @@ describe('height pin — content growth must remeasure', () => {
     const pin = nextMonoScrollHeightPin(undefined, 'stable', 20);
     const again = nextMonoScrollHeightPin(pin, 'stable', 20.2);
     expect(again).toBe(pin);
+  });
+});
+
+describe('MONO_SCROLL_TEXT_MODE_OPTIONS — segmented-control order matches the sheet default', () => {
+  it('is exactly wrap then scroll, with stable labels', () => {
+    expect(MONO_SCROLL_TEXT_MODE_OPTIONS).toEqual([
+      { value: 'wrap', label: 'Wrap' },
+      { value: 'scroll', label: 'Scroll' },
+    ]);
   });
 });
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { type LayoutChangeEvent, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
@@ -9,6 +9,7 @@ import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import {
   MONO_SCROLL_VIEW_PROPS,
   type MonoScrollHeightPin,
+  type MonoScrollTextMode,
   nextMonoScrollHeightPin,
   prepareMonoScrollContent,
   resolveMonoScrollPinnedHeight,
@@ -25,7 +26,31 @@ type MonoScrollBlockProps = {
 };
 
 /**
- * Horizontally scrollable monospace block for tool-card / preparation output.
+ * Sheet-level mono display mode and presence tracker, provided by the tool
+ * detail sheet. `null` outside the sheet (transcript/preparation blocks).
+ */
+export type MonoScrollSheetContextValue = {
+  mode: MonoScrollTextMode;
+  /** Registers a mounted mono block; returns the unregister. */
+  track: () => () => void;
+};
+
+const MonoScrollSheetContext = createContext<MonoScrollSheetContextValue | null>(null);
+export const MonoScrollSheetProvider = MonoScrollSheetContext.Provider;
+
+/**
+ * Monospace block for tool-card / preparation output.
+ *
+ * Two display modes:
+ * - `scroll` (default outside the sheet): the RNGH horizontal ScrollView with
+ *   intrinsic-width text and a measured height pin (delivery notes below).
+ * - `wrap` (sheet default): plain wrapped text with no ScrollView, no `onLayout`
+ *   measurement, and no height pin — the sheet's own vertical ScrollView is the
+ *   only scroller, so no nested horizontal gesture exists.
+ *
+ * The mode comes from `MonoScrollSheetContext`, provided by `PartDetailSheet`.
+ * Each mounted block also registers presence through that context so the sheet
+ * can render its mode control exactly when mono content exists.
  *
  * Nested-scroll delivery (device-proven): RN 0.83 Fabric does not hand
  * horizontal pans to a stock RN ScrollView nested inside the session FlashList
@@ -50,9 +75,17 @@ export function MonoScrollBlock({
   containerClassName,
 }: Readonly<MonoScrollBlockProps>) {
   const textSelectable = useTranscriptTextSelectable();
+  const sheet = useContext(MonoScrollSheetContext);
+  const textMode = sheet?.mode ?? 'scroll';
+  const track = sheet?.track;
   const { displayText, isTruncated } = prepareMonoScrollContent(content, maxLength);
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   const contentHeight = resolveMonoScrollPinnedHeight(heightPin, displayText);
+
+  // Registers this block's presence exactly once per mount; the cleanup is the
+  // unregister. The effect only re-runs when `track` identity changes, which
+  // the sheet keeps stable, so mode flips never re-register.
+  useEffect(() => track?.(), [track]);
 
   const handleContentLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -62,11 +95,32 @@ export function MonoScrollBlock({
     [displayText]
   );
 
+  if (textMode === 'wrap') {
+    return (
+      <View className={containerClassName}>
+        <Text
+          selectable={textSelectable}
+          className={cn('font-mono text-xs leading-4', textClassName)}
+        >
+          {displayText}
+        </Text>
+        {isTruncated ? (
+          <Text
+            accessibilityLabel="Content truncated"
+            className="mt-1 text-xs text-muted-foreground"
+          >
+            Truncated
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View className={containerClassName}>
       <ScrollView
         {...MONO_SCROLL_VIEW_PROPS}
-        // Explicit height from measured content — see D10 / component doc.
+        // Explicit height from measured content — see component doc.
         // eslint-disable-next-line react-native/no-inline-styles -- measured height cannot be a Tailwind class
         style={contentHeight === undefined ? undefined : { height: contentHeight }}
       >

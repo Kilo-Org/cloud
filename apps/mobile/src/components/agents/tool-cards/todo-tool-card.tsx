@@ -2,9 +2,8 @@ import { View } from 'react-native';
 import { ListTodo } from 'lucide-react-native';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
-import { Text } from '@/components/ui/text';
+import { SelectableText } from '@/components/ui/selectable-text';
 
-import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
@@ -16,19 +15,13 @@ import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
  * pending/running status line live in `ToolPartDetailBody`.
  */
 export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
-  const textSelectable = useTranscriptTextSelectable();
-
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
 
   return (
     <View className="gap-2">
       {output ? <MonoScrollBlock content={output} textClassName="text-foreground" /> : null}
-      {error ? (
-        <Text selectable={textSelectable} className="text-xs text-destructive">
-          {error}
-        </Text>
-      ) : null}
+      {error ? <SelectableText className="text-xs text-destructive">{error}</SelectableText> : null}
     </View>
   );
 }

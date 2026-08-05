@@ -1,18 +1,22 @@
 import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
-export function applyWorstProviderDataPolicy(
-  models: ReadonlyArray<OpenRouterModel>,
+export function withWorstProviderDataPolicy(
+  model: OpenRouterModel,
   providerPolicy: { training: boolean; retainsPrompts: boolean }
-): void {
-  for (const model of models) {
-    if (!model.endpoint) continue;
+): OpenRouterModel {
+  if (!model.endpoint) return model;
 
-    model.endpoint.data_policy = {
-      training: providerPolicy.training || model.endpoint.data_policy?.training === true,
-      retainsPrompts:
-        providerPolicy.retainsPrompts || model.endpoint.data_policy?.retainsPrompts === true,
-    };
-  }
+  return {
+    ...model,
+    endpoint: {
+      ...model.endpoint,
+      data_policy: {
+        training: providerPolicy.training || model.endpoint.data_policy?.training === true,
+        retainsPrompts:
+          providerPolicy.retainsPrompts || model.endpoint.data_policy?.retainsPrompts === true,
+      },
+    },
+  };
 }
 
 export function modelTrains(model: OpenRouterModel, providerTrains: boolean): boolean {

@@ -45,7 +45,7 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
-import { applyWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 
 /**
@@ -338,10 +338,6 @@ async function syncProviders(
     openRouterFreeEndpoints,
     kiloExclusiveModels,
   });
-  // The cards API selects one arbitrary route when a provider has policy variants (for example ZDR).
-  for (const { provider, models } of providerModelData) {
-    applyWorstProviderDataPolicy(models, provider.dataPolicy);
-  }
 
   // Filter out providers with no models
   const filteredProviderModelData = providerModelData.filter(data => data.models.length > 0);
@@ -351,7 +347,9 @@ async function syncProviders(
     // Deduplicate models within each provider by slug
     const uniqueModelsMap = new Map<string, OpenRouterModel>();
     data.models.forEach(model => {
-      uniqueModelsMap.set(normalizeModelId(model.slug), model);
+      // The cards API selects one arbitrary route when a provider has policy variants (for example ZDR).
+      const normalizedModel = withWorstProviderDataPolicy(model, data.provider.dataPolicy);
+      uniqueModelsMap.set(normalizeModelId(model.slug), normalizedModel);
     });
     const uniqueModels = Array.from(uniqueModelsMap.values());
 

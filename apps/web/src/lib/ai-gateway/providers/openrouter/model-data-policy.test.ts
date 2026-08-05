@@ -1,8 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
 import {
-  applyWorstProviderDataPolicy,
   modelRetainsPrompts,
   modelTrains,
+  withWorstProviderDataPolicy,
 } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { OpenRouterSearchResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
@@ -39,14 +39,20 @@ describe('model data policy', () => {
       },
     });
 
-    applyWorstProviderDataPolicy(response.data.models, {
+    const model = response.data.models[0];
+    if (!model) throw new Error('expected model');
+    const normalizedModel = withWorstProviderDataPolicy(model, {
       training: false,
       retainsPrompts: true,
     });
 
-    expect(response.data.models[0]?.endpoint?.data_policy).toEqual({
+    expect(normalizedModel.endpoint?.data_policy).toEqual({
       training: false,
       retainsPrompts: true,
+    });
+    expect(model.endpoint?.data_policy).toEqual({
+      training: false,
+      retainsPrompts: false,
     });
   });
 
@@ -70,12 +76,14 @@ describe('model data policy', () => {
       },
     });
 
-    applyWorstProviderDataPolicy(response.data.models, {
+    const model = response.data.models[0];
+    if (!model) throw new Error('expected model');
+    const normalizedModel = withWorstProviderDataPolicy(model, {
       training: false,
       retainsPrompts: false,
     });
 
-    expect(response.data.models[0]?.endpoint?.data_policy).toEqual({
+    expect(normalizedModel.endpoint?.data_policy).toEqual({
       training: true,
       retainsPrompts: true,
     });

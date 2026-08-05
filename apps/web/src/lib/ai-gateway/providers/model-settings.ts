@@ -18,12 +18,13 @@ import {
   REASONING_VARIANTS_THINKING_ONLY,
   REASONING_VARIANTS_BINARY,
 } from '@/lib/ai-gateway/providers/variants';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 export async function getOpenRouterDerivedModelVariants(
   model: string
 ): Promise<OpenCodeSettings['variants']> {
   const models = await getOpenRouterModelsMetadataFromDatabase();
-  const reasoning = models[model]?.reasoning;
+  const reasoning = (models[model] ?? models[normalizeModelId(model)])?.reasoning;
   if (!reasoning) {
     return undefined;
   }

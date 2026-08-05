@@ -138,6 +138,15 @@ describe('addAutoRoutingModels', () => {
     expect(result).toEqual([paidModel]);
   });
 
+  test('keeps the free auto model visible when candidate lookup fails', async () => {
+    const freeModel = makeModel('kilo-auto/free');
+    mockedGetAutoFreeCandidates.mockRejectedValue(new Error('Redis unavailable'));
+
+    const result = await addAutoRoutingModels([freeModel]);
+
+    expect(result).toEqual([freeModel]);
+  });
+
   test('leaves the auto model unannotated when no candidates are visible', async () => {
     const efficientModel = makeModel('kilo-auto/efficient');
     mockedGetCachedRoutingTable.mockResolvedValue(routingTable(['denied/model']));

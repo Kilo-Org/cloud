@@ -245,7 +245,87 @@ describe('createAnswerPermissionHandler', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ status: 'answered', success: true });
-    expect(deps.kiloClient.answerPermission).toHaveBeenCalledWith('perm_1', 'always');
+    expect(deps.kiloClient.answerPermission).toHaveBeenCalledWith(
+      'perm_1',
+      'always',
+      undefined,
+      true
+    );
+  });
+
+  it('forwards the response with no message as interactive', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_1',
+      ingestUrl: 'wss://ingest.example.com',
+      ingestToken: 'token',
+      workerAuthToken: 'auth',
+    });
+    const deps = createMockDeps(state);
+    const handler = createAnswerPermissionHandler(deps);
+
+    const response = await handler(jsonRequest({ permissionId: 'perm_2', response: 'once' }));
+    const data = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ status: 'answered', success: true });
+    expect(deps.kiloClient.answerPermission).toHaveBeenCalledWith(
+      'perm_2',
+      'once',
+      undefined,
+      true
+    );
+  });
+
+  it('threads an optional rejection message through the interactive reply', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_1',
+      ingestUrl: 'wss://ingest.example.com',
+      ingestToken: 'token',
+      workerAuthToken: 'auth',
+    });
+    const deps = createMockDeps(state);
+    const handler = createAnswerPermissionHandler(deps);
+
+    const response = await handler(
+      jsonRequest({ permissionId: 'perm_3', response: 'reject', message: 'no' })
+    );
+    const data = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ status: 'answered', success: true });
+    expect(deps.kiloClient.answerPermission).toHaveBeenCalledWith('perm_3', 'reject', 'no', true);
+  });
+
+  it('returns PERMISSION_ERROR when the kilo reply fails', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_1',
+      ingestUrl: 'wss://ingest.example.com',
+      ingestToken: 'token',
+      workerAuthToken: 'auth',
+    });
+    const deps = createMockDeps(state);
+    deps.kiloClient.answerPermission = vi
+      .fn()
+      .mockRejectedValue(new Error('Permission reply perm_4 failed: HTTP 500'));
+    const handler = createAnswerPermissionHandler(deps);
+
+    const response = await handler(jsonRequest({ permissionId: 'perm_4', response: 'once' }));
+    const data = await readJson(response);
+
+    expect(response.status).toBe(500);
+    expect(data).toEqual({
+      error: 'PERMISSION_ERROR',
+      message: 'Failed to answer permission: Permission reply perm_4 failed: HTTP 500',
+    });
+    expect(deps.kiloClient.answerPermission).toHaveBeenCalledWith(
+      'perm_4',
+      'once',
+      undefined,
+      true
+    );
   });
 });
 

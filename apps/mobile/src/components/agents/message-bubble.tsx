@@ -11,6 +11,7 @@ import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
+import { formatTranscriptTimeLabel } from './message-time-label';
 import { PartRenderer } from './part-renderer';
 import { isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
@@ -78,6 +79,12 @@ export function MessageBubble({
     );
   }
 
+  // Subtle time label, computed once per render. `Date.now()` at render time
+  // only: no timer and no day-boundary watcher, so a message mounted across
+  // midnight keeps its label until the next render (stream tick, list recycle,
+  // navigation).
+  const timeLabel = formatTranscriptTimeLabel(message.info.time.created, Date.now());
+
   if (isUser) {
     // Composer, queued-message synthesis, and slash commands emit exactly one
     // human-authored text part, so the separator separates it from synthesized
@@ -104,22 +111,29 @@ export function MessageBubble({
               ))}
             </InMessageBubbleContext.Provider>
           </Bubble>
-          {hasBadgeSlot ? (
-            <View
-              accessibilityRole={isQueued ? 'text' : undefined}
-              accessibilityLabel={isQueued ? 'Message queued' : undefined}
-              accessible={isQueued}
-              {...(!isQueued
-                ? {
-                    accessibilityElementsHidden: true as const,
-                    importantForAccessibility: 'no-hide-descendants' as const,
-                  }
-                : {})}
-              pointerEvents={isQueued ? 'auto' : 'none'}
-              className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
-            >
-              <Clock size={12} color={colors.mutedForeground} />
-              <Text className="text-xs text-muted-foreground">Queued</Text>
+          {hasBadgeSlot || timeLabel ? (
+            <View className="flex-row items-center gap-2 self-end pr-1">
+              {hasBadgeSlot ? (
+                <View
+                  accessibilityRole={isQueued ? 'text' : undefined}
+                  accessibilityLabel={isQueued ? 'Message queued' : undefined}
+                  accessible={isQueued}
+                  {...(!isQueued
+                    ? {
+                        accessibilityElementsHidden: true as const,
+                        importantForAccessibility: 'no-hide-descendants' as const,
+                      }
+                    : {})}
+                  pointerEvents={isQueued ? 'auto' : 'none'}
+                  className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
+                >
+                  <Clock size={12} color={colors.mutedForeground} />
+                  <Text className="text-xs text-muted-foreground">Queued</Text>
+                </View>
+              ) : null}
+              {timeLabel ? (
+                <Text className="text-xs text-muted-foreground tabular-nums">{timeLabel}</Text>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -159,6 +173,9 @@ export function MessageBubble({
           ))}
         </View>
       </InMessageBubbleContext.Provider>
+      {timeLabel ? (
+        <Text className="mt-1 text-xs text-muted-foreground tabular-nums">{timeLabel}</Text>
+      ) : null}
       {a11y.accessibilityActions.length > 0 ? (
         <View
           accessible

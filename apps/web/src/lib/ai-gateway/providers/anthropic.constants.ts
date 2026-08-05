@@ -102,20 +102,6 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   inference_provider_restriction: [],
 };
 
-export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
-  public_id: CLAUDE_SONNET_CURRENT_MODEL_ID + ':clawsetup',
-  internal_id: CLAUDE_SONNET_CURRENT_MODEL_ID,
-  display_name: 'Claude Sonnet KiloClaw Setup Promo',
-  description: 'Claude Sonnet KiloClaw Setup Promo',
-  status: 'hidden', // only usable through kilo-auto
-  context_length: 1_000_000,
-  max_completion_tokens: 128_000,
-  gateway: 'openrouter',
-  flags: ['reasoning', 'vision', 'vercel-routing'],
-  pricing: null,
-  inference_provider_restriction: [],
-};
-
 export function isClaudeModel(requestedModel: string) {
   return requestedModel.includes('claude');
 }

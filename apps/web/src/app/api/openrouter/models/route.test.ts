@@ -170,7 +170,12 @@ describe('GET /api/openrouter/models', () => {
             models: ['poolside/laguna-m.1:free'],
           },
         },
-        balancedModel,
+        {
+          ...balancedModel,
+          autoRouting: {
+            models: ['google/gemini-2.5-flash', 'openai/gpt-5.4-mini'],
+          },
+        },
         geminiModel,
         gptMiniModel,
         poolsideModel,

@@ -696,10 +696,15 @@ export function createAnswerPermissionHandler(deps: ServerDependencies) {
     }
 
     try {
-      const success =
-        body.message === undefined
-          ? await kiloClient.answerPermission(body.permissionId, body.response)
-          : await kiloClient.answerPermission(body.permissionId, body.response, body.message);
+      // Every caller of this endpoint is a human tap in a client UI, so the reply is
+      // always interactive (skill-shell approvals require it). The wrapper's own
+      // auto-approve path calls kiloClient.answerPermission directly and omits the flag.
+      const success = await kiloClient.answerPermission(
+        body.permissionId,
+        body.response,
+        body.message,
+        true
+      );
       state.updateActivity();
       logToFile(
         `job/answer-permission: permissionId=${body.permissionId} response=${body.response}`

@@ -14,7 +14,7 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
+import { parseGitHubOwnerRepo, computeSearchNextCursor } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -2052,6 +2052,121 @@ describe('cli-sessions-v2-router', () => {
         newerCreatedOlderUpdated,
         olderCreatedNewerUpdated,
       ]);
+    });
+  });
+
+  describe('search cursor paging', () => {
+    const needle = 'cursor-paging-search-fixture';
+    const sessionA = 'ses_cursor_paging_a_0001';
+    const sessionB = 'ses_cursor_paging_b_0001';
+    const sessionC = 'ses_cursor_paging_c_0001';
+    const allIds = [sessionA, sessionB, sessionC];
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: sessionA,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} alpha`,
+          updated_at: '2026-01-03T10:00:00.000Z',
+        },
+        {
+          session_id: sessionB,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} beta`,
+          updated_at: '2026-01-02T10:00:00.000Z',
+        },
+        {
+          session_id: sessionC,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} gamma`,
+          updated_at: '2026-01-01T10:00:00.000Z',
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, allIds));
+    });
+
+    it('returns the first page with nextCursor pointing at the remaining rows', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
+
+      expect(result.results).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.offset).toBe(0);
+      expect(result.nextCursor).toBe(2);
+      // Default sort is updated_at descending.
+      expect(result.results.map(s => s.session_id)).toEqual([sessionA, sessionB]);
+    });
+
+    it('returns the remaining row with nextCursor null on the cursor page', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const page1 = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
+      const page1Ids = new Set(page1.results.map(s => s.session_id));
+
+      const page2 = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 2,
+      });
+
+      expect(page2.results).toHaveLength(1);
+      expect(page2.total).toBe(3);
+      expect(page2.offset).toBe(2);
+      expect(page2.nextCursor).toBeNull();
+      expect(page1Ids.has(page2.results[0].session_id)).toBe(false);
+      expect(page2.results[0].session_id).toBe(sessionC);
+    });
+
+    it('prefers cursor over legacy offset when both arrive', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 2,
+        offset: 0,
+      });
+
+      expect(result.offset).toBe(2);
+      expect(result.results).toHaveLength(1);
+    });
+
+    it('offsets from zero when only legacy offset is supplied', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        offset: 0,
+      });
+
+      expect(result.results).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.offset).toBe(0);
+    });
+
+    it('returns null nextCursor on an empty page even when nextOffset < total', () => {
+      // Empty page: results.length === 0, nextOffset === pageOffset.
+      // When pageOffset (2) < total (3), the naive formula
+      //   nextOffset < total ? nextOffset : null
+      // returns 2 — a non-null cursor that would cause an infinite loop.
+      // The empty-results guard prevents this.
+      const resultsLength = 0;
+      const nextOffset = 2;
+      const total = 3;
+
+      const withGuard = computeSearchNextCursor(resultsLength, nextOffset, total);
+      expect(withGuard).toBeNull();
+
+      // Old formula:  nextOffset < total → truthy, returns nextOffset (wrong)
+      // Empty guard:  resultsLength > 0 → false → null (correct)
+      const oldFormula: number | null = nextOffset < total ? nextOffset : null;
+      expect(oldFormula).toBe(nextOffset);
+      expect(withGuard).not.toBe(oldFormula);
     });
   });
 

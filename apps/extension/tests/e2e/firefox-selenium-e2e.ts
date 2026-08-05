@@ -8,7 +8,7 @@ import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Builder, By, Key } from 'selenium-webdriver';
 import type { WebDriver, WebElement } from 'selenium-webdriver';
-import firefox from 'selenium-webdriver/firefox';
+import firefox, { ServiceBuilder } from 'selenium-webdriver/firefox';
 import { z } from 'zod';
 
 const extensionRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -56,6 +56,7 @@ const chromeWorkflowNames = [
   'memory tools search and read saved memories',
   'settings memories list supports delete and shows the empty state',
   'model picker search filters and selects by model id',
+  'workflow create, approve, and run returns result',
 ] as const;
 
 const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
@@ -63,12 +64,20 @@ const AGENT_MEMORIES_KEY = 'kiloAgentMemories';
 const EMPTY_MEMORIES_MESSAGE =
   'No memories yet. Highlight text on any page, right-click, and choose Add to memory.';
 const CONFIRMATION_MESSAGE = 'Saved to memory';
+const workflowToolNames = [
+  'search_workflows',
+  'get_workflow',
+  'save_workflow',
+  'save_memory',
+] as const;
+
 const safeToolNames = [
   'get_page_snapshot',
   'get_element_details',
   'find_in_page',
   'search_memories',
   'get_memory',
+  ...workflowToolNames,
 ] as const;
 
 interface ServerHandle {
@@ -165,6 +174,9 @@ const dangerousToolNames = [
   'search_memories',
   'get_memory',
   'eval',
+  ...workflowToolNames,
+  'run_workflow',
+  'delete_workflow',
 ];
 
 const defaultFirstCompletionEvents = (): unknown[] => [
@@ -785,9 +797,12 @@ const startFirefoxSession = async (): Promise<FirefoxSession> => {
   options.setPreference('extensions.install.requireBuiltInCerts', false);
   options.setPreference('xpinstall.signatures.required', false);
 
+  const service = new ServiceBuilder().addArguments('--allow-system-access');
+
   const sessionDriver = await new Builder()
     .forBrowser('firefox')
     .setFirefoxOptions(options)
+    .setFirefoxService(service)
     .build();
 
   const targetServers: ServerHandle[] = [];
@@ -1430,6 +1445,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1475,6 +1491,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1511,6 +1528,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1595,6 +1613,7 @@ const scenarios: FirefoxScenario[] = [
         },
         async session => {
           await submitDangerousPrompt(session, 'Show markdown');
+          await waitForText(session.driver, 'Markdown title');
           await session.driver.findElement(By.xpath('//h3[normalize-space(.)="Markdown title"]'));
           await session.driver.findElement(By.xpath('//strong[normalize-space(.)="bold text"]'));
 
@@ -1791,6 +1810,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1941,6 +1961,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -2127,6 +2148,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -2177,6 +2199,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -2520,6 +2543,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -2913,6 +2937,145 @@ const scenarios: FirefoxScenario[] = [
         await selectModelByIdFirefox(session.driver, modelId);
         assert.equal(await getModelTriggerSelectedId(session.driver), modelId);
       }),
+  },
+  {
+    name: 'workflow create, approve, and run returns result',
+    run: async context => {
+      const simpleReadScript = `
+  const heading = await page.text('h1');
+  return { done: true, result: { heading } };
+`;
+
+      const targetServer = await startTargetPageServer();
+      const scopeOrigin = new URL(targetServer.url).origin;
+
+      try {
+        await withSession(
+          context.api,
+          {
+            firstCompletionEvents: [
+              {
+                choices: [
+                  {
+                    delta: {
+                      tool_calls: [
+                        {
+                          function: {
+                            arguments: JSON.stringify({
+                              description: 'Read the page heading.',
+                              name: 'Read heading',
+                              scopeOrigin,
+                              script: simpleReadScript,
+                            }),
+                            name: 'save_workflow',
+                          },
+                          id: 'call_save_wf_firefox',
+                          index: 0,
+                          type: 'function',
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+            secondCompletionEvents: contentOnlyCompletion('Workflow saved and ready to run.'),
+            toolNames: dangerousToolNames,
+          },
+          async session => {
+            // Navigate to the pre-started target page.
+            await session.driver.switchTo().newWindow('tab');
+            await session.driver.get(targetServer.url);
+
+            // Open side panel on extension origin before any storage access.
+            await openAuthenticatedPanel(session);
+            await waitForModel(session.driver);
+            await waitForTargetTab(session.driver, 'Kilo extension fixture');
+            await switchToDangerousMode(session.driver);
+
+            // Turn 1: save_workflow — true create (no workflowId, storage starts empty).
+            await sendMessage(session.driver, 'Save a workflow to read the heading');
+
+            // The tool call triggers the approval card.
+            await waitUntil(
+              session.driver,
+              async () => {
+                const dialogs = await session.driver.findElements(
+                  By.css('[role="dialog"][aria-label="Save workflow"]')
+                );
+                return dialogs.length > 0;
+              },
+              'Timed out waiting for Save workflow dialog'
+            );
+
+            // Approve the workflow.
+            await clickButtonByText(session.driver, 'Approve and save');
+            await waitForText(session.driver, 'Workflow saved and ready to run.');
+
+            // Read the created workflow from storage to get its assigned ID.
+            const storedWorkflows = await readFirefoxStorage(session.driver, [
+              'kiloAgentWorkflows',
+            ]);
+            const workflowsArray = z
+              .array(z.object({ id: z.string() }))
+              .parse(storedWorkflows['kiloAgentWorkflows']);
+            const createdWorkflowId = workflowsArray[0]?.id;
+            assert.ok(
+              typeof createdWorkflowId === 'string',
+              'Expected a created workflow in storage'
+            );
+
+            // Reset the API with the real workflow ID for the run_workflow turn.
+            context.api.reset({
+              firstCompletionEvents: [
+                {
+                  choices: [
+                    {
+                      delta: {
+                        tool_calls: [
+                          {
+                            function: {
+                              arguments: JSON.stringify({
+                                dryRun: false,
+                                workflowId: createdWorkflowId,
+                              }),
+                              name: 'run_workflow',
+                            },
+                            id: 'call_run_wf_firefox',
+                            index: 0,
+                            type: 'function',
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              ],
+              secondCompletionEvents: contentOnlyCompletion(
+                'The workflow read the heading: Kilo extension fixture.'
+              ),
+              toolNames: dangerousToolNames,
+            });
+
+            // Turn 2: the model returns run_workflow — the extension executes it.
+            await sendMessage(session.driver, 'Run the workflow now');
+
+            // The workflow result appears in the conversation.
+            await waitForText(session.driver, 'run_workflow completed');
+            const wfResultBody = await expandToolExchange(session.driver, 'run_workflow');
+            assert.match(wfResultBody, /"heading"\s*:\s*"Kilo extension fixture"/u);
+
+            // The follow-up assistant turn receives explicit content, not the generic fallback.
+            await waitForText(
+              session.driver,
+              'The workflow read the heading: Kilo extension fixture.'
+            );
+          }
+        );
+      } finally {
+        await targetServer.close();
+      }
+    },
   },
 ];
 

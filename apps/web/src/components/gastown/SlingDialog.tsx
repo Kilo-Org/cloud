@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 type SlingDialogProps = {
@@ -119,16 +119,10 @@ export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="secondary" size="md" type="button" onClick={onClose}>
+            <Button variant="secondary" type="button" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              size="md"
-              type="submit"
-              disabled={!title.trim() || sling.isPending}
-              className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-            >
+            <Button variant="default" type="submit" disabled={!title.trim() || sling.isPending}>
               {sling.isPending ? 'Slinging...' : 'Sling'}
             </Button>
           </DialogFooter>

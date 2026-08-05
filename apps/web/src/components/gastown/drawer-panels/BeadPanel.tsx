@@ -279,13 +279,15 @@ export function BeadPanel({
           ) : (
             <span className="text-base font-semibold text-white/90">{bead.title}</span>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={editing ? cancelEdit : enterEditMode}
-            className="ml-auto shrink-0 rounded-md p-1 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
+            className="ml-auto size-7 shrink-0 text-white/30 hover:text-white/60"
             title={editing ? 'Cancel editing' : 'Edit bead'}
           >
             {editing ? <X className="size-3.5" /> : <Pencil className="size-3.5" />}
-          </button>
+          </Button>
         </div>
 
         {editing ? (
@@ -305,9 +307,10 @@ export function BeadPanel({
             <div className="ml-auto flex items-center gap-1.5">
               <Button
                 size="sm"
+                variant="default"
                 onClick={handleSave}
                 disabled={isUpdatePending}
-                className="gap-1bg-[color:oklch(95%_0.15_108_/_0.90)] h-6 px-2.5 text-[10px] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+                className="gap-1 h-6 px-2.5 text-[10px]"
               >
                 {isUpdatePending ? (
                   <Loader2 className="size-3 animate-spin" />
@@ -347,9 +350,10 @@ export function BeadPanel({
             {isHeld && (
               <Button
                 size="sm"
+                variant="outline"
                 onClick={() => doStartBead({ rigId, beadId: bead.bead_id })}
                 disabled={isStartPending}
-                className="ml-auto h-6 gap-1 border border-emerald-500/30 bg-emerald-500/10 px-2.5 text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20"
+                className="ml-auto h-6 gap-1 px-2.5 text-[10px] font-medium"
               >
                 {isStartPending ? (
                   <Loader2 className="size-3 animate-spin" />

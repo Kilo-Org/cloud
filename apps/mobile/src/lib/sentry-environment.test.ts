@@ -17,8 +17,8 @@ describe('resolveSentryEnvironment', () => {
     expect(resolveSentryEnvironment(undefined, true)).toBe('development');
   });
 
-  it('falls back to production when raw is undefined and isDev is false', () => {
-    expect(resolveSentryEnvironment(undefined, false)).toBe('production');
+  it('falls back to unknown when raw is undefined and isDev is false', () => {
+    expect(resolveSentryEnvironment(undefined, false)).toBe('unknown');
   });
 
   it('falls back to development for empty/whitespace raw when isDev is true', () => {
@@ -26,9 +26,9 @@ describe('resolveSentryEnvironment', () => {
     expect(resolveSentryEnvironment('   ', true)).toBe('development');
   });
 
-  it('falls back to production for empty/whitespace raw when isDev is false', () => {
-    expect(resolveSentryEnvironment('', false)).toBe('production');
-    expect(resolveSentryEnvironment('   ', false)).toBe('production');
+  it('falls back to unknown for empty/whitespace raw when isDev is false', () => {
+    expect(resolveSentryEnvironment('', false)).toBe('unknown');
+    expect(resolveSentryEnvironment('   ', false)).toBe('unknown');
   });
 
   it('always returns a string (never undefined)', () => {

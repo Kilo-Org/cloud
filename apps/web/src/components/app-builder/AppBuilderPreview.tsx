@@ -354,12 +354,7 @@ function DeploymentControls({
       );
     case 'ready-to-deploy':
       return (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onDeploy}
-          className="border-yellow-500/50 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
-        >
+        <Button size="sm" variant="default" onClick={onDeploy}>
           <Rocket className="mr-2 h-4 w-4" />
           Deploy
         </Button>

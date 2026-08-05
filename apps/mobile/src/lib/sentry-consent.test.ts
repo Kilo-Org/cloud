@@ -17,14 +17,22 @@ describe('sentryOptionsForConsent', () => {
     });
   });
 
-  it('enables replay, screenshots, view-hierarchy, and tracing when consent is accepted', () => {
+  it('disables replay, screenshots, and view-hierarchy even when consent is accepted', () => {
     const options = sentryOptionsForConsent(true);
 
-    expect(options.attachScreenshot).toBe(true);
-    expect(options.attachViewHierarchy).toBe(true);
-    expect(options.replaysSessionSampleRate).toBeGreaterThan(0);
-    expect(options.replaysOnErrorSampleRate).toBeGreaterThan(0);
-    expect(options.tracesSampleRate).toBeGreaterThan(0);
+    expect(options.attachScreenshot).toBe(false);
+    expect(options.attachViewHierarchy).toBe(false);
+    expect(options.replaysSessionSampleRate).toBe(0);
+    expect(options.replaysOnErrorSampleRate).toBe(0);
+    expect(options.tracesSampleRate).toBe(0.1);
+  });
+
+  it('sets tracesSampleRate to 0 when optional consent is declined', () => {
+    expect(sentryOptionsForConsent(false).tracesSampleRate).toBe(0);
+  });
+
+  it('sets tracesSampleRate to 0.1 when optional consent is accepted', () => {
+    expect(sentryOptionsForConsent(true).tracesSampleRate).toBe(0.1);
   });
 });
 
@@ -45,6 +53,45 @@ describe('reinitSentryForConsent', () => {
     await reinitSentryForConsent(true, init);
 
     expect(events).toEqual(['close', 'init:true']);
+  });
+
+  it('re-initialises with init(false) when Sentry.close() throws (fail-closed)', async () => {
+    closeMock.mockRejectedValueOnce(new Error('close failed'));
+    const events: string[] = [];
+    const init = vi.fn((consented: boolean) => {
+      events.push(`init:${consented}`);
+    });
+    const onFailure = vi.fn(() => {
+      events.push('onFailure');
+    });
+
+    await reinitSentryForConsent(true, init, onFailure);
+
+    expect(init).toHaveBeenCalledWith(false);
+    expect(onFailure).toHaveBeenCalledOnce();
+    // init(false) must run before onFailure.
+    expect(events).toEqual(['init:false', 'onFailure']);
+  });
+
+  it('reports failure and keeps chain alive when init(false) throws', async () => {
+    closeMock.mockRejectedValueOnce(new Error('close failed'));
+    const init = vi.fn<(_: boolean) => void>().mockImplementationOnce(() => {
+      throw new Error('init(false) failed');
+    });
+    const onFailure = vi.fn<() => void>();
+
+    await reinitSentryForConsent(true, init, onFailure);
+
+    // onFailure must run even though init(false) threw.
+    expect(onFailure).toHaveBeenCalledOnce();
+    // init was called with false (fail-closed attempt).
+    expect(init).toHaveBeenCalledWith(false);
+
+    // A later consent transition must still run — the chain must not reject.
+    closeMock.mockResolvedValue(undefined);
+    await reinitSentryForConsent(false, init);
+    expect(init).toHaveBeenCalledWith(false);
+    expect(init).toHaveBeenCalledTimes(2);
   });
 
   it('serializes overlapping consent transitions', async () => {

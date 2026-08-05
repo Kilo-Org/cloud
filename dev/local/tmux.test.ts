@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -10,6 +10,9 @@ import {
   buildInteractiveShellCommand,
   captureServicePane,
   listWindows,
+  createSession,
+  createWindow,
+  killSession,
   pipeServicePane,
   setPaneServiceIdentity,
 } from './tmux';
@@ -19,6 +22,15 @@ import {
   buildStartCommand,
   restartServiceInTmux,
 } from './runner';
+
+const hasTmux = (() => {
+  try {
+    execFileSync('tmux', ['-V'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
   const startupCommand =
@@ -30,11 +42,91 @@ test('buildInteractiveShellCommand wraps quoted startup commands in parseable sh
   assert.match(wrapped, /exec/);
   assert.match(wrapped, /PATH/);
   execFileSync('/bin/sh', ['-n', '-c', wrapped]);
+
+  const rooted = buildInteractiveShellCommand(startupCommand, '/bin/sh', '/tmp/worktree root');
+  assert.match(rooted, /^'\/bin\/sh' -c /);
+  assert.match(rooted, /cd .*tmp\/worktree root/);
+  execFileSync('/bin/sh', ['-n', '-c', rooted]);
 });
 
-const hasTmux = (() => {
+test(
+  'new tmux sessions and service windows ignore stale global worktree environment',
+  { skip: !hasTmux },
+  async () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf8',
+    }).trim();
+    const marker = path.join(os.tmpdir(), `${sessionName}-pwd`);
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+    const tmuxOutput = (...args: string[]) =>
+      execFileSync('tmux', args, { encoding: 'utf8' }).trim();
+    const savedGlobalEnvironment = new Map<string, string | undefined>();
+    for (const key of ['PWD', 'OLDPWD']) {
+      try {
+        savedGlobalEnvironment.set(
+          key,
+          tmuxOutput('show-environment', '-g', key).slice(key.length + 1)
+        );
+      } catch {
+        savedGlobalEnvironment.set(key, undefined);
+      }
+    }
+
+    try {
+      const staleWorktree = path.join(os.tmpdir(), 'deleted-sibling-worktree');
+      tmux('set-environment', '-g', 'PWD', staleWorktree);
+      tmux('set-environment', '-g', 'OLDPWD', staleWorktree);
+      createSession(sessionName);
+
+      assert.equal(
+        tmuxOutput('display-message', '-p', '-t', `${sessionName}:0.0`, '#{pane_current_path}'),
+        repoRoot
+      );
+      const windowIndex = createWindow(
+        sessionName,
+        'service',
+        undefined,
+        `pwd > ${JSON.stringify(marker)}`
+      );
+      for (let i = 0; i < 20 && !fs.existsSync(marker); i++) await sleep(50);
+      assert.equal(fs.readFileSync(marker, 'utf8').trim(), repoRoot);
+      assert.doesNotMatch(
+        tmuxOutput('capture-pane', '-p', '-J', '-t', `${sessionName}:${windowIndex}.0`),
+        /shell-init: error retrieving current directory/
+      );
+      assert.equal(
+        tmuxOutput(
+          'display-message',
+          '-p',
+          '-t',
+          `${sessionName}:${windowIndex}.0`,
+          '#{pane_current_path}'
+        ),
+        repoRoot
+      );
+    } finally {
+      fs.rmSync(marker, { force: true });
+      try {
+        killSession(sessionName);
+      } catch {
+        // Session may already be gone if setup fails.
+      }
+      for (const [key, value] of savedGlobalEnvironment) {
+        try {
+          if (value === undefined) tmux('set-environment', '-gu', key);
+          else tmux('set-environment', '-g', key, value);
+        } catch {
+          // The variable may not exist in this tmux version's environment.
+        }
+      }
+    }
+  }
+);
+
+const hasScript = (() => {
   try {
-    execFileSync('tmux', ['-V'], { stdio: 'ignore' });
+    execFileSync('sh', ['-c', 'command -v script'], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -121,6 +213,7 @@ test(
   { skip: !hasTmux },
   () => {
     const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const otherSessionName = `${sessionName}-other`;
     const serviceName = 'nextjs';
     const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
     const tmuxOutput = (...args: string[]) =>
@@ -150,6 +243,12 @@ test(
         `${sessionName}:0.0`
       );
 
+      // A second active session makes the tmux current session ambiguous. The
+      // old unqualified break-pane created the new window in the current
+      // session, which could be the other session; the session-qualified
+      // production fix always targets the requested source session.
+      tmux('new-session', '-d', '-s', otherSessionName, '-n', 'other', 'sleep 120');
+
       const newWindowIndex = breakPane(sessionName, 0, 1, serviceName);
       const window = listWindows(sessionName).find(entry => entry.index === newWindowIndex);
 
@@ -164,11 +263,165 @@ test(
         ),
         '0'
       );
+      assert.ok(
+        listWindows(otherSessionName).every(entry => entry.name !== serviceName),
+        'broken-out window must not land in the other active session'
+      );
     } finally {
       try {
         tmux('kill-session', '-t', sessionName);
       } catch {
         // Session may already be gone if tmux fails during setup.
+      }
+      try {
+        tmux('kill-session', '-t', otherSessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);
+
+test(
+  'breakPane creates the window in the requested session when a real foreign client is attached',
+  { skip: !hasTmux || !hasScript },
+  () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const decoySession = `kilo-tmux-test-decoy-${process.pid}-${Date.now()}`;
+    const serviceName = 'nextjs';
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+    const tmuxOutput = (...args: string[]) =>
+      execFileSync('tmux', args, { encoding: 'utf-8' }).trim();
+
+    // Attach a real client to the decoy session through a pseudoterminal.
+    // A forged TMUX env var alone does not steer break-pane — tmux requires
+    // an actual attached client for the "current session" to differ from the
+    // source pane's session.  script(1) provides the pty so tmux can attach.
+    //
+    // Strip TMUX and TMUX_PANE from the child environment.  When the test
+    // itself runs inside tmux, the child script inherits those variables and
+    // the nested tmux refuses to attach its decoy session.
+    const {
+      TMUX: _childTmux,
+      TMUX_PANE: _childTmuxPane,
+      ...childEnv
+    } = process.env as Record<string, string | undefined>;
+    childEnv.TERM = process.env.TERM ?? 'xterm-256color';
+
+    const clientProc =
+      process.platform === 'darwin'
+        ? spawn(
+            'script',
+            ['-q', '/dev/null', 'tmux', 'new-session', '-s', decoySession, 'sleep', '999'],
+            { stdio: 'ignore', env: childEnv }
+          )
+        : spawn(
+            'script',
+            ['-q', '-c', `tmux new-session -s ${decoySession} sleep 999`, '/dev/null'],
+            { stdio: 'ignore', env: childEnv }
+          );
+
+    const savedTmux = process.env.TMUX;
+    try {
+      // Wait for the decoy client to attach (up to 2 s).
+      let clientReady = false;
+      for (let i = 0; i < 20 && !clientReady; i++) {
+        try {
+          const attached = tmuxOutput(
+            'display-message',
+            '-t',
+            `=${decoySession}:0`,
+            '-p',
+            '#{session_attached}'
+          );
+          clientReady = parseInt(attached, 10) > 0;
+        } catch {
+          // Session not yet visible.
+        }
+        if (!clientReady) execFileSync('sleep', ['0.1']);
+      }
+      assert.ok(clientReady, 'decoy session must have an attached client');
+
+      // Point child tmux commands at the decoy session.  The trailing colon
+      // is required: display-message -t =<session> without it returns no ID.
+      const socketPath = tmuxOutput('display-message', '-p', '#{socket_path}');
+      const sessionId = tmuxOutput(
+        'display-message',
+        '-t',
+        `=${decoySession}:`,
+        '-p',
+        '#{session_id}'
+      );
+      const sessionCreated = sessionId.replace(/^\$/, '');
+      process.env.TMUX = `${socketPath},${sessionCreated},0`;
+
+      // Set up the test session with a joined pane, then break it out.
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep', '120');
+      tmux(
+        'new-window',
+        '-d',
+        '-t',
+        sessionName,
+        '-n',
+        serviceName,
+        'sh -lc "while true; do sleep 60; done"'
+      );
+
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+
+      tmux(
+        'join-pane',
+        '-h',
+        '-s',
+        `${sessionName}:${serviceWindow.index}.0`,
+        '-t',
+        `${sessionName}:0.0`
+      );
+
+      const newWindowIndex = breakPane(sessionName, 0, 1, serviceName);
+
+      // The window must belong to the requested session, not the decoy.
+      const windowSession = tmuxOutput(
+        'display-message',
+        '-t',
+        `${sessionName}:${newWindowIndex}`,
+        '-p',
+        '#{session_name}'
+      );
+      assert.equal(windowSession, sessionName);
+
+      // Verify window name and that automatic rename is disabled.
+      const window = listWindows(sessionName).find(entry => entry.index === newWindowIndex);
+      assert.deepEqual(window, { index: newWindowIndex, name: serviceName });
+      assert.equal(
+        tmuxOutput(
+          'display-message',
+          '-p',
+          '-t',
+          `${sessionName}:${newWindowIndex}`,
+          '#{automatic-rename}'
+        ),
+        '0'
+      );
+    } finally {
+      // Restore the inherited TMUX value.
+      if (savedTmux === undefined) {
+        delete process.env.TMUX;
+      } else {
+        process.env.TMUX = savedTmux;
+      }
+      // Detach the script client, then tear down both sessions.
+      clientProc.kill('SIGTERM');
+      try {
+        tmux('kill-session', '-t', `=${decoySession}`);
+      } catch {
+        // Session may already be gone.
+      }
+      try {
+        tmux('kill-session', '-t', `=${sessionName}`);
+      } catch {
+        // Session may already be gone.
       }
     }
   }

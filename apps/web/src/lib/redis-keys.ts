@@ -21,11 +21,8 @@ export const VERCEL_ROUTING_REDIS_KEY = redisKey('ai-gateway:vercel-routing-perc
 
 export const GATEWAY_METADATA_REDIS_KEYS = {
   allProviders: redisKey('ai-gateway.metadata:all-providers'),
-  openrouterModels: redisKey('ai-gateway.metadata:openrouter-models'),
-  vercelModels: redisKey('ai-gateway.metadata:vercel-models'),
-  // Lightweight lists of language model ids, mirrored alongside the full
-  // catalogs above so existence checks don't need to load every model's
-  // metadata and endpoints.
+  // Lightweight lists of language model ids used for existence checks without
+  // loading every model's metadata and endpoints.
   openrouterModelIds: redisKey('ai-gateway.metadata:openrouter-model-ids'),
   vercelModelIds: redisKey('ai-gateway.metadata:vercel-model-ids'),
   openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),

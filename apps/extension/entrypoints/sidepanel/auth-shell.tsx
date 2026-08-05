@@ -28,6 +28,7 @@ import { MemorySettings } from './memory-settings';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
 import { settingsDialogOpenAtom } from './settings-dialog-state';
+import { WorkflowSettings } from './workflow-settings';
 
 const emptyOrganizationOptions: KiloOrganizationOption[] = [];
 
@@ -200,6 +201,7 @@ const HeaderActions = ({
               </p>
             </div>
             <MemorySettings />
+            <WorkflowSettings />
             <OrganizationCreditAccountSelect
               onChange={onOrganizationChange}
               organizationOptions={organizationOptions}

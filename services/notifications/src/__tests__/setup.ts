@@ -5,7 +5,7 @@ vi.mock('@kilocode/db/client', () => ({
     select: () => ({
       from: (table: { _: { name: string } }) => ({
         where: () => ({
-          limit: async () => [{ api_token_pepper: null }],
+          limit: async () => [{ api_token_pepper: null, blocked_reason: null }],
           then: (resolve: (rows: unknown[]) => unknown) => {
             if (table._.name === 'user_push_tokens') return resolve([]);
             return resolve([]);

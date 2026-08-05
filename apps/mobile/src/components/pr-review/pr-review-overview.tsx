@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { CheckCheck, GitPullRequest } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -24,7 +25,7 @@ import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
@@ -97,7 +98,16 @@ export function PrReviewOverview({
   }, [queryClient, trpc.githubApps.getUserAuthorization]);
 
   const handleInstallApp = useCallback(() => {
-    void WebBrowser.openBrowserAsync(getGitHubIntegrationUrl(WEB_BASE_URL));
+    void (async () => {
+      try {
+        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+          returnTo: '/cloud/sessions',
+        });
+        await WebBrowser.openBrowserAsync(getGitHubIntegrationUrl(WEB_BASE_URL, undefined, token));
+      } catch {
+        toast.error('Could not open GitHub App settings');
+      }
+    })();
   }, []);
 
   if (pr.isLoading) {

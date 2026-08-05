@@ -13,11 +13,13 @@ import {
   selectAllowedAttachments,
 } from './message-attachment-state';
 import {
+  clipboardImageToSelection,
   materializeAttachment,
   pickCameraImage,
   pickFiles,
   pickLibraryImages,
 } from './message-attachment-picker';
+import { type ClipboardImageFile } from '@/lib/agent-attachments/clipboard-image';
 import { MessageInputContent } from './message-input-content';
 import {
   type AttachmentEnabledProps,
@@ -50,47 +52,54 @@ export function MessageInputWithAttachmentQueue({
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
 
+  const addSelectedAttachments = useCallback(
+    async (selected: readonly MessageAttachment[]) => {
+      if (selected.length === 0) {
+        return;
+      }
+
+      // Gate on size and capacity before any bytes are read: materializing an
+      // oversized file is what runs the device out of memory.
+      const { accepted, toast: rejectionToast } = selectAllowedAttachments({
+        existingCount: queue.rows.length,
+        selected,
+      });
+      if (rejectionToast) {
+        toast.error(rejectionToast);
+      }
+
+      // Sequential on purpose: concurrent materialize multiplies peak memory by
+      // the selection size. eslint no-await-in-loop wants Promise.all; refuse.
+      for (const attachment of accepted) {
+        // Per-file, so one unreadable file in a multi-select does not discard the
+        // rest. Same message as the gate's unreadable rejection: from the user's
+        // side "we could not read this file" is the same fact whether the size
+        // stat or the read itself failed.
+        try {
+          // eslint-disable-next-line no-await-in-loop -- sequential materialize bounds peak memory
+          const picked = await materializeAttachment(attachment);
+          const tempId = queue.addFile(picked.input);
+          if (tempId) {
+            localUrisRef.current.set(tempId, picked.localUri);
+          }
+        } catch {
+          toast.error(buildAttachmentUnreadableToast(attachment.filename));
+        }
+      }
+    },
+    [queue]
+  );
+
   const pickFromSource = useCallback(
     async (source: 'camera' | 'library' | 'files') => {
       try {
         const selected = await pickAttachmentsFromSource(source);
-        if (selected.length === 0) {
-          return;
-        }
-
-        // Gate on size and capacity before any bytes are read: materializing an
-        // oversized file is what runs the device out of memory.
-        const { accepted, toast: rejectionToast } = selectAllowedAttachments({
-          existingCount: queue.rows.length,
-          selected,
-        });
-        if (rejectionToast) {
-          toast.error(rejectionToast);
-        }
-
-        // Sequential on purpose: concurrent materialize multiplies peak memory by
-        // the selection size. eslint no-await-in-loop wants Promise.all; refuse.
-        for (const attachment of accepted) {
-          // Per-file, so one unreadable file in a multi-select does not discard the
-          // rest. Same message as the gate's unreadable rejection: from the user's
-          // side "we could not read this file" is the same fact whether the size
-          // stat or the read itself failed.
-          try {
-            // eslint-disable-next-line no-await-in-loop -- sequential materialize bounds peak memory
-            const picked = await materializeAttachment(attachment);
-            const tempId = queue.addFile(picked.input);
-            if (tempId) {
-              localUrisRef.current.set(tempId, picked.localUri);
-            }
-          } catch {
-            toast.error(buildAttachmentUnreadableToast(attachment.filename));
-          }
-        }
+        await addSelectedAttachments(selected);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Failed to attach file');
       }
     },
-    [queue]
+    [addSelectedAttachments]
   );
 
   const openPicker = useCallback(() => {
@@ -113,6 +122,14 @@ export function MessageInputWithAttachmentQueue({
     );
   }, [bottom, pickFromSource, showActionSheetWithOptions]);
 
+  const addClipboardImage = useCallback(
+    async (file: ClipboardImageFile) => {
+      const attachment = clipboardImageToSelection(file);
+      await addSelectedAttachments([attachment]);
+    },
+    [addSelectedAttachments]
+  );
+
   const attachmentQueue: ComposerAttachmentQueue = {
     ...queue,
     getLocalUri: tempId => localUrisRef.current.get(tempId) ?? null,
@@ -127,6 +144,7 @@ export function MessageInputWithAttachmentQueue({
         localUrisRef.current.delete(tempId);
       }
     },
+    addClipboardImage,
   };
 
   return (

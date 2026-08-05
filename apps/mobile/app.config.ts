@@ -52,6 +52,13 @@ const config: ExpoConfig = {
     supportsTablet: true,
     usesAppleSignIn: true,
     associatedDomains: ['applinks:app.kilo.ai'],
+    entitlements: {
+      // App Attest, used by @expo/app-integrity for native admission. `production`
+      // is required for App Store builds; a development build against the
+      // production environment still attests, it just uses Apple's dev servers
+      // when the app is signed with a development profile.
+      'com.apple.developer.devicecheck.appattest-environment': 'production',
+    },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',

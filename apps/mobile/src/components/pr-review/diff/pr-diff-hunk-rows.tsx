@@ -1,7 +1,7 @@
 // Hunk / expand / pagination / empty-state rows for the PR diff FlashList.
 
 import { Check, ChevronDown, File, GitCommit, X } from 'lucide-react-native';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -9,10 +9,6 @@ import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-item
 
 const DEFAULT_EXPAND_WINDOW = 20;
 const EXPAND_ALL_MAX = 100;
-
-// Module-level style constants so FlashList content containers avoid
-// recreating object literals (and so no-inline-styles is satisfied).
-export const LIST_CONTENT_STYLE: ViewStyle = { paddingBottom: 24 };
 
 export function HunkHeaderRow({ header }: { header: string }) {
   const colors = useThemeColors();

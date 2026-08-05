@@ -60,4 +60,30 @@ describe('agent GitHub integration helpers', () => {
       'https://app.kilo.ai/github-app?organizationId=org_123'
     );
   });
+
+  it('builds app-initiated URLs with a pre-minted install state token', () => {
+    const url = getGitHubIntegrationUrl('https://app.kilo.ai', 'org_123', 'abc-token-123');
+    expect(url).toBe(
+      'https://app.kilo.ai/github-app?organizationId=org_123&installState=abc-token-123&fromApp=1'
+    );
+  });
+
+  it('builds app-initiated personal URLs with a pre-minted install state token', () => {
+    const url = getGitHubIntegrationUrl('https://app.kilo.ai/', undefined, 'abc-token-456');
+    expect(url).toBe('https://app.kilo.ai/github-app?installState=abc-token-456&fromApp=1');
+  });
+
+  it('never sets fromApp=1 when no installState token is provided', () => {
+    const url = getGitHubIntegrationUrl('https://app.kilo.ai', 'org_123');
+    expect(url).not.toContain('fromApp');
+  });
+
+  it('shows the prompt when integration status is unknown', () => {
+    expect(
+      shouldShowGitHubIntegrationPrompt({
+        isLoadingRepos: false,
+        integrationInstalled: undefined,
+      })
+    ).toBe(false);
+  });
 });

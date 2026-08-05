@@ -80,6 +80,7 @@ describe('PartRenderer', () => {
     ).props.children;
     expect(reasoningElement.type).toBe(ReasoningPartRenderer);
     expect(reasoningElement.props).toMatchObject({
+      partId: 'r1',
       text: 'Meaningful reasoning text',
       isStreaming: false,
     });

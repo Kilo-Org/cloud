@@ -25,8 +25,10 @@ Updated 2026-05-28 -- Credit-funded payment source label.
 Updated 2026-05-28 -- Coding Plans API key configuration summary.
 Updated 2026-05-28 -- Coding Plans billing history USD amount display.
 Updated 2026-06-05 -- KiloClaw final Commit term continuation behavior.
+Updated 2026-06-19 -- Current Coding Plan quota presentation and routing independence.
 Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
 Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan exclusivity.
+Updated 2026-08-05 -- BytePlus Coding Plan Pro catalog requirements.
 
 ## Conventions
 
@@ -276,6 +278,10 @@ historical Commit names, prices, invoices, and credit deductions.
     subscription per configured provider ID. The Coding Plans group MUST
     display one Subscription Card for each non-terminal coding plan
     subscription, including a `past_due` subscription in its warning state.
+    Authenticated Kilo clients MAY reuse the same current personal subscription
+    data for current-plan presentation outside the Subscription Center. These
+    clients MUST NOT include terminal history, invoices, or billing history in
+    that current-plan response.
 
 28. The Coding Plans detail page MUST be served at
     `/subscriptions/coding-plans/[subscriptionId]`.
@@ -296,8 +302,20 @@ historical Commit names, prices, invoices, and credit deductions.
       linking to `/byok` when a managed key is installed
     - Traffic routing information (Kilo Gateway through the ordinary BYOK
       setup for the subscription's provider)
+    - Current Upstream Provider quota for an `active` or `past_due` Coding Plan
+      when available, authorized through the retained Managed Plan Credential
+      without exposing it to the client
     - Inline billing history showing credit transactions with amounts in USD
       (see Billing History rules)
+
+    Current quota state and Installed BYOK Configuration routing state MUST be
+    presented separately. For an active or `past_due` plan, quota lookup MUST be
+    authorized through the retained assigned Managed Plan Credential rather
+    than through the Installed BYOK Configuration. Cloud MUST normalize current
+    provider quota into an ordered set of windows owned by that subscription.
+    Each window MUST include a stable semantic ID, remaining percentage, reset
+    timestamp, and positive period. Kilo clients MUST NOT depend on
+    provider-native quota fields or labels.
 
     `/byok` MUST identify the Kilo-managed installed key as read-only and MUST
     NOT offer update, enable/disable, delete, saved raw-key view, or copy
@@ -315,8 +333,13 @@ historical Commit names, prices, invoices, and credit deductions.
     offering with provider name, plan name, recurring USD price, billing
     period, payment source, and catalog feature copy. MiniMax token offerings
     MUST include Token Plan Plus, Token Plan Max, and Token Plan Ultra.
-    BytePlus offerings MUST include Coding Plan Lite at $20 per 30 days. An
-    offering with assignable credential capacity MUST show a subscribe action.
+    BytePlus offerings MUST include Coding Plan Lite at $20 per 30 days and
+    Coding Plan Pro at $100 per 30 days. Lite MUST display approximately 1,900
+    requests every 5 hours, 12,000 per week, and 24,000 per subscription
+    period. Pro MUST display approximately 9,500 requests every 5 hours,
+    60,000 per week, and 120,000 per subscription period. Both offerings MUST
+    use the model IDs and exclusions defined in `.specs/coding-plans.md`.
+    An offering with assignable credential capacity MUST show a subscribe action.
     Purchase messaging MUST explain automatic BYOK setup for the selected
     provider, and purchase MUST be blocked when any personal BYOK key for that
     provider exists, including a disabled key. In that state, the system MUST direct
@@ -483,6 +506,12 @@ not yet enforced in the current codebase:
 
 - Blocked direct deletion of a Kilo-managed installed MiniMax key in `/byok`; the key is removed by cancelling the plan in Subscription Center, which cleans it up at Effective Cancellation.
 - Kept update and disable available with the existing billing-separation warning; a replaced, user-managed key remains deletable.
+
+### 2026-06-19 -- Current Coding Plan quota presentation
+
+- Allowed authenticated Kilo clients to reuse current personal subscription data without moving billing history out of Subscription Center.
+- Kept provider quota authorization on the retained Managed Plan Credential and independent from current BYOK routing state.
+- Normalized provider quota into subscription-owned windows so current-plan clients do not depend on provider-native response formats.
 
 ### 2026-06-05 -- KiloClaw final Commit continuation
 

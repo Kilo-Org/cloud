@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { DeviceAuthClient } from './DeviceAuthClient';
 import { buildDeviceAuthPath, isDeviceAuthAppMode } from './device-auth-url';
+import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -31,9 +32,12 @@ export default async function DeviceAuthPage({ searchParams }: PageProps) {
     redirect('/');
   }
 
+  const viewerToken = createDeviceAuthViewerToken(code, user.id);
+
   return (
     <DeviceAuthClient
       code={code}
+      viewerToken={viewerToken}
       isAppMode={isAppMode}
       user={{
         name: user.google_user_name,

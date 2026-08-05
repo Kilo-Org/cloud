@@ -329,7 +329,7 @@ function CardShell({
       className={[
         'rounded-lg border transition-colors',
         selected
-          ? 'border-[color:oklch(95%_0.15_108_/_0.5)] bg-[color:oklch(95%_0.15_108_/_0.04)]'
+          ? 'border-border bg-surface-selected'
           : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.04]',
       ].join(' ')}
     >
@@ -343,15 +343,11 @@ function CardShell({
         <div
           className={[
             'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border',
-            selected
-              ? 'border-[color:oklch(95%_0.15_108_/_0.7)] bg-[color:oklch(95%_0.15_108_/_0.2)]'
-              : 'border-white/20 bg-transparent',
+            selected ? 'border-white/40 bg-white/10' : 'border-white/20 bg-transparent',
           ].join(' ')}
           aria-hidden
         >
-          {selected && (
-            <span className="size-2 rounded-full bg-[color:oklch(95%_0.15_108_/_0.95)]" />
-          )}
+          {selected && <span className="size-2 rounded-full bg-white/80" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

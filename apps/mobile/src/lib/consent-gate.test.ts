@@ -25,12 +25,36 @@ describe('consent gate', () => {
     expect(await checkConsentGate('user-1')).toEqual({ status: 'needs-consent' });
   });
 
-  it('returns accepted when the current consent version is stored', async () => {
+  it('returns accepted with optional when the current consent version is stored', async () => {
     const { CURRENT_CONSENT_VERSION } = await import('./consent');
     const { checkConsentGate } = await import('./consent-gate');
-    store.set('consent-accepted-user1', String(CURRENT_CONSENT_VERSION));
+    store.set(
+      'consent-accepted-757365722d31',
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false })
+    );
 
-    expect(await checkConsentGate('user-1')).toEqual({ status: 'accepted' });
+    expect(await checkConsentGate('user-1')).toEqual({ status: 'accepted', optional: false });
+  });
+
+  it('returns accepted with optional true when optional consent was given', async () => {
+    const { CURRENT_CONSENT_VERSION } = await import('./consent');
+    const { checkConsentGate } = await import('./consent-gate');
+    store.set(
+      'consent-accepted-757365722d31',
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true })
+    );
+
+    expect(await checkConsentGate('user-1')).toEqual({ status: 'accepted', optional: true });
+  });
+
+  it('returns needs-consent when only a legacy consent key exists', async () => {
+    const { checkConsentGate } = await import('./consent-gate');
+    // Legacy key: strip-based, non-injective. e.g. "user-1" → "user1".
+    store.set('consent-accepted-user1', JSON.stringify({ v: 1, optional: false }));
+
+    const result = await checkConsentGate('user-1');
+
+    expect(result).toEqual({ status: 'needs-consent' });
   });
 
   it('returns an error result when consent storage cannot be read', async () => {

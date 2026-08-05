@@ -30,7 +30,7 @@ catalog:
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
   drizzle-orm: 0.45.2
-  hono: 4.12.25
+  hono: 4.12.27
   jose: 6.2.3
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
@@ -77,12 +77,13 @@ overrides:
   # swallows that as a recoverable error, so builds stay green while silently
   # uploading nothing. This previously broke apps/web source maps for months.
   '@babel/plugin-transform-modules-systemjs': 7.29.7
+  '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.4.6
-  next: 16.2.6
+  next: 16.2.11
   preact: 10.28.4
   glob: '>=13.0.1'
-  esbuild: '>=0.25.0'
+  esbuild: '>=0.28.1'
   lodash: '>=4.18.1'
   diff: '>=8.0.3'
   fast-xml-parser: '>=5.7.3'
@@ -91,17 +92,17 @@ overrides:
   ws@^7: 7.5.11
   ws@^8: 8.21.0
   tmp: 0.2.7
-  dompurify: 3.4.3
+  dompurify: 3.4.12
   handlebars: 4.7.9
-  brace-expansion: 5.0.6
+  brace-expansion: 5.0.9
   node-forge: 1.4.0
-  postcss: '>=8.5.10 <8.5.14'
+  postcss: '>=8.5.23'
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.4
   yaml: 2.8.4
-  undici@^7: 7.28.0
+  undici@^7: 7.29.0
   path-to-regexp: 8.4.2
-  ip-address: 10.2.0
+  ip-address: 10.3.1
   drizzle-orm: 0.45.2
   lodash-es: '>=4.18.1'
   '@xmldom/xmldom': 0.8.13
@@ -109,17 +110,24 @@ overrides:
   smol-toml: 1.6.1
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
-  hono: 4.12.25
-  '@hono/node-server': 1.19.14
-  undici@^6: 6.27.0
-  undici@^8: 8.5.0
-  shell-quote: '>=1.8.4'
+  hono: 4.12.27
+  '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
+  undici@^6: 6.28.0
+  undici@^8: 8.9.0
   # 1.30.2+ regresses var() round-trip through JS visitors, breaking
   # react-native-css's metro transformer. Upstream issue:
   # https://github.com/parcel-bundler/lightningcss/issues/1081
   lightningcss: 1.30.1
-  axios: 1.16.1
-  fast-uri: 3.1.2
+  axios: 1.18.0
+  fast-uri: 3.1.4
+  '@opentelemetry/core': 2.8.0
+  body-parser: 2.3.0
+  js-yaml: 4.3.0
+  linkify-it: 5.0.2
+  protobufjs: 7.6.5
+  sharp: '>=0.35.0'
+  tar: 7.5.21
+  shell-quote: 1.10.0
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).

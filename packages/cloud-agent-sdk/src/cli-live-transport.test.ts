@@ -1240,7 +1240,19 @@ describe('CliLiveTransport unified user web connection', () => {
       'respondToPermission',
       () => ({ requestId: 'p-1', response: 'always' }),
       'permission_respond',
-      { requestID: 'p-1', reply: 'always' },
+      { requestID: 'p-1', reply: 'always', interactive: true },
+    ],
+    [
+      'respondToPermission',
+      () => ({ requestId: 'p-2', response: 'once' }),
+      'permission_respond',
+      { requestID: 'p-2', reply: 'once', interactive: true },
+    ],
+    [
+      'respondToPermission',
+      () => ({ requestId: 'p-3', response: 'reject' }),
+      'permission_respond',
+      { requestID: 'p-3', reply: 'reject', interactive: true },
     ],
     [
       'acceptSuggestion',

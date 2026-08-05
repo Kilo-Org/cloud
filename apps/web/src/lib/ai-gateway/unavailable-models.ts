@@ -1,4 +1,3 @@
-import { claude_sonnet_clawsetup_model } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 const unavailableModelIds: ReadonlySet<string> = new Set([
@@ -47,7 +46,6 @@ const unavailableModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
   'qwen/qwen3.7-plus:free',
-  'sakana/fugu-ultra', // this model is not available in the EU
   'upstage/solar-pro-3:free',
   'x-ai/grok-code-fast-1:optimized:free',
   'xiaomi/mimo-v2-omni:free',
@@ -56,7 +54,6 @@ const unavailableModelIds: ReadonlySet<string> = new Set([
   'z-ai/glm-4.7:free',
   'stepfun/step-3.5-flash:free',
   'z-ai/glm-5:free',
-  claude_sonnet_clawsetup_model.public_id, // only usable through kilo-auto
 ]);
 
 export function isUnavailableModel(modelId: string): boolean {

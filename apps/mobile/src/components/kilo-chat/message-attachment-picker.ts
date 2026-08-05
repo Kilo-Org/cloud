@@ -4,6 +4,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert, Linking } from 'react-native';
 import { type AddFileInput } from '@kilocode/kilo-chat-hooks';
 
+import { type ClipboardImageFile } from '@/lib/agent-attachments/clipboard-image';
+
 import {
   type MessageAttachment,
   type NativeAttachmentSelection,
@@ -60,6 +62,14 @@ export async function materializeAttachment(
     input: { blob, filename: attachment.filename, mimeType: attachment.mimeType },
     localUri: attachment.uri,
   };
+}
+
+export function clipboardImageToSelection(file: ClipboardImageFile): MessageAttachment {
+  return assetToSelection({
+    uri: file.uri,
+    name: file.name,
+    mimeType: file.mimeType,
+  });
 }
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {

@@ -31,6 +31,7 @@ export async function findPepperByUserId(db: WorkerDb, userId: string) {
     .select({
       id: kilocode_users.id,
       api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_reason: kilocode_users.blocked_reason,
     })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, userId))

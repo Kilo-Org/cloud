@@ -655,75 +655,6 @@ export const CodingPlanTermKind = {
 
 export type CodingPlanTermKind = (typeof CodingPlanTermKind)[keyof typeof CodingPlanTermKind];
 
-// --- Cost Insights enums ---
-
-export const CostInsightSpendCategory = {
-  Variable: 'variable',
-  Scheduled: 'scheduled',
-} as const;
-
-export type CostInsightSpendCategory =
-  (typeof CostInsightSpendCategory)[keyof typeof CostInsightSpendCategory];
-
-export const CostInsightSpendSource = {
-  AiGateway: 'ai_gateway',
-  KiloClaw: 'kiloclaw',
-  CodingPlan: 'coding_plan',
-  Other: 'other',
-} as const;
-
-export type CostInsightSpendSource =
-  (typeof CostInsightSpendSource)[keyof typeof CostInsightSpendSource];
-
-export const CostInsightRollupDegradedReason = {
-  CaptureBypass: 'capture_bypass',
-  ReconciliationMismatch: 'reconciliation_mismatch',
-  LateSourceData: 'late_source_data',
-} as const;
-
-export type CostInsightRollupDegradedReason =
-  (typeof CostInsightRollupDegradedReason)[keyof typeof CostInsightRollupDegradedReason];
-
-export const CostInsightEventType = {
-  ConfigChanged: 'config_changed',
-  AnomalyAlert: 'anomaly_alert',
-  ThresholdCrossed: 'threshold_crossed',
-  AlertReviewed: 'alert_reviewed',
-  SuggestionCreated: 'suggestion_created',
-  SuggestionDismissed: 'suggestion_dismissed',
-  Disabled: 'disabled',
-} as const;
-
-export type CostInsightEventType = (typeof CostInsightEventType)[keyof typeof CostInsightEventType];
-
-export const CostInsightAlertKind = {
-  Anomaly: 'anomaly',
-  Threshold: 'threshold',
-  Threshold7Day: 'threshold_7d',
-  Threshold30Day: 'threshold_30d',
-} as const;
-
-export type CostInsightAlertKind = (typeof CostInsightAlertKind)[keyof typeof CostInsightAlertKind];
-
-export const CostInsightSuggestionKind = {
-  CodingPlan: 'coding_plan',
-  KiloPass: 'kilo_pass',
-} as const;
-
-export type CostInsightSuggestionKind =
-  (typeof CostInsightSuggestionKind)[keyof typeof CostInsightSuggestionKind];
-
-export const CostInsightNotificationStatus = {
-  Pending: 'pending',
-  Sending: 'sending',
-  Sent: 'sent',
-  Failed: 'failed',
-  Skipped: 'skipped',
-} as const;
-
-export type CostInsightNotificationStatus =
-  (typeof CostInsightNotificationStatus)[keyof typeof CostInsightNotificationStatus];
-
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',
@@ -2025,6 +1956,13 @@ export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  reasoning: z
+    .object({
+      mandatory: z.boolean(),
+      supported_efforts: z.array(ReasoningEffortSchema).optional(),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
@@ -2130,6 +2068,10 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'session_import_failed',
   'setup_command_failed',
   'container_shutdown',
+  // Closed out by the stale review reaper because it sat in a non-terminal state
+  // past the reap threshold. Distinct from 'timeout', which means the agent
+  // itself timed out; this one means nothing ever reported back at all.
+  'abandoned',
   'unknown',
 ] as const;
 
@@ -2166,6 +2108,14 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
   // ownership could be either.
   'assistant_rate_limited_byok',
+  // Set only by the stale review reaper, which measures cleanup rather than the
+  // fault that stranded the review, so alerting on it would count janitorial work
+  // as incidents. Every stranded pending review measured on 2026-08-04 traced to
+  // customer-side state: Code Reviewer disabled, the platform integration
+  // suspended, or an action-required disable. The signal for genuinely stuck work
+  // is the live "Running > 90m" queue health counter, which is unaffected by this
+  // and does not depend on a review having been reaped yet.
+  'abandoned',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

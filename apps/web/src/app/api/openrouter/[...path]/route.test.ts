@@ -629,6 +629,34 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(ctx.posthog_distinct_id).toBeUndefined();
   });
 
+  it('bills classifier cost for the balanced alias using its requested model id', async () => {
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.002,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
+
+    expect(response.status).toBe(200);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
+    );
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(ctx.requested_model).toBe('kilo-auto/balanced');
+  });
+
   it('does not bill when classifier cost is 0 (cache hit)', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
@@ -816,20 +844,25 @@ describe('auto-routing shadow classifier', () => {
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
-    mockedApplyResolvedAutoModel.mockImplementation(async (_opts, request) => {
+    mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
+      if (opts.efficientDecision) await opts.efficientDecision();
       request.body.model = 'openai/gpt-4o';
       return { kind: 'ok', resolved: { model: 'openai/gpt-4o' } };
     });
   });
 
-  it('does not schedule a background classifier request for non-efficient auto models', async () => {
+  it('routes kilo-auto/balanced through the efficient classifier', async () => {
     const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
+    );
     expect(mockedAfter).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'bun:test';
-import { isKiloServerUnreachableError } from './kilo-api';
+import { afterEach, describe, expect, it } from 'bun:test';
+import type { KiloClient as SDKClient } from '@kilocode/sdk';
+import { createWrapperKiloClient, isKiloServerUnreachableError } from './kilo-api';
 
 describe('isKiloServerUnreachableError', () => {
   it('matches a raw ECONNREFUSED error', () => {
@@ -92,5 +93,98 @@ describe('isKiloServerUnreachableError', () => {
     expect(isKiloServerUnreachableError('ECONNREFUSED')).toBe(false);
     expect(isKiloServerUnreachableError(undefined)).toBe(false);
     expect(isKiloServerUnreachableError(null)).toBe(false);
+  });
+});
+
+describe('createWrapperKiloClient().answerPermission', () => {
+  type RecordedRequest = {
+    method: string;
+    pathname: string;
+    body: Record<string, unknown>;
+  };
+
+  const startedServers: ReturnType<typeof Bun.serve>[] = [];
+
+  afterEach(async () => {
+    await Promise.all(startedServers.splice(0).map(server => server.stop()));
+  });
+
+  async function startStub(status: number): Promise<{ url: string; requests: RecordedRequest[] }> {
+    const requests: RecordedRequest[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: async req => {
+        const url = new URL(req.url);
+        requests.push({
+          method: req.method,
+          pathname: url.pathname,
+          body: (await req.json()) as Record<string, unknown>,
+        });
+        return new Response('{}', { status });
+      },
+    });
+    startedServers.push(server);
+    // Bun 1.3.14 exposes `server.url` as a URL object; normalize to a string.
+    return { url: server.url.toString(), requests };
+  }
+
+  function createClient(serverUrl: string) {
+    return createWrapperKiloClient({} as SDKClient, serverUrl, '/workspace');
+  }
+
+  it('POSTs an interactive reply to /permission/<id>/reply on a trailing-slash URL', async () => {
+    const stub = await startStub(200);
+    const client = createClient(stub.url);
+
+    const result = await client.answerPermission('perm_1', 'once', undefined, true);
+    expect(result).toBe(true);
+    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests[0].method).toBe('POST');
+    expect(stub.requests[0].pathname).toBe('/permission/perm_1/reply');
+    expect(stub.requests[0].body).toEqual({ reply: 'once', interactive: true });
+  });
+
+  it('omits interactive and message for the non-interactive auto-approve shape', async () => {
+    const stub = await startStub(200);
+    const client = createClient(stub.url);
+
+    const result = await client.answerPermission('perm_2', 'always');
+    expect(result).toBe(true);
+    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests[0].method).toBe('POST');
+    expect(stub.requests[0].pathname).toBe('/permission/perm_2/reply');
+    expect(stub.requests[0].body).toEqual({ reply: 'always' });
+  });
+
+  it('threads the message through an interactive reply on a stripped URL', async () => {
+    const stub = await startStub(200);
+    const client = createClient(stub.url.replace(/\/+$/, ''));
+
+    const result = await client.answerPermission('perm_3', 'reject', 'continue read-only', true);
+    expect(result).toBe(true);
+    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests[0].method).toBe('POST');
+    expect(stub.requests[0].pathname).toBe('/permission/perm_3/reply');
+    expect(stub.requests[0].body).toEqual({
+      reply: 'reject',
+      message: 'continue read-only',
+      interactive: true,
+    });
+  });
+
+  it('throws on a non-2xx reply', async () => {
+    const stub = await startStub(500);
+    const client = createClient(stub.url.replace(/\/+$/, ''));
+
+    let caught: Error | undefined;
+    try {
+      await client.answerPermission('perm_4', 'once', undefined, true);
+    } catch (error) {
+      caught = error as Error;
+    }
+    expect(caught?.message).toMatch(/Permission reply perm_4 failed/);
+    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests[0].method).toBe('POST');
+    expect(stub.requests[0].pathname).toBe('/permission/perm_4/reply');
   });
 });

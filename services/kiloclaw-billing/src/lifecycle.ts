@@ -25,11 +25,6 @@ import {
 } from '@kilocode/db';
 import { classifyOrganizationEntitlement } from '@kilocode/organization-entitlement';
 import {
-  captureCostInsightSpend,
-  COST_INSIGHT_DRIVER_FALLBACK,
-  COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
-} from '@kilocode/db/cost-insights-rollups';
-import {
   listOrganizationTrialExpiryEnforcementCandidates,
   type OrganizationTrialExpiryCandidateRow,
 } from '@kilocode/db/kiloclaw-organization-trial-expiry-candidates';
@@ -2105,19 +2100,6 @@ async function processCreditRenewalRow(
           newPeriodEnd,
         } satisfies CreditRenewalTransactionOutcome;
       }
-
-      await captureCostInsightSpend(tx, {
-        owner: { type: 'user', id: userId },
-        actorUserId: userId,
-        occurredAt,
-        amountMicrodollars: costMicrodollars,
-        category: 'scheduled',
-        source: 'kiloclaw',
-        productKey: COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
-        featureKey: 'renewal',
-        modelOrPlanKey: effectivePlan,
-        providerKey: COST_INSIGHT_DRIVER_FALLBACK,
-      });
 
       await tx
         .update(kilocode_users)

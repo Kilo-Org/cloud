@@ -16,11 +16,6 @@ import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
-import {
-  appendNewSessionPrefill,
-  buildContinuePrefillParams,
-} from '@/components/agents/new-session-prefill';
-import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
@@ -77,6 +72,7 @@ import {
   openChildSessionSheet,
   releaseChildSessionSheet,
 } from '@/components/agents/child-session-sheet-state';
+import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
@@ -104,6 +100,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useContinueSession } from '@/components/agents/use-continue-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -236,6 +233,12 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
+  const { continueSession, isContinuing } = useContinueSession({
+    organizationId,
+    manager,
+    models: modelOptions,
+    modelsLoading: gatewayModelsLoading,
+  });
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
     [contextUsage, sessionModels.options]
@@ -764,15 +767,13 @@ export function SessionDetailContent({
   );
 
   const handleContinueInNewSession = useCallback(() => {
-    const base = getNewAgentSessionPath(organizationId ?? null);
-    const params = buildContinuePrefillParams({
+    void continueSession({
       gitUrl: fetchedData?.gitUrl,
       mode: currentMode,
       model: currentModel,
       variant: currentVariant,
     });
-    router.push(appendNewSessionPrefill(base, params) as Href);
-  }, [organizationId, fetchedData?.gitUrl, currentMode, currentModel, currentVariant, router]);
+  }, [continueSession, fetchedData?.gitUrl, currentMode, currentModel, currentVariant]);
 
   const isFocused = useIsFocused();
   // Focus bounds the awake window to the visible working UI; a backgrounded
@@ -781,96 +782,98 @@ export function SessionDetailContent({
     isFocused && agentStatus.type !== 'disconnected' && (isStreaming || pendingMessages.size > 0);
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={rename.title}
-        headerRight={headerRight}
-        {...(rename.isTitleInteractive
-          ? {
-              onTitlePress: rename.openModal,
-              onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
-            }
-          : {})}
-      />
-      {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
+    <PartDetailSheetHost messages={messages}>
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={rename.title}
+          headerRight={headerRight}
+          {...(rename.isTitleInteractive
+            ? {
+                onTitlePress: rename.openModal,
+                onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+              }
+            : {})}
+        />
+        {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
-      {!isConnected && <ConnectivityBanner />}
+        {!isConnected && <ConnectivityBanner />}
 
-      {keyboardContainerKind === 'app-aware-padding' ? (
-        <AppAwareKeyboardPaddingView className="flex-1">
-          {renderKeyboardBody()}
-        </AppAwareKeyboardPaddingView>
-      ) : (
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
-          {renderKeyboardBody()}
-        </KeyboardAvoidingView>
-      )}
+        {keyboardContainerKind === 'app-aware-padding' ? (
+          <AppAwareKeyboardPaddingView className="flex-1">
+            {renderKeyboardBody()}
+          </AppAwareKeyboardPaddingView>
+        ) : (
+          <KeyboardAvoidingView className="flex-1" behavior="padding">
+            {renderKeyboardBody()}
+          </KeyboardAvoidingView>
+        )}
 
-      {isComposerVisible ? (
-        <BlurBar className="border-t-0">
-          <View style={{ height: bottom }} />
-        </BlurBar>
-      ) : (
-        <View style={{ height: bottom }} className="bg-background" />
-      )}
+        {isComposerVisible ? (
+          <BlurBar className="border-t-0">
+            <View style={{ height: bottom }} />
+          </BlurBar>
+        ) : (
+          <View style={{ height: bottom }} className="bg-background" />
+        )}
 
-      {sheetMountState.mounted ? (
-        <SessionContextSheet
-          visible={sheetMountState.visible}
-          info={sheetMountState.info}
-          modelDisplay={contextModelAndProvider.model}
-          providerDisplay={contextModelAndProvider.provider}
-          totalCostMicrodollars={totalMicrodollars}
-          breakdownCostUsd={breakdownCostUsd}
-          messages={messages}
+        {sheetMountState.mounted ? (
+          <SessionContextSheet
+            visible={sheetMountState.visible}
+            info={sheetMountState.info}
+            modelDisplay={contextModelAndProvider.model}
+            providerDisplay={contextModelAndProvider.provider}
+            totalCostMicrodollars={totalMicrodollars}
+            breakdownCostUsd={breakdownCostUsd}
+            messages={messages}
+            modelOptions={modelOptions}
+            onClose={() => {
+              setOpenContextSheetIdentity(null);
+            }}
+          />
+        ) : null}
+
+        <MessageDetailsSheet
+          visible={detailsMessage !== null}
+          message={detailsMessage}
           modelOptions={modelOptions}
           onClose={() => {
-            setOpenContextSheetIdentity(null);
+            setDetailsMessage(null);
           }}
         />
-      ) : null}
 
-      <MessageDetailsSheet
-        visible={detailsMessage !== null}
-        message={detailsMessage}
-        modelOptions={modelOptions}
-        onClose={() => {
-          setDetailsMessage(null);
-        }}
-      />
+        {childSessionSheet.sheet ? (
+          <ChildSessionSheet
+            visible={childSessionSheet.visible}
+            sessionId={childSessionSheet.sheet.sessionId}
+            title={childSessionSheet.sheet.title}
+            getChildMessages={getChildMessages}
+            hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+            isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+            renderPart={props => <PartRenderer {...props} />}
+            onOpenChildSession={handleOpenChildSession}
+            onRetry={() => {
+              const openSheet = childSessionSheet.sheet;
+              if (!openSheet) {
+                return;
+              }
+              void manager.hydrateChildSession(openSheet.sessionId);
+            }}
+            onClose={handleCloseChildSession}
+            onDismiss={handleChildSheetDismiss}
+          />
+        ) : null}
 
-      {childSessionSheet.sheet ? (
-        <ChildSessionSheet
-          visible={childSessionSheet.visible}
-          sessionId={childSessionSheet.sheet.sessionId}
-          title={childSessionSheet.sheet.title}
-          getChildMessages={getChildMessages}
-          hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
-          isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
-          renderPart={props => <PartRenderer {...props} />}
-          onOpenChildSession={handleOpenChildSession}
-          onRetry={() => {
-            const openSheet = childSessionSheet.sheet;
-            if (!openSheet) {
-              return;
-            }
-            void manager.hydrateChildSession(openSheet.sessionId);
-          }}
-          onClose={handleCloseChildSession}
-          onDismiss={handleChildSheetDismiss}
-        />
-      ) : null}
-
-      {rename.isTitleInteractive && rename.isModalOpen ? (
-        <RenameModal
-          title="Rename session"
-          placeholder="Session name"
-          initialValue={rename.modalInitialValue}
-          onSave={handleRenameSave}
-          onClose={handleRenameClose}
-        />
-      ) : null}
-    </View>
+        {rename.isTitleInteractive && rename.isModalOpen ? (
+          <RenameModal
+            title="Rename session"
+            placeholder="Session name"
+            initialValue={rename.modalInitialValue}
+            onSave={handleRenameSave}
+            onClose={handleRenameClose}
+          />
+        ) : null}
+      </View>
+    </PartDetailSheetHost>
   );
 
   function renderKeyboardBody() {
@@ -946,6 +949,7 @@ export function SessionDetailContent({
               variant="outline"
               size="sm"
               accessibilityLabel="Continue in a new session"
+              disabled={isContinuing}
               onPress={handleContinueInNewSession}
             >
               <Text>Continue in a new session</Text>

@@ -1290,7 +1290,7 @@ importers:
         version: 7.0.0-dev.20260514.1
       jest:
         specifier: 30.3.0
-        version: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
+        version: 30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1942,8 +1942,8 @@ importers:
         specifier: 'catalog:'
         version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@kilocode/sdk':
-        specifier: 7.3.54
-        version: 7.3.54
+        specifier: 7.4.20
+        version: 7.4.20
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
@@ -1981,8 +1981,8 @@ importers:
   services/cloud-agent-next/wrapper:
     dependencies:
       '@kilocode/sdk':
-        specifier: 7.3.54
-        version: 7.3.54
+        specifier: 7.4.20
+        version: 7.4.20
       fuzzysort:
         specifier: 3.1.0
         version: 3.1.0
@@ -4657,11 +4657,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild/aix-ppc64@0.28.1':
     resolution: {integrity: sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ==}
@@ -5586,8 +5586,8 @@ packages:
   '@kilocode/sdk@7.2.52':
     resolution: {integrity: sha512-j8w6ewvo7dyu/qxjJAg0bcjHGUGGvIZ4F2f5tJnpMwLzPTAu26DJoO/08aoxf1BhfuZLzNS9tA2q+ZPdzPT8Jg==}
 
-  '@kilocode/sdk@7.3.54':
-    resolution: {integrity: sha512-A+g744DVuAHXSU3pu6BLe2AoxEh4fq7NdrYvlET3+waXSS0tG41Blr3ItCKSMLJH5M6C4rK2ZXi7plzkPNbdmA==}
+  '@kilocode/sdk@7.4.20':
+    resolution: {integrity: sha512-Dl1gBNAtZ3z8FWl4+Q08d7iP+mr8Rg2tqqn6kU9NJLlhuVtKUlp6PyIXqutam2zn+hu5xdRfbHwNauy4yHufmw==}
 
   '@lexical/clipboard@0.35.0':
     resolution: {integrity: sha512-ko7xSIIiayvDiqjNDX6fgH9RlcM6r9vrrvJYTcfGVBor5httx16lhIi0QJZ4+RNPvGtTjyFv4bwRmsixRRwImg==}
@@ -22109,7 +22109,7 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
 
-  '@kilocode/sdk@7.3.54':
+  '@kilocode/sdk@7.4.20':
     dependencies:
       cross-spawn: 7.0.6
 

@@ -32,7 +32,7 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   if (diffModel) {
     body = <ToolDiffPreview model={diffModel} partId={part.id} />;
   } else if (content.length > 0) {
-    body = <MonoScrollBlock content={content} maxLength={2000} textClassName="text-foreground" />;
+    body = <MonoScrollBlock content={content} textClassName="text-foreground" />;
   }
 
   return (

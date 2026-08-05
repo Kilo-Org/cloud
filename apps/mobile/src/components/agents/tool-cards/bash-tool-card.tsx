@@ -32,9 +32,7 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
           </Text>
         </View>
       ) : null}
-      {output ? (
-        <MonoScrollBlock content={output} maxLength={2000} textClassName="text-muted-foreground" />
-      ) : null}
+      {output ? <MonoScrollBlock content={output} textClassName="text-muted-foreground" /> : null}
       {error ? (
         <Text selectable={textSelectable} className="text-xs text-destructive">
           {error}

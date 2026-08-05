@@ -22,7 +22,6 @@ function EditFallbackBody({
       {oldString.length > 0 ? (
         <MonoScrollBlock
           content={oldString}
-          maxLength={1000}
           containerClassName="rounded bg-red-50 px-2 py-1 dark:bg-red-950"
           textClassName="text-red-700 dark:text-red-400"
         />
@@ -30,7 +29,6 @@ function EditFallbackBody({
       {newString.length > 0 ? (
         <MonoScrollBlock
           content={newString}
-          maxLength={1000}
           containerClassName="rounded bg-green-50 px-2 py-1 dark:bg-green-950"
           textClassName="text-green-700 dark:text-green-400"
         />

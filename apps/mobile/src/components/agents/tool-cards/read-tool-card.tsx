@@ -35,7 +35,7 @@ export function ReadToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
       {/* An image read's output is only "Image read successfully" — the image itself
           is the content, so the mono block would be noise (plan D10). */}
       {markdownPreview === undefined && !hasImages && output ? (
-        <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
+        <MonoScrollBlock content={output} textClassName="text-foreground" />
       ) : null}
       {error ? (
         <Text selectable={textSelectable} className="text-xs text-destructive">

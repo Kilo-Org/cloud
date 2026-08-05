@@ -37,6 +37,13 @@ export const CodingPlanQuotaWindowsSchema = z
 
 export type CodingPlanQuotaWindow = z.infer<typeof CodingPlanQuotaWindowSchema>;
 
+export const CodingPlanUsageSnapshotSchema = z.object({
+  fetchedAt: z.iso.datetime(),
+  windows: CodingPlanQuotaWindowsSchema,
+});
+
+export type CodingPlanUsageSnapshot = z.infer<typeof CodingPlanUsageSnapshotSchema>;
+
 export type CodingPlanUsageErrorCode = 'network' | 'http' | 'invalid_response' | 'application';
 
 // Thrown by provider usage adapters. The message is a safe generic user-facing

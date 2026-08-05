@@ -18,6 +18,7 @@ import {
   CodingPlanUsageError,
 } from '@/lib/coding-plans/usage-contract';
 import {
+  canQueryCodingPlanUsage,
   CodingPlanUsageEligibilityError,
   getCodingPlanUsageResponse,
 } from '@/lib/coding-plans/usage';
@@ -141,6 +142,7 @@ function toCodingPlanSubscriptionView(subscription: CodingPlanSubscriptionRow) {
     providerId: subscription.providerId,
     routeLabel: `${providerName} via Kilo Gateway`,
     features: plan?.features ?? [],
+    canQueryUsage: canQueryCodingPlanUsage(subscription),
     hasInstalledByokKey: subscription.installedByokKeyId !== null,
     status: subscription.status,
     billingPeriodDays: subscription.billingPeriodDays,

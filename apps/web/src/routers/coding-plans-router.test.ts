@@ -5,6 +5,7 @@ import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
+import { redisClient } from '@/lib/redis';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -21,6 +22,13 @@ jest.mock('ai', () => ({
   createGateway: jest.fn(() => jest.fn((modelId: string) => ({ modelId }))),
   generateText: jest.fn(),
 }));
+jest.mock('@/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+  },
+}));
 
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
@@ -30,6 +38,9 @@ const BYTEPLUS_PRO_PLAN_ID = 'byteplus-coding-plan-team-pro';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
 const mockedGenerateText = jest.mocked(generateText);
+const mockedRedisGet = jest.mocked(redisClient.get);
+const mockedRedisSet = jest.mocked(redisClient.set);
+const mockedRedisDel = jest.mocked(redisClient.del);
 
 function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.randomUUID()}`) {
   return `${key}::${upstreamPlanId}`;
@@ -56,6 +67,12 @@ function usageResponse() {
     { status: 200, headers: { 'content-type': 'application/json' } }
   );
 }
+
+beforeEach(() => {
+  mockedRedisGet.mockResolvedValue(null);
+  mockedRedisSet.mockResolvedValue('OK');
+  mockedRedisDel.mockResolvedValue(1);
+});
 
 afterEach(async () => {
   jest.restoreAllMocks();
@@ -313,6 +330,7 @@ describe('coding plans router', () => {
     });
 
     expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]).toMatchObject({ canQueryUsage: true });
     expect(detail).toMatchObject({
       id: activation.subscriptionId,
       planId: PLAN_ID,
@@ -321,6 +339,7 @@ describe('coding plans router', () => {
       providerId: 'minimax',
       routeLabel: 'MiniMax via Kilo Gateway',
       features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
+      canQueryUsage: true,
       hasInstalledByokKey: true,
       status: 'active',
       costKiloCredits: 20,
@@ -470,12 +489,17 @@ describe('coding plans router', () => {
       .update(coding_plan_subscriptions)
       .set({ status: 'canceled' })
       .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    const cacheReadsBeforeCancellation = mockedRedisGet.mock.calls.length;
     await expect(
       caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
     ).rejects.toMatchObject({
       code: 'PRECONDITION_FAILED',
       message: 'Coding Plan subscription is not eligible for usage.',
     });
+    expect(mockedRedisGet).toHaveBeenCalledTimes(cacheReadsBeforeCancellation);
+    await expect(
+      caller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
+    ).resolves.toMatchObject({ canQueryUsage: false });
   });
 
   it('fails safely for a corrupt inventory assignment without affecting database-only reads', async () => {

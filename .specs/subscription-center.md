@@ -26,6 +26,7 @@ Updated 2026-05-28 -- Coding Plans API key configuration summary.
 Updated 2026-05-28 -- Coding Plans billing history USD amount display.
 Updated 2026-06-05 -- KiloClaw final Commit term continuation behavior.
 Updated 2026-06-19 -- Current Coding Plan quota presentation and routing independence.
+Updated 2026-08-05 -- Current Coding Plan quota summary on live subscription cards.
 Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
 Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan exclusivity.
 Updated 2026-08-05 -- BytePlus Coding Plan Pro catalog requirements.
@@ -282,6 +283,9 @@ Commit names, prices, invoices, and credit deductions.
     subscription per configured provider ID. The Coding Plans group MUST
     display one Subscription Card for each non-terminal coding plan
     subscription, including a `past_due` subscription in its warning state.
+    When current upstream quota is supported and available, the live
+    Subscription Card SHOULD include a compact quota summary; a quota lookup
+    failure MUST NOT hide or replace the subscription metadata.
     Authenticated Kilo clients MAY reuse the same current personal subscription
     data for current-plan presentation outside the Subscription Center. These
     clients MUST NOT include terminal history, invoices, or billing history in
@@ -500,6 +504,10 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-08-05 -- Coding Plan quota summary
+
+- Allowed eligible live Coding Plan cards to show compact current upstream quota without letting quota failures hide subscription metadata.
 
 ### 2026-08-05 -- Close fresh KiloClaw instance provisioning surfaces
 

@@ -224,7 +224,7 @@ describe('container usage PostgreSQL application', () => {
     expect(segments).toHaveLength(3);
   });
 
-  it('settles paid personal usage once, emits threshold verdicts, and rejects another start below the floor', async () => {
+  it('settles paid personal usage once, stops at the floor, and rejects another start at the floor', async () => {
     const startEpochMs = Date.now();
     const paidContext = { ...context, instanceId: `paid-user-${suffix}`, sku: paidSkuId };
     const paidFingerprint = await usageContextFingerprint(paidContext);
@@ -313,7 +313,7 @@ describe('container usage PostgreSQL application', () => {
       startEpochMs,
       idempotencyKey: stopIdempotencyKey(paidContext.service, paidContext.instanceId, startEpochMs),
       seq: 2,
-      usageSinceLast: 500,
+      usageSinceLast: 495,
       reason: 'runtime_signal' as const,
       context: paidContext,
     };
@@ -323,17 +323,17 @@ describe('container usage PostgreSQL application', () => {
         stop,
         paidIntervalId,
         paidFingerprint,
-        startEpochMs + 510_000,
+        startEpochMs + 505_000,
         paidBillingConfig
       )
     ).resolves.toMatchObject({
-      budget: { verdict: 'stop', remainingMicrodollars: 4_950_000 },
+      budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
     });
     const [user] = await client.db
       .select({ used: kilocode_users.microdollars_used })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, userId));
-    expect(user?.used).toBe(5_100_000);
+    expect(user?.used).toBe(5_050_000);
 
     await expect(
       applyStartWithDb(

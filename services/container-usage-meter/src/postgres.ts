@@ -154,7 +154,7 @@ function budgetForRemaining(
   warnRemainingMicrodollars: number
 ): ApplyResult['budget'] {
   if (billingMode === 'shadow') return { verdict: 'continue' };
-  if (remainingMicrodollars < MINIMUM_REMAINING_MICRODOLLARS) {
+  if (remainingMicrodollars <= MINIMUM_REMAINING_MICRODOLLARS) {
     return {
       verdict: 'stop',
       remainingMicrodollars,
@@ -396,7 +396,7 @@ export async function applyStartWithDb(
     const billingMode = billingModeFor(billingConfig, input.service, input.subject);
     if (billingMode === 'paid') {
       const remaining = await balanceForSubject(tx, input.subject, true);
-      if (remaining < MINIMUM_REMAINING_MICRODOLLARS) {
+      if (remaining <= MINIMUM_REMAINING_MICRODOLLARS) {
         return {
           kind: 'rejected',
           code: 'insufficient_credits',

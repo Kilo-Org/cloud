@@ -103,6 +103,10 @@ vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/kiloclaw-tab-ownership', () => ({
+  clearKiloClawOwned: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));

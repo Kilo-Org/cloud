@@ -16,6 +16,7 @@ import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { clearKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
     await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
     await clearLastActiveInstance();
+    await clearKiloClawOwned();
     await clearRecentPrs();
     await clearViewedFiles();
     clearAgentModelPreference();

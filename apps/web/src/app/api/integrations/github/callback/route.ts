@@ -38,6 +38,29 @@ import { getEnvVariable } from '@/lib/dotenvx';
 const appendQueryParam = (path: string, queryParam: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
 
+type InstallStateClass =
+  | 'none'
+  | 'legacy_org'
+  | 'legacy_user'
+  | 'bot_link'
+  | 'install_token'
+  | 'unknown';
+
+/**
+ * Classifies a GitHub callback state value without revealing its contents.
+ * Database install states are bearer tokens, so diagnostics must never carry
+ * the raw value — only its shape class.
+ */
+function classifyInstallState(rawState: string | null): InstallStateClass {
+  if (!rawState) return 'none';
+  if (rawState.startsWith('org_')) return 'legacy_org';
+  if (rawState.startsWith('user_')) return 'legacy_user';
+  if (rawState.includes('.')) return 'bot_link';
+  // Database install tokens are 32 random bytes, base64url-encoded (no dots).
+  if (/^[A-Za-z0-9_-]{16,}$/.test(rawState)) return 'install_token';
+  return 'unknown';
+}
+
 function htmlPage(title: string, message: string, status = 200): Response {
   return new Response(
     `<!DOCTYPE html>
@@ -143,7 +166,7 @@ export async function GET(request: NextRequest) {
         captureMessage('GitHub callback using legacy plaintext install state', {
           level: 'info',
           tags: { endpoint: 'github/callback', source: 'legacy_install_state' },
-          extra: { rawState, installationId },
+          extra: { installationId, stateClass: classifyInstallState(rawState) },
         });
         return await handleLegacyInstallFlow(request, user, rawState, installationId, setupAction);
       }
@@ -152,7 +175,7 @@ export async function GET(request: NextRequest) {
       captureMessage('GitHub callback with legacy state refused (flag disabled)', {
         level: 'warning',
         tags: { endpoint: 'github/callback', source: 'legacy_install_state_disabled' },
-        extra: { rawState, installationId },
+        extra: { installationId, stateClass: classifyInstallState(rawState) },
       });
       return NextResponse.redirect(new URL('/', APP_URL));
     }
@@ -177,7 +200,12 @@ export async function GET(request: NextRequest) {
     captureMessage('GitHub callback with unrecognized state', {
       level: 'warning',
       tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-      extra: { installationId, rawState, allParams: Object.fromEntries(searchParams.entries()) },
+      extra: {
+        installationId,
+        setupAction,
+        stateClass: classifyInstallState(rawState),
+        reason: 'state_not_bot_link_or_install_token',
+      },
     });
     return NextResponse.redirect(new URL('/', APP_URL));
   } catch (error) {
@@ -194,7 +222,8 @@ export async function GET(request: NextRequest) {
       extra: {
         installationId: searchParams.get('installation_id'),
         setupAction: searchParams.get('setup_action'),
-        rawState,
+        stateClass: classifyInstallState(rawState),
+        reason: 'callback_flow_error',
       },
     });
 
@@ -279,8 +308,6 @@ async function handleLegacyInstallFlow(
   installationId: string,
   setupAction: string | null
 ): Promise<Response> {
-  const searchParams = request.nextUrl.searchParams;
-
   // Parse owner from state (with optional |return=<path> suffix)
   const { ownerToken, returnTo } = parseStateReturn(rawState);
   let owner: Owner;
@@ -296,7 +323,11 @@ async function handleLegacyInstallFlow(
     captureMessage('GitHub callback missing or invalid owner in state', {
       level: 'warning',
       tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-      extra: { installationId, rawState, allParams: Object.fromEntries(searchParams.entries()) },
+      extra: {
+        installationId,
+        stateClass: classifyInstallState(rawState),
+        reason: 'owner_not_org_or_user_prefix',
+      },
     });
     return NextResponse.redirect(new URL('/', APP_URL));
   }
@@ -469,8 +500,8 @@ async function handleCoreInstallFlow(params: {
       tags: { endpoint: 'github/callback', source: 'github_app_installation' },
       extra: {
         setupAction,
-        rawState: searchParams.get('state'),
-        allParams: Object.fromEntries(searchParams.entries()),
+        stateClass: classifyInstallState(searchParams.get('state')),
+        reason: 'missing_installation_id',
       },
     });
 

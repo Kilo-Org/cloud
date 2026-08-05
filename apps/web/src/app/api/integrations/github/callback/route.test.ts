@@ -16,7 +16,9 @@ import {
 } from '@/lib/integrations/db/platform-integrations';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
+import { parseStateReturn } from '@/lib/integrations/validate-return-path';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
@@ -79,6 +81,15 @@ jest.mock('@/lib/dotenvx', () => ({
     return value;
   },
 }));
+jest.mock('@/lib/integrations/validate-return-path', () => {
+  const actual = jest.requireActual('@/lib/integrations/validate-return-path');
+  return {
+    ...actual,
+    // Wrapped so tests can force the invalid-owner branch while every other
+    // path keeps the real return-path parsing.
+    parseStateReturn: jest.fn(actual.parseStateReturn),
+  };
+});
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedVerifyGitHubBotLinkState = jest.mocked(verifyGitHubBotLinkState);
@@ -93,6 +104,9 @@ const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 const mockedConsumeInstallState = jest.mocked(consumeInstallState);
 const mockedGetEnvVariable = jest.mocked(getEnvVariable);
 const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
+const mockedCaptureException = jest.mocked(captureException);
+const mockedCaptureMessage = jest.mocked(captureMessage);
+const mockedParseStateReturn = jest.mocked(parseStateReturn);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
@@ -1095,5 +1109,214 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     expect(nonAdminLogs[0][0]).not.toContain('code_absent');
 
     logSpy.mockRestore();
+  });
+});
+
+describe('GET /api/integrations/github/callback Sentry redaction', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: USER_ID,
+        google_user_email: 'mobile-e2e@example.com',
+        google_user_name: 'Mobile E2E',
+      },
+      authFailedResponse: null,
+    } as never);
+    mockedVerifyGitHubBotLinkState.mockReturnValue(null);
+    mockedConsumeInstallState.mockResolvedValue(null);
+    mockedGetEnvVariable.mockReturnValue('true');
+    mockedCreateAppAuth.mockReturnValue(
+      jest.fn(async () => ({ token: 'github-app-token' })) as never
+    );
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => ({
+              data: {
+                account: { id: 12_345, login: 'securexg' },
+                created_at: '2026-07-09T19:00:00.000Z',
+                events: ['issues'],
+                permissions: { contents: 'write' },
+                repository_selection: 'all',
+              },
+            })),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+  });
+
+  test('unrecognized-state warning does not include the raw state token', async () => {
+    const RAW_TOKEN = `sentry-redaction-unknown-${Date.now()}`;
+    mockedConsumeInstallState.mockResolvedValue(null);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/');
+    expect(mockedCaptureMessage).toHaveBeenCalled();
+    const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
+    // The raw state is a bearer token and must never reach Sentry.
+    expect(serializedMessage).not.toContain(RAW_TOKEN);
+    // Safe diagnostics survive: state class, reason, and the callback ids.
+    expect(serializedMessage).toContain('install_token');
+    expect(serializedMessage).toContain('state_not_bot_link_or_install_token');
+    expect(serializedMessage).toContain(INSTALLATION_ID);
+  });
+
+  test('catch-path exception does not include the raw state token', async () => {
+    const RAW_TOKEN = `sentry-redaction-catch-${Date.now()}`;
+    mockedConsumeInstallState.mockResolvedValue({
+      token: RAW_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: null,
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => {
+              throw new Error('get installation failed');
+            }),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/?error=installation_failed');
+    expect(mockedCaptureException).toHaveBeenCalled();
+    const serializedException = JSON.stringify(mockedCaptureException.mock.calls);
+    // The raw state is a bearer token and must never reach Sentry.
+    expect(serializedException).not.toContain(RAW_TOKEN);
+    // Safe diagnostics survive: state class, reason, and the callback ids.
+    expect(serializedException).toContain('install_token');
+    expect(serializedException).toContain('callback_flow_error');
+    expect(serializedException).toContain(INSTALLATION_ID);
+  });
+
+  test('legacy-enabled warning does not include the raw state token', async () => {
+    const RAW_TOKEN = `org_sentry-redaction-legacy-${Date.now()}`;
+    mockedGetEnvVariable.mockReturnValue('true');
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockedCaptureMessage).toHaveBeenCalled();
+    const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
+    // The raw state is a bearer token and must never reach Sentry.
+    expect(serializedMessage).not.toContain(RAW_TOKEN);
+    // Safe diagnostics survive: state class and the callback id.
+    expect(serializedMessage).toContain('legacy_org');
+    expect(serializedMessage).toContain('legacy_install_state');
+    expect(serializedMessage).toContain(INSTALLATION_ID);
+  });
+
+  test('legacy-refused warning does not include the raw state token', async () => {
+    const RAW_TOKEN = `user_sentry-redaction-refused-${Date.now()}`;
+    mockedGetEnvVariable.mockReturnValue('false');
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/');
+    expect(mockedCaptureMessage).toHaveBeenCalled();
+    const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
+    // The raw state is a bearer token and must never reach Sentry.
+    expect(serializedMessage).not.toContain(RAW_TOKEN);
+    // Safe diagnostics survive: state class and the callback id.
+    expect(serializedMessage).toContain('legacy_user');
+    expect(serializedMessage).toContain('legacy_install_state_disabled');
+    expect(serializedMessage).toContain(INSTALLATION_ID);
+  });
+
+  test('missing-installation diagnostic does not include the raw state token or params', async () => {
+    const RAW_TOKEN = `user_${USER_ID}`;
+    mockedGetEnvVariable.mockReturnValue('true');
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?setup_action=install&state=${RAW_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/integrations/github?error=missing_installation_id');
+    expect(mockedCaptureMessage).toHaveBeenCalled();
+    const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
+    // The raw state is a bearer token and must never reach Sentry.
+    expect(serializedMessage).not.toContain(RAW_TOKEN);
+    // Safe diagnostics survive: state class, reason, and the setup action.
+    expect(serializedMessage).toContain('legacy_user');
+    expect(serializedMessage).toContain('missing_installation_id');
+    expect(serializedMessage).toContain('setupAction');
+  });
+
+  test('invalid-owner diagnostic does not include the raw state token or params', async () => {
+    const RAW_TOKEN = `user_sentry-redaction-invalid-owner-${Date.now()}`;
+    mockedGetEnvVariable.mockReturnValue('true');
+    // Force the defensive invalid-owner branch inside handleLegacyInstallFlow,
+    // which is unreachable through the legacy prefix gate alone.
+    mockedParseStateReturn.mockReturnValue({ ownerToken: 'unrecognized', returnTo: null });
+
+    try {
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/');
+      expect(mockedCaptureMessage).toHaveBeenCalled();
+      const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
+      // The raw state is a bearer token and must never reach Sentry.
+      expect(serializedMessage).not.toContain(RAW_TOKEN);
+      // Safe diagnostics survive: state class, reason, and the callback id.
+      expect(serializedMessage).toContain('legacy_user');
+      expect(serializedMessage).toContain('owner_not_org_or_user_prefix');
+      expect(serializedMessage).toContain(INSTALLATION_ID);
+    } finally {
+      const realParseStateReturn = jest.requireActual('@/lib/integrations/validate-return-path')
+        .parseStateReturn as (rawState: string | null) => {
+        ownerToken: string;
+        returnTo: string | null;
+      };
+      mockedParseStateReturn.mockImplementation(realParseStateReturn);
+    }
   });
 });

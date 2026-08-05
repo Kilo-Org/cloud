@@ -50,7 +50,7 @@ export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
 } as const;
 
 export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH = {
-  xhigh: { reasoning: { enabled: false, effort: 'xhigh' } },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
   medium: { reasoning: { enabled: true, effort: 'medium' } },
   low: { reasoning: { enabled: true, effort: 'low' } },

@@ -32,7 +32,7 @@ Updated 2026-05-12 -- retired current Standard first-month discount.
 Updated 2026-05-18 -- organization hard-expiry suspension and recovery contract.
 Updated 2026-05-28 -- exceptional personal Stripe EFW cancellation and suspension contract.
 Updated 2026-06-05 -- retirement of new and renewing Commit subscriptions.
-Updated 2026-08-05 -- closed fresh personal subscription signup.
+Updated 2026-08-05 -- closed fresh KiloClaw instance provisioning.
 
 ## Conventions
 
@@ -146,11 +146,13 @@ Current organization-managed bootstrap rows remain a temporary
 managed-active funding carveout, but their compute lifecycle is still
 subordinate to organization trial and seat entitlement.
 
-Fresh personal KiloClaw signup is closed. A user without an existing
-canonical personal KiloClaw subscription MUST NOT provision a personal
-instance or receive a new trial subscription. Existing canonical personal
-subscription rows retain their current trial conversion, renewal,
-reactivation, management, and safe reprovision behavior. Legacy
+Fresh KiloClaw instance provisioning is closed in personal and organization
+contexts. A current access-granting subscription in the requested ownership
+context is REQUIRED before replacement infrastructure may be provisioned.
+Canceled, expired, unpaid, suspended, or purely historical subscription rows
+MUST NOT authorize a new instance. Existing live instances and current
+subscription rows retain their management, renewal, and reconfiguration
+behavior. Legacy
 `kiloclaw_earlybird_purchases` rows without canonical subscription rows
 MUST NOT mint fresh trial access and instead require manual
 remediation. Canonical earlybird subscription rows continue to grant
@@ -206,26 +208,28 @@ lapses, with email notifications at each stage.
     price increase. Larger-machine and tiered-pricing selection require
     a future spec change.
 
-### Fresh Personal Subscription Closure
+### Fresh Instance Provisioning Closure
 
-1. A user without an existing canonical personal KiloClaw subscription
-   MUST NOT provision a personal KiloClaw instance or create a fresh trial
-   subscription.
-2. Personal KiloClaw surfaces MUST NOT show onboarding, checkout, or
-   enrollment actions to a user without an existing canonical personal
-   subscription. They MUST instead state that new subscriptions are
-   unavailable. Navigation and product-promotion surfaces MUST omit KiloClaw
-   entirely for those users; a directly opened KiloClaw route MAY show the
-   unavailable state.
-3. Existing canonical personal subscriptions MUST retain their current
-   access, conversion, renewal, reactivation, cancellation, management,
-   and safe reprovision behavior.
-4. Provisioning services and post-checkout fulfillment paths MUST enforce
-   the same canonical-subscription boundary before creating personal
-   infrastructure or subscription state, including stale or already-completed
-   checkout sessions.
-5. This closure does not change organization-managed KiloClaw provisioning
-   or entitlement behavior.
+1. A current access-granting KiloClaw subscription in the requested personal
+   or organization context is REQUIRED before provisioning a replacement
+   KiloClaw instance.
+2. Canceled, expired, unpaid, suspended, transferred-out, or purely historical
+   subscription rows MUST NOT authorize provisioning. Subscription history
+   alone is insufficient.
+3. KiloClaw surfaces MUST NOT show onboarding, checkout, or enrollment actions
+   when the requested context has no current subscription. They MUST instead
+   state that a current subscription is required. Navigation and product-promotion
+   surfaces MUST omit KiloClaw entirely for those contexts; a directly opened
+   KiloClaw route MAY show the unavailable state.
+4. Existing live instances and current subscriptions MUST retain their access,
+   conversion, renewal, reactivation, cancellation, management, and
+   configuration-update behavior.
+5. Provisioning services and post-checkout fulfillment paths MUST enforce the
+   same current-subscription boundary before creating infrastructure or
+   subscription state, including stale or already-completed checkout sessions.
+6. Provisioning MUST preserve the existing current subscription context; it
+   MUST NOT create a new trial or managed-active subscription from canceled or
+   historical rows.
 
 ### Pricing Versions and Legacy Lineages
 
@@ -266,12 +270,11 @@ lapses, with email notifications at each stage.
    receive a fresh current-price subscription row, not a renewed legacy
    lineage.
 10. Price and display calculations MUST use the subscription row's
-    price version, or the intended price version for a checkout or
+    price version, or the intended price version for an eligible checkout or
     enrollment that has not created a row yet. Existing live legacy
-    subscriptions MUST show legacy prices and legacy instance
-    entitlement; fresh current signups MUST show current prices and
-    current instance entitlement. Canceled history MUST NOT cause fresh
-    subscribe surfaces to show legacy pricing.
+    subscriptions MUST show legacy prices and legacy instance entitlement.
+    Canceled history MUST NOT cause subscription surfaces to show legacy
+    pricing or expose replacement-instance actions.
 11. Self-service default instance size and maximum self-service size
     MUST come from the active or intended price version. Existing
     running instances MUST NOT be actively resized solely because of
@@ -522,18 +525,18 @@ rules resolve conflicts.
    manually subscribe to regain access.
 6. The system MUST deny access and return a forbidden error when none of
    the above conditions are met.
-7. All instance lifecycle operations (start, stop, destroy, provision,
-   configuration changes) MUST be gated behind the access check, except
-   for provisioning which uses the trial-bootstrap flow.
+7. Instance lifecycle operations that create infrastructure MUST require a
+   current paid, locally settled subscription. Existing-instance start, stop,
+   destroy, and configuration changes remain governed by their existing access
+   and entitlement checks.
 
 ### Subscription Checkout (Stripe)
 
 1. The system MUST reject a checkout request if the user already has a
    subscription in active, past-due, or unpaid status.
-2. The system MUST allow checkout when the existing subscription status
-   is trialing or canceled. Checkout from a trialing live lineage MUST
-   use that lineage's price version. Checkout after canceled history
-   MUST create a fresh current-price subscription row.
+2. Checkout MUST NOT create a new KiloClaw instance. Any checkout action
+   shown for an existing live instance MUST remain anchored to that instance;
+   canceled history MUST NOT authorize replacement infrastructure.
 3. The system MUST verify with the payment provider that no subscription
    in active or trialing (delayed-billing) status already exists for the
    customer before creating a new checkout session, to guard against
@@ -592,11 +595,9 @@ rules resolve conflicts.
 1. The system MUST reject a credit enrollment request if the user
    already has a subscription in active, past-due, or unpaid status.
    This is the same guard as Subscription Checkout rule 1.
-2. The system MUST allow credit enrollment when the existing
-   subscription status is trialing or canceled. Enrollment from a
-   trialing live lineage MUST use that lineage's price version.
-   Enrollment after canceled history MUST create a fresh current-price
-   subscription row.
+2. Credit enrollment MUST NOT provision replacement infrastructure.
+   Enrollment may update billing for an existing live instance, but canceled
+   history MUST NOT authorize a new instance or successor row.
 3. The system MUST NOT apply a built-in first-paid-month Standard
    discount for fresh current-price credit enrollment. It MUST apply a
    first-paid-month discounted Standard price only when enrolling an
@@ -1524,10 +1525,11 @@ rows renew.
 
 ### Changelog
 
-#### 2026-08-05 -- Close fresh personal subscription signup
+#### 2026-08-05 -- Close fresh KiloClaw instance provisioning
 
-- Blocked personal provisioning and trial creation for users without an existing canonical personal KiloClaw subscription.
-- Removed personal onboarding and enrollment actions for those users while preserving existing subscription lifecycle and organization-managed behavior.
+- Required a current access-granting subscription in the requested personal or organization context before replacement instance provisioning.
+- Blocked canceled and historical rows from authorizing new infrastructure or subscription bootstrap.
+- Removed onboarding and enrollment actions from ineligible contexts while preserving existing live instances and current subscription management.
 
 #### 2026-06-05 -- Retire new and renewing Commit subscriptions
 

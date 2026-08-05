@@ -9,10 +9,10 @@ export function KiloClawSignupUnavailable() {
         <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-full">
           <CircleOff aria-hidden="true" className="size-5" />
         </div>
-        <CardTitle>New KiloClaw subscriptions are unavailable</CardTitle>
+        <CardTitle>New KiloClaw instances are unavailable</CardTitle>
         <CardDescription>
-          KiloClaw is no longer accepting new subscriptions. Existing subscriptions continue as
-          normal.
+          A current KiloClaw subscription is required to provision an instance. Existing instances
+          and subscriptions continue as normal.
         </CardDescription>
       </CardHeader>
     </Card>

@@ -29,7 +29,7 @@ Updated 2026-06-19 -- Current Coding Plan quota presentation and routing indepen
 Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
 Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan exclusivity.
 Updated 2026-08-05 -- BytePlus Coding Plan Pro catalog requirements.
-Updated 2026-08-05 -- closed fresh personal KiloClaw signup surfaces.
+Updated 2026-08-05 -- closed fresh KiloClaw instance provisioning surfaces.
 
 ## Conventions
 
@@ -500,10 +500,11 @@ not yet enforced in the current codebase:
 
 ## Changelog
 
-### 2026-08-05 -- Close fresh personal KiloClaw signup surfaces
+### 2026-08-05 -- Close fresh KiloClaw instance provisioning surfaces
 
-- Replaced KiloClaw signup offers with an unavailable notice for users without canonical personal subscription history.
-- Preserved enrollment, recovery, and management surfaces for existing personal subscription history.
+- Replaced KiloClaw signup offers with an unavailable notice when the requested personal or organization context lacks a current access-granting subscription.
+- Prevented canceled and historical subscription rows from presenting replacement-instance actions.
+- Preserved management surfaces for existing live instances and current subscriptions.
 
 ### 2026-07-14 -- Coding Plans installed keys made read-only
 

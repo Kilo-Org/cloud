@@ -334,6 +334,8 @@ export default function OrganizationAppSidebar({
       : 'absent'
     : 'unknown';
   const hasKiloClawInstance = kiloClawInstanceState === 'present';
+  const shouldShowKiloClaw =
+    kiloClawNavStateQuery.isSuccess && kiloClawNavStateQuery.data.hasCurrentSubscription;
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
   const [sidebarMenu, setSidebarMenu] = useState<'main' | 'kiloClaw'>(
     isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main'
@@ -350,17 +352,18 @@ export default function OrganizationAppSidebar({
     onClick?: () => void;
     isActive: boolean;
     suffixIcon?: React.ElementType;
-  }> = hasKiloClawInstance
-    ? [
-        {
-          title: 'KiloClaw',
-          icon: MessageSquare,
-          onClick: () => setSidebarMenu('kiloClaw'),
-          isActive: isKiloClawPath,
-          suffixIcon: ChevronRight,
-        },
-      ]
-    : [];
+  }> =
+    shouldShowKiloClaw && hasKiloClawInstance
+      ? [
+          {
+            title: 'KiloClaw',
+            icon: MessageSquare,
+            onClick: () => setSidebarMenu('kiloClaw'),
+            isActive: isKiloClawPath,
+            suffixIcon: ChevronRight,
+          },
+        ]
+      : [];
 
   const backItems: Array<{
     title: string;

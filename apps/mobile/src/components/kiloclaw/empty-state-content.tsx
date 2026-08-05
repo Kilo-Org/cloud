@@ -53,8 +53,8 @@ export function EmptyStateContent({
     return (
       <EmptyState
         icon={Server}
-        title="New KiloClaw subscriptions are unavailable"
-        description="KiloClaw is no longer accepting new subscriptions. Existing subscribers can continue managing their service."
+        title="New KiloClaw instances are unavailable"
+        description="A current KiloClaw subscription is required to provision an instance. Existing instances and subscriptions continue as normal."
       />
     );
   }

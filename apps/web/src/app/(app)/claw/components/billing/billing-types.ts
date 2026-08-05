@@ -343,9 +343,9 @@ export function getKiloPassHostingRecoveryCopy(reason: KiloPassHostingRecoveryRe
       };
     case 'signup_unavailable':
       return {
-        title: 'New KiloClaw subscriptions are unavailable',
+        title: 'New KiloClaw instances are unavailable',
         description:
-          'Your Kilo Pass credits are ready, but this checkout cannot create a first KiloClaw subscription.',
+          'Your Kilo Pass credits are ready, but a current KiloClaw subscription is required to provision an instance.',
         destination: '/profile',
         destinationLabel: 'Go to profile',
         canRetry: false,

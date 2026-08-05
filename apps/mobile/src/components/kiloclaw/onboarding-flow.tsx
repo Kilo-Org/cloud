@@ -389,11 +389,11 @@ export function OnboardingFlow() {
       unavailableContent = (
         <View className="items-center gap-2 px-6">
           <Text className="text-center text-2xl font-semibold">
-            New KiloClaw subscriptions are unavailable
+            New KiloClaw instances are unavailable
           </Text>
           <Text variant="muted" className="text-center text-base">
-            KiloClaw is no longer accepting new subscriptions. Existing subscribers can continue
-            managing their service.
+            A current KiloClaw subscription is required to provision an instance. Existing instances
+            and subscriptions continue as normal.
           </Text>
         </View>
       );

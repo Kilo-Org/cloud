@@ -330,10 +330,13 @@ describe('platform provision bootstrap quarantine', () => {
     const { env, provision, beginFreshProvision } = makeEnv();
     mockGetWorkerDb.mockReturnValue(createWorkerDb());
     mockResolveProvisionEntitlementWithFallback.mockRejectedValueOnce(
-      Object.assign(new Error('New KiloClaw subscriptions are unavailable.'), {
-        status: 403,
-        code: 'new_kiloclaw_subscriptions_unavailable',
-      })
+      Object.assign(
+        new Error('A current KiloClaw subscription is required to provision an instance.'),
+        {
+          status: 403,
+          code: 'new_kiloclaw_instances_unavailable',
+        }
+      )
     );
 
     const response = await platform.request(

@@ -906,7 +906,7 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
     });
   });
 
-  it('resolves org provisioning entitlement for a hard-expired org with paid seat state', async () => {
+  it('rejects org provisioning entitlement without a current KiloClaw subscription', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
     const { db } = createFreshInsertDb({
@@ -920,6 +920,52 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
           },
         ],
         [{ subscriptionStatus: 'past_due' }],
+        [],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      await expect(
+        resolveProvisionEntitlement(createEnv(), {
+          userId: 'user-1',
+          orgId: '22222222-2222-4222-8222-222222222222',
+        })
+      ).rejects.toMatchObject({
+        code: 'new_kiloclaw_instances_unavailable',
+        status: 403,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resolves org provisioning entitlement for a current destroyed KiloClaw subscription', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const { db } = createFreshInsertDb({
+      selectRows: [
+        [
+          {
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2026-05-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
+          },
+        ],
+        [{ subscriptionStatus: 'past_due' }],
+        [
+          {
+            subscription: createTransferSource({
+              instance_id: 'instance-old-org',
+              stripe_subscription_id: null,
+              stripe_schedule_id: null,
+            }),
+            instance: { id: 'instance-old-org', destroyedAt: '2026-05-12T00:00:00.000Z' },
+          },
+        ],
       ],
       insertFirstReturningRows: [],
       reselectAfterConflictRows: [],
@@ -1024,9 +1070,9 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
         orgId: null,
       })
     ).rejects.toMatchObject({
-      code: 'new_kiloclaw_subscriptions_unavailable',
+      code: 'new_kiloclaw_instances_unavailable',
       status: 403,
-      message: 'New KiloClaw subscriptions are unavailable.',
+      message: 'A current KiloClaw subscription is required to provision an instance.',
     });
     expect(insertValues).toHaveLength(0);
   });
@@ -1042,13 +1088,13 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
     await expect(
       resolveProvisionEntitlement(createEnv(), { userId: 'user-1', orgId: null })
     ).rejects.toMatchObject({
-      code: 'new_kiloclaw_subscriptions_unavailable',
+      code: 'new_kiloclaw_instances_unavailable',
       status: 403,
-      message: 'New KiloClaw subscriptions are unavailable.',
+      message: 'A current KiloClaw subscription is required to provision an instance.',
     });
   });
 
-  it('personal fresh-insert after canceled legacy history creates a current-version trial', async () => {
+  it('rejects personal provisioning after canceled subscription history', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-12T00:00:00.000Z'));
     const canceledLegacyRow = {
@@ -1083,21 +1129,6 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
       created_at: '2026-04-01T00:00:00.000Z',
       updated_at: '2026-05-01T00:00:00.000Z',
     };
-    const createdRow = {
-      ...canceledLegacyRow,
-      id: 'sub-current-trial',
-      instance_id: 'instance-new',
-      plan: 'trial',
-      status: 'trialing',
-      kiloclaw_price_version: '2026-05-10',
-      payment_source: null,
-      current_period_start: null,
-      current_period_end: null,
-      trial_started_at: '2026-05-12T00:00:00.000Z',
-      trial_ends_at: '2026-05-13T00:00:00.000Z',
-      created_at: '2026-05-12T00:00:00.000Z',
-      updated_at: '2026-05-12T00:00:00.000Z',
-    };
     const { db, insertValues } = createFreshInsertDb({
       selectRows: [
         [],
@@ -1108,25 +1139,23 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
         ],
         [],
       ],
-      insertFirstReturningRows: [createdRow],
+      insertFirstReturningRows: [],
       reselectAfterConflictRows: [],
     });
     mockGetWorkerDb.mockReturnValue(db);
 
     try {
-      const result = await bootstrapProvisionSubscription(createEnv(), {
-        userId: 'user-1',
-        instanceId: 'instance-new',
-        orgId: null,
-      });
-
-      expect(result).toEqual(createdRow);
-      expect(insertValues[0]).toEqual(
-        expect.objectContaining({
-          kiloclaw_price_version: '2026-05-10',
-          trial_ends_at: '2026-05-13T00:00:00.000Z',
+      await expect(
+        bootstrapProvisionSubscription(createEnv(), {
+          userId: 'user-1',
+          instanceId: 'instance-new',
+          orgId: null,
         })
-      );
+      ).rejects.toMatchObject({
+        code: 'new_kiloclaw_instances_unavailable',
+        status: 403,
+      });
+      expect(insertValues).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }
@@ -1152,7 +1181,7 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
         orgId: null,
       })
     ).rejects.toMatchObject({
-      code: 'new_kiloclaw_subscriptions_unavailable',
+      code: 'new_kiloclaw_instances_unavailable',
       status: 403,
     });
 
@@ -1205,6 +1234,16 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
           },
         ],
         [],
+        [
+          {
+            subscription: createTransferSource({
+              instance_id: 'instance-old-org',
+              stripe_subscription_id: null,
+              stripe_schedule_id: null,
+            }),
+            instance: { id: 'instance-old-org', destroyedAt: '2026-04-15T00:00:00.000Z' },
+          },
+        ],
         [winnerRow],
         [
           {

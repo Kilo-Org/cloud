@@ -118,10 +118,7 @@ group by u.id, ev.properties.apiProvider
 limit 5e5
 `;
 
-export const DEPRECATED_AUTO_MODEL_IDS = [
-  'kilo-auto/frontier',
-  'kilo-auto/balanced',
-] as const;
+export const DEPRECATED_AUTO_MODEL_IDS = ['kilo-auto/frontier', 'kilo-auto/balanced'] as const;
 
 const DEPRECATED_AUTO_MODELS_QUERY = `
 select distinct kilo_user_id, auto_model
@@ -250,10 +247,7 @@ export async function syncByokProviderNotificationsToRedis(
 ): Promise<SyncNotificationAudienceResult> {
   const rows = await fetchRows();
   const byUser = groupProvidersByUser(rows);
-  await writeNotificationAudienceEntries(
-    [...byUser.entries()],
-    byokProvidersNotificationRedisKey
-  );
+  await writeNotificationAudienceEntries([...byUser.entries()], byokProvidersNotificationRedisKey);
 
   return { rowCount: rows.length, userCount: byUser.size };
 }

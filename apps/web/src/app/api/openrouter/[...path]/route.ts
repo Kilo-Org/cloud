@@ -88,6 +88,7 @@ import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
+  KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
@@ -295,14 +296,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     const efficientDecision =
-      requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id
+      requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
+      requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id
         ? async () => {
             const { user, authFailedResponse, organizationId } = await authPromise;
             // The classifier is a paid call on Kilo's own credential. Skip it
-            // for unauthenticated requests: kilo-auto/efficient resolves to a
+            // for unauthenticated requests: auto-routed models resolve to a
             // paid model, so an unauthenticated caller is rejected downstream
             // regardless, and a null decision simply falls back to balanced.
-            // This stops anonymous/abusive traffic from repeatedly spending
+            // This stops anonymous or abusive traffic from repeatedly spending
             // Kilo-funded classification with no user to attribute it to.
             if (!user || authFailedResponse) return null;
             const { settings, plan } = await balanceAndSettingsPromise;
@@ -520,7 +522,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             fraudHeaders,
             organizationId,
             provider: 'openrouter',
-            requested_model: KILO_AUTO_EFFICIENT_MODEL.id,
+            requested_model: requestedModelLowerCased,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -554,7 +556,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
           };
           await logMicrodollarUsage(classifierStats, classifierContext);
         } catch (error) {
-          console.error('Failed to bill classifier cost for kilo-auto/efficient', error);
+          console.error('Failed to bill classifier cost for auto routing', error);
         }
       })()
     );

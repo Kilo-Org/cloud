@@ -12,6 +12,7 @@ import { resolveAutoModel } from './resolution';
 import {
   BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
+  KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
@@ -38,6 +39,21 @@ const sampleDecision: AutoRoutingDecision = {
 };
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {
+  it('resolves kilo-auto/balanced as an alias of kilo-auto/efficient', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_BALANCED_MODEL.id,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => sampleDecision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: { model: sampleDecision.model } });
+  });
+
   it('resolves to decision.model when the thunk returns a decision', async () => {
     const result = await resolveAutoModel(
       {

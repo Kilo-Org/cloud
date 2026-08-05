@@ -54,8 +54,7 @@ type ResolveAutoModelParams = {
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
-  // Lazily fetches the auto-routing worker's decision; only set for
-  // kilo-auto/efficient requests (route.ts owns the request-body capture).
+  // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   organizationContext?: Promise<{
     organizationId?: string;
@@ -308,7 +307,7 @@ export async function resolveAutoModel(
       },
     };
   }
-  if (model === KILO_AUTO_EFFICIENT_MODEL.id) {
+  if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = resolveEfficientDecisionModel(decision);
@@ -319,12 +318,11 @@ export async function resolveAutoModel(
       // with implicit defaults — same balanced fallback as the no-decision path.
       return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
     }
-    // Static fallback when the worker is slow/unavailable: same model as
-    // balanced so an efficient request never degrades below balanced.
+    // Static fallback when the worker is slow or unavailable.
     return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
   }
   const mode = resolveMode(modeHeader, featureHeader);
-  if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
+  if (model === KILO_AUTO_LEGACY_MODEL) {
     if (mode === 'claw' && featureHeader === 'kiloclaw') {
       const user = await userPromise;
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {

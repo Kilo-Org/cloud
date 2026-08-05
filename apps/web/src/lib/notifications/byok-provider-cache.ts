@@ -78,6 +78,9 @@ export const BYOK_PROVIDER_NOTIFICATION_LABELS: Record<string, string> = {
   zhipuai: 'GLM Coding Plan',
   'zhipuai-coding-plan': 'GLM Coding Plan',
 
+  // Tencent Token Plan
+  'tencent-token-plan': 'Tencent Token Plan',
+
   // Xiaomi MiMo
   xiaomi: 'Xiaomi MiMo API Key',
   'xiaomi-mimo': 'Xiaomi MiMo API Key',

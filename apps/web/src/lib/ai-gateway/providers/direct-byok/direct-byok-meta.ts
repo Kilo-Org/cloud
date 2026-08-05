@@ -16,6 +16,7 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   'opencode-go': 'OpenCode Go',
   orcarouter: 'OrcaRouter',
   synthetic: 'Synthetic',
+  'tencent-token-plan': 'Tencent Token Plan (Singapore)',
   'xiaomi-token-plan-ams': 'Xiaomi Token Plan (Europe)',
   'xiaomi-token-plan-sgp': 'Xiaomi Token Plan (Singapore)',
   'zai-coding': 'Z.ai Coding Plan',

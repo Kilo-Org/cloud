@@ -13,6 +13,7 @@ import ollamaCloud from './ollama-cloud';
 import openCodeGo from './opencode-go';
 import orcarouter from './orcarouter';
 import synthetic from './synthetic';
+import tencentTokenPlan from './tencent-token-plan';
 import xiaomiTokenPlanAms from './xiaomi-token-plan-ams';
 import xiaomiTokenPlanSgp from './xiaomi-token-plan-sgp';
 import zaiCoding from './zai-coding';
@@ -32,6 +33,7 @@ export default [
   openCodeGo,
   orcarouter,
   synthetic,
+  tencentTokenPlan,
   xiaomiTokenPlanAms,
   xiaomiTokenPlanSgp,
   zaiCoding,

@@ -241,6 +241,23 @@ describe('verifyAppleAttestation certificate chain', () => {
     expect(result).toEqual({ ok: false, error: 'KEY_ID_MISMATCH' });
   });
 
+  test('rejects authData too short to hold the credential-ID length', async () => {
+    // 37 to 54 bytes cleared the old floor but cannot be parsed: readUInt16BE(53)
+    // throws a RangeError, which the route surfaces as a 500 instead of a
+    // refusal. Malformed authData must keep failing closed.
+    const full = buildAuthData({ rpIdHash, credentialId, coseKey: buildCoseKey() });
+
+    for (const length of [37, 48, 54]) {
+      const result = await verifyAppleAttestation(
+        buildAttestation([REAL_LEAF_DER, REAL_INTERMEDIATE_DER], full.subarray(0, length)),
+        challenge,
+        keyId,
+        bundleId
+      );
+      expect(result).toEqual({ ok: false, error: 'INVALID_ATTEST_FORMAT' });
+    }
+  });
+
   test('rejects a chain whose signatures do not verify', async () => {
     // The real leaf is signed by the intermediate, not by the root.
     const result = await verifyAppleAttestation(

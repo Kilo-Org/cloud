@@ -123,8 +123,12 @@ export async function verifyAppleAttestation(
   if (attestMap.get('fmt') !== 'apple-appattest')
     return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
 
+  // Shortest possible attested authData: rpIdHash(32) + flags(1) + signCount(4)
+  // + aaguid(16) + credIdLen(2). Anything shorter cannot hold the credential-ID
+  // length prefix, and `readUInt16BE` would throw a RangeError instead of
+  // failing closed. A real attestation always exceeds this.
   const authData = asBuffer(attestMap.get('authData'));
-  if (!authData || authData.length < 37) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
+  if (!authData || authData.length < 55) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
 
   const attStmt = attestMap.get('attStmt');
   if (!(attStmt instanceof Map)) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };

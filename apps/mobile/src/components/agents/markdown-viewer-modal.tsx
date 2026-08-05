@@ -6,6 +6,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { MarkdownText } from './markdown-text';
+import { getFilename } from './tool-card-utils';
 
 type MarkdownViewerModalProps = {
   visible: boolean;
@@ -38,7 +39,7 @@ export function MarkdownViewerModal({
             onPress={onClose}
             className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
             accessibilityRole="button"
-            accessibilityLabel={`Close ${path}`}
+            accessibilityLabel={`Close ${getFilename(path)}`}
           >
             <X size={20} color={colors.foreground} />
           </Pressable>

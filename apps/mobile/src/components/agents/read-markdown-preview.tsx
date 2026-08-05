@@ -1,7 +1,9 @@
+import { BookOpen } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
@@ -11,6 +13,7 @@ import { getFilename } from './tool-card-utils';
 
 export function ReadMarkdownPreview({ preview }: Readonly<{ preview: MarkdownPreview }>) {
   const textSelectable = useTranscriptTextSelectable();
+  const colors = useThemeColors();
   const [readerVisible, setReaderVisible] = useState(false);
 
   if (preview.text === '') {
@@ -19,21 +22,22 @@ export function ReadMarkdownPreview({ preview }: Readonly<{ preview: MarkdownPre
 
   return (
     <View className="gap-1">
-      <Pressable
-        onPress={() => {
-          setReaderVisible(true);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${getFilename(preview.path)} full screen`}
-        className="active:opacity-80"
-      >
-        <ChatMarkdownText value={preview.inlineText} selectable={textSelectable} />
-      </Pressable>
+      <ChatMarkdownText value={preview.inlineText} selectable={textSelectable} />
       {preview.footer ? (
         <Text className="text-xs text-muted-foreground">{preview.footer}</Text>
       ) : null}
       {preview.inlineTruncated ? (
-        <Text className="text-xs text-muted-foreground">Tap to read the full file</Text>
+        <Pressable
+          onPress={() => {
+            setReaderVisible(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Read ${getFilename(preview.path)} in full`}
+          className="flex-row items-center gap-1.5 self-start rounded-md bg-neutral-100 px-2.5 py-1.5 active:opacity-70 dark:bg-neutral-900"
+        >
+          <BookOpen size={14} color={colors.mutedForeground} />
+          <Text className="text-xs text-muted-foreground">Read full file</Text>
+        </Pressable>
       ) : null}
       <MarkdownViewerModal
         visible={readerVisible}

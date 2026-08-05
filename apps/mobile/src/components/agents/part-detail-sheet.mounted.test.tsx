@@ -32,20 +32,24 @@ vi.mock('expo-haptics', () => ({
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',
 }));
-// Content-driven body mock: mounts a real MonoScrollBlock iff the fixture
-// carries mono content (`input.command` non-empty), at any status. This proves
-// the full wiring: sheet state -> real SegmentedControl -> context provider ->
-// real MonoScrollBlock branch. Keyed by part id so a part swap unmounts and
-// remounts the block in one commit (the block-replacement test depends on the
-// real effect batching). SegmentedControl is NOT mocked: the real control
-// renders so its radiogroup/radio semantics are under test.
+// Content-driven body mock that mirrors the real bodies' mono content:
+// BashToolCardBody renders the `$ command` line as plain text, so only a
+// completed bash output block is mono (running and error bash bodies are
+// mono-free); GenericToolCardBody renders the input JSON as a mono block at
+// any status, plus the completed output block. Mounting a real
+// MonoScrollBlock proves the full wiring: sheet state -> real SegmentedControl
+// -> context provider -> real MonoScrollBlock branch. Keyed by part id so a
+// part swap unmounts and remounts the block in one commit (the
+// block-replacement test depends on the real effect batching).
+// SegmentedControl is NOT mocked: the real control renders so its
+// radiogroup/radio semantics are under test.
 vi.mock('./tool-part-detail-body', () => ({
   ToolPartDetailBody: ({ part }: { part: ToolPart }) => {
-    const command = part.state.input.command;
-    if (typeof command === 'string' && command.length > 0) {
-      return createElement(MonoScrollBlock, { key: part.id, content: LONG_LINE });
-    }
-    return null;
+    const input = part.state.input;
+    const output = part.state.status === 'completed' ? part.state.output : undefined;
+    const hasMono =
+      part.tool === 'bash' ? Boolean(output) : Object.keys(input).length > 0 || Boolean(output);
+    return hasMono ? createElement(MonoScrollBlock, { key: part.id, content: LONG_LINE }) : null;
   },
 }));
 
@@ -54,7 +58,16 @@ const LONG_LINE = `${'x'.repeat(300)} tail`;
 
 type FixtureStatus = 'running' | 'completed' | 'error';
 
-function makeBashPart(id: string, command: string, status: FixtureStatus = 'completed'): ToolPart {
+type BashFixtureOptions = {
+  status?: FixtureStatus;
+  output?: string;
+};
+
+function makeBashPart(
+  id: string,
+  command: string,
+  { status = 'completed', output = 'done' }: BashFixtureOptions = {}
+): ToolPart {
   const base = {
     id,
     sessionID: 's1',
@@ -77,8 +90,43 @@ function makeBashPart(id: string, command: string, status: FixtureStatus = 'comp
     state: {
       status: 'completed',
       input: { command },
-      output: 'done',
+      output,
       title: 'bash',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+function makeGenericPart(
+  id: string,
+  input: Record<string, unknown>,
+  status: FixtureStatus = 'completed'
+): ToolPart {
+  const base = {
+    id,
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'tool' as const,
+    callID: `call-${id}`,
+    tool: 'custom_tool',
+  };
+  if (status === 'running') {
+    return { ...base, state: { status: 'running', input, time: { start: 1 } } };
+  }
+  if (status === 'error') {
+    return {
+      ...base,
+      state: { status: 'error', input, error: 'boom', time: { start: 1, end: 2 } },
+    };
+  }
+  return {
+    ...base,
+    state: {
+      status: 'completed',
+      input,
+      output: 'done',
+      title: 'custom_tool',
       metadata: {},
       time: { start: 1, end: 2 },
     },
@@ -170,7 +218,7 @@ async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> 
 
 describe('PartDetailSheet mounted', () => {
   it('defaults to wrap: Wrap radio selected, block renders no inner scroller', async () => {
-    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi', 'completed'));
+    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi'));
 
     expect(radiogroup(renderer.root)).toBeTruthy();
     expect(radioSelected(renderer.root, 'Wrap')).toBe(true);
@@ -182,7 +230,7 @@ describe('PartDetailSheet mounted', () => {
   });
 
   it('toggles to scroll and keeps the selection across a stream-style rerender', async () => {
-    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi', 'completed'));
+    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi'));
 
     await act(async () => {
       await Promise.resolve();
@@ -195,15 +243,17 @@ describe('PartDetailSheet mounted', () => {
     // Stream-style rerender: a fresh part object with the same id.
     await act(async () => {
       await Promise.resolve();
-      renderer.update(sheetElement(makeBashPart('bash-1', 'echo hi', 'completed')));
+      renderer.update(sheetElement(makeBashPart('bash-1', 'echo hi')));
     });
     expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
 
     await unmount(renderer);
   });
 
-  it('follows the selected mode for error-status mono content', async () => {
-    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi', 'error'));
+  it('follows the selected mode for error-status mono content and hides the control for command-only bash errors', async () => {
+    // An error generic body still carries the input JSON mono block, so the
+    // control appears and drives the real error-status mono path.
+    const renderer = await mountSheet(makeGenericPart('generic-1', { query: 'x' }, 'error'));
 
     expect(radiogroup(renderer.root)).toBeTruthy();
     expect(radioSelected(renderer.root, 'Wrap')).toBe(true);
@@ -217,24 +267,33 @@ describe('PartDetailSheet mounted', () => {
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(2);
 
     await unmount(renderer);
+
+    // Error bash body is command-only and mono-free: no control.
+    const bashError = await mountSheet(makeBashPart('bash-1', 'echo hi', { status: 'error' }));
+    expect(radiogroup(bashError.root)).toBeUndefined();
+    await unmount(bashError);
   });
 
-  it('shows the control for running mono content and hides it for mono-free content', async () => {
-    const withMono = await mountSheet(makeBashPart('bash-1', 'echo hi', 'running'));
+  it('shows the control for running generic input JSON and hides it for command-only bash bodies', async () => {
+    // Running generic input JSON is mono (GenericToolCardBody renders the
+    // input as a mono block at any status), so the control appears.
+    const withMono = await mountSheet(makeGenericPart('generic-1', { query: 'x' }, 'running'));
     expect(radiogroup(withMono.root)).toBeTruthy();
     await unmount(withMono);
 
-    const withoutMono = await mountSheet(makeBashPart('bash-2', '', 'running'));
+    // Running bash command-only is mono-free (the command renders as plain
+    // text), so the control stays hidden.
+    const withoutMono = await mountSheet(makeBashPart('bash-1', 'echo hi', { status: 'running' }));
     expect(radiogroup(withoutMono.root)).toBeUndefined();
     await unmount(withoutMono);
 
     // Transition running-no-mono -> completed-with-mono: the control appears
     // with Wrap still selected.
-    const renderer = await mountSheet(makeBashPart('bash-3', '', 'running'));
+    const renderer = await mountSheet(makeBashPart('bash-2', '', { status: 'running' }));
     expect(radiogroup(renderer.root)).toBeUndefined();
     await act(async () => {
       await Promise.resolve();
-      renderer.update(sheetElement(makeBashPart('bash-3', 'echo hi', 'completed')));
+      renderer.update(sheetElement(makeBashPart('bash-2', 'echo hi')));
     });
     expect(radiogroup(renderer.root)).toBeTruthy();
     expect(radioSelected(renderer.root, 'Wrap')).toBe(true);
@@ -243,17 +302,18 @@ describe('PartDetailSheet mounted', () => {
   });
 
   it('keeps the selection across a mono-free gap on the same part id', async () => {
-    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi', 'completed'));
+    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi'));
     await act(async () => {
       await Promise.resolve();
       pressRadio(renderer.root, 'Scroll');
     });
     expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
 
-    // Mono-free gap on the same part id: the control disappears.
+    // Mono-free gap on the same part id: a completed bash body with no output
+    // has no mono block, so the control disappears.
     await act(async () => {
       await Promise.resolve();
-      renderer.update(sheetElement(makeBashPart('bash-1', '', 'completed')));
+      renderer.update(sheetElement(makeBashPart('bash-1', 'echo hi', { output: '' })));
     });
     expect(radiogroup(renderer.root)).toBeUndefined();
 
@@ -261,7 +321,7 @@ describe('PartDetailSheet mounted', () => {
     // sheet only resets the mode on close, never on content changes.
     await act(async () => {
       await Promise.resolve();
-      renderer.update(sheetElement(makeBashPart('bash-1', 'echo hi', 'completed')));
+      renderer.update(sheetElement(makeBashPart('bash-1', 'echo hi')));
     });
     expect(radiogroup(renderer.root)).toBeTruthy();
     expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
@@ -270,12 +330,12 @@ describe('PartDetailSheet mounted', () => {
   });
 
   it('keeps the control present across a block-replacing part swap in one commit', async () => {
-    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi', 'completed'));
+    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi'));
     expect(radiogroup(renderer.root)).toBeTruthy();
 
     await act(async () => {
       await Promise.resolve();
-      renderer.update(sheetElement(makeBashPart('bash-2', 'ls -la', 'completed')));
+      renderer.update(sheetElement(makeBashPart('bash-2', 'ls -la')));
     });
 
     // Different part id -> the keyed block unmounts and remounts in the same

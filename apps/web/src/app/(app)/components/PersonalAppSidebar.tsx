@@ -265,7 +265,9 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     : 'unknown';
   const hasKiloClawInstance = kiloClawInstanceState === 'present';
   const shouldShowKiloClaw =
-    kiloClawNavStateQuery.isSuccess && kiloClawNavStateQuery.data.hasExistingPersonalSubscription;
+    kiloClawNavStateQuery.isSuccess &&
+    (kiloClawNavStateQuery.data.hasActiveInstance ||
+      kiloClawNavStateQuery.data.hasCurrentPersonalSubscription);
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
   const [sidebarMenuOverride, setSidebarMenuOverride] = useState<{
     pathname: string;

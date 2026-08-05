@@ -646,7 +646,7 @@ describe('kiloclawRouter getNavState', () => {
 
     expect(result).toEqual({
       hasActiveInstance: false,
-      hasExistingPersonalSubscription: false,
+      hasCurrentPersonalSubscription: false,
     });
     expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
     expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
@@ -665,8 +665,9 @@ describe('kiloclawRouter getNavState', () => {
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       instance_id: instanceId,
-      plan: 'trial',
-      status: 'trialing',
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'credits',
     });
     const caller = createCaller({ user });
 
@@ -674,7 +675,7 @@ describe('kiloclawRouter getNavState', () => {
 
     expect(result).toEqual({
       hasActiveInstance: true,
-      hasExistingPersonalSubscription: true,
+      hasCurrentPersonalSubscription: true,
     });
     expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
     expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
@@ -697,11 +698,11 @@ describe('kiloclawRouter getNavState', () => {
 
     expect(result).toEqual({
       hasActiveInstance: false,
-      hasExistingPersonalSubscription: false,
+      hasCurrentPersonalSubscription: false,
     });
   });
 
-  it('keeps KiloClaw navigation available for canceled personal subscription history', async () => {
+  it('does not expose KiloClaw navigation for canceled personal subscription history', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-nav-canceled-${Math.random()}@example.com`,
     });
@@ -725,7 +726,7 @@ describe('kiloclawRouter getNavState', () => {
 
     expect(result).toEqual({
       hasActiveInstance: false,
-      hasExistingPersonalSubscription: true,
+      hasCurrentPersonalSubscription: false,
     });
   });
 });

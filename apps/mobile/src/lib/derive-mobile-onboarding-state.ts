@@ -52,7 +52,7 @@ export function deriveMobileOnboardingStateFromBilling(
     return { state: 'quarantined', instanceId: liveInstanceId };
   }
 
-  if (!billing.hasExistingPersonalSubscription) {
+  if (!billing.hasCurrentPersonalSubscription) {
     return { state: 'signup_unavailable' };
   }
 

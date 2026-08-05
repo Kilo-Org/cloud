@@ -265,12 +265,13 @@ the change completes. Every final Commit summary card and detail view MUST
 state that hosting ends on the final date unless the customer continues
 month-to-month, and MUST expose the continuation action directly. When retirement state cannot be derived safely, the surface MUST hide unsafe billing actions, preserve only access supported by canonical state, and show a generic temporary billing-state error without exposing internal reason codes.
 
-When the user has no canonical personal KiloClaw subscription history, the
-KiloClaw group MUST state that new subscriptions are unavailable and MUST NOT
-show a signup or enrollment action. Users with existing canonical personal
-subscription history retain the applicable enrollment, recovery, and management
-surfaces. Canceled KiloClaw history MUST NOT cause Commit, an earlier price, or
-an earlier entitlement to appear as the available offer. Stripe-funded
+When the user has no current personal KiloClaw subscription, the KiloClaw group
+MUST state that new instances are unavailable and MUST NOT show a signup,
+enrollment, or recovery action. Users with a current personal subscription or an
+existing live instance retain the applicable enrollment, recovery, and
+management surfaces. Canceled, expired, suspended, transferred-out, and purely
+historical KiloClaw rows MUST NOT cause an available offer, Commit, an earlier
+price, or an earlier entitlement to appear. Stripe-funded
 enrollment awaiting invoice settlement MUST be presented as pending rather
 than active. Active and terminal history MUST continue to show historical
 Commit names, prices, invoices, and credit deductions.

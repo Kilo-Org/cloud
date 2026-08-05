@@ -58,8 +58,7 @@ export function KiloClawGroup({
   const subscriptions = query.data?.subscriptions ?? [];
   const commitPlanAvailable =
     query.data?.commitPlanAvailable ?? summaryQuery.data?.commitPlanAvailable ?? false;
-  const hasExistingPersonalSubscription =
-    summaryQuery.data?.hasExistingPersonalSubscription === true;
+  const hasCurrentPersonalSubscription = summaryQuery.data?.hasCurrentPersonalSubscription === true;
   const isLoading = query.isLoading || summaryQuery.isLoading;
   const isError = query.isError || summaryQuery.isError;
   const error = query.error ?? summaryQuery.error;
@@ -203,7 +202,7 @@ export function KiloClawGroup({
             );
           })}
         </div>
-      ) : subscriptions.length === 0 && !hasExistingPersonalSubscription ? (
+      ) : subscriptions.length === 0 && !hasCurrentPersonalSubscription ? (
         <KiloClawSignupUnavailable />
       ) : subscriptions.length === 0 || nonTerminalSubscriptions.length === 0 ? (
         <KiloClawSubscribeCard

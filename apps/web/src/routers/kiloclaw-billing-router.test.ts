@@ -617,6 +617,7 @@ describe('getBillingStatus', () => {
     expect(result).not.toBeNull();
     expect(result.trialEligible).toBe(false);
     expect(result.hasExistingPersonalSubscription).toBe(true);
+    expect(result.hasCurrentPersonalSubscription).toBe(false);
   });
 
   it('returns trialEligible false when user only has an org-backed subscription', async () => {
@@ -8578,6 +8579,7 @@ describe('getBillingStatus with credits', () => {
     const result = await caller.kiloclaw.getPersonalBillingSummary();
 
     expect(result.hasExistingPersonalSubscription).toBe(true);
+    expect(result.hasCurrentPersonalSubscription).toBe(true);
     expect(result.hasActiveInstance).toBe(false);
   });
 

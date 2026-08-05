@@ -79,7 +79,7 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
     return <>{children}</>;
   }
 
-  if (!billing.hasExistingPersonalSubscription) {
+  if (!billing.hasCurrentPersonalSubscription && !billing.instance?.exists) {
     return (
       <div className="flex w-full flex-1 items-center justify-center p-4 md:p-6">
         <KiloClawSignupUnavailable />

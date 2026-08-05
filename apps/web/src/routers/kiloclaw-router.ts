@@ -1967,7 +1967,12 @@ async function getPersonalBillingStatus(user: {
     };
   }
 
-  const [anySubscription, anyPersonalSubscription, anyPersonalInstanceHistory] = await Promise.all([
+  const [
+    anySubscription,
+    anyPersonalSubscription,
+    currentPersonalProvisioningSubscription,
+    anyPersonalInstanceHistory,
+  ] = await Promise.all([
     db
       .select({ id: kiloclaw_subscriptions.id })
       .from(kiloclaw_subscriptions)
@@ -1981,6 +1986,24 @@ async function getPersonalBillingStatus(user: {
       .where(
         and(
           eq(kiloclaw_subscriptions.user_id, user.id),
+          or(
+            isNull(kiloclaw_subscriptions.instance_id),
+            and(eq(kiloclaw_instances.user_id, user.id), isNull(kiloclaw_instances.organization_id))
+          )
+        )
+      )
+      .limit(1)
+      .then(rows => rows[0] ?? null),
+    db
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, user.id),
+          eq(kiloclaw_subscriptions.status, 'active'),
+          isNull(kiloclaw_subscriptions.suspended_at),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
           or(
             isNull(kiloclaw_subscriptions.instance_id),
             and(eq(kiloclaw_instances.user_id, user.id), isNull(kiloclaw_instances.organization_id))
@@ -2062,6 +2085,7 @@ async function getPersonalBillingStatus(user: {
     hasAccess,
     accessReason,
     hasExistingPersonalSubscription: anyPersonalSubscription !== null,
+    hasCurrentPersonalSubscription: currentPersonalProvisioningSubscription !== null,
     commitPlanAvailable: maySelectKiloClawCommit(now),
     trialEligible: !anyPersonalInstanceHistory && !anySubscription,
     creditBalanceMicrodollars,
@@ -2174,6 +2198,7 @@ function summarizePersonalBillingStatus(billing: ClawBillingStatus) {
     hasActiveInstance,
     activeInstanceHasAccess: hasActiveInstance && billing.hasAccess,
     hasExistingPersonalSubscription: billing.hasExistingPersonalSubscription,
+    hasCurrentPersonalSubscription: billing.hasCurrentPersonalSubscription,
     activeInstanceId,
     creditBalanceMicrodollars: billing.creditBalanceMicrodollars,
     creditIntroEligible: billing.creditIntroEligible,
@@ -3457,7 +3482,7 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   getNavState: baseProcedure.query(async ({ ctx }) => {
-    const [instance, personalSubscription] = await Promise.all([
+    const [instance, currentPersonalSubscription] = await Promise.all([
       getActiveInstance(ctx.user.id),
       db
         .select({ id: kiloclaw_subscriptions.id })
@@ -3466,6 +3491,9 @@ export const kiloclawRouter = createTRPCRouter({
         .where(
           and(
             eq(kiloclaw_subscriptions.user_id, ctx.user.id),
+            eq(kiloclaw_subscriptions.status, 'active'),
+            isNull(kiloclaw_subscriptions.suspended_at),
+            isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
             or(
               isNull(kiloclaw_subscriptions.instance_id),
               and(
@@ -3480,7 +3508,7 @@ export const kiloclawRouter = createTRPCRouter({
     ]);
     return {
       hasActiveInstance: instance !== null,
-      hasExistingPersonalSubscription: personalSubscription !== null,
+      hasCurrentPersonalSubscription: currentPersonalSubscription !== null,
     };
   }),
 

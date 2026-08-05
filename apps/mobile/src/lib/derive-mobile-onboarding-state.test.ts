@@ -144,6 +144,7 @@ function billingStatus(overrides: Partial<ClawBillingStatus> = {}): ClawBillingS
     hasAccess: false,
     hasActiveKiloPass: false,
     hasExistingPersonalSubscription: false,
+    hasCurrentPersonalSubscription: false,
     instance: null,
     intendedPriceVersion: '2026-05-10',
     intendedSelfServiceInstanceType: 'perf-1-3',
@@ -162,18 +163,15 @@ describe('deriveMobileOnboardingStateFromBilling', () => {
     });
   });
 
-  it('preserves existing subscriber recovery state', () => {
+  it('blocks recovery for historical subscribers without a current subscription', () => {
     expect(
       deriveMobileOnboardingStateFromBilling(
         billingStatus({
           hasExistingPersonalSubscription: true,
+          hasCurrentPersonalSubscription: false,
           trialEligible: false,
         })
       )
-    ).toEqual({
-      state: 'access_required',
-      reason: 'subscription_canceled',
-      instanceId: null,
-    });
+    ).toEqual({ state: 'signup_unavailable' });
   });
 });

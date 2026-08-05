@@ -127,7 +127,7 @@ function ClawNewLiveClient() {
 
   const billing = billingQuery.data;
 
-  if (billing && !billing.hasExistingPersonalSubscription) {
+  if (billing && !billing.hasCurrentPersonalSubscription) {
     return (
       <div
         className="container m-auto flex w-full max-w-[1140px] items-center justify-center p-4 md:p-6"

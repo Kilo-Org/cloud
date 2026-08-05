@@ -1486,10 +1486,12 @@ rows renew.
 10. The billing status MUST include instance data (whether an
     undestroyed instance exists, suspension timestamp, destruction
     deadline, and destroyed flag) when any instance record exists.
-11. The billing status MUST indicate whether the user has any existing
-    canonical personal KiloClaw subscription row so personal surfaces can
-    enforce the fresh-subscription closure without treating organization-owned
-    subscriptions as personal history.
+11. The billing status MUST distinguish any existing canonical personal
+    KiloClaw subscription history from a current personal subscription that may
+    authorize replacement provisioning. Personal surfaces MUST use current,
+    context-scoped eligibility for onboarding, navigation, enrollment, and
+    recovery actions without treating organization-owned or purely historical
+    subscriptions as authorization.
 
 ### Billing Portal
 

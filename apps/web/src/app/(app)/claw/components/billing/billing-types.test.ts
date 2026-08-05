@@ -38,6 +38,7 @@ function createBillingStatus(overrides?: BillingStatusOverrides): ClawBillingSta
     hasAccess: false,
     accessReason: null,
     hasExistingPersonalSubscription: true,
+    hasCurrentPersonalSubscription: true,
     trialEligible: false,
     creditBalanceMicrodollars: 0,
     creditIntroEligible: false,

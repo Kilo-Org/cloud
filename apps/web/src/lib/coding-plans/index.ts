@@ -490,6 +490,26 @@ export async function getCodingPlanAvailabilityIntentPlanIds(userId: string): Pr
   return rows.map(row => row.planId);
 }
 
+export async function getCodingPlanAvailabilityIntentCounts(): Promise<
+  Array<{ planId: string; count: number }>
+> {
+  const { rows } = await db.execute<{ plan_id: string; count: string }>(sql`
+    SELECT intents.plan_id, COUNT(DISTINCT intents.user_id) AS count
+    FROM coding_plan_availability_intents AS intents
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM coding_plan_terms AS terms
+      WHERE terms.user_id = intents.user_id
+        AND terms.plan_id = intents.plan_id
+        AND terms.kind = 'activation'
+        AND terms.created_at >= intents.created_at
+    )
+    GROUP BY intents.plan_id
+    ORDER BY intents.plan_id
+  `);
+  return rows.map(row => ({ planId: row.plan_id, count: Number.parseInt(row.count, 10) }));
+}
+
 export async function requestCodingPlanAvailabilityNotification(
   userId: string,
   planId: CodingPlanId

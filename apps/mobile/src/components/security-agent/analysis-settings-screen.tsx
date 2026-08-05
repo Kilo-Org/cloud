@@ -13,6 +13,7 @@ import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -159,7 +160,10 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Analysis depth
           </Text>
-          <View className="flex-row gap-2 rounded-full bg-secondary p-1">
+          <RadioGroup
+            label="Analysis depth"
+            className="flex-row gap-2 rounded-full bg-secondary p-1"
+          >
             {ANALYSIS_MODES.map(option => {
               const active = analysisMode === option.value;
               return (
@@ -174,8 +178,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                   onPress={() => {
                     setAnalysisMode(option.value);
                   }}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: active, disabled: !canManage }}
+                  {...radioItemA11y({ label: option.label, checked: active, disabled: !canManage })}
                 >
                   <Text
                     className={cn(
@@ -188,7 +191,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                 </Pressable>
               );
             })}
-          </View>
+          </RadioGroup>
         </View>
 
         {modelsLoading && (

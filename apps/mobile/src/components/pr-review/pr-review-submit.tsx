@@ -17,6 +17,7 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import {
   PendingQueueHint,
@@ -292,7 +293,7 @@ function ReviewEventChips(props: {
       <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Review event
       </Text>
-      <View className="flex-row flex-wrap gap-1.5">
+      <RadioGroup label="Review event" className="flex-row flex-wrap gap-1.5">
         {EVENT_OPTIONS.map(option => {
           const active = props.value === option.value;
           return (
@@ -303,9 +304,7 @@ function ReviewEventChips(props: {
                 void Haptics.selectionAsync();
                 props.onChange(option.value);
               }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active, disabled: props.disabled }}
-              accessibilityLabel={option.label}
+              {...radioItemA11y({ label: option.label, checked: active, disabled: props.disabled })}
               className={cn(
                 'min-h-9 items-center justify-center rounded-full border px-3 py-1.5 active:opacity-70',
                 active ? 'border-primary bg-primary' : 'border-border bg-secondary',
@@ -323,7 +322,7 @@ function ReviewEventChips(props: {
             </Pressable>
           );
         })}
-      </View>
+      </RadioGroup>
     </View>
   );
 }

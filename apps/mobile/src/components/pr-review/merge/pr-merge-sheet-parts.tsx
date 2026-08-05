@@ -10,6 +10,7 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -46,7 +47,7 @@ function MethodPicker({
       <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Method
       </Text>
-      <View className="flex-row flex-wrap gap-1">
+      <RadioGroup label="Method" className="flex-row flex-wrap gap-1">
         {methodOptions.map(option => {
           const active = method === option.value;
           // Long labels stay readable via accessibilityLabel; chip shows short text.
@@ -59,9 +60,7 @@ function MethodPicker({
                 void Haptics.selectionAsync();
                 onChange(option.value);
               }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active, disabled: isDisabled }}
-              accessibilityLabel={option.label}
+              {...radioItemA11y({ label: option.label, checked: active, disabled: isDisabled })}
               accessibilityHint={PR_MERGE_DESCRIPTIONS[option.value]}
               className={cn(
                 'min-h-8 items-center justify-center rounded-full border px-2.5 py-1 active:opacity-70',
@@ -80,7 +79,7 @@ function MethodPicker({
             </Pressable>
           );
         })}
-      </View>
+      </RadioGroup>
     </View>
   );
 }

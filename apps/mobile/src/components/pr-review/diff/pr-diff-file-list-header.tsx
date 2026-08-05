@@ -13,6 +13,7 @@ import { Columns2, Rows3 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -93,29 +94,33 @@ function ViewModeToggle({
 }) {
   const colors = useThemeColors();
   return (
-    <View
-      className="flex-row overflow-hidden rounded-md border border-border bg-card"
-      accessibilityRole="radiogroup"
-      accessibilityLabel="Diff layout"
-    >
-      <ViewModeButton
-        active={viewMode === 'unified'}
-        label="Unified"
-        onPress={() => {
-          onChange('unified');
-        }}
-        testId="diff-mode-unified"
-        colors={colors}
-      />
-      <ViewModeButton
-        active={viewMode === 'side-by-side'}
-        label="Side by side"
-        onPress={() => {
-          onChange('side-by-side');
-        }}
-        testId="diff-mode-side-by-side"
-        colors={colors}
-      />
+    <View className="flex-row items-center gap-2">
+      <Text variant="muted" className="text-xs">
+        Layout
+      </Text>
+      <RadioGroup
+        label="Layout"
+        className="flex-row overflow-hidden rounded-md border border-border bg-card"
+      >
+        <ViewModeButton
+          active={viewMode === 'unified'}
+          label="Unified"
+          onPress={() => {
+            onChange('unified');
+          }}
+          testId="diff-mode-unified"
+          colors={colors}
+        />
+        <ViewModeButton
+          active={viewMode === 'side-by-side'}
+          label="Side by side"
+          onPress={() => {
+            onChange('side-by-side');
+          }}
+          testId="diff-mode-side-by-side"
+          colors={colors}
+        />
+      </RadioGroup>
     </View>
   );
 }
@@ -136,9 +141,7 @@ function ViewModeButton({
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={label}
+      {...radioItemA11y({ label, checked: active })}
       testID={testId}
       className={cn(
         'min-h-9 flex-row items-center gap-1.5 px-3 active:opacity-70',

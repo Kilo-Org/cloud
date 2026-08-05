@@ -10031,37 +10031,45 @@ export const native_attested_keys = pgTable(
 export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 
-// Immutable debit ledger, partitioned monthly on the source segment's received_at.
-// The partition key is included in the primary key because PostgreSQL requires it
-// for partitioned unique constraints; interval locking is the primary replay guard.
-export const container_usage_charge = pgTable(
-  'container_usage_charge',
+// Immutable metered-infrastructure debit ledger, partitioned monthly on the
+// source's immutable effective timestamp. Source domains own their own
+// idempotency and cumulative-settlement state.
+export const compute_usage_charge = pgTable(
+  'compute_usage_charge',
   {
-    interval_id: text()
+    usage_source: text().notNull(),
+    usage_source_id: text().notNull(),
+    user_id: text().references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
+    cloud_billing_sku_id: text()
       .notNull()
-      .references(() => container_usage_interval.id, { onDelete: 'cascade' }),
-    seq: integer().notNull(),
-    subject_type: text().$type<ContainerUsageSubjectType>().notNull(),
-    subject_id: text().notNull(),
+      .references(() => cloud_billing_sku.id, { onDelete: 'restrict' }),
+    quantity: decimal({ precision: 24, scale: 12 }).notNull(),
+    settled_quantity_after: decimal({ precision: 24, scale: 12 }),
+    rate_cents_per_unit: decimal({ precision: 24, scale: 12 }).notNull(),
     amount_microdollars: bigint({ mode: 'number' }).notNull(),
-    settled_billable_seconds_after: integer().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
   },
   table => [
-    primaryKey({ columns: [table.interval_id, table.seq, table.created_at] }),
-    index('IDX_container_usage_charge_subject_created').on(
-      table.subject_type,
-      table.subject_id,
+    primaryKey({ columns: [table.usage_source, table.usage_source_id, table.created_at] }),
+    index('IDX_compute_usage_charge_user_created').on(table.user_id, table.created_at),
+    index('IDX_compute_usage_charge_organization_created').on(
+      table.organization_id,
       table.created_at
     ),
-    check('container_usage_charge_subject_type', sql`${table.subject_type} IN ('user', 'org')`),
-    check('container_usage_charge_amount_positive', sql`${table.amount_microdollars} > 0`),
     check(
-      'container_usage_charge_settled_seconds_positive',
-      sql`${table.settled_billable_seconds_after} > 0`
+      'compute_usage_charge_exactly_one_payer',
+      sql`(${table.user_id} IS NULL) <> (${table.organization_id} IS NULL)`
     ),
+    check('compute_usage_charge_quantity_positive', sql`${table.quantity} > 0`),
+    check(
+      'compute_usage_charge_settled_quantity_positive',
+      sql`${table.settled_quantity_after} IS NULL OR ${table.settled_quantity_after} > 0`
+    ),
+    check('compute_usage_charge_rate_positive', sql`${table.rate_cents_per_unit} > 0`),
+    check('compute_usage_charge_amount_positive', sql`${table.amount_microdollars} > 0`),
   ]
 );
 
-export type ContainerUsageCharge = typeof container_usage_charge.$inferSelect;
-export type NewContainerUsageCharge = typeof container_usage_charge.$inferInsert;
+export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
+export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;

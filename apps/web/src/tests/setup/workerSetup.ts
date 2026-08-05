@@ -7,7 +7,7 @@ import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import {
-  provisionContainerUsageChargePartitions,
+  provisionComputeUsageChargePartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/exa-usage-partitions';
 import { provisionModelExperimentRequestPartitions } from '@/lib/model-experiment-request-partitions';
@@ -68,11 +68,11 @@ beforeAll(async () => {
       );
     }
 
-    const { errors: chargePartitionErrors } = await provisionContainerUsageChargePartitions(testDb);
+    const { errors: chargePartitionErrors } = await provisionComputeUsageChargePartitions(testDb);
     if (chargePartitionErrors.length > 0) {
       const [{ name, error }] = chargePartitionErrors;
       throw new Error(
-        `Failed to create container usage charge partition ${name}: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to create compute usage charge partition ${name}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
 

@@ -1,6 +1,7 @@
 import {
   buildExaUsageLogPartitionIndexDefinitions,
   buildExaUsageLogPartitionIndexDropStatement,
+  provisionComputeUsageChargePartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/exa-usage-partitions';
 import type { SQL } from 'drizzle-orm';
@@ -98,5 +99,38 @@ describe('Exa usage-log partition indexes', () => {
       'CREATE INDEX IF NOT EXISTS "exa_usage_log_2026_08_charged_created_at_idx" ON "public"."exa_usage_log_2026_08" ("created_at") WHERE "charged_to_balance" = true AND "cost_microdollars" > 0',
       'CREATE INDEX IF NOT EXISTS "exa_usage_log_2026_08_charged_org_created_at_idx" ON "public"."exa_usage_log_2026_08" ("organization_id", "created_at") WHERE "organization_id" IS NOT NULL AND "charged_to_balance" = true AND "cost_microdollars" > 0',
     ]);
+  });
+});
+
+describe('compute usage charge partitions', () => {
+  test('provisions current and next two monthly partitions', async () => {
+    const statements: string[] = [];
+    const dialect = new PgDialect();
+    const fakeDb = {
+      execute: async (query: SQL) => {
+        statements.push(dialect.sqlToQuery(query).sql);
+        return { rows: [] };
+      },
+    };
+
+    const result = await provisionComputeUsageChargePartitions(
+      fakeDb as never,
+      new Date(2026, 7, 4, 12)
+    );
+
+    expect(result).toEqual({
+      created: [
+        'compute_usage_charge_2026_08',
+        'compute_usage_charge_2026_09',
+        'compute_usage_charge_2026_10',
+      ],
+      errors: [],
+    });
+    expect(statements).toHaveLength(3);
+    expect(statements[0]).toContain(
+      'PARTITION OF "public"."compute_usage_charge" FOR VALUES FROM (\'2026-08-01\') TO (\'2026-09-01\')'
+    );
+    expect(statements[1]).toContain('"compute_usage_charge_2026_09"');
+    expect(statements[2]).toContain('"compute_usage_charge_2026_10"');
   });
 });

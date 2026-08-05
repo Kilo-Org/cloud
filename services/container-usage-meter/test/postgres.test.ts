@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDrizzleClient } from '@kilocode/db/client';
 import {
   cloud_billing_sku,
-  container_usage_charge,
+  compute_usage_charge,
   container_usage_interval,
   container_usage_segment,
   kilocode_users,
@@ -54,7 +54,7 @@ function currentChargePartition(): { name: string; start: string; end: string } 
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const month = (date: Date) => date.toISOString().slice(0, 10);
   return {
-    name: `container_usage_charge_${start.getUTCFullYear()}_${String(start.getUTCMonth() + 1).padStart(2, '0')}`,
+    name: `compute_usage_charge_${start.getUTCFullYear()}_${String(start.getUTCMonth() + 1).padStart(2, '0')}`,
     start: month(start),
     end: month(end),
   };
@@ -95,13 +95,16 @@ describe('container usage PostgreSQL application', () => {
     });
     const partition = currentChargePartition();
     await client.pool.query(
-      `CREATE TABLE IF NOT EXISTS "${partition.name}" PARTITION OF "container_usage_charge" FOR VALUES FROM ('${partition.start}') TO ('${partition.end}')`
+      `CREATE TABLE IF NOT EXISTS "${partition.name}" PARTITION OF "compute_usage_charge" FOR VALUES FROM ('${partition.start}') TO ('${partition.end}')`
     );
     fixtureCreated = true;
   });
 
   afterAll(async () => {
     if (fixtureCreated) {
+      await client.db
+        .delete(compute_usage_charge)
+        .where(eq(compute_usage_charge.cloud_billing_sku_id, paidSkuId));
       await client.db
         .delete(container_usage_interval)
         .where(eq(container_usage_interval.cloud_billing_sku_id, skuId));
@@ -288,13 +291,19 @@ describe('container usage PostgreSQL application', () => {
 
     const charges = await client.db
       .select()
-      .from(container_usage_charge)
-      .where(eq(container_usage_charge.interval_id, paidIntervalId));
+      .from(compute_usage_charge)
+      .where(eq(compute_usage_charge.usage_source_id, heartbeat.idempotencyKey));
     expect(charges).toEqual([
       expect.objectContaining({
-        seq: 1,
+        usage_source: 'container_usage_segment',
+        usage_source_id: heartbeat.idempotencyKey,
+        user_id: userId,
+        organization_id: null,
+        cloud_billing_sku_id: paidSkuId,
+        quantity: '10.000000000000',
         amount_microdollars: 100_000,
-        settled_billable_seconds_after: 10,
+        rate_cents_per_unit: '1.000000000000',
+        settled_quantity_after: '10.000000000000',
       }),
     ]);
 
@@ -350,6 +359,12 @@ describe('container usage PostgreSQL application', () => {
     };
     const organizationFingerprint = await usageContextFingerprint(organizationContext);
     const organizationIntervalId = `cloud-agent-next:${organizationContext.instanceId}:${startEpochMs}`;
+    const organizationHeartbeatId = heartbeatIdempotencyKey(
+      organizationContext.service,
+      organizationContext.instanceId,
+      startEpochMs,
+      1
+    );
     await applyStartWithDb(
       client.db,
       {
@@ -373,12 +388,7 @@ describe('container usage PostgreSQL application', () => {
           service: organizationContext.service,
           instanceId: organizationContext.instanceId,
           startEpochMs,
-          idempotencyKey: heartbeatIdempotencyKey(
-            organizationContext.service,
-            organizationContext.instanceId,
-            startEpochMs,
-            1
-          ),
+          idempotencyKey: organizationHeartbeatId,
           seq: 1,
           usageSinceLast: 20,
           context: organizationContext,
@@ -399,6 +409,21 @@ describe('container usage PostgreSQL application', () => {
       .from(organizations)
       .where(eq(organizations.id, organizationId));
     expect(organization).toEqual({ used: 200_000, balance: 4_900_000 });
+    const [charge] = await client.db
+      .select()
+      .from(compute_usage_charge)
+      .where(eq(compute_usage_charge.usage_source_id, organizationHeartbeatId));
+    expect(charge).toMatchObject({
+      usage_source: 'container_usage_segment',
+      usage_source_id: organizationHeartbeatId,
+      user_id: null,
+      organization_id: organizationId,
+      cloud_billing_sku_id: paidSkuId,
+      quantity: '20.000000000000',
+      settled_quantity_after: '20.000000000000',
+      rate_cents_per_unit: '1.000000000000',
+      amount_microdollars: 200_000,
+    });
   });
 
   it('closes stale open intervals at their last confirmed boundary', async () => {

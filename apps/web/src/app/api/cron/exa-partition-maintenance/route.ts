@@ -3,7 +3,7 @@ import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { CRON_SECRET } from '@/lib/config.server';
 import {
-  provisionContainerUsageChargePartitions,
+  provisionComputeUsageChargePartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/exa-usage-partitions';
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     { created: chargeCreated, errors: chargeErrors },
   ] = await Promise.all([
     provisionExaUsageLogPartitions(db),
-    provisionContainerUsageChargePartitions(db),
+    provisionComputeUsageChargePartitions(db),
   ]);
   const created = [...exaCreated, ...chargeCreated];
   const partitionErrors = [...exaErrors, ...chargeErrors];

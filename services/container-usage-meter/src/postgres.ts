@@ -1,6 +1,6 @@
 import {
   cloud_billing_sku,
-  container_usage_charge,
+  compute_usage_charge,
   container_usage_interval,
   container_usage_segment,
   getWorkerDb,
@@ -174,7 +174,7 @@ function budgetForRemaining(
 async function settleSegment(
   tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
   interval: typeof container_usage_interval.$inferSelect,
-  seq: number,
+  usageSourceId: string,
   appliedSeconds: number,
   receivedAt: string,
   billingConfig: BillingConfig
@@ -187,6 +187,9 @@ async function settleSegment(
       })
       .where(eq(container_usage_interval.id, interval.id));
     return { verdict: 'continue' };
+  }
+  if (!interval.rate_cents_per_unit) {
+    throw new UsageMutationConflictError('Paid usage interval is missing its rate snapshot');
   }
 
   const settledAfter = interval.settled_billable_seconds + appliedSeconds;
@@ -210,15 +213,19 @@ async function settleSegment(
 
   let remainingMicrodollars: number;
   if (amountMicrodollars > 0) {
-    await tx.insert(container_usage_charge).values({
-      interval_id: interval.id,
-      seq,
-      subject_type: interval.subject_type,
-      subject_id: interval.subject_id,
+    const charge: typeof compute_usage_charge.$inferInsert = {
+      usage_source: 'container_usage_segment',
+      usage_source_id: usageSourceId,
+      user_id: interval.subject_type === 'user' ? interval.subject_id : undefined,
+      organization_id: interval.subject_type === 'org' ? interval.subject_id : undefined,
+      cloud_billing_sku_id: interval.cloud_billing_sku_id,
+      quantity: String(appliedSeconds),
+      settled_quantity_after: String(settledAfter),
+      rate_cents_per_unit: interval.rate_cents_per_unit,
       amount_microdollars: amountMicrodollars,
-      settled_billable_seconds_after: settledAfter,
       created_at: receivedAt,
-    });
+    };
+    await tx.insert(compute_usage_charge).values(charge);
     if (interval.subject_type === 'user') {
       const [payer] = await tx
         .update(kilocode_users)
@@ -574,7 +581,7 @@ export async function applyHeartbeatWithDb(
     const budget = await settleSegment(
       tx,
       interval,
-      input.seq,
+      input.idempotencyKey,
       appliedSeconds,
       receivedAt,
       billingConfig
@@ -714,7 +721,7 @@ export async function applyStopWithDb(
             billingConfig.warnRemainingMicrodollars
           )
         : { verdict: 'continue' as const }
-      : await settleSegment(tx, interval, input.seq, finalSeconds, receivedAt, billingConfig);
+      : await settleSegment(tx, interval, finalSegmentKey, finalSeconds, receivedAt, billingConfig);
 
     await tx
       .update(container_usage_interval)

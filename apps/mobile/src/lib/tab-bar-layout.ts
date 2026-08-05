@@ -83,3 +83,11 @@ export function shouldHideTabBar(pathname: string): boolean {
     parts[0] === 'security-agent' && parts.length === 3 && parts[2] === 'filter';
   return isKiloClawInstancePicker || isSecurityFindingFilter;
 }
+
+/**
+ * Accessibility label for a tab bar entry. The position and the total must match
+ * the rendered tab count, which changes when the KiloClaw tab is hidden.
+ */
+export function tabAccessibilityLabel(name: string, position: number, total: number): string {
+  return `${name}, tab, ${position} of ${total}`;
+}

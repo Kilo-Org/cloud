@@ -20,6 +20,7 @@ import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -244,8 +245,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const signOut = useCallback(async (ended = false) => {
     isSignedOutReference.current = true;
     invalidateRefreshSession();
-    // Synchronous gate close — must happen before any await so capture
-    // is denied for the entire async teardown window.
+    // Close ownership persistence before any await so a late list response
+    // cannot write the previous account's answer during teardown.
+    gateKiloClawOwned();
     clearTelemetryDecision();
     Sentry.setUser(null);
     // SDK teardown — drop queues, do not flush them. Must happen before
@@ -266,6 +268,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
     await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
     await clearLastActiveInstance();
+    await clearKiloClawOwned();
     await clearRecentPrs();
     await clearViewedFiles();
     clearAgentModelPreference();

@@ -150,7 +150,8 @@ export async function handleInstallationDeleted(
       await deleteIntegration(
         integrationToDelete.owned_by_organization_id,
         PLATFORM.GITHUB,
-        appType
+        appType,
+        installationIdStr
       );
       logExceptInTest('Deleted organization installation:', {
         installation_id: installationIdStr,
@@ -160,7 +161,8 @@ export async function handleInstallationDeleted(
       await deleteIntegrationForOwner(
         { type: 'user', id: integrationToDelete.owned_by_user_id },
         PLATFORM.GITHUB,
-        appType
+        appType,
+        installationIdStr
       );
       logExceptInTest('Deleted user installation:', {
         installation_id: installationIdStr,
@@ -178,9 +180,10 @@ export async function handleInstallationSuspend(
   payload: InstallationSuspendPayload,
   appType: GitHubAppType
 ) {
+  const installationIdStr = payload.installation.id.toString();
   const integrationToSuspend = await findIntegrationByInstallationId(
     PLATFORM.GITHUB,
-    payload.installation.id.toString(),
+    installationIdStr,
     appType
   );
 
@@ -193,7 +196,8 @@ export async function handleInstallationSuspend(
         integrationToSuspend.owned_by_organization_id,
         PLATFORM.GITHUB,
         suspendedBy,
-        appType
+        appType,
+        installationIdStr
       );
       logExceptInTest('GitHub App suspended (organization):', {
         installation_id: payload.installation.id,
@@ -204,7 +208,8 @@ export async function handleInstallationSuspend(
         { type: 'user', id: integrationToSuspend.owned_by_user_id },
         PLATFORM.GITHUB,
         suspendedBy,
-        appType
+        appType,
+        installationIdStr
       );
       logExceptInTest('GitHub App suspended (user):', {
         installation_id: payload.installation.id,
@@ -222,9 +227,10 @@ export async function handleInstallationUnsuspend(
   payload: InstallationUnsuspendPayload,
   appType: GitHubAppType
 ) {
+  const installationIdStr = payload.installation.id.toString();
   const integrationToUnsuspend = await findIntegrationByInstallationId(
     PLATFORM.GITHUB,
-    payload.installation.id.toString(),
+    installationIdStr,
     appType
   );
 
@@ -234,7 +240,8 @@ export async function handleInstallationUnsuspend(
       await unsuspendIntegration(
         integrationToUnsuspend.owned_by_organization_id,
         PLATFORM.GITHUB,
-        appType
+        appType,
+        installationIdStr
       );
       logExceptInTest('GitHub App unsuspended (organization):', {
         installation_id: payload.installation.id,
@@ -244,7 +251,8 @@ export async function handleInstallationUnsuspend(
       await unsuspendIntegrationForOwner(
         { type: 'user', id: integrationToUnsuspend.owned_by_user_id },
         PLATFORM.GITHUB,
-        appType
+        appType,
+        installationIdStr
       );
       logExceptInTest('GitHub App unsuspended (user):', {
         installation_id: payload.installation.id,

@@ -218,13 +218,15 @@ export async function updateIntegrationAccountIdentity(
  * GitHub rows are unique per `(platform, github_app_type, installation_id)`,
  * so an organization can hold both a standard and a lite row. Pass
  * `githubAppType` when the caller knows it so a suspend touches only the
- * matching app-type row.
+ * matching app-type row. Pass `installationId` when the caller already
+ * matched a specific installation so the suspend touches only that row.
  */
 export async function suspendIntegration(
   organizationId: string,
   platform: string,
   suspendedBy: string,
-  githubAppType?: GitHubAppType
+  githubAppType?: GitHubAppType,
+  installationId?: string
 ) {
   const conditions = [
     eq(platform_integrations.owned_by_organization_id, organizationId),
@@ -232,6 +234,9 @@ export async function suspendIntegration(
   ];
   if (githubAppType) {
     conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+  if (installationId) {
+    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
 
   await db
@@ -249,12 +254,15 @@ export async function suspendIntegration(
  * Unsuspends a platform integration.
  *
  * Pass `githubAppType` when the caller knows it so an unsuspend touches only
- * the matching standard or lite row.
+ * the matching standard or lite row. Pass `installationId` when the caller
+ * already matched a specific installation so the unsuspend touches only that
+ * row.
  */
 export async function unsuspendIntegration(
   organizationId: string,
   platform: string,
-  githubAppType?: GitHubAppType
+  githubAppType?: GitHubAppType,
+  installationId?: string
 ) {
   const conditions = [
     eq(platform_integrations.owned_by_organization_id, organizationId),
@@ -262,6 +270,9 @@ export async function unsuspendIntegration(
   ];
   if (githubAppType) {
     conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+  if (installationId) {
+    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
 
   await db
@@ -279,12 +290,14 @@ export async function unsuspendIntegration(
  * Deletes a platform integration.
  *
  * Pass `githubAppType` when the caller knows it so a delete removes only the
- * matching standard or lite row.
+ * matching standard or lite row. Pass `installationId` when the caller
+ * already matched a specific installation so the delete removes only that row.
  */
 export async function deleteIntegration(
   organizationId: string,
   platform: string,
-  githubAppType?: GitHubAppType
+  githubAppType?: GitHubAppType,
+  installationId?: string
 ) {
   const conditions = [
     eq(platform_integrations.owned_by_organization_id, organizationId),
@@ -292,6 +305,9 @@ export async function deleteIntegration(
   ];
   if (githubAppType) {
     conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+  if (installationId) {
+    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
 
   await db.delete(platform_integrations).where(and(...conditions));
@@ -540,12 +556,14 @@ export async function getAllIntegrationsForOwner(owner: Owner) {
  * Deletes a platform integration for an owner (user or organization).
  *
  * Pass `githubAppType` when the caller knows it so a delete removes only the
- * matching standard or lite row.
+ * matching standard or lite row. Pass `installationId` when the caller
+ * already matched a specific installation so the delete removes only that row.
  */
 export async function deleteIntegrationForOwner(
   owner: Owner,
   platform: string,
-  githubAppType?: GitHubAppType
+  githubAppType?: GitHubAppType,
+  installationId?: string
 ) {
   const ownershipCondition =
     owner.type === 'user'
@@ -556,6 +574,9 @@ export async function deleteIntegrationForOwner(
   if (githubAppType) {
     conditions.push(eq(platform_integrations.github_app_type, githubAppType));
   }
+  if (installationId) {
+    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
+  }
 
   await db.delete(platform_integrations).where(and(...conditions));
 }
@@ -564,13 +585,15 @@ export async function deleteIntegrationForOwner(
  * Suspends a platform integration for an owner (user or organization).
  *
  * Pass `githubAppType` when the caller knows it so a suspend touches only the
- * matching standard or lite row.
+ * matching standard or lite row. Pass `installationId` when the caller
+ * already matched a specific installation so the suspend touches only that row.
  */
 export async function suspendIntegrationForOwner(
   owner: Owner,
   platform: string,
   suspendedBy: string,
-  githubAppType?: GitHubAppType
+  githubAppType?: GitHubAppType,
+  installationId?: string
 ) {
   const ownershipCondition =
     owner.type === 'user'
@@ -580,6 +603,9 @@ export async function suspendIntegrationForOwner(
   const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
   if (githubAppType) {
     conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+  if (installationId) {
+    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
 
   await db
@@ -597,12 +623,15 @@ export async function suspendIntegrationForOwner(
  * Unsuspends a platform integration for an owner (user or organization).
  *
  * Pass `githubAppType` when the caller knows it so an unsuspend touches only
- * the matching standard or lite row.
+ * the matching standard or lite row. Pass `installationId` when the caller
+ * already matched a specific installation so the unsuspend touches only that
+ * row.
  */
 export async function unsuspendIntegrationForOwner(
   owner: Owner,
   platform: string,
-  githubAppType?: GitHubAppType
+  githubAppType?: GitHubAppType,
+  installationId?: string
 ) {
   const ownershipCondition =
     owner.type === 'user'
@@ -612,6 +641,9 @@ export async function unsuspendIntegrationForOwner(
   const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
   if (githubAppType) {
     conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+  if (installationId) {
+    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
 
   await db

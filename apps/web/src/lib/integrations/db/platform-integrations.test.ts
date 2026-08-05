@@ -571,5 +571,173 @@ describe('upsertPlatformIntegrationForOwner', () => {
       ]);
       expect(lite?.repositories).toBeNull();
     });
+
+    // Two rows for the same owner, same app type, but different installation
+    // ids are legal (the GitHub unique index is keyed per installation id).
+    // A mutation scoped only to owner and app type would touch both rows; the
+    // installation-scoped one must leave the sibling untouched.
+    async function seedOrgSameAppTypeSiblings() {
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_organization_id: orgId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '1000',
+          platform_account_login: 'org-a',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+        {
+          owned_by_organization_id: orgId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: siblingInstallId,
+          platform_account_id: '2000',
+          platform_account_login: 'org-b',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+      ]);
+    }
+
+    async function seedUserSameAppTypeSiblings() {
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_user_id: userId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '3000',
+          platform_account_login: 'user-a',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+        {
+          owned_by_user_id: userId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: siblingInstallId,
+          platform_account_id: '4000',
+          platform_account_login: 'user-b',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+      ]);
+    }
+
+    test('deleteIntegration with installation id leaves the same-owner same-app-type sibling', async () => {
+      await seedOrgSameAppTypeSiblings();
+
+      await deleteIntegration(orgId, 'github', 'standard', destructiveInstallId);
+
+      const rows = await getOrgRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].platform_installation_id).toBe(siblingInstallId);
+      expect(rows[0].github_app_type).toBe('standard');
+    });
+
+    test('suspendIntegration with installation id leaves the same-owner same-app-type sibling active', async () => {
+      await seedOrgSameAppTypeSiblings();
+
+      await suspendIntegration(orgId, 'github', 'webhook-sender', 'standard', destructiveInstallId);
+
+      const rows = await getOrgRows();
+      expect(rows).toHaveLength(2);
+      const matched = rows.find(row => row.platform_installation_id === destructiveInstallId);
+      const sibling = rows.find(row => row.platform_installation_id === siblingInstallId);
+      expect(matched?.integration_status).toBe('suspended');
+      expect(matched?.suspended_by).toBe('webhook-sender');
+      expect(sibling?.integration_status).toBe('active');
+      expect(sibling?.suspended_at).toBeNull();
+    });
+
+    test('unsuspendIntegration with installation id leaves the same-owner same-app-type sibling suspended', async () => {
+      await seedOrgSameAppTypeSiblings();
+      await db
+        .update(platform_integrations)
+        .set({ integration_status: 'suspended' })
+        .where(
+          and(
+            eq(platform_integrations.platform, 'github'),
+            eq(platform_integrations.owned_by_organization_id, orgId)
+          )
+        );
+
+      await unsuspendIntegration(orgId, 'github', 'standard', destructiveInstallId);
+
+      const rows = await getOrgRows();
+      expect(rows).toHaveLength(2);
+      const matched = rows.find(row => row.platform_installation_id === destructiveInstallId);
+      const sibling = rows.find(row => row.platform_installation_id === siblingInstallId);
+      expect(matched?.integration_status).toBe('active');
+      expect(sibling?.integration_status).toBe('suspended');
+    });
+
+    test('deleteIntegrationForOwner with installation id leaves the same-owner same-app-type sibling', async () => {
+      await seedUserSameAppTypeSiblings();
+
+      await deleteIntegrationForOwner(
+        { type: 'user', id: userId },
+        'github',
+        'standard',
+        destructiveInstallId
+      );
+
+      const rows = await getUserRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].platform_installation_id).toBe(siblingInstallId);
+      expect(rows[0].github_app_type).toBe('standard');
+    });
+
+    test('suspendIntegrationForOwner with installation id leaves the same-owner same-app-type sibling active', async () => {
+      await seedUserSameAppTypeSiblings();
+
+      await suspendIntegrationForOwner(
+        { type: 'user', id: userId },
+        'github',
+        'webhook-sender',
+        'standard',
+        destructiveInstallId
+      );
+
+      const rows = await getUserRows();
+      expect(rows).toHaveLength(2);
+      const matched = rows.find(row => row.platform_installation_id === destructiveInstallId);
+      const sibling = rows.find(row => row.platform_installation_id === siblingInstallId);
+      expect(matched?.integration_status).toBe('suspended');
+      expect(sibling?.integration_status).toBe('active');
+    });
+
+    test('unsuspendIntegrationForOwner with installation id leaves the same-owner same-app-type sibling suspended', async () => {
+      await seedUserSameAppTypeSiblings();
+      await db
+        .update(platform_integrations)
+        .set({ integration_status: 'suspended' })
+        .where(
+          and(
+            eq(platform_integrations.platform, 'github'),
+            eq(platform_integrations.owned_by_user_id, userId)
+          )
+        );
+
+      await unsuspendIntegrationForOwner(
+        { type: 'user', id: userId },
+        'github',
+        'standard',
+        destructiveInstallId
+      );
+
+      const rows = await getUserRows();
+      expect(rows).toHaveLength(2);
+      const matched = rows.find(row => row.platform_installation_id === destructiveInstallId);
+      const sibling = rows.find(row => row.platform_installation_id === siblingInstallId);
+      expect(matched?.integration_status).toBe('active');
+      expect(sibling?.integration_status).toBe('suspended');
+    });
   });
 });

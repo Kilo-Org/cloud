@@ -26,16 +26,31 @@ const mockFindIntegrationByInstallationId =
     ) => Promise<GitHubIntegrationRow | null>
   >();
 const mockDeleteIntegration =
-  jest.fn<(organizationId: string, platform: string, appType: GitHubAppType) => Promise<void>>();
+  jest.fn<
+    (
+      organizationId: string,
+      platform: string,
+      appType: GitHubAppType,
+      installationId?: string
+    ) => Promise<void>
+  >();
 const mockDeleteIntegrationForOwner =
-  jest.fn<(owner: GitHubOwner, platform: string, appType: GitHubAppType) => Promise<void>>();
+  jest.fn<
+    (
+      owner: GitHubOwner,
+      platform: string,
+      appType: GitHubAppType,
+      installationId?: string
+    ) => Promise<void>
+  >();
 const mockSuspendIntegration =
   jest.fn<
     (
       organizationId: string,
       platform: string,
       suspendedBy: string,
-      appType: GitHubAppType
+      appType: GitHubAppType,
+      installationId?: string
     ) => Promise<void>
   >();
 const mockSuspendIntegrationForOwner =
@@ -44,13 +59,28 @@ const mockSuspendIntegrationForOwner =
       owner: GitHubOwner,
       platform: string,
       suspendedBy: string,
-      appType: GitHubAppType
+      appType: GitHubAppType,
+      installationId?: string
     ) => Promise<void>
   >();
 const mockUnsuspendIntegration =
-  jest.fn<(organizationId: string, platform: string, appType: GitHubAppType) => Promise<void>>();
+  jest.fn<
+    (
+      organizationId: string,
+      platform: string,
+      appType: GitHubAppType,
+      installationId?: string
+    ) => Promise<void>
+  >();
 const mockUnsuspendIntegrationForOwner =
-  jest.fn<(owner: GitHubOwner, platform: string, appType: GitHubAppType) => Promise<void>>();
+  jest.fn<
+    (
+      owner: GitHubOwner,
+      platform: string,
+      appType: GitHubAppType,
+      installationId?: string
+    ) => Promise<void>
+  >();
 const mockUpdateIntegrationRepositories =
   jest.fn<
     (
@@ -74,26 +104,44 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     appType: GitHubAppType
   ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
   autoCompleteInstallation: jest.fn(),
-  deleteIntegration: (organizationId: string, platform: string, appType: GitHubAppType) =>
-    mockDeleteIntegration(organizationId, platform, appType),
-  deleteIntegrationForOwner: (owner: GitHubOwner, platform: string, appType: GitHubAppType) =>
-    mockDeleteIntegrationForOwner(owner, platform, appType),
+  deleteIntegration: (
+    organizationId: string,
+    platform: string,
+    appType: GitHubAppType,
+    installationId?: string
+  ) => mockDeleteIntegration(organizationId, platform, appType, installationId),
+  deleteIntegrationForOwner: (
+    owner: GitHubOwner,
+    platform: string,
+    appType: GitHubAppType,
+    installationId?: string
+  ) => mockDeleteIntegrationForOwner(owner, platform, appType, installationId),
   suspendIntegration: (
     organizationId: string,
     platform: string,
     suspendedBy: string,
-    appType: GitHubAppType
-  ) => mockSuspendIntegration(organizationId, platform, suspendedBy, appType),
+    appType: GitHubAppType,
+    installationId?: string
+  ) => mockSuspendIntegration(organizationId, platform, suspendedBy, appType, installationId),
   suspendIntegrationForOwner: (
     owner: GitHubOwner,
     platform: string,
     suspendedBy: string,
-    appType: GitHubAppType
-  ) => mockSuspendIntegrationForOwner(owner, platform, suspendedBy, appType),
-  unsuspendIntegration: (organizationId: string, platform: string, appType: GitHubAppType) =>
-    mockUnsuspendIntegration(organizationId, platform, appType),
-  unsuspendIntegrationForOwner: (owner: GitHubOwner, platform: string, appType: GitHubAppType) =>
-    mockUnsuspendIntegrationForOwner(owner, platform, appType),
+    appType: GitHubAppType,
+    installationId?: string
+  ) => mockSuspendIntegrationForOwner(owner, platform, suspendedBy, appType, installationId),
+  unsuspendIntegration: (
+    organizationId: string,
+    platform: string,
+    appType: GitHubAppType,
+    installationId?: string
+  ) => mockUnsuspendIntegration(organizationId, platform, appType, installationId),
+  unsuspendIntegrationForOwner: (
+    owner: GitHubOwner,
+    platform: string,
+    appType: GitHubAppType,
+    installationId?: string
+  ) => mockUnsuspendIntegrationForOwner(owner, platform, appType, installationId),
   updateRepositoriesForIntegration: jest.fn(),
   updateIntegrationRepositories: (
     platform: string,
@@ -184,7 +232,7 @@ describe('handleInstallationDeleted', () => {
     expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
     expect(mockBotInitialize).toHaveBeenCalled();
     expect(mockUnlinkTeamKiloUsers).toHaveBeenCalledWith(expect.anything(), 'github', '98765');
-    expect(mockDeleteIntegration).toHaveBeenCalledWith('org_1', 'github', 'standard');
+    expect(mockDeleteIntegration).toHaveBeenCalledWith('org_1', 'github', 'standard', '98765');
     expect(mockDeleteIntegrationForOwner).not.toHaveBeenCalled();
   });
 
@@ -200,7 +248,8 @@ describe('handleInstallationDeleted', () => {
     expect(mockDeleteIntegrationForOwner).toHaveBeenCalledWith(
       { type: 'user', id: 'user_1' },
       'github',
-      'lite'
+      'lite',
+      '98765'
     );
     expect(mockDeleteIntegration).not.toHaveBeenCalled();
   });
@@ -220,7 +269,13 @@ describe('handleInstallationSuspend', () => {
 
     expect(response.status).toBe(200);
     expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
-    expect(mockSuspendIntegration).toHaveBeenCalledWith('org_1', 'github', 'octocat', 'standard');
+    expect(mockSuspendIntegration).toHaveBeenCalledWith(
+      'org_1',
+      'github',
+      'octocat',
+      'standard',
+      '98765'
+    );
     expect(mockSuspendIntegrationForOwner).not.toHaveBeenCalled();
   });
 
@@ -234,7 +289,8 @@ describe('handleInstallationSuspend', () => {
       { type: 'user', id: 'user_1' },
       'github',
       'octocat',
-      'lite'
+      'lite',
+      '98765'
     );
     expect(mockSuspendIntegration).not.toHaveBeenCalled();
   });
@@ -254,7 +310,7 @@ describe('handleInstallationUnsuspend', () => {
 
     expect(response.status).toBe(200);
     expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
-    expect(mockUnsuspendIntegration).toHaveBeenCalledWith('org_1', 'github', 'lite');
+    expect(mockUnsuspendIntegration).toHaveBeenCalledWith('org_1', 'github', 'lite', '98765');
     expect(mockUnsuspendIntegrationForOwner).not.toHaveBeenCalled();
   });
 
@@ -267,7 +323,8 @@ describe('handleInstallationUnsuspend', () => {
     expect(mockUnsuspendIntegrationForOwner).toHaveBeenCalledWith(
       { type: 'user', id: 'user_1' },
       'github',
-      'standard'
+      'standard',
+      '98765'
     );
     expect(mockUnsuspendIntegration).not.toHaveBeenCalled();
   });

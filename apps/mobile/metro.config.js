@@ -21,7 +21,7 @@ config.resolver.nodeModulesPaths = [
 // every `.tsx` under `src/app`, so a `*.test.tsx` next to a route registers as a route
 // and drags vitest (and vite) into the bundle, which Metro cannot transform.
 config.resolver.blockList = [
-  ...config.resolver.blockList,
+  ...(config.resolver.blockList || []),
   /[\\/]apps[\\/]mobile[\\/]src[\\/].*\.test\.[jt]sx?$/,
 ];
 

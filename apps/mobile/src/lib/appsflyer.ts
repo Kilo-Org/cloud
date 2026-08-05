@@ -11,8 +11,11 @@ import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
 import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 
 let initialized = false;
-/** Blocks re-entry into create() within one JS bundle (before initSdk succeeds). */
-let purchaseConnectorCreateStarted = false;
+/**
+ * Resolves to whether the native purchase connector is configured. Null until
+ * `create()` is first called. See `ensurePurchaseConnector`.
+ */
+let connectorReady: Promise<boolean> | null = null;
 /**
  * Invalidation token for in-flight initSdk callbacks. Incremented by
  * `resetAppsFlyerState()` so a late success after stop/optional revoke
@@ -74,21 +77,46 @@ function isConnectorAlreadyConfigured(error: unknown): boolean {
 }
 
 /**
- * Settles create() without floating promises. `Promise.resolve` normalizes a
- * non-promise return (bare mocks / unpatched install) so await never throws
- * TypeError. Known-benign "already configured" is swallowed; anything else
- * goes to Sentry via handleError.
+ * Reports whether the native purchase connector is configured.
+ *
+ * Native PCAppsFlyer keeps a process-lifetime static connector. A JS reload
+ * resets module state while native state survives, so create() then rejects
+ * with "Connector already configured" — which still means configured. Any
+ * other failure goes to Sentry and leaves the connector unusable.
  */
-async function settlePurchaseConnectorCreate(
-  createResult: void | PromiseLike<void>
-): Promise<void> {
+async function createPurchaseConnector(): Promise<boolean> {
   try {
-    await Promise.resolve(createResult);
+    await AppsFlyerPurchaseConnector.create({
+      logSubscriptions: true,
+      logInApps: false,
+      sandbox: __DEV__,
+      storeKitVersion: StoreKitVersion.SK2,
+    });
+    return true;
   } catch (error: unknown) {
     if (isConnectorAlreadyConfigured(error)) {
-      return;
+      return true;
     }
     handleError('AppsFlyer purchase connector failed')(error);
+    return false;
+  }
+}
+
+/**
+ * Runs a connector call only once the connector is known to be configured.
+ * The library discards the promise that start/stopObservingTransactions
+ * return, so a native "Connector not configured" rejection escapes as an
+ * unhandled rejection and lands in Sentry. `connectorReady` stays null on
+ * Android and before the first create(), so both calls are skipped there.
+ */
+async function whenConnectorReady(action: () => void): Promise<void> {
+  if (connectorReady === null || !(await connectorReady)) {
+    return;
+  }
+  try {
+    action();
+  } catch {
+    // Native module missing or threw synchronously.
   }
 }
 
@@ -117,22 +145,9 @@ export function initAppsFlyer(): void {
   // purchase revenue server-side, so revenue is attributed without touching the
   // purchase flow. iOS-only: Kilo Pass IAP ships on iOS only (subscriptions,
   // StoreKit 2 via expo-iap). Create it before initSdk and start observing once
-  // the SDK has started (in the success callback below).
-  //
-  // Native PCAppsFlyer keeps a process-lifetime static connector. JS reloads
-  // reset module state while native state remains, so create() can reject with
-  // "Connector already configured". Guard sync re-entry within one bundle and
-  // swallow only that known-benign rejection (any other failure goes to Sentry).
-  if (Platform.OS === 'ios' && !purchaseConnectorCreateStarted) {
-    purchaseConnectorCreateStarted = true;
-    void settlePurchaseConnectorCreate(
-      AppsFlyerPurchaseConnector.create({
-        logSubscriptions: true,
-        logInApps: false,
-        sandbox: __DEV__,
-        storeKitVersion: StoreKitVersion.SK2,
-      })
-    );
+  // both the SDK has started and the connector is configured.
+  if (Platform.OS === 'ios') {
+    connectorReady ??= createPurchaseConnector();
   }
 
   // Send the optional-consent signal before the SDK starts so attribution
@@ -169,9 +184,13 @@ export function initAppsFlyer(): void {
         return;
       }
       initialized = true;
-      if (Platform.OS === 'ios') {
+      void whenConnectorReady(() => {
+        // Re-check: a reset can land while the create() promise settles.
+        if (currentGeneration() !== initGeneration || callbackToken !== initToken) {
+          return;
+        }
         AppsFlyerPurchaseConnector.startObservingTransactions();
-      }
+      });
       drainPendingEvents();
     },
     handleError('AppsFlyer init failed')
@@ -208,8 +227,8 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
  * clears the pending-event buffer so stale events from a prior account do
  * not transmit on a later init.
  *
- * Does NOT reset `purchaseConnectorCreateStarted`: native `PCAppsFlyer` keeps
- * a process-lifetime static connector, so re-entering `create()` rejects with
+ * Does NOT clear `connectorReady`: native `PCAppsFlyer` keeps a
+ * process-lifetime static connector, so re-entering `create()` rejects with
  * "Connector already configured".
  */
 export function resetAppsFlyerState(): void {
@@ -228,17 +247,7 @@ export function resetAppsFlyerState(): void {
     // Native stop may throw — JS invalidation has already run.
   }
 
-  if (Platform.OS === 'ios') {
-    try {
-      if (
-        typeof (AppsFlyerPurchaseConnector as unknown as Record<string, unknown>)
-          .stopObservingTransactions === 'function'
-      ) {
-        AppsFlyerPurchaseConnector.stopObservingTransactions();
-      }
-    } catch {
-      // Native stopObservingTransactions may throw — JS invalidation has
-      // already run.
-    }
-  }
+  void whenConnectorReady(() => {
+    AppsFlyerPurchaseConnector.stopObservingTransactions();
+  });
 }

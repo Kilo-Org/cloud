@@ -74,6 +74,13 @@ async function loadModule() {
   return module;
 }
 
+/** Drains the microtasks that gate connector calls on the create() promise. */
+async function flushConnector() {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('initAppsFlyer purchase connector', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,7 +108,19 @@ describe('initAppsFlyer purchase connector', () => {
       sandbox: false,
       storeKitVersion: 'SK2',
     });
+    await flushConnector();
     expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not observe transactions when create fails', async () => {
+    mockedPlatform.OS = 'ios';
+    mockedAppsFlyer.create.mockRejectedValue(new Error('native bridge down'));
+
+    const initAppsFlyer = await loadInit();
+    initAppsFlyer();
+
+    await flushConnector();
+    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
   });
 
   it('does not touch the purchase connector on Android', async () => {
@@ -131,6 +150,7 @@ describe('initAppsFlyer purchase connector', () => {
     initAppsFlyer();
     initAppsFlyer();
 
+    await flushConnector();
     expect(mockedAppsFlyer.create).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
 
@@ -138,6 +158,7 @@ describe('initAppsFlyer purchase connector', () => {
 
     initAppsFlyer();
 
+    await flushConnector();
     expect(mockedAppsFlyer.create).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
   });
@@ -410,19 +431,38 @@ describe('resetAppsFlyerState', () => {
     expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(true);
   });
 
-  it('calls stopObservingTransactions on iOS', async () => {
+  it('calls stopObservingTransactions on iOS after the connector was created', async () => {
+    mockedPlatform.OS = 'ios';
+    const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
+    initAppsFlyer();
+    await flushConnector();
+
+    resetAppsFlyerState();
+
+    await flushConnector();
+    expect(mockedAppsFlyer.stopObservingTransactions).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: a signed-out cold start resets before initAppsFlyer ever runs.
+  // Native rejects with "Connector not configured, did you call `create`
+  // first?" and the library drops that promise, so it reached Sentry as an
+  // unhandled rejection.
+  it('does not call stopObservingTransactions when the connector was never created', async () => {
     mockedPlatform.OS = 'ios';
     const { resetAppsFlyerState } = await loadModule();
     resetAppsFlyerState();
 
-    expect(mockedAppsFlyer.stopObservingTransactions).toHaveBeenCalledTimes(1);
+    await flushConnector();
+    expect(mockedAppsFlyer.stopObservingTransactions).not.toHaveBeenCalled();
   });
 
   it('does not call stopObservingTransactions on Android', async () => {
     mockedPlatform.OS = 'android';
-    const { resetAppsFlyerState } = await loadModule();
+    const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
+    initAppsFlyer();
     resetAppsFlyerState();
 
+    await flushConnector();
     expect(mockedAppsFlyer.stopObservingTransactions).not.toHaveBeenCalled();
   });
 
@@ -490,6 +530,7 @@ describe('resetAppsFlyerState', () => {
 
     // Fire the stale callback — must not re-arm the SDK.
     successHolders[0]?.('ok');
+    await flushConnector();
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
 
     // Track an event — must buffer, not log, because initialized was cleared.
@@ -568,6 +609,7 @@ describe('stale initSdk callback', () => {
 
     // initialized must still be false, so trackEvent queues instead of logging.
     module.trackEvent('post-stale-event');
+    await flushConnector();
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
   });
@@ -616,6 +658,7 @@ describe('stale initSdk callback', () => {
 
     // Fire the stale callback.
     successHolders[0]?.('ok');
+    await flushConnector();
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
 
     // Re-init — generation now matches the controller.
@@ -631,6 +674,7 @@ describe('stale initSdk callback', () => {
     // Fire the new callback.
     expect(successHolders).toHaveLength(2);
     successHolders[1]?.('ok');
+    await flushConnector();
     expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
   });
 });
@@ -714,6 +758,7 @@ describe('callback token revoke invalidation', () => {
 
     // Fire the stale callback.
     successHolders[0]?.('ok');
+    await flushConnector();
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
 
     // Re-init — token now matches because resetAppsFlyerState was already called.
@@ -729,6 +774,7 @@ describe('callback token revoke invalidation', () => {
     // Fire the new callback — token matches, must succeed.
     expect(successHolders).toHaveLength(2);
     successHolders[1]?.('ok');
+    await flushConnector();
     expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
   });
 });

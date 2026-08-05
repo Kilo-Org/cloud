@@ -187,7 +187,11 @@ export async function handleGitHubWebhook(
 
         // Get integration before deletion to log the event
         const installationId = parseResult.data.installation.id.toString();
-        const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+        const integration = await findIntegrationByInstallationId(
+          PLATFORM.GITHUB,
+          installationId,
+          appType
+        );
 
         if (integration) {
           const logResult = await logWebhook(integration, action);
@@ -195,7 +199,7 @@ export async function handleGitHubWebhook(
             return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
           }
 
-          const result = await handleInstallationDeleted(parseResult.data);
+          const result = await handleInstallationDeleted(parseResult.data, appType);
 
           // Mark webhook event as processed
           if (logResult.webhookEventId) {
@@ -214,7 +218,7 @@ export async function handleGitHubWebhook(
           return result;
         }
 
-        return await handleInstallationDeleted(parseResult.data);
+        return await handleInstallationDeleted(parseResult.data, appType);
       }
 
       if (action === GITHUB_ACTION.SUSPEND) {
@@ -230,7 +234,11 @@ export async function handleGitHubWebhook(
         }
 
         const installationId = parseResult.data.installation.id.toString();
-        const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+        const integration = await findIntegrationByInstallationId(
+          PLATFORM.GITHUB,
+          installationId,
+          appType
+        );
 
         if (integration) {
           const logResult = await logWebhook(integration, action);
@@ -238,7 +246,7 @@ export async function handleGitHubWebhook(
             return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
           }
 
-          const result = await handleInstallationSuspend(parseResult.data);
+          const result = await handleInstallationSuspend(parseResult.data, appType);
 
           // Mark webhook event as processed
           if (logResult.webhookEventId) {
@@ -257,7 +265,7 @@ export async function handleGitHubWebhook(
           return result;
         }
 
-        return await handleInstallationSuspend(parseResult.data);
+        return await handleInstallationSuspend(parseResult.data, appType);
       }
 
       if (action === GITHUB_ACTION.UNSUSPEND) {
@@ -273,7 +281,11 @@ export async function handleGitHubWebhook(
         }
 
         const installationId = parseResult.data.installation.id.toString();
-        const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+        const integration = await findIntegrationByInstallationId(
+          PLATFORM.GITHUB,
+          installationId,
+          appType
+        );
 
         if (integration) {
           const logResult = await logWebhook(integration, action);
@@ -281,7 +293,7 @@ export async function handleGitHubWebhook(
             return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
           }
 
-          const result = await handleInstallationUnsuspend(parseResult.data);
+          const result = await handleInstallationUnsuspend(parseResult.data, appType);
 
           // Mark webhook event as processed
           if (logResult.webhookEventId) {
@@ -300,7 +312,7 @@ export async function handleGitHubWebhook(
           return result;
         }
 
-        return await handleInstallationUnsuspend(parseResult.data);
+        return await handleInstallationUnsuspend(parseResult.data, appType);
       }
 
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
@@ -330,7 +342,11 @@ export async function handleGitHubWebhook(
       }
 
       const installationId = parseResult.data.installation.id.toString();
-      const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+      const integration = await findIntegrationByInstallationId(
+        PLATFORM.GITHUB,
+        installationId,
+        appType
+      );
       if (!integration) {
         console.warn(`Integration not found${logSuffix}:`, installationId);
         return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
@@ -382,7 +398,11 @@ export async function handleGitHubWebhook(
       }
 
       const installationId = parseResult.data.installation.id.toString();
-      const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+      const integration = await findIntegrationByInstallationId(
+        PLATFORM.GITHUB,
+        installationId,
+        appType
+      );
 
       if (!integration) {
         console.warn(`Integration not found${logSuffix}:`, installationId);
@@ -395,7 +415,7 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
 
-      const result = await handleInstallationRepositories(parseResult.data);
+      const result = await handleInstallationRepositories(parseResult.data, appType);
 
       // Mark webhook event as processed
       if (logResult.webhookEventId) {
@@ -423,7 +443,11 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ message: 'Missing installation ID' }, { status: 400 });
     }
 
-    const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+    const integration = await findIntegrationByInstallationId(
+      PLATFORM.GITHUB,
+      installationId,
+      appType
+    );
 
     if (!integration) {
       console.warn(`Integration not found for installation${logSuffix}:`, installationId);

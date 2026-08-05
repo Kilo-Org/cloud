@@ -327,6 +327,9 @@ export const githubAppsRouter = createTRPCRouter({
       scopes: installationDetails.events,
       repositoryAccess: installationDetails.repository_selection,
       installedAt: installationDetails.created_at,
+      // Keep the integration's app type so a lite refresh is never matched
+      // against (or converted into) the standard app's row.
+      githubAppType: appType,
     });
 
     if (!upsertResult.ok) {

@@ -15,23 +15,33 @@ import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 
 /**
- * Finds a platform integration by installation ID
+ * Finds a platform integration by installation ID.
+ *
+ * GitHub uniqueness is keyed on `(platform, github_app_type, installation_id)`,
+ * so the same installation ID can exist once per app type (owned by different
+ * owners). Callers that know the app type must pass `githubAppType` to select
+ * the correct row. Callers without an app type (e.g. legacy bot-link states)
+ * keep the unscoped lookup, which preserves legacy behavior.
  */
 export async function findIntegrationByInstallationId(
   platform: string,
-  installationId: string | undefined
+  installationId: string | undefined,
+  githubAppType?: GitHubAppType
 ) {
   if (!installationId) return null;
+
+  const conditions = [
+    eq(platform_integrations.platform, platform),
+    eq(platform_integrations.platform_installation_id, installationId),
+  ];
+  if (githubAppType) {
+    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
 
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, platform),
-        eq(platform_integrations.platform_installation_id, installationId)
-      )
-    )
+    .where(and(...conditions))
     .limit(1);
 
   return integration || null;
@@ -137,13 +147,25 @@ export async function upsertPlatformIntegration(data: {
 }
 
 /**
- * Updates repository list for an integration by installation ID
+ * Updates repository list for an integration by installation ID.
+ * GitHub rows are unique per `(platform, github_app_type, installation_id)`;
+ * pass `githubAppType` when the caller knows it so the update targets only the
+ * matching standard or lite row.
  */
 export async function updateIntegrationRepositories(
   platform: string,
   installationId: string,
-  repositories: PlatformRepository[]
+  repositories: PlatformRepository[],
+  githubAppType?: GitHubAppType
 ) {
+  const conditions = [
+    eq(platform_integrations.platform, platform),
+    eq(platform_integrations.platform_installation_id, installationId),
+  ];
+  if (githubAppType) {
+    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+
   await db
     .update(platform_integrations)
     .set({
@@ -153,12 +175,7 @@ export async function updateIntegrationRepositories(
       auth_invalid_reason: null,
       updated_at: new Date().toISOString(),
     })
-    .where(
-      and(
-        eq(platform_integrations.platform, platform),
-        eq(platform_integrations.platform_installation_id, installationId)
-      )
-    );
+    .where(and(...conditions));
 }
 
 /**
@@ -196,13 +213,27 @@ export async function updateIntegrationAccountIdentity(
 }
 
 /**
- * Suspends a platform integration
+ * Suspends a platform integration.
+ *
+ * GitHub rows are unique per `(platform, github_app_type, installation_id)`,
+ * so an organization can hold both a standard and a lite row. Pass
+ * `githubAppType` when the caller knows it so a suspend touches only the
+ * matching app-type row.
  */
 export async function suspendIntegration(
   organizationId: string,
   platform: string,
-  suspendedBy: string
+  suspendedBy: string,
+  githubAppType?: GitHubAppType
 ) {
+  const conditions = [
+    eq(platform_integrations.owned_by_organization_id, organizationId),
+    eq(platform_integrations.platform, platform),
+  ];
+  if (githubAppType) {
+    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+
   await db
     .update(platform_integrations)
     .set({
@@ -211,18 +242,28 @@ export async function suspendIntegration(
       suspended_by: suspendedBy,
       updated_at: new Date().toISOString(),
     })
-    .where(
-      and(
-        eq(platform_integrations.owned_by_organization_id, organizationId),
-        eq(platform_integrations.platform, platform)
-      )
-    );
+    .where(and(...conditions));
 }
 
 /**
- * Unsuspends a platform integration
+ * Unsuspends a platform integration.
+ *
+ * Pass `githubAppType` when the caller knows it so an unsuspend touches only
+ * the matching standard or lite row.
  */
-export async function unsuspendIntegration(organizationId: string, platform: string) {
+export async function unsuspendIntegration(
+  organizationId: string,
+  platform: string,
+  githubAppType?: GitHubAppType
+) {
+  const conditions = [
+    eq(platform_integrations.owned_by_organization_id, organizationId),
+    eq(platform_integrations.platform, platform),
+  ];
+  if (githubAppType) {
+    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+
   await db
     .update(platform_integrations)
     .set({
@@ -231,26 +272,29 @@ export async function unsuspendIntegration(organizationId: string, platform: str
       suspended_by: null,
       updated_at: new Date().toISOString(),
     })
-    .where(
-      and(
-        eq(platform_integrations.owned_by_organization_id, organizationId),
-        eq(platform_integrations.platform, platform)
-      )
-    );
+    .where(and(...conditions));
 }
 
 /**
- * Deletes a platform integration
+ * Deletes a platform integration.
+ *
+ * Pass `githubAppType` when the caller knows it so a delete removes only the
+ * matching standard or lite row.
  */
-export async function deleteIntegration(organizationId: string, platform: string) {
-  await db
-    .delete(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.owned_by_organization_id, organizationId),
-        eq(platform_integrations.platform, platform)
-      )
-    );
+export async function deleteIntegration(
+  organizationId: string,
+  platform: string,
+  githubAppType?: GitHubAppType
+) {
+  const conditions = [
+    eq(platform_integrations.owned_by_organization_id, organizationId),
+    eq(platform_integrations.platform, platform),
+  ];
+  if (githubAppType) {
+    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+
+  await db.delete(platform_integrations).where(and(...conditions));
 }
 
 /**
@@ -493,31 +537,50 @@ export async function getAllIntegrationsForOwner(owner: Owner) {
 }
 
 /**
- * Deletes a platform integration for an owner (user or organization)
+ * Deletes a platform integration for an owner (user or organization).
+ *
+ * Pass `githubAppType` when the caller knows it so a delete removes only the
+ * matching standard or lite row.
  */
-export async function deleteIntegrationForOwner(owner: Owner, platform: string) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
-
-  await db
-    .delete(platform_integrations)
-    .where(and(ownershipCondition, eq(platform_integrations.platform, platform)));
-}
-
-/**
- * Suspends a platform integration for an owner (user or organization)
- */
-export async function suspendIntegrationForOwner(
+export async function deleteIntegrationForOwner(
   owner: Owner,
   platform: string,
-  suspendedBy: string
+  githubAppType?: GitHubAppType
 ) {
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)
       : eq(platform_integrations.owned_by_organization_id, owner.id);
+
+  const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
+  if (githubAppType) {
+    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
+
+  await db.delete(platform_integrations).where(and(...conditions));
+}
+
+/**
+ * Suspends a platform integration for an owner (user or organization).
+ *
+ * Pass `githubAppType` when the caller knows it so a suspend touches only the
+ * matching standard or lite row.
+ */
+export async function suspendIntegrationForOwner(
+  owner: Owner,
+  platform: string,
+  suspendedBy: string,
+  githubAppType?: GitHubAppType
+) {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(platform_integrations.owned_by_user_id, owner.id)
+      : eq(platform_integrations.owned_by_organization_id, owner.id);
+
+  const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
+  if (githubAppType) {
+    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
 
   await db
     .update(platform_integrations)
@@ -527,17 +590,29 @@ export async function suspendIntegrationForOwner(
       suspended_by: suspendedBy,
       updated_at: new Date().toISOString(),
     })
-    .where(and(ownershipCondition, eq(platform_integrations.platform, platform)));
+    .where(and(...conditions));
 }
 
 /**
- * Unsuspends a platform integration for an owner (user or organization)
+ * Unsuspends a platform integration for an owner (user or organization).
+ *
+ * Pass `githubAppType` when the caller knows it so an unsuspend touches only
+ * the matching standard or lite row.
  */
-export async function unsuspendIntegrationForOwner(owner: Owner, platform: string) {
+export async function unsuspendIntegrationForOwner(
+  owner: Owner,
+  platform: string,
+  githubAppType?: GitHubAppType
+) {
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)
       : eq(platform_integrations.owned_by_organization_id, owner.id);
+
+  const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
+  if (githubAppType) {
+    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+  }
 
   await db
     .update(platform_integrations)
@@ -547,7 +622,7 @@ export async function unsuspendIntegrationForOwner(owner: Owner, platform: strin
       suspended_by: null,
       updated_at: new Date().toISOString(),
     })
-    .where(and(ownershipCondition, eq(platform_integrations.platform, platform)));
+    .where(and(...conditions));
 }
 
 export type UpsertPlatformIntegrationResult =
@@ -614,8 +689,15 @@ export async function upsertPlatformIntegrationForOwner(
       return { ok: true };
     }
 
-    // Insert was blocked — another row claims this installation.
-    const existing = await findIntegrationByInstallationId('github', data.platformInstallationId);
+    // Insert was blocked — another row claims this installation. Look up the
+    // row with the same app type as the unique index
+    // `(platform, github_app_type, installation_id)` so a standard refresh is
+    // never matched against a lite row (or vice versa).
+    const existing = await findIntegrationByInstallationId(
+      'github',
+      data.platformInstallationId,
+      appType
+    );
 
     if (!existing) {
       // The blocked insert produced no row and we cannot find the

@@ -26,6 +26,7 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
+import type { GitHubAppType } from '../app-selector';
 
 /**
  * GitHub Installation Event Handlers
@@ -114,18 +115,28 @@ export async function handleInstallationCreated(payload: InstallationCreatedPayl
   );
 }
 
-export async function handleInstallationDeleted(payload: InstallationDeletedPayload) {
+export async function handleInstallationDeleted(
+  payload: InstallationDeletedPayload,
+  appType: GitHubAppType
+) {
   const installationIdStr = payload.installation.id.toString();
 
-  // Find and delete the integration (whether completed or pending)
+  // Find and delete the integration (whether completed or pending). The
+  // webhook is signed by a specific GitHub App, so scope the lookup by app
+  // type to avoid deleting the other app's row for the same installation ID.
   const integrationToDelete = await findIntegrationByInstallationId(
     PLATFORM.GITHUB,
-    installationIdStr
+    installationIdStr,
+    appType
   );
 
   try {
-    await bot.initialize();
-    await unlinkTeamKiloUsers(bot.getState(), PLATFORM.GITHUB, installationIdStr);
+    // The bot identity store has no app-type dimension and the lite app has no
+    // bot-link flow, so only the standard app unlinks team bot identities.
+    if (appType !== 'lite') {
+      await bot.initialize();
+      await unlinkTeamKiloUsers(bot.getState(), PLATFORM.GITHUB, installationIdStr);
+    }
   } catch (error) {
     captureException(error, {
       tags: { component: 'kilo-bot', op: 'github-installation-deleted-unlink' },
@@ -136,7 +147,11 @@ export async function handleInstallationDeleted(payload: InstallationDeletedPayl
   if (integrationToDelete) {
     // Determine owner from the integration record
     if (integrationToDelete.owned_by_organization_id) {
-      await deleteIntegration(integrationToDelete.owned_by_organization_id, PLATFORM.GITHUB);
+      await deleteIntegration(
+        integrationToDelete.owned_by_organization_id,
+        PLATFORM.GITHUB,
+        appType
+      );
       logExceptInTest('Deleted organization installation:', {
         installation_id: installationIdStr,
         owned_by_organization_id: integrationToDelete.owned_by_organization_id,
@@ -144,7 +159,8 @@ export async function handleInstallationDeleted(payload: InstallationDeletedPayl
     } else if (integrationToDelete.owned_by_user_id) {
       await deleteIntegrationForOwner(
         { type: 'user', id: integrationToDelete.owned_by_user_id },
-        PLATFORM.GITHUB
+        PLATFORM.GITHUB,
+        appType
       );
       logExceptInTest('Deleted user installation:', {
         installation_id: installationIdStr,
@@ -158,10 +174,14 @@ export async function handleInstallationDeleted(payload: InstallationDeletedPayl
   return NextResponse.json({ message: 'Installation removed' }, { status: 200 });
 }
 
-export async function handleInstallationSuspend(payload: InstallationSuspendPayload) {
+export async function handleInstallationSuspend(
+  payload: InstallationSuspendPayload,
+  appType: GitHubAppType
+) {
   const integrationToSuspend = await findIntegrationByInstallationId(
     PLATFORM.GITHUB,
-    payload.installation.id.toString()
+    payload.installation.id.toString(),
+    appType
   );
 
   if (integrationToSuspend) {
@@ -172,7 +192,8 @@ export async function handleInstallationSuspend(payload: InstallationSuspendPayl
       await suspendIntegration(
         integrationToSuspend.owned_by_organization_id,
         PLATFORM.GITHUB,
-        suspendedBy
+        suspendedBy,
+        appType
       );
       logExceptInTest('GitHub App suspended (organization):', {
         installation_id: payload.installation.id,
@@ -182,7 +203,8 @@ export async function handleInstallationSuspend(payload: InstallationSuspendPayl
       await suspendIntegrationForOwner(
         { type: 'user', id: integrationToSuspend.owned_by_user_id },
         PLATFORM.GITHUB,
-        suspendedBy
+        suspendedBy,
+        appType
       );
       logExceptInTest('GitHub App suspended (user):', {
         installation_id: payload.installation.id,
@@ -196,16 +218,24 @@ export async function handleInstallationSuspend(payload: InstallationSuspendPayl
   return NextResponse.json({ message: 'Installation suspended' }, { status: 200 });
 }
 
-export async function handleInstallationUnsuspend(payload: InstallationUnsuspendPayload) {
+export async function handleInstallationUnsuspend(
+  payload: InstallationUnsuspendPayload,
+  appType: GitHubAppType
+) {
   const integrationToUnsuspend = await findIntegrationByInstallationId(
     PLATFORM.GITHUB,
-    payload.installation.id.toString()
+    payload.installation.id.toString(),
+    appType
   );
 
   if (integrationToUnsuspend) {
     // Determine owner from the integration record
     if (integrationToUnsuspend.owned_by_organization_id) {
-      await unsuspendIntegration(integrationToUnsuspend.owned_by_organization_id, PLATFORM.GITHUB);
+      await unsuspendIntegration(
+        integrationToUnsuspend.owned_by_organization_id,
+        PLATFORM.GITHUB,
+        appType
+      );
       logExceptInTest('GitHub App unsuspended (organization):', {
         installation_id: payload.installation.id,
         owned_by_organization_id: integrationToUnsuspend.owned_by_organization_id,
@@ -213,7 +243,8 @@ export async function handleInstallationUnsuspend(payload: InstallationUnsuspend
     } else if (integrationToUnsuspend.owned_by_user_id) {
       await unsuspendIntegrationForOwner(
         { type: 'user', id: integrationToUnsuspend.owned_by_user_id },
-        PLATFORM.GITHUB
+        PLATFORM.GITHUB,
+        appType
       );
       logExceptInTest('GitHub App unsuspended (user):', {
         installation_id: payload.installation.id,

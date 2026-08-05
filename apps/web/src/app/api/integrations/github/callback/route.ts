@@ -96,6 +96,9 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     );
   }
 
+  // Bot-link states carry no GitHub app type, so this lookup is intentionally
+  // unscoped; the integration row's own github_app_type drives the OAuth
+  // exchange below. Ownership checks then restrict the result to this user.
   const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, state.installationId);
 
   if (!integration) {

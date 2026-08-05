@@ -143,8 +143,8 @@ function RepositoryOverrideRowItem({
   disabled?: boolean;
 }) {
   const availableVariants = useMemo(
-    () => getAvailableThinkingEfforts(value.modelSlug),
-    [value.modelSlug]
+    () => getAvailableThinkingEfforts(value.modelSlug, models),
+    [models, value.modelSlug]
   );
 
   return (

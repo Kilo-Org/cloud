@@ -127,8 +127,8 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
   }, [configQuery.data, readinessQuery.data?.repositoryCache]);
 
   const availableThinkingEfforts = useMemo(
-    () => getAvailableThinkingEfforts(draft.modelSlug),
-    [draft.modelSlug]
+    () => getAvailableThinkingEfforts(draft.modelSlug, modelOptions),
+    [draft.modelSlug, modelOptions]
   );
 
   useEffect(() => {

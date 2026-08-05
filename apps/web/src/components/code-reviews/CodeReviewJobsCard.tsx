@@ -174,12 +174,13 @@ function selectInitialManualJobModel(params: {
 
 function selectInitialManualJobThinkingEffort(
   configuredThinkingEffort: string | null | undefined,
-  modelSlug: string
+  modelSlug: string,
+  modelOptions: ModelOption[]
 ): string | null {
   if (!configuredThinkingEffort) {
     return null;
   }
-  return getAvailableThinkingEfforts(modelSlug).includes(configuredThinkingEffort)
+  return getAvailableThinkingEfforts(modelSlug, modelOptions).includes(configuredThinkingEffort)
     ? configuredThinkingEffort
     : null;
 }
@@ -233,7 +234,10 @@ export function CodeReviewJobsCard({
     platform === 'gitlab'
       ? 'https://gitlab.com/group/project/-/merge_requests/123'
       : 'https://github.com/owner/repo/pull/123';
-  const manualJobAvailableThinkingEfforts = getAvailableThinkingEfforts(manualJobModelSlug);
+  const manualJobAvailableThinkingEfforts = getAvailableThinkingEfforts(
+    manualJobModelSlug,
+    modelOptions
+  );
   const manualJobUrlError = getManualJobUrlError(
     manualJobUrl,
     platform,
@@ -311,11 +315,13 @@ export function CodeReviewJobsCard({
   useEffect(() => {
     if (
       manualJobThinkingEffort &&
-      !getAvailableThinkingEfforts(manualJobModelSlug).includes(manualJobThinkingEffort)
+      !getAvailableThinkingEfforts(manualJobModelSlug, modelOptions).includes(
+        manualJobThinkingEffort
+      )
     ) {
       setManualJobThinkingEffort(null);
     }
-  }, [manualJobModelSlug, manualJobThinkingEffort]);
+  }, [manualJobModelSlug, manualJobThinkingEffort, modelOptions]);
 
   useEffect(() => {
     if (!manualJobDialogOpen || modelOptions.length === 0 || manualJobModelAllowed) {
@@ -329,7 +335,7 @@ export function CodeReviewJobsCard({
     });
     setManualJobModelSlug(nextModelSlug);
     setManualJobThinkingEffort(
-      selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug)
+      selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug, modelOptions)
     );
   }, [
     defaultModel,
@@ -350,7 +356,7 @@ export function CodeReviewJobsCard({
     setManualJobUrlTouched(false);
     setManualJobModelSlug(nextModelSlug);
     setManualJobThinkingEffort(
-      selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug)
+      selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug, modelOptions)
     );
     setManualJobInstructions('');
     setManualJobCouncilEnabled(false);

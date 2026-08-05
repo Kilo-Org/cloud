@@ -1,7 +1,20 @@
 import { getFallbackModelVariants } from '@/lib/ai-gateway/providers/variants';
 
-/** Returns the ordered list of thinking-effort variant names available for a model, or [] if the model has no variants. */
-export function getAvailableThinkingEfforts(modelSlug: string): string[] {
+type ModelWithVariants = {
+  id: string;
+  variants?: string[];
+};
+
+/** Returns variants discovered through /models, falling back when the model is absent. */
+export function getAvailableThinkingEfforts(
+  modelSlug: string,
+  models: readonly ModelWithVariants[]
+): string[] {
+  const discoveredVariants = models.find(model => model.id === modelSlug)?.variants;
+  if (discoveredVariants) {
+    return discoveredVariants;
+  }
+
   const variants = getFallbackModelVariants(modelSlug);
   return variants ? Object.keys(variants) : [];
 }

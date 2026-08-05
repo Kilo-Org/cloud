@@ -69,7 +69,9 @@ export function CouncilSpecialistPicker({
     const next: Record<string, CouncilSpecialistSelection> = {};
     for (const [id, selection] of Object.entries(selections)) {
       const effortModel = selection.modelSlug ?? defaultModelSlug ?? null;
-      const validEfforts = effortModel ? getAvailableThinkingEfforts(effortModel) : [];
+      const validEfforts = effortModel
+        ? getAvailableThinkingEfforts(effortModel, modelOptions)
+        : [];
       if (selection.thinkingEffort && !validEfforts.includes(selection.thinkingEffort)) {
         next[id] = { ...selection, thinkingEffort: null };
         changed = true;
@@ -78,7 +80,7 @@ export function CouncilSpecialistPicker({
       }
     }
     if (changed) onChange(next);
-  }, [selections, defaultModelSlug, isLoadingModels, onChange]);
+  }, [selections, defaultModelSlug, isLoadingModels, modelOptions, onChange]);
 
   return (
     <div className="space-y-3">
@@ -91,7 +93,7 @@ export function CouncilSpecialistPicker({
         // Effort options follow the specialist's own model, or the review's default
         // model when the specialist is left on the default.
         const effortModel = selection.modelSlug ?? defaultModelSlug ?? null;
-        const variants = effortModel ? getAvailableThinkingEfforts(effortModel) : [];
+        const variants = effortModel ? getAvailableThinkingEfforts(effortModel, modelOptions) : [];
 
         return (
           <div key={preset.id} className="space-y-3 rounded-md border p-3">

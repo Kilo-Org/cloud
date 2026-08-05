@@ -296,8 +296,8 @@ export function ReviewConfigForm({
 
   // Available thinking effort variants for the selected model
   const availableVariants = useMemo(
-    () => getAvailableThinkingEfforts(selectedModel),
-    [selectedModel]
+    () => getAvailableThinkingEfforts(selectedModel, modelOptions),
+    [modelOptions, selectedModel]
   );
 
   const selectableRepositories = useMemo(

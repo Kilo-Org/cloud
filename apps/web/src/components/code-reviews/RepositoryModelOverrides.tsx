@@ -20,10 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import {
-  getAvailableThinkingEfforts,
-  thinkingEffortLabel,
-} from '@/lib/code-reviews/core/model-variants';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 
 export type RepositoryModelOverrideValue = {
   repoFullName: string;
@@ -143,7 +140,7 @@ function RepositoryOverrideRowItem({
   disabled?: boolean;
 }) {
   const availableVariants = useMemo(
-    () => getAvailableThinkingEfforts(value.modelSlug, models),
+    () => models.find(model => model.id === value.modelSlug)?.variants ?? [],
     [models, value.modelSlug]
   );
 

@@ -26,10 +26,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
-import {
-  getAvailableThinkingEfforts,
-  thinkingEffortLabel,
-} from '@/lib/code-reviews/core/model-variants';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { useTRPC } from '@/lib/trpc/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
 import { FOCUS_AREAS, REVIEW_STYLES } from './ReviewConfigForm';
@@ -127,7 +124,7 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
   }, [configQuery.data, readinessQuery.data?.repositoryCache]);
 
   const availableThinkingEfforts = useMemo(
-    () => getAvailableThinkingEfforts(draft.modelSlug, modelOptions),
+    () => modelOptions.find(model => model.id === draft.modelSlug)?.variants ?? [],
     [draft.modelSlug, modelOptions]
   );
 

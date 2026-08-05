@@ -66,10 +66,7 @@ import {
   defaultCouncilSelections,
   type CouncilSpecialistSelection,
 } from '@/lib/code-reviews/core/council-selection';
-import {
-  getAvailableThinkingEfforts,
-  thinkingEffortLabel,
-} from '@/lib/code-reviews/core/model-variants';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import {
   getCodeReviewActionRequiredCopy,
   getCodeReviewActionRequiredRecoveryHref,
@@ -180,7 +177,9 @@ function selectInitialManualJobThinkingEffort(
   if (!configuredThinkingEffort) {
     return null;
   }
-  return getAvailableThinkingEfforts(modelSlug, modelOptions).includes(configuredThinkingEffort)
+  return modelOptions
+    .find(model => model.id === modelSlug)
+    ?.variants?.includes(configuredThinkingEffort)
     ? configuredThinkingEffort
     : null;
 }
@@ -234,10 +233,8 @@ export function CodeReviewJobsCard({
     platform === 'gitlab'
       ? 'https://gitlab.com/group/project/-/merge_requests/123'
       : 'https://github.com/owner/repo/pull/123';
-  const manualJobAvailableThinkingEfforts = getAvailableThinkingEfforts(
-    manualJobModelSlug,
-    modelOptions
-  );
+  const manualJobAvailableThinkingEfforts =
+    modelOptions.find(model => model.id === manualJobModelSlug)?.variants ?? [];
   const manualJobUrlError = getManualJobUrlError(
     manualJobUrl,
     platform,
@@ -315,9 +312,9 @@ export function CodeReviewJobsCard({
   useEffect(() => {
     if (
       manualJobThinkingEffort &&
-      !getAvailableThinkingEfforts(manualJobModelSlug, modelOptions).includes(
-        manualJobThinkingEffort
-      )
+      !modelOptions
+        .find(model => model.id === manualJobModelSlug)
+        ?.variants?.includes(manualJobThinkingEffort)
     ) {
       setManualJobThinkingEffort(null);
     }

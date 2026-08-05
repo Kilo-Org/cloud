@@ -2,7 +2,12 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
-import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_IOS_CLIENT_ID } from '@/lib/config.server';
+import {
+  APPLE_APP_BUNDLE_ID,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  GOOGLE_IOS_CLIENT_ID,
+} from '@/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
 
 /** Thrown when a native (mobile) ID token fails verification — maps to 401 INVALID_TOKEN. */
@@ -33,7 +38,12 @@ export async function verifyNativeAppleIdToken(
   idToken: string,
   nonce?: string
 ): Promise<VerifiedAppleIdToken> {
-  const payload = await verifyAppleJwtWithJwks(idToken, 'com.kilocode.kiloapp');
+  // The Apple identity token's `aud` claim is the native app's bundle ID.  Use
+  // the configured bundle ID and fall back to the shipped default so
+  // deployments that have not set APPLE_APP_BUNDLE_ID keep accepting tokens
+  // from the current release.
+  const audience = APPLE_APP_BUNDLE_ID || 'com.kilocode.kiloapp';
+  const payload = await verifyAppleJwtWithJwks(idToken, audience);
 
   // The mobile client pre-computes the SHA-256 digest of the raw nonce and passes the
   // digest to AppleAuthentication.signInAsync.  Apple embeds the digest in the identity

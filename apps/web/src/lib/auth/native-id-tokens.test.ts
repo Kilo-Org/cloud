@@ -17,6 +17,7 @@ jest.mock('google-auth-library');
 const mockConfig = {
   GOOGLE_IOS_CLIENT_ID: 'ios-client-id',
   GOOGLE_CLIENT_SECRET: 'web-client-secret',
+  APPLE_APP_BUNDLE_ID: 'com.kilocode.kiloapp',
 };
 jest.mock('@/lib/config.server', () => ({
   GOOGLE_CLIENT_ID: 'web-client-id',
@@ -25,6 +26,9 @@ jest.mock('@/lib/config.server', () => ({
   },
   get GOOGLE_IOS_CLIENT_ID() {
     return mockConfig.GOOGLE_IOS_CLIENT_ID;
+  },
+  get APPLE_APP_BUNDLE_ID() {
+    return mockConfig.APPLE_APP_BUNDLE_ID;
   },
 }));
 jest.mock('@sentry/nextjs', () => ({
@@ -57,9 +61,23 @@ const mockCaptureMessage = jest.mocked(captureMessage);
 describe('verifyNativeAppleIdToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConfig.APPLE_APP_BUNDLE_ID = 'com.kilocode.kiloapp';
   });
 
-  it('verifies against the Kilo app bundle ID and returns sub/email', async () => {
+  it('verifies against the configured Apple bundle ID and returns sub/email', async () => {
+    mockConfig.APPLE_APP_BUNDLE_ID = 'com.kilocode.kiloapp.dev';
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    const result = await verifyNativeAppleIdToken('a-token');
+
+    expect(mockVerifyAppleJwtWithJwks).toHaveBeenCalledWith('a-token', 'com.kilocode.kiloapp.dev');
+    expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
+  });
+
+  it('falls back to the default bundle ID when APPLE_APP_BUNDLE_ID is not configured', async () => {
+    mockConfig.APPLE_APP_BUNDLE_ID = '';
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
       applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
     );

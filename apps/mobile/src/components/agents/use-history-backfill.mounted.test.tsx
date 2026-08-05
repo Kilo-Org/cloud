@@ -7,7 +7,7 @@ import {
   MAX_HISTORY_AUTOLOAD_PAGES,
   shouldBackfillHistoryAfterActiveExclusion,
 } from './session-list-backfill';
-import { useHistoryBackfill } from './use-history-backfill';
+import { createOperationCoordinator, useHistoryBackfill } from './use-history-backfill';
 
 type SelectorInputs = Parameters<typeof shouldBackfillHistoryAfterActiveExclusion>[0];
 type R = TestRenderer.ReactTestRenderer;
@@ -65,6 +65,15 @@ async function updateProbe(
   await act(async () => {
     await Promise.resolve();
     renderer.update(createElement(BackfillProbe, { ...inputs, fetchNextPage }));
+  });
+}
+
+// The coordinator starts an enqueued operation one microtask after its
+// predecessor settles; flush so queued calls are observable in assertions.
+async function flushMicrotasks(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
   });
 }
 
@@ -134,5 +143,80 @@ describe('useHistoryBackfill mounted', () => {
     // The refetch settles: the false-to-true transition fetches exactly once.
     await updateProbe(renderer, fetchNextPage, greenInputs());
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('shared operation coordinator', () => {
+  it('backfill waits for an in-flight focus refetch, then fetches once', async () => {
+    const coordinator = createOperationCoordinator();
+    const resolveRefetch: { current: (() => void) | undefined } = { current: undefined };
+    const refetchResult = new Promise<void>(resolve => {
+      resolveRefetch.current = resolve;
+    });
+    const refetch = vi.fn().mockReturnValue(refetchResult);
+    const backfillFetch = vi.fn();
+    const fetchNextPage = vi.fn(async () => {
+      await coordinator(backfillFetch);
+    });
+
+    // Focus return enqueues the stored refetch first; it is still in flight
+    // when the backfill effect fires in the same commit.
+    const enqueuedRefetch = coordinator(refetch);
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(resolveRefetch.current).toBeDefined();
+
+    await mountProbe(fetchNextPage, greenInputs());
+    await flushMicrotasks();
+    expect(backfillFetch).not.toHaveBeenCalled();
+
+    resolveRefetch.current?.();
+    await enqueuedRefetch;
+    await flushMicrotasks();
+    expect(backfillFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetch waits for an in-flight backfill instead of cancelling it', async () => {
+    const coordinator = createOperationCoordinator();
+    const resolveBackfill: { current: (() => void) | undefined } = { current: undefined };
+    const backfillResult = new Promise<void>(resolve => {
+      resolveBackfill.current = resolve;
+    });
+    const backfillFetch = vi.fn().mockReturnValue(backfillResult);
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    const fetchNextPage = vi.fn(async () => {
+      await coordinator(backfillFetch);
+    });
+
+    // The backfill starts first (queue empty) and stays in flight.
+    await mountProbe(fetchNextPage, greenInputs());
+    await flushMicrotasks();
+    expect(backfillFetch).toHaveBeenCalledTimes(1);
+
+    // Focus return enqueues a refetch in the same window: it must wait for
+    // the backfill page, not cancel or replace it.
+    const enqueuedRefetch = coordinator(refetch);
+    expect(refetch).not.toHaveBeenCalled();
+
+    resolveBackfill.current?.();
+    await enqueuedRefetch;
+    await flushMicrotasks();
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(backfillFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the queue usable after a failed operation', async () => {
+    const coordinator = createOperationCoordinator();
+    const refetch = vi.fn().mockRejectedValue(new Error('refetch failed'));
+    const backfillFetch = vi.fn();
+    const fetchNextPage = vi.fn(async () => {
+      await coordinator(backfillFetch);
+    });
+
+    await expect(coordinator(refetch)).rejects.toThrow('refetch failed');
+    await flushMicrotasks();
+
+    await mountProbe(fetchNextPage, greenInputs());
+    await flushMicrotasks();
+    expect(backfillFetch).toHaveBeenCalledTimes(1);
   });
 });

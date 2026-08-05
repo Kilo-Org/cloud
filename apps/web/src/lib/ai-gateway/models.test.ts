@@ -171,7 +171,7 @@ describe('isFreeModel', () => {
       expect(randomSeed).toBeDefined();
       if (!randomSeed) return;
 
-      expect(getRandomNumber(randomSeed, candidates.length)).toBe(1);
+      expect(getRandomNumber(randomSeed, 4)).toBe(1);
       expect(selectAutoFreeModel(candidates, randomSeed)).toBe('preferred/model');
     });
 

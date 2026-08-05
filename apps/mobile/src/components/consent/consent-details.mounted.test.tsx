@@ -91,16 +91,23 @@ function collectTextStrings(element: any): string[] {
   return children;
 }
 
-function mount(): TestRenderer.ReactTestRenderer {
+function mount(mode?: 'onboarding' | 'review'): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   TestRenderer.act(() => {
-    renderer = TestRenderer.create(createElement(ConsentDetails));
+    renderer = TestRenderer.create(createElement(ConsentDetails, { mode }));
   });
   // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- act callback assignment, not statically guaranteed
   if (!renderer) {
     throw new Error('renderer was not created');
   }
   return renderer;
+}
+
+function findTextStrings(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')
+    .map(n => (n.props as { children?: unknown }).children)
+    .filter((child): child is string => typeof child === 'string');
 }
 
 // ---- tests ----
@@ -115,6 +122,19 @@ describe('ConsentDetails copy', () => {
     expect(titles).toContain('Crash reporting');
     expect(titles).toContain('Product analytics');
     expect(titles).toContain('Install attribution');
+  });
+
+  it('onboarding heading states the default-on behavior', () => {
+    const renderer = mount('onboarding');
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Optional — on unless you turn it off');
+  });
+
+  it('review heading does not claim optional telemetry is on', () => {
+    const renderer = mount('review');
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Optional — you can change this any time in Settings');
+    expect(texts).not.toContain('Optional — on unless you turn it off');
   });
 
   it('product analytics footer names the correct surface', () => {

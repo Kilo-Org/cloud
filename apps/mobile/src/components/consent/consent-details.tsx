@@ -4,6 +4,7 @@ import { Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Section } from '@/components/consent/section';
+import { type ConsentMode } from '@/components/consent/consent-mode';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -11,7 +12,11 @@ import { WEB_BASE_URL } from '@/lib/config';
 
 const PRIVACY_URL = `${WEB_BASE_URL}/privacy-app`;
 
-export function ConsentDetails() {
+type ConsentDetailsProps = {
+  readonly mode?: ConsentMode;
+};
+
+export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
   const contentContainerStyle = {
@@ -61,7 +66,9 @@ export function ConsentDetails() {
         />
 
         <Text className="mt-6 text-sm font-semibold text-foreground">
-          Optional — on unless you turn it off
+          {mode === 'review'
+            ? 'Optional — you can change this any time in Settings'
+            : 'Optional — on unless you turn it off'}
         </Text>
 
         <Section

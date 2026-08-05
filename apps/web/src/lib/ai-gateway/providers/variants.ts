@@ -1,13 +1,14 @@
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
+import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import { isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
-import { isGrok42Model, isGrok45Model } from '@/lib/ai-gateway/providers/xai';
+import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { type OpenCodeSettings, ReasoningEffortSchema } from '@kilocode/db/schema-types';
 
@@ -26,16 +27,19 @@ export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
   high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
-export const REASONING_VARIANTS_MAX_HIGH_LOW = {
+export const REASONING_VARIANTS_MAX_HIGH_LOW_NONE = {
   max: { reasoning: { enabled: true, effort: 'max' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
   low: { reasoning: { enabled: true, effort: 'low' } },
+  none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
-export const REASONING_VARIANTS_XHIGH_MEDIUM_LOW = {
+export const REASONING_VARIANTS_XHIGH_HIGH_MEDIUM_LOW_MINIMAL = {
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
   medium: { reasoning: { enabled: true, effort: 'medium' } },
   low: { reasoning: { enabled: true, effort: 'low' } },
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
 } as const;
 
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
@@ -43,15 +47,23 @@ export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
 } as const;
 
-export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH = {
+export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH = {
   none: { reasoning: { enabled: false, effort: 'none' } },
   ...REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+  xhigh: { reasoning: { enabled: false, effort: 'xhigh' } },
 } as const;
 
 export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
   none: { reasoning: { enabled: false, effort: 'none' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+} as const;
+
+export const REASONING_VARIANTS_NONE_LOW_HIGH_MAX = {
+  none: { reasoning: { enabled: false, effort: 'none' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  max: { reasoning: { enabled: true, effort: 'max' } },
 } as const;
 
 const REASONING_VARIANTS_CLAUDE = {
@@ -72,12 +84,8 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
   if (isClaudeModel(model)) {
     return REASONING_VARIANTS_CLAUDE;
   }
-  if (model.includes('codex') || isGemini3Model(model)) {
-    return Object.fromEntries(
-      ReasoningEffortSchema.options
-        .filter(e => e !== 'none' && e !== 'minimal' && e !== 'max')
-        .map(effort => [effort, { reasoning: { enabled: true, effort } }])
-    );
+  if (isGeminiModel(model)) {
+    return REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH;
   }
   if (isOpenAiModel(model)) {
     return Object.fromEntries(
@@ -86,41 +94,38 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (model.includes('mistral-medium-3-5')) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  if (model.includes('kimi-k2.7-code')) {
-    return REASONING_VARIANTS_THINKING_ONLY;
-  }
-  if (model.includes('kimi-k2')) {
+  if (isMistralModel(model)) {
     return REASONING_VARIANTS_BINARY;
   }
   if (isKimiModel(model)) {
-    return REASONING_VARIANTS_MAX_HIGH_LOW;
+    return REASONING_VARIANTS_MAX_HIGH_LOW_NONE;
   }
-  if (model.includes('qwen3.8') && (model.includes('plus') || model.includes('max'))) {
-    return REASONING_VARIANTS_XHIGH_MEDIUM_LOW;
+  if (isQwenModel(model)) {
+    return REASONING_VARIANTS_XHIGH_HIGH_MEDIUM_LOW_MINIMAL;
   }
-  if (
-    isMinimaxModel(model) ||
-    isGrok42Model(model) ||
-    isQwenModel(model) ||
-    isGemmaModel(model) ||
-    model.includes('mimo')
-  ) {
+  if (isMinimaxModel(model)) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (model.startsWith('inception/mercury-2')) {
+  if (model.includes('mimo')) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (model.includes('mercury')) {
     return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
   }
-  if (isStepModel(model) || isGrok45Model(model)) {
+  if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
   }
-  if (isDeepseekModel(model) || isGlmModel(model)) {
+  if (isGrokModel(model)) {
+    return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
+  }
+  if (isDeepseekModel(model)) {
+    return REASONING_VARIANTS_NONE_LOW_HIGH_MAX;
+  }
+  if (isGlmModel(model)) {
     return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
   if (isMuseModel(model)) {
-    return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH;
+    return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH;
   }
   return undefined;
 }

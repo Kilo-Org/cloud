@@ -126,7 +126,7 @@ export default function OrganizationAppSidebar({
     {
       title: 'Usage',
       icon: ChartColumnIncreasing,
-      url: `/organizations/${organizationId}/usage-details`,
+      url: `/organizations/${organizationId}/usage-details?view=ai-usage`,
     },
   ];
 

@@ -247,6 +247,13 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // vs "keep showing stale data") should use these instead of `isError`.
     storedIsError: stored.isError,
     storedIsSuccess: stored.isSuccess,
+    // Any stored-list fetch in flight (initial load, refetch, next page),
+    // used by the backfill selector to serialize automatic fetches behind
+    // user- or focus-driven refetches on the same infinite query.
+    storedIsFetching: stored.isFetching,
+    // Loaded stored pages; the backfill bound is `data.pages.length`, not the
+    // rendered row count, because active-set exclusion can hide whole pages.
+    storedLoadedPageCount: stored.data?.pages.length ?? 0,
     activeIsError: active.isError,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,

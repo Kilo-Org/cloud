@@ -46,7 +46,9 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 1.6. The catalog **MUST** contain BytePlus Coding Plan Lite with Plan ID `byteplus-coding-plan-team-lite`, provider ID `byteplus-coding`, a price of $20 in Kilo Credits, and a 30-day billing period. Its displayed limits **MUST** be described as approximately 1,900 requests every 5 hours, 12,000 requests per week, and 24,000 requests per subscription period. The plan's supported model IDs are `dola-seed-2.0-pro`, `dola-seed-2.0-lite`, `dola-seed-2.0-code`, `bytedance-seed-code`, `kimi-k2.5`, `glm-5.1`, `glm-5.2`, `deepseek-v4-flash`, `deepseek-v4-pro`, and `gpt-oss-120b`. Upstream Auto, Kimi-K2-Thinking, and GLM-4.7 **MUST NOT** be exposed.
 
-1.7. When no assignable Managed Plan Credential exists for an offering, customer-facing catalog responses **MUST** identify the offering as sold out without exposing credential counts or credential metadata.
+1.7. The catalog **MUST** contain BytePlus Coding Plan Pro with Plan ID `byteplus-coding-plan-team-pro`, provider ID `byteplus-coding`, a price of $100 in Kilo Credits, and a 30-day billing period. Its displayed limits **MUST** be described as approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per subscription period. Pro **MUST** support exactly the same model IDs as Lite and **MUST NOT** expose Upstream Auto, Kimi-K2-Thinking, or GLM-4.7.
+
+1.8. When no assignable Managed Plan Credential exists for an offering, customer-facing catalog responses **MUST** identify the offering as sold out without exposing credential counts or credential metadata.
 
 ## 2. Subscription and billing
 

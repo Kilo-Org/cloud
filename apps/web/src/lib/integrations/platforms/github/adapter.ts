@@ -412,6 +412,7 @@ export async function exchangeGitHubOAuthCode(
 ): Promise<{
   id: string;
   login: string;
+  accessToken: string;
 }> {
   const credentials = getGitHubAppCredentials(appType);
 
@@ -441,6 +442,7 @@ export async function exchangeGitHubOAuthCode(
   return {
     id: githubUser.id.toString(),
     login: githubUser.login,
+    accessToken,
   };
 }
 

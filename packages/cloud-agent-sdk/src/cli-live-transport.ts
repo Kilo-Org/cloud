@@ -138,7 +138,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       config.onCapabilitiesChange?.(next);
     }
     let catalogRequestGeneration = 0;
-    let catalogRequestInFlight: { ownerConnectionId: string; generation: number } | null = null;
+    let catalogRequestInFlight: {
+      ownerConnectionId: string;
+      generation: number;
+    } | null = null;
     // Command catalog discovery runs on its own generation so it stays
     // independent of model discovery: a model refresh that completes or
     // fails must not drop an in-flight command catalog request.
@@ -168,7 +171,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function publishRemoteCommandState(next: RemoteCommandState): void {
-      remoteCommandState = { ...next, commands: deepCopyCommands(next.commands) };
+      remoteCommandState = {
+        ...next,
+        commands: deepCopyCommands(next.commands),
+      };
       config.onRemoteCommandStateChange?.(next);
     }
 
@@ -184,7 +190,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       // state callback each hold an independent snapshot.
       const snapshotted = deepCopyCommands(commands);
       lastValidCommands = snapshotted;
-      sink.onServiceEvent({ type: 'commands.available', commands: deepCopyCommands(snapshotted) });
+      sink.onServiceEvent({
+        type: 'commands.available',
+        commands: deepCopyCommands(snapshotted),
+      });
     }
 
     function snapshotCommands(): SlashCommandInfo[] {
@@ -589,7 +598,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       }
     }
 
-    async function sendCommand(command: string, data: unknown): Promise<unknown> {
+    async function sendCommand(
+      command: string,
+      data: unknown,
+      mutationId?: string
+    ): Promise<unknown> {
       const expectedOwnerConnectionId = ownerConnectionId;
       if (!expectedOwnerConnectionId) throw new Error('Remote session has no connected owner');
 
@@ -598,7 +611,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           config.kiloSessionId,
           command,
           data,
-          expectedOwnerConnectionId
+          expectedOwnerConnectionId,
+          ...(mutationId !== undefined ? [mutationId] : [])
         );
       } catch (error) {
         if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
@@ -861,6 +875,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // snapshotted before the await and SESSION_OWNER_CHANGED is handled.
         // Extended fields degrade via a single bare retry on the exact
         // old-CLI delivered error; other failures are hard rejects.
+        const mutationId = input?.mutationId ?? crypto.randomUUID();
         const wireData = buildCreateSessionWireData(input);
         const hasExtendedFields =
           wireData.agent !== undefined ||
@@ -868,7 +883,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           wireData.orgId !== undefined;
         let result: unknown;
         try {
-          result = await sendCommand('create_session', wireData);
+          result = await sendCommand('create_session', wireData, mutationId);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
@@ -877,7 +892,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             error instanceof CommandDeliveredError &&
             error.message === INVALID_CREATE_SESSION_COMMAND
           ) {
-            result = await sendCommand('create_session', { protocolVersion: 1 });
+            result = await sendCommand(
+              'create_session',
+              { protocolVersion: 1 },
+              crypto.randomUUID()
+            );
           } else {
             throw error;
           }

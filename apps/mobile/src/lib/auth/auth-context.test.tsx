@@ -10,7 +10,9 @@ const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
 
   const secureStore = {
+    getItem: vi.fn().mockReturnValue(null),
     getItemAsync: vi.fn().mockResolvedValue(null),
+    setItem: vi.fn().mockReturnValue(undefined),
     setItemAsync: vi.fn().mockResolvedValue(undefined),
     // eslint-disable-next-line require-await -- mock returning a resolved promise
     deleteItemAsync: vi.fn().mockImplementation(async (_key: string) => {
@@ -57,7 +59,9 @@ const hoisted = vi.hoisted(() => {
 // ---- all vi.mock calls ----
 
 vi.mock('expo-secure-store', () => ({
+  getItem: hoisted.secureStore.getItem,
   getItemAsync: hoisted.secureStore.getItemAsync,
+  setItem: hoisted.secureStore.setItem,
   setItemAsync: hoisted.secureStore.setItemAsync,
   deleteItemAsync: hoisted.secureStore.deleteItemAsync,
 }));
@@ -107,6 +111,10 @@ vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
 }));
 
+// The ownership module is intentionally NOT mocked here: the sign-out gate
+// regression test must observe the real gate closing before any await and
+// blocking a late persist from calling SecureStore.setItem.
+
 vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
@@ -122,9 +130,23 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
+  KILOCLAW_OWNED_KEY: 'kiloclaw-owned',
+  LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
+  REFRESH_TOKEN_KEY: 'refresh-token',
   SESSION_FILTERS_KEY: 'session-filters',
+  TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
+}));
+
+vi.mock('@/lib/config', () => ({
+  API_BASE_URL: 'https://api.example.com',
+}));
+
+vi.mock('react-native', () => ({
+  AppState: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 
 // ---- helpers ----
@@ -249,11 +271,9 @@ describe('sign-out teardown ordering', () => {
       hoisted.posthogStorage.purgePostHogPersistence.mock.invocationCallOrder[0],
     ];
     const secureStoreOrder = hoisted.secureStore.deleteItemAsync.mock.invocationCallOrder[0];
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed by mock setup; expect call above validates it is defined
-    expect(secureStoreOrder!).toBeDefined();
+    expect(secureStoreOrder).toBeDefined();
     for (const invocationOrder of sdkInvocationOrders) {
-      // oxlint-disable-next-line typescript-eslint/no-non-null-assertion -- validated by expect above
-      expect(invocationOrder).toBeLessThan(secureStoreOrder!);
+      expect(invocationOrder).toBeLessThan(secureStoreOrder);
     }
 
     unmount();
@@ -283,6 +303,33 @@ describe('sign-out teardown ordering', () => {
 
     expect(clearKeepScreenOnPreference).toHaveBeenCalled();
     expect(clearReasoningPreference).toHaveBeenCalled();
+  });
+
+  it('closes the ownership gate before any await and blocks a late persist', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const ownership = await import('@/lib/kiloclaw-tab-ownership');
+
+    // The old account's tab layout already resolved and persisted ownership.
+    ownership.persistKiloClawOwned(true);
+    expect(hoisted.secureStore.setItem).toHaveBeenCalledTimes(1);
+
+    // Sign-out starts; the gate closes synchronously at the first line,
+    // before the first await, while the teardown awaits are still in flight.
+    const signOutPromise = ctx.signOut();
+
+    // A late list reconcile from the old observer runs before
+    // clearKiloClawOwned is reached.
+    ownership.persistKiloClawOwned(false);
+
+    await act(async () => {
+      await signOutPromise;
+    });
+
+    // The late persist could not call SecureStore.setItem; only the
+    // pre-sign-out write happened, and the clear step still deleted the key.
+    expect(hoisted.secureStore.setItem).toHaveBeenCalledTimes(1);
+    expect(hoisted.secureStore.setItem).toHaveBeenCalledWith('kiloclaw-owned', '1');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('kiloclaw-owned');
 
     unmount();
   });

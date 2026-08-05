@@ -8,12 +8,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import KiloLogo from '@/components/KiloLogo';
 import { useUser } from '@/hooks/useUser';
+import { useTRPC } from '@/lib/trpc/utils';
+import { useMutation } from '@tanstack/react-query';
 import {
   getPlatformOAuthConnectPath,
   type StandardOAuthPlatform,
 } from '@/lib/integrations/oauth/paths';
 import { getPlatform, type PlatformId, type PlatformOption } from '../../_components/platforms';
 import { buildReturnToPath } from './authorize-path';
+import { buildGitHubInstallState } from '@/components/integrations/github-install-state';
 
 type ProgressListProps = {
   count: number;
@@ -32,6 +35,8 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
   const { serviceIds, connectedServiceIds, organizationId, initialIndex, initialError } = props;
   const router = useRouter();
   const { data: user } = useUser();
+  const trpc = useTRPC();
+  const mintInstallState = useMutation(trpc.githubApps.mintInstallState.mutationOptions());
   const [index, setIndex] = useState(initialIndex);
   const [done, setDone] = useState(initialIndex >= serviceIds.length);
   const [connectionError, setConnectionError] = useState<string | null>(initialError ?? null);
@@ -70,6 +75,18 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
 
     try {
       setIsStartingOAuth(true);
+
+      if (current.id === 'github') {
+        const result = await mintInstallState.mutateAsync({
+          organizationId: organizationId ?? undefined,
+          returnTo,
+        });
+        const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
+        const state = buildGitHubInstallState(result.token);
+        window.location.href = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
+        return;
+      }
+
       const oauthUrl = await getOAuthUrl(current.id, {
         organizationId,
         returnTo,
@@ -176,17 +193,6 @@ async function getOAuthUrl(
 ): Promise<string | null> {
   if (isCollabOAuthConnectPlatform(platformId)) {
     return getPlatformOAuthConnectPath(platformId, options.organizationId, options.returnTo);
-  }
-  if (platformId === 'github') {
-    const ownerToken = options.organizationId
-      ? `org_${options.organizationId}`
-      : options.userId
-        ? `user_${options.userId}`
-        : null;
-    if (!ownerToken) return null;
-    const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
-    const state = `${ownerToken}|return=${encodeURIComponent(options.returnTo)}`;
-    return `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
   }
   return null;
 }

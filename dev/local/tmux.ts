@@ -23,6 +23,13 @@ function getWorktreeRoot(): string {
   return cachedWorktreeRoot;
 }
 
+function worktreeEnvironment(
+  repoRoot: string,
+  env?: Record<string, string>
+): Record<string, string> {
+  return { ...env, PWD: repoRoot };
+}
+
 // ---------------------------------------------------------------------------
 // Session management
 // ---------------------------------------------------------------------------
@@ -65,16 +72,22 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
   // environment — NOT our current process.env. Pass critical vars with -e and
   // set them on the session so later windows see values like KILO_PORT_OFFSET
   // and CI-provided PATH updates.
-  const envArgs = env
-    ? Object.entries(env)
-        .map(([k, v]) => `-e ${escapeForShell(`${k}=${v}`)}`)
-        .join(' ')
-    : '';
-  const envPrefix = envArgs ? `${envArgs} ` : '';
-  execSync(`tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${repoRoot}`, {
-    stdio: 'ignore',
-  });
-  for (const [key, value] of Object.entries(env ?? {})) {
+  const sessionEnv = worktreeEnvironment(repoRoot, env);
+  const newSessionEnv = { ...sessionEnv };
+  delete newSessionEnv.OLDPWD;
+  const envArgs = Object.entries(newSessionEnv)
+    .map(([k, v]) => `-e ${escapeForShell(`${k}=${v}`)}`)
+    .join(' ');
+  const envPrefix = `${envArgs} `;
+  execSync(
+    `tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${repoRoot} ${buildInteractiveShellCommand(
+      `cd ${escapeForShell(repoRoot)}`,
+      undefined,
+      repoRoot
+    )}`,
+    { stdio: 'ignore' }
+  );
+  for (const [key, value] of Object.entries({ ...sessionEnv, OLDPWD: repoRoot })) {
     execSync(
       `tmux set-environment -t ${sessionName} ${escapeForShell(key)} ${escapeForShell(value)}`,
       { stdio: 'ignore' }
@@ -140,7 +153,10 @@ function createWindow(
   const args = [
     'new-window',
     '-d',
-    ...Object.entries(env ?? {}).flatMap(([key, value]) => ['-e', `${key}=${value}`]),
+    ...Object.entries(worktreeEnvironment(getWorktreeRoot(), env)).flatMap(([key, value]) => [
+      '-e',
+      `${key}=${value}`,
+    ]),
     '-t',
     sessionName,
     '-n',
@@ -152,7 +168,7 @@ function createWindow(
     '#{window_index}',
   ];
   if (startupCommand) {
-    args.push(buildInteractiveShellCommand(startupCommand));
+    args.push(buildInteractiveShellCommand(startupCommand, undefined, getWorktreeRoot()));
   }
 
   const output = execFileSync('tmux', args, { encoding: 'utf-8' }).trim();
@@ -181,10 +197,14 @@ function setPaneServiceIdentity(
 
 function buildInteractiveShellCommand(
   startupCommand: string,
-  shell = process.env.SHELL || '/bin/sh'
+  shell = process.env.SHELL || '/bin/sh',
+  cwd?: string
 ): string {
-  return `${escapeForShell(shell)} -lc ${escapeForShell(
-    `${startupCommand}; exec ${escapeForShell(shell)} -l`
+  const interactiveCommand = `${startupCommand}; exec ${escapeForShell(shell)} -l`;
+  const command = `${escapeForShell(shell)} -lc ${escapeForShell(interactiveCommand)}`;
+  if (cwd === undefined) return command;
+  return `${escapeForShell('/bin/sh')} -c ${escapeForShell(
+    `cd ${escapeForShell(cwd)} && exec ${command}`
   )}`;
 }
 

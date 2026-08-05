@@ -18,7 +18,12 @@ vi.mock('@kilocode/db/client', () => ({
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => [{ api_token_pepper: currentPepperByUserId.get('user-xyz-789') }],
+          limit: async () => [
+            {
+              api_token_pepper: currentPepperByUserId.get('user-xyz-789'),
+              blocked_reason: null,
+            },
+          ],
         }),
       }),
     }),

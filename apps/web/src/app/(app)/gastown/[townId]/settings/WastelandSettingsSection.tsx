@@ -6,7 +6,7 @@ import { useGastownTRPC, useGastownTRPCClient } from '@/lib/gastown/trpc';
 import { useWastelandTRPC, useWastelandTRPCClient } from '@/lib/wasteland/trpc';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';

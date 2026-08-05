@@ -275,6 +275,25 @@ export function createSessionManagementHandlers() {
             'getCurrentMessageWork'
           );
 
+          // Fetch the latest persisted event ID for the durability watermark.
+          // Failures are swallowed so an optional watermark read never blocks
+          // the session response.
+          let latestEventId: number | null = null;
+          try {
+            latestEventId = await withDORetry(
+              getStub,
+              s => s.getLatestEventId(),
+              'getLatestEventId'
+            );
+          } catch (error) {
+            logger
+              .withFields({
+                sessionId,
+                error: error instanceof Error ? error.message : String(error),
+              })
+              .warn('Failed to fetch latest event ID for getSession');
+          }
+
           // Compute sandboxId for log correlation
           const sessionMetadata = metadata;
           const metadataProfile = readProfileBundle(sessionMetadata);
@@ -350,6 +369,7 @@ export function createSessionManagementHandlers() {
 
             timestamp: sessionMetadata.lifecycle.timestamp,
             version: sessionMetadata.lifecycle.version,
+            latestEventId,
           };
         });
       }),

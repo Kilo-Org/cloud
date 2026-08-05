@@ -1,12 +1,12 @@
-import {
-  REASONING_VARIANTS_BINARY,
-  REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
-} from '@/lib/ai-gateway/providers/model-settings';
 import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type {
   DirectByokModel,
   DirectByokProvider,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
+import {
+  REASONING_VARIANTS_BINARY,
+  REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+} from '@/lib/ai-gateway/providers/variants';
 
 export const BYTEPLUS_CODING_PROVIDER_ID = 'byteplus-coding';
 

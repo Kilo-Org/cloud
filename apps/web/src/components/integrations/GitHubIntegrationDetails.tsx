@@ -18,7 +18,6 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useUser } from '@/hooks/useUser';
 import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -28,6 +27,11 @@ import { useConfirm } from '@/components/ui/confirm';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
+  /** Pre-minted C1 install state token from the mobile app. When set, the
+   *  component skips its own mint and passes the token directly to GitHub. */
+  installState?: string;
+  /** True when the page was opened by the mobile app via /github-app?fromApp=1. */
+  fromApp?: boolean;
   success?: boolean;
   userConnectionSuccess?: boolean;
   error?: string;
@@ -37,8 +41,85 @@ type GitHubIntegrationDetailsProps = {
   onInstallationDetected?: () => void;
 };
 
+/**
+ * /cloud/sessions return href for an app-initiated install outcome.  Carries
+ * the original organizationId so the mobile app can retry an org-scoped
+ * install on the same organization owner.
+ */
+function buildAppReturnHref(query: string, organizationId?: string): string {
+  const orgParam = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
+  return `/cloud/sessions?${query}${orgParam}`;
+}
+
+export type AppReturnOutcomeView = {
+  kind: 'installed' | 'pending' | 'blocked' | 'retryable';
+  title: string;
+  description: string;
+  cta: string;
+  href: string;
+};
+
+/**
+ * View model for the fromApp outcome card. `blocked` (non-retryable) shows
+ * `Back` and never offers retry; `retryable` shows `Try again` (a real action
+ * wired by the component) plus `Return to Kilo App`, both via `href`.
+ */
+export function buildAppReturnOutcomeView(input: {
+  success?: boolean;
+  pendingApproval?: boolean;
+  error?: string;
+  organizationId?: string;
+}): AppReturnOutcomeView {
+  const isSuccess = Boolean(input.success);
+  const isPending = !isSuccess && Boolean(input.pendingApproval);
+  const isNonRetryable =
+    input.error === 'install_state_user_mismatch' ||
+    input.error === 'not_installation_admin' ||
+    input.error === 'installation_already_claimed';
+  const returnQuery = isSuccess
+    ? 'github_install=success'
+    : isPending
+      ? 'github_pending_approval=true'
+      : `error=${encodeURIComponent(input.error ?? 'installation_failed')}`;
+  const title = isSuccess
+    ? 'GitHub App installed'
+    : isPending
+      ? 'Awaiting admin approval'
+      : isNonRetryable
+        ? 'Cannot complete installation'
+        : 'Installation failed';
+  const description = isSuccess
+    ? 'Your repositories are now connected.'
+    : isPending
+      ? 'An organization admin must approve the installation request.'
+      : input.error === 'not_installation_admin'
+        ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
+        : input.error === 'installation_already_claimed'
+          ? 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'
+          : input.error === 'install_state_user_mismatch'
+            ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
+            : 'The installation did not complete. Try again or return to the Kilo App.';
+  const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
+
+  return {
+    kind: isSuccess
+      ? 'installed'
+      : isPending
+        ? 'pending'
+        : isNonRetryable
+          ? 'blocked'
+          : 'retryable',
+    title,
+    description,
+    cta,
+    href: buildAppReturnHref(returnQuery, input.organizationId),
+  };
+}
+
 export function GitHubIntegrationDetails({
   organizationId,
+  installState,
+  fromApp,
   success,
   userConnectionSuccess,
   error,
@@ -51,6 +132,7 @@ export function GitHubIntegrationDetails({
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const input = organizationId ? { organizationId } : undefined;
+  const hasAppOutcome = Boolean(success || pendingApproval || error);
 
   // Fetch organization data to check GitHub app type
   const { data: organizationData } = useOrganizationWithMembers(organizationId ?? '', {
@@ -180,6 +262,8 @@ export function GitHubIntegrationDetails({
     })
   );
 
+  const mintInstallState = useMutation(trpc.githubApps.mintInstallState.mutationOptions());
+
   // Initialize selected model from installation data
   useEffect(() => {
     if (installationData?.installation?.modelSlug) {
@@ -227,16 +311,30 @@ export function GitHubIntegrationDetails({
         description: `You already have a pending GitHub installation in another organization. Please complete or cancel that installation first.`,
         duration: 8000,
       });
+    } else if (error === 'not_installation_admin') {
+      toast.error(
+        'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
+        { duration: 8000 }
+      );
+    } else if (error === 'installation_already_claimed') {
+      toast.error(
+        'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
+        { duration: 8000 }
+      );
+    } else if (error === 'github_authorization_required') {
+      toast.error('GitHub did not return an authorization. Start the connection again.', {
+        duration: 8000,
+      });
     } else if (error === 'already_connected_to_another_account') {
       toast.error('This GitHub identity is already connected to another Kilo account.');
     } else if (error === 'disconnect_existing_identity_first') {
       toast.error('Disconnect your current GitHub identity before connecting another account.');
+    } else if (error === 'install_state_user_mismatch') {
+      // Handled by the fromApp fallback card — no toast needed.
     } else if (error) {
       toast.error(`GitHub connection failed: ${error}`);
     }
   }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
-
-  const { data: user } = useUser();
 
   const handleModelChange = (modelSlug: string) => {
     setSelectedModel(modelSlug);
@@ -261,20 +359,59 @@ export function GitHubIntegrationDetails({
     );
   };
 
-  const handleInstall = () => {
-    const state = organizationId ? `org_${organizationId}` : `user_${user?.id}`;
-    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(state, appReturnPath))}`;
-    if (appReturnPath) {
-      window.open(installUrl, '_blank', 'noopener,noreferrer');
-      return;
+  const handleInstall = async () => {
+    try {
+      // Pre-minted state from the mobile app — use it directly without a
+      // second mint.  The state token is the raw database token; it must be
+      // passed to GitHub exactly as received.
+      if (installState) {
+        const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(installState))}`;
+        window.open(installUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      const result = await mintInstallState.mutateAsync({
+        organizationId: organizationId ?? undefined,
+        returnTo: appReturnPath ?? undefined,
+      });
+      const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(result.token))}`;
+      if (appReturnPath) {
+        window.open(installUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      window.location.href = installUrl;
+    } catch (err) {
+      toast.error('Failed to start GitHub installation', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
     }
-    window.location.href = installUrl;
+  };
+
+  /**
+   * App-initiated retry: mints a fresh C1 state. The original pre-minted
+   * token was consumed by the callback.  A retry must never reuse it.
+   */
+  const handleAppRetry = async () => {
+    try {
+      const result = await mintInstallState.mutateAsync({
+        organizationId: organizationId ?? undefined,
+        returnTo: '/cloud/sessions',
+      });
+      const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(result.token))}`;
+      window.open(installUrl, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      toast.error('Failed to start GitHub installation', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
   };
 
   const handleConnectIdentity = () => {
     connectUserAuthorization.mutate(undefined, {
       onError: error => {
-        toast.error('Failed to start GitHub connection', { description: error.message });
+        toast.error('Failed to start GitHub connection', {
+          description: error.message,
+        });
       },
     });
   };
@@ -290,7 +427,9 @@ export function GitHubIntegrationDetails({
     ) {
       disconnectUserAuthorization.mutate(undefined, {
         onError: error => {
-          toast.error('Failed to disconnect GitHub identity', { description: error.message });
+          toast.error('Failed to disconnect GitHub identity', {
+            description: error.message,
+          });
         },
       });
     }
@@ -359,7 +498,7 @@ export function GitHubIntegrationDetails({
     });
   };
 
-  if (isLoading) {
+  if (isLoading && !hasAppOutcome) {
     return appReturnPath ? (
       <div className="animate-pulse space-y-4 rounded-xl border border-border bg-surface-background p-6">
         <div className="h-5 w-40 rounded bg-surface-hover" />
@@ -382,7 +521,32 @@ export function GitHubIntegrationDetails({
   const status = installation?.status;
   const isPendingApproval = status === 'awaiting_installation';
 
-  if (appReturnPath && !isInstalled && !isPendingApproval) {
+  // Non-app mismatch landing: show corrective copy when the callback
+  // detected a user mismatch and redirects without fromApp=1.  The
+  // fromApp fallback card below handles the app-initiated case.
+  if (error === 'install_state_user_mismatch' && !fromApp) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <UserRound className="h-8 w-8 text-amber-500" />
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold">Account mismatch</h3>
+              <p className="text-muted-foreground text-sm">
+                This connection was started from the Kilo App signed in as a different account. Sign
+                in to the web with that account, or start again from the app.
+              </p>
+            </div>
+            <Button asChild variant="outline" className="mt-2">
+              <Link href="/">Go to dashboard</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (appReturnPath && !isInstalled && !isPendingApproval && !hasAppOutcome) {
     return (
       <section
         className="flex min-h-64 flex-col justify-between rounded-xl border border-border bg-surface-background p-6"
@@ -437,10 +601,11 @@ export function GitHubIntegrationDetails({
           <Button
             onClick={handleInstall}
             disabled={
-              pendingCheck?.hasPending && pendingCheck.pendingOrganizationId !== organizationId
+              mintInstallState.isPending ||
+              (pendingCheck?.hasPending && pendingCheck.pendingOrganizationId !== organizationId)
             }
           >
-            Open GitHub setup
+            {mintInstallState.isPending ? 'Starting installation...' : 'Open GitHub setup'}
             <ExternalLink className="size-4" />
           </Button>
           <p className="type-label mt-3 text-muted-foreground">
@@ -456,6 +621,51 @@ export function GitHubIntegrationDetails({
           </div>
         </div>
       </section>
+    );
+  }
+
+  if (fromApp && hasAppOutcome) {
+    const view = buildAppReturnOutcomeView({ success, pendingApproval, error, organizationId });
+    const isRetryable = view.kind === 'retryable';
+
+    return (
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center gap-4 text-center">
+            {view.kind === 'installed' ? (
+              <CheckCircle2 className="h-8 w-8 text-green-500" />
+            ) : view.kind === 'pending' ? (
+              <RefreshCw className="h-8 w-8 text-amber-500" />
+            ) : error === 'install_state_user_mismatch' ? (
+              <UserRound className="h-8 w-8 text-amber-500" />
+            ) : (
+              <XCircle className="h-8 w-8 text-destructive" />
+            )}
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold">{view.title}</h3>
+              <p className="text-muted-foreground text-sm">{view.description}</p>
+            </div>
+            {isRetryable ? (
+              <div className="mt-2 flex flex-col gap-2">
+                <Button onClick={handleAppRetry} disabled={mintInstallState.isPending}>
+                  Try again
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href={view.href}>Return to Kilo App</Link>
+                </Button>
+              </div>
+            ) : (
+              <Button
+                asChild
+                variant={view.kind === 'installed' ? 'default' : 'outline'}
+                className="mt-2"
+              >
+                <Link href={view.href}>{view.cta}</Link>
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -652,9 +862,16 @@ export function GitHubIntegrationDetails({
                       </AlertDescription>
                     </Alert>
                   ) : (
-                    <Button onClick={handleInstall} size="lg" className="w-full">
+                    <Button
+                      onClick={handleInstall}
+                      size="lg"
+                      className="w-full"
+                      disabled={mintInstallState.isPending}
+                    >
                       <GitBranch className="mr-2 h-4 w-4" />
-                      Install Kilo GitHub App
+                      {mintInstallState.isPending
+                        ? 'Starting installation...'
+                        : 'Install Kilo GitHub App'}
                     </Button>
                   )}
                 </>
@@ -769,6 +986,117 @@ export function GitHubIntegrationDetails({
             </CardContent>
           </Card>
         )
+      )}
+
+      {/* App-initiated flow: show outcome and "Return to Kilo App" after install
+          completes.  The callback redirects to /cloud/sessions (claimed universal-link
+          route) but a server redirect does not always open the app.  This fallback
+          stays visible so the user can tap the button — a user-initiated navigation
+          reliably triggers the universal link. */}
+      {fromApp && (isInstalled || isPendingApproval || hasAppOutcome) && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4 text-center">
+              {success || isInstalled ? (
+                <>
+                  <CheckCircle2 className="h-8 w-8 text-green-500" />
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold">GitHub App installed</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Your repositories are now connected. Return to the Kilo App to continue.
+                    </p>
+                  </div>
+                  <Button asChild className="mt-2">
+                    <Link href={buildAppReturnHref('github_install=success', organizationId)}>
+                      Continue
+                    </Link>
+                  </Button>
+                </>
+              ) : pendingApproval || isPendingApproval ? (
+                <>
+                  <RefreshCw className="h-8 w-8 text-amber-500" />
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold">Awaiting admin approval</h3>
+                    <p className="text-muted-foreground text-sm">
+                      An organization admin must approve the installation request. Return to the
+                      Kilo App to check later.
+                    </p>
+                  </div>
+                  <Button asChild variant="outline" className="mt-2">
+                    <Link href={buildAppReturnHref('github_pending_approval=true', organizationId)}>
+                      Done
+                    </Link>
+                  </Button>
+                </>
+              ) : error === 'install_state_user_mismatch' ? (
+                <>
+                  <UserRound className="h-8 w-8 text-amber-500" />
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold">Account mismatch</h3>
+                    <p className="text-muted-foreground text-sm">
+                      This connection was started from the Kilo App signed in as a different
+                      account. Sign in to the web with that account, or start again from the app.
+                    </p>
+                  </div>
+                  <Button asChild variant="outline" className="mt-2">
+                    <Link
+                      href={buildAppReturnHref('error=install_state_user_mismatch', organizationId)}
+                    >
+                      Back
+                    </Link>
+                  </Button>
+                </>
+              ) : error === 'not_installation_admin' || error === 'installation_already_claimed' ? (
+                <>
+                  <XCircle className="h-8 w-8 text-destructive" />
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold">Cannot complete installation</h3>
+                    <p className="text-muted-foreground text-sm">
+                      {error === 'not_installation_admin'
+                        ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
+                        : 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'}
+                    </p>
+                  </div>
+                  <Button asChild variant="outline" className="mt-2">
+                    <Link
+                      href={buildAppReturnHref(
+                        `error=${encodeURIComponent(error)}`,
+                        organizationId
+                      )}
+                    >
+                      Back
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-8 w-8 text-destructive" />
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold">Installation failed</h3>
+                    <p className="text-muted-foreground text-sm">
+                      The installation did not complete. Try again or return to the Kilo App.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" asChild>
+                      <Link
+                        href={buildAppReturnHref(
+                          `error=${encodeURIComponent(error ?? 'installation_failed')}`,
+                          organizationId
+                        )}
+                      >
+                        Back
+                      </Link>
+                    </Button>
+                    <Button onClick={handleAppRetry} disabled={mintInstallState.isPending}>
+                      Try again
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Dev-only card for adding existing installations - only show when no app is installed */}

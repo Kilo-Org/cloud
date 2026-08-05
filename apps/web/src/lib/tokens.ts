@@ -12,6 +12,7 @@ const jwtSigningAlgorithm = 'HS256';
 
 export type JWTTokenExtraPayload = {
   deviceAuthRequestCode?: string;
+  deviceSessionId?: string;
   botId?: string;
   organizationId?: string;
   organizationRole?: OrganizationRole;

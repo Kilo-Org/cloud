@@ -9,6 +9,7 @@ import {
   captureLaunchDeepLink,
   getPendingDeepLink,
 } from './deep-link-launch';
+import { setGitHubInstallReturnOutcome } from './github-install-return';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -52,12 +53,14 @@ const MAPPED_CASES = [
 describe('redirectSystemPath', () => {
   beforeEach(() => {
     _resetDeepLinkLaunchForTests();
+    setGitHubInstallReturnOutcome(null);
     mocks.navigate.mockReset();
     mocks.shouldThrow = false;
   });
 
   afterEach(() => {
     _resetDeepLinkLaunchForTests();
+    setGitHubInstallReturnOutcome(null);
     mocks.shouldThrow = false;
   });
 
@@ -162,6 +165,99 @@ describe('redirectSystemPath', () => {
       expect(result).toBe(path);
       expect(getPendingDeepLink()).toBeNull();
       expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('C13 return outcome', () => {
+    it('stores success outcome from /cloud/sessions universal link with query params', async () => {
+      const mod = await import('./github-install-return');
+      // Store already reset by beforeEach.
+      expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
+
+      const result = redirectSystemPath({
+        path: 'https://app.kilo.ai/cloud/sessions?github_install=success',
+        initial: false,
+      });
+      expect(result).toBeNull();
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)');
+
+      // Outcome must be stored for the agents tab to read.
+      const outcome = mod.getGitHubInstallReturnOutcome();
+      expect(outcome).toEqual({ kind: 'success' });
+    });
+
+    it('does not store outcome for non-/cloud/sessions links', async () => {
+      const mod = await import('./github-install-return');
+      expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
+
+      const result = redirectSystemPath({
+        path: 'https://app.kilo.ai/profile',
+        initial: false,
+      });
+      expect(result).toBeNull();
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
+      expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
+    });
+
+    it('stores pending outcome from /cloud/sessions universal link', async () => {
+      const mod = await import('./github-install-return');
+      expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
+
+      const result = redirectSystemPath({
+        path: 'https://app.kilo.ai/cloud/sessions?github_pending_approval=true',
+        initial: false,
+      });
+      expect(result).toBeNull();
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)');
+
+      const outcome = mod.getGitHubInstallReturnOutcome();
+      expect(outcome).toEqual({ kind: 'pending' });
+    });
+
+    it('stores error outcome from /cloud/sessions universal link', async () => {
+      const mod = await import('./github-install-return');
+      expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
+
+      const result = redirectSystemPath({
+        path: 'https://app.kilo.ai/cloud/sessions?error=installation_failed',
+        initial: false,
+      });
+      expect(result).toBeNull();
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)');
+
+      const outcome = mod.getGitHubInstallReturnOutcome();
+      expect(outcome).toEqual({ kind: 'error', code: 'installation_failed' });
+    });
+
+    it('stores mismatch error outcome', async () => {
+      const mod = await import('./github-install-return');
+      expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
+
+      const result = redirectSystemPath({
+        path: 'https://app.kilo.ai/cloud/sessions?error=install_state_user_mismatch',
+        initial: false,
+      });
+      expect(result).toBeNull();
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)');
+
+      const outcome = mod.getGitHubInstallReturnOutcome();
+      expect(outcome).toEqual({ kind: 'error', code: 'install_state_user_mismatch' });
+    });
+
+    it('warm return stores outcome for already-mounted agents tab', async () => {
+      const mod = await import('./github-install-return');
+      expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
+
+      // Simulate warm deep-link return: initial=false.
+      redirectSystemPath({
+        path: 'https://app.kilo.ai/cloud/sessions?github_install=success',
+        initial: false,
+      });
+
+      // Outcome stored; agents tab useFocusEffect can read it.
+      expect(mod.getGitHubInstallReturnOutcome()).toEqual({ kind: 'success' });
+      // Read clears the slot — subsequent reads return null.
+      expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
     });
   });
 });

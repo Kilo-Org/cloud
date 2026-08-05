@@ -37,6 +37,7 @@ function createBillingStatus(overrides?: BillingStatusOverrides): ClawBillingSta
   return {
     hasAccess: false,
     accessReason: null,
+    hasExistingPersonalSubscription: true,
     trialEligible: false,
     creditBalanceMicrodollars: 0,
     creditIntroEligible: false,
@@ -65,12 +66,28 @@ function createBillingStatus(overrides?: BillingStatusOverrides): ClawBillingSta
     },
     kiloPassUpsellPreview: {
       standard: {
-        monthly: { '19': emptyUpsellPreview, '49': emptyUpsellPreview, '199': emptyUpsellPreview },
-        yearly: { '19': emptyUpsellPreview, '49': emptyUpsellPreview, '199': emptyUpsellPreview },
+        monthly: {
+          '19': emptyUpsellPreview,
+          '49': emptyUpsellPreview,
+          '199': emptyUpsellPreview,
+        },
+        yearly: {
+          '19': emptyUpsellPreview,
+          '49': emptyUpsellPreview,
+          '199': emptyUpsellPreview,
+        },
       },
       commit: {
-        monthly: { '19': emptyUpsellPreview, '49': emptyUpsellPreview, '199': emptyUpsellPreview },
-        yearly: { '19': emptyUpsellPreview, '49': emptyUpsellPreview, '199': emptyUpsellPreview },
+        monthly: {
+          '19': emptyUpsellPreview,
+          '49': emptyUpsellPreview,
+          '199': emptyUpsellPreview,
+        },
+        yearly: {
+          '19': emptyUpsellPreview,
+          '49': emptyUpsellPreview,
+          '199': emptyUpsellPreview,
+        },
       },
     },
     trial: null,
@@ -181,6 +198,7 @@ describe('KiloClaw funding and recovery copy', () => {
     ['credits_not_settled', true, null, null],
     ['enrollment_failed', true, '/claw/subscription', 'Choose hosting plan'],
     ['requires_reprovision', false, null, null],
+    ['signup_unavailable', false, '/profile', 'Go to profile'],
     ['missing_instance', false, null, null],
     ['destroyed_instance', false, null, null],
     ['stale_intent', false, '/claw/subscription', 'Choose hosting plan'],
@@ -199,7 +217,10 @@ describe('KiloClaw funding and recovery copy', () => {
 
   it('distinguishes credit-funded hosting from a separate recurring Stripe subscription', () => {
     expect(
-      getKiloClawFundingChoiceCopy({ plan: 'standard', costMicrodollars: 55_000_000 })
+      getKiloClawFundingChoiceCopy({
+        plan: 'standard',
+        costMicrodollars: 55_000_000,
+      })
     ).toEqual({
       creditHeading: 'Credit-funded hosting',
       creditDescription:

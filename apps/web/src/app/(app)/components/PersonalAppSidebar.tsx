@@ -264,6 +264,8 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       : 'absent'
     : 'unknown';
   const hasKiloClawInstance = kiloClawInstanceState === 'present';
+  const shouldShowKiloClaw =
+    kiloClawNavStateQuery.isSuccess && kiloClawNavStateQuery.data.hasExistingPersonalSubscription;
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
   const [sidebarMenuOverride, setSidebarMenuOverride] = useState<{
     pathname: string;
@@ -283,24 +285,26 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     onClick?: () => void;
     isActive: boolean;
     suffixIcon?: React.ElementType;
-  }> = hasKiloClawInstance
-    ? [
-        {
-          title: 'KiloClaw',
-          icon: MessageSquare,
-          onClick: () => setSidebarMenuOverride({ pathname, menu: 'kiloClaw' }),
-          isActive: isKiloClawPath,
-          suffixIcon: ChevronRight,
-        },
-      ]
-    : [
-        {
-          title: 'KiloClaw',
-          icon: MessageSquare,
-          url: kiloClawInstanceState === 'absent' ? `${kiloClawBaseUrl}/new` : kiloClawBaseUrl,
-          isActive: isKiloClawPath,
-        },
-      ];
+  }> = !shouldShowKiloClaw
+    ? []
+    : hasKiloClawInstance
+      ? [
+          {
+            title: 'KiloClaw',
+            icon: MessageSquare,
+            onClick: () => setSidebarMenuOverride({ pathname, menu: 'kiloClaw' }),
+            isActive: isKiloClawPath,
+            suffixIcon: ChevronRight,
+          },
+        ]
+      : [
+          {
+            title: 'KiloClaw',
+            icon: MessageSquare,
+            url: `${kiloClawBaseUrl}/new`,
+            isActive: isKiloClawPath,
+          },
+        ];
 
   const backItems: Array<{
     title: string;
@@ -344,7 +348,9 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
         ) : (
           <>
             <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
-            <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
+            {kiloClawEntryItems.length > 0 && (
+              <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
+            )}
             {cloudItems.length > 0 && (
               <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             )}

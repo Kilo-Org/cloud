@@ -1009,66 +1009,43 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
     }
   });
 
-  it('personal fresh-insert creates a current-version one-day trial', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-12T00:00:00.000Z'));
-    const createdRow = {
-      id: 'sub-current-trial',
-      user_id: 'user-1',
-      instance_id: 'instance-new',
-      plan: 'trial',
-      status: 'trialing',
-      kiloclaw_price_version: '2026-05-10',
-      access_origin: null,
-      payment_source: null,
-      cancel_at_period_end: false,
-      trial_started_at: '2026-05-12T00:00:00.000Z',
-      trial_ends_at: '2026-05-13T00:00:00.000Z',
-      stripe_subscription_id: null,
-      stripe_schedule_id: null,
-      transferred_to_subscription_id: null,
-      scheduled_plan: null,
-      scheduled_by: null,
-      pending_conversion: false,
-      current_period_start: null,
-      current_period_end: null,
-      credit_renewal_at: null,
-      commit_ends_at: null,
-      past_due_since: null,
-      suspended_at: null,
-      destruction_deadline: null,
-      auto_resume_requested_at: null,
-      auto_resume_retry_after: null,
-      auto_resume_attempt_count: 0,
-      auto_top_up_triggered_for_period: null,
-      created_at: '2026-05-12T00:00:00.000Z',
-      updated_at: '2026-05-12T00:00:00.000Z',
-    };
+  it('rejects fresh personal provisioning without canonical subscription history', async () => {
     const { db, insertValues } = createFreshInsertDb({
       selectRows: [[], [], [{ id: 'instance-new', destroyedAt: null, organizationId: null }], []],
-      insertFirstReturningRows: [createdRow],
+      insertFirstReturningRows: [],
       reselectAfterConflictRows: [],
     });
     mockGetWorkerDb.mockReturnValue(db);
 
-    try {
-      const result = await bootstrapProvisionSubscription(createEnv(), {
+    await expect(
+      bootstrapProvisionSubscription(createEnv(), {
         userId: 'user-1',
         instanceId: 'instance-new',
         orgId: null,
-      });
+      })
+    ).rejects.toMatchObject({
+      code: 'new_kiloclaw_subscriptions_unavailable',
+      status: 403,
+      message: 'New KiloClaw subscriptions are unavailable.',
+    });
+    expect(insertValues).toHaveLength(0);
+  });
 
-      expect(result).toEqual(createdRow);
-      expect(insertValues[0]).toEqual(
-        expect.objectContaining({
-          kiloclaw_price_version: '2026-05-10',
-          trial_started_at: '2026-05-12T00:00:00.000Z',
-          trial_ends_at: '2026-05-13T00:00:00.000Z',
-        })
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+  it('rejects personal provision entitlement without canonical subscription history', async () => {
+    const { db } = createFreshInsertDb({
+      selectRows: [[], [], []],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await expect(
+      resolveProvisionEntitlement(createEnv(), { userId: 'user-1', orgId: null })
+    ).rejects.toMatchObject({
+      code: 'new_kiloclaw_subscriptions_unavailable',
+      status: 403,
+      message: 'New KiloClaw subscriptions are unavailable.',
+    });
   });
 
   it('personal fresh-insert after canceled legacy history creates a current-version trial', async () => {
@@ -1155,65 +1132,31 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
     }
   });
 
-  it('personal fresh-insert: loser of insert race returns winner row instead of throwing', async () => {
-    const winnerRow = {
-      id: 'sub-winner',
-      user_id: 'user-1',
-      instance_id: 'instance-new',
-      plan: 'trial',
-      status: 'trialing',
-      access_origin: null,
-      payment_source: null,
-      cancel_at_period_end: false,
-      trial_started_at: '2026-04-16T00:00:00.000Z',
-      trial_ends_at: '2026-04-23T00:00:00.000Z',
-      stripe_subscription_id: null,
-      stripe_schedule_id: null,
-      transferred_to_subscription_id: null,
-      scheduled_plan: null,
-      scheduled_by: null,
-      pending_conversion: false,
-      current_period_start: null,
-      current_period_end: null,
-      credit_renewal_at: null,
-      commit_ends_at: null,
-      past_due_since: null,
-      suspended_at: null,
-      destruction_deadline: null,
-      auto_resume_requested_at: null,
-      auto_resume_retry_after: null,
-      auto_resume_attempt_count: 0,
-      auto_top_up_triggered_for_period: null,
-      created_at: '2026-04-16T00:00:00.000Z',
-      updated_at: '2026-04-16T00:00:00.000Z',
-    };
+  it('personal fresh-insert race still fails closed without prior subscription history', async () => {
     const { db, insertValues } = createFreshInsertDb({
       selectRows: [
-        [], // existingForInstance (none seen yet — TOCTOU window)
+        [], // existingForInstance
         [], // subscriptions for user
         [], // instances for user
         [], // legacy earlybird purchase
-        [winnerRow], // reselect after conflict
       ],
-      insertFirstReturningRows: [], // onConflictDoNothing swallowed our insert
-      reselectAfterConflictRows: [winnerRow],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
     });
     mockGetWorkerDb.mockReturnValue(db);
 
-    const result = await bootstrapProvisionSubscription(createEnv(), {
-      userId: 'user-1',
-      instanceId: 'instance-new',
-      orgId: null,
+    await expect(
+      bootstrapProvisionSubscription(createEnv(), {
+        userId: 'user-1',
+        instanceId: 'instance-new',
+        orgId: null,
+      })
+    ).rejects.toMatchObject({
+      code: 'new_kiloclaw_subscriptions_unavailable',
+      status: 403,
     });
 
-    expect(result).toEqual(winnerRow);
-    expect(insertValues).toHaveLength(1);
-    expect(insertValues[0]).toEqual(
-      expect.objectContaining({
-        instance_id: 'instance-new',
-      })
-    );
-    // Race loser must not write a change-log row (winner already logged it).
+    expect(insertValues).toHaveLength(0);
     expect(mockInsertKiloClawSubscriptionChangeLog).not.toHaveBeenCalled();
   });
 

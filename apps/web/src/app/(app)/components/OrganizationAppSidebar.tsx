@@ -360,14 +360,7 @@ export default function OrganizationAppSidebar({
           suffixIcon: ChevronRight,
         },
       ]
-    : [
-        {
-          title: 'KiloClaw',
-          icon: MessageSquare,
-          url: kiloClawInstanceState === 'absent' ? `${kiloClawBaseUrl}/new` : kiloClawBaseUrl,
-          isActive: isKiloClawPath,
-        },
-      ];
+    : [];
 
   const backItems: Array<{
     title: string;
@@ -417,7 +410,9 @@ export default function OrganizationAppSidebar({
         ) : (
           <>
             <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
-            <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
+            {kiloClawEntryItems.length > 0 && (
+              <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
+            )}
             {cloudItems.length > 0 && (
               <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             )}

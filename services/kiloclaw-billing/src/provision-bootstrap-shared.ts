@@ -34,6 +34,16 @@ export class OrganizationKiloClawProvisionEntitlementError extends Error {
   }
 }
 
+export class PersonalKiloClawProvisioningUnavailableError extends Error {
+  readonly status = 403;
+  readonly code = 'new_kiloclaw_subscriptions_unavailable';
+
+  constructor() {
+    super('New KiloClaw subscriptions are unavailable.');
+    this.name = 'PersonalKiloClawProvisioningUnavailableError';
+  }
+}
+
 export type BootstrapProvisionInput = {
   userId: string;
   instanceId: string;
@@ -922,6 +932,10 @@ function resolvePersonalProvisionEntitlementFromContext(params: {
     );
   }
 
+  if (params.personalSubscriptions.length === 0) {
+    throw new PersonalKiloClawProvisioningUnavailableError();
+  }
+
   return getProvisionEntitlementForPriceVersion(CURRENT_KILOCLAW_PRICE_VERSION);
 }
 
@@ -1026,6 +1040,10 @@ async function bootstrapPersonalSubscription(params: BootstrapProvisionWithDbPar
     throw new Error(
       'Cannot bootstrap personal subscription for legacy earlybird purchase without canonical row'
     );
+  }
+
+  if (context.personalSubscriptions.length === 0) {
+    throw new PersonalKiloClawProvisioningUnavailableError();
   }
 
   const currentCatalogEntry = getKiloClawPricingCatalogEntry(CURRENT_KILOCLAW_PRICE_VERSION);

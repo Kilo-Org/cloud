@@ -293,6 +293,7 @@ export type KiloPassHostingRecoveryReason =
   | 'credits_not_settled'
   | 'enrollment_failed'
   | 'requires_reprovision'
+  | 'signup_unavailable'
   | 'missing_instance'
   | 'destroyed_instance'
   | 'stale_intent'
@@ -339,6 +340,16 @@ export function getKiloPassHostingRecoveryCopy(reason: KiloPassHostingRecoveryRe
         destinationLabel: null,
         canRetry: false,
         showSupport: true,
+      };
+    case 'signup_unavailable':
+      return {
+        title: 'New KiloClaw subscriptions are unavailable',
+        description:
+          'Your Kilo Pass credits are ready, but this checkout cannot create a first KiloClaw subscription.',
+        destination: '/profile',
+        destinationLabel: 'Go to profile',
+        canRetry: false,
+        showSupport: false,
       };
     case 'missing_instance':
       return {
@@ -436,6 +447,8 @@ export function planPriceLabel(plan: ClawPlan, priceVersion?: string): string {
 export type ClawBillingStatus = {
   hasAccess: boolean;
   accessReason: 'trial' | 'subscription' | 'earlybird' | null;
+  /** Whether this user already has a canonical personal KiloClaw subscription row. */
+  hasExistingPersonalSubscription: boolean;
   trialEligible: boolean;
 
   /** User's credit balance in microdollars (null when not fetched). */

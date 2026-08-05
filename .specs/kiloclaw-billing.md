@@ -32,6 +32,7 @@ Updated 2026-05-12 -- retired current Standard first-month discount.
 Updated 2026-05-18 -- organization hard-expiry suspension and recovery contract.
 Updated 2026-05-28 -- exceptional personal Stripe EFW cancellation and suspension contract.
 Updated 2026-06-05 -- retirement of new and renewing Commit subscriptions.
+Updated 2026-08-05 -- closed fresh personal subscription signup.
 
 ## Conventions
 
@@ -145,9 +146,11 @@ Current organization-managed bootstrap rows remain a temporary
 managed-active funding carveout, but their compute lifecycle is still
 subordinate to organization trial and seat entitlement.
 
-New users who provision an instance without subscribing first
-automatically receive a free trial whose duration is determined by the
-subscription row's price version. Legacy
+Fresh personal KiloClaw signup is closed. A user without an existing
+canonical personal KiloClaw subscription MUST NOT provision a personal
+instance or receive a new trial subscription. Existing canonical personal
+subscription rows retain their current trial conversion, renewal,
+reactivation, management, and safe reprovision behavior. Legacy
 `kiloclaw_earlybird_purchases` rows without canonical subscription rows
 MUST NOT mint fresh trial access and instead require manual
 remediation. Canonical earlybird subscription rows continue to grant
@@ -202,6 +205,27 @@ lapses, with email notifications at each stage.
     tiers or instance-size-based paid plans as part of the current
     price increase. Larger-machine and tiered-pricing selection require
     a future spec change.
+
+### Fresh Personal Subscription Closure
+
+1. A user without an existing canonical personal KiloClaw subscription
+   MUST NOT provision a personal KiloClaw instance or create a fresh trial
+   subscription.
+2. Personal KiloClaw surfaces MUST NOT show onboarding, checkout, or
+   enrollment actions to a user without an existing canonical personal
+   subscription. They MUST instead state that new subscriptions are
+   unavailable. Navigation and product-promotion surfaces MUST omit KiloClaw
+   entirely for those users; a directly opened KiloClaw route MAY show the
+   unavailable state.
+3. Existing canonical personal subscriptions MUST retain their current
+   access, conversion, renewal, reactivation, cancellation, management,
+   and safe reprovision behavior.
+4. Provisioning services and post-checkout fulfillment paths MUST enforce
+   the same canonical-subscription boundary before creating personal
+   infrastructure or subscription state, including stale or already-completed
+   checkout sessions.
+5. This closure does not change organization-managed KiloClaw provisioning
+   or entitlement behavior.
 
 ### Pricing Versions and Legacy Lineages
 
@@ -1461,6 +1485,10 @@ rows renew.
 10. The billing status MUST include instance data (whether an
     undestroyed instance exists, suspension timestamp, destruction
     deadline, and destroyed flag) when any instance record exists.
+11. The billing status MUST indicate whether the user has any existing
+    canonical personal KiloClaw subscription row so personal surfaces can
+    enforce the fresh-subscription closure without treating organization-owned
+    subscriptions as personal history.
 
 ### Billing Portal
 
@@ -1495,6 +1523,11 @@ rows renew.
    requirements on credit transaction records.
 
 ### Changelog
+
+#### 2026-08-05 -- Close fresh personal subscription signup
+
+- Blocked personal provisioning and trial creation for users without an existing canonical personal KiloClaw subscription.
+- Removed personal onboarding and enrollment actions for those users while preserving existing subscription lifecycle and organization-managed behavior.
 
 #### 2026-06-05 -- Retire new and renewing Commit subscriptions
 

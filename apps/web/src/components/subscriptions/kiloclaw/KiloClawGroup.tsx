@@ -21,6 +21,7 @@ import { useInvalidateKiloClawBilling } from './useKiloClawBillingQueries';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
+import { KiloClawSignupUnavailable } from './KiloClawSignupUnavailable';
 import { KiloClawSubscribeCard } from './KiloClawSubscribeCard';
 import {
   formatDateLabel,
@@ -195,6 +196,8 @@ export function KiloClawGroup({
             );
           })}
         </div>
+      ) : subscriptions.length === 0 ? (
+        <KiloClawSignupUnavailable />
       ) : nonTerminalSubscriptions.length === 0 ? (
         <KiloClawSubscribeCard
           standardCostMicrodollars={

@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { useTRPC } from '@/lib/trpc/utils';
+import { KiloClawSignupUnavailable } from '@/components/subscriptions/kiloclaw/KiloClawSignupUnavailable';
 import {
   ClawOnboardingFlow,
   type ClawOnboardingMode,
@@ -125,6 +126,18 @@ function ClawNewLiveClient() {
   }
 
   const billing = billingQuery.data;
+
+  if (billing && !billing.hasExistingPersonalSubscription) {
+    return (
+      <div
+        className="container m-auto flex w-full max-w-[1140px] items-center justify-center p-4 md:p-6"
+        style={{ minHeight: '50vh' }}
+      >
+        <KiloClawSignupUnavailable />
+      </div>
+    );
+  }
+
   const isNewUser =
     billing &&
     !billing.hasAccess &&

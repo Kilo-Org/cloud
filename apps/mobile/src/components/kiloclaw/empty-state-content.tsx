@@ -28,9 +28,9 @@ export function resolveAccessRequiredSubcase(
   ) {
     return state.state;
   }
-  // trial_eligible | has_access | pending_settlement — the `satisfies` guard forces
+  // signup_unavailable | has_access | pending_settlement — the `satisfies` guard forces
   // a typecheck failure if the server ever adds a new state kind we forgot to handle.
-  state.state satisfies 'trial_eligible' | 'has_access' | 'pending_settlement';
+  state.state satisfies 'signup_unavailable' | 'has_access' | 'pending_settlement';
   return null;
 }
 
@@ -45,6 +45,16 @@ export function EmptyStateContent({
         icon={Server}
         title="Finishing setup"
         description="Hang tight, we're finalizing your account. This usually takes a moment."
+      />
+    );
+  }
+
+  if (state.state === 'signup_unavailable') {
+    return (
+      <EmptyState
+        icon={Server}
+        title="New KiloClaw subscriptions are unavailable"
+        description="KiloClaw is no longer accepting new subscriptions. Existing subscribers can continue managing their service."
       />
     );
   }

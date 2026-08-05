@@ -106,8 +106,7 @@ export function OnboardingFlow() {
     if (!data) {
       return;
     }
-    const kind = data.state;
-    const eligible = kind === 'trial_eligible' || kind === 'has_access';
+    const eligible = data.state === 'has_access';
     // pending_settlement means the subscription is activating; the instance
     // may already exist, in which case we should redirect rather than block.
     const hasAccessWithInstance =
@@ -378,6 +377,30 @@ export function OnboardingFlow() {
     const subcase = onboardingQuery.data
       ? resolveAccessRequiredSubcase(onboardingQuery.data)
       : null;
+    let unavailableContent: ReactNode = (
+      <View className="items-center gap-3 px-6">
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+        <Text variant="muted" className="text-center">
+          Finishing setup — hang tight while we finalize your account.
+        </Text>
+      </View>
+    );
+    if (onboardingQuery.data?.state === 'signup_unavailable') {
+      unavailableContent = (
+        <View className="items-center gap-2 px-6">
+          <Text className="text-center text-2xl font-semibold">
+            New KiloClaw subscriptions are unavailable
+          </Text>
+          <Text variant="muted" className="text-center text-base">
+            KiloClaw is no longer accepting new subscriptions. Existing subscribers can continue
+            managing their service.
+          </Text>
+        </View>
+      );
+    } else if (subcase) {
+      unavailableContent = <AccessRequiredScreen subcase={subcase} />;
+    }
+
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="" modal showBackButton={false} headerRight={closeButton} />
@@ -385,19 +408,7 @@ export function OnboardingFlow() {
           entering={FadeIn.duration(200)}
           className="flex-1 items-center justify-center"
         >
-          {subcase ? (
-            <AccessRequiredScreen subcase={subcase} />
-          ) : (
-            // pending_settlement without an instance — the subscription is still
-            // activating server-side. `resolveAccessRequiredSubcase` returns null
-            // because this is neither an access-required nor a remediation case.
-            <View className="items-center gap-3 px-6">
-              <ActivityIndicator size="small" color={colors.mutedForeground} />
-              <Text variant="muted" className="text-center">
-                Finishing setup — hang tight while we finalize your account.
-              </Text>
-            </View>
-          )}
+          {unavailableContent}
         </Animated.View>
       </View>
     );

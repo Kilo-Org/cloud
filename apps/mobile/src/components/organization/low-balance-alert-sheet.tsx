@@ -98,6 +98,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         <>
           <FormField
             label="Alert below (USD)"
+            required
             accessibilityLabel="Alert threshold"
             placeholder="10.00"
             keyboardType="decimal-pad"
@@ -112,6 +113,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           <View className="gap-1.5">
             <FormField
               label="Notify emails"
+              required
               accessibilityLabel="Notify emails"
               placeholder="name@company.com"
               keyboardType="email-address"

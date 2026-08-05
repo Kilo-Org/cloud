@@ -56,6 +56,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
     <>
       <FormField
         label="Limit (USD per day)"
+        required
         accessibilityLabel="Daily usage limit"
         placeholder="No limit"
         keyboardType="decimal-pad"

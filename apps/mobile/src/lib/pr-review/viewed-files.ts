@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
+import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { PR_REVIEW_VIEWED_KEY } from '@/lib/storage-keys';
 
 type ViewedFileEntry = {
@@ -16,25 +17,6 @@ type ViewedFilePrRef = {
   repo: string;
   number: number;
 };
-
-// Same serialized write-queue pattern as last-active-instance and recent-prs.
-let writeQueue: Promise<void> | null = null;
-
-async function enqueueWrite(op: () => Promise<void>): Promise<void> {
-  const previous = writeQueue;
-  const next = (async () => {
-    if (previous) {
-      try {
-        await previous;
-      } catch {
-        // An earlier failed write must not block the queue.
-      }
-    }
-    await op();
-  })();
-  writeQueue = next;
-  await next;
-}
 
 function viewedFilesKey(ref: ViewedFilePrRef): string {
   return `${ref.owner.toLowerCase()}/${ref.repo.toLowerCase()}#${ref.number}`;
@@ -123,7 +105,7 @@ type ToggleViewedFileInput = ViewedFilePrRef & {
 
 export async function toggleViewedFile(input: ToggleViewedFileInput): Promise<void> {
   const { headSha, path } = input;
-  await enqueueWrite(async () => {
+  await writeAccountMetadata(PR_REVIEW_VIEWED_KEY, async () => {
     const map = await readMap();
     const key = viewedFilesKey(input);
     const existing = map[key];
@@ -152,7 +134,5 @@ export async function toggleViewedFile(input: ToggleViewedFileInput): Promise<vo
 }
 
 export async function clearViewedFiles(): Promise<void> {
-  await enqueueWrite(async () => {
-    await SecureStore.deleteItemAsync(PR_REVIEW_VIEWED_KEY);
-  });
+  await deleteAccountMetadata(PR_REVIEW_VIEWED_KEY);
 }

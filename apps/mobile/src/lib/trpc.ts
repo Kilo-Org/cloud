@@ -8,7 +8,13 @@ import { API_BASE_URL, E2E_LATENCY_MESSAGES_MS, E2E_LATENCY_SESSION_MS } from '@
 import { performRefresh, REFRESH_MARGIN_MS } from '@/lib/auth/auth-context';
 import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { shouldRefreshBeforeRequest } from '@/lib/auth/native-auth-contract';
-import { AUTH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
+import {
+  getActiveToken,
+  getActiveTokenSnapshot,
+  getAuthTokenForRequest,
+  publishActiveTokenExpiry,
+} from '@/lib/auth/token-owner';
+import { TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
 
@@ -79,25 +85,46 @@ export const deadlineFetch: typeof fetch = async (url, init) => {
 };
 
 async function getAuthHeaders() {
-  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  const token = await getAuthTokenForRequest();
   if (!token) {
     return buildAuthHeaders(token);
   }
 
   // Proactive refresh: if the token is expiring within the margin, rotate
   // before this request hits a 401. performRefresh handles single-flight
-  // so concurrent requests share one rotation.
-  const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
-  if (expiresAtStr) {
-    const expiresAt = Number(expiresAtStr);
-    if (shouldRefreshBeforeRequest(expiresAt, Date.now(), REFRESH_MARGIN_MS)) {
-      await performRefresh();
-      const currentToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-      return buildAuthHeaders(currentToken);
+  // so concurrent requests share one rotation. The expiry comes from the
+  // in-memory owner when available; only the cold path (owner warmed by
+  // getAuthTokenForRequest without an expiry) reads TOKEN_EXPIRES_AT_KEY,
+  // and the resolved value is published back into the owner so normal
+  // requests never reread it.
+  const active = getActiveTokenSnapshot();
+  let expiresAtMs = active?.expiresAtMs ?? null;
+  if (expiresAtMs === null) {
+    const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+    const resolvedExpiresAtMs = expiresAtStr ? Number(expiresAtStr) : null;
+    // Publish the resolved expiry into the owner that the cold read warmed.
+    // A newer owner published while the expiry was read keeps its own token
+    // and expiry.
+    if (active) {
+      publishActiveTokenExpiry(active, resolvedExpiresAtMs);
     }
+    expiresAtMs = resolvedExpiresAtMs;
+  }
+  // Prefer the newest owner token: a sign-in or refresh may have published a
+  // newer one while the cold reads were in flight.
+  const newest = getActiveToken();
+  const currentToken = newest?.token ?? token;
+  const currentExpiresAtMs = newest ? newest.expiresAtMs : expiresAtMs;
+  if (
+    currentExpiresAtMs !== null &&
+    shouldRefreshBeforeRequest(currentExpiresAtMs, Date.now(), REFRESH_MARGIN_MS)
+  ) {
+    await performRefresh();
+    const refreshedToken = getActiveToken()?.token ?? (await getAuthTokenForRequest());
+    return buildAuthHeaders(refreshedToken);
   }
 
-  return buildAuthHeaders(token);
+  return buildAuthHeaders(currentToken);
 }
 
 const singleLink = httpLink({

@@ -1,8 +1,10 @@
 /* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable max-lines -- one cohesive auth-context suite: sign-out teardown ordering and stale sign-in fencing share the provider mount and the SecureStore mock */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as AuthContextModule from './auth-context';
 
 // ---- hoisted mocks ----
 
@@ -53,7 +55,22 @@ const hoisted = vi.hoisted(() => {
     }),
   };
 
-  return { callOrder, secureStore, posthog, appsflyer, controller, posthogStorage, sentry };
+  // Hoisted so the foreground tests can capture AppState listeners from the
+  // same mock instance every module registry resolves to.
+  const appState = {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  };
+
+  return {
+    callOrder,
+    secureStore,
+    posthog,
+    appsflyer,
+    controller,
+    posthogStorage,
+    sentry,
+    appState,
+  };
 });
 
 // ---- all vi.mock calls ----
@@ -144,9 +161,7 @@ vi.mock('@/lib/config', () => ({
 }));
 
 vi.mock('react-native', () => ({
-  AppState: {
-    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
-  },
+  AppState: hoisted.appState,
 }));
 
 // ---- helpers ----
@@ -154,8 +169,9 @@ vi.mock('react-native', () => ({
 type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;
+  sessionEnded: boolean;
   signIn: (token: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (ended?: boolean) => Promise<void>;
 };
 
 /** Load the auth-context module from a fresh module registry so
@@ -331,6 +347,359 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.secureStore.setItem).toHaveBeenCalledWith('kiloclaw-owned', '1');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('kiloclaw-owned');
 
+    unmount();
+  });
+
+  it('regression: sign-out deletes run through deleteAccountMetadata and land after in-flight metadata writes', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const amw = await import('@/lib/auth/account-metadata-write');
+    const secureStore = hoisted.secureStore;
+
+    // An in-flight write holds the filters key's chain open.
+    let releaseInFlight: (() => void) | undefined = undefined;
+    const inFlightGate = new Promise<void>(resolve => {
+      releaseInFlight = resolve;
+    });
+    let markStarted: (() => void) | undefined = undefined;
+    const started = new Promise<void>(resolve => {
+      markStarted = resolve;
+    });
+    const inFlight = amw.writeAccountMetadata('session-filters', async () => {
+      markStarted?.();
+      await inFlightGate;
+      await secureStore.setItemAsync('session-filters', 'stale-filters');
+    });
+    // A second, now-stale write is queued behind it before the user signs out.
+    const staleWrite = amw.writeAccountMetadata('session-filters', async () => {
+      await secureStore.setItemAsync('session-filters', 'stale-filters-2');
+    });
+
+    // Wait until the in-flight write has started and holds the chain.
+    await started;
+
+    const signOutPromise = ctx.signOut();
+    // Let signOut reach the per-key metadata deletes while the filters write
+    // is still in flight, so the filters delete must serialize behind it.
+    await vi.waitFor(() => {
+      expect(secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+    });
+    releaseInFlight?.();
+    await act(async () => {
+      await signOutPromise;
+    });
+    await Promise.all([inFlight, staleWrite]);
+
+    // The stale queued write was fenced by the sign-out epoch bump: only the
+    // in-flight write landed on the key.
+    expect(secureStore.setItemAsync).toHaveBeenCalledTimes(1);
+    expect(secureStore.setItemAsync).toHaveBeenCalledWith('session-filters', 'stale-filters');
+
+    // The sign-out delete for the filters key ran through the per-key chain,
+    // so it landed after the in-flight write to the same key — a plain
+    // SecureStore delete could have been overtaken by the queued stale write.
+    expect(secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
+    const deleteCalls = secureStore.deleteItemAsync.mock.calls;
+    const deleteIndex = deleteCalls.findIndex((call: string[]) => call[0] === 'session-filters');
+    expect(deleteIndex).toBeGreaterThanOrEqual(0);
+    const deleteOrder = secureStore.deleteItemAsync.mock.invocationCallOrder[deleteIndex];
+    expect(deleteOrder).toBeGreaterThan(secureStore.setItemAsync.mock.invocationCallOrder[0]);
+
+    unmount();
+  });
+});
+
+describe('stale sign-in continuation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.callOrder.length = 0;
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+  });
+
+  /** Mount the provider with a consumer that re-captures the context on
+   *  every render, and resolve the preload effect. getCtx reads the latest
+   *  captured value so a test can assert post-operation state. */
+  // oxlint-disable-next-line require-await -- dynamic import is awaited
+  async function mountStaleTest(): Promise<{
+    getCtx: () => AuthContextValue;
+    unmount: () => void;
+  }> {
+    vi.resetModules();
+    const mod = await import('./auth-context');
+
+    let capturedCtx: AuthContextValue | undefined = undefined;
+    function Consumer(): null {
+      capturedCtx = mod.useAuth();
+      return null;
+    }
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(mod.AuthProvider, null, createElement(Consumer))
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    return {
+      getCtx: () => {
+        // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- safety net for test failures
+        if (!capturedCtx) {
+          throw new Error('auth context not captured');
+        }
+        return capturedCtx;
+      },
+      unmount: () => {
+        renderer?.unmount();
+      },
+    };
+  }
+
+  it('does not clear the guard, update auth state, or run login side effects when a sign-out fences the sign-in write', async () => {
+    const { getCtx, unmount } = await mountStaleTest();
+
+    // The sign-in bumps the epoch and queues its credential write; the
+    // sign-out bumps it again and fences that write before it can publish.
+    const staleSignIn = getCtx().signIn('stale-token');
+    const signOutPromise = getCtx().signOut(true);
+
+    await act(async () => {
+      await Promise.all([staleSignIn, signOutPromise]);
+    });
+
+    // The fenced sign-in ran none of its continuation: no login side effect,
+    // no token restore, no session reset.
+    expect(hoisted.appsflyer.trackEvent).not.toHaveBeenCalled();
+    const { resetPurchaseErrorToastDedup } =
+      await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
+    expect(resetPurchaseErrorToastDedup).not.toHaveBeenCalled();
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(true);
+
+    unmount();
+  });
+
+  it('does not run login side effects for a sign-in superseded by a newer sign-in', async () => {
+    const { getCtx, unmount } = await mountStaleTest();
+
+    // The second sign-in bumps the epoch and fences the first sign-in's
+    // credential write.
+    const firstSignIn = getCtx().signIn('first-token');
+    const secondSignIn = getCtx().signIn('second-token');
+
+    await act(async () => {
+      await Promise.all([firstSignIn, secondSignIn]);
+    });
+
+    // Only the winning sign-in runs login side effects and owns the token.
+    expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(1);
+    const { resetPurchaseErrorToastDedup } =
+      await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
+    expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(1);
+    expect(getCtx().token).toBe('second-token');
+
+    unmount();
+  });
+});
+
+describe('bootstrap and foreground race fencing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.callOrder.length = 0;
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+  });
+
+  /** Reset the module registry and mount the provider so the bootstrap load
+   *  runs against the caller-installed SecureStore mock queue. The queue is
+   *  consumed in this order: preloadedToken, preloadedRefreshToken, the
+   *  bootstrap expiry read, then the bootstrap credential re-read. */
+  async function mountProvider(): Promise<{
+    getCtx: () => AuthContextValue;
+    unmount: () => void;
+    mod: AuthContextModule;
+  }> {
+    vi.resetModules();
+    const mod = await import('./auth-context');
+
+    let capturedCtx: AuthContextValue | undefined = undefined;
+    function Consumer(): null {
+      capturedCtx = mod.useAuth();
+      return null;
+    }
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(mod.AuthProvider, null, createElement(Consumer))
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    return {
+      getCtx: () => {
+        // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- safety net for test failures
+        if (!capturedCtx) {
+          throw new Error('auth context not captured');
+        }
+        return capturedCtx;
+      },
+      unmount: () => {
+        renderer?.unmount();
+      },
+      mod,
+    };
+  }
+
+  it('regression: sign-out during bootstrap does not restore the preloaded token into React state or the owner', async () => {
+    let releaseRead: (() => void) | undefined = undefined;
+    const readGate = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    // Mock queue consumed by the bootstrap load: preloadedToken,
+    // preloadedRefreshToken, then the expiry read (held), then the
+    // credential re-read (unchanged, so only the epoch fence can stop it).
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce('stored-token')
+      .mockResolvedValueOnce('stored-refresh')
+      .mockImplementationOnce(async () => {
+        // Bootstrap expiry read: hold open so a sign-out can land mid-read.
+        await readGate;
+        return '9999999999999';
+      })
+      .mockResolvedValueOnce('stored-token');
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // Sign out while the bootstrap expiry read is in flight.
+    await act(async () => {
+      await getCtx().signOut(true);
+    });
+
+    releaseRead?.();
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The stale bootstrap never published — even with the stored credentials
+    // unchanged, the epoch fence stops the preloaded token from being
+    // resurrected into React state or the token owner.
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()).toBeNull();
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(true);
+
+    unmount();
+  });
+
+  it('regression: bootstrap does not publish the preloaded token over credentials written during the load', async () => {
+    let releaseRead: (() => void) | undefined = undefined;
+    const readGate = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    // Mock queue consumed by the bootstrap load: preloadedToken,
+    // preloadedRefreshToken, then the expiry read (held). The credential
+    // re-read falls back to the null base mock, so it reports the preloaded
+    // snapshot no longer matches the stored session.
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce('stored-token')
+      .mockResolvedValueOnce('stored-refresh')
+      .mockImplementationOnce(async () => {
+        // Bootstrap expiry read: hold open while a same-session credential
+        // write replaces the stored pair.
+        await readGate;
+        return '9999999999999';
+      });
+
+    const { getCtx, unmount, mod } = await mountProvider();
+
+    // A same-session refresh replaces the stored pair and publishes the owner
+    // while the bootstrap expiry read is in flight.
+    await act(async () => {
+      await mod.persistSignInCredentialsAtEpoch('newer-token', 'newer-refresh', {
+        expiresIn: 3600,
+      });
+    });
+
+    releaseRead?.();
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The refresh-owned session stands: the preloaded snapshot was not
+    // republished over it, and bootstrap never surfaced a token in React state.
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()).toEqual({
+      token: 'newer-token',
+      expiresAtMs: expect.any(Number),
+    });
+    expect(getCtx().token).toBeUndefined();
+
+    unmount();
+  });
+
+  it('regression: a foreground event from a stale epoch does not refresh or publish a token after sign-out', async () => {
+    const { getCtx, unmount } = await mountProvider();
+
+    // Sign in so the foreground effect re-subscribes with a token in scope.
+    await act(async () => {
+      await getCtx().signIn('active-token');
+    });
+
+    // Grab the listener registered by the token-bearing foreground effect.
+    const listeners = hoisted.appState.addEventListener.mock.calls;
+    const eventListener = listeners.at(-1)?.[1];
+
+    // Hold the expiry read open so a sign-out can land inside the handler.
+    let releaseRead: (() => void) | undefined = undefined;
+    const readGate = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    hoisted.secureStore.getItemAsync.mockImplementationOnce(async () => {
+      await readGate;
+      // An expiry inside the refresh margin: without the epoch fence the
+      // handler would proceed to refresh.
+      return String(Date.now() + 60_000);
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    await act(async () => {
+      eventListener?.('active');
+      await Promise.resolve();
+    });
+
+    // Sign out while the foreground event's expiry read is in flight.
+    await act(async () => {
+      await getCtx().signOut(true);
+    });
+
+    releaseRead?.();
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The stale event never initiated a refresh and never published a token.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(getCtx().token).toBeUndefined();
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()).toBeNull();
+
+    fetchSpy.mockRestore();
     unmount();
   });
 });

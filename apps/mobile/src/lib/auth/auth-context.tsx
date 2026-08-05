@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive auth-context module: refresh rotation, epoch fencing, the serialized credential write queue, and provider teardown stay together */
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 import {
@@ -15,9 +16,12 @@ import { discardPostHog } from '@/lib/analytics/posthog';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { API_BASE_URL } from '@/lib/config';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
+import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { clearActiveToken, setActiveToken } from '@/lib/auth/token-owner';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
@@ -56,7 +60,6 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 // Single-flight refresh lock. Only the first caller initiates the rotation;
 // concurrent callers await the same promise.
 let refreshPromise: Promise<RefreshOutcome> | null = null;
-let refreshSessionVersion = 0;
 let credentialWrite: Promise<void> = new Promise<void>(resolve => {
   resolve();
 });
@@ -77,11 +80,7 @@ export type RefreshOutcome = RefreshSuccess | RefreshRefused | RefreshTransient 
 export const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
 export function invalidateRefreshSession(): void {
-  refreshSessionVersion += 1;
-}
-
-function isRefreshSessionCurrent(sessionVersion: number): boolean {
-  return sessionVersion === refreshSessionVersion;
+  bumpAuthEpoch();
 }
 
 async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
@@ -98,21 +97,80 @@ async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Persists a credential pair through the serialized credential write queue.
+ * Returns whether the pair was published to the token owner. A newer sign-in
+ * or sign-out that superseded the write while it waited or ran fences it:
+ * any partial credential keys already committed are cleared and nothing is
+ * published, so a stale sign-in can never surface.
+ */
+type PersistCredentialsOptions = {
+  expiresIn?: number;
+  expectedEpoch?: number;
+};
+
 export async function persistSignInCredentials(
   token: string,
   refreshToken?: string,
   expiresIn?: number
-): Promise<void> {
-  await writeCredentials(async () => {
-    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
-    if (refreshToken && expiresIn) {
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
-      await SecureStore.setItemAsync(TOKEN_EXPIRES_AT_KEY, String(Date.now() + expiresIn * 1000));
-      return;
-    }
+): Promise<boolean> {
+  const published = await persistSignInCredentialsAtEpoch(token, refreshToken, { expiresIn });
+  return published;
+}
+
+export async function persistSignInCredentialsAtEpoch(
+  token: string,
+  refreshToken: string | undefined,
+  options: PersistCredentialsOptions
+): Promise<boolean> {
+  const epoch = options.expectedEpoch ?? currentAuthEpoch();
+  const expiresIn = options.expiresIn;
+  const expiresAtMs = refreshToken && expiresIn ? Date.now() + expiresIn * 1000 : null;
+  const hasPair = Boolean(refreshToken && expiresIn);
+
+  // Wipe every credential key a fenced write may already have committed.
+  // Runs inside the serialized write queue, so it cannot remove the keys of
+  // a newer sign-in or sign-out: their own credential write is queued
+  // strictly behind this one.
+  const clearPartialCredentials = async (): Promise<void> => {
+    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY);
+  };
+
+  // Fence one credential operation: skip it when the epoch moved before the
+  // op, and clear the partial pair when it moved during the op.
+  const commitWrite = async (key: string, value?: string): Promise<boolean> => {
+    if (!isCurrentAuthEpoch(epoch)) {
+      return false;
+    }
+    await (value === undefined
+      ? SecureStore.deleteItemAsync(key)
+      : SecureStore.setItemAsync(key, value));
+    if (!isCurrentAuthEpoch(epoch)) {
+      await clearPartialCredentials();
+      return false;
+    }
+    return true;
+  };
+
+  let published = false;
+  await writeCredentials(async () => {
+    if (!(await commitWrite(AUTH_TOKEN_KEY, token))) {
+      return;
+    }
+    if (!(await commitWrite(REFRESH_TOKEN_KEY, hasPair ? refreshToken : undefined))) {
+      return;
+    }
+    if (!(await commitWrite(TOKEN_EXPIRES_AT_KEY, hasPair ? String(expiresAtMs) : undefined))) {
+      return;
+    }
+    // Every fenced operation passed its post-check and nothing awaited since
+    // the last one, so the epoch is still current: publish to the owner.
+    setActiveToken(token, expiresAtMs);
+    published = true;
   });
+  return published;
 }
 
 export async function performRefresh(): Promise<RefreshOutcome> {
@@ -132,10 +190,10 @@ export async function performRefresh(): Promise<RefreshOutcome> {
 }
 
 async function doRefresh(): Promise<RefreshOutcome> {
-  const sessionVersion = refreshSessionVersion;
+  const sessionVersion = currentAuthEpoch();
   try {
     const storedRefreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-    if (!isRefreshSessionCurrent(sessionVersion)) {
+    if (!isCurrentAuthEpoch(sessionVersion)) {
       return { ok: false, refused: false, superseded: true };
     }
     if (!storedRefreshToken) {
@@ -149,7 +207,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
       body: JSON.stringify({ refreshToken: storedRefreshToken }),
     });
 
-    if (!isRefreshSessionCurrent(sessionVersion)) {
+    if (!isCurrentAuthEpoch(sessionVersion)) {
       return { ok: false, refused: false, superseded: true };
     }
 
@@ -170,26 +228,25 @@ async function doRefresh(): Promise<RefreshOutcome> {
       return { ok: false, refused: false };
     }
 
-    return await writeCredentials(async () => {
-      if (!isRefreshSessionCurrent(sessionVersion)) {
-        return { ok: false, refused: false, superseded: true };
-      }
+    if (!isCurrentAuthEpoch(sessionVersion)) {
+      return { ok: false, refused: false, superseded: true };
+    }
 
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, parsed.token);
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, parsed.refreshToken);
-      await SecureStore.setItemAsync(
-        TOKEN_EXPIRES_AT_KEY,
-        String(Date.now() + parsed.expiresIn * 1000)
-      );
-
-      return {
-        ok: true,
-        token: parsed.token,
-        refreshToken: parsed.refreshToken,
-        expiresIn: parsed.expiresIn,
-        sessionVersion,
-      };
+    const published = await persistSignInCredentialsAtEpoch(parsed.token, parsed.refreshToken, {
+      expiresIn: parsed.expiresIn,
+      expectedEpoch: sessionVersion,
     });
+    if (!published) {
+      return { ok: false, refused: false, superseded: true };
+    }
+
+    return {
+      ok: true,
+      token: parsed.token,
+      refreshToken: parsed.refreshToken,
+      expiresIn: parsed.expiresIn,
+      sessionVersion,
+    };
   } catch {
     return { ok: false, refused: false };
   }
@@ -206,6 +263,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
+        // Capture the epoch before any asynchronous read: every later check
+        // fences against this moment, so a sign-out or newer sign-in during
+        // bootstrap can never be followed by the preloaded token being
+        // restored into React state or the token owner.
+        const epoch = currentAuthEpoch();
         const stored = await preloadedToken;
         const storedRefresh = await preloadedRefreshToken;
 
@@ -220,6 +282,23 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             }
           }
 
+          // The session moved while the preload or legacy exchange was in
+          // flight: never resurrect the preloaded token.
+          if (!isCurrentAuthEpoch(epoch)) {
+            return;
+          }
+
+          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+
+          // Fence the asynchronous expiry read: publish only when the epoch
+          // is still current and the stored credentials still match the
+          // preloaded session. A refresh or sign-in that completed during the
+          // reads already owns the session; the stale snapshot must not win.
+          const currentStored = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+          if (!isCurrentAuthEpoch(epoch) || currentStored !== stored) {
+            return;
+          }
+          setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
         }
       } finally {
@@ -232,7 +311,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const signIn = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresIn?: number) => {
       invalidateRefreshSession();
-      await persistSignInCredentials(tokenValue, refreshTokenValue, expiresIn);
+      const epoch = currentAuthEpoch();
+      const published = await persistSignInCredentials(tokenValue, refreshTokenValue, expiresIn);
+      // A sign-in superseded by a newer sign-in or sign-out while its
+      // credential write was fenced must not clear the signed-out guard,
+      // update React auth state, or run login side effects.
+      if (!published || !isCurrentAuthEpoch(epoch)) {
+        return;
+      }
       // Clear the guard so a later refused refresh can sign out again.
       isSignedOutReference.current = false;
       setSessionEnded(false);
@@ -246,6 +332,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const signOut = useCallback(async (ended = false) => {
     isSignedOutReference.current = true;
     invalidateRefreshSession();
+    clearActiveToken();
     // Close ownership persistence before any await so a late list response
     // cannot write the previous account's answer during teardown.
     gateKiloClawOwned();
@@ -265,9 +352,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
     });
     // Clear per-user preferences so they don't leak to the next signed-in account
-    await SecureStore.deleteItemAsync(ORGANIZATION_STORAGE_KEY);
-    await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
-    await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
+    await deleteAccountMetadata(ORGANIZATION_STORAGE_KEY);
+    await deleteAccountMetadata(SESSION_FILTERS_KEY);
+    await deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY);
     await clearLastActiveInstance();
     await clearKiloClawOwned();
     await clearRecentPrs();
@@ -287,7 +374,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     const handler = async () => {
       const outcome = await performRefresh();
 
-      if (outcome.ok && isRefreshSessionCurrent(outcome.sessionVersion)) {
+      if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
         setToken(outcome.token);
         // Invalidate all queries so failed authenticated work recovers
         // with the new token. UNAUTHORIZED errors have retry=0, so a
@@ -314,6 +401,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
 
+      // Capture the epoch that owns this foreground event. A sign-out or
+      // newer sign-in that lands while the expiry read is in flight makes
+      // the event stale: it must not refresh on the old session or publish
+      // a token after sign-out.
+      const epoch = currentAuthEpoch();
+
       void (async () => {
         const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
         if (!expiresAtStr) {
@@ -325,9 +418,15 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           return;
         }
 
+        // The epoch moved while the expiry read was in flight: the event is
+        // stale, so do not initiate a refresh for the old session.
+        if (!isCurrentAuthEpoch(epoch)) {
+          return;
+        }
+
         const outcome = await performRefresh();
 
-        if (outcome.ok && isRefreshSessionCurrent(outcome.sessionVersion)) {
+        if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
           setToken(outcome.token);
         }
         // Transient or refused: do not sign out — the user did not trigger

@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import {
   type AgentSessionFilters,
   createDefaultAgentSessionFilters,
@@ -58,7 +59,9 @@ export function usePersistedAgentSessionFilters() {
 
     const saveFilters = async () => {
       try {
-        await SecureStore.setItemAsync(SESSION_FILTERS_KEY, JSON.stringify(filters));
+        await writeAccountMetadata(SESSION_FILTERS_KEY, async () => {
+          await SecureStore.setItemAsync(SESSION_FILTERS_KEY, JSON.stringify(filters));
+        });
       } catch {
         // Keep the in-memory filters so the session still works, but the
         // change won't survive relaunch — tell the user so it's not a silent

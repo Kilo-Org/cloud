@@ -18,13 +18,13 @@ export const REASONING_VARIANTS_THINKING_ONLY = {
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
-  ...REASONING_VARIANTS_THINKING_ONLY,
+  thinking: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
-  low: { reasoning: { enabled: true, effort: 'low' } },
-  medium: { reasoning: { enabled: true, effort: 'medium' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
 } as const;
 
 export const REASONING_VARIANTS_MAX_HIGH_LOW_NONE = {
@@ -43,41 +43,48 @@ export const REASONING_VARIANTS_XHIGH_HIGH_MEDIUM_LOW_MINIMAL = {
 } as const;
 
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
   minimal: { reasoning: { enabled: true, effort: 'minimal' } },
-  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
 } as const;
 
 export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
-  ...REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
   xhigh: { reasoning: { enabled: false, effort: 'xhigh' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+  none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
 export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
 export const REASONING_VARIANTS_NONE_LOW_HIGH_MAX = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
-  low: { reasoning: { enabled: true, effort: 'low' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
   max: { reasoning: { enabled: true, effort: 'max' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
 const REASONING_VARIANTS_CLAUDE = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
-  low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-  medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-  high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-  xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
   max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
+  high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+  medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+  low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+  none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
 export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
-  instant: REASONING_VARIANTS_BINARY.instant,
-  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+  instant: { reasoning: { enabled: false, effort: 'none' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
 } as const;
 
 export function getFallbackModelVariants(model: string): OpenCodeSettings['variants'] {

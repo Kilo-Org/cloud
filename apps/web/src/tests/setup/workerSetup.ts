@@ -9,7 +9,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import {
   provisionComputeUsageChargePartitions,
   provisionExaUsageLogPartitions,
-} from '@/lib/exa-usage-partitions';
+} from '@/lib/usage-partitions';
 import { provisionModelExperimentRequestPartitions } from '@/lib/model-experiment-request-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';

@@ -3,7 +3,7 @@ import {
   buildExaUsageLogPartitionIndexDropStatement,
   provisionComputeUsageChargePartitions,
   provisionExaUsageLogPartitions,
-} from '@/lib/exa-usage-partitions';
+} from '@/lib/usage-partitions';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 

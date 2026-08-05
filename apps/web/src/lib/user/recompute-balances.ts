@@ -32,7 +32,9 @@ export type MigrationResult = Result<UserBalanceUpdates, string>;
  * 6. Updates the user record and transaction baselines (unless dryRun is true).
  *
  * Postconditions:
- * - microdollars_used = all personal LLM, Exa, and container charge ledger records
+ * - microdollars_used = sum(personal microdollar_usage.cost)
+ *   + sum(personal exa_usage_log.cost_microdollars where charged_to_balance)
+ *   + sum(compute_usage_charge.amount_microdollars where user_id matches)
  * - total_microdollars_acquired = sum(credit_transactions) [including any new adjustment]
  * - All expiring credit transactions have expiration_baseline_microdollars_used set
  */

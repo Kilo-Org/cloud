@@ -2,14 +2,12 @@ import type { db as defaultDb } from '@/lib/drizzle';
 import { sql } from 'drizzle-orm';
 import { format } from 'date-fns';
 
-type ExaPartitionDb = Pick<typeof defaultDb, 'execute'>;
+type UsagePartitionDb = Pick<typeof defaultDb, 'execute'>;
 
-export type ExaUsageLogPartitionProvisioningResult = {
+export type UsagePartitionProvisioningResult = {
   created: string[];
   errors: Array<{ name: string; error: unknown }>;
 };
-
-export type ComputeUsageChargePartitionProvisioningResult = ExaUsageLogPartitionProvisioningResult;
 
 export type ExaUsageLogPartitionIndexDefinition = {
   name: string;
@@ -81,9 +79,9 @@ export function buildExaUsageLogPartitionIndexDefinitions(
  * failed partition as fatal after calling this best-effort helper.
  */
 export async function provisionExaUsageLogPartitions(
-  fromDb: ExaPartitionDb,
+  fromDb: UsagePartitionDb,
   now: Date = new Date()
-): Promise<ExaUsageLogPartitionProvisioningResult> {
+): Promise<UsagePartitionProvisioningResult> {
   const created: string[] = [];
   const errors: Array<{ name: string; error: unknown }> = [];
 
@@ -119,9 +117,9 @@ export async function provisionExaUsageLogPartitions(
 
 /** Keeps the metered-compute debit ledger writable through the current and next two months. */
 export async function provisionComputeUsageChargePartitions(
-  fromDb: ExaPartitionDb,
+  fromDb: UsagePartitionDb,
   now: Date = new Date()
-): Promise<ComputeUsageChargePartitionProvisioningResult> {
+): Promise<UsagePartitionProvisioningResult> {
   const created: string[] = [];
   const errors: Array<{ name: string; error: unknown }> = [];
 

@@ -38,6 +38,7 @@ export async function addAutoRoutingModels(
     availableModelIds
   );
   const freeModelIds = visibleConcreteModelIds(autoFreeCandidates ?? [], availableModelIds);
+  const hideAutoFreeModel = autoFreeCandidates !== null && freeModelIds.length === 0;
   const autoRoutingChoices = new Map([
     [KILO_AUTO_BALANCED_MODEL.id, efficientModelIds],
     [KILO_AUTO_EFFICIENT_MODEL.id, efficientModelIds],
@@ -46,7 +47,7 @@ export async function addAutoRoutingModels(
 
   return models.flatMap(model => {
     const modelIds = autoRoutingChoices.get(model.id);
-    if (model.id === KILO_AUTO_FREE_MODEL.id && autoFreeCandidates !== null && !modelIds?.length) {
+    if (hideAutoFreeModel && model.id === KILO_AUTO_FREE_MODEL.id) {
       return [];
     }
     return [modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model];

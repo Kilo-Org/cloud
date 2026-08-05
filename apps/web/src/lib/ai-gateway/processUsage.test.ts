@@ -130,6 +130,16 @@ describe('useGenerationLookup', () => {
   test('skips generation lookup for free models', async () => {
     await expect(useGenerationLookup(usageStats, usageContext)).resolves.toBe(false);
   });
+
+  test('skips generation lookup for user BYOK', async () => {
+    await expect(
+      useGenerationLookup(usageStats, {
+        ...usageContext,
+        requested_model: 'provider/model',
+        user_byok: true,
+      })
+    ).resolves.toBe(false);
+  });
 });
 
 describe('authoritative usage transaction configuration', () => {

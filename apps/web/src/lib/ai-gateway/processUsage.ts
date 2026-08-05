@@ -1196,11 +1196,17 @@ export async function useGenerationLookup(
   if (!isGatewayProvider || !isSuccessStatusCode) {
     return false;
   }
-  if (await isFreeModel(usageContext.requested_model)) {
+  const isFree = await isFreeModel(usageContext.requested_model);
+  if (isFree) {
+    console.debug('[useGenerationLookup] skipping lookup for free model');
+    return false;
+  }
+  if (usageContext.user_byok) {
+    console.debug('[useGenerationLookup] skipping lookup for user BYOK');
     return false;
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
-  const hasCostWhenPaid = usageContext.user_byok || (usageStats?.cost_mUsd ?? 0) > 0;
+  const hasCostWhenPaid = (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);
   if (!hasOutputTokens) {
     console.debug('[useGenerationLookup] token stats are missing');

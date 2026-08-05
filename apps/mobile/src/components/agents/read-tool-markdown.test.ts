@@ -5,10 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
   balanceCodeFences,
   isMarkdownPath,
-  MARKDOWN_INLINE_MAX_CHARS,
   parseReadFileDisplay,
   parseReadOutputFallback,
-  resolveMarkdownPreview,
+  resolveMarkdownBody,
 } from './read-tool-markdown';
 
 // F1 complete 3-line read (note the trailing space on line 2)
@@ -233,7 +232,7 @@ describe('balanceCodeFences', () => {
   });
 });
 
-describe('resolveMarkdownPreview', () => {
+describe('resolveMarkdownBody', () => {
   it('prefers display text over output when both exist', () => {
     const part = makeCompletedPart({
       output: COMPLETE,
@@ -248,10 +247,10 @@ describe('resolveMarkdownPreview', () => {
         },
       },
     });
-    const preview = resolveMarkdownPreview(part);
-    expect(preview?.text).toBe('# From display');
-    expect(preview?.text).not.toMatch(/^\d+: /m);
-    expect(preview?.text).not.toContain('1: ');
+    const body = resolveMarkdownBody(part);
+    expect(body?.text).toBe('# From display');
+    expect(body?.text).not.toMatch(/^\d+: /m);
+    expect(body?.text).not.toContain('1: ');
   });
 
   it('falls back to output when display.text is absent', () => {
@@ -259,9 +258,8 @@ describe('resolveMarkdownPreview', () => {
       output: COMPLETE,
       metadata: {},
     });
-    const preview = resolveMarkdownPreview(part);
-    expect(preview?.text).toBe('# Title\n\n- item');
-    expect(preview?.path).toBe('/repo/README.md');
+    const body = resolveMarkdownBody(part);
+    expect(body?.text).toBe('# Title\n\n- item');
   });
 
   it('returns undefined for a non-completed state', () => {
@@ -278,7 +276,7 @@ describe('resolveMarkdownPreview', () => {
         time: { start: 0 },
       },
     };
-    expect(resolveMarkdownPreview(part)).toBeUndefined();
+    expect(resolveMarkdownBody(part)).toBeUndefined();
   });
 
   it('omits the footer for a complete untruncated read', () => {
@@ -295,7 +293,7 @@ describe('resolveMarkdownPreview', () => {
         },
       },
     });
-    expect(resolveMarkdownPreview(part)?.footer).toBeUndefined();
+    expect(resolveMarkdownBody(part)?.footer).toBeUndefined();
   });
 
   it('formats a windowed footer with en dash and thousands separator', () => {
@@ -313,7 +311,7 @@ describe('resolveMarkdownPreview', () => {
         },
       },
     });
-    expect(resolveMarkdownPreview(part)?.footer).toBe('lines 201–400 of 1,450');
+    expect(resolveMarkdownBody(part)?.footer).toBe('lines 201–400 of 1,450');
   });
 
   it('formats a byte-capped footer ending with (truncated)', () => {
@@ -321,14 +319,14 @@ describe('resolveMarkdownPreview', () => {
       output: CAPPED,
       metadata: {},
     });
-    const footer = resolveMarkdownPreview(part)?.footer;
+    const footer = resolveMarkdownBody(part)?.footer;
     expect(footer).toBeDefined();
     expect(footer?.endsWith('(truncated)')).toBe(true);
   });
 
-  it('caps inline text over the char limit at a newline boundary', () => {
+  it('keeps the full markdown over 2000 chars without truncation', () => {
     const longText = `${'a'.repeat(100)}\n`.repeat(30);
-    expect(longText.length).toBeGreaterThan(MARKDOWN_INLINE_MAX_CHARS);
+    expect(longText.length).toBeGreaterThan(2000);
     const part = makeCompletedPart({
       metadata: {
         display: {
@@ -341,42 +339,8 @@ describe('resolveMarkdownPreview', () => {
         },
       },
     });
-    const preview = resolveMarkdownPreview(part);
-    expect(preview).toBeDefined();
-    if (!preview) {
-      return;
-    }
-    expect(preview.inlineTruncated).toBe(true);
-    expect(preview.inlineText.length).toBeLessThan(preview.text.length);
-    expect(preview.inlineText.length).toBeLessThanOrEqual(MARKDOWN_INLINE_MAX_CHARS);
-    // backed off to last newline in the 2000-char slice (content is 'a'*100 + '\n' repeats)
-    expect(preview.inlineText.endsWith('a')).toBe(true);
-    expect(preview.text.startsWith(preview.inlineText)).toBe(true);
-  });
-
-  it('balances an open fence introduced by the inline slice', () => {
-    const openFence = '```ts\n';
-    const filler = 'x'.repeat(MARKDOWN_INLINE_MAX_CHARS - openFence.length + 50);
-    const text = `${openFence}${filler}\n\`\`\``;
-    const part = makeCompletedPart({
-      metadata: {
-        display: {
-          type: 'file',
-          path: '/repo/CODE.md',
-          text,
-          lineStart: 1,
-          lineEnd: 3,
-          totalLines: 3,
-        },
-      },
-    });
-    const preview = resolveMarkdownPreview(part);
-    expect(preview?.inlineTruncated).toBe(true);
-    expect(preview?.inlineText.endsWith('```')).toBe(true);
-    const fenceCount = (preview?.inlineText.split('\n') ?? []).filter(line =>
-      /^\s*```/.test(line)
-    ).length;
-    expect(fenceCount % 2).toBe(0);
+    const body = resolveMarkdownBody(part);
+    expect(body?.text).toBe(balanceCodeFences(longText));
   });
 
   it('returns empty text for an empty file display', () => {
@@ -393,9 +357,8 @@ describe('resolveMarkdownPreview', () => {
         },
       },
     });
-    const preview = resolveMarkdownPreview(part);
-    expect(preview?.text).toBe('');
-    expect(preview?.inlineText).toBe('');
-    expect(preview?.footer).toBeUndefined();
+    const body = resolveMarkdownBody(part);
+    expect(body?.text).toBe('');
+    expect(body?.footer).toBeUndefined();
   });
 });

@@ -79,10 +79,11 @@ function isTRPC4xxError(error: unknown): boolean {
   );
 }
 
-// The GitHub OAuth callback uses `state` as a short-lived bearer token. Sentry's
-// automatic request-data integration can capture it in the request URL or query
-// string, so strip it from both while keeping the rest of the request data.
-const REDACTED_QUERY_KEY = 'state';
+// The GitHub OAuth callback uses `state` as a short-lived bearer token, and the
+// mobile app handoff carries a C1 bearer in `installState`. Sentry's automatic
+// request-data integration can capture either in the request URL or query
+// string, so strip both from both while keeping the rest of the request data.
+const REDACTED_QUERY_KEYS = new Set(['state', 'installState'].map(key => key.toLowerCase()));
 
 // Decode a raw query key the way URLSearchParams would, so percent-encoded
 // forms of the key are compared against their decoded value. Malformed
@@ -99,7 +100,7 @@ function decodeQueryKey(rawKey: string): string {
 // object. Keys are matched after URL-decoding and case-folding so percent-
 // encoded (`%73tate`) and mixed-case (`State`) forms cannot survive.
 function isRedactedQueryKey(rawKey: string): boolean {
-  return decodeQueryKey(rawKey).toLowerCase() === REDACTED_QUERY_KEY;
+  return REDACTED_QUERY_KEYS.has(decodeQueryKey(rawKey).toLowerCase());
 }
 
 type SentryRequest = NonNullable<Event['request']>;
@@ -243,8 +244,9 @@ if (process.env.NODE_ENV !== 'development') {
         }
       }
 
-      // Automatic request data can retain the GitHub OAuth `state` token in the
-      // callback URL or query string; strip it while keeping the rest.
+      // Automatic request data can retain the GitHub OAuth `state` token or the
+      // app-flow `installState` bearer in the request URL or query string; strip
+      // them while keeping the rest.
       sanitizeSentryRequestData(event);
 
       return event;

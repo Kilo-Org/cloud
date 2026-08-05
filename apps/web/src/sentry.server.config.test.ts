@@ -178,6 +178,98 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.url).toBe('/api/integrations/github/callback');
   });
 
+  test('removes the app flow installState bearer from the request URL and query string', () => {
+    const event: Event = {
+      request: {
+        url: 'https://app.kilo.sh/github-app?organizationId=org_123&installState=abc-token-123&fromApp=1',
+        query_string: 'organizationId=org_123&installState=abc-token-123&fromApp=1',
+        method: 'GET',
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.url).toBe(
+      'https://app.kilo.sh/github-app?organizationId=org_123&fromApp=1'
+    );
+    expect(result.request?.query_string).toBe('organizationId=org_123&fromApp=1');
+  });
+
+  test('removes percent-encoded installState keys from the request URL and query string', () => {
+    const event: Event = {
+      request: {
+        url: 'https://app.kilo.sh/github-app?organizationId=org_123&%69nstallState=abc-token-123',
+        query_string: 'organizationId=org_123&%69nstallState=abc-token-123',
+        method: 'GET',
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.url).toBe('https://app.kilo.sh/github-app?organizationId=org_123');
+    expect(result.request?.query_string).toBe('organizationId=org_123');
+  });
+
+  test('removes installState from an object-form query string', () => {
+    const event: Event = {
+      request: {
+        url: 'https://app.kilo.sh/github-app',
+        query_string: { organizationId: 'org_123', installState: 'abc-token-123' },
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.query_string).toEqual({ organizationId: 'org_123' });
+  });
+
+  test('removes percent-encoded installState keys from an array-form query string', () => {
+    const event: Event = {
+      request: {
+        query_string: [
+          ['organizationId', 'org_123'],
+          ['%69nstallState', 'abc-token-123'],
+        ],
+        method: 'GET',
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.query_string).toEqual([['organizationId', 'org_123']]);
+  });
+
+  test('removes both state and installState while keeping unrelated parameters', () => {
+    const event: Event = {
+      request: {
+        url: 'https://app.kilo.sh/github-app?organizationId=org_123&installState=abc-token-123&state=oauth-token&fromApp=1',
+        query_string:
+          'organizationId=org_123&installState=abc-token-123&state=oauth-token&fromApp=1',
+        method: 'GET',
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.url).toBe(
+      'https://app.kilo.sh/github-app?organizationId=org_123&fromApp=1'
+    );
+    expect(result.request?.query_string).toBe('organizationId=org_123&fromApp=1');
+  });
+
+  test('sanitizes a relative request URL with an installState bearer', () => {
+    const event: Event = {
+      request: {
+        url: '/github-app?organizationId=org_123&installState=abc-token-123&fromApp=1',
+        method: 'GET',
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.url).toBe('/github-app?organizationId=org_123&fromApp=1');
+  });
+
   test('returns an event without request data untouched', () => {
     const event: Event = { message: 'no request data' };
 

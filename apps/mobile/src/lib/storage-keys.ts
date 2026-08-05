@@ -21,3 +21,5 @@ export const THEME_PREFERENCE_KEY = 'theme-preference';
 export const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';
 export const LEGACY_EXCHANGE_DONE_KEY = 'auth-legacy-exchange-done';
+/** iOS App Attest key identifier. The key itself lives in the Secure Enclave. */
+export const ATTEST_KEY_ID_KEY = 'auth-attest-key-id';

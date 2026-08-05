@@ -176,6 +176,9 @@ export async function verifyPlayIntegrity(
     tokenPayloadExternal?: {
       requestDetails?: {
         requestPackageName?: string;
+        /** Standard requests: the client-supplied hash, returned verbatim. */
+        requestHash?: string;
+        /** Classic requests only. */
         nonce?: string;
         timestampMillis?: string;
       };
@@ -196,16 +199,21 @@ export async function verifyPlayIntegrity(
   const payload = result.tokenPayloadExternal;
   if (!payload) return { ok: false, error: 'INVALID_TOKEN' };
 
-  // ── Challenge (nonce) binding ───────────────────────────────────────────
-  const nonce = payload.requestDetails?.nonce;
-  if (!nonce) {
-    captureMessage('play_integrity_missing_nonce');
+  // ── Challenge binding ───────────────────────────────────────────────────
+  // Standard requests bind through `requestHash`, returned verbatim; classic
+  // requests use `nonce`. The client sends standard requests, so read
+  // `requestHash` and fall back to `nonce` only so a device still running a
+  // classic-request build is not refused mid-rollout. Both are compared
+  // against the same digest, so accepting either binds the same challenge.
+  const binding = payload.requestDetails?.requestHash ?? payload.requestDetails?.nonce;
+  if (!binding) {
+    captureMessage('play_integrity_missing_request_hash');
     return { ok: false, error: 'NONCE_MISMATCH' };
   }
 
-  const expectedNonce = createHash('sha256').update(challenge).digest('base64');
-  if (nonce !== expectedNonce) {
-    captureMessage('play_integrity_nonce_mismatch');
+  const expectedBinding = createHash('sha256').update(challenge, 'utf8').digest('base64');
+  if (binding !== expectedBinding) {
+    captureMessage('play_integrity_request_hash_mismatch');
     return { ok: false, error: 'NONCE_MISMATCH' };
   }
 

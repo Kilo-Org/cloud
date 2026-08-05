@@ -13,6 +13,7 @@
 import { describe, test, expect } from '@jest/globals';
 import { createHash } from 'node:crypto';
 import {
+  appAttestClientDataHash,
   verifyAppleAttestation,
   extractAppleAttestNonce,
   parseAppleAttestNonceExtension,
@@ -130,6 +131,27 @@ function buildAttestation(x5c: Buffer[], authData: Buffer): string {
   ]);
   return object.toString('base64');
 }
+
+// ── clientDataHash convention ──────────────────────────────────────────────
+
+describe('appAttestClientDataHash', () => {
+  test('hashes the UTF-8 bytes of the challenge string', () => {
+    // `@expo/app-integrity` computes SHA256(Data(challenge.utf8)) before calling
+    // DCAppAttestService. Both sides must agree or every attestation and every
+    // assertion fails with a nonce or signature mismatch.
+    const challenge = 'c2VydmVyLWNoYWxsZW5nZQ';
+    expect(appAttestClientDataHash(challenge)).toEqual(
+      createHash('sha256').update(Buffer.from(challenge, 'utf8')).digest()
+    );
+  });
+
+  test('does not base64url-decode the challenge first', () => {
+    const challenge = 'c2VydmVyLWNoYWxsZW5nZQ';
+    expect(appAttestClientDataHash(challenge)).not.toEqual(
+      createHash('sha256').update(Buffer.from(challenge, 'base64url')).digest()
+    );
+  });
+});
 
 // ── Certificate chain verification ─────────────────────────────────────────
 

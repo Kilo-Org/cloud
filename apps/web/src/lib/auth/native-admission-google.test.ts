@@ -172,6 +172,90 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     );
   });
 
+  test('accepts a standard request bound through requestHash', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'test-access-token' }),
+    });
+    const expectedHash = createHash('sha256').update('challenge-value', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        tokenPayloadExternal: {
+          // Standard requests return requestHash verbatim and carry no nonce.
+          requestDetails: {
+            requestPackageName: 'com.kilocode.kiloapp',
+            requestHash: expectedHash,
+          },
+          appIntegrity: {
+            appRecognitionVerdict: 'PLAY_RECOGNIZED',
+            certificateSha256Digest: ['test-cert-digest'],
+            packageName: 'com.kilocode.kiloapp',
+          },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+        },
+      }),
+    });
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+
+    expect(result).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+  });
+
+  test('refuses a standard request whose requestHash binds another challenge', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'test-access-token' }),
+    });
+    const otherHash = createHash('sha256').update('other-challenge', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        tokenPayloadExternal: {
+          requestDetails: {
+            requestPackageName: 'com.kilocode.kiloapp',
+            requestHash: otherHash,
+          },
+          appIntegrity: {
+            appRecognitionVerdict: 'PLAY_RECOGNIZED',
+            certificateSha256Digest: ['test-cert-digest'],
+            packageName: 'com.kilocode.kiloapp',
+          },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+        },
+      }),
+    });
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+
+    expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
+  });
+
+  test('refuses a verdict that carries no request binding', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'test-access-token' }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        tokenPayloadExternal: {
+          requestDetails: { requestPackageName: 'com.kilocode.kiloapp' },
+          appIntegrity: {
+            appRecognitionVerdict: 'PLAY_RECOGNIZED',
+            certificateSha256Digest: ['test-cert-digest'],
+            packageName: 'com.kilocode.kiloapp',
+          },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+        },
+      }),
+    });
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+
+    expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
+  });
+
   test('surfaces an API status error without exposing the configured package name', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

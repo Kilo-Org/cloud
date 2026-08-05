@@ -11,6 +11,10 @@ jest.mock('@vercel/firewall', () => ({
 jest.mock('./native-admission-apple', () => ({
   verifyAppleAttestation: jest.fn(),
   verifyAppleAssertion: jest.fn(),
+  // The digest is handed straight to the mocked verifyAppleAssertion, so its
+  // value is irrelevant here. native-admission-apple.test.ts pins the actual
+  // clientDataHash convention.
+  appAttestClientDataHash: jest.fn(() => Buffer.alloc(32)),
 }));
 
 jest.mock('./native-admission-google', () => ({

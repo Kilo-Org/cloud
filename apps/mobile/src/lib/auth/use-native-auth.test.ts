@@ -25,6 +25,23 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
 
+// The admission module is imported for real (importOriginal), and these native
+// modules would pull in expo-modules-core, which needs a device runtime.
+vi.mock('@expo/app-integrity', () => ({
+  isSupported: false,
+  generateKeyAsync: vi.fn(),
+  attestKeyAsync: vi.fn(),
+  generateAssertionAsync: vi.fn(),
+  prepareIntegrityTokenProviderAsync: vi.fn(),
+  requestIntegrityCheckAsync: vi.fn(),
+}));
+
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
+
 // Mock dependencies of use-native-auth.ts so we can import production helpers.
 vi.mock('expo-apple-authentication', () => ({
   AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },

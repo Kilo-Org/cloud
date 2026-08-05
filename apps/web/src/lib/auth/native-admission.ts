@@ -1,5 +1,5 @@
 import 'server-only';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { captureMessage } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
@@ -8,7 +8,11 @@ import { native_admission_challenges, native_attested_keys } from '@kilocode/db/
 import { eq, and, lt, isNull, gt } from 'drizzle-orm';
 import { checkRateLimit } from '@vercel/firewall';
 import type { NextRequest } from 'next/server';
-import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
+import {
+  appAttestClientDataHash,
+  verifyAppleAttestation,
+  verifyAppleAssertion,
+} from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -294,7 +298,7 @@ async function verifyAppleAdmission(
 
   const assertionResult = await verifyAppleAssertion(
     keyId,
-    createHash('sha256').update(Buffer.from(challenge, 'base64url')).digest(),
+    appAttestClientDataHash(challenge),
     payload,
     existingKey.public_key
   );

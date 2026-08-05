@@ -84,6 +84,19 @@ export type AppleAttestError =
 export type AppleAssertionError = 'INVALID_ASSERTION' | 'KEY_NOT_FOUND';
 
 /**
+ * The clientDataHash App Attest binds a challenge with.
+ *
+ * `@expo/app-integrity` passes `Data(challenge.utf8)` through SHA-256 before
+ * handing it to `DCAppAttestService`, so both the attestation nonce and the
+ * assertion signature are over the hash of the challenge string's bytes. This
+ * is the single definition of that convention — the assertion caller uses it
+ * too, so the two paths cannot drift apart.
+ */
+export function appAttestClientDataHash(challenge: string): Buffer {
+  return createHash('sha256').update(challenge, 'utf8').digest();
+}
+
+/**
  * Verify an Apple App Attest attestation object and return the extracted
  * credential ID and DER-encoded SPKI public key.
  *
@@ -168,12 +181,11 @@ export async function verifyAppleAttestation(
     return { ok: false, error: 'RP_ID_MISMATCH' };
   }
 
-  // Nonce check.
-  // Apple's nonce is SHA256(authData || clientDataHash).
-  // App Attest: clientDataHash = SHA256(challenge).
-  // The server challenge is base64url-encoded random bytes. The mobile client
-  // hashes the raw challenge bytes to produce clientDataHash.
-  const clientDataHash = createHash('sha256').update(Buffer.from(challenge, 'base64url')).digest();
+  // Nonce check. Apple's nonce is SHA256(authData || clientDataHash).
+  // `@expo/app-integrity` computes clientDataHash as SHA256 over the UTF-8
+  // bytes of the challenge string it was handed, so hash the same bytes here.
+  // The challenge is base64url ASCII, so the string is the wire form.
+  const clientDataHash = appAttestClientDataHash(challenge);
 
   // Apple nonce = SHA256(authData || clientDataHash)
   const expectedNonce = createHash('sha256')

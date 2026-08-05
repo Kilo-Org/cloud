@@ -1,4 +1,9 @@
 import { getAiSdkProvider } from '../model-settings';
+import openCodeGo from './opencode-go';
+
+test('allows the Responses API for OpenCode Go', () => {
+  expect(openCodeGo.supported_chat_apis).toContain('responses');
+});
 
 describe('getAiSdkProvider', () => {
   test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus'])(

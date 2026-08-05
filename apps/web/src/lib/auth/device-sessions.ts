@@ -82,6 +82,10 @@ export async function issueSessionCredentials(
  * Reuse-detection: if the refresh token was already consumed (consumed_at is set),
  * the session is revoked because replay implies theft.
  * An unknown or expired token is refused without revocation.
+ *
+ * The consume and the replacement issuance run in one transaction. If issuing
+ * the replacement fails, the transaction rolls back so the old token stays
+ * usable instead of leaving the client with a permanently dead refresh path.
  */
 export async function rotateRefreshToken(
   refreshToken: string
@@ -151,47 +155,75 @@ export async function rotateRefreshToken(
     return { ok: false, error: 'USER_BLOCKED' };
   }
 
-  // Step 4: Atomic consume — only after all precondition checks pass.
-  const [consumed] = await db
-    .update(device_refresh_tokens)
-    .set({ consumed_at: now })
-    .where(
-      and(
-        eq(device_refresh_tokens.token_hash, tokenHash),
-        isNull(device_refresh_tokens.consumed_at),
-        gt(device_refresh_tokens.expires_at, now)
+  // Steps 4-7: Consume the old token and issue the replacement pair in one
+  // transaction. If issuing the replacement fails, the transaction rolls back
+  // and the old token remains usable, so the client can retry with it.
+  const outcome = await db.transaction(async tx => {
+    // Fetch the full user for token generation BEFORE consuming, so a missing
+    // user refuses without burning the token.
+    const [fullUser] = await tx
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, session.kilo_user_id))
+      .limit(1);
+
+    if (!fullUser) {
+      return { kind: 'missing_user' } as const;
+    }
+
+    // Step 4: Atomic consume — only after all precondition checks pass.
+    const [consumed] = await tx
+      .update(device_refresh_tokens)
+      .set({ consumed_at: now })
+      .where(
+        and(
+          eq(device_refresh_tokens.token_hash, tokenHash),
+          isNull(device_refresh_tokens.consumed_at),
+          gt(device_refresh_tokens.expires_at, now)
+        )
       )
-    )
-    .returning();
+      .returning();
 
-  // Step 5: If consume failed, a concurrent request consumed the token.
-  // We already confirmed the token was not reused at Step 1, so this is
-  // a race, not theft. Refuse without revocation.
-  if (!consumed) {
+    // Step 5: If consume failed, a concurrent request consumed the token.
+    // We already confirmed the token was not reused at Step 1, so this is
+    // a race, not theft. Refuse without revocation.
+    if (!consumed) {
+      return { kind: 'consume_lost' } as const;
+    }
+
+    // Step 6: Update last_seen_at on the session.
+    await tx
+      .update(device_sessions)
+      .set({ last_seen_at: now })
+      .where(eq(device_sessions.id, consumed.device_session_id));
+
+    // Step 7: Issue the replacement pair in the same transaction.
+    const accessToken = generateApiToken(
+      fullUser,
+      { deviceSessionId: session.id },
+      { expiresIn: TOKEN_EXPIRY.oneHour }
+    );
+
+    const newRefreshToken = generateRefreshToken();
+    const newExpiresAt = new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString();
+
+    await tx.insert(device_refresh_tokens).values({
+      token_hash: hashToken(newRefreshToken),
+      device_session_id: session.id,
+      expires_at: newExpiresAt,
+    });
+
+    return {
+      kind: 'ok',
+      pair: { token: accessToken, refreshToken: newRefreshToken, expiresIn: TOKEN_EXPIRY.oneHour },
+    } as const;
+  });
+
+  if (outcome.kind !== 'ok') {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
-  // Step 6: Update last_seen_at on the session.
-  await db
-    .update(device_sessions)
-    .set({ last_seen_at: now })
-    .where(eq(device_sessions.id, consumed.device_session_id));
-
-  // Fetch full user for token generation.
-  const [fullUser] = await db
-    .select()
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, session.kilo_user_id))
-    .limit(1);
-
-  if (!fullUser) {
-    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
-  }
-
-  // Step 7: Issue new pair.
-  const newPair = await issueSessionCredentials(fullUser, session.id);
-
-  return { ok: true, ...newPair };
+  return { ok: true, ...outcome.pair };
 }
 
 /**

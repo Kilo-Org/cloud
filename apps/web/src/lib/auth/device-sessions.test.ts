@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, getTableName } from 'drizzle-orm';
 import {
   createDeviceSession,
   issueSessionCredentials,
@@ -248,6 +248,59 @@ describe('device-sessions', () => {
           expect(expiresIn).toBeGreaterThan(thirtyDaysMs - 5000); // within 5s
           expect(expiresIn).toBeLessThan(thirtyDaysMs + 5000);
         }
+      }
+    });
+
+    test('replacement issuance failure rolls back the consume and keeps the old token usable', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // Force the replacement refresh-token insert to fail inside the rotation
+      // transaction. The real transaction then rolls back the consume.
+      const originalTransaction = db.transaction.bind(db);
+      const transactionSpy = jest.spyOn(db, 'transaction').mockImplementation((async (
+        callback: (tx: unknown) => unknown
+      ) => {
+        return originalTransaction(async tx => {
+          const originalInsert = tx.insert.bind(tx);
+          tx.insert = table => {
+            if (getTableName(table) === getTableName(device_refresh_tokens)) {
+              throw new Error('synthetic refresh issuance failure');
+            }
+            return originalInsert(table);
+          };
+          return callback(tx);
+        });
+      }) as unknown as typeof db.transaction);
+
+      try {
+        await expect(rotateRefreshToken(refreshToken)).rejects.toThrow(
+          'synthetic refresh issuance failure'
+        );
+      } finally {
+        transactionSpy.mockRestore();
+      }
+
+      // The old token must NOT be consumed by the failed rotation.
+      const tokensAfterFailure = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(tokensAfterFailure).toHaveLength(1);
+      expect(tokensAfterFailure[0]!.consumed_at).toBeNull();
+
+      // The session must not be revoked by the failed rotation.
+      const [sessionAfterFailure] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(sessionAfterFailure!.revoked_at).toBeNull();
+
+      // The same refresh token must now rotate successfully — proves recovery.
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+      if (retry.ok) {
+        expect(retry.refreshToken).not.toBe(refreshToken);
       }
     });
   });

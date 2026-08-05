@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
+import type * as nextServerModule from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
 import type * as analyticsDbModule from '@/lib/code-reviews/analytics/db';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
@@ -95,6 +96,23 @@ const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
 const mockDisableCodeReviewForRepeatedCloneTimeoutsToday = jest.fn<any>();
 
 // --- Module mocks ---
+
+jest.mock('next/server', () => {
+  const actual = jest.requireActual<typeof nextServerModule>('next/server');
+  return {
+    ...actual,
+    // The route hands `after()` an already-started promise (dispatch is
+    // kicked off immediately, not deferred behind it) so it can keep the
+    // serverless invocation alive until the promise settles. Outside a real
+    // request scope `after()` throws, so just swallow the task here; the
+    // dispatch call itself already ran by the time this is invoked.
+    after: (task: Promise<unknown> | (() => Promise<void> | void)) => {
+      if (typeof task === 'function') {
+        void task();
+      }
+    },
+  };
+});
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',

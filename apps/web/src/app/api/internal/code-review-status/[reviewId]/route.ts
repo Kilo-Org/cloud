@@ -17,7 +17,7 @@
  */
 
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import * as z from 'zod';
 import {
   updateCodeReviewStatus,
@@ -1654,17 +1654,25 @@ export async function POST(
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
       const ownerResolution = await getTerminalOwnerResolution();
       if (ownerResolution?.canDispatch) {
-        // Trigger dispatch in background (don't await - fire and forget)
-        tryDispatchPendingReviews(ownerResolution.owner).catch(dispatchError => {
-          errorExceptInTest(
-            '[code-review-status] Error dispatching pending reviews:',
-            dispatchError
-          );
-          captureException(dispatchError, {
-            tags: { source: 'code-review-status-dispatch' },
-            extra: { reviewId, owner: ownerResolution.owner },
-          });
-        });
+        // Start dispatch immediately (don't wait behind the remaining
+        // provider work below), but hand the promise to `after()` so Vercel
+        // keeps the serverless invocation alive until it settles instead of
+        // freezing it once the response is sent. That freeze is what
+        // produced spurious worker-call/status-probe timeouts (in-flight
+        // fetches stall while the function is suspended).
+        const dispatchPromise = tryDispatchPendingReviews(ownerResolution.owner).catch(
+          dispatchError => {
+            errorExceptInTest(
+              '[code-review-status] Error dispatching pending reviews:',
+              dispatchError
+            );
+            captureException(dispatchError, {
+              tags: { source: 'code-review-status-dispatch' },
+              extra: { reviewId, owner: ownerResolution.owner },
+            });
+          }
+        );
+        after(dispatchPromise);
 
         logExceptInTest('[code-review-status] Triggered dispatch for pending reviews', {
           reviewId,

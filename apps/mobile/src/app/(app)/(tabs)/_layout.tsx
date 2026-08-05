@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
+import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getEffectiveTabBarHeight,
@@ -13,6 +14,7 @@ import {
   shouldHideTabBar,
   shouldShowTabLabel,
   TAB_LABEL_WRAP_FONT_SCALE,
+  tabAccessibilityLabel,
 } from '@/lib/tab-bar-layout';
 
 const TAB_BAR_ICON_STYLE = {
@@ -61,6 +63,8 @@ export default function TabsLayout() {
     fontScale,
   });
   const tabIconSize = getTabBarIconSize(fontScale);
+  const showKiloClawTab = useKiloClawTabVisible();
+  const tabCount = showKiloClawTab ? 4 : 3;
 
   return (
     <Tabs
@@ -88,7 +92,7 @@ export default function TabsLayout() {
         name="(0_home)"
         options={{
           title: 'Home',
-          tabBarAccessibilityLabel: 'Home, tab, 1 of 4',
+          tabBarAccessibilityLabel: tabAccessibilityLabel('Home', 1, tabCount),
           tabBarLabel: ({ focused }) => <TabLabel label="Home" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
@@ -103,8 +107,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="(1_kiloclaw)"
         options={{
+          href: showKiloClawTab ? undefined : null,
           title: 'KiloClaw',
-          tabBarAccessibilityLabel: 'KiloClaw, tab, 2 of 4',
+          tabBarAccessibilityLabel: tabAccessibilityLabel('KiloClaw', 2, tabCount),
           tabBarLabel: ({ focused }) => (
             <TabLabel
               label={fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 'Kilo\nClaw' : 'KiloClaw'}
@@ -127,7 +132,11 @@ export default function TabsLayout() {
         name="(2_agents)"
         options={{
           title: 'Agents',
-          tabBarAccessibilityLabel: 'Agents, tab, 3 of 4',
+          tabBarAccessibilityLabel: tabAccessibilityLabel(
+            'Agents',
+            showKiloClawTab ? 3 : 2,
+            tabCount
+          ),
           tabBarLabel: ({ focused }) => <TabLabel label="Agents" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
@@ -143,7 +152,11 @@ export default function TabsLayout() {
         name="(3_profile)"
         options={{
           title: 'Profile',
-          tabBarAccessibilityLabel: 'Profile, tab, 4 of 4',
+          tabBarAccessibilityLabel: tabAccessibilityLabel(
+            'Profile',
+            showKiloClawTab ? 4 : 3,
+            tabCount
+          ),
           tabBarLabel: ({ focused }) => <TabLabel label="Profile" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />

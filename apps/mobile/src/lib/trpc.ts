@@ -63,20 +63,28 @@ async function getAuthHeaders() {
   return { Authorization: `Bearer ${token}` };
 }
 
+const singleLink = httpLink({
+  url: trpcUrl,
+  headers: getAuthHeaders,
+  fetch: e2eFetch,
+  methodOverride: 'POST',
+});
+
+const batchLink = httpBatchLink({
+  url: trpcUrl,
+  headers: getAuthHeaders,
+  fetch: e2eFetch,
+  methodOverride: 'POST',
+});
+
+const trpcLinks = [
+  splitLink({
+    condition: op => op.context.skipBatch === true,
+    true: singleLink,
+    false: batchLink,
+  }),
+];
+
 export const trpcClient = createTRPCClient<MobileRouter>({
-  links: [
-    splitLink({
-      condition: op => op.context.skipBatch === true,
-      true: httpLink({
-        url: trpcUrl,
-        headers: getAuthHeaders,
-        fetch: e2eFetch,
-      }),
-      false: httpBatchLink({
-        url: trpcUrl,
-        headers: getAuthHeaders,
-        fetch: e2eFetch,
-      }),
-    }),
-  ],
+  links: trpcLinks,
 });

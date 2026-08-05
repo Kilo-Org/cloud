@@ -571,17 +571,14 @@ export async function createOrUpdateUser(
     const hasThisProvider = existingProviders.some(p => p.provider === args.provider);
     const onlyHasFakeLogin =
       existingProviders.length === 1 && existingProviders[0].provider === 'fake-login';
-    const hasNoProviders = existingProviders.length === 0;
 
     // Link this new provider to the existing user if they don't already have it.
     // fake-login is placeholder auth (dev-only) - always allow upgrading from it.
-    // Otherwise, only link if autoLinkToExistingUser AND one of:
-    //   - User has no providers (clean slate after admin reset)
-    //   - Provider is WorkOS/fake-login (special upgrade paths)
-    const isUpgradeProvider = args.provider === 'workos' || args.provider === 'fake-login';
-    const shouldLink =
-      !hasThisProvider &&
-      (onlyHasFakeLogin || (autoLinkToExistingUser && (hasNoProviders || isUpgradeProvider)));
+    // Callers pass autoLinkToExistingUser=true only when the credential proves
+    // ownership of the email (consumed magic-link/code, or a provider-asserted
+    // email_verified claim). Proof authorizes the link; without proof the
+    // sign-in keeps the DIFFERENT-OAUTH refusal below.
+    const shouldLink = !hasThisProvider && (onlyHasFakeLogin || autoLinkToExistingUser);
 
     if (shouldLink) {
       let linkedUser = userByEmail;

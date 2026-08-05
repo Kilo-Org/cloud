@@ -1,26 +1,28 @@
+import { View } from 'react-native';
 import { Cpu } from 'lucide-react-native';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
 import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
+import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
-import { ToolCardShell } from '../tool-card-shell';
-import { truncateText } from '../tool-card-utils';
+import { useOpenPartDetail } from '../open-part-detail-context';
+import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 
-export function TaskToolCard({ part }: Readonly<{ part: ToolPart }>) {
+/**
+ * Sheet body for a task tool part: the output block and the error. Renders only
+ * inside the detail sheet — attachments and the pending/running status line
+ * live in `ToolPartDetailBody`.
+ */
+export function TaskToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const textSelectable = useTranscriptTextSelectable();
-  const input = part.state.input;
-  const description = typeof input.description === 'string' ? input.description : undefined;
-  const prompt = typeof input.prompt === 'string' ? input.prompt : undefined;
-
-  const subtitle = description ?? (prompt ? truncateText(prompt, 60) : 'task');
 
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
 
   return (
-    <ToolCardShell icon={Cpu} title="task" subtitle={subtitle} status={part.state.status}>
+    <View className="gap-2">
       {output ? (
         <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
       ) : null}
@@ -29,6 +31,28 @@ export function TaskToolCard({ part }: Readonly<{ part: ToolPart }>) {
           {error}
         </Text>
       ) : null}
-    </ToolCardShell>
+    </View>
+  );
+}
+
+export function TaskToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const openPartDetail = useOpenPartDetail();
+  const display = getToolDisplay(part);
+  const hasDetails = toolPartHasDetails(part);
+
+  return (
+    <FixedPartRow
+      icon={Cpu}
+      label={display.subtitle ?? display.title}
+      status={part.state.status}
+      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      onPress={
+        hasDetails && openPartDetail
+          ? () => {
+              openPartDetail(part.id);
+            }
+          : undefined
+      }
+    />
   );
 }

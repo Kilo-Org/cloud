@@ -113,12 +113,10 @@ describe('mapModelIdToVercel', () => {
     });
 
     it('does not use internal_id for exclusives that are not vercel-routed', () => {
-      // claude_sonnet_clawsetup_model has gateway 'openrouter' and no
+      // claude_sonnet_4_6_stealth_model has gateway 'martian' and no
       // 'vercel-routing' flag, so the mapping must pass the public id through
       // the generic prefix rewrite instead of substituting internal_id.
-      expect(mapModelIdToVercel('anthropic/claude-sonnet-4.6:clawsetup')).toBe(
-        'anthropic/claude-sonnet-4.6:clawsetup'
-      );
+      expect(mapModelIdToVercel('stealth/claude-sonnet-4.6')).toBe('stealth/claude-sonnet-4.6');
     });
 
     it('does not use internal_id for disabled exclusives even when vercel-routed', () => {

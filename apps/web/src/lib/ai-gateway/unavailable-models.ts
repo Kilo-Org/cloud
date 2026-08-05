@@ -1,4 +1,3 @@
-import { claude_sonnet_clawsetup_model } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 const unavailableModelIds: ReadonlySet<string> = new Set([
@@ -55,7 +54,6 @@ const unavailableModelIds: ReadonlySet<string> = new Set([
   'z-ai/glm-4.7:free',
   'stepfun/step-3.5-flash:free',
   'z-ai/glm-5:free',
-  claude_sonnet_clawsetup_model.public_id, // only usable through kilo-auto
 ]);
 
 export function isUnavailableModel(modelId: string): boolean {

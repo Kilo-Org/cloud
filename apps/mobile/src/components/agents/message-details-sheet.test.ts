@@ -132,6 +132,10 @@ describe('formatMessageSentTime', () => {
     expect(formatMessageSentTime(Number.NaN)).toBeNull();
     expect(formatMessageSentTime(-1)).toBeNull();
   });
+
+  it('returns null for an out-of-range finite epoch without throwing', () => {
+    expect(formatMessageSentTime(Number.MAX_VALUE)).toBeNull();
+  });
 });
 
 describe('getMessageDetailsContent — happy', () => {

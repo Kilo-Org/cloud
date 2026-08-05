@@ -1,6 +1,7 @@
 import type {
   AgentConversationEvent,
   RemoteMcpToolCallEvent,
+  WorkflowToolCallEvent,
 } from '@/src/shared/agent-conversation';
 import { createSafeToolDefinitions } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
@@ -16,8 +17,13 @@ import { executeSafeToolCall } from './agent-safe-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
+  isWorkflowToolCallEvent,
+  isWorkflowToolName,
   toSafeToolCallEvents,
+  toWorkflowToolCallEvents,
 } from './agent-tool-call-events';
+import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
+import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
 
 interface RunSafeLlmTurnOptions {
   readonly apiBaseUrl: string;
@@ -42,10 +48,13 @@ interface RunSafeLlmTurnOptions {
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
   readonly onAssistantStreaming?: ((eventId: string | undefined) => void) | undefined;
+  readonly workflowTools?: KiloGatewayToolDefinition[] | undefined;
+  readonly workflowToolContext?: WorkflowToolContext | undefined;
 }
 
 type SafeRunToolCallEvent =
   | ReturnType<typeof toSafeToolCallEvents>[number]
+  | WorkflowToolCallEvent
   | RemoteMcpToolCallEvent;
 
 export const runSafeLlmTurn = ({
@@ -54,12 +63,24 @@ export const runSafeLlmTurn = ({
   selectedTabId,
   supportsImages = false,
   toRemoteMcpToolCallEvents,
+  workflowToolContext,
+  workflowTools = [],
   ...options
 }: RunSafeLlmTurnOptions): Promise<void> =>
   runLlmTurn<SafeRunToolCallEvent>({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
+      if (isWorkflowToolCallEvent(toolCall)) {
+        if (workflowToolContext === undefined) {
+          return {
+            error: `Workflow tool ${toolCall.name} is no longer available.`,
+            ok: false,
+          };
+        }
+        return executeWorkflowToolCall(toolCall, workflowToolContext);
+      }
+
       if (isRemoteMcpToolCallEvent(toolCall)) {
         return executeRemoteMcpToolCall === undefined
           ? { error: `Remote MCP tool ${toolCall.name} is no longer available.`, ok: false }
@@ -73,12 +94,16 @@ export const runSafeLlmTurn = ({
     noResponseMessage: 'The model did not return a response.',
     supportsImages,
     toToolCallEvents: toolCalls =>
-      toolCalls.flatMap<SafeRunToolCallEvent>(toolCall =>
-        isRemoteMcpToolName(toolCall.name)
-          ? (toRemoteMcpToolCallEvents?.([toolCall]) ?? [])
-          : toSafeToolCallEvents([toolCall], selectedTabId)
-      ),
+      toolCalls.flatMap<SafeRunToolCallEvent>(toolCall => {
+        if (isWorkflowToolName(toolCall.name)) {
+          return toWorkflowToolCallEvents([toolCall], selectedTabId);
+        }
+        if (isRemoteMcpToolName(toolCall.name)) {
+          return toRemoteMcpToolCallEvents?.([toolCall]) ?? [];
+        }
+        return toSafeToolCallEvents([toolCall], selectedTabId);
+      }),
     tooManyToolRoundsMessage:
       'The model requested too many safe read rounds. Send another message to continue.',
-    tools: [...createSafeToolDefinitions({ supportsImages }), ...remoteMcpTools],
+    tools: [...createSafeToolDefinitions({ supportsImages }), ...workflowTools, ...remoteMcpTools],
   });

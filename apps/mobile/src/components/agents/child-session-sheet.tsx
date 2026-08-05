@@ -14,6 +14,7 @@ import {
   type RenderPartFn,
 } from './child-session-section';
 import { MessageErrorBoundary } from './message-error-boundary';
+import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { getChildSessionSheetState } from './child-session-sheet-state';
 import { SessionMessageList } from './session-message-list';
 import { WorkingIndicator } from './working-indicator';
@@ -125,7 +126,7 @@ export function ChildSessionSheet({
     >
       <View className="flex-1 bg-background">
         <SheetHeader title={title} onDone={onClose} />
-        {content}
+        <PartDetailSheetHost messages={messages}>{content}</PartDetailSheetHost>
       </View>
     </Modal>
   );

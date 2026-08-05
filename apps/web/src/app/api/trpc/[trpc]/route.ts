@@ -10,6 +10,7 @@ const handler = (req: Request) =>
     req,
     router: rootRouter,
     createContext: createTRPCContext,
+    allowMethodOverride: true,
   });
 
 export { handler as GET, handler as POST };

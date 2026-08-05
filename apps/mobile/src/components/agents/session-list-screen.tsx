@@ -15,9 +15,11 @@ import {
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
+import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
+import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { ScreenHeader } from '@/components/screen-header';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { useOrganization } from '@/lib/organization-context';
@@ -62,17 +64,12 @@ export function AgentSessionListScreen() {
 
   const ready = filtersLoaded && orgLoaded;
 
-  // Navigation guard: prevent double-push on rapid row taps. Re-arms on next focus.
-  const rowNavLockRef = useRef(false);
-
   const {
     storedSessions,
     activeSessions,
     activeIsError,
     isLoading,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
+    paging,
     refetch,
     handleRetry,
     handleRefetch,
@@ -96,7 +93,6 @@ export function AgentSessionListScreen() {
   }, [refetch]);
   useFocusEffect(
     useCallback(() => {
-      rowNavLockRef.current = false;
       void refetchRef.current();
     }, [])
   );
@@ -114,30 +110,13 @@ export function AgentSessionListScreen() {
     [storedSessions]
   );
 
-  const navigateToSession = useCallback(
-    (sessionId: string, sessionOrgId?: string | null) => {
-      if (rowNavLockRef.current) {
-        return;
-      }
-      rowNavLockRef.current = true;
-      try {
-        router.push(
-          (sessionOrgId
-            ? `/(app)/agent-chat/${sessionId}?organizationId=${sessionOrgId}`
-            : `/(app)/agent-chat/${sessionId}`) as Href
-        );
-      } catch {
-        rowNavLockRef.current = false;
-      }
-    },
-    [router]
-  );
+  const navigateToSession = useAgentSessionNavigator();
 
   const handleEndReached = useCallback(() => {
-    if (!isSearching && hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage();
+    if (shouldLoadMoreSessions(paging)) {
+      void paging.fetchNextPage();
     }
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isSearching]);
+  }, [paging]);
 
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
   const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
@@ -223,7 +202,7 @@ export function AgentSessionListScreen() {
           isLoading={isLoading || !ready}
           isError={contentIsError}
           activeIsError={activeIsError}
-          isFetchingNextPage={isFetchingNextPage}
+          isFetchingNextPage={paging.isFetchingNextPage}
           refetch={handleRefetch}
           onRetry={handleRetry}
           onEndReached={handleEndReached}

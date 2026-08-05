@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -35,6 +35,15 @@ test('buildInteractiveShellCommand wraps quoted startup commands in parseable sh
 const hasTmux = (() => {
   try {
     execFileSync('tmux', ['-V'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+const hasScript = (() => {
+  try {
+    execFileSync('sh', ['-c', 'command -v script'], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -185,6 +194,151 @@ test(
         tmux('kill-session', '-t', otherSessionName);
       } catch {
         // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);
+
+test(
+  'breakPane creates the window in the requested session when a real foreign client is attached',
+  { skip: !hasTmux || !hasScript },
+  () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const decoySession = `kilo-tmux-test-decoy-${process.pid}-${Date.now()}`;
+    const serviceName = 'nextjs';
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+    const tmuxOutput = (...args: string[]) =>
+      execFileSync('tmux', args, { encoding: 'utf-8' }).trim();
+
+    // Attach a real client to the decoy session through a pseudoterminal.
+    // A forged TMUX env var alone does not steer break-pane — tmux requires
+    // an actual attached client for the "current session" to differ from the
+    // source pane's session.  script(1) provides the pty so tmux can attach.
+    //
+    // Strip TMUX and TMUX_PANE from the child environment.  When the test
+    // itself runs inside tmux, the child script inherits those variables and
+    // the nested tmux refuses to attach its decoy session.
+    const {
+      TMUX: _childTmux,
+      TMUX_PANE: _childTmuxPane,
+      ...childEnv
+    } = process.env as Record<string, string | undefined>;
+    childEnv.TERM = process.env.TERM ?? 'xterm-256color';
+
+    const clientProc =
+      process.platform === 'darwin'
+        ? spawn(
+            'script',
+            ['-q', '/dev/null', 'tmux', 'new-session', '-s', decoySession, 'sleep', '999'],
+            { stdio: 'ignore', env: childEnv }
+          )
+        : spawn(
+            'script',
+            ['-q', '-c', `tmux new-session -s ${decoySession} sleep 999`, '/dev/null'],
+            { stdio: 'ignore', env: childEnv }
+          );
+
+    const savedTmux = process.env.TMUX;
+    try {
+      // Wait for the decoy client to attach (up to 2 s).
+      let clientReady = false;
+      for (let i = 0; i < 20 && !clientReady; i++) {
+        try {
+          const attached = tmuxOutput(
+            'display-message',
+            '-t',
+            `=${decoySession}:0`,
+            '-p',
+            '#{session_attached}'
+          );
+          clientReady = parseInt(attached, 10) > 0;
+        } catch {
+          // Session not yet visible.
+        }
+        if (!clientReady) execFileSync('sleep', ['0.1']);
+      }
+      assert.ok(clientReady, 'decoy session must have an attached client');
+
+      // Point child tmux commands at the decoy session.  The trailing colon
+      // is required: display-message -t =<session> without it returns no ID.
+      const socketPath = tmuxOutput('display-message', '-p', '#{socket_path}');
+      const sessionId = tmuxOutput(
+        'display-message',
+        '-t',
+        `=${decoySession}:`,
+        '-p',
+        '#{session_id}'
+      );
+      const sessionCreated = sessionId.replace(/^\$/, '');
+      process.env.TMUX = `${socketPath},${sessionCreated},0`;
+
+      // Set up the test session with a joined pane, then break it out.
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep', '120');
+      tmux(
+        'new-window',
+        '-d',
+        '-t',
+        sessionName,
+        '-n',
+        serviceName,
+        'sh -lc "while true; do sleep 60; done"'
+      );
+
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+
+      tmux(
+        'join-pane',
+        '-h',
+        '-s',
+        `${sessionName}:${serviceWindow.index}.0`,
+        '-t',
+        `${sessionName}:0.0`
+      );
+
+      const newWindowIndex = breakPane(sessionName, 0, 1, serviceName);
+
+      // The window must belong to the requested session, not the decoy.
+      const windowSession = tmuxOutput(
+        'display-message',
+        '-t',
+        `${sessionName}:${newWindowIndex}`,
+        '-p',
+        '#{session_name}'
+      );
+      assert.equal(windowSession, sessionName);
+
+      // Verify window name and that automatic rename is disabled.
+      const window = listWindows(sessionName).find(entry => entry.index === newWindowIndex);
+      assert.deepEqual(window, { index: newWindowIndex, name: serviceName });
+      assert.equal(
+        tmuxOutput(
+          'display-message',
+          '-p',
+          '-t',
+          `${sessionName}:${newWindowIndex}`,
+          '#{automatic-rename}'
+        ),
+        '0'
+      );
+    } finally {
+      // Restore the inherited TMUX value.
+      if (savedTmux === undefined) {
+        delete process.env.TMUX;
+      } else {
+        process.env.TMUX = savedTmux;
+      }
+      // Detach the script client, then tear down both sessions.
+      clientProc.kill('SIGTERM');
+      try {
+        tmux('kill-session', '-t', `=${decoySession}`);
+      } catch {
+        // Session may already be gone.
+      }
+      try {
+        tmux('kill-session', '-t', `=${sessionName}`);
+      } catch {
+        // Session may already be gone.
       }
     }
   }

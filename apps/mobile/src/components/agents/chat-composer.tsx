@@ -23,6 +23,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { AttachmentPasteHint } from '@/components/agents/attachment-paste-hint';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
@@ -55,6 +56,8 @@ import {
   type AgentAttachmentWire,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
+import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
@@ -324,6 +327,16 @@ export function ChatComposer({
     isFocused,
     isSending,
     voiceInputActive: voiceInput.isActive,
+  });
+
+  const hint = useClipboardImageHint({
+    enabled: attachmentsEnabled && !control.paperclipDisabled,
+    addFile: async file => {
+      await upload.addCandidates([file]);
+    },
+    onUnreadable: () => {
+      toast.error(describeClassificationFailure('unreadable'));
+    },
   });
 
   const commandList = useMemo(
@@ -688,6 +701,14 @@ export function ChatComposer({
         />
       ) : null}
 
+      {hint.visible ? (
+        <AttachmentPasteHint
+          onPress={() => {
+            hint.paste();
+          }}
+        />
+      ) : null}
+
       {slashCommandSuggestions.length > 0 && !isSending ? (
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(100)}>
           <SlashCommandSuggestions
@@ -726,6 +747,7 @@ export function ChatComposer({
             onInputFocus={() => {
               inputFocusedRef.current = true;
               setIsFocused(true);
+              hint.refresh();
             }}
             onInputLayout={handleInputLayout}
             onStop={handleStop}

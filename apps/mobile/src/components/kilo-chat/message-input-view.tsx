@@ -12,6 +12,7 @@ import {
   VoiceInputButton,
   VoiceInputStatus as VoiceInputStatusView,
 } from '@/components/voice-input-control';
+import { AttachmentPasteHint } from '@/components/agents/attachment-paste-hint';
 import { MessageAttachmentPreviewStrip } from './message-attachment-preview-strip';
 import { messageInputKeyboardProps, messageInputTextStyle } from './message-input-layout';
 import { type ComposerAttachmentQueue } from './message-input-types';
@@ -54,6 +55,8 @@ type Props = {
   voiceInputAvailable: boolean;
   voiceInputDisabled: boolean;
   voiceInputStatus: VoiceInputStatus;
+  showPasteHint: boolean;
+  onPasteImage: () => void;
 };
 
 export function MessageInputView({
@@ -92,6 +95,8 @@ export function MessageInputView({
   voiceInputAvailable,
   voiceInputDisabled,
   voiceInputStatus,
+  showPasteHint,
+  onPasteImage,
 }: Props) {
   const colors = useThemeColors();
   const inputDisabled = controlsDisabled || voiceInputActive;
@@ -152,6 +157,7 @@ export function MessageInputView({
           onRemove={onRemoveEditableAttachment}
         />
       ) : null}
+      {showPasteHint ? <AttachmentPasteHint onPress={onPasteImage} /> : null}
       <View className="gap-1">
         {inputMeasureElement}
         <View className="flex-row items-center gap-2">

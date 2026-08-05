@@ -70,8 +70,7 @@ export function buildAgentSessionSearchInput(options: {
   const sortBy = resolveSortBy(options.sortBy);
   return {
     search_string: options.searchQuery,
-    // Endpoint max; no offset paging — past 50 matches, refining the query is the answer.
-    limit: 50,
+    limit: SESSIONS_PAGE_SIZE,
     orderBy: sortBy,
     includeChildren: false,
     createdOnPlatform: options.createdOnPlatform,

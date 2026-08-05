@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- card states + draft form push past 300, and splitting would scatter related logic */
 import { storage } from '#imports';
-import { useSetAtom } from 'jotai';
+import { useAtom, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { MAX_MEMORY_NOTE_LENGTH } from '@/src/shared/agent-memories';
-import { addAgentMemory, clearPendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
+import type { PendingAgentMemoryDraft } from '@/src/shared/agent-memories';
+import { applyApprovalDecision, pendingApprovalAtom } from './pending-approval';
 import {
   buildDraftSelectionPreview,
   classifySaveError,
@@ -12,13 +14,11 @@ import {
 } from './pending-memory-save-card-state';
 import { settingsDialogOpenAtom } from './settings-dialog-state';
 import { useAgentMemories } from './use-agent-memories';
-
 const SAVE_ERROR_MESSAGE = "Couldn't save memory. Try again.";
 const LOAD_ERROR_MESSAGE = "Couldn't load memories. Try again.";
 const FULL_MESSAGE = 'Memory is full. Delete memories to save new ones.';
 const CONFIRMATION_MESSAGE = 'Saved to memory';
 const TRUNCATION_NOTICE = 'Selection truncated to 8,000 characters';
-
 const secondaryButtonClass =
   'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle';
 
@@ -27,19 +27,23 @@ const primaryButtonClass =
 
 export const PendingMemorySaveCard = (): JSX.Element | null => {
   const { isLoaded, loadError, memories, pendingDraft, reload } = useAgentMemories();
+  const [approvalEntry, setApprovalEntry] = useAtom(pendingApprovalAtom);
   const setSettingsOpen = useSetAtom(settingsDialogOpenAtom);
   const [savedConfirmation, setSavedConfirmation] = useState(false);
   const [saveError, setSaveError] = useState<string | undefined>();
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [fullOutcome, setFullOutcome] = useState(false);
   const lastDraftKeyRef = useRef<string | null>(null);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
   const focusedDraftKeyRef = useRef<string | null>(null);
+  const settledRef = useRef(false);
 
   useEffect(() => {
     if (pendingDraft === undefined) {
       lastDraftKeyRef.current = null;
       focusedDraftKeyRef.current = null;
+      settledRef.current = false;
       return;
     }
 
@@ -47,17 +51,23 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
     if (lastDraftKeyRef.current !== null && lastDraftKeyRef.current !== draftKey) {
       setSavedConfirmation(false);
       setSaveError(undefined);
-      setNote('');
+      setNote(pendingDraft.note ?? '');
+      setFullOutcome(false);
+      settledRef.current = false;
     } else if (lastDraftKeyRef.current === null) {
       // Fresh draft while confirmation may still be showing from a prior save.
       setSavedConfirmation(false);
       setSaveError(undefined);
+      setNote(pendingDraft.note ?? '');
+      setFullOutcome(false);
+      settledRef.current = false;
     }
 
     lastDraftKeyRef.current = draftKey;
   }, [pendingDraft]);
 
   const view = deriveSaveCardState({
+    fullOutcome,
     isLoaded,
     loadError,
     memories,
@@ -89,16 +99,28 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
   }
 
   const handleCancel = (): void => {
-    void clearPendingAgentMemoryDraft(storage);
+    // Settle the atom first if one exists for memory kind.
+    if (approvalEntry !== undefined && approvalEntry.kind === 'memory' && !settledRef.current) {
+      settledRef.current = true;
+      approvalEntry.settle({ status: 'rejected' });
+      setApprovalEntry(undefined);
+    }
+    // ApplyApprovalDecision for reject clears the draft.
+    if (pendingDraft !== undefined) {
+      void applyApprovalDecision(storage, 'memory', pendingDraft, false);
+    }
     setSavedConfirmation(false);
     setSaveError(undefined);
     setNote('');
+    setFullOutcome(false);
+    reload();
   };
 
   const handleDone = (): void => {
     setSavedConfirmation(false);
     setSaveError(undefined);
     setNote('');
+    setFullOutcome(false);
   };
 
   const handleSave = async (): Promise<void> => {
@@ -109,21 +131,47 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
     setIsSaving(true);
     try {
       const trimmedNote = note.trim();
-      await addAgentMemory(storage, {
-        createdAt: pendingDraft.createdAt,
-        pageTitle: pendingDraft.pageTitle,
-        pageUrl: pendingDraft.pageUrl,
-        text: pendingDraft.text,
-        ...(pendingDraft.truncated === undefined ? {} : { truncated: pendingDraft.truncated }),
-        ...(trimmedNote.length === 0 ? {} : { note: trimmedNote }),
-      });
-      await clearPendingAgentMemoryDraft(storage);
-      setSaveError(undefined);
-      setSavedConfirmation(true);
-      setNote('');
+      const finalDraft: PendingAgentMemoryDraft = {
+        ...pendingDraft,
+        note: trimmedNote.length > 0 ? trimmedNote : undefined,
+      };
+
+      const outcome = await applyApprovalDecision(storage, 'memory', finalDraft, true);
+
+      if (outcome.status === 'approved') {
+        // Settle the atom if one exists.
+        if (approvalEntry !== undefined && approvalEntry.kind === 'memory' && !settledRef.current) {
+          settledRef.current = true;
+          approvalEntry.settle(outcome);
+          setApprovalEntry(undefined);
+        }
+        setSaveError(undefined);
+        setSavedConfirmation(true);
+        setNote('');
+        return;
+      }
+
+      if (outcome.status === 'failed') {
+        // The draft stays in storage, but the tool caller needs the failure.
+        if (approvalEntry !== undefined && approvalEntry.kind === 'memory' && !settledRef.current) {
+          settledRef.current = true;
+          approvalEntry.settle(outcome);
+          setApprovalEntry(undefined);
+        }
+
+        // Only true store-full outcomes set the full view; generic failures stay retryable.
+        if (outcome.reason === 'Memory store is full.') {
+          setFullOutcome(true);
+          reload();
+          return;
+        }
+
+        setSaveError(SAVE_ERROR_MESSAGE);
+      }
     } catch (error) {
       if (classifySaveError(error) === 'full') {
-        // Reactive full view is already correct — do not set saveError.
+        setFullOutcome(true);
+        reload();
         return;
       }
 
@@ -153,7 +201,6 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
             </div>
           </div>
         ) : null}
-
         {view.kind === 'loadError' ? (
           <div className="flex flex-col gap-3">
             <p className="type-body text-status-red-400">{LOAD_ERROR_MESSAGE}</p>
@@ -164,7 +211,6 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
             </div>
           </div>
         ) : null}
-
         {view.kind === 'full' || view.kind === 'saveError' || view.kind === 'draft' ? (
           <div className="flex flex-col gap-3">
             {view.kind === 'full' ? (
@@ -183,7 +229,6 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
                 </div>
               </div>
             ) : null}
-
             {view.kind === 'saveError' ? (
               <div className="flex flex-col gap-2">
                 <p className="type-body text-status-red-400">{view.message}</p>

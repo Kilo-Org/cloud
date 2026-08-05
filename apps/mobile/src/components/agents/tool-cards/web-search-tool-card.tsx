@@ -1,31 +1,29 @@
+import { View } from 'react-native';
 import { Globe } from 'lucide-react-native';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
 import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
+import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
-import { ToolCardShell } from '../tool-card-shell';
-import { truncateText } from '../tool-card-utils';
+import { useOpenPartDetail } from '../open-part-detail-context';
+import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 
-export function WebSearchToolCard({ part }: Readonly<{ part: ToolPart }>) {
+/**
+ * Sheet body for a websearch/codesearch/webfetch tool part: the output block
+ * and the error. The query/url lives in the sheet title. Renders only inside
+ * the detail sheet — attachments and the pending/running status line live in
+ * `ToolPartDetailBody`.
+ */
+export function WebSearchToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const textSelectable = useTranscriptTextSelectable();
-  const input = part.state.input;
-  const query = typeof input.query === 'string' ? input.query : undefined;
-  const url = typeof input.url === 'string' ? input.url : undefined;
-
-  let subtitle = part.tool;
-  if (query) {
-    subtitle = truncateText(query, 60);
-  } else if (url) {
-    subtitle = truncateText(url, 60);
-  }
 
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
 
   return (
-    <ToolCardShell icon={Globe} title={part.tool} subtitle={subtitle} status={part.state.status}>
+    <View className="gap-2">
       {output ? (
         <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
       ) : null}
@@ -34,6 +32,28 @@ export function WebSearchToolCard({ part }: Readonly<{ part: ToolPart }>) {
           {error}
         </Text>
       ) : null}
-    </ToolCardShell>
+    </View>
+  );
+}
+
+export function WebSearchToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const openPartDetail = useOpenPartDetail();
+  const display = getToolDisplay(part);
+  const hasDetails = toolPartHasDetails(part);
+
+  return (
+    <FixedPartRow
+      icon={Globe}
+      label={display.subtitle ?? display.title}
+      status={part.state.status}
+      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      onPress={
+        hasDetails && openPartDetail
+          ? () => {
+              openPartDetail(part.id);
+            }
+          : undefined
+      }
+    />
   );
 }

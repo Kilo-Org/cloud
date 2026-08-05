@@ -73,6 +73,13 @@ const startedReviewsCteSql = sql`
       COALESCE(completed_at, updated_at) AS completed_at_effective
     FROM ${cloud_agent_code_reviews}
     WHERE status NOT IN ('pending', 'queued')
+      -- Reaped reviews that never started have no started_at, so the COALESCE
+      -- above would resolve to the reap-stamped updated_at and place a days-old
+      -- row inside the live windows. The benign-reason filter already keeps
+      -- 'abandoned' out of both numerators, so counting it in started_count
+      -- would only dilute the rates and mask a real spike for the window right
+      -- after each reaper run.
+      AND COALESCE(terminal_reason, '') <> 'abandoned'
   )
 `;
 

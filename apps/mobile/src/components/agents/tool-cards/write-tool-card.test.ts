@@ -2,7 +2,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ToolDiffModel } from '../tool-diff-model';
-import { WriteToolCard } from './write-tool-card';
+import { WriteToolCard, WriteToolCardBody } from './write-tool-card';
 import * as React from 'react';
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -12,10 +12,7 @@ vi.mock('../bubble-text-selection-context', () => ({
   useTranscriptTextSelectable: () => true,
 }));
 vi.mock('../mono-scroll-block', () => ({ MonoScrollBlock: 'MonoScrollBlock' }));
-vi.mock('../tool-card-shell', () => ({ ToolCardShell: 'ToolCardShell' }));
-vi.mock('../tool-card-utils', () => ({
-  getFilename: (p: string) => p.split('/').pop() ?? p,
-}));
+vi.mock('../fixed-part-row', () => ({ FixedPartRow: 'FixedPartRow' }));
 vi.mock('../tool-diff-preview', () => ({ ToolDiffPreview: 'ToolDiffPreview' }));
 vi.mock('react', async importOriginal => {
   const actual = await importOriginal<typeof React>();
@@ -30,6 +27,14 @@ const { buildToolDiffModel } = vi.hoisted(() => ({
   buildToolDiffModel: vi.fn(),
 }));
 vi.mock('../tool-diff-model', () => ({ buildToolDiffModel }));
+
+const { getToolDisplay, toolPartHasDetails, openSpy } = vi.hoisted(() => ({
+  getToolDisplay: vi.fn(),
+  toolPartHasDetails: vi.fn(),
+  openSpy: vi.fn(),
+}));
+vi.mock('../tool-card-display', () => ({ getToolDisplay, toolPartHasDetails }));
+vi.mock('../open-part-detail-context', () => ({ useOpenPartDetail: () => openSpy }));
 
 function makeCompletedState(overrides: {
   filePath: string;
@@ -123,6 +128,9 @@ function findAll(
         matches.push(value);
       }
       const props = value.props as { children?: unknown };
+      if (typeof value.type === 'function') {
+        walk((value.type as React.FunctionComponent<unknown>)(props));
+      }
       walk(props.children);
     }
   }
@@ -134,7 +142,69 @@ function findByType(root: React.ReactElement, type: string): React.ReactElement[
   return findAll(root, el => el.type === type);
 }
 
-describe('WriteToolCard — diff preview routing', () => {
+describe('WriteToolCard — fixed row', () => {
+  beforeEach(() => {
+    buildToolDiffModel.mockReset();
+    getToolDisplay.mockReset();
+    toolPartHasDetails.mockReset();
+    openSpy.mockReset();
+  });
+
+  it('renders a FixedPartRow with the display projection and status', () => {
+    getToolDisplay.mockReturnValue({ title: 'write', subtitle: 'new.ts' });
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCard({ part: makeWritePart({}) }) as unknown as React.ReactElement;
+    const rows = findByType(root, 'FixedPartRow');
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    if (!row) {
+      throw new Error('row not found');
+    }
+    const rowProps = row.props as {
+      icon: string;
+      label: string;
+      status: string;
+      accessibilityLabel: string;
+      badge?: unknown;
+    };
+    expect(rowProps).toMatchObject({
+      icon: 'FilePlus',
+      label: 'new.ts',
+      status: 'completed',
+      accessibilityLabel: 'new.ts tool, completed',
+    });
+    expect(rowProps.badge).toBeUndefined();
+  });
+
+  it('wires onPress to openPartDetail with the part id when details exist', () => {
+    getToolDisplay.mockReturnValue({ title: 'write', subtitle: 'new.ts' });
+    toolPartHasDetails.mockReturnValue(true);
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCard({ part: makeWritePart({}) }) as unknown as React.ReactElement;
+    const row = findByType(root, 'FixedPartRow')[0];
+    if (!row) {
+      throw new Error('row not found');
+    }
+    const onPress = (row.props as { onPress?: unknown }).onPress as () => void;
+    expect(onPress).toBeTypeOf('function');
+    onPress();
+    expect(openSpy).toHaveBeenCalledWith('write-1');
+  });
+
+  it('leaves onPress undefined when details do not exist', () => {
+    getToolDisplay.mockReturnValue({ title: 'write', subtitle: 'new.ts' });
+    toolPartHasDetails.mockReturnValue(false);
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCard({ part: makeWritePart({}) }) as unknown as React.ReactElement;
+    const row = findByType(root, 'FixedPartRow')[0];
+    if (!row) {
+      throw new Error('row not found');
+    }
+    expect((row.props as { onPress?: unknown }).onPress).toBeUndefined();
+  });
+});
+
+describe('WriteToolCardBody — diff preview routing', () => {
   beforeEach(() => {
     buildToolDiffModel.mockReset();
   });
@@ -143,7 +213,7 @@ describe('WriteToolCard — diff preview routing', () => {
     const model = makeModel();
     buildToolDiffModel.mockReturnValue(model);
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCard({ part: makeWritePart({}) }) as unknown as React.ReactElement;
+    const root = WriteToolCardBody({ part: makeWritePart({}) }) as unknown as React.ReactElement;
     const previews = findByType(root, 'ToolDiffPreview');
     expect(previews).toHaveLength(1);
   });
@@ -152,7 +222,7 @@ describe('WriteToolCard — diff preview routing', () => {
     const model = makeModel();
     buildToolDiffModel.mockReturnValue(model);
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCard({ part: makeWritePart({}) }) as unknown as React.ReactElement;
+    const root = WriteToolCardBody({ part: makeWritePart({}) }) as unknown as React.ReactElement;
     const preview = findByType(root, 'ToolDiffPreview')[0];
     expect(preview).toBeDefined();
     if (!preview) {
@@ -165,7 +235,7 @@ describe('WriteToolCard — diff preview routing', () => {
   it('renders MonoScrollBlock fallback when the model does not exist', () => {
     buildToolDiffModel.mockReturnValue(null);
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCard({
+    const root = WriteToolCardBody({
       part: makeWritePart({ content: 'hello' }),
     }) as unknown as React.ReactElement;
     expect(findByType(root, 'ToolDiffPreview')).toHaveLength(0);
@@ -175,7 +245,7 @@ describe('WriteToolCard — diff preview routing', () => {
   it('renders no body when the model does not exist and content is empty', () => {
     buildToolDiffModel.mockReturnValue(null);
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCard({
+    const root = WriteToolCardBody({
       part: makeWritePart({ content: '' }),
     }) as unknown as React.ReactElement;
     expect(findByType(root, 'ToolDiffPreview')).toHaveLength(0);
@@ -186,7 +256,7 @@ describe('WriteToolCard — diff preview routing', () => {
     const model = makeModel();
     buildToolDiffModel.mockReturnValue(model);
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCard({
+    const root = WriteToolCardBody({
       part: makeWritePart({ status: 'error', error: 'write failed' }),
     }) as unknown as React.ReactElement;
     const texts = findAll(
@@ -199,7 +269,7 @@ describe('WriteToolCard — diff preview routing', () => {
   it('preserves the error block when the model does not exist', () => {
     buildToolDiffModel.mockReturnValue(null);
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCard({
+    const root = WriteToolCardBody({
       part: makeWritePart({ content: 'hello', status: 'error', error: 'write error' }),
     }) as unknown as React.ReactElement;
     const texts = findAll(

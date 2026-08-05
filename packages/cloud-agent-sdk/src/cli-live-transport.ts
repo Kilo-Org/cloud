@@ -977,10 +977,14 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         sendCommand('question_reject', {
           requestID: payload.requestId,
         }),
+      // Human reply from the app UI: mark it interactive so the CLI's skill-shell
+      // gate accepts approvals (VS Code does the same for every human reply).
+      // Old CLIs zod-strip the unknown key, so this is safe for every CLI version.
       respondToPermission: payload =>
         sendCommand('permission_respond', {
           requestID: payload.requestId,
           reply: payload.response,
+          interactive: true,
         }),
       acceptSuggestion: payload =>
         sendCommand('suggestion_accept', {

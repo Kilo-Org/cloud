@@ -3,19 +3,22 @@ import {
   createEvalToolCall,
   createRemoteMcpToolCall,
   createSafeToolCall,
+  createWorkflowToolCall,
 } from '@/src/shared/agent-conversation';
 import type {
   AgentConversationEvent,
   RemoteMcpAgentToolName,
   RemoteMcpToolCallEvent,
   SafeToolName,
+  WorkflowToolCallEvent,
+  WorkflowToolName,
 } from '@/src/shared/agent-conversation';
 import type { KiloGatewayToolCallRequest } from '@/src/shared/kilo-api-client';
 import type { RemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
 
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
-type DangerousToolCallEvent = EvalToolCallEvent | SafeToolCallEvent;
+type DangerousToolCallEvent = EvalToolCallEvent | SafeToolCallEvent | WorkflowToolCallEvent;
 
 const stringArgumentSchema = z.string();
 
@@ -32,6 +35,14 @@ const isSafeToolName = (name: string): name is SafeToolName =>
   name === 'get_page_snapshot' ||
   name === 'get_viewport_screenshot' ||
   name === 'search_memories';
+
+export const isWorkflowToolName = (name: string): name is WorkflowToolName =>
+  name === 'delete_workflow' ||
+  name === 'get_workflow' ||
+  name === 'run_workflow' ||
+  name === 'save_memory' ||
+  name === 'save_workflow' ||
+  name === 'search_workflows';
 
 const toSafeToolCallEvent = (
   toolCall: KiloGatewayToolCallRequest,
@@ -74,6 +85,10 @@ export const isRemoteMcpToolCallEvent = (toolCall: {
   readonly name: string;
 }): toolCall is RemoteMcpToolCallEvent => isRemoteMcpToolName(toolCall.name);
 
+export const isWorkflowToolCallEvent = (toolCall: {
+  readonly name: string;
+}): toolCall is WorkflowToolCallEvent => isWorkflowToolName(toolCall.name);
+
 /*
  * Always emit an event for an mcp_ call, even when its route is gone (server
  * removed/disabled mid-turn). The executor resolves the route again and returns
@@ -102,6 +117,32 @@ export const toRemoteMcpToolCallEvents = (
     ];
   });
 
+export const toWorkflowToolCallEvent = (
+  toolCall: KiloGatewayToolCallRequest,
+  selectedTabId: number
+): WorkflowToolCallEvent | undefined => {
+  if (!isWorkflowToolName(toolCall.name)) {
+    return undefined;
+  }
+
+  return createWorkflowToolCall({
+    arguments: toolCall.arguments,
+    name: toolCall.name,
+    providerToolCallId: toolCall.id,
+    tabId: selectedTabId,
+  });
+};
+
+export const toWorkflowToolCallEvents = (
+  toolCalls: KiloGatewayToolCallRequest[],
+  selectedTabId: number
+): WorkflowToolCallEvent[] =>
+  toolCalls.flatMap(toolCall => {
+    const event = toWorkflowToolCallEvent(toolCall, selectedTabId);
+
+    return event === undefined ? [] : [event];
+  });
+
 export const toDangerousToolCallEvents = (
   toolCalls: KiloGatewayToolCallRequest[],
   selectedTabId: number
@@ -109,7 +150,13 @@ export const toDangerousToolCallEvents = (
   const events: DangerousToolCallEvent[] = [];
 
   for (const toolCall of toolCalls) {
-    if (toolCall.name === 'eval') {
+    if (isWorkflowToolName(toolCall.name)) {
+      const event = toWorkflowToolCallEvent(toolCall, selectedTabId);
+
+      if (event !== undefined) {
+        events.push(event);
+      }
+    } else if (toolCall.name === 'eval') {
       const code = getStringArgument(toolCall.arguments, 'code');
 
       if (code !== undefined) {

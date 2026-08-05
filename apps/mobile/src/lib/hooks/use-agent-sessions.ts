@@ -12,6 +12,7 @@ import {
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
+import { collectSearchPages, collectUnfilteredPages } from '@/lib/agent-session-pages';
 import { groupAgentSessionsByDate } from '@/lib/agent-session-groups';
 import {
   type AgentSessionSortBy,
@@ -132,31 +133,38 @@ type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
 };
 
 /**
- * Server-side session search. The list itself is cursor-paginated, so
- * client-side filtering would only see the pages loaded so far — this
- * searches the user's full history instead.
+ * Server-side session search, now cursor-paginated for consistent
+ * page size and dedupe across pages. Uses `useInfiniteQuery` with
+ * `keepPreviousData` so stale rows stay visible during a search-text
+ * refinement while the footer spinner signals the next-page fetch.
  */
 export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const trpc = useTRPC();
   const sortBy = resolveSortBy(options.sortBy);
 
-  const query = useQuery(
-    trpc.cliSessionsV2.search.queryOptions(buildAgentSessionSearchInput(options), {
+  const query = useInfiniteQuery(
+    trpc.cliSessionsV2.search.infiniteQueryOptions(buildAgentSessionSearchInput(options), {
       staleTime: 30_000,
       enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
       placeholderData: keepPreviousData,
+      getNextPageParam: lastPage => lastPage.nextCursor,
     })
   );
 
-  const sessions = useMemo(() => query.data?.results ?? [], [query.data]);
+  const sessions = useMemo(() => collectSearchPages(query.data?.pages), [query.data]);
   const dateGroups = useMemo(() => groupAgentSessionsByDate(sessions, sortBy), [sessions, sortBy]);
 
   return {
     dateGroups,
     isPending: query.isPending,
-    isFetching: query.isFetching,
+    // Header-level fetch only — footer spinner has its own flag.
+    isFetching: query.isFetching && !query.isFetchingNextPage,
     isError: query.isError,
     refetch: query.refetch,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    isPlaceholderData: query.isPlaceholderData,
+    fetchNextPage: query.fetchNextPage,
   };
 }
 
@@ -168,21 +176,9 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const active = useActiveSessions(options);
 
   // A session can repeat across pages when it is updated while older pages
-  // load (the cursor follows the selected sort field), so dedupe by
-  // session_id.
-  const storedSessions = useMemo(() => {
-    const seen = new Set<string>();
-    const sessions: StoredSession[] = [];
-    for (const page of stored.data?.pages ?? []) {
-      for (const session of page.cliSessions) {
-        if (!seen.has(session.session_id)) {
-          seen.add(session.session_id);
-          sessions.push(session);
-        }
-      }
-    }
-    return sessions;
-  }, [stored.data]);
+  // load (the cursor follows the selected sort field). Dedupe by session_id
+  // using the shared collection helper.
+  const storedSessions = useMemo(() => collectUnfilteredPages(stored.data?.pages), [stored.data]);
 
   // The server already filters by context; this covers the window where a WS
   // heartbeat has introduced a row the client has not enriched yet (see

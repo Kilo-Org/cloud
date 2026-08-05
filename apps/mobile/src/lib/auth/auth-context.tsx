@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import * as Sentry from '@sentry/react-native';
 import {
   createContext,
   type ReactNode,
@@ -10,8 +11,8 @@ import {
   useState,
 } from 'react';
 
-import { resetAnalyticsUser } from '@/lib/analytics/posthog';
-import { trackEvent } from '@/lib/appsflyer';
+import { discardPostHog } from '@/lib/analytics/posthog';
+import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { API_BASE_URL } from '@/lib/config';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { queryClient } from '@/lib/query-client';
@@ -32,6 +33,8 @@ import {
   SESSION_FILTERS_KEY,
   TOKEN_EXPIRES_AT_KEY,
 } from '@/lib/storage-keys';
+import { clearTelemetryDecision } from '@/lib/telemetry/controller';
+import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
 
 // Pre-load tokens at module level so they're available before React mounts
@@ -241,6 +244,17 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const signOut = useCallback(async (ended = false) => {
     isSignedOutReference.current = true;
     invalidateRefreshSession();
+    // Synchronous gate close — must happen before any await so capture
+    // is denied for the entire async teardown window.
+    clearTelemetryDecision();
+    Sentry.setUser(null);
+    // SDK teardown — drop queues, do not flush them. Must happen before
+    // any SecureStore or cache awaits so optional analytics cannot transmit
+    // during the teardown window.
+    resetAppsFlyerState();
+    await discardPostHog();
+    purgePostHogPersistence();
+
     await writeCredentials(async () => {
       await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
       await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
@@ -252,15 +266,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
     await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
     await clearLastActiveInstance();
-    // PR-review storage is keyed by (owner, repo, number) so it's not
-    // obviously user-scoped, but the user-facing recents list absolutely
-    // is — clear it so the next signed-in account doesn't inherit the
-    // previous user's recently-opened PRs.
     await clearRecentPrs();
     await clearViewedFiles();
     clearAgentModelPreference();
     clearReasoningPreference();
-    resetAnalyticsUser();
     queryClient.clear();
     setSessionEnded(ended);
     setToken(undefined);

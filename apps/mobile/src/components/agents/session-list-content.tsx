@@ -348,6 +348,10 @@ export function AgentSessionListContent({
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10,
+        }}
       />
     </Animated.View>
   );

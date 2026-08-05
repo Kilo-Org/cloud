@@ -91,6 +91,10 @@ export function PermissionCard({
   const title = formatBlockingCardTitle('Permission required', pendingCount);
   const isInert = presentation.state === 'non-retryable';
 
+  // Skill-shell batches accept only once/reject (CLI/TUI show no persist option);
+  // never offer Always Allow for them.
+  const isSkillShell = metadata?.skillShell === true;
+
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
@@ -179,29 +183,31 @@ export function PermissionCard({
                   </Text>
                 )}
               </Button>
-              <Button
-                size="sm"
-                className="flex-1"
-                onPress={() => {
-                  handleRespond('always');
-                }}
-                disabled={isSubmitting || isInert}
-                accessibilityRole="button"
-                accessibilityLabel="Always allow"
-              >
-                {activeResponse === 'always' && isSubmitting ? (
-                  <ActivityIndicator size="small" color={colors.primaryForeground} />
-                ) : (
-                  <Text
-                    className={cn(
-                      'text-xs text-primary-foreground',
-                      activeResponse === 'always' && 'font-medium'
-                    )}
-                  >
-                    Always Allow
-                  </Text>
-                )}
-              </Button>
+              {!isSkillShell ? (
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onPress={() => {
+                    handleRespond('always');
+                  }}
+                  disabled={isSubmitting || isInert}
+                  accessibilityRole="button"
+                  accessibilityLabel="Always allow"
+                >
+                  {activeResponse === 'always' && isSubmitting ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <Text
+                      className={cn(
+                        'text-xs text-primary-foreground',
+                        activeResponse === 'always' && 'font-medium'
+                      )}
+                    >
+                      Always Allow
+                    </Text>
+                  )}
+                </Button>
+              ) : null}
             </>
           ) : null}
           {presentation.hasRetryCta ? (

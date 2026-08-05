@@ -15,6 +15,26 @@ describe('drizzle', () => {
     expect(res.rows[0].current_setting).toBe('kilocode-web');
   });
 
+  describe('pool error listeners', () => {
+    it('attaches a non-exiting error listener in test mode', () => {
+      // If no listener is attached, Node treats an 'error' emit as a throw.
+      // In test mode, pool.end() during cleanup triggers idle client errors
+      // that must not crash the test runner.
+      expect(pool.listenerCount('error')).toBeGreaterThan(0);
+    });
+
+    it('does not throw on an idle-client error in test mode', () => {
+      // The test-mode handler catches errors without exit.
+      // Verifying the emit does not throw proves the listener works.
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        expect(() => pool.emit('error', new Error('idle client disconnect'))).not.toThrow();
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
+  });
+
   describe('replica selection', () => {
     const primaryUrl = 'postgres://primary';
 

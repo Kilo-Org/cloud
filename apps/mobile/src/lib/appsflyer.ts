@@ -1,14 +1,30 @@
 import * as Sentry from '@sentry/react-native';
 import { Platform } from 'react-native';
-import appsFlyer, { AppsFlyerPurchaseConnector, StoreKitVersion } from 'react-native-appsflyer';
+import appsFlyer, {
+  AppsFlyerConsent,
+  AppsFlyerPurchaseConnector,
+  StoreKitVersion,
+} from 'react-native-appsflyer';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
+import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 
 let initialized = false;
 /** Blocks re-entry into create() within one JS bundle (before initSdk succeeds). */
 let purchaseConnectorCreateStarted = false;
-const pendingEvents: { name: string; values: Record<string, string> }[] = [];
+/**
+ * Invalidation token for in-flight initSdk callbacks. Incremented by
+ * `resetAppsFlyerState()` so a late success after stop/optional revoke
+ * cannot re-arm the SDK even when generation is unchanged.
+ */
+let callbackToken = 0;
+type PendingEvent = {
+  name: string;
+  values: Record<string, string>;
+  generation: number;
+};
+const pendingEvents: PendingEvent[] = [];
 
 const CONNECTOR_ALREADY_CONFIGURED = 'Connector already configured';
 
@@ -81,13 +97,18 @@ function noop() {}
 
 function drainPendingEvents() {
   for (const event of pendingEvents) {
-    // Error callback is `noop` for the same reason as in trackEvent below.
-    appsFlyer.logEvent(event.name, event.values, noop, noop);
+    if (event.generation === currentGeneration()) {
+      // Error callback is `noop` for the same reason as in trackEvent below.
+      appsFlyer.logEvent(event.name, event.values, noop, noop);
+    }
   }
   pendingEvents.length = 0;
 }
 
 export function initAppsFlyer(): void {
+  if (!allowsOptional()) {
+    return;
+  }
   if (initialized) {
     return;
   }
@@ -114,6 +135,27 @@ export function initAppsFlyer(): void {
     );
   }
 
+  // Send the optional-consent signal before the SDK starts so attribution
+  // data is either collected with consent or not collected at all.
+  // isUserSubjectToGDPR is left undefined: we do not know the user's GDPR
+  // status at this layer, and a false negative is a legal risk.  The SDK
+  // treats undefined as "not determined."
+  appsFlyer.setConsentData(
+    new AppsFlyerConsent(undefined, allowsOptional(), allowsOptional(), allowsOptional())
+  );
+
+  // Resume the SDK if it was stopped by a prior reset. Native stop may throw
+  // synchronously — catch it so initSdk still proceeds.
+  try {
+    if (typeof (appsFlyer as Record<string, unknown>).stop === 'function') {
+      appsFlyer.stop(false);
+    }
+  } catch {
+    // Native stop threw; JS invalidation (if any) already ran in resetAppsFlyerState.
+  }
+
+  const initGeneration = currentGeneration();
+  const initToken = callbackToken;
   appsFlyer.initSdk(
     {
       devKey: APPSFLYER_DEV_KEY,
@@ -123,6 +165,9 @@ export function initAppsFlyer(): void {
       timeToWaitForATTUserAuthorization: 10,
     },
     () => {
+      if (currentGeneration() !== initGeneration || callbackToken !== initToken) {
+        return;
+      }
       initialized = true;
       if (Platform.OS === 'ios') {
         AppsFlyerPurchaseConnector.startObservingTransactions();
@@ -134,6 +179,9 @@ export function initAppsFlyer(): void {
 }
 
 export function trackEvent(name: string, values?: Record<string, string>): void {
+  if (!allowsOptional()) {
+    return;
+  }
   const eventValues = values ?? {};
 
   // Mirror attribution events into PostHog so the onboarding funnel is
@@ -142,7 +190,7 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
   captureEvent(name, eventValues);
 
   if (!initialized) {
-    pendingEvents.push({ name, values: eventValues });
+    pendingEvents.push({ name, values: eventValues, generation: currentGeneration() });
     return;
   }
 
@@ -152,4 +200,45 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
   // dev key or app id, or a broken purchase connector — still reach Sentry
   // through initSdk's and the connector's error callbacks.
   appsFlyer.logEvent(name, eventValues, noop, noop);
+}
+
+/**
+ * Tear down the native SDK and clear JS state. Calls `stop(true)` to stop
+ * native transmission, then, on iOS, `stopObservingTransactions()`. Also
+ * clears the pending-event buffer so stale events from a prior account do
+ * not transmit on a later init.
+ *
+ * Does NOT reset `purchaseConnectorCreateStarted`: native `PCAppsFlyer` keeps
+ * a process-lifetime static connector, so re-entering `create()` rejects with
+ * "Connector already configured".
+ */
+export function resetAppsFlyerState(): void {
+  // Invalidate JS state BEFORE native teardown calls. If a native call throws,
+  // the JS token, the initialized flag, and pendingEvents are already cleared —
+  // a late initSdk success after reset cannot re-arm the SDK or drain events.
+  callbackToken += 1;
+  initialized = false;
+  pendingEvents.length = 0;
+
+  try {
+    if (typeof (appsFlyer as Record<string, unknown>).stop === 'function') {
+      appsFlyer.stop(true);
+    }
+  } catch {
+    // Native stop may throw — JS invalidation has already run.
+  }
+
+  if (Platform.OS === 'ios') {
+    try {
+      if (
+        typeof (AppsFlyerPurchaseConnector as unknown as Record<string, unknown>)
+          .stopObservingTransactions === 'function'
+      ) {
+        AppsFlyerPurchaseConnector.stopObservingTransactions();
+      }
+    } catch {
+      // Native stopObservingTransactions may throw — JS invalidation has
+      // already run.
+    }
+  }
 }

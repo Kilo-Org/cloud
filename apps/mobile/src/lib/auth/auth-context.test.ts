@@ -24,12 +24,13 @@ vi.mock('@/lib/config', () => ({
 }));
 
 vi.mock('@/lib/analytics/posthog', () => ({
-  resetAnalyticsUser: vi.fn(),
+  discardPostHog: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/appsflyer', () => ({
-  trackEvent: vi.fn(),
-}));
+vi.mock('@/lib/appsflyer', () => ({ resetAppsFlyerState: vi.fn(), trackEvent: vi.fn() }));
+vi.mock('@sentry/react-native', () => ({ setUser: vi.fn() }));
+vi.mock('@/lib/telemetry/controller', () => ({ clearTelemetryDecision: vi.fn() }));
+vi.mock('@/lib/telemetry/posthog-storage', () => ({ purgePostHogPersistence: vi.fn() }));
 
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),

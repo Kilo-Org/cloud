@@ -47,6 +47,7 @@ const toPendingDraft = (
   pageTitle: value.pageTitle,
   pageUrl: value.pageUrl,
   text: value.text,
+  ...(value.note === undefined ? {} : { note: value.note }),
   ...(value.truncated === undefined ? {} : { truncated: value.truncated }),
 });
 

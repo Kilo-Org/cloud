@@ -582,15 +582,20 @@ export function OrganizationAdminMembers({
                   const canEditRole =
                     member.status === 'active' &&
                     canManageMembers(currentUserRole, isKiloAdmin) &&
+                    canActOnMemberRole(currentUserRole, isKiloAdmin, member.role) &&
                     (!isCurrentUser || isKiloAdmin);
+                  // Usage limits are deliberately not owner-gated: the server only
+                  // reserves role changes and removals for owners, so an admin may
+                  // still set an owner's daily limit.
                   const canEditLimit =
                     organizationData.plan === 'enterprise' &&
                     member.status === 'active' &&
                     canManageMembers(currentUserRole, isKiloAdmin);
                   const canDelete =
                     member.status === 'active'
-                      ? canRemoveMember(currentUserRole, isKiloAdmin, isCurrentUser)
-                      : canManageMembers(currentUserRole, isKiloAdmin);
+                      ? canRemoveMember(currentUserRole, isKiloAdmin, isCurrentUser, member.role)
+                      : canManageMembers(currentUserRole, isKiloAdmin) &&
+                        canActOnMemberRole(currentUserRole, isKiloAdmin, member.role);
                   const canEditChildTeams =
                     member.status === 'active' && canInviteMembers(currentUserRole, isKiloAdmin);
 

@@ -123,8 +123,7 @@ export function RoutingContent() {
 
   const currentOverride = data?.vercel_routing_percentage;
   const currentFreeOverride = data?.vercel_routing_percentage_free;
-  const effectiveFreeRoutingPercentage =
-    currentFreeOverride ?? DEFAULT_VERCEL_PERCENTAGE_FREE;
+  const effectiveFreeRoutingPercentage = currentFreeOverride ?? DEFAULT_VERCEL_PERCENTAGE_FREE;
   const totalEffectiveAutoFreeVercelPercentage =
     effectiveFreeRoutingPercentage * (totalVercelEligibleAutoFreeWeight / totalAutoFreeWeight);
   const isOverrideActive =
@@ -259,9 +258,9 @@ export function RoutingContent() {
               <h3 className="text-sm font-medium">Auto Free effective Vercel routing</h3>
               <p className="text-muted-foreground text-sm">
                 Share of all Auto Free traffic based only on the active free routing percentage (
-                {percentageFormatter.format(effectiveFreeRoutingPercentage)}%), constituent
-                weights, and the vercel-routing flag. Runtime availability and request constraints
-                are not included.
+                {percentageFormatter.format(effectiveFreeRoutingPercentage)}%), constituent weights,
+                and the vercel-routing flag. Runtime availability and request constraints are not
+                included.
               </p>
             </div>
             <div className="overflow-x-auto rounded-md border">

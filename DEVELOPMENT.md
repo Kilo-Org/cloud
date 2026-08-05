@@ -251,6 +251,7 @@ should pass against the local PostgreSQL database.
 | `pnpm format:changed` | Format only files changed since `main` |
 | `pnpm validate` | Run the root typecheck, lint, and test scripts |
 | `pnpm drizzle migrate` | Apply pending database migrations |
+| `pnpm drizzle:migrate-safely` | Apply pending migrations the way deploys do: `lock_timeout` below `deadlock_timeout`, retries on lock failures, and full PostgreSQL error detail on failure |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 | `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly |
 | `pnpm dev:db:reset` | Drop all app-owned schemas in the local dev database, recreate `public`, and leave the DB truly empty before re-migrating |

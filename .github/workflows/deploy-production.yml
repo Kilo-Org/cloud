@@ -75,7 +75,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Drizzle migrations
-        run: NODE_ENV=production pnpm run drizzle migrate
+        run: NODE_ENV=production pnpm run drizzle:migrate-safely
 
   stage-app:
     uses: ./.github/workflows/stage-vercel-deployment.yml

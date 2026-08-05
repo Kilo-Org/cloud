@@ -25,6 +25,8 @@
 - Dropping columns/tables that may still be read by running application code
 - Large backfills or data transforms without batching
 - Missing partial index opportunities (e.g. `WHERE col IS NOT NULL`)
+- A single statement needing `ACCESS EXCLUSIVE` on more than one busy table - `DROP TABLE`/`ALTER TABLE` also locks every table the target references by foreign key, so dropping a table with FKs to both `kilocode_users` and `organizations` deadlocks against normal traffic. Flag it and ask for the foreign keys to be dropped one statement at a time before the table
+- A new migration whose journal `when` is not the newest in `meta/_journal.json` - the migrator compares against `max(created_at)` and skips older entries silently
 
 # COMMENT FORMAT
 

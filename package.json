@@ -19,6 +19,7 @@
     "format:changed": "git diff --name-only $(git merge-base origin/main HEAD) --diff-filter=ACMR -- '**/*.js' '**/*.jsx' '**/*.ts' '**/*.tsx' '**/*.json' '**/*.css' '**/*.md' | xargs -r oxfmt --no-error-on-unmatched-pattern",
     "validate": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "drizzle": "pnpm --filter @kilocode/db exec drizzle-kit",
+    "drizzle:migrate-safely": "tsx packages/db/src/migrate-cli.ts",
     "drizzle:verify-bootstrap": "bash scripts/verify-drizzle-bootstrap.sh",
     "test:e2e": "pnpm --filter web run test:e2e",
     "dependency-cycle-check": "pnpm --filter web run dependency-cycle-check",

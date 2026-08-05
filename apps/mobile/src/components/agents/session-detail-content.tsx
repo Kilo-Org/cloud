@@ -72,6 +72,7 @@ import {
   openChildSessionSheet,
   releaseChildSessionSheet,
 } from '@/components/agents/child-session-sheet-state';
+import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
@@ -781,96 +782,98 @@ export function SessionDetailContent({
     isFocused && agentStatus.type !== 'disconnected' && (isStreaming || pendingMessages.size > 0);
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={rename.title}
-        headerRight={headerRight}
-        {...(rename.isTitleInteractive
-          ? {
-              onTitlePress: rename.openModal,
-              onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
-            }
-          : {})}
-      />
-      {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
+    <PartDetailSheetHost messages={messages}>
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={rename.title}
+          headerRight={headerRight}
+          {...(rename.isTitleInteractive
+            ? {
+                onTitlePress: rename.openModal,
+                onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+              }
+            : {})}
+        />
+        {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
-      {!isConnected && <ConnectivityBanner />}
+        {!isConnected && <ConnectivityBanner />}
 
-      {keyboardContainerKind === 'app-aware-padding' ? (
-        <AppAwareKeyboardPaddingView className="flex-1">
-          {renderKeyboardBody()}
-        </AppAwareKeyboardPaddingView>
-      ) : (
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
-          {renderKeyboardBody()}
-        </KeyboardAvoidingView>
-      )}
+        {keyboardContainerKind === 'app-aware-padding' ? (
+          <AppAwareKeyboardPaddingView className="flex-1">
+            {renderKeyboardBody()}
+          </AppAwareKeyboardPaddingView>
+        ) : (
+          <KeyboardAvoidingView className="flex-1" behavior="padding">
+            {renderKeyboardBody()}
+          </KeyboardAvoidingView>
+        )}
 
-      {isComposerVisible ? (
-        <BlurBar className="border-t-0">
-          <View style={{ height: bottom }} />
-        </BlurBar>
-      ) : (
-        <View style={{ height: bottom }} className="bg-background" />
-      )}
+        {isComposerVisible ? (
+          <BlurBar className="border-t-0">
+            <View style={{ height: bottom }} />
+          </BlurBar>
+        ) : (
+          <View style={{ height: bottom }} className="bg-background" />
+        )}
 
-      {sheetMountState.mounted ? (
-        <SessionContextSheet
-          visible={sheetMountState.visible}
-          info={sheetMountState.info}
-          modelDisplay={contextModelAndProvider.model}
-          providerDisplay={contextModelAndProvider.provider}
-          totalCostMicrodollars={totalMicrodollars}
-          breakdownCostUsd={breakdownCostUsd}
-          messages={messages}
+        {sheetMountState.mounted ? (
+          <SessionContextSheet
+            visible={sheetMountState.visible}
+            info={sheetMountState.info}
+            modelDisplay={contextModelAndProvider.model}
+            providerDisplay={contextModelAndProvider.provider}
+            totalCostMicrodollars={totalMicrodollars}
+            breakdownCostUsd={breakdownCostUsd}
+            messages={messages}
+            modelOptions={modelOptions}
+            onClose={() => {
+              setOpenContextSheetIdentity(null);
+            }}
+          />
+        ) : null}
+
+        <MessageDetailsSheet
+          visible={detailsMessage !== null}
+          message={detailsMessage}
           modelOptions={modelOptions}
           onClose={() => {
-            setOpenContextSheetIdentity(null);
+            setDetailsMessage(null);
           }}
         />
-      ) : null}
 
-      <MessageDetailsSheet
-        visible={detailsMessage !== null}
-        message={detailsMessage}
-        modelOptions={modelOptions}
-        onClose={() => {
-          setDetailsMessage(null);
-        }}
-      />
+        {childSessionSheet.sheet ? (
+          <ChildSessionSheet
+            visible={childSessionSheet.visible}
+            sessionId={childSessionSheet.sheet.sessionId}
+            title={childSessionSheet.sheet.title}
+            getChildMessages={getChildMessages}
+            hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+            isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+            renderPart={props => <PartRenderer {...props} />}
+            onOpenChildSession={handleOpenChildSession}
+            onRetry={() => {
+              const openSheet = childSessionSheet.sheet;
+              if (!openSheet) {
+                return;
+              }
+              void manager.hydrateChildSession(openSheet.sessionId);
+            }}
+            onClose={handleCloseChildSession}
+            onDismiss={handleChildSheetDismiss}
+          />
+        ) : null}
 
-      {childSessionSheet.sheet ? (
-        <ChildSessionSheet
-          visible={childSessionSheet.visible}
-          sessionId={childSessionSheet.sheet.sessionId}
-          title={childSessionSheet.sheet.title}
-          getChildMessages={getChildMessages}
-          hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
-          isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
-          renderPart={props => <PartRenderer {...props} />}
-          onOpenChildSession={handleOpenChildSession}
-          onRetry={() => {
-            const openSheet = childSessionSheet.sheet;
-            if (!openSheet) {
-              return;
-            }
-            void manager.hydrateChildSession(openSheet.sessionId);
-          }}
-          onClose={handleCloseChildSession}
-          onDismiss={handleChildSheetDismiss}
-        />
-      ) : null}
-
-      {rename.isTitleInteractive && rename.isModalOpen ? (
-        <RenameModal
-          title="Rename session"
-          placeholder="Session name"
-          initialValue={rename.modalInitialValue}
-          onSave={handleRenameSave}
-          onClose={handleRenameClose}
-        />
-      ) : null}
-    </View>
+        {rename.isTitleInteractive && rename.isModalOpen ? (
+          <RenameModal
+            title="Rename session"
+            placeholder="Session name"
+            initialValue={rename.modalInitialValue}
+            onSave={handleRenameSave}
+            onClose={handleRenameClose}
+          />
+        ) : null}
+      </View>
+    </PartDetailSheetHost>
   );
 
   function renderKeyboardBody() {

@@ -64,6 +64,7 @@ export function PartRenderer({
     return (
       <MessageErrorBoundary>
         <ReasoningPartRenderer
+          partId={part.id}
           text={part.text}
           isStreaming={isStreaming && isPartStreaming(part)}
           defaultExpanded={defaultReasoningExpanded}

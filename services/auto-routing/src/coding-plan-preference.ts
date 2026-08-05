@@ -9,12 +9,22 @@ const CODING_PLAN_PREFERENCE_KEY_PREFIX = 'coding_plan_preference:v2:';
 const CODING_PLAN_PREFERENCE_TTL_SECONDS = 60;
 const BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID = 'byteplus-coding/bytedance-seed-code';
 const MINIMAX_CODING_PLAN_DEFAULT_MODEL_ID = 'minimax/minimax-m3';
+const BYTEPLUS_CODING_PLAN_IDS = [
+  'byteplus-coding-plan-team-lite',
+  'byteplus-coding-plan-team-pro',
+] as const;
+const BYTEPLUS_CODING_PLAN_ID_SET = new Set<string>(BYTEPLUS_CODING_PLAN_IDS);
+type ByteplusCodingPlanId = (typeof BYTEPLUS_CODING_PLAN_IDS)[number];
+
+function isByteplusCodingPlanId(value: string): value is ByteplusCodingPlanId {
+  return BYTEPLUS_CODING_PLAN_ID_SET.has(value);
+}
 
 const CodingPlanPreferenceSchema = z.union([
   z.object({ active: z.literal(false) }),
   z.object({
     active: z.literal(true),
-    planId: z.literal('byteplus-coding-plan-team-lite'),
+    planId: z.enum(BYTEPLUS_CODING_PLAN_IDS),
     providerId: z.literal('byteplus-coding'),
     modelId: z.literal(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID),
   }),
@@ -75,7 +85,7 @@ async function queryCodingPlanPreference(
         eq(byok_api_keys.is_enabled, true),
         or(
           and(
-            eq(coding_plan_subscriptions.plan_id, 'byteplus-coding-plan-team-lite'),
+            inArray(coding_plan_subscriptions.plan_id, BYTEPLUS_CODING_PLAN_IDS),
             eq(coding_plan_subscriptions.provider_id, 'byteplus-coding')
           ),
           and(
@@ -87,18 +97,17 @@ async function queryCodingPlanPreference(
     )
     .orderBy(
       sql`case
-        when ${coding_plan_subscriptions.plan_id} = 'byteplus-coding-plan-team-lite'
-          and ${coding_plan_subscriptions.provider_id} = 'byteplus-coding' then 0
+        when ${coding_plan_subscriptions.provider_id} = 'byteplus-coding' then 0
         when ${coding_plan_subscriptions.plan_id} = 'minimax-token-plan-plus'
           and ${coding_plan_subscriptions.provider_id} = 'minimax' then 1
         else 2
       end`
     )
     .limit(1);
-  if (row?.planId === 'byteplus-coding-plan-team-lite' && row.providerId === 'byteplus-coding') {
+  if (row?.providerId === 'byteplus-coding' && isByteplusCodingPlanId(row.planId)) {
     return {
       active: true,
-      planId: 'byteplus-coding-plan-team-lite',
+      planId: row.planId,
       providerId: 'byteplus-coding',
       modelId: BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID,
     };

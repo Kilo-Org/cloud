@@ -123,4 +123,19 @@ describe('validateCodingPlanCredential', () => {
       maxOutputTokens: 1,
     });
   });
+
+  it('accepts BytePlus Pro credentials through the same direct provider validation', async () => {
+    mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+
+    await expect(
+      validateCodingPlanCredential({
+        apiKey: 'byteplus-pro-inventory-key',
+        planId: 'byteplus-coding-plan-team-pro',
+        providerId: 'byteplus-coding',
+        upstreamPlanId: 'byteplus-pro-plan-123',
+      })
+    ).resolves.toBe(true);
+
+    expect(mockDirectModel).toHaveBeenCalledWith('bytedance-seed-code');
+  });
 });

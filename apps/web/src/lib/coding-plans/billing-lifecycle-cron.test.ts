@@ -22,8 +22,10 @@ jest.mock('@/lib/autoTopUp', () => ({
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
 const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
+const BYTEPLUS_PRO_PLAN_ID = 'byteplus-coding-plan-team-pro';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
+const BYTEPLUS_PRO_COST_MICRODOLLARS = 100_000_000;
 const dueAt = new Date(Date.now() - 60_000).toISOString();
 
 async function createSubscription(
@@ -37,7 +39,7 @@ async function createSubscription(
     auto_top_up_enabled: autoTopUpEnabled,
   });
   await uploadKeysToInventory(
-    planId === BYTEPLUS_PLAN_ID ? 'byteplus-coding' : 'minimax',
+    planId === BYTEPLUS_PLAN_ID || planId === BYTEPLUS_PRO_PLAN_ID ? 'byteplus-coding' : 'minimax',
     planId,
     [`cron-key-${crypto.randomUUID()}::minimax-plan-${crypto.randomUUID()}`],
     {
@@ -160,6 +162,38 @@ describe('Coding Plan billing lifecycle cron', () => {
     });
     expect(credential.status).toBe('assigned');
     expect(renewal).toEqual([{ description: 'Coding plan renewal: BytePlus Coding Plan Lite' }]);
+  });
+
+  it('renews BytePlus Pro for 100 credits while retaining its assigned credential', async () => {
+    const { subscriptionId } = await createSubscription(
+      BYTEPLUS_PRO_COST_MICRODOLLARS * 2,
+      false,
+      BYTEPLUS_PRO_PLAN_ID
+    );
+
+    const summary = await runCodingPlanBillingLifecycleCron(db);
+    const [subscription] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, subscriptionId));
+    const [credential] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
+    const renewal = await db
+      .select({ description: credit_transactions.description })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.description, 'Coding plan renewal: BytePlus Coding Plan Pro'));
+
+    expect(summary.renewals).toBe(1);
+    expect(subscription).toMatchObject({
+      plan_id: BYTEPLUS_PRO_PLAN_ID,
+      provider_id: 'byteplus-coding',
+      cost_microdollars: BYTEPLUS_PRO_COST_MICRODOLLARS,
+      billing_period_days: 30,
+    });
+    expect(credential.status).toBe('assigned');
+    expect(renewal).toEqual([{ description: 'Coding plan renewal: BytePlus Coding Plan Pro' }]);
   });
 
   it('renews after the subscriber deletes the installed MiniMax BYOK key', async () => {

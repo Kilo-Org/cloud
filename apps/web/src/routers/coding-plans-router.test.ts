@@ -26,6 +26,7 @@ const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
 const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
 const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
+const BYTEPLUS_PRO_PLAN_ID = 'byteplus-coding-plan-team-pro';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
 const mockedGenerateText = jest.mocked(generateText);
@@ -126,6 +127,20 @@ describe('coding plans router', () => {
         availabilityStatus: 'sold_out',
         notificationRequested: false,
       },
+      {
+        planId: BYTEPLUS_PRO_PLAN_ID,
+        providerName: 'BytePlus',
+        name: 'Coding Plan Pro',
+        providerId: 'byteplus-coding',
+        costKiloCredits: 100,
+        billingPeriodDays: 30,
+        features: expect.arrayContaining([
+          'For complex, high-intensity development use.',
+          'Approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per 30-day subscription period.',
+        ]),
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      },
     ]);
   });
 
@@ -159,6 +174,11 @@ describe('coding plans router', () => {
       }),
       expect.objectContaining({
         planId: BYTEPLUS_PLAN_ID,
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      }),
+      expect.objectContaining({
+        planId: BYTEPLUS_PRO_PLAN_ID,
         availabilityStatus: 'sold_out',
         notificationRequested: false,
       }),
@@ -200,6 +220,11 @@ describe('coding plans router', () => {
       }),
       expect.objectContaining({
         planId: BYTEPLUS_PLAN_ID,
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      }),
+      expect.objectContaining({
+        planId: BYTEPLUS_PRO_PLAN_ID,
         availabilityStatus: 'sold_out',
         notificationRequested: false,
       }),

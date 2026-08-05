@@ -1626,6 +1626,51 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
+  it('loads and caches the BytePlus Pro coding-plan preference on cache miss', async () => {
+    dbLimit.mockResolvedValueOnce([
+      { planId: 'byteplus-coding-plan-team-pro', providerId: 'byteplus-coding' },
+    ]);
+
+    const response = await decideRequest(mirrorPayload({ userId: 'pro-user-1' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'byteplus-coding/bytedance-seed-code',
+        source: 'coding_plan_default',
+      },
+    });
+    expect(configPut).toHaveBeenCalledWith(
+      expect.stringMatching(/^coding_plan_preference:v2:[0-9a-f]{16}$/),
+      JSON.stringify({
+        active: true,
+        planId: 'byteplus-coding-plan-team-pro',
+        providerId: 'byteplus-coding',
+        modelId: 'byteplus-coding/bytedance-seed-code',
+      }),
+      { expirationTtl: 60 }
+    );
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('prioritizes BytePlus Pro over MiniMax when both subscriptions are active', async () => {
+    dbLimit.mockResolvedValueOnce([
+      { planId: 'byteplus-coding-plan-team-pro', providerId: 'byteplus-coding' },
+      { planId: 'minimax-token-plan-plus', providerId: 'minimax' },
+    ]);
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'byteplus-coding/bytedance-seed-code',
+        source: 'coding_plan_default',
+      },
+    });
+    expect(dbOrderBy).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the database-selected BytePlus row when both recognized plans are active', async () => {
     dbLimit.mockResolvedValueOnce([
       { planId: 'byteplus-coding-plan-team-lite', providerId: 'byteplus-coding' },

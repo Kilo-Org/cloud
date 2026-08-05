@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
-import { eq, getTableName } from 'drizzle-orm';
+import { eq, getTableName, sql } from 'drizzle-orm';
 import {
   createDeviceSession,
   issueSessionCredentials,
@@ -161,6 +161,101 @@ describe('device-sessions', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error).toBe('SESSION_REVOKED');
+      }
+    });
+
+    test('concurrent revocation during rotation is refused and issues no replacement pair', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // Real concurrency: run the revoke as a separate transaction that takes
+      // the session row lock and stays open. Then start the rotation: its
+      // pre-transaction checks read the pre-revoke state, and its
+      // in-transaction `FOR UPDATE` recheck blocks on the held row lock. We
+      // commit the revoke only after the rotation is observed blocked, so the
+      // recheck under the lock is what must refuse and no replacement pair can
+      // be issued after the revoke wins.
+      let signalLockHeld: () => void = () => {};
+      const lockHeld = new Promise<void>(resolve => {
+        signalLockHeld = resolve;
+      });
+      let releaseRevoke: () => void = () => {};
+      const revokeGate = new Promise<void>(resolve => {
+        releaseRevoke = resolve;
+      });
+
+      const revokeTx = db.transaction(async tx => {
+        await tx
+          .update(device_sessions)
+          .set({
+            revoked_at: new Date().toISOString(),
+            revoked_reason: 'concurrent-revoke-test',
+          })
+          .where(eq(device_sessions.id, sessionId));
+        signalLockHeld();
+        await revokeGate;
+      });
+
+      try {
+        // Wait until the revoke transaction holds the session row lock.
+        await lockHeld;
+
+        // Start the rotation while the revoke is still uncommitted.
+        const rotatePromise = rotateRefreshToken(refreshToken);
+
+        // Deterministic barrier: the rotation cannot pass its `FOR UPDATE`
+        // recheck until the revoke commits, so poll until the rotation is
+        // observed waiting on the session row lock inside its transaction.
+        let rotationBlocked = false;
+        for (let attempt = 0; attempt < 200 && !rotationBlocked; attempt++) {
+          const {
+            rows: [{ blocked }],
+          } = await db.execute<{ blocked: number }>(sql`
+            SELECT count(*)::int AS blocked
+            FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND pid <> pg_backend_pid()
+              AND state = 'active'
+              AND wait_event_type = 'Lock'
+              AND query ILIKE '%device_sessions%'
+          `);
+          rotationBlocked = blocked > 0;
+          if (!rotationBlocked) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        }
+        expect(rotationBlocked).toBe(true);
+
+        // Commit the revoke; the rotation's locked recheck then refuses.
+        releaseRevoke();
+
+        const [result] = await Promise.all([rotatePromise, revokeTx]);
+
+        // The rotation must refuse instead of issuing a replacement pair.
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toBe('SESSION_REVOKED');
+        }
+
+        // No replacement pair was issued: the old token is not consumed.
+        const tokens = await db
+          .select()
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, sessionId));
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0]!.consumed_at).toBeNull();
+
+        // The session is revoked.
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).not.toBeNull();
+      } finally {
+        // Always commit the revoke so the held row lock is released, even when
+        // an assertion fails. This keeps the afterEach cleanup unblocked.
+        releaseRevoke();
+        await revokeTx.catch(() => {});
       }
     });
 

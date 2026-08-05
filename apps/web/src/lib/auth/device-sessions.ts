@@ -83,6 +83,10 @@ export async function issueSessionCredentials(
  * the session is revoked because replay implies theft.
  * An unknown or expired token is refused without revocation.
  *
+ * The session validity check is repeated INSIDE the transaction under a row
+ * lock, so a session revoked concurrently with the rotation cannot receive a
+ * replacement pair.
+ *
  * The consume and the replacement issuance run in one transaction. If issuing
  * the replacement fails, the transaction rolls back so the old token stays
  * usable instead of leaving the client with a permanently dead refresh path.
@@ -155,7 +159,7 @@ export async function rotateRefreshToken(
     return { ok: false, error: 'USER_BLOCKED' };
   }
 
-  // Steps 4-7: Consume the old token and issue the replacement pair in one
+  // Steps 4-8: Consume the old token and issue the replacement pair in one
   // transaction. If issuing the replacement fails, the transaction rolls back
   // and the old token remains usable, so the client can retry with it.
   const outcome = await db.transaction(async tx => {
@@ -171,7 +175,28 @@ export async function rotateRefreshToken(
       return { kind: 'missing_user' } as const;
     }
 
-    // Step 4: Atomic consume — only after all precondition checks pass.
+    // Step 4: Lock the parent session row and recheck revoked_at INSIDE the
+    // transaction, before consuming. The pre-transaction session check above
+    // can be raced by a revokeDeviceSession that commits between that read and
+    // this point; holding the session row lock until this transaction commits
+    // closes the gap — the revoke either commits first and this recheck refuses,
+    // or it blocks until this rotation commits.
+    const [lockedSession] = await tx
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, session.id))
+      .for('update')
+      .limit(1);
+
+    if (!lockedSession) {
+      return { kind: 'missing_session' } as const;
+    }
+
+    if (lockedSession.revoked_at) {
+      return { kind: 'session_revoked' } as const;
+    }
+
+    // Step 5: Atomic consume — only after the in-transaction revocation check.
     const [consumed] = await tx
       .update(device_refresh_tokens)
       .set({ consumed_at: now })
@@ -184,23 +209,23 @@ export async function rotateRefreshToken(
       )
       .returning();
 
-    // Step 5: If consume failed, a concurrent request consumed the token.
+    // Step 6: If consume failed, a concurrent request consumed the token.
     // We already confirmed the token was not reused at Step 1, so this is
     // a race, not theft. Refuse without revocation.
     if (!consumed) {
       return { kind: 'consume_lost' } as const;
     }
 
-    // Step 6: Update last_seen_at on the session.
+    // Step 7: Update last_seen_at on the session.
     await tx
       .update(device_sessions)
       .set({ last_seen_at: now })
       .where(eq(device_sessions.id, consumed.device_session_id));
 
-    // Step 7: Issue the replacement pair in the same transaction.
+    // Step 8: Issue the replacement pair in the same transaction.
     const accessToken = generateApiToken(
       fullUser,
-      { deviceSessionId: session.id },
+      { deviceSessionId: lockedSession.id },
       { expiresIn: TOKEN_EXPIRY.oneHour }
     );
 
@@ -209,7 +234,7 @@ export async function rotateRefreshToken(
 
     await tx.insert(device_refresh_tokens).values({
       token_hash: hashToken(newRefreshToken),
-      device_session_id: session.id,
+      device_session_id: lockedSession.id,
       expires_at: newExpiresAt,
     });
 
@@ -218,6 +243,10 @@ export async function rotateRefreshToken(
       pair: { token: accessToken, refreshToken: newRefreshToken, expiresIn: TOKEN_EXPIRY.oneHour },
     } as const;
   });
+
+  if (outcome.kind === 'session_revoked') {
+    return { ok: false, error: 'SESSION_REVOKED' };
+  }
 
   if (outcome.kind !== 'ok') {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };

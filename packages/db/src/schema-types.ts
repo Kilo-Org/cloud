@@ -2025,6 +2025,13 @@ export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  reasoning: z
+    .object({
+      mandatory: z.boolean(),
+      supported_efforts: z.array(ReasoningEffortSchema).optional(),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });

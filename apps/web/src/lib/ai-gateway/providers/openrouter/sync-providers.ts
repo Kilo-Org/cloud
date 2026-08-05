@@ -98,8 +98,17 @@ async function fetchGatewayModels(gateway: Provider) {
           );
         }
         const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
+        const { reasoning, ...modelMetadata } = model;
         result[model.id] = {
-          ...model,
+          ...modelMetadata,
+          ...(reasoning && {
+            reasoning: {
+              mandatory: reasoning.mandatory,
+              ...(reasoning.supported_efforts && {
+                supported_efforts: reasoning.supported_efforts,
+              }),
+            },
+          }),
           endpoints: endpoints.data.endpoints,
         };
       })

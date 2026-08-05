@@ -82,7 +82,7 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
   execSync(
     `tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${repoRoot} ${buildInteractiveShellCommand(
       `cd ${escapeForShell(repoRoot)}`,
-      '/bin/sh',
+      undefined,
       repoRoot
     )}`,
     { stdio: 'ignore' }

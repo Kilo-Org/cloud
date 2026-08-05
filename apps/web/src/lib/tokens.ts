@@ -161,6 +161,7 @@ export function validateAuthorizationHeader(headers: Headers) {
     createdOnPlatform: payload.createdOnPlatform,
     botId: payload.botId,
     tokenSource: payload.tokenSource,
+    deviceSessionId: payload.deviceSessionId,
   };
 }
 

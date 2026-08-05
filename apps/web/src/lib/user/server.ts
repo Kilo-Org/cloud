@@ -1040,6 +1040,7 @@ type GetAuthResponse =
       internalApiUse?: undefined;
       botId?: undefined;
       tokenSource?: undefined;
+      deviceSessionId?: undefined;
     }
   | {
       user: User;
@@ -1049,6 +1050,7 @@ type GetAuthResponse =
       internalApiUse?: boolean;
       botId?: string;
       tokenSource?: string;
+      deviceSessionId?: string;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -1075,6 +1077,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;
     const tokenSource = authorizationValidationResult.tokenSource;
+    const deviceSessionId = authorizationValidationResult.deviceSessionId;
 
     return await validateUserAuthorization(
       authorizationValidationResult.kiloUserId,
@@ -1085,7 +1088,8 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       internalApiUse,
       readDb,
       botId,
-      tokenSource
+      tokenSource,
+      deviceSessionId
     );
   }
 
@@ -1156,7 +1160,11 @@ async function appendCallbackPath(url: string): Promise<string> {
 
 function authError(status: number, error: string, kiloUserId: string) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
-  return { user: null, authFailedResponse: NextResponse.json(failureResult(error), { status }) };
+  return {
+    user: null,
+    authFailedResponse: NextResponse.json(failureResult(error), { status }),
+    deviceSessionId: undefined,
+  };
 }
 
 async function validateUserAuthorization(
@@ -1168,7 +1176,8 @@ async function validateUserAuthorization(
   internalApiUse?: boolean,
   fromDb: typeof db = db,
   botId?: string,
-  tokenSource?: string
+  tokenSource?: string,
+  deviceSessionId?: string
 ): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId);
@@ -1199,6 +1208,7 @@ async function validateUserAuthorization(
     internalApiUse,
     botId,
     tokenSource,
+    deviceSessionId,
   };
 }
 

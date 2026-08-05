@@ -32,5 +32,50 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
     expect(result.error).toBeUndefined();
     expect(result.kiloUserId).toBe('test-user-c15');
     expect(result.apiTokenPepper).toBe('test-pepper');
+    expect(result.deviceSessionId).toBe('device-session-c15-test');
+  });
+
+  test('preserves the deviceSessionId claim on the validated payload', () => {
+    const deviceSessionId = 'device-session-preserved';
+    const token = jwt.sign(
+      {
+        env: process.env.NODE_ENV,
+        kiloUserId: 'test-user-c15',
+        apiTokenPepper: 'test-pepper',
+        version: JWT_TOKEN_VERSION,
+        deviceSessionId,
+      },
+      getEnvVariable('NEXTAUTH_SECRET'),
+      { algorithm: 'HS256', expiresIn: '5y' }
+    );
+
+    const headers = new Headers();
+    headers.set('authorization', `Bearer ${token}`);
+
+    const result = validateAuthorizationHeader(headers);
+
+    expect(result.error).toBeUndefined();
+    expect(result.deviceSessionId).toBe(deviceSessionId);
+  });
+
+  test('leaves deviceSessionId undefined when the token has no claim', () => {
+    const token = jwt.sign(
+      {
+        env: process.env.NODE_ENV,
+        kiloUserId: 'test-user-c15',
+        apiTokenPepper: 'test-pepper',
+        version: JWT_TOKEN_VERSION,
+      },
+      getEnvVariable('NEXTAUTH_SECRET'),
+      { algorithm: 'HS256', expiresIn: '5y' }
+    );
+
+    const headers = new Headers();
+    headers.set('authorization', `Bearer ${token}`);
+
+    const result = validateAuthorizationHeader(headers);
+
+    expect(result.error).toBeUndefined();
+    expect(result.deviceSessionId).toBeUndefined();
   });
 });

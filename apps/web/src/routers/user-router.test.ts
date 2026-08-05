@@ -2,6 +2,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import {
   credit_transactions,
+  device_sessions,
   kilocode_users,
   user_notification_preferences,
 } from '@kilocode/db/schema';
@@ -802,5 +803,230 @@ describe('user router - notification preferences', () => {
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
+  });
+});
+
+describe('user router - device sessions', () => {
+  let owner: User;
+  let otherUser: User;
+  let currentSessionId: string;
+  let productionShapeSessionId: string;
+  let alreadyRevokedSessionId: string;
+  let revokeByIdSessionId: string;
+  let revokeCurrentSessionId: string;
+  let otherOwnedSessionId: string;
+
+  beforeAll(async () => {
+    owner = await insertTestUser({
+      google_user_email: `device-sessions-owner-${crypto.randomUUID()}@example.com`,
+    });
+    otherUser = await insertTestUser({
+      google_user_email: `device-sessions-other-${crypto.randomUUID()}@example.com`,
+    });
+
+    const [current, productionShape, alreadyRevoked, revokeById, revokeCurrent, otherOwned] =
+      await db
+        .insert(device_sessions)
+        .values([
+          {
+            kilo_user_id: owner.id,
+            user_agent: 'Kilo iOS (current)',
+            last_seen_at: '2026-04-30 10:00:00+00',
+          },
+          {
+            kilo_user_id: owner.id,
+            user_agent: 'Kilo Android (production shape)',
+            created_at: '2026-04-29 01:16:12.945+00',
+            last_seen_at: '2026-04-29 01:16:12.945+00',
+          },
+          {
+            kilo_user_id: owner.id,
+            user_agent: 'Kilo Desktop (already revoked)',
+            revoked_at: '2026-04-27 10:00:00+00',
+            revoked_reason: 'user_revoked',
+          },
+          {
+            kilo_user_id: owner.id,
+            user_agent: 'Kilo macOS (revoke by id)',
+            last_seen_at: '2026-04-26 10:00:00+00',
+          },
+          {
+            kilo_user_id: owner.id,
+            user_agent: 'Kilo Tablet (revoke current)',
+            last_seen_at: '2026-04-28 10:00:00+00',
+          },
+          {
+            kilo_user_id: otherUser.id,
+            user_agent: "Other user's session",
+          },
+        ])
+        .returning();
+
+    currentSessionId = current.id;
+    productionShapeSessionId = productionShape.id;
+    alreadyRevokedSessionId = alreadyRevoked.id;
+    revokeByIdSessionId = revokeById.id;
+    revokeCurrentSessionId = revokeCurrent.id;
+    otherOwnedSessionId = otherOwned.id;
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(device_sessions)
+      .where(inArray(device_sessions.kilo_user_id, [owner.id, otherUser.id]));
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [owner.id, otherUser.id]));
+  });
+
+  it('lists active owned sessions ordered by last seen with normalized timestamps and isCurrent', async () => {
+    const caller = await createCallerForUser(owner.id, { deviceSessionId: currentSessionId });
+
+    const result = await caller.user.listDeviceSessions();
+
+    expect(result).toHaveLength(4);
+    expect(result[0]).toEqual({
+      id: currentSessionId,
+      user_agent: 'Kilo iOS (current)',
+      created_at: expect.any(String),
+      last_seen_at: '2026-04-30T10:00:00.000Z',
+      isCurrent: true,
+    });
+    // The row inserted with production-shaped PostgreSQL timestamp text is
+    // normalized to strict UTC ISO before it crosses the JSON boundary.
+    expect(result[1]).toEqual({
+      id: productionShapeSessionId,
+      user_agent: 'Kilo Android (production shape)',
+      created_at: '2026-04-29T01:16:12.945Z',
+      last_seen_at: '2026-04-29T01:16:12.945Z',
+      isCurrent: false,
+    });
+    expect(result[2]).toEqual({
+      id: revokeCurrentSessionId,
+      user_agent: 'Kilo Tablet (revoke current)',
+      created_at: expect.any(String),
+      last_seen_at: '2026-04-28T10:00:00.000Z',
+      isCurrent: false,
+    });
+    expect(result[3]).toEqual({
+      id: revokeByIdSessionId,
+      user_agent: 'Kilo macOS (revoke by id)',
+      created_at: expect.any(String),
+      last_seen_at: '2026-04-26T10:00:00.000Z',
+      isCurrent: false,
+    });
+    // Revoked sessions and other users' sessions never appear.
+    expect(result.some(row => row.id === alreadyRevokedSessionId)).toBe(false);
+    expect(result.some(row => row.id === otherOwnedSessionId)).toBe(false);
+  });
+
+  it('marks no session as current when the request carries no deviceSessionId claim', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.listDeviceSessions();
+
+    expect(result).toHaveLength(4);
+    expect(result.every(row => row.isCurrent === false)).toBe(true);
+  });
+
+  it('revokes an owned active session with the user_revoked reason', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.revokeDeviceSessionById({ sessionId: revokeByIdSessionId });
+
+    expect(result).toEqual({ outcome: 'revoked' });
+
+    const [row] = await db
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, revokeByIdSessionId));
+    expect(row?.revoked_at).not.toBeNull();
+    expect(row?.revoked_reason).toBe('user_revoked');
+  });
+
+  it('is idempotent: a second revocation of the same session reports already_revoked', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    // The session is already revoked (revoked_at pre-set in the fixture).
+    const first = await caller.user.revokeDeviceSessionById({ sessionId: alreadyRevokedSessionId });
+    expect(first).toEqual({ outcome: 'already_revoked' });
+
+    // Repeating the revoke must stay idempotent.
+    const second = await caller.user.revokeDeviceSessionById({
+      sessionId: alreadyRevokedSessionId,
+    });
+    expect(second).toEqual({ outcome: 'already_revoked' });
+  });
+
+  it('refuses to revoke a session owned by another user', async () => {
+    const caller = await createCallerForUser(otherUser.id);
+
+    await expect(
+      caller.user.revokeDeviceSessionById({ sessionId: currentSessionId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+    // The owner's session stays active.
+    const [row] = await db
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, currentSessionId));
+    expect(row?.revoked_at).toBeNull();
+  });
+
+  it('returns NOT_FOUND for a session id that does not exist', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.user.revokeDeviceSessionById({ sessionId: crypto.randomUUID() })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('rejects a non-UUID session id', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.user.revokeDeviceSessionById({ sessionId: 'not-a-uuid' })
+    ).rejects.toThrow();
+  });
+
+  it('revokes the current device session with the logout reason and stays idempotent', async () => {
+    const caller = await createCallerForUser(owner.id, {
+      deviceSessionId: revokeCurrentSessionId,
+    });
+
+    const first = await caller.user.revokeCurrentDeviceSession();
+    expect(first).toEqual({ outcome: 'revoked' });
+
+    const [row] = await db
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, revokeCurrentSessionId));
+    expect(row?.revoked_at).not.toBeNull();
+    expect(row?.revoked_reason).toBe('logout');
+
+    const second = await caller.user.revokeCurrentDeviceSession();
+    expect(second).toEqual({ outcome: 'already_revoked' });
+  });
+
+  it('returns no_identifiable_session when the request carries no deviceSessionId claim', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.revokeCurrentDeviceSession();
+
+    expect(result).toEqual({ outcome: 'no_identifiable_session' });
+  });
+
+  it('refuses to revoke the current session when the claim names a session owned by another user', async () => {
+    const caller = await createCallerForUser(otherUser.id, {
+      deviceSessionId: currentSessionId,
+    });
+
+    await expect(caller.user.revokeCurrentDeviceSession()).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    const [row] = await db
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, currentSessionId));
+    expect(row?.revoked_at).toBeNull();
   });
 });

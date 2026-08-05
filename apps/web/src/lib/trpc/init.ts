@@ -14,13 +14,14 @@ export { UpstreamApiError } from '@/lib/trpc/transport';
 // Define the context type
 export type TRPCContext = {
   user: User;
+  deviceSessionId?: string;
 };
 
 /**
  * @see: https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (): Promise<TRPCContext> => {
-  const { user } = await getUserFromAuth({ adminOnly: false });
+  const { user, deviceSessionId } = await getUserFromAuth({ adminOnly: false });
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
@@ -34,6 +35,7 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
   setTag('userId', user.id);
   return {
     user,
+    deviceSessionId,
   };
 };
 

@@ -1,10 +1,11 @@
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 import {
   cancelCodingPlanSubscription,
   getAvailableCodingPlanIds,
+  getCodingPlanAvailabilityIntentCounts,
   getCodingPlanAvailabilityIntentPlanIds,
   getKeyInventoryCounts,
   requestCodingPlanAvailabilityNotification,
@@ -37,7 +38,6 @@ import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
 import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
-  coding_plan_availability_intents,
   coding_plan_subscriptions,
   coding_plan_terms,
   credit_transactions,
@@ -201,13 +201,7 @@ export const codingPlansRouter = createTRPCRouter({
   }),
 
   adminAvailabilityIntentCounts: adminProcedure.input(z.object({})).query(async () => {
-    return db
-      .select({
-        planId: coding_plan_availability_intents.plan_id,
-        count: count(),
-      })
-      .from(coding_plan_availability_intents)
-      .groupBy(coding_plan_availability_intents.plan_id);
+    return getCodingPlanAvailabilityIntentCounts();
   }),
 
   getSubscriptionDetail: baseProcedure

@@ -17,6 +17,9 @@ vi.mock('react-native-gesture-handler', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
+vi.mock('@/components/ui/selectable-text', () => ({
+  SelectableText: 'SelectableText',
+}));
 vi.mock('./bubble-text-selection-context', () => ({
   useTranscriptTextSelectable: () => true,
 }));
@@ -49,7 +52,7 @@ function monoText(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestI
   const found = root.findAll(
     node =>
       typeof node.type === 'string' &&
-      (node.type as string) === 'Text' &&
+      ((node.type as string) === 'Text' || (node.type as string) === 'SelectableText') &&
       typeof propOf(node, 'children') === 'string' &&
       (propOf(node, 'children') as string).length > 50
   );
@@ -58,6 +61,16 @@ function monoText(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestI
     throw new Error(`expected exactly one mono text, found ${found.length}`);
   }
   return text;
+}
+
+function findMonoText(root: TestRenderer.ReactTestInstance, type: string) {
+  const found = findByType(root, type).find(
+    node => typeof propOf(node, 'children') === 'string' && (propOf(node, 'children') as string).length > 50
+  );
+  if (!found) {
+    throw new Error(`expected ${type} mono text`);
+  }
+  return found;
 }
 
 function truncatedMarkers(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
@@ -134,8 +147,7 @@ describe('MonoScrollBlock mounted', () => {
     expect(propOf(scrollViews[0], 'horizontal')).toBe(true);
     expect(propOf(scrollViews[0], 'showsHorizontalScrollIndicator')).toBe(true);
 
-    const text = monoText(renderer.root);
-    expect(propOf(text, 'selectable')).toBe(true);
+    const text = findMonoText(renderer.root, 'SelectableText');
     expect(propOf(text, 'className') as string).toContain('shrink-0 self-start');
 
     // Height pin: measuring the content pins the ScrollView height.
@@ -164,7 +176,7 @@ describe('MonoScrollBlock mounted', () => {
     const renderer = await mount(withSheet('wrap', NOOP_TRACK, blockElement()));
 
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
-    const text = monoText(renderer.root);
+    const text = findMonoText(renderer.root, 'Text');
     expect(propOf(text, 'selectable')).toBe(true);
     const className = propOf(text, 'className') as string;
     expect(className).toContain('font-mono text-xs leading-4');

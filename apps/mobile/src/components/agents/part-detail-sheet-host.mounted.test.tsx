@@ -36,6 +36,9 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',
 }));
+vi.mock('@/components/ui/selectable-text', () => ({
+  SelectableText: 'SelectableText',
+}));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
 }));
@@ -227,9 +230,8 @@ describe('PartDetailSheetHost mounted', () => {
     const reasoningTexts = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        propOf(node, 'children') === 'working through it' &&
-        propOf(node, 'selectable') === true
+        (node.type as string) === 'SelectableText' &&
+        propOf(node, 'children') === 'working through it'
     );
     expect(reasoningTexts).toHaveLength(1);
   });

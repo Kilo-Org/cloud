@@ -304,10 +304,31 @@ async function verifyAppleAdmission(
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
 
-  // Monotonic sign count check
-  if (assertionResult.signCount <= existingKey.sign_count) {
+  // Atomic monotonic sign-count gate. The check and the update are a single
+  // conditional UPDATE requiring sign_count < assertion count, so two
+  // concurrent assertions cannot both accept the same count and a lower or
+  // equal count can never overwrite a higher stored count. Zero updated rows
+  // means the assertion is stale or replayed — refuse admission.
+  const [updatedKey] = await db
+    .update(native_attested_keys)
+    .set({ sign_count: assertionResult.signCount })
+    .where(
+      and(
+        eq(native_attested_keys.key_id, keyId),
+        eq(native_attested_keys.platform, 'ios'),
+        eq(native_attested_keys.kilo_user_id, existingKey.kilo_user_id),
+        lt(native_attested_keys.sign_count, assertionResult.signCount)
+      )
+    )
+    .returning({ key_id: native_attested_keys.key_id });
+
+  if (!updatedKey) {
+    // The update matched zero rows, so the assertion is stale or replayed.
+    // Report only the asserted count: `existingKey.sign_count` is the pre-read
+    // value and may have been advanced by a concurrent assertion, so it must
+    // not be presented as the current database count.
     captureMessage(
-      `apple_assertion_sign_count_not_increasing: ${assertionResult.signCount} <= ${existingKey.sign_count}`
+      `apple_assertion_stale_or_replayed: asserted ${assertionResult.signCount} rejected`
     );
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
@@ -357,7 +378,8 @@ async function verifyAndroidAdmission(
  * Persist an attested key after user settlement.
  *
  * For attestation: inserts a new key row.
- * For assertion: updates sign_count and last_used_at.
+ * For assertion: verification already advanced `sign_count` atomically in
+ * `verifyAppleAdmission`; persistence only refreshes `last_used_at`.
  *
  * Cross-user collision: if the keyId already exists for a different user,
  * refuses the insert/update.
@@ -396,12 +418,14 @@ export async function persistAttestedKey(
       throw new KeyCollisionError();
     }
   } else if (verification.signCount !== undefined) {
-    // Assertion: update sign_count and last_used_at
+    // Assertion: refresh last_used_at only. The sign count was already bumped
+    // atomically during verification; never rewrite it here so a stale
+    // assertion cannot regress a newer count. The ownership predicate is
+    // preserved.
     const now = new Date().toISOString();
     await db
       .update(native_attested_keys)
       .set({
-        sign_count: verification.signCount,
         last_used_at: now,
       })
       .where(
@@ -462,12 +486,14 @@ export async function persistAttestedKeyTx(
       throw new KeyCollisionError();
     }
   } else if (verification.signCount !== undefined) {
-    // Assertion: update sign_count and last_used_at
+    // Assertion: refresh last_used_at only. The sign count was already bumped
+    // atomically during verification; never rewrite it here so a stale
+    // assertion cannot regress a newer count. The ownership predicate is
+    // preserved.
     const now = new Date().toISOString();
     await tx
       .update(native_attested_keys)
       .set({
-        sign_count: verification.signCount,
         last_used_at: now,
       })
       .where(

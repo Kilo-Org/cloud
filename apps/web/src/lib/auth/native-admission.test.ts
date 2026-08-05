@@ -34,6 +34,9 @@ import { checkRateLimit } from '@vercel/firewall';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import { db } from '@/lib/drizzle';
+import { native_attested_keys } from '@kilocode/db/schema';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core/dialect';
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -77,6 +80,109 @@ function makeRequest(): any {
     headers: new Map(),
     nextUrl: { pathname: '/api/auth/native/admission-challenge' },
   };
+}
+
+/**
+ * Mock `db.update` so the challenge-consume update
+ * (`native_admission_challenges`) resolves with `challengeRows` and the
+ * attested-key update (`native_attested_keys`) resolves with `keyRows`.
+ * Assertion tests exercise both updates, so the two must be distinguished.
+ */
+function mockDualUpdate(
+  keyRows: unknown[],
+  challengeRows: unknown[] = [{ challenge: 'ch123' }]
+): void {
+  jest.mocked(db.update).mockImplementation((table: unknown) => {
+    if (table === native_attested_keys) {
+      return {
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue(keyRows),
+          }),
+        }),
+      } as any;
+    }
+    return {
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue(challengeRows),
+        }),
+      }),
+    } as any;
+  });
+}
+
+/**
+ * Mock `db.update` with a stateful atomic sign-count gate: the attested-key
+ * update is accepted only while `sign_count` strictly increases, mirroring the
+ * DB predicate. Returns the update mock and a getter for the stored count so
+ * tests can prove a stale assertion never regresses the counter.
+ */
+function mockAtomicSignCountGate(initialCount: number): {
+  setMock: jest.Mock;
+  getStored: () => number;
+} {
+  let stored = initialCount;
+  const setMock = jest.fn().mockImplementation((setValues: { sign_count: number }) => {
+    const accepted = setValues.sign_count > stored;
+    if (accepted) stored = setValues.sign_count;
+    return {
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue(accepted ? [{ key_id: 'key1' }] : []),
+      }),
+    };
+  });
+  jest.mocked(db.update).mockImplementation((table: unknown) => {
+    if (table === native_attested_keys) {
+      return { set: setMock } as any;
+    }
+    return {
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
+        }),
+      }),
+    } as any;
+  });
+  return { setMock, getStored: () => stored };
+}
+
+/**
+ * Mock `db.update` and capture the real conditional UPDATE that production
+ * sends for the attested-key table: the `set` values and the `where`
+ * predicate. The predicate is the actual Drizzle SQL object built by
+ * `verifyAppleAdmission`, so tests can render it and prove the strict
+ * `sign_count < asserted` clause reaches the database.
+ */
+function mockSignCountPredicateUpdate(keyRows: unknown[]): {
+  getSet: () => Record<string, unknown> | undefined;
+  getWhere: () => SQL | undefined;
+} {
+  let setValues: Record<string, unknown> | undefined;
+  let whereCond: SQL | undefined;
+  jest.mocked(db.update).mockImplementation((table: unknown) => {
+    if (table === native_attested_keys) {
+      return {
+        set: jest.fn().mockImplementation((values: Record<string, unknown>) => {
+          setValues = values;
+          return {
+            where: jest.fn().mockImplementation((cond: SQL) => {
+              whereCond = cond;
+              return { returning: jest.fn().mockResolvedValue(keyRows) };
+            }),
+          };
+        }),
+      } as any;
+    }
+    return {
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
+        }),
+      }),
+    } as any;
+  });
+  return { getSet: () => setValues, getWhere: () => whereCond };
 }
 
 // ── Wire contract validation ───────────────────────────────────────────────
@@ -557,12 +663,8 @@ describe('verifyAdmissionAsync', () => {
   });
 
   test('ios assertion fails when sign count is not increasing', async () => {
-    const setMock = jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue({
-        returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
-      }),
-    });
-    jest.mocked(db.update).mockReturnValue({ set: setMock } as any);
+    // Atomic key-counter update matches zero rows: stored 10 >= asserted 5.
+    mockDualUpdate([]);
 
     const existingKey = {
       key_id: 'key1',
@@ -590,15 +692,17 @@ describe('verifyAdmissionAsync', () => {
     };
     const result = await verifyAdmissionAsync(admission);
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'apple_assertion_stale_or_replayed: asserted 5 rejected'
+    );
   });
 
-  test('ios assertion succeeds with increasing sign count', async () => {
-    const setMock = jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue({
-        returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
-      }),
-    });
-    jest.mocked(db.update).mockReturnValue({ set: setMock } as any);
+  test('ios assertion succeeds and proves the database sign_count < asserted predicate', async () => {
+    // Capture the real conditional UPDATE production sends to the database:
+    // stored 10 < asserted 11 matches the row. The predicate is rendered SQL,
+    // not a JavaScript model, so this test fails if the strict `<` clause is
+    // removed or weakened (for example to `<=`).
+    const { getSet, getWhere } = mockSignCountPredicateUpdate([{ key_id: 'key1' }]);
 
     const existingKey = {
       key_id: 'key1',
@@ -632,6 +736,91 @@ describe('verifyAdmissionAsync', () => {
       signCount: 11,
       existingKeyUserId: 'user1',
     });
+
+    // Verification advances the counter in the same conditional update.
+    expect(getSet()).toEqual({ sign_count: 11 });
+
+    // The strict `<` clause must reach the database: the rendered predicate
+    // contains `"sign_count" < $N` bound to the asserted count.
+    const { sql, params } = new PgDialect().sqlToQuery(getWhere()!);
+    const signCountPredicate = /"sign_count"\s*<\s*\$(\d+)/.exec(sql);
+    expect(signCountPredicate).not.toBeNull();
+    expect(params[Number(signCountPredicate![1]) - 1]).toBe(11);
+  });
+
+  // ── iOS assertion: concurrency and monotonicity ─────────────────────────
+
+  test('two concurrent assertions for the same sign count cannot both be accepted', async () => {
+    const { setMock, getStored } = mockAtomicSignCountGate(10);
+
+    const existingKey = {
+      key_id: 'key1',
+      kilo_user_id: 'user1',
+      platform: 'ios',
+      public_key: 'base64pubkey',
+      sign_count: 10,
+      attested_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+      last_used_at: null,
+    };
+    jest.mocked(db.query.native_attested_keys.findFirst).mockResolvedValue(existingKey as any);
+    mockVerifyAppleAssertion.mockResolvedValue({ ok: true, signCount: 11 });
+
+    const admission: AdmissionPayload = {
+      platform: 'ios',
+      kind: 'assertion',
+      challenge: 'ch123',
+      payload: 'base64assertion',
+      keyId: 'key1',
+    };
+
+    // Both assertions verify the same authenticator and race for the same
+    // counter. The DB gate admits exactly one; the loser sees zero rows.
+    const [first, second] = await Promise.all([
+      verifyAdmissionAsync(admission),
+      verifyAdmissionAsync(admission),
+    ]);
+
+    expect([first, second].filter(r => r.ok)).toHaveLength(1);
+    expect(setMock).toHaveBeenCalledTimes(2);
+    expect(getStored()).toBe(11);
+  });
+
+  test('a lower or equal sign count cannot overwrite a higher stored count', async () => {
+    // A concurrent assertion already advanced the counter to 12.
+    const { setMock, getStored } = mockAtomicSignCountGate(12);
+
+    const existingKey = {
+      key_id: 'key1',
+      kilo_user_id: 'user1',
+      platform: 'ios',
+      public_key: 'base64pubkey',
+      sign_count: 12,
+      attested_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+      last_used_at: null,
+    };
+    jest.mocked(db.query.native_attested_keys.findFirst).mockResolvedValue(existingKey as any);
+
+    for (const staleCount of [11, 12]) {
+      mockVerifyAppleAssertion.mockResolvedValue({ ok: true, signCount: staleCount });
+
+      const admission: AdmissionPayload = {
+        platform: 'ios',
+        kind: 'assertion',
+        challenge: 'ch123',
+        payload: 'base64assertion',
+        keyId: 'key1',
+      };
+      const result = await verifyAdmissionAsync(admission);
+      expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        `apple_assertion_stale_or_replayed: asserted ${staleCount} rejected`
+      );
+      // The higher stored count is never overwritten.
+      expect(getStored()).toBe(12);
+    }
+    expect(setMock).toHaveBeenCalledTimes(2);
   });
 
   // ── Android ─────────────────────────────────────────────────────────────
@@ -764,7 +953,7 @@ describe('persistAttestedKey', () => {
     ).rejects.toThrow(KeyCollisionError);
   });
 
-  test('updates sign count on assertion', async () => {
+  test('refreshes last_used_at on assertion without rewriting the sign count', async () => {
     const setMock = jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(undefined),
     });
@@ -776,6 +965,11 @@ describe('persistAttestedKey', () => {
       keyId: 'key1',
       signCount: 15,
     });
+
+    // The counter was bumped atomically during verification; persistence must
+    // only touch last_used_at so a stale assertion cannot regress it.
+    expect(setMock).toHaveBeenCalledWith({ last_used_at: expect.any(String) });
+    expect(setMock.mock.calls[0]?.[0]).not.toHaveProperty('sign_count');
   });
 
   test('skips persistence for Android (no key tracking)', async () => {

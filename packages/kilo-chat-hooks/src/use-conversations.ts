@@ -46,14 +46,14 @@ type KiloChatConversationEventClient = Pick<
   | 'onConversationActivity'
 >;
 
-type ReconnectEventService = {
-  onReconnect: (handler: () => void) => () => void;
+type ResyncEventService = {
+  onResync: (handler: () => void) => () => void;
 };
 
 type RegisterConversationListCacheHandlersOptions = {
   activeConversationId?: string | null;
   currentUserId: string | null;
-  eventService: ReconnectEventService;
+  eventService: ResyncEventService;
   kiloChatClient: KiloChatConversationEventClient;
   queryClient: QueryClient;
   queryKey: QueryKey;
@@ -577,7 +577,7 @@ export function registerConversationListCacheHandlers({
       if (!matchesContext(ctx)) return;
       patchActivity(event);
     }),
-    eventService.onReconnect(() => {
+    eventService.onResync(() => {
       invalidateConversationListQuery(queryClient, queryKey);
     }),
   ];

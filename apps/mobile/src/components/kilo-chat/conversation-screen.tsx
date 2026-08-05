@@ -29,6 +29,7 @@ import { useMessageCacheUpdater, useMessages } from './hooks/use-messages';
 import { useNowTicker } from './hooks/use-now-ticker';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { useKiloChatTokenError } from './kilo-chat-provider';
+import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
 import {
   instanceOrgId,
   useAllKiloClawInstances,
@@ -56,6 +57,7 @@ export function ConversationScreen({
 }: Props) {
   const client = useKiloChatClient();
   const eventClient = useEventServiceClient();
+  const activeAndFocused = useAppActiveAndFocused();
   const router = useRouter();
   const currentUserId = useCurrentUserId();
   const tokenError = useKiloChatTokenError();
@@ -67,7 +69,7 @@ export function ConversationScreen({
   const { data: instances } = useAllKiloClawInstances();
   const currentInstance = instances?.find(instance => instance.sandboxId === sandboxId);
   const instanceStatus = instanceStatusQuery.data?.status ?? currentInstance?.status ?? null;
-  const botStatus = useBotStatus(client, eventClient, sandboxId);
+  const botStatus = useBotStatus(client, eventClient, sandboxId, activeAndFocused);
   const botPresence = botStatus ? { online: botStatus.online, lastAt: botStatus.at } : undefined;
   const hasAttachmentsCapability = botStatus?.capabilities?.includes('attachments') ?? false;
   const now = useNowTicker(10_000);

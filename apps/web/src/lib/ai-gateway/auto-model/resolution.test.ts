@@ -21,6 +21,7 @@ const baseParams = {
   featureHeader: null,
   sessionId: null,
   clientIp: null,
+  isAutoFreeCandidateAllowed: null,
 };
 
 const nullUserPromise = Promise.resolve(null);

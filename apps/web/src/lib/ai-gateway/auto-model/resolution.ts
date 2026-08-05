@@ -50,7 +50,7 @@ type ResolveAutoModelParams = {
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
-  isAutoFreeCandidateAllowed?: (modelId: string) => Promise<boolean>;
+  isAutoFreeCandidateAllowed: ((modelId: string) => Promise<boolean>) | null;
   // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   organizationContext?: Promise<{

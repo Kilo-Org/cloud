@@ -57,6 +57,14 @@ describe('effective organization model access', () => {
     expect((await getEffectiveModelDecision(policy, 'openai/o3')).allowed).toBe(false);
   });
 
+  it('normalizes model suffixes before applying organization restrictions', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({ defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }] })
+    );
+
+    expect((await getEffectiveModelDecision(policy, 'openai/o3:free')).allowed).toBe(false);
+  });
+
   it('requires an explicit none policy to grant no models', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(context());
     expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(false);

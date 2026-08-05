@@ -21,8 +21,9 @@ type CollapsibleSectionProps = {
 };
 
 // Shared collapsible section for finding-details/-analysis/-remediation
-// panels (source record, technical report, attempt history) — mirrors
-// tool-card-shell.tsx's chevron-rotation pattern but adds the
+// panels (source record, technical report, attempt history) — the
+// transcript tool cards dropped this chevron-rotation pattern when they
+// moved to fixed rows; this section keeps it and adds the
 // accessibilityState the security-agent brief calls for.
 export function CollapsibleSection({
   title,

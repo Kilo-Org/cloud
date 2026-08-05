@@ -40,14 +40,14 @@ describe('pickAutoSelectedModel', () => {
     });
   });
 
-  it('dev, matching org default wins over efficient', () => {
+  it('dev, efficient wins over a matching org default', () => {
     expect(
       pickAutoSelectedModel({
         ...base,
         models: [claude, efficient],
         orgDefaultModel: 'anthropic/claude',
       })
-    ).toEqual({ model: 'anthropic/claude', variant: 'thinking' });
+    ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
   });
 
   it('dev, org default not in catalog → efficient', () => {
@@ -60,22 +60,32 @@ describe('pickAutoSelectedModel', () => {
     ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
   });
 
-  it('dev, server lastSelected wins over efficient', () => {
+  it('dev, efficient wins over server lastSelected', () => {
     expect(
       pickAutoSelectedModel({
         ...base,
         models: [claude, efficient],
         lastSelected: { model: 'anthropic/claude', variant: 'thinking' },
       })
-    ).toEqual({ model: 'anthropic/claude', variant: 'thinking' });
+    ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
   });
 
-  it('dev, local persisted preference wins over efficient', () => {
+  it('dev, efficient wins over a local persisted preference', () => {
     expect(
       pickAutoSelectedModel({
         ...base,
         models: [gpt, efficient],
         stored: { personal: { model: 'openai/gpt', variant: '' } },
+      })
+    ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
+  });
+
+  it('dev, efficient absent → server lastSelected still wins', () => {
+    expect(
+      pickAutoSelectedModel({
+        ...base,
+        models: [claude, gpt],
+        lastSelected: { model: 'openai/gpt' },
       })
     ).toEqual({ model: 'openai/gpt', variant: '' });
   });

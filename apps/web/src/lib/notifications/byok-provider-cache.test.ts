@@ -37,13 +37,12 @@ describe('groupProvidersByUser', () => {
       { userId: 'user_a', provider: 'anthropic' },
       { userId: 'user_a', provider: 'google' },
       { userId: 'user_a', provider: 'anthropic' },
-      { userId: 'user_a', provider: 'tencent-token-plan' },
       { userId: 'user_b', provider: 'deepseek' },
     ];
 
     const grouped = groupProvidersByUser(rows);
 
-    expect(grouped.get('user_a')).toEqual(['anthropic', 'google', 'tencent-token-plan']);
+    expect(grouped.get('user_a')).toEqual(['anthropic', 'google']);
     expect(grouped.get('user_b')).toEqual(['deepseek']);
     expect(grouped.size).toBe(2);
   });

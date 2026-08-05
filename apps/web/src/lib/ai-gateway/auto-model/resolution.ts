@@ -29,11 +29,11 @@ import {
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
-import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {
   autoFreeModels,
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
+  selectAutoFreeModel,
 } from '@/lib/ai-gateway/models';
 import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
@@ -84,7 +84,7 @@ export async function getAutoFreeCandidates(
 ): Promise<ReadonlyArray<string>> {
   const openRouterModels = await getOpenRouterModelsFromRedis();
   const candidates = new Set<string>();
-  for (const model of autoFreeModels) {
+  for (const { model } of autoFreeModels) {
     if (isKiloExclusiveFreeModel(model)) {
       const kiloModel = findKiloExclusiveModel(model);
       if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
@@ -286,11 +286,16 @@ export async function resolveAutoModel(
     if (candidates.length === 0) {
       return { kind: 'no_free_models_available' };
     }
-    const randomNumber = getRandomNumber(
-      'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp),
-      candidates.length
+    const candidateIds = new Set(candidates);
+    const selectedModel = selectAutoFreeModel(
+      autoFreeModels
+        .filter(candidate => candidateIds.has(candidate.model))
+        .toSorted((a, b) => a.model.localeCompare(b.model)),
+      'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp)
     );
-    return { kind: 'ok', resolved: { model: candidates[randomNumber] } };
+    return selectedModel
+      ? { kind: 'ok', resolved: { model: selectedModel } }
+      : { kind: 'no_free_models_available' };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {

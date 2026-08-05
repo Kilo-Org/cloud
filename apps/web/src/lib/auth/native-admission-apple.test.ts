@@ -12,7 +12,11 @@
  */
 import { describe, test, expect } from '@jest/globals';
 import { createHash } from 'node:crypto';
-import { verifyAppleAttestation, extractAppleAttestNonce } from './native-admission-apple';
+import {
+  verifyAppleAttestation,
+  extractAppleAttestNonce,
+  parseAppleAttestNonceExtension,
+} from './native-admission-apple';
 
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
@@ -192,42 +196,44 @@ describe('verifyAppleAttestation certificate chain', () => {
 // ── Nonce extension parsing ────────────────────────────────────────────────
 
 describe('extractAppleAttestNonce', () => {
-  const NONCE_OID = Buffer.from([0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x08, 0x02]);
-
-  /**
-   * DER OCTET STRING (tag 0x04) wrapping `content`.
-   */
-  function derOctetString(content: Buffer): Buffer {
-    if (content.length < 0x80) return Buffer.concat([Buffer.from([0x04, content.length]), content]);
-    return Buffer.concat([Buffer.from([0x04, 0x81, content.length]), content]);
-  }
-
-  /**
-   * Build a DER blob shaped like a certificate holding a nonce extension:
-   * the OID followed by the X.509 extnValue OCTET STRING.
-   */
-  function extensionDer(extnValueContent: Buffer): Buffer {
-    return Buffer.concat([NONCE_OID, derOctetString(extnValueContent)]);
-  }
-
-  function wellFormedExtension(nonce: Buffer): Buffer {
-    const octet = Buffer.concat([Buffer.from([0x04, nonce.length]), nonce]);
-    const tagged = Buffer.concat([Buffer.from([0xa1, octet.length]), octet]);
-    const seq = Buffer.concat([Buffer.from([0x30, tagged.length]), tagged]);
-    return extensionDer(seq);
-  }
-
   test('extracts the nested nonce from the real Apple credential certificate', () => {
     expect(extractAppleAttestNonce(REAL_LEAF_DER)).toEqual(REAL_LEAF_NONCE);
   });
 
-  test('extracts a nested nonce from a synthetic extension value', () => {
-    const nonce = Buffer.alloc(32, 0xab);
-    expect(extractAppleAttestNonce(wellFormedExtension(nonce))).toEqual(nonce);
+  test('returns null when the certificate carries no nonce extension', () => {
+    // Apple's root CA is a real certificate without the App Attest extension.
+    expect(extractAppleAttestNonce(REAL_ROOT_DER)).toBeNull();
   });
 
-  test('returns null when the extension is absent', () => {
+  test('returns null when the input is not a certificate', () => {
     expect(extractAppleAttestNonce(Buffer.from([0x30, 0x00]))).toBeNull();
+    expect(extractAppleAttestNonce(Buffer.alloc(64, 0xab))).toBeNull();
+  });
+
+  test('returns null for a nonce-shaped byte run outside the extension', () => {
+    // The OID bytes appear verbatim, but there is no X.509 structure around
+    // them, so an OID-scanning parser would match and this one must not.
+    const nonce = Buffer.alloc(32, 0xab);
+    const oidBytes = Buffer.from([
+      0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x08, 0x02,
+    ]);
+    expect(
+      extractAppleAttestNonce(Buffer.concat([oidBytes, nonceExtensionValue(nonce)]))
+    ).toBeNull();
+  });
+});
+
+/** `SEQUENCE { [1] EXPLICIT OCTET STRING nonce }` — the value Apple emits. */
+function nonceExtensionValue(nonce: Buffer): Buffer {
+  const octet = Buffer.concat([Buffer.from([0x04, nonce.length]), nonce]);
+  const tagged = Buffer.concat([Buffer.from([0xa1, octet.length]), octet]);
+  return Buffer.concat([Buffer.from([0x30, tagged.length]), tagged]);
+}
+
+describe('parseAppleAttestNonceExtension', () => {
+  test('extracts the nested nonce', () => {
+    const nonce = Buffer.alloc(32, 0xab);
+    expect(parseAppleAttestNonceExtension(nonceExtensionValue(nonce))).toEqual(nonce);
   });
 
   test('returns null when the [1] EXPLICIT context tag is missing', () => {
@@ -235,7 +241,7 @@ describe('extractAppleAttestNonce', () => {
     const nonce = Buffer.alloc(32, 0xcd);
     const octet = Buffer.concat([Buffer.from([0x04, nonce.length]), nonce]);
     const seq = Buffer.concat([Buffer.from([0x30, octet.length]), octet]);
-    expect(extractAppleAttestNonce(extensionDer(seq))).toBeNull();
+    expect(parseAppleAttestNonceExtension(seq)).toBeNull();
   });
 
   test('returns null when the [1] tag is primitive instead of constructed', () => {
@@ -246,29 +252,32 @@ describe('extractAppleAttestNonce', () => {
       Buffer.from([0x81, octet.length]),
       octet,
     ]);
-    expect(extractAppleAttestNonce(extensionDer(seq))).toBeNull();
+    expect(parseAppleAttestNonceExtension(seq)).toBeNull();
   });
 
-  test('returns null when the outer sequence holds trailing bytes', () => {
+  test('returns null when the outer sequence holds a second element', () => {
     const nonce = Buffer.alloc(32, 0xab);
     const octet = Buffer.concat([Buffer.from([0x04, nonce.length]), nonce]);
     const tagged = Buffer.concat([Buffer.from([0xa1, octet.length]), octet]);
-    // Extra NULL element after the [1] tag.
     const seq = Buffer.concat([
       Buffer.from([0x30, tagged.length + 2]),
       tagged,
       Buffer.from([0x05, 0x00]),
     ]);
-    expect(extractAppleAttestNonce(extensionDer(seq))).toBeNull();
+    expect(parseAppleAttestNonceExtension(seq)).toBeNull();
   });
 
-  test('returns null for a truncated extension length', () => {
-    // The extnValue OCTET STRING claims more bytes than the buffer holds.
-    const der = Buffer.concat([
-      NONCE_OID,
-      Buffer.from([0x04, 0x1e, 0x30, 0x1c, 0xa1, 0x1a, 0x04, 0x18]),
-      Buffer.alloc(8, 0xef),
-    ]);
-    expect(extractAppleAttestNonce(der)).toBeNull();
+  test('returns null when bytes trail the outer sequence', () => {
+    const value = nonceExtensionValue(Buffer.alloc(32, 0xab));
+    expect(
+      parseAppleAttestNonceExtension(Buffer.concat([value, Buffer.from([0x05, 0x00])]))
+    ).toBeNull();
+  });
+
+  test('returns null for a truncated length', () => {
+    // The outer SEQUENCE claims more bytes than the buffer holds.
+    expect(
+      parseAppleAttestNonceExtension(Buffer.from([0x30, 0x1c, 0xa1, 0x1a, 0x04, 0x18]))
+    ).toBeNull();
   });
 });

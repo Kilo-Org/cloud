@@ -1,5 +1,9 @@
 import 'server-only';
-import { createHash, createVerify, X509Certificate } from 'node:crypto';
+import { createHash, createPublicKey, createVerify, X509Certificate } from 'node:crypto';
+import { decode as decodeCbor } from 'cbor2';
+import { AsnParser } from '@peculiar/asn1-schema';
+import { Certificate } from '@peculiar/asn1-x509';
+import * as asn1js from 'asn1js';
 import { APPLE_APP_BUNDLE_ID, APPLE_TEAM_ID } from '@/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
 
@@ -10,111 +14,31 @@ import { captureMessage } from '@sentry/nextjs';
  * authentication) produced by the DeviceCheck App Attest service.
  *
  * https://developer.apple.com/documentation/devicecheck/validating-apps-that-connect-to-your-server
+ *
+ * CBOR, X.509, and ASN.1 decoding are delegated to `cbor2`, `@peculiar/asn1-x509`,
+ * and `asn1js`. Only the App Attest rules live here.
  */
-
-type CBORValue = number | Buffer | string | CBORValue[] | Map<number | string, CBORValue>;
-
-const CBOR_MAJOR_UINT = 0;
-const CBOR_MAJOR_NEGINT = 1;
-const CBOR_MAJOR_BYTES = 2;
-const CBOR_MAJOR_TEXT = 3;
-const CBOR_MAJOR_ARRAY = 4;
-const CBOR_MAJOR_MAP = 5;
-const CBOR_MAJOR_TAG = 6;
-const CBOR_INFO_MASK = 0x1f;
-const CBOR_ADDITIONAL_1BYTE = 24;
-
-class CBORDecodeError extends Error {}
-
-function decodeCBORLength(buf: Buffer, offset: number): [number, number] {
-  const byte0 = buf[offset];
-  if (byte0 === undefined) throw new CBORDecodeError('unexpected end of buffer');
-  const additional = byte0 & CBOR_INFO_MASK;
-  if (additional < CBOR_ADDITIONAL_1BYTE) return [additional, offset + 1];
-  if (additional === CBOR_ADDITIONAL_1BYTE) {
-    const byte1 = buf[offset + 1];
-    if (byte1 === undefined) throw new CBORDecodeError('unexpected end of buffer');
-    return [byte1, offset + 2];
-  }
-  if (additional === 25) return [buf.readUInt16BE(offset + 1), offset + 3];
-  if (additional === 26) return [buf.readUInt32BE(offset + 1), offset + 5];
-  if (additional === 27) {
-    const hi = buf.readUInt32BE(offset + 1);
-    const lo = buf.readUInt32BE(offset + 5);
-    const val = hi * 0x1_0000_0000 + lo;
-    if (!Number.isSafeInteger(val)) throw new CBORDecodeError('unsafe integer length');
-    return [val, offset + 9];
-  }
-  throw new CBORDecodeError(`unsupported additional info: ${additional}`);
-}
 
 /**
- * Decode a CBOR value. Map keys can be integer or string (COSE uses integer labels).
+ * Decode CBOR into a Map. `preferMap` keeps string-keyed maps as Maps, matching
+ * the integer-keyed COSE maps, so one accessor shape covers both. `decode`
+ * throws on truncated input and on trailing bytes, so every malformed payload
+ * fails closed.
  */
-function decodeCBOR(buf: Buffer, offset: number): [CBORValue, number] {
-  const initialByte = buf[offset];
-  if (initialByte === undefined) throw new CBORDecodeError('unexpected end of buffer');
-  const initial = initialByte;
-  const major = initial >> 5;
-  switch (major) {
-    case CBOR_MAJOR_UINT:
-    case CBOR_MAJOR_NEGINT: {
-      const [val, next] = decodeCBORLength(buf, offset);
-      return [major === CBOR_MAJOR_NEGINT ? -1 - val : val, next];
-    }
-    case CBOR_MAJOR_BYTES: {
-      const [len, start] = decodeCBORLength(buf, offset);
-      return [Buffer.from(buf.subarray(start, start + len)), start + len];
-    }
-    case CBOR_MAJOR_TEXT: {
-      const [len, start] = decodeCBORLength(buf, offset);
-      return [buf.subarray(start, start + len).toString('utf8'), start + len];
-    }
-    case CBOR_MAJOR_ARRAY: {
-      const [len, pos] = decodeCBORLength(buf, offset);
-      const arr: CBORValue[] = [];
-      let cursor = pos;
-      for (let i = 0; i < len; i++) {
-        const [val, next] = decodeCBOR(buf, cursor);
-        arr.push(val);
-        cursor = next;
-      }
-      return [arr, cursor];
-    }
-    case CBOR_MAJOR_MAP: {
-      const [len, pos] = decodeCBORLength(buf, offset);
-      // Allow both string and number map keys (COSE uses integer labels)
-      const map = new Map<number | string, CBORValue>();
-      let cursor = pos;
-      for (let i = 0; i < len; i++) {
-        const [keyVal, keyEnd] = decodeCBOR(buf, cursor);
-        const [val, valEnd] = decodeCBOR(buf, keyEnd);
-        if (typeof keyVal === 'number') {
-          map.set(keyVal, val);
-        } else if (typeof keyVal === 'string') {
-          map.set(keyVal, val);
-        } else if (keyVal instanceof Buffer) {
-          map.set(keyVal.toString('hex'), val);
-        } else {
-          throw new CBORDecodeError(`map key must be string or number, got ${typeof keyVal}`);
-        }
-        cursor = valEnd;
-      }
-      return [map, cursor];
-    }
-    case CBOR_MAJOR_TAG: {
-      const [, afterTag] = decodeCBORLength(buf, offset);
-      return decodeCBOR(buf, afterTag);
-    }
-    default:
-      throw new CBORDecodeError(`unsupported major type: ${major}`);
+function decodeCborMap(buf: Buffer): Map<unknown, unknown> | null {
+  try {
+    const value: unknown = decodeCbor(buf, { preferMap: true });
+    return value instanceof Map ? (value as Map<unknown, unknown>) : null;
+  } catch {
+    return null;
   }
 }
 
-function parseCBOR(buf: Buffer): CBORValue {
-  const [value, offset] = decodeCBOR(buf, 0);
-  if (offset !== buf.length) throw new CBORDecodeError('trailing bytes');
-  return value;
+/** CBOR byte strings decode to Uint8Array; normalize to Buffer without copying. */
+function asBuffer(value: unknown): Buffer | null {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value.buffer, value.byteOffset, value.length);
+  return null;
 }
 
 // Apple App Attestation Root CA, published at
@@ -181,30 +105,24 @@ export async function verifyAppleAttestation(
     return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
   }
 
-  let attestMap: CBORValue;
-  try {
-    attestMap = parseCBOR(buf);
-  } catch {
-    return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
-  }
-
-  if (!(attestMap instanceof Map)) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
+  const attestMap = decodeCborMap(buf);
+  if (!attestMap) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
   if (attestMap.get('fmt') !== 'apple-appattest')
     return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
 
-  const authData = attestMap.get('authData');
-  if (!(authData instanceof Buffer) || authData.length < 37)
-    return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
+  const authData = asBuffer(attestMap.get('authData'));
+  if (!authData || authData.length < 37) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
 
   const attStmt = attestMap.get('attStmt');
   if (!(attStmt instanceof Map)) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
   const x5c = attStmt.get('x5c');
   if (!Array.isArray(x5c) || x5c.length < 2) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
-  const credCertBuf = x5c[0];
-  if (!(credCertBuf instanceof Buffer) || !x5c.slice(1).every(entry => entry instanceof Buffer)) {
+  const chainDer = x5c.map(entry => asBuffer(entry));
+  if (chainDer.some(entry => entry === null)) {
     return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
   }
-  const chainDer: Buffer[] = [credCertBuf, ...(x5c.slice(1) as Buffer[])];
+  const chainBuffers = chainDer as Buffer[];
+  const credCertBuf = chainBuffers[0];
 
   // Certificate chain verification. Every certificate must be signed by the
   // next one in the array (leaf → intermediate → … → root) and the chain must
@@ -213,7 +131,7 @@ export async function verifyAppleAttestation(
   // certificate must either be the pinned root itself or be signed by it.
   let chain: X509Certificate[];
   try {
-    chain = chainDer.map(der => new X509Certificate(der));
+    chain = chainBuffers.map(der => new X509Certificate(der));
   } catch {
     return { ok: false, error: 'CERT_CHAIN_INVALID' };
   }
@@ -288,11 +206,13 @@ export async function verifyAppleAttestation(
     return { ok: false, error: 'KEY_ID_MISMATCH' };
   }
 
-  // Extract COSE public key and convert to SPKI DER
+  // Extract COSE public key and export it as SPKI DER
   const coseKeyBuf = authData.subarray(pos);
   let publicKeySpkiBase64: string;
   try {
-    publicKeySpkiBase64 = coseKeyToDerSpki(coseKeyBuf).toString('base64');
+    publicKeySpkiBase64 = coseKeyToPublicKey(coseKeyBuf)
+      .export({ type: 'spki', format: 'der' })
+      .toString('base64');
   } catch {
     return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
   }
@@ -300,167 +220,88 @@ export async function verifyAppleAttestation(
   return { ok: true, credentialId, publicKeySpkiBase64 };
 }
 
-// Apple App Attest nonce extension OID 1.2.840.113635.100.8.2.
-const APPLE_ATTEST_NONCE_OID = Buffer.from([
-  0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x08, 0x02,
-]);
+/** Apple App Attest nonce extension. */
+const APPLE_ATTEST_NONCE_OID = '1.2.840.113635.100.8.2';
 
-class DERDecodeError extends Error {}
-
-interface DERTLV {
-  /** 0 = universal, 2 = context-specific. */
-  tagClass: number;
-  constructed: boolean;
-  tagNumber: number;
-  content: Buffer;
-}
+/** asn1js tag classes are 1-indexed: 1 = universal, 3 = context-specific. */
+const ASN1_CLASS_CONTEXT = 3;
 
 /**
- * Read one DER TLV from `buf` starting at `offset`.
+ * Decode the Apple nonce extension's value: `SEQUENCE { [1] EXPLICIT OCTET STRING }`.
  *
- * Returns `[tlv, endOffset]`. Throws `DERDecodeError` for a malformed tag or
- * length and for any declared length that runs past the end of the buffer, so
- * callers can fail closed instead of reading out-of-bounds bytes.
+ * Exported so the grammar can be unit tested without re-signing a certificate.
+ * Every level must be exactly the structure Apple emits, and no trailing bytes
+ * are tolerated, so a malformed value returns null instead of a partial read.
  */
-function readDERTLV(buf: Buffer, offset: number): [DERTLV, number] {
-  const tagByte = buf[offset];
-  if (tagByte === undefined) throw new DERDecodeError('unexpected end of buffer');
-  const tagClass = tagByte >> 6;
-  const constructed = (tagByte & 0x20) !== 0;
-  let tagNumber = tagByte & 0x1f;
-  let pos = offset + 1;
-  if (tagNumber === 0x1f) {
-    tagNumber = 0;
-    let b: number;
-    do {
-      b = buf[pos];
-      if (b === undefined) throw new DERDecodeError('unexpected end of tag');
-      if (tagNumber > 0x7fffff) throw new DERDecodeError('tag number too large');
-      tagNumber = tagNumber * 128 + (b & 0x7f);
-      pos++;
-    } while ((b & 0x80) !== 0);
-  }
+export function parseAppleAttestNonceExtension(extnValue: Buffer): Buffer | null {
+  const { result, offset } = asn1js.fromBER(extnValue);
+  if (offset === -1 || offset !== extnValue.length) return null;
 
-  const lenByte = buf[pos];
-  if (lenByte === undefined) throw new DERDecodeError('unexpected end of length');
-  pos++;
-  let length: number;
-  if (lenByte < 0x80) {
-    length = lenByte;
-  } else {
-    const numOctets = lenByte & 0x7f;
-    if (numOctets === 0) throw new DERDecodeError('indefinite length not allowed in DER');
-    if (numOctets > 4) throw new DERDecodeError('length field too long');
-    length = 0;
-    for (let i = 0; i < numOctets; i++) {
-      const octet = buf[pos];
-      if (octet === undefined) throw new DERDecodeError('unexpected end of length');
-      length = length * 256 + octet;
-      pos++;
-    }
-  }
-  const contentEnd = pos + length;
-  if (contentEnd > buf.length) throw new DERDecodeError('length exceeds buffer');
-  return [
-    {
-      tagClass,
-      constructed,
-      tagNumber,
-      content: buf.subarray(pos, contentEnd),
-    },
-    contentEnd,
-  ];
+  if (!(result instanceof asn1js.Sequence)) return null;
+  const sequenceItems = result.valueBlock.value;
+  if (sequenceItems.length !== 1) return null;
+
+  const tagged = sequenceItems[0];
+  if (!(tagged instanceof asn1js.Constructed)) return null;
+  if (tagged.idBlock.tagClass !== ASN1_CLASS_CONTEXT || tagged.idBlock.tagNumber !== 1) return null;
+
+  const taggedItems = tagged.valueBlock.value;
+  if (taggedItems.length !== 1) return null;
+
+  const nonce = taggedItems[0];
+  if (!(nonce instanceof asn1js.OctetString)) return null;
+
+  return Buffer.from(nonce.valueBlock.valueHexView);
 }
 
 /**
  * Extract the nonce from the Apple App Attest credential certificate.
  *
- * The nonce extension (OID 1.2.840.113635.100.8.2) holds the DER value
- * `SEQUENCE { [1] EXPLICIT OCTET STRING }`, where the nested OCTET STRING is
- * the 32-byte nonce. The X.509 `extnValue` field wraps that value in an OCTET
- * STRING, so the parser walks four DER levels and requires each element to be
- * exactly the structure Apple emits. Returns null when the extension is
- * missing or malformed.
+ * The certificate is parsed as X.509 and the extension is located by OID, so a
+ * nonce-shaped byte run elsewhere in the certificate cannot be mistaken for the
+ * extension. Returns null when the certificate, the extension, or the nested
+ * value is missing or malformed.
  */
 export function extractAppleAttestNonce(certDer: Buffer): Buffer | null {
-  const oidIdx = certDer.indexOf(APPLE_ATTEST_NONCE_OID);
-  if (oidIdx === -1) return null;
   try {
-    // 1. X.509 extnValue OCTET STRING.
-    const [extn] = readDERTLV(certDer, oidIdx + APPLE_ATTEST_NONCE_OID.length);
-    if (extn.tagClass !== 0 || extn.tagNumber !== 4 || extn.constructed) return null;
-
-    // 2. Outer SEQUENCE containing exactly one element.
-    const [outerSeq, afterOuterSeq] = readDERTLV(extn.content, 0);
-    if (outerSeq.tagClass !== 0 || outerSeq.tagNumber !== 16 || !outerSeq.constructed) return null;
-    if (afterOuterSeq !== extn.content.length) return null;
-
-    // 3. [1] EXPLICIT context-specific constructed tag.
-    const [tagged, afterTagged] = readDERTLV(outerSeq.content, 0);
-    if (tagged.tagClass !== 2 || tagged.tagNumber !== 1 || !tagged.constructed) return null;
-    if (afterTagged !== outerSeq.content.length) return null;
-
-    // 4. Nested nonce OCTET STRING.
-    const [nonce, afterNonce] = readDERTLV(tagged.content, 0);
-    if (nonce.tagClass !== 0 || nonce.tagNumber !== 4 || nonce.constructed) return null;
-    if (afterNonce !== tagged.content.length) return null;
-
-    return nonce.content;
+    const certificate = AsnParser.parse(certDer, Certificate);
+    const extension = certificate.tbsCertificate.extensions?.find(
+      candidate => candidate.extnID === APPLE_ATTEST_NONCE_OID
+    );
+    if (!extension) return null;
+    return parseAppleAttestNonceExtension(Buffer.from(extension.extnValue.buffer));
   } catch {
     return null;
   }
 }
 
-/** Convert a COSE EC2 P-256 key (CBOR map with integer labels) to DER-encoded SPKI. */
-function coseKeyToDerSpki(coseKeyBuf: Buffer): Buffer {
-  const coseKey = parseCBOR(coseKeyBuf);
-  if (!(coseKey instanceof Map)) throw new Error('not a map');
+/**
+ * Convert a COSE EC2 P-256 key (CBOR map with integer labels) to a public key.
+ *
+ * The COSE coordinates go through a JWK, so Node builds the SPKI encoding and
+ * validates the point instead of this module hand-writing DER.
+ */
+function coseKeyToPublicKey(coseKeyBuf: Buffer) {
+  const coseKey = decodeCborMap(coseKeyBuf);
+  if (!coseKey) throw new Error('not a map');
 
   // COSE labels: 1=kty, -1=crv, -2=x, -3=y (all integers)
   if (coseKey.get(1) !== 2) throw new Error('not EC2');
   if (coseKey.get(-1) !== 1) throw new Error('not P-256');
-  const x = coseKey.get(-2);
-  const y = coseKey.get(-3);
-  if (!(x instanceof Buffer) || !(y instanceof Buffer)) throw new Error('missing coordinates');
+  const x = asBuffer(coseKey.get(-2));
+  const y = asBuffer(coseKey.get(-3));
+  if (!x || !y) throw new Error('missing coordinates');
   if (x.length !== 32 || y.length !== 32) throw new Error('invalid coordinate length');
 
-  // Uncompressed point: 04 || x || y
-  const point = Buffer.concat([Buffer.from([0x04]), x, y]);
-
-  // Build DER SPKI for secp256r1 (P-256)
-  const algoSeq = Buffer.from([
-    0x30,
-    0x13, // SEQUENCE
-    0x06,
-    0x07,
-    0x2a,
-    0x86,
-    0x48,
-    0xce,
-    0x3d,
-    0x02,
-    0x01, // ecPublicKey OID 1.2.840.10045.2.1
-    0x06,
-    0x08,
-    0x2a,
-    0x86,
-    0x48,
-    0xce,
-    0x3d,
-    0x03,
-    0x01,
-    0x07, // secp256r1 OID 1.2.840.10045.3.1.7
-  ]);
-
-  const bitStrLen = point.length + 1;
-  const bitStr = Buffer.concat([
-    bitStrLen < 0x80 ? Buffer.from([0x03, bitStrLen]) : Buffer.from([0x03, 0x81, bitStrLen]),
-    Buffer.from([0x00]), // unused bits
-    point,
-  ]);
-
-  const inner = Buffer.concat([algoSeq, bitStr]);
-  return Buffer.concat([Buffer.from([0x30]), Buffer.from([inner.length]), inner]);
+  return createPublicKey({
+    key: {
+      kty: 'EC',
+      crv: 'P-256',
+      x: x.toString('base64url'),
+      y: y.toString('base64url'),
+    },
+    format: 'jwk',
+  });
 }
 
 // ── Assertion verification ────────────────────────────────────────────────
@@ -484,18 +325,12 @@ export async function verifyAppleAssertion(
     return { ok: false, error: 'INVALID_ASSERTION' };
   }
 
-  let assertionMap: CBORValue;
-  try {
-    assertionMap = parseCBOR(assertionBuf);
-  } catch {
-    return { ok: false, error: 'INVALID_ASSERTION' };
-  }
+  const assertionMap = decodeCborMap(assertionBuf);
+  if (!assertionMap) return { ok: false, error: 'INVALID_ASSERTION' };
 
-  if (!(assertionMap instanceof Map)) return { ok: false, error: 'INVALID_ASSERTION' };
-
-  const signature = assertionMap.get('signature');
-  const authenticatorData = assertionMap.get('authenticatorData');
-  if (!(signature instanceof Buffer) || !(authenticatorData instanceof Buffer)) {
+  const signature = asBuffer(assertionMap.get('signature'));
+  const authenticatorData = asBuffer(assertionMap.get('authenticatorData'));
+  if (!signature || !authenticatorData) {
     return { ok: false, error: 'INVALID_ASSERTION' };
   }
 

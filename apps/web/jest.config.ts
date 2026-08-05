@@ -53,7 +53,7 @@ const config: Config = {
   ],
   modulePathIgnorePatterns: ['<rootDir>/../../.worktrees/'],
   transformIgnorePatterns: [
-    'node_modules/.pnpm/(?!(@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser))',
+    'node_modules/.pnpm/(?!(@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser|cbor2|@cto\\.af))',
   ],
 
   // Parallel execution configuration

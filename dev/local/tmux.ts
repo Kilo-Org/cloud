@@ -357,7 +357,7 @@ function breakPane(
   newWindowName: string
 ): number {
   const output = execSync(
-    `tmux break-pane -d -s ${sessionName}:${windowTarget}.${pane} -n ${escapeForShell(
+    `tmux break-pane -d -s ${sessionName}:${windowTarget}.${pane} -t ${sessionName}: -n ${escapeForShell(
       newWindowName
     )} -P -F "#{window_index}"`,
     { encoding: 'utf-8' }

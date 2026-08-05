@@ -50,25 +50,25 @@ vi.mock('../mono-scroll-block', () => ({ MonoScrollBlock: 'MonoScrollBlock' }));
 vi.mock('../fixed-part-row', () => ({ FixedPartRow: 'FixedPartRow' }));
 vi.mock('../open-part-detail-context', () => ({ useOpenPartDetail: () => openSpy }));
 vi.mock('../tool-card-display', () => ({ getToolDisplay, toolPartHasDetails }));
-vi.mock('../read-markdown-preview', () => ({ ReadMarkdownPreview: 'ReadMarkdownPreview' }));
+vi.mock('../read-markdown-body', () => ({ ReadMarkdownBody: 'ReadMarkdownBody' }));
 
 const {
   getToolImageAttachments,
   isMarkdownPath,
-  resolveMarkdownPreview,
+  resolveMarkdownBody,
   openSpy,
   getToolDisplay,
   toolPartHasDetails,
 } = vi.hoisted(() => ({
   getToolImageAttachments: vi.fn(() => []),
   isMarkdownPath: vi.fn(() => false),
-  resolveMarkdownPreview: vi.fn(),
+  resolveMarkdownBody: vi.fn(),
   openSpy: vi.fn(),
   getToolDisplay: vi.fn(),
   toolPartHasDetails: vi.fn(),
 }));
 vi.mock('../tool-card-attachments', () => ({ getToolImageAttachments }));
-vi.mock('../read-tool-markdown', () => ({ isMarkdownPath, resolveMarkdownPreview }));
+vi.mock('../read-tool-markdown', () => ({ isMarkdownPath, resolveMarkdownBody }));
 
 /**
  * A 20000-character output with one 4000-character line and no newline in it,
@@ -165,7 +165,7 @@ const bodies: BodyCase[] = [
     blockCount: 1,
   },
   {
-    // A markdown path would route to ReadMarkdownPreview instead of the mono block.
+    // A markdown path would route to ReadMarkdownBody instead of the mono block.
     name: 'ReadToolCardBody',
     body: ReadToolCardBody,
     part: makeCompletedPart('read', { filePath: 'src/main.ts' }),
@@ -215,6 +215,50 @@ describe('tool-card output caps removed', () => {
       expect(outputBlocks).toHaveLength(1);
     }
   );
+
+  it('routes a markdown read to ReadMarkdownBody with the full body and no mono block', () => {
+    isMarkdownPath.mockReturnValue(true);
+    const markdownBody = { text: '# Full', footer: undefined };
+    resolveMarkdownBody.mockReturnValue(markdownBody);
+    const part = makeCompletedPart('read', { filePath: 'README.md' });
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ReadToolCardBody({ part }) as unknown as React.ReactElement;
+    const bodyElements = findByType(root, 'ReadMarkdownBody');
+    expect(bodyElements).toHaveLength(1);
+    const bodyElement = bodyElements[0];
+    if (!bodyElement) {
+      throw new Error('body not found');
+    }
+    expect((bodyElement.props as { body?: unknown }).body).toBe(markdownBody);
+    expect(findByType(root, 'MonoScrollBlock')).toHaveLength(0);
+    isMarkdownPath.mockReturnValue(false);
+  });
+
+  it('keeps the error text and renders no body for an error read', () => {
+    isMarkdownPath.mockReturnValue(true);
+    resolveMarkdownBody.mockReturnValue(undefined);
+    const part: ToolPart = {
+      id: 'read-error-1',
+      sessionID: 'session-1',
+      messageID: 'message-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'read',
+      state: {
+        status: 'error',
+        input: { filePath: 'README.md' },
+        error: 'boom',
+        time: { start: 0, end: 1 },
+      },
+    };
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ReadToolCardBody({ part }) as unknown as React.ReactElement;
+    expect(resolveMarkdownBody).toHaveBeenCalledWith(part);
+    const texts = findByType(root, 'Text');
+    expect(texts.some(el => (el.props as { children?: unknown }).children === 'boom')).toBe(true);
+    expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(0);
+    isMarkdownPath.mockReturnValue(false);
+  });
 
   it('prepareMonoScrollContent keeps the full output when maxLength is undefined', () => {
     expect(prepareMonoScrollContent(longOutput, undefined)).toEqual({

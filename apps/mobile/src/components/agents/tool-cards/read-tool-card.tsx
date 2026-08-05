@@ -7,13 +7,13 @@ import { SelectableText } from '@/components/ui/selectable-text';
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
-import { ReadMarkdownPreview } from '../read-markdown-preview';
-import { isMarkdownPath, resolveMarkdownPreview } from '../read-tool-markdown';
+import { ReadMarkdownBody } from '../read-markdown-body';
+import { isMarkdownPath, resolveMarkdownBody } from '../read-tool-markdown';
 import { getToolImageAttachments } from '../tool-card-attachments';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 
 /**
- * Sheet body for a read tool part: the markdown preview for markdown paths,
+ * Sheet body for a read tool part: the markdown body for markdown paths,
  * else the output block (skipped for image reads), plus the error. Image
  * attachments render above via `ToolPartDetailBody`. Renders only inside the
  * detail sheet — the pending/running status line lives in `ToolPartDetailBody`.
@@ -24,15 +24,15 @@ export function ReadToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
-  const markdownPreview = isMarkdownPath(filePath) ? resolveMarkdownPreview(part) : undefined;
+  const markdownBody = isMarkdownPath(filePath) ? resolveMarkdownBody(part) : undefined;
   const hasImages = getToolImageAttachments(part).length > 0;
 
   return (
     <View className="gap-2">
-      {markdownPreview ? <ReadMarkdownPreview preview={markdownPreview} /> : null}
+      {markdownBody ? <ReadMarkdownBody body={markdownBody} /> : null}
       {/* An image read's output is only "Image read successfully" — the image itself
           is the content, so the mono block would be noise (plan D10). */}
-      {markdownPreview === undefined && !hasImages && output ? (
+      {markdownBody === undefined && !hasImages && output ? (
         <MonoScrollBlock content={output} textClassName="text-foreground" />
       ) : null}
       {error ? <SelectableText className="text-xs text-destructive">{error}</SelectableText> : null}

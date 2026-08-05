@@ -45,6 +45,7 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import { applyWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 
 /**
@@ -337,6 +338,10 @@ async function syncProviders(
     openRouterFreeEndpoints,
     kiloExclusiveModels,
   });
+  // The cards API selects one arbitrary route when a provider has policy variants (for example ZDR).
+  for (const { provider, models } of providerModelData) {
+    applyWorstProviderDataPolicy(models, provider.dataPolicy);
+  }
 
   // Filter out providers with no models
   const filteredProviderModelData = providerModelData.filter(data => data.models.length > 0);

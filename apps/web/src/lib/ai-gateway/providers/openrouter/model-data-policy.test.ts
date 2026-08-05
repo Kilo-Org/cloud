@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  applyWorstProviderDataPolicy,
   modelRetainsPrompts,
   modelTrains,
 } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
@@ -18,6 +19,68 @@ const baseModel = {
 };
 
 describe('model data policy', () => {
+  test('uses the worst policy when OpenRouter selects a provider route', () => {
+    const response = OpenRouterSearchResponse.parse({
+      data: {
+        models: [
+          {
+            ...baseModel,
+            endpoint: {
+              provider_display_name: 'SpaceXAI (ZDR)',
+              is_free: false,
+              pricing: { prompt: '0.000002', completion: '0.000006' },
+              data_policy: {
+                training: false,
+                retainsPrompts: false,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    applyWorstProviderDataPolicy(response.data.models, {
+      training: false,
+      retainsPrompts: true,
+    });
+
+    expect(response.data.models[0]?.endpoint?.data_policy).toEqual({
+      training: false,
+      retainsPrompts: true,
+    });
+  });
+
+  test('preserves a model policy that is worse than the provider policy', () => {
+    const response = OpenRouterSearchResponse.parse({
+      data: {
+        models: [
+          {
+            ...baseModel,
+            endpoint: {
+              provider_display_name: 'Test Provider',
+              is_free: false,
+              pricing: { prompt: '0.000002', completion: '0.000006' },
+              data_policy: {
+                training: true,
+                retainsPrompts: true,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    applyWorstProviderDataPolicy(response.data.models, {
+      training: false,
+      retainsPrompts: false,
+    });
+
+    expect(response.data.models[0]?.endpoint?.data_policy).toEqual({
+      training: true,
+      retainsPrompts: true,
+    });
+  });
+
   test('preserves and uses model endpoint policy overrides', () => {
     const response = OpenRouterSearchResponse.parse({
       data: {

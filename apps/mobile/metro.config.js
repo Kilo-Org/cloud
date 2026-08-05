@@ -17,6 +17,14 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
+// Keep colocated tests out of the app bundle. Expo Router's require.context matches
+// every `.tsx` under `src/app`, so a `*.test.tsx` next to a route registers as a route
+// and drags vitest (and vite) into the bundle, which Metro cannot transform.
+config.resolver.blockList = [
+  ...config.resolver.blockList,
+  /[\\/]apps[\\/]mobile[\\/]src[\\/].*\.test\.[jt]sx?$/,
+];
+
 // Drop the unused Material Symbols font chain from the bundle.
 //
 // `expo-router`'s <Tabs> statically pulls `expo-symbols` (via withLayoutContext ->

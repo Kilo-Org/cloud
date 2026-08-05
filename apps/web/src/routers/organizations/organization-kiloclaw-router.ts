@@ -187,10 +187,7 @@ async function hasCurrentOrganizationKiloClawSubscription(userId: string, orgId:
     );
 
   return rows.some(
-    row =>
-      row.subscription.status === 'active' &&
-      row.subscription.suspended_at === null &&
-      row.subscription.payment_source !== 'stripe'
+    row => row.subscription.status === 'active' && row.subscription.suspended_at === null
   );
 }
 

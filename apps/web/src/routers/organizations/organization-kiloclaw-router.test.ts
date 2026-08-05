@@ -330,6 +330,29 @@ describe('organizations.kiloclaw.getNavState', () => {
     expect(result).toEqual({ hasActiveInstance: true, hasCurrentSubscription: true });
   });
 
+  it('treats an active Stripe-funded organization subscription as current', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-stripe-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Stripe Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'stripe',
+      stripe_subscription_id: `sub_${crypto.randomUUID()}`,
+    });
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: true, hasCurrentSubscription: true });
+  });
+
   it('does not leak a personal instance into organization nav state', async () => {
     const user = await insertTestUser({
       google_user_email: `org-kiloclaw-nav-personal-${Math.random()}@example.com`,

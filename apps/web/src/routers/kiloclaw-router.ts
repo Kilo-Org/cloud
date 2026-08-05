@@ -1967,50 +1967,16 @@ async function getPersonalBillingStatus(user: {
     };
   }
 
-  const [
-    anySubscription,
-    anyPersonalSubscription,
-    currentPersonalProvisioningSubscription,
-    anyPersonalInstanceHistory,
-  ] = await Promise.all([
+  const [subscriptionPresence, anyPersonalInstanceHistory] = await Promise.all([
     db
-      .select({ id: kiloclaw_subscriptions.id })
+      .select({
+        hasAnySubscription: sql<boolean>`bool_or(true)`,
+        hasAnyPersonalSubscription: sql<boolean>`coalesce(bool_or(${kiloclaw_subscriptions.instance_id} is null or (${kiloclaw_instances.user_id} = ${user.id} and ${kiloclaw_instances.organization_id} is null)), false)`,
+        hasCurrentPersonalSubscription: sql<boolean>`coalesce(bool_or((${kiloclaw_subscriptions.instance_id} is null or (${kiloclaw_instances.user_id} = ${user.id} and ${kiloclaw_instances.organization_id} is null)) and ${kiloclaw_subscriptions.status} = 'active' and ${kiloclaw_subscriptions.suspended_at} is null and ${kiloclaw_subscriptions.transferred_to_subscription_id} is null), false)`,
+      })
       .from(kiloclaw_subscriptions)
+      .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
       .where(eq(kiloclaw_subscriptions.user_id, user.id))
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-    db
-      .select({ id: kiloclaw_subscriptions.id })
-      .from(kiloclaw_subscriptions)
-      .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, user.id),
-          or(
-            isNull(kiloclaw_subscriptions.instance_id),
-            and(eq(kiloclaw_instances.user_id, user.id), isNull(kiloclaw_instances.organization_id))
-          )
-        )
-      )
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-    db
-      .select({ id: kiloclaw_subscriptions.id })
-      .from(kiloclaw_subscriptions)
-      .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, user.id),
-          eq(kiloclaw_subscriptions.status, 'active'),
-          isNull(kiloclaw_subscriptions.suspended_at),
-          isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
-          or(
-            isNull(kiloclaw_subscriptions.instance_id),
-            and(eq(kiloclaw_instances.user_id, user.id), isNull(kiloclaw_instances.organization_id))
-          )
-        )
-      )
-      .limit(1)
       .then(rows => rows[0] ?? null),
     db
       .select({ id: kiloclaw_instances.id })
@@ -2084,10 +2050,10 @@ async function getPersonalBillingStatus(user: {
   return {
     hasAccess,
     accessReason,
-    hasExistingPersonalSubscription: anyPersonalSubscription !== null,
-    hasCurrentPersonalSubscription: currentPersonalProvisioningSubscription !== null,
+    hasExistingPersonalSubscription: subscriptionPresence?.hasAnyPersonalSubscription === true,
+    hasCurrentPersonalSubscription: subscriptionPresence?.hasCurrentPersonalSubscription === true,
     commitPlanAvailable: maySelectKiloClawCommit(now),
-    trialEligible: !anyPersonalInstanceHistory && !anySubscription,
+    trialEligible: !anyPersonalInstanceHistory && subscriptionPresence?.hasAnySubscription !== true,
     creditBalanceMicrodollars,
     creditIntroEligible,
     hasActiveKiloPass,

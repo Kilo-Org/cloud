@@ -13,7 +13,6 @@ import {
 } from '../components';
 import type { ClawOnboardingRenderStep } from '../components/ClawOnboardingFlow.state';
 import { ClawOnboardingFakeWalkthrough } from '../components/ClawOnboardingFakeWalkthrough';
-import { WelcomePage } from '../components/billing/WelcomePage';
 import { getClawNewStatusQueryForBoundary } from './ClawNewClient.state';
 
 const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
@@ -134,21 +133,6 @@ function ClawNewLiveClient() {
         style={{ minHeight: '50vh' }}
       >
         <KiloClawSignupUnavailable />
-      </div>
-    );
-  }
-
-  const isNewUser =
-    billing &&
-    !billing.hasAccess &&
-    billing.instance === null &&
-    !billing.earlybird &&
-    !billing.trial?.expired;
-
-  if (isNewUser && !billing.trialEligible) {
-    return (
-      <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
-        <WelcomePage />
       </div>
     );
   }

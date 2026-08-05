@@ -15,7 +15,9 @@
     "./kiloclaw-commit-retirement": "./src/kiloclaw-commit-retirement.ts",
     "./kiloclaw-organization-trial-expiry-candidates": "./src/kiloclaw-organization-trial-expiry-candidates.ts",
     "./client": "./src/client.ts",
-    "./user-soft-delete": "./src/user-soft-delete.ts"
+    "./user-soft-delete": "./src/user-soft-delete.ts",
+    "./operation-ledger": "./src/operation-ledger.ts",
+    "./analytics-outbox": "./src/analytics-outbox.ts"
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",

@@ -102,6 +102,8 @@ import {
   coding_plan_availability_intents,
   coding_plan_subscriptions,
   deployments_ephemeral,
+  operation_ledgers,
+  analytics_event_outbox,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -991,6 +993,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences)
+ * - operation_ledgers (per-intent dedupe rows, keyed by kilo_user_id)
+ * - analytics_event_outbox (pending analytics delivery rows, keyed by the
+ *   user's email as distinct_id)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1039,6 +1044,16 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(security_finding_notifications)
       .where(eq(security_finding_notifications.recipient_user_id, userId));
+
+    // ── 0b. Operation ledger and analytics outbox ────────────────────────
+    // Ledger rows are keyed by kilo_user_id; delete them so the dedupe
+    // identity dies with the account. Outbox rows are keyed by the user's
+    // email as distinct_id — delete by the original email captured before
+    // the user row is anonymized below.
+    await tx.delete(operation_ledgers).where(eq(operation_ledgers.kilo_user_id, userId));
+    await tx
+      .delete(analytics_event_outbox)
+      .where(eq(analytics_event_outbox.distinct_id, originalEmail));
 
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx

@@ -1,0 +1,595 @@
+/**
+ * Shared per-intent operation ledger (P1-A-08a / DEC-01).
+ *
+ * One row per `(kilo_user_id, domain, operation_key)` identity. Admission is
+ * concurrent-safe: exactly one caller admits, the rest receive the typed
+ * duplicate/takeover outcome and never re-execute the effect. Terminal settles
+ * are CAS from `admitted | reconcile_pending`; a second settle is a no-op.
+ * The analytics outbox row is written in the same transaction as the settle,
+ * so settle-plus-outbox is atomic, and ONLY the helpers in this file insert
+ * `analytics_event_outbox` rows (grep-enforced invariant).
+ *
+ * Retention: rows expire `LEDGER_RETENTION_DAYS` (30) after `admitted_at`. An
+ * expired row (any status) is deleted and re-admitted by the next admit.
+ * `canonical_result` is bounded at `MAX_CANONICAL_RESULT_BYTES` (4096)
+ * serialized bytes; the settle helper rejects larger payloads.
+ *
+ * Event identity: outbox `event_uuid` is a deterministic UUIDv5 of the UTF-8
+ * string `` `${ledger_row_id}:${event_name}` `` under the fixed namespace
+ * literal `EVENT_UUID_NAMESPACE`. No `uuid` package is in the lockfile, so
+ * the UUIDv5 is computed with a small WebCrypto SHA-1 digest helper.
+ */
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import type { NodePgDatabase, NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
+import { ANALYTICS_EVENT_SCHEMAS } from '@kilocode/app-shared/analytics';
+import type { AnalyticsEventMap, TerminalOutcomeEventName } from '@kilocode/app-shared/analytics';
+
+import type * as schema from './schema';
+import {
+  analytics_event_outbox,
+  operation_ledgers,
+  type AnalyticsEventOutboxRow,
+  type NewAnalyticsEventOutboxRow,
+  type NewOperationLedgerRow,
+  type OperationLedgerRow,
+} from './schema';
+
+// ----- constants -----------------------------------------------------------
+
+/** Ledger rows are retained 30 days after admission (the dedupe window). */
+export const LEDGER_RETENTION_DAYS = 30;
+
+/** `canonical_result` is bounded at 4096 serialized bytes (DEC-01). */
+export const MAX_CANONICAL_RESULT_BYTES = 4096;
+
+/** Fixed UUIDv5 namespace literal for outbox event identities (DEC-01). */
+export const EVENT_UUID_NAMESPACE = 'c3a4f8e0-8e34-45b2-9c1d-7a2b5e6d4f10';
+
+/** Mutation taxonomy (DEC-01). */
+export const OPERATION_TAXONOMIES = ['safe-retry', 'reconcile-first', 'never-replay'] as const;
+export type OperationTaxonomy = (typeof OPERATION_TAXONOMIES)[number];
+
+/** Ledger domains. `create_remote` session identity lives in the DO, not here. */
+export const OPERATION_DOMAINS = ['session', 'pr', 'security', 'organization'] as const;
+export type OperationDomain = (typeof OPERATION_DOMAINS)[number];
+
+export const OPERATION_TERMINAL_STATUSES = [
+  'completed',
+  'failed',
+  'no_op',
+  'interrupted',
+  'superseded',
+] as const;
+export type TerminalOperationStatus = (typeof OPERATION_TERMINAL_STATUSES)[number];
+
+export const OPERATION_NON_TERMINAL_STATUSES = ['admitted', 'reconcile_pending'] as const;
+export type NonTerminalOperationStatus = (typeof OPERATION_NON_TERMINAL_STATUSES)[number];
+
+export const OPERATION_STATUSES = [
+  ...OPERATION_NON_TERMINAL_STATUSES,
+  ...OPERATION_TERMINAL_STATUSES,
+] as const;
+export type OperationStatus = (typeof OPERATION_STATUSES)[number];
+
+export function isTerminalOperationStatus(status: string): status is TerminalOperationStatus {
+  return (OPERATION_TERMINAL_STATUSES as readonly string[]).includes(status);
+}
+
+// ----- connection types ------------------------------------------------------
+
+export type LedgerTransaction = PgTransaction<
+  NodePgQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
+
+/** Accepts either a `NodePgDatabase` or an open transaction. */
+export type LedgerDatabase = NodePgDatabase<typeof schema> | LedgerTransaction;
+
+// ----- public errors ---------------------------------------------------------
+
+/** Thrown when `canonical_result` would exceed 4096 serialized bytes. */
+export class CanonicalResultTooLargeError extends Error {
+  constructor(bytes: number) {
+    super(
+      `Operation ledger canonical_result is ${bytes} serialized bytes; the limit is ${MAX_CANONICAL_RESULT_BYTES}`
+    );
+    this.name = 'CanonicalResultTooLargeError';
+  }
+}
+
+/** Thrown when an outbox event payload fails the shared catalog schema. */
+export class OutboxEventValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OutboxEventValidationError';
+  }
+}
+
+// ----- input / output types ---------------------------------------------------
+
+export type AdmitOperationInput = {
+  /** The acting user. */
+  userId: string;
+  /** Organization context when the operation is organization-scoped. */
+  orgId?: string | null;
+  domain: OperationDomain;
+  intent: string;
+  /** Client-generated UUID, stable across retries of one user intent. */
+  operationKey: string;
+  /** Domain resource identity (for example `owner/repo#number`). Never analytics. */
+  resourceKey?: string | null;
+  taxonomy: OperationTaxonomy;
+  /** Lease duration for the `admitted` claim, in seconds. */
+  leaseSeconds: number;
+};
+
+export type AdmitOperationResult =
+  | { admission: 'admitted'; row: OperationLedgerRow }
+  | { admission: 'duplicate_settled'; row: OperationLedgerRow }
+  | { admission: 'duplicate_in_flight'; row: OperationLedgerRow }
+  | { admission: 'takeover'; row: OperationLedgerRow }
+  | { admission: 'duplicate_reconcile_pending'; row: OperationLedgerRow };
+
+/** Terminal outbox event input, correlated by event name. */
+export type OutboxEventInput = {
+  [K in TerminalOutcomeEventName]: {
+    eventName: K;
+    /** Identity channel (the user's email), not an event property. */
+    distinctId: string;
+    properties: AnalyticsEventMap[K];
+  };
+}[TerminalOutcomeEventName];
+
+export type SettleOperationInput = {
+  rowId: string;
+  status: TerminalOperationStatus;
+  outcomeCode?: string | null;
+  canonicalResult?: Record<string, unknown> | null;
+  outboxEvent?: OutboxEventInput | null;
+};
+
+export type SettleOperationResult =
+  | { settled: true; row: OperationLedgerRow }
+  | { settled: false; row: OperationLedgerRow | null };
+
+export type MarkReconcilePendingInput = {
+  rowId: string;
+  outboxEvent?: OutboxEventInput | null;
+};
+
+// ----- unit-of-work helpers ----------------------------------------------------
+
+/** True when `value` is a database instance rather than an open transaction. */
+function isDatabase(database: LedgerDatabase): database is NodePgDatabase<typeof schema> {
+  // `drizzle()` attaches `$client` to database instances; transactions never have it.
+  return typeof (database as { $client?: unknown }).$client !== 'undefined';
+}
+
+/** Runs `work` in its own transaction, or inline when given an open transaction. */
+async function runInTransaction<T>(
+  database: LedgerDatabase,
+  work: (tx: LedgerTransaction) => Promise<T>
+): Promise<T> {
+  if (isDatabase(database)) {
+    return database.transaction(work);
+  }
+  return work(database);
+}
+
+// ----- admission ----------------------------------------------------------------
+
+function admissionInsertValues(input: AdmitOperationInput, now: Date): NewOperationLedgerRow {
+  return {
+    operation_key: input.operationKey,
+    domain: input.domain,
+    intent: input.intent,
+    kilo_user_id: input.userId,
+    organization_id: input.orgId ?? null,
+    resource_key: input.resourceKey ?? null,
+    taxonomy: input.taxonomy,
+    status: 'admitted',
+    admitted_at: now.toISOString(),
+    lease_expires_at: new Date(now.getTime() + input.leaseSeconds * 1000).toISOString(),
+    expires_at: new Date(now.getTime() + LEDGER_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
+/**
+ * Admits an operation. Concurrent same-key admits produce exactly one
+ * `admitted` row; the loser receives the typed duplicate outcome. An expired
+ * row (`expires_at` past, any status) is deleted and re-inserted in one
+ * transaction. A live-lease `admitted` row is `duplicate_in_flight`; an
+ * expired-lease `admitted` row is a compare-and-set `takeover` that renews
+ * the lease.
+ */
+export async function admitOperation(
+  database: LedgerDatabase,
+  input: AdmitOperationInput
+): Promise<AdmitOperationResult> {
+  return database.transaction(async tx => admitOperationInTransaction(tx, input));
+}
+
+async function admitOperationInTransaction(
+  tx: LedgerTransaction,
+  input: AdmitOperationInput
+): Promise<AdmitOperationResult> {
+  const now = new Date();
+
+  const existing = await tx
+    .select()
+    .from(operation_ledgers)
+    .where(
+      and(
+        eq(operation_ledgers.kilo_user_id, input.userId),
+        eq(operation_ledgers.domain, input.domain),
+        eq(operation_ledgers.operation_key, input.operationKey)
+      )
+    )
+    .for('update')
+    .limit(1);
+
+  if (existing.length === 0) {
+    // Conflict-safe insert: the unique index on
+    // (kilo_user_id, domain, operation_key) arbitrates the race. When a
+    // concurrent admit wins, this insert is a silent no-op instead of raising
+    // a unique violation. A raised violation would abort the whole transaction
+    // (PostgreSQL rejects every later statement with 25P02), so the winner
+    // must never be read after a failure.
+    const [row] = await tx
+      .insert(operation_ledgers)
+      .values(admissionInsertValues(input, now))
+      .onConflictDoNothing({
+        target: [
+          operation_ledgers.kilo_user_id,
+          operation_ledgers.domain,
+          operation_ledgers.operation_key,
+        ],
+      })
+      .returning();
+
+    if (row) {
+      return { admission: 'admitted', row };
+    }
+
+    // A concurrent admit won the insert race under the same identity key.
+    // Read the committed winner and classify it.
+    const [winner] = await tx
+      .select()
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.kilo_user_id, input.userId),
+          eq(operation_ledgers.domain, input.domain),
+          eq(operation_ledgers.operation_key, input.operationKey)
+        )
+      )
+      .for('update')
+      .limit(1);
+    if (!winner) {
+      throw new Error('Operation ledger row vanished after a conflict-safe insert');
+    }
+    return evaluateExistingRow(tx, winner, input, now);
+  }
+
+  return evaluateExistingRow(tx, existing[0], input, now);
+}
+
+async function evaluateExistingRow(
+  tx: LedgerTransaction,
+  row: OperationLedgerRow,
+  input: AdmitOperationInput,
+  now: Date
+): Promise<AdmitOperationResult> {
+  // Expired row (any status): delete + fresh insert in one transaction.
+  if (new Date(row.expires_at).getTime() < now.getTime()) {
+    await tx.delete(operation_ledgers).where(eq(operation_ledgers.id, row.id));
+    const [fresh] = await tx
+      .insert(operation_ledgers)
+      .values(admissionInsertValues(input, now))
+      .returning();
+    if (!fresh) {
+      throw new Error('Operation ledger re-insert returned no row');
+    }
+    return { admission: 'admitted', row: fresh };
+  }
+
+  if (row.status === 'admitted') {
+    if (new Date(row.lease_expires_at).getTime() >= now.getTime()) {
+      return { admission: 'duplicate_in_flight', row };
+    }
+    // Compare-and-set lease takeover: renew only while the lease is still expired.
+    const renewedLease = new Date(now.getTime() + input.leaseSeconds * 1000).toISOString();
+    const [renewed] = await tx
+      .update(operation_ledgers)
+      .set({ lease_expires_at: renewedLease })
+      .where(
+        and(
+          eq(operation_ledgers.id, row.id),
+          eq(operation_ledgers.status, 'admitted'),
+          sql`${operation_ledgers.lease_expires_at} < ${now.toISOString()}::timestamptz`
+        )
+      )
+      .returning();
+    return { admission: 'takeover', row: renewed ?? row };
+  }
+
+  if (row.status === 'reconcile_pending') {
+    return { admission: 'duplicate_reconcile_pending', row };
+  }
+
+  return { admission: 'duplicate_settled', row };
+}
+
+// ----- progress and provider reference ------------------------------------------
+
+/**
+ * Merges allocated identifiers into `canonical_result` while the row stays
+ * `admitted`. Returns the updated row, or null when the row is missing or no
+ * longer admitted (the CAS did not match). The merged result is bounded at
+ * `MAX_CANONICAL_RESULT_BYTES` serialized bytes: an oversized merge throws
+ * `CanonicalResultTooLargeError` and leaves the row unchanged.
+ */
+export async function recordOperationProgress(
+  database: LedgerDatabase,
+  rowId: string,
+  partialResult: Record<string, unknown>
+): Promise<OperationLedgerRow | null> {
+  return runInTransaction(database, async tx => {
+    const [row] = await tx
+      .select()
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.id, rowId))
+      .for('update');
+
+    if (!row || row.status !== 'admitted') {
+      return null;
+    }
+
+    const merged = { ...(row.canonical_result ?? {}), ...partialResult };
+    const serialized = JSON.stringify(merged) ?? '{}';
+    const bytes = serializedByteLength(serialized);
+    if (bytes > MAX_CANONICAL_RESULT_BYTES) {
+      throw new CanonicalResultTooLargeError(bytes);
+    }
+
+    const [updated] = await tx
+      .update(operation_ledgers)
+      .set({ canonical_result: merged })
+      .where(and(eq(operation_ledgers.id, row.id), eq(operation_ledgers.status, 'admitted')))
+      .returning();
+    return updated ?? null;
+  });
+}
+
+/**
+ * Overwrites the `provider_ref` column (for example the security provider's
+ * `messageId`). Used after acceptance and on takeover re-submits so the
+ * worker can join terminal outcomes by provider reference.
+ */
+export async function setOperationProviderRef(
+  database: LedgerDatabase,
+  input: { rowId: string; providerRef: string | null }
+): Promise<OperationLedgerRow | null> {
+  const [updated] = await database
+    .update(operation_ledgers)
+    .set({ provider_ref: input.providerRef })
+    .where(eq(operation_ledgers.id, input.rowId))
+    .returning();
+  return updated ?? null;
+}
+
+// ----- terminal settle and reconcile ----------------------------------------------
+
+/**
+ * Settles a row to a terminal status, CAS from `admitted | reconcile_pending`.
+ * A second settle is a no-op returning the stored row. When `outboxEvent` is
+ * given, the outbox row is written in the same transaction: settle-plus-outbox
+ * is atomic — any outbox failure rolls back the settle. The merged
+ * `canonical_result` must fit `MAX_CANONICAL_RESULT_BYTES` serialized bytes.
+ */
+export async function settleOperation(
+  database: LedgerDatabase,
+  input: SettleOperationInput
+): Promise<SettleOperationResult> {
+  return runInTransaction(database, async tx => settleOperationInTransaction(tx, input));
+}
+
+async function settleOperationInTransaction(
+  tx: LedgerTransaction,
+  input: SettleOperationInput
+): Promise<SettleOperationResult> {
+  const [row] = await tx
+    .select()
+    .from(operation_ledgers)
+    .where(eq(operation_ledgers.id, input.rowId))
+    .for('update');
+
+  if (!row) {
+    return { settled: false, row: null };
+  }
+
+  if (isTerminalOperationStatus(row.status)) {
+    // Double settle is a no-op.
+    return { settled: false, row };
+  }
+
+  const mergedCanonical = { ...(row.canonical_result ?? {}), ...(input.canonicalResult ?? {}) };
+  const serialized = JSON.stringify(mergedCanonical) ?? '{}';
+  if (serializedByteLength(serialized) > MAX_CANONICAL_RESULT_BYTES) {
+    throw new CanonicalResultTooLargeError(serializedByteLength(serialized));
+  }
+
+  if (input.outboxEvent) {
+    validateOutboxEvent(input.outboxEvent);
+  }
+
+  const [updated] = await tx
+    .update(operation_ledgers)
+    .set({
+      status: input.status,
+      outcome_code: input.outcomeCode ?? null,
+      canonical_result: mergedCanonical,
+      settled_at: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(operation_ledgers.id, row.id),
+        inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES)
+      )
+    )
+    .returning();
+
+  if (!updated) {
+    // Defensive: another writer settled between the lock and the update.
+    const [current] = await tx
+      .select()
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.id, row.id));
+    return { settled: false, row: current ?? null };
+  }
+
+  if (input.outboxEvent) {
+    await insertOutboxEvent(tx, { rowId: row.id, event: input.outboxEvent });
+  }
+
+  return { settled: true, row: updated };
+}
+
+/**
+ * Marks a row `reconcile_pending`, CAS from `admitted`. May emit an
+ * `outcome: 'ambiguous'` outbox event (a ledger state change, not an HTTP
+ * receipt). Returns the stored row when the CAS did not match (missing or not
+ * `admitted`).
+ */
+export async function markReconcilePending(
+  database: LedgerDatabase,
+  input: MarkReconcilePendingInput
+): Promise<OperationLedgerRow | null> {
+  return runInTransaction(database, async tx => {
+    const [row] = await tx
+      .select()
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.id, input.rowId))
+      .for('update');
+
+    if (!row) {
+      return null;
+    }
+    if (row.status !== 'admitted') {
+      return row;
+    }
+
+    if (input.outboxEvent) {
+      validateOutboxEvent(input.outboxEvent);
+      await insertOutboxEvent(tx, { rowId: row.id, event: input.outboxEvent });
+    }
+
+    const [updated] = await tx
+      .update(operation_ledgers)
+      .set({ status: 'reconcile_pending' })
+      .where(and(eq(operation_ledgers.id, row.id), eq(operation_ledgers.status, 'admitted')))
+      .returning();
+    return updated ?? row;
+  });
+}
+
+// ----- outbox insert (the only insert path for analytics_event_outbox) -------------
+
+function validateOutboxEvent(event: OutboxEventInput): void {
+  const schema = ANALYTICS_EVENT_SCHEMAS[event.eventName];
+  if (!schema) {
+    throw new OutboxEventValidationError(
+      `No catalog schema for analytics event ${event.eventName}`
+    );
+  }
+  const result = schema.safeParse(event.properties);
+  if (!result.success) {
+    throw new OutboxEventValidationError(
+      `Analytics event ${event.eventName} failed schema validation: ${result.error.message}`
+    );
+  }
+}
+
+/**
+ * Inserts an outbox row with the deterministic UUIDv5 `event_uuid`. A
+ * conflicting `event_uuid` (the same row already emitted this event name) is
+ * skipped: one event per (ledger row, event name) by design.
+ */
+async function insertOutboxEvent(
+  tx: LedgerTransaction,
+  params: { rowId: string; event: OutboxEventInput }
+): Promise<AnalyticsEventOutboxRow | null> {
+  validateOutboxEvent(params.event);
+  const eventUuid = await computeEventUuid(params.rowId, params.event.eventName);
+
+  const values: NewAnalyticsEventOutboxRow = {
+    event_uuid: eventUuid,
+    event_name: params.event.eventName,
+    distinct_id: params.event.distinctId,
+    properties: params.event.properties,
+    status: 'pending',
+    attempts: 0,
+  };
+
+  const [inserted] = await tx
+    .insert(analytics_event_outbox)
+    .values(values)
+    .onConflictDoNothing({ target: analytics_event_outbox.event_uuid })
+    .returning();
+  return inserted ?? null;
+}
+
+// ----- deterministic UUIDv5 ---------------------------------------------------------
+
+/**
+ * Computes the deterministic outbox `event_uuid` for a ledger row and event
+ * name: UUIDv5 of the UTF-8 string `${rowId}:${eventName}` under
+ * `EVENT_UUID_NAMESPACE`.
+ */
+export async function computeEventUuid(rowId: string, eventName: string): Promise<string> {
+  return uuidv5(EVENT_UUID_NAMESPACE, `${rowId}:${eventName}`);
+}
+
+/**
+ * UUIDv5 (SHA-1 name-based) computed with WebCrypto. Implemented here because
+ * no `uuid` package is present in the lockfile. Deterministic across Node and
+ * Workers runtimes.
+ */
+export async function uuidv5(namespace: string, name: string): Promise<string> {
+  const namespaceBytes = parseUuidHex(namespace);
+  const nameBytes = new TextEncoder().encode(name);
+  const data = new Uint8Array(namespaceBytes.length + nameBytes.length);
+  data.set(namespaceBytes, 0);
+  data.set(nameBytes, namespaceBytes.length);
+
+  const digest = await crypto.subtle.digest('SHA-1', data);
+  const bytes = new Uint8Array(digest).slice(0, 16);
+  // Version 5: set the version nibble to 0101.
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  // RFC 4122 variant: set the two MSBs of byte 8 to 10.
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  return formatUuidHex(bytes);
+}
+
+function parseUuidHex(value: string): Uint8Array {
+  const hex = value.replace(/-/g, '');
+  const bytes = new Uint8Array(16);
+  for (let index = 0; index < 16; index += 1) {
+    bytes[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+const HEX_DIGITS = '0123456789abcdef';
+
+function formatUuidHex(bytes: Uint8Array): string {
+  const hex = Array.from(bytes, byte => HEX_DIGITS[byte >> 4] + HEX_DIGITS[byte & 0x0f]).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function serializedByteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
+}

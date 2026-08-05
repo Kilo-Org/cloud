@@ -10012,4 +10012,96 @@ export const native_attested_keys = pgTable(
 );
 
 export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
+
+// ── W3-B operation ledger and analytics outbox (P1-A-08a / P2-A-04) ──────
+
+/**
+ * Durable per-intent operation ledger (DEC-01).
+ *
+ * One row per (kilo_user_id, domain, operation_key) identity. Rows move from
+ * `admitted` to exactly one terminal state (`completed | failed | no_op |
+ * interrupted | superseded`) or to the intermediate `reconcile_pending`.
+ * `canonical_result` carries replay-safe outcome data bounded at 4096
+ * serialized bytes by the settle helper. Rows expire 30 days after
+ * `admitted_at`; an expired row is deleted and re-admitted by the next admit.
+ */
+export const operation_ledgers = pgTable(
+  'operation_ledgers',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    operation_key: text().notNull(),
+    domain: text().notNull(),
+    intent: text().notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    resource_key: text(),
+    provider_ref: text(),
+    taxonomy: text().notNull(),
+    status: text().notNull().default('admitted'),
+    outcome_code: text(),
+    canonical_result: jsonb().$type<Record<string, unknown> | null>(),
+    admitted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    settled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_operation_ledgers_kilo_user_id_domain_operation_key').on(
+      table.kilo_user_id,
+      table.domain,
+      table.operation_key
+    ),
+    index('IDX_operation_ledgers_status_expires_at').on(table.status, table.expires_at),
+    index('IDX_operation_ledgers_provider_ref').on(table.provider_ref),
+  ]
+);
+
+export type OperationLedgerRow = typeof operation_ledgers.$inferSelect;
+export type NewOperationLedgerRow = typeof operation_ledgers.$inferInsert;
+
+/**
+ * Durable analytics outbox (P2-A-04), modeled on `user_affiliate_events`.
+ *
+ * Rows are inserted only by the operation-ledger settle helpers in
+ * `packages/db/src/operation-ledger.ts` (grep-enforced invariant). Delivery
+ * is at-least-once with a deterministic UUIDv5 `event_uuid`; the drainer
+ * claims due `pending` rows, sends to PostHog, and marks `delivered`; on
+ * error it backs off and retries, and fails a row after 8 attempts. `sending`
+ * claims older than 5 minutes are reclaimed by the cron. Delivered rows purge
+ * after 7 days, failed rows after 30 days.
+ */
+export const analytics_event_outbox = pgTable(
+  'analytics_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    event_uuid: uuid().notNull(),
+    event_name: text().notNull(),
+    distinct_id: text().notNull(),
+    properties: jsonb().$type<Record<string, unknown>>().notNull(),
+    status: text().notNull().default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_analytics_event_outbox_event_uuid').on(table.event_uuid),
+    index('IDX_analytics_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+  ]
+);
+
+export type AnalyticsEventOutboxRow = typeof analytics_event_outbox.$inferSelect;
+export type NewAnalyticsEventOutboxRow = typeof analytics_event_outbox.$inferInsert;
+
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;

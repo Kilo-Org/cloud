@@ -113,6 +113,8 @@ import {
   mcp_gateway_oauth_clients,
   mcp_gateway_oauth_grants,
   deployments_ephemeral,
+  operation_ledgers,
+  analytics_event_outbox,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -166,6 +168,8 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
     await db.delete(deployments_ephemeral);
+    await db.delete(operation_ledgers);
+    await db.delete(analytics_event_outbox);
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
@@ -644,6 +648,80 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('deletes operation ledger rows by user id and analytics outbox rows by the original email', async () => {
+      const user = await insertTestUser({ google_user_email: 'ledger-user@example.com' });
+      const otherUser = await insertTestUser();
+
+      const now = new Date();
+      const leaseExpiresAt = new Date(now.getTime() + 60_000).toISOString();
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const [userLedger, otherLedger] = await db
+        .insert(operation_ledgers)
+        .values([
+          {
+            operation_key: 'op-1',
+            domain: 'session',
+            intent: 'create',
+            kilo_user_id: user.id,
+            taxonomy: 'safe-retry',
+            lease_expires_at: leaseExpiresAt,
+            expires_at: expiresAt,
+          },
+          {
+            operation_key: 'op-2',
+            domain: 'session',
+            intent: 'create',
+            kilo_user_id: otherUser.id,
+            taxonomy: 'safe-retry',
+            lease_expires_at: leaseExpiresAt,
+            expires_at: expiresAt,
+          },
+        ])
+        .returning();
+
+      const [userOutbox, otherOutbox] = await db
+        .insert(analytics_event_outbox)
+        .values([
+          {
+            event_uuid: crypto.randomUUID(),
+            event_name: 'session_create_settled',
+            distinct_id: user.google_user_email,
+            properties: { source: 'server' },
+          },
+          {
+            event_uuid: crypto.randomUUID(),
+            event_name: 'session_create_settled',
+            distinct_id: otherUser.google_user_email,
+            properties: { source: 'server' },
+          },
+        ])
+        .returning();
+      if (!userLedger || !otherLedger || !userOutbox || !otherOutbox) {
+        throw new Error('Failed to seed ledger or outbox rows');
+      }
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db.select().from(operation_ledgers).where(eq(operation_ledgers.id, userLedger.id))
+      ).toHaveLength(0);
+      expect(
+        await db.select().from(operation_ledgers).where(eq(operation_ledgers.id, otherLedger.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(analytics_event_outbox)
+          .where(eq(analytics_event_outbox.id, userOutbox.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(analytics_event_outbox)
+          .where(eq(analytics_event_outbox.id, otherOutbox.id))
+      ).toHaveLength(1);
+    });
+
     it('anonymizes recommendation dismissal actor references', async () => {
       const organizationOwner = await insertTestUser();
       const dismissingUser = await insertTestUser();

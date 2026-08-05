@@ -21,8 +21,15 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));
-vi.mock('@/components/ui/text', () => ({
-  Text: 'Text',
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return {
+    Text: 'Text',
+    TextClassContext: React.createContext<string | undefined>(undefined),
+  };
+});
+vi.mock('@/components/ui/selectable-text', () => ({
+  SelectableText: 'SelectableText',
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),

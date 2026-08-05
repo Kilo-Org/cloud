@@ -14,9 +14,13 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',
 }));
-vi.mock('@/components/ui/text', () => ({
-  Text: 'Text',
-}));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return {
+    Text: 'Text',
+    TextClassContext: React.createContext<string | undefined>(undefined),
+  };
+});
 vi.mock('@/components/ui/selectable-text', () => ({
   SelectableText: 'SelectableText',
 }));
@@ -65,7 +69,9 @@ function monoText(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestI
 
 function findMonoText(root: TestRenderer.ReactTestInstance, type: string) {
   const found = findByType(root, type).find(
-    node => typeof propOf(node, 'children') === 'string' && (propOf(node, 'children') as string).length > 50
+    node =>
+      typeof propOf(node, 'children') === 'string' &&
+      (propOf(node, 'children') as string).length > 50
   );
   if (!found) {
     throw new Error(`expected ${type} mono text`);

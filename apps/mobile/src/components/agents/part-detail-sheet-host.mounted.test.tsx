@@ -27,9 +27,13 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));
-vi.mock('@/components/ui/text', () => ({
-  Text: 'Text',
-}));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return {
+    Text: 'Text',
+    TextClassContext: React.createContext<string | undefined>(undefined),
+  };
+});
 // RNGH ships Flow source that the node project cannot parse; the horizontal
 // ScrollView becomes a string element. The real SegmentedControl imports
 // expo-haptics, which is stubbed below.

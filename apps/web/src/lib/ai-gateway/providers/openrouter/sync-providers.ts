@@ -407,8 +407,6 @@ async function syncProviders(
   return result;
 }
 
-const MODEL_METADATA_REDIS_TTL_SECONDS = 7 * 24 * 60 * 60;
-
 async function mirrorToRedis(values: {
   providers: NormalizedOpenRouterResponse;
   openrouter: Record<string, StoredModel>;
@@ -417,8 +415,6 @@ async function mirrorToRedis(values: {
 }): Promise<void> {
   const entries: [RedisKey, unknown][] = [
     [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
-    [GATEWAY_METADATA_REDIS_KEYS.openrouterModels, values.openrouter],
-    [GATEWAY_METADATA_REDIS_KEYS.vercelModels, values.vercel],
     [GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds, getLanguageModelIds(values.openrouter)],
     [GATEWAY_METADATA_REDIS_KEYS.vercelModelIds, getLanguageModelIds(values.vercel)],
   ];
@@ -428,12 +424,6 @@ async function mirrorToRedis(values: {
   await Promise.all([
     ...entries.map(([key, value]) => {
       const serializedValue = JSON.stringify(value);
-      if (
-        key === GATEWAY_METADATA_REDIS_KEYS.openrouterModels ||
-        key === GATEWAY_METADATA_REDIS_KEYS.vercelModels
-      ) {
-        return redisClient.set(key, serializedValue, { ex: MODEL_METADATA_REDIS_TTL_SECONDS });
-      }
       return redisClient.set(key, serializedValue);
     }),
     mirrorVercelInferenceProvidersToRedis(values.vercel),

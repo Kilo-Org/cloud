@@ -46,8 +46,17 @@ export function persistKiloClawOwned(owned: boolean): void {
   }
 }
 
-export async function clearKiloClawOwned(): Promise<void> {
+// Sign-out must close the gate synchronously, at its first line, before any
+// teardown await, so a late list response from the old tab layout observer
+// cannot write the previous account's answer while the awaits are in flight.
+// The cached answer and the native key are left untouched here;
+// clearKiloClawOwned resets those once the teardown awaits have completed.
+export function gateKiloClawOwned(): void {
   persistenceLocked = true;
+}
+
+export async function clearKiloClawOwned(): Promise<void> {
+  gateKiloClawOwned();
   cached = false;
   await SecureStore.deleteItemAsync(KILOCLAW_OWNED_KEY);
 }

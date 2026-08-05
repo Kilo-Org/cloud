@@ -113,6 +113,29 @@ describe('kiloclaw tab ownership', () => {
     expect(readKiloClawOwned()).toBe(false);
   });
 
+  it('gateKiloClawOwned blocks persistence without resetting memory or deleting the key', async () => {
+    mocks.setItem.mockReturnValue(undefined);
+    mocks.deleteItemAsync.mockResolvedValue(undefined);
+    const { gateKiloClawOwned, persistKiloClawOwned, readKiloClawOwned } =
+      await import('./kiloclaw-tab-ownership');
+
+    // The old account's resolved answer is already persisted.
+    persistKiloClawOwned(true);
+    expect(mocks.setItem).toHaveBeenCalledTimes(1);
+
+    // Sign-out starts; the gate closes synchronously, before any await.
+    gateKiloClawOwned();
+
+    // A late list reconcile cannot write while the gate is closed.
+    persistKiloClawOwned(false);
+    expect(mocks.setItem).toHaveBeenCalledTimes(1);
+
+    // The gate itself neither resets memory nor deletes the native key;
+    // clearKiloClawOwned remains responsible for those.
+    expect(mocks.deleteItemAsync).not.toHaveBeenCalled();
+    expect(readKiloClawOwned()).toBe(true);
+  });
+
   it('lets the next signed-in account persist after reading the cleared state', async () => {
     mocks.setItem.mockReturnValue(undefined);
     mocks.deleteItemAsync.mockResolvedValue(undefined);

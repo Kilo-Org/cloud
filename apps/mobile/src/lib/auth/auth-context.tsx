@@ -16,7 +16,7 @@ import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
-import { clearKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
+import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -66,8 +66,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    // Synchronous gate close — must happen before any await so capture
-    // is denied for the entire async teardown window.
+    // Synchronous gate close — must run at the first line, before any await,
+    // so a late ownership persist from the old tab layout observer cannot
+    // write the previous account's answer during the teardown window.
+    // clearKiloClawOwned still resets the cached answer and deletes the
+    // native key later in the sequence.
+    gateKiloClawOwned();
     clearTelemetryDecision();
     Sentry.setUser(null);
     // SDK teardown — drop queues, do not flush them. Must happen before

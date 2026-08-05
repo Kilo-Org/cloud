@@ -12,6 +12,7 @@ import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
 import {
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
+  genericFailureMessage,
 } from './safe-failure-projection.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import type { SessionMessageQueue } from './session-message-queue.js';
@@ -649,7 +650,7 @@ export function createWrapperSupervisor(
         error,
         completionSource: 'wrapper_failure',
         failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-        failureCode: activityObserved ? 'wrapper_error_after_activity' : failureCode,
+        failureCode,
       });
     }
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
@@ -728,7 +729,7 @@ export function createWrapperSupervisor(
         error: 'Wrapper disconnected',
         completionSource: 'wrapper_failure',
         failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-        failureCode: activityObserved ? 'wrapper_error_after_activity' : 'wrapper_disconnected',
+        failureCode: 'wrapper_disconnected',
       });
     }
     await clearWrapperRuntimeIdentity(
@@ -1431,17 +1432,25 @@ export function createWrapperSupervisor(
         if (status === 'failed') {
           if (errorSource === 'assistant') {
             const assistantFailure = classifyAssistantFailure(error);
+            const failureCode =
+              terminalFailureCode ?? assistantFailure.terminalCode ?? 'assistant_error';
+            const usesExplicitTerminalCode =
+              terminalFailureCode === 'kilo_output_limit' ||
+              terminalFailureCode === 'kilo_empty_terminal_response';
             await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
               kind: 'failed',
               reason: 'assistant_error',
               error: error ?? 'Assistant request failed',
               completionSource: 'wrapper_failure',
               failureStage: 'agent_activity',
-              failureCode:
-                terminalFailureCode ?? assistantFailure.terminalCode ?? 'assistant_error',
-              assistantFailureReason: assistantFailure.reason,
-              providerOwnership: assistantFailure.providerOwnership,
-              safeFailureMessage: assistantFailure.safeMessage,
+              failureCode,
+              ...(usesExplicitTerminalCode
+                ? { safeFailureMessage: genericFailureMessage(failureCode) }
+                : {
+                    assistantFailureReason: assistantFailure.reason,
+                    providerOwnership: assistantFailure.providerOwnership,
+                    safeFailureMessage: assistantFailure.safeMessage,
+                  }),
               ...(persistedModelNotFoundDiagnostics
                 ? { modelNotFoundRuntimeDiagnostics: persistedModelNotFoundDiagnostics }
                 : {}),

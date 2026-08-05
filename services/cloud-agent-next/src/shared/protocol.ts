@@ -53,7 +53,12 @@ export type IngestEvent = {
   data: unknown;
 };
 
-export const WrapperTerminalFailureCodes = ['payment_required', 'model_missing'] as const;
+export const WrapperTerminalFailureCodes = [
+  'payment_required',
+  'model_missing',
+  'kilo_output_limit',
+  'kilo_empty_terminal_response',
+] as const;
 export type WrapperTerminalFailureCode = (typeof WrapperTerminalFailureCodes)[number];
 
 /**

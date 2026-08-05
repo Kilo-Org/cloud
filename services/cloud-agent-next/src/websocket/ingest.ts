@@ -26,6 +26,7 @@ import {
 } from '../session/ingest-handlers/index.js';
 import {
   WrapperTerminalFailureCodes,
+  type WrapperTerminalFailureCode,
   type CompleteEventData,
   type KilocodeEventData,
   type CloudStatusData,
@@ -37,6 +38,7 @@ import type { TerminalizeParams } from '../session/session-message-state.js';
 import {
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
+  genericFailureMessage,
 } from '../session/safe-failure-projection.js';
 import { parseModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
 import {
@@ -153,6 +155,22 @@ function sanitizeKilocodeEventData(data: unknown): unknown {
   return data;
 }
 
+/**
+ * The wrapper sends fixed text for kilo_output_limit/kilo_empty_terminal_response that
+ * text classification cannot recognize, so resolve those from the structured code.
+ * payment_required/model_missing keep text classification: the model-not-found
+ * diagnostics gate keys off the classified safe message.
+ */
+function safeAssistantFailureMessage(
+  failureCode: WrapperTerminalFailureCode | undefined,
+  rawError: unknown
+): string {
+  if (failureCode === 'kilo_output_limit' || failureCode === 'kilo_empty_terminal_response') {
+    return genericFailureMessage(failureCode);
+  }
+  return classifyAssistantFailureMessage(rawError);
+}
+
 function sanitizePublicEventData(eventType: string, data: unknown): unknown {
   if (eventType === 'kilocode') return sanitizeKilocodeEventData(data);
 
@@ -162,7 +180,7 @@ function sanitizePublicEventData(eventType: string, data: unknown): unknown {
     const rawError = parsed.data.error ?? parsed.data.message;
     const safeMessage =
       parsed.data.errorSource === 'assistant'
-        ? classifyAssistantFailureMessage(rawError)
+        ? safeAssistantFailureMessage(parsed.data.failureCode, rawError)
         : 'Agent wrapper failed';
     return {
       fatal: parsed.data.fatal,
@@ -923,7 +941,7 @@ export function createIngestHandler(
             const fatalMessage = errorData.error ?? errorData.message ?? 'Fatal error';
             const safeFatalMessage =
               errorData.errorSource === 'assistant'
-                ? classifyAssistantFailureMessage(fatalMessage)
+                ? safeAssistantFailureMessage(errorData.failureCode, fatalMessage)
                 : 'Agent wrapper failed';
             const shouldForwardModelNotFoundDiagnostics =
               errorData.errorSource === 'assistant' &&

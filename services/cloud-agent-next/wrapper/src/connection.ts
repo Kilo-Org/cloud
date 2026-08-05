@@ -230,9 +230,31 @@ export function isSessionIdleEvent(
 
 function isAssistantCompletionSignal(info: unknown): boolean {
   if (!isRecord(info) || info.role !== 'assistant') return false;
+  if (isOutputLimitTermination(info)) return false;
   const time = isRecord(info.time) ? info.time : undefined;
   return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
 }
+
+function isOutputLimitTermination(info: Record<string, unknown>): boolean {
+  if (info.finish === 'length') return true;
+  const error = info.error;
+  return isRecord(error) && error.name === 'MessageOutputLengthError';
+}
+
+function isVisibleTextPart(part: unknown): boolean {
+  if (!isRecord(part) || part.type !== 'text') return false;
+  if (part.ignored === true) return false;
+  return typeof part.text === 'string' && part.text.trim().length > 0;
+}
+
+const KILO_OUTPUT_LIMIT_MESSAGE = 'Assistant response hit the output length limit';
+const KILO_EMPTY_TERMINAL_RESPONSE_MESSAGE = 'The review ended without any user-visible response.';
+
+type RootAssistantTerminalState = {
+  messageId: string;
+  finish: string | undefined;
+  hasVisibleText: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -489,6 +511,7 @@ export function createConnectionManager(
   let reconnectAttempt = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let generation = 0;
+  let lastRootAssistant: RootAssistantTerminalState | undefined;
 
   // Event buffer for disconnection periods. Byte budget is primary; the count
   // cap is secondary. Lifecycle/terminal frames are protected from eviction.
@@ -1220,10 +1243,46 @@ export function createConnectionManager(
               const currentSessionId = state.currentSession?.kiloSessionId;
               if (!currentSessionId || msgSessionId === currentSessionId) {
                 state.setLastAssistantMessageId(messageInfo.id);
+                const finish =
+                  typeof messageInfo.finish === 'string' ? messageInfo.finish : undefined;
+                lastRootAssistant = {
+                  messageId: messageInfo.id,
+                  finish,
+                  hasVisibleText:
+                    lastRootAssistant?.messageId === messageInfo.id
+                      ? lastRootAssistant.hasVisibleText
+                      : false,
+                };
+                // finish === "length" must win over completion-signal arming so a
+                // terminalized run does not also arm post-completion waiters.
+                if (isOutputLimitTermination(messageInfo)) {
+                  callbacks.onTerminalError({
+                    code: 'kilo_output_limit',
+                    message: KILO_OUTPUT_LIMIT_MESSAGE,
+                    errorSource: 'assistant',
+                  });
+                  return;
+                }
               }
             }
             if (isAssistantCompletionSignal(messageInfo)) {
               callbacks.onCompletionSignal();
+            }
+          }
+
+          if (eventType === 'message.part.updated') {
+            const part = properties.part;
+            if (
+              isVisibleTextPart(part) &&
+              isRecord(part) &&
+              typeof part.messageID === 'string' &&
+              lastRootAssistant?.messageId === part.messageID
+            ) {
+              const partSessionId = typeof part.sessionID === 'string' ? part.sessionID : undefined;
+              const currentSessionId = state.currentSession?.kiloSessionId;
+              if (!currentSessionId || partSessionId === currentSessionId) {
+                lastRootAssistant = { ...lastRootAssistant, hasVisibleText: true };
+              }
             }
           }
 
@@ -1259,6 +1318,20 @@ export function createConnectionManager(
                 `ignoring session.idle for child session: event=${sessionID} current=${currentSessionId}`
               );
               continue;
+            }
+            // Empty stop-finished reviews are a hard fail for code-review jobs.
+            // finish === "length" is owned by the message.updated path above.
+            if (
+              isCodeReviewJob(state) &&
+              lastRootAssistant?.finish === 'stop' &&
+              !lastRootAssistant.hasVisibleText
+            ) {
+              callbacks.onTerminalError({
+                code: 'kilo_empty_terminal_response',
+                message: KILO_EMPTY_TERMINAL_RESPONSE_MESSAGE,
+                errorSource: 'assistant',
+              });
+              return;
             }
             logToFile('session.idle received');
             callbacks.onCompletionSignal();

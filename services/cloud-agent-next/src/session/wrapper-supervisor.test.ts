@@ -971,6 +971,27 @@ describe('WrapperSupervisor', () => {
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
   });
 
+  it('preserves wrapper_no_output after agent activity', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      agentActivityObservedAt: acceptedAt + 1_000,
+    });
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'agent_activity',
+      failureCode: 'wrapper_no_output',
+    });
+  });
+
   it('terminates an unresponsive wrapper on ping timeout before no-output expires', async () => {
     const pingDeadlineAt = 92_000;
     const noOutputDeadlineAt = 332_000;
@@ -986,6 +1007,57 @@ describe('WrapperSupervisor', () => {
       status: 'failed',
       error: 'Wrapper did not respond to liveness ping',
       failureCode: 'wrapper_ping_timeout',
+    });
+  });
+
+  it('preserves wrapper_ping_timeout after agent activity', async () => {
+    const pingDeadlineAt = 92_000;
+    const noOutputDeadlineAt = 332_000;
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      agentActivityObservedAt: 9_000,
+    });
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'agent_activity',
+      failureCode: 'wrapper_ping_timeout',
+    });
+  });
+
+  it.each([
+    {
+      failureCode: 'kilo_output_limit' as const,
+      error: 'Assistant response hit the output length limit',
+    },
+    {
+      failureCode: 'kilo_empty_terminal_response' as const,
+      error: 'The review ended without any user-visible response.',
+    },
+  ])('preserves $failureCode after agent activity', async failure => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      agentActivityObservedAt: 9_000,
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'failed',
+      errorSource: 'assistant',
+      ...failure,
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'agent_activity',
+      failureCode: failure.failureCode,
     });
   });
 

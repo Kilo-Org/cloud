@@ -26,4 +26,15 @@ describe('getFallbackModelVariants', () => {
       max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
     });
   });
+
+  test('orders OpenAI variants from most to least intensive', () => {
+    expect(Object.keys(getFallbackModelVariants('openai/gpt-5.6-sol') ?? {})).toEqual([
+      'max',
+      'xhigh',
+      'high',
+      'medium',
+      'low',
+      'none',
+    ]);
+  });
 });

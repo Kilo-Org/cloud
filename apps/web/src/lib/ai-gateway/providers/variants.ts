@@ -143,6 +143,7 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
     return Object.fromEntries(
       ReasoningEffortSchema.options
         .filter(e => e !== 'minimal')
+        .reverse()
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }

@@ -2057,6 +2057,7 @@ export const EndpointsSchema = z.object({
 export const StoredModelSchema = ModelSchema.and(
   z.object({
     endpoints: z.array(EndpointSchema),
+    variants: OpenCodeSettingsSchema.shape.variants,
   })
 );
 

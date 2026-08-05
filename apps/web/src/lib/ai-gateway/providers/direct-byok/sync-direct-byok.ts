@@ -6,23 +6,19 @@ import {
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
+import { VerbositySchema, type OpenCodeSettings } from '@kilocode/db/schema-types';
+import { getAiSdkProvider, getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
 import {
-  ReasoningEffortSchema,
-  VerbositySchema,
-  type OpenCodeSettings,
-} from '@kilocode/db/schema-types';
-import {
-  getAiSdkProvider,
-  getModelVariants,
-  REASONING_VARIANTS_BINARY,
-} from '@/lib/ai-gateway/providers/model-settings';
+  fetchModelsDevCatalog,
+  ModelsDevModalitySchema,
+  modelsDevReasoningOptionsToVariants,
+  parseModelsDevProvider,
+  type ModelsDevCatalog,
+  type ModelsDevModality,
+} from '@/lib/ai-gateway/providers/models-dev';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
-
-const ModalitySchema = z
-  .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
-  .catch('unknown');
 
 const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
@@ -32,55 +28,18 @@ const OpenAICompatibleModelsResponseSchema = z.object({
       context_length: z.number().optional(),
       max_model_len: z.number().optional(),
       max_output_length: z.number().optional(),
-      input_modalities: z.array(ModalitySchema).optional(),
+      input_modalities: z.array(ModelsDevModalitySchema).optional(),
       supported_features: z.array(z.string()).optional(),
     })
   ),
 });
-
-const ModelsDevReasoningOptionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('toggle') }),
-  z.object({
-    type: z.literal('effort'),
-    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
-  }),
-]);
-
-const ModelsDevModelSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  reasoning: z.boolean().optional(),
-  reasoning_options: z.array(ModelsDevReasoningOptionSchema).optional().catch(undefined),
-  status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
-  limit: z
-    .object({
-      context: z.number().optional(),
-      output: z.number().optional(),
-    })
-    .optional(),
-  modalities: z
-    .object({
-      input: z.array(ModalitySchema).optional(),
-      output: z.array(ModalitySchema).optional(),
-    })
-    .optional(),
-  tool_call: z.boolean().optional(),
-});
-
-const ModelsDevProviderSchema = z.object({
-  models: z.record(z.string(), ModelsDevModelSchema),
-});
-
-const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
-
-type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
 type RawModel = {
   id: string;
   name?: string;
   context_length?: number;
   max_completion_tokens?: number;
-  input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
+  input_modalities?: ReadonlyArray<ModelsDevModality>;
   flags?: ReadonlyArray<DirectByokModelFlag>;
   variants?: OpenCodeSettings['variants'];
 };
@@ -135,33 +94,6 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
     }));
 }
 
-function modelsDevReasoningOptionsToVariants(
-  options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>>
-): OpenCodeSettings['variants'] {
-  const hasToggle = options.some(option => option.type === 'toggle');
-  const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};
-  for (const option of options) {
-    if (option.type !== 'effort') continue;
-    for (const value of option.values) {
-      const effort = ReasoningEffortSchema.safeParse(value);
-      if (!effort.success) continue;
-      effortVariants[effort.data] = {
-        reasoning: { enabled: effort.data !== 'none', effort: effort.data },
-      };
-    }
-  }
-
-  if (Object.keys(effortVariants).length > 0) {
-    return hasToggle && !effortVariants.none
-      ? { none: { reasoning: { enabled: false, effort: 'none' } }, ...effortVariants }
-      : effortVariants;
-  }
-  if (hasToggle) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  return undefined;
-}
-
 function addAnthropicVariantVerbosity(
   variants: OpenCodeSettings['variants'],
   aiSdkProvider: OpenCodeSettings['ai_sdk_provider']
@@ -181,7 +113,7 @@ export function parseModelsDevProviderModels(
   providerId: DirectUserByokInferenceProviderId,
   availableModelIds?: ReadonlySet<string>
 ): RawModel[] {
-  const provider = ModelsDevProviderSchema.parse(entry);
+  const provider = parseModelsDevProvider(entry);
   return Object.values(provider.models)
     .filter(
       model =>
@@ -239,16 +171,6 @@ function modelsDevFetcher(
       return parseModelsDevProviderModels(entry, providerId, availableModelIds);
     },
   };
-}
-
-async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
-  const response = await fetch('https://models.dev/api.json');
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-    );
-  }
-  return ModelsDevCatalogSchema.parse(await response.json());
 }
 
 const FETCHERS: ReadonlyArray<ProviderFetcher> = [
@@ -328,10 +250,10 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
   return models.length;
 }
 
-export async function syncDirectByokModels(): Promise<
-  Partial<Record<DirectUserByokInferenceProviderId, number>>
-> {
-  let catalogPromise: Promise<ModelsDevCatalog> | null = null;
+export async function syncDirectByokModels(
+  sharedModelsDevCatalog?: Promise<ModelsDevCatalog>
+): Promise<Partial<Record<DirectUserByokInferenceProviderId, number>>> {
+  let catalogPromise: Promise<ModelsDevCatalog> | null = sharedModelsDevCatalog ?? null;
   const ctx: SyncContext = {
     getModelsDevCatalog() {
       catalogPromise ??= fetchModelsDevCatalog();

@@ -46,6 +46,12 @@ import {
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
+import {
+  fetchModelsDevCatalog,
+  getModelsDevProvider,
+  modelsDevReasoningOptionsToVariants,
+  type ModelsDevCatalog,
+} from '@/lib/ai-gateway/providers/models-dev';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -68,20 +74,27 @@ async function mirrorVercelInferenceProvidersToRedis(vercelModels: Record<string
   await pipeline.exec();
 }
 
-async function fetchGatewayModels(gateway: Provider) {
+async function fetchGatewayModels(
+  gateway: Provider,
+  modelsDevCatalogPromise: Promise<ModelsDevCatalog> = fetchModelsDevCatalog()
+) {
   const headers = {
     ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
   };
 
-  const modelsResponse = await fetch(`${gateway.apiUrl}/models`, {
-    method: 'GET',
-    headers,
-  });
+  const [modelsResponse, modelsDevCatalog] = await Promise.all([
+    fetch(`${gateway.apiUrl}/models`, {
+      method: 'GET',
+      headers,
+    }),
+    modelsDevCatalogPromise,
+  ]);
   if (!modelsResponse.ok) {
     throw new Error(`Fetching models from ${gateway.id} failed: ${modelsResponse.status}`);
   }
   const models = ModelsSchema.parse(await modelsResponse.json());
+  const modelsDevProvider = getModelsDevProvider(modelsDevCatalog, gateway.id);
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
@@ -98,9 +111,13 @@ async function fetchGatewayModels(gateway: Provider) {
           );
         }
         const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
+        const variants = modelsDevReasoningOptionsToVariants(
+          modelsDevProvider.models[model.id]?.reasoning_options ?? []
+        );
         result[model.id] = {
           ...model,
           endpoints: endpoints.data.endpoints,
+          ...(variants && { variants }),
         };
       })
     )
@@ -504,8 +521,11 @@ export async function applySnapshotChangesAndAudit(params: {
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
-  const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
-  const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
+  const modelsDevCatalogPromise = fetchModelsDevCatalog();
+  const [openrouter_data, vercel_data] = await Promise.all([
+    fetchGatewayModels(PROVIDERS.OPENROUTER, modelsDevCatalogPromise),
+    fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY, modelsDevCatalogPromise),
+  ]);
 
   const openrouterProviders = await fetchProviders();
   if (openrouterProviders.length < 10) {
@@ -537,7 +557,7 @@ export async function syncAndStoreProviders() {
     openrouterProviders,
   });
 
-  const direct_byok_model_counts = await syncDirectByokModels();
+  const direct_byok_model_counts = await syncDirectByokModels(modelsDevCatalogPromise);
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
   return {

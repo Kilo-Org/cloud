@@ -5,12 +5,15 @@
  * universal link delivers the URL with query params to the app.  The deep-link
  * handler extracts the outcome and stores it here.  The agents tab reads it
  * on mount to show the four C13 plan states.
+ *
+ * An org-scoped install keeps `organizationId` on the outcome so a retryable
+ * failure can re-mint the install state for the original organization owner.
  */
 
 export type GitHubInstallReturnOutcome =
-  | { kind: 'success' }
-  | { kind: 'pending' }
-  | { kind: 'error'; code: string }
+  | { kind: 'success'; organizationId?: string }
+  | { kind: 'pending'; organizationId?: string }
+  | { kind: 'error'; code: string; organizationId?: string }
   | null;
 
 let outcome: GitHubInstallReturnOutcome = null;
@@ -40,15 +43,16 @@ export function subscribeToGitHubInstallReturnOutcome(listener: () => void): () 
 /** Extract C13 return outcome params from a raw URL query string. */
 export function parseGitHubReturnParams(search: string): GitHubInstallReturnOutcome {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const organizationId = params.get('organizationId') ?? undefined;
   if (params.get('github_install') === 'success') {
-    return { kind: 'success' };
+    return { kind: 'success', ...(organizationId ? { organizationId } : {}) };
   }
   if (params.get('github_pending_approval') === 'true') {
-    return { kind: 'pending' };
+    return { kind: 'pending', ...(organizationId ? { organizationId } : {}) };
   }
   const error = params.get('error');
   if (error) {
-    return { kind: 'error', code: error };
+    return { kind: 'error', code: error, ...(organizationId ? { organizationId } : {}) };
   }
   return null;
 }

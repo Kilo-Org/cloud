@@ -90,4 +90,33 @@ describe('github-install-return', () => {
     expect(getGitHubInstallReturnOutcome()).toBeNull();
     unsubscribe();
   });
+
+  it('parseGitHubReturnParams keeps organizationId on success', () => {
+    expect(parseGitHubReturnParams('?github_install=success&organizationId=org-123')).toEqual({
+      kind: 'success',
+      organizationId: 'org-123',
+    });
+  });
+
+  it('parseGitHubReturnParams keeps organizationId on error', () => {
+    expect(parseGitHubReturnParams('?error=installation_failed&organizationId=org-123')).toEqual({
+      kind: 'error',
+      code: 'installation_failed',
+      organizationId: 'org-123',
+    });
+  });
+
+  it('parseGitHubReturnParams keeps organizationId on pending', () => {
+    expect(parseGitHubReturnParams('?github_pending_approval=true&organizationId=org-123')).toEqual(
+      { kind: 'pending', organizationId: 'org-123' }
+    );
+  });
+
+  it('parseGitHubReturnParams omits organizationId when absent', () => {
+    expect(parseGitHubReturnParams('?github_install=success')).toEqual({ kind: 'success' });
+    expect(parseGitHubReturnParams('?error=installation_failed')).toEqual({
+      kind: 'error',
+      code: 'installation_failed',
+    });
+  });
 });

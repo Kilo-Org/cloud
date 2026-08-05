@@ -16,7 +16,8 @@ export function createSecureStorePreference<T>(options: {
   const { key, defaultValue, parse, serialize } = options;
   let value = defaultValue;
   let hasLoaded = false;
-  // A set() before the initial load resolves must win over the disk value.
+  // A set() or clear() before the initial load resolves must win over the
+  // disk value.
   let dirty = false;
   let loadStarted = false;
   const listeners = new Set<() => void>();
@@ -86,7 +87,9 @@ export function createSecureStorePreference<T>(options: {
     /** Reset memory and disk (e.g. on sign-out). */
     clear: () => {
       value = defaultValue;
-      dirty = false;
+      // Keep dirty set so an in-flight initial read does not restore the old
+      // value after sign-out.
+      dirty = true;
       emit();
       void remove();
     },

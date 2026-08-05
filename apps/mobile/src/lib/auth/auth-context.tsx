@@ -15,6 +15,7 @@ import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await clearViewedFiles();
     clearAgentModelPreference();
     clearReasoningPreference();
+    clearKeepScreenOnPreference();
     queryClient.clear();
     setToken(undefined);
   }, []);

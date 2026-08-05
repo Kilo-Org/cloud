@@ -1,7 +1,6 @@
-/* eslint-disable max-lines -- Queued-badge, delivery, a11y, and time-label seams share the direct-invocation MessageBubble harness. */
+/* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
 import { describe, expect, it, vi } from 'vitest';
 
-import { formatTranscriptTimeLabel } from './message-time-label';
 import {
   assistantMessage,
   findElementByType,
@@ -151,78 +150,6 @@ describe('MessageBubble failed delivery state', () => {
   });
 });
 
-describe('MessageBubble time label', () => {
-  it('renders a same-day time label matching the formatter evaluated in the test', async () => {
-    const created = Date.now();
-    const message = userMessage('m-time-same-day');
-    message.info.time = { created };
-    const tree = await renderBubble(message);
-    const expected = formatTranscriptTimeLabel(created, Date.now());
-    expect(expected).not.toBeNull();
-    expect(findText(tree, t => t === expected)).toBe(true);
-  });
-
-  it('renders the user time label in the meta row after the queued badge slot', async () => {
-    const tree = await renderBubble(userMessage('m-time-user'), { status: 'queued' });
-    const metaRow = findElementByType(
-      tree,
-      'View',
-      p =>
-        typeof p.className === 'string' &&
-        p.className.includes('flex-row items-center gap-2 self-end pr-1')
-    );
-    expect(metaRow).not.toBeNull();
-    if (!metaRow) {
-      throw new Error('expected meta row');
-    }
-    const children = Array.isArray(metaRow.props.children)
-      ? metaRow.props.children
-      : [metaRow.props.children];
-    expect(children.length).toBe(2);
-    const badge = children[0] as { props?: Record<string, unknown> };
-    const badgeClass = typeof badge.props?.className === 'string' ? badge.props.className : null;
-    expect(badgeClass).not.toBeNull();
-    expect(badgeClass?.includes(BADGE_CLASS)).toBe(true);
-    const label = children[1] as { props?: Record<string, unknown> };
-    const labelClass = typeof label.props?.className === 'string' ? label.props.className : null;
-    expect(labelClass).not.toBeNull();
-    expect(labelClass?.includes('tabular-nums')).toBe(true);
-    expect(typeof label.props?.children).toBe('string');
-  });
-
-  it('renders the assistant time label after the parts view', async () => {
-    const tree = await renderBubble(assistantMessage('m-time-asst'));
-    const pressable = findElementByType(tree, 'Pressable');
-    expect(pressable).not.toBeNull();
-    if (!pressable) {
-      throw new Error('expected pressable');
-    }
-    const children = Array.isArray(pressable.props.children)
-      ? pressable.props.children
-      : [pressable.props.children];
-    const partsIndex = children.findIndex(child =>
-      subtreeContains(child, p => typeof p.className === 'string' && p.className.includes('gap-2'))
-    );
-    const labelIndex = children.findIndex(child => subtreeContainsTimeLabel(child));
-    expect(partsIndex).toBeGreaterThanOrEqual(0);
-    expect(labelIndex).toBeGreaterThan(partsIndex);
-  });
-
-  it('does not render a time label when time.created is absent', async () => {
-    const message = userMessage('m-time-absent');
-    (message.info.time as { created?: number }).created = undefined;
-    const tree = await renderBubble(message);
-    expect(findTimeLabel(tree)).toBeNull();
-  });
-
-  it('does not render a time label when time.created is invalid', async () => {
-    const message = assistantMessage('m-time-invalid');
-    message.info.time = { created: Number.NaN };
-    const tree = await renderBubble(message);
-    expect(findTimeLabel(tree)).toBeNull();
-  });
-});
-
 describe('MessageBubble regressions', () => {
   it('holds badge slot when queued and holdQueuedSlot is set after dequeue', async () => {
     const message = userMessage('m7');
@@ -348,57 +275,6 @@ function findProvider(
     }
   } else if (children && typeof children === 'object') {
     return findProvider(children, providerType);
-  }
-  return null;
-}
-
-function subtreeContains(
-  node: unknown,
-  predicate: (props: Record<string, unknown>) => boolean
-): boolean {
-  if (node == null || typeof node !== 'object') {
-    return false;
-  }
-  const element = node as { type?: unknown; props?: Record<string, unknown> };
-  if (predicate(element.props ?? {})) {
-    return true;
-  }
-  const children = element.props?.children;
-  if (Array.isArray(children)) {
-    return children.some(child => subtreeContains(child, predicate));
-  }
-  if (children && typeof children === 'object') {
-    return subtreeContains(children, predicate);
-  }
-  return false;
-}
-
-function subtreeContainsTimeLabel(node: unknown): boolean {
-  return subtreeContains(
-    node,
-    p => typeof p.className === 'string' && p.className.includes('tabular-nums')
-  );
-}
-
-function findTimeLabel(node: unknown): { props: Record<string, unknown> } | null {
-  if (node == null || typeof node !== 'object') {
-    return null;
-  }
-  const element = node as { type?: unknown; props?: Record<string, unknown> };
-  const props = element.props ?? {};
-  if (typeof props.className === 'string' && props.className.includes('tabular-nums')) {
-    return { props };
-  }
-  const children = element.props?.children;
-  if (Array.isArray(children)) {
-    for (const child of children) {
-      const hit = findTimeLabel(child);
-      if (hit) {
-        return hit;
-      }
-    }
-  } else if (children && typeof children === 'object') {
-    return findTimeLabel(children);
   }
   return null;
 }

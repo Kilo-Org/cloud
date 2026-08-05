@@ -12,6 +12,7 @@ import {
   LogOut,
   MessageSquare,
   ShieldCheck,
+  SlidersHorizontal,
   Trash2,
 } from 'lucide-react-native';
 import { Alert, Platform, View } from 'react-native';
@@ -288,6 +289,23 @@ export function ProfileScreen() {
             ]}
             value={themePreference}
             onChange={setThemePreference}
+          />
+        </View>
+
+        {/* App */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            App
+          </Text>
+          <ConfigureRow
+            icon={SlidersHorizontal}
+            title="Preferences"
+            subtitle="Thinking and screen behavior"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
           />
         </View>
 

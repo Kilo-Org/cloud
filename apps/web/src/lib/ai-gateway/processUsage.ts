@@ -1196,8 +1196,7 @@ export async function useGenerationLookup(
   if (!isGatewayProvider || !isSuccessStatusCode) {
     return false;
   }
-  const isFree = await isFreeModel(usageContext.requested_model);
-  if (isFree) {
+  if (await isFreeModel(usageContext.requested_model)) {
     console.debug('[useGenerationLookup] skipping lookup for free model');
     return false;
   }
@@ -1206,13 +1205,13 @@ export async function useGenerationLookup(
     return false;
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
-  const hasCostWhenPaid = (usageStats?.cost_mUsd ?? 0) > 0;
+  const hasCost = (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);
   if (!hasOutputTokens) {
     console.debug('[useGenerationLookup] token stats are missing');
     return true;
   }
-  if (!hasCostWhenPaid) {
+  if (!hasCost) {
     console.debug('[useGenerationLookup] cost is missing');
     return true;
   }

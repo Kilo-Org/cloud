@@ -105,7 +105,7 @@ describe('useGenerationLookup', () => {
     hasError: false,
     cost_mUsd: 0,
     inputTokens: 100,
-    outputTokens: 100,
+    outputTokens: 0,
     cacheWriteTokens: 0,
     cacheHitTokens: 0,
     is_byok: false,

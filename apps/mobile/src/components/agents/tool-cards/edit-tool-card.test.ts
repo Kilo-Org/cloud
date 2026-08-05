@@ -251,7 +251,11 @@ describe('EditToolCardBody — diff preview routing', () => {
       part: makeEditPart({ oldString: 'old', newString: 'new' }),
     }) as unknown as React.ReactElement;
     expect(findByType(root, 'ToolDiffPreview')).toHaveLength(0);
-    expect(findByType(root, 'MonoScrollBlock')).toHaveLength(2);
+    const blocks = findByType(root, 'MonoScrollBlock');
+    expect(blocks).toHaveLength(2);
+    for (const block of blocks) {
+      expect((block.props as { maxLength?: unknown }).maxLength).toBeUndefined();
+    }
   });
 
   it('renders no body when the model does not exist and strings are empty', () => {

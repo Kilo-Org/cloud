@@ -88,4 +88,28 @@ describe('createSecureStorePreference', () => {
     expect(store.get()).toBe(false);
     unsubscribe();
   });
+
+  it('keeps the default when clear() runs during an in-flight initial load', async () => {
+    const pendingReads: ((raw: string | null) => void)[] = [];
+    getItemAsync.mockReturnValue(
+      new Promise<string | null>(resolve => {
+        pendingReads.push(resolve);
+      })
+    );
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    const unsubscribe = store.subscribe(noopListener);
+    store.clear();
+    pendingReads[0]?.('true');
+    await flushMicrotasks();
+
+    expect(deleteItemAsync).toHaveBeenCalled();
+    expect(store.get()).toBe(false);
+    unsubscribe();
+  });
 });

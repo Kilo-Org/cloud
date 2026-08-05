@@ -3,15 +3,14 @@ import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
 import { MessageErrorBoundary } from './message-error-boundary';
+import { partRendersContent } from './message-visibility';
 import {
   isCompactionPart,
   isFilePart,
   isPartStreaming,
   isReasoningPart,
-  isSnapshotProgressPart,
   isTextPart,
   isToolPart,
-  shouldRenderReasoningPart,
 } from './part-types';
 import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
@@ -33,12 +32,10 @@ export function PartRenderer({
   defaultReasoningExpanded,
   onOpenChildSession,
 }: Readonly<PartRendererProps>) {
+  if (!partRendersContent(part)) {
+    return null;
+  }
   if (isTextPart(part)) {
-    // Snapshot-init progress is shown only in the fixed WorkingIndicator row.
-    // Hide unconditionally so a persisted part never lingers in the transcript.
-    if (isSnapshotProgressPart(part)) {
-      return null;
-    }
     return (
       <MessageErrorBoundary>
         <TextPartRenderer text={part.text} />
@@ -58,9 +55,6 @@ export function PartRenderer({
     );
   }
   if (isReasoningPart(part)) {
-    if (!shouldRenderReasoningPart(part, isStreaming ?? false)) {
-      return null;
-    }
     return (
       <MessageErrorBoundary>
         <ReasoningPartRenderer

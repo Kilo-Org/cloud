@@ -239,7 +239,13 @@ describe('WriteToolCardBody — diff preview routing', () => {
       part: makeWritePart({ content: 'hello' }),
     }) as unknown as React.ReactElement;
     expect(findByType(root, 'ToolDiffPreview')).toHaveLength(0);
-    expect(findByType(root, 'MonoScrollBlock')).toHaveLength(1);
+    const blocks = findByType(root, 'MonoScrollBlock');
+    expect(blocks).toHaveLength(1);
+    const block = blocks[0];
+    if (!block) {
+      throw new Error('block not found');
+    }
+    expect((block.props as { maxLength?: unknown }).maxLength).toBeUndefined();
   });
 
   it('renders no body when the model does not exist and content is empty', () => {

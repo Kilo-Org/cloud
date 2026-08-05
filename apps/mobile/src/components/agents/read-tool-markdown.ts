@@ -1,6 +1,6 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
-/** Inline preview cap. Matches the maxLength ReadToolCard already gives MonoScrollBlock. */
+/** Inline preview cap for the card. The reader shows the full markdown. */
 export const MARKDOWN_INLINE_MAX_CHARS = 2000;
 
 export type ReadFileDisplay = {

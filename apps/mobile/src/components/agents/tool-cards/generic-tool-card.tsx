@@ -36,15 +36,9 @@ export function GenericToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   return (
     <View className="gap-2">
       {inputStr ? (
-        <MonoScrollBlock
-          content={inputStr}
-          maxLength={1000}
-          textClassName="text-muted-foreground"
-        />
+        <MonoScrollBlock content={inputStr} textClassName="text-muted-foreground" />
       ) : null}
-      {output ? (
-        <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
-      ) : null}
+      {output ? <MonoScrollBlock content={output} textClassName="text-foreground" /> : null}
       {error ? (
         <Text selectable={textSelectable} className="text-xs text-destructive">
           {error}

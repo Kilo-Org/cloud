@@ -23,9 +23,7 @@ export function GrepToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
   return (
     <View className="gap-2">
-      {output ? (
-        <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
-      ) : null}
+      {output ? <MonoScrollBlock content={output} textClassName="text-foreground" /> : null}
       {error ? (
         <Text selectable={textSelectable} className="text-xs text-destructive">
           {error}

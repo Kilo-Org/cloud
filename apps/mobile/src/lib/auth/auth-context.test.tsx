@@ -99,9 +99,13 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
 }));
 
-vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
+const { clearKeepScreenOnPreference, clearReasoningPreference } = vi.hoisted(() => ({
+  clearKeepScreenOnPreference: vi.fn(),
   clearReasoningPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
+
+vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 
 vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
@@ -125,6 +129,7 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 
 vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
+  KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
   KILOCLAW_OWNED_KEY: 'kiloclaw-owned',
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
@@ -287,6 +292,17 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
 
     unmount();
+  });
+
+  it('clears both local preferences on sign-out', async () => {
+    const { ctx } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(clearKeepScreenOnPreference).toHaveBeenCalled();
+    expect(clearReasoningPreference).toHaveBeenCalled();
   });
 
   it('closes the ownership gate before any await and blocks a late persist', async () => {

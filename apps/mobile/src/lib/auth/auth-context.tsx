@@ -19,6 +19,7 @@ import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
@@ -273,6 +274,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await clearViewedFiles();
     clearAgentModelPreference();
     clearReasoningPreference();
+    clearKeepScreenOnPreference();
     queryClient.clear();
     setSessionEnded(ended);
     setToken(undefined);

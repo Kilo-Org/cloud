@@ -48,6 +48,8 @@ import {
   shouldShowFooterWorkingIndicator,
   shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
+import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
+import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import {
@@ -94,6 +96,7 @@ import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
   createRemoteModelOverride,
@@ -221,6 +224,7 @@ export function SessionDetailContent({
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
+  const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { models: gatewayModels, isLoading: gatewayModelsLoading } =
     useAvailableModels(organizationId);
   const sessionModels = useSessionModelOptions({
@@ -431,6 +435,9 @@ export function SessionDetailContent({
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
         return <PreparationGroup attempt={item.attempt} />;
+      }
+      if (item.type === 'time') {
+        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
       }
       // Look up delivery state by message id. The map is keyed by user-message
       // id and may briefly contain an entry before the bubble has rendered
@@ -776,10 +783,14 @@ export function SessionDetailContent({
   }, [continueSession, fetchedData?.gitUrl, currentMode, currentModel, currentVariant]);
 
   const isFocused = useIsFocused();
-  // Focus bounds the awake window to the visible working UI; a backgrounded
-  // or covered screen must not hold the OS idle timer.
-  const keepScreenAwake =
-    isFocused && agentStatus.type !== 'disconnected' && (isStreaming || pendingMessages.size > 0);
+  const keepScreenAwake = shouldKeepSessionAwake({
+    keepScreenOn,
+    preferenceLoaded: keepScreenOnLoaded,
+    isFocused,
+    isDisconnected: agentStatus.type === 'disconnected',
+    isStreaming,
+    pendingMessageCount: pendingMessages.size,
+  });
 
   return (
     <PartDetailSheetHost messages={messages}>

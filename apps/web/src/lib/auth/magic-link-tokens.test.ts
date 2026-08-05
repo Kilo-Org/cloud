@@ -9,12 +9,32 @@ import {
   releaseSignInCode,
   reserveSignInCode,
   verifyAndConsumeMagicLinkToken,
-  verifyAndConsumeSignInCode,
 } from './magic-link-tokens';
 import { db } from '@/lib/drizzle';
 import { sql, eq, and } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import { createHash } from 'crypto';
+
+/**
+ * Reserve then immediately commit a sign-in code — the no-settlement shape the
+ * production route no longer uses. Kept here so the reserve/commit/release
+ * contract stays covered without shipping a caller-less wrapper.
+ */
+async function verifyAndConsumeSignInCode(
+  email: string,
+  code: string,
+  challengeId?: string
+): Promise<'ok' | 'invalid' | 'too_many_attempts'> {
+  const result = await reserveSignInCode(email, code, challengeId);
+  if (result !== 'ok') {
+    return result === 'in_progress' ? 'invalid' : result;
+  }
+  if (!(await commitSignInCode(email, code, challengeId))) {
+    await releaseSignInCode(email, code, challengeId);
+    return 'invalid';
+  }
+  return 'ok';
+}
 
 describe('Magic Link Tokens', () => {
   const testEmail = 'test@example.com';

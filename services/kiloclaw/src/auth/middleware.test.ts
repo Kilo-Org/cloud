@@ -10,6 +10,7 @@ vi.mock('../db', () => ({
   findPepperByUserId: vi.fn(async (_db: unknown, userId: string) => ({
     id: userId,
     api_token_pepper: `pepper_for_${userId}`,
+    blocked_reason: userId === 'blocked_user' ? 'abuse' : null,
   })),
 }));
 
@@ -218,6 +219,29 @@ describe('authMiddleware', () => {
     expect(res.status).toBe(401);
     const body = await jsonBody(res);
     expect(body.error).toBe('Authentication failed');
+  });
+});
+
+describe('blocked users', () => {
+  let app: ReturnType<typeof createTestApp>;
+
+  beforeEach(() => {
+    app = createTestApp();
+  });
+
+  it('rejects a matching-pepper token when blocked_reason is set', async () => {
+    const token = await signToken({
+      kiloUserId: 'blocked_user',
+      apiTokenPepper: pepperFor('blocked_user'),
+      version: KILO_TOKEN_VERSION,
+    });
+
+    const res = await app.request(
+      '/protected/whoami',
+      { headers: { Authorization: `Bearer ${token}` } },
+      ENV_WITH_HYPERDRIVE
+    );
+    expect(res.status).toBe(401);
   });
 });
 

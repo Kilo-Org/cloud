@@ -147,7 +147,6 @@ export async function createSignInCode(
 }
 
 export type ReserveSignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts' | 'in_progress';
-export type VerifySignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts';
 
 /**
  * Reserve a sign-in code for settlement. Does not consume the code.
@@ -382,35 +381,6 @@ export async function consumeSignInCode(
     .returning();
 
   return consumed.length > 0;
-}
-
-/**
- * Verify and consume an email sign-in code atomically, scoped by email.
- *
- * This is a thin compatibility wrapper that reserves then immediately commits.
- * Callers that perform a settlement (createOrUpdateUser) between verification
- * and consumption must use reserveSignInCode / commitSignInCode / releaseSignInCode
- * directly instead.
- */
-export async function verifyAndConsumeSignInCode(
-  email: string,
-  code: string,
-  challengeId?: string
-): Promise<VerifySignInCodeResult> {
-  const result = await reserveSignInCode(email, code, challengeId);
-  if (result !== 'ok') {
-    // Map 'in_progress' to 'invalid' — the wrapper has no settlement phase
-    // so a reservation conflict is a bug, not a retryable state.
-    return result === 'in_progress' ? 'invalid' : result;
-  }
-  const committed = await commitSignInCode(email, code, challengeId);
-  if (!committed) {
-    // Reservation expired between reserve and commit — release so the code
-    // stays usable and the user can retry.
-    await releaseSignInCode(email, code, challengeId);
-    return 'invalid';
-  }
-  return 'ok';
 }
 
 export async function deleteSignInCode(email: string, code: string): Promise<void> {

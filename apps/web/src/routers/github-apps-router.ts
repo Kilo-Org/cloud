@@ -97,7 +97,13 @@ export const githubAppsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
+      // Any org member can start an install, matching the pre-C1 callback,
+      // which called ensureOrganizationAccess with no role filter.
+      const owner = await resolveAuthorizedOwner(ctx, input.organizationId, [
+        'owner',
+        'billing_manager',
+        'member',
+      ]);
       const appType = await getGitHubAppTypeForOrganization(input.organizationId ?? null);
 
       const token = await createInstallState({

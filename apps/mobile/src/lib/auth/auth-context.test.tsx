@@ -295,7 +295,7 @@ describe('sign-out teardown ordering', () => {
   });
 
   it('clears both local preferences on sign-out', async () => {
-    const { ctx, unmount } = await mountAndGetContext();
+    const { ctx } = await mountAndGetContext();
 
     await act(async () => {
       await ctx.signOut();

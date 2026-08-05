@@ -31,6 +31,9 @@ vi.mock('@/lib/appsflyer', () => ({ resetAppsFlyerState: vi.fn(), trackEvent: vi
 vi.mock('@sentry/react-native', () => ({ setUser: vi.fn() }));
 vi.mock('@/lib/telemetry/controller', () => ({ clearTelemetryDecision: vi.fn() }));
 vi.mock('@/lib/telemetry/posthog-storage', () => ({ purgePostHogPersistence: vi.fn() }));
+// sonner-native pulls in react-native at runtime, whose Flow-only `import
+// typeof` syntax crashes Node's parser in the pure (node) test environment.
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),

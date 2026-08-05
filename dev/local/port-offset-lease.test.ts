@@ -122,6 +122,53 @@ test('automatic port selection skips conflicts and restores the offset on exhaus
   }
 });
 
+test('automatic port selection skips the X11 range rejected by Next.js', async () => {
+  const leases = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-port-lease-'));
+  const initialOffset = portOffset;
+  let scans = 0;
+  try {
+    applyPortOffset(3000);
+    await acquirePortOffsetLease(
+      ['nextjs'],
+      false,
+      '/worktree/one',
+      'missing-session-one',
+      leases,
+      async () => {
+        scans++;
+        return { conflicts: [], reusedHostServices: new Set<string>() };
+      }
+    );
+    assert.equal(portOffset, 3100);
+    assert.equal(scans, 1);
+    await releasePortOffsetClaims('/worktree/one', 'missing-session-one', leases);
+  } finally {
+    applyPortOffset(initialOffset);
+    fs.rmSync(leases, { recursive: true, force: true });
+  }
+});
+
+test('explicit port offsets remain unchanged even when a resolved port is reserved', async () => {
+  const leases = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-port-lease-'));
+  const initialOffset = portOffset;
+  try {
+    applyPortOffset(3000);
+    await acquirePortOffsetLease(
+      ['nextjs'],
+      true,
+      '/worktree/one',
+      'missing-session-one',
+      leases,
+      async () => ({ conflicts: [], reusedHostServices: new Set<string>() })
+    );
+    assert.equal(portOffset, 3000);
+    await releasePortOffsetClaims('/worktree/one', 'missing-session-one', leases);
+  } finally {
+    applyPortOffset(initialOffset);
+    fs.rmSync(leases, { recursive: true, force: true });
+  }
+});
+
 test('keeps a port offset reserved until its stack stops', async () => {
   const leases = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-port-lease-'));
   try {

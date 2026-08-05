@@ -105,6 +105,28 @@ async function findPortConflicts(
   return { conflicts, reusedHostServices };
 }
 
+// Next.js rejects the X11 range. Keep automatic worktree offsets away from it
+// for every resolved listener, including worker inspector ports.
+const RESERVED_PORT_RANGES: readonly [number, number][] = [[6000, 6063]];
+
+function reservedPort(port: number): boolean {
+  return RESERVED_PORT_RANGES.some(([start, end]) => port >= start && port <= end);
+}
+
+function findReservedPorts(serviceNames: string[]): string[] {
+  const reserved: string[] = [];
+  for (const name of serviceNames) {
+    const service = getService(name);
+    if (service.port > 0 && reservedPort(service.port)) {
+      reserved.push(`${name}:${service.port}`);
+    }
+    if (service.type === 'worker' && reservedPort(service.port + 10_000)) {
+      reserved.push(`${name}-inspector:${service.port + 10_000}`);
+    }
+  }
+  return reserved;
+}
+
 function processIdentity(pid: number): string | undefined {
   try {
     return (
@@ -135,6 +157,7 @@ async function acquirePortOffsetLease(
 
   for (const candidate of candidates) {
     applyPortOffset(candidate);
+    if (!explicit && findReservedPorts(serviceNames).length > 0) continue;
     const claimPath = path.join(leasesRoot, `${candidate}.json`);
     let release: () => Promise<void>;
     try {

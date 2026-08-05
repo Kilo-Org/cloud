@@ -13,7 +13,17 @@ import { TodoToolCardBody } from './todo-tool-card';
 import { WebSearchToolCardBody } from './web-search-tool-card';
 import { prepareMonoScrollContent } from '../mono-scroll-block-model';
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+vi.mock('react', async importOriginal => {
+  const actual = await importOriginal<typeof React>();
+  return {
+    default: actual,
+    ...actual,
+    // `SelectableText` is invoked directly by the pure walker, outside a React
+    // render, so the real `useContext` would throw on the null dispatcher.
+    useContext: () => undefined,
+  };
+});
 vi.mock('lucide-react-native', () => ({
   Terminal: 'Terminal',
   Search: 'Search',
@@ -25,7 +35,14 @@ vi.mock('lucide-react-native', () => ({
   Globe: 'Globe',
   Plug: 'Plug',
 }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// Real context so the shared `SelectableText` can call `useContext(TextClassContext)`.
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return {
+    Text: 'Text',
+    TextClassContext: createContext<string | undefined>(undefined),
+  };
+});
 vi.mock('../bubble-text-selection-context', () => ({
   useTranscriptTextSelectable: () => true,
 }));

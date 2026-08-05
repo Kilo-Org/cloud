@@ -4,6 +4,7 @@ import { Modal, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetHeader } from '@/components/sheet-header';
+import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
 
 import { getPartDetailTitle } from './part-detail-model';
@@ -25,9 +26,9 @@ function renderPartContent(part: Part | null): ReactNode {
   }
   if (isReasoningPart(part)) {
     return (
-      <Text selectable className="text-sm leading-5 text-muted-foreground">
+      <SelectableText className="text-sm leading-5 text-muted-foreground">
         {part.text}
-      </Text>
+      </SelectableText>
     );
   }
   return null;

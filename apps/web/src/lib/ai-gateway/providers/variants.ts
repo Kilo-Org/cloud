@@ -84,8 +84,35 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
   if (isClaudeModel(model)) {
     return REASONING_VARIANTS_CLAUDE;
   }
+  if (isDeepseekModel(model)) {
+    return REASONING_VARIANTS_NONE_LOW_HIGH_MAX;
+  }
   if (isGeminiModel(model)) {
     return REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH;
+  }
+  if (isGlmModel(model)) {
+    return REASONING_VARIANTS_NONE_HIGH_XHIGH;
+  }
+  if (isGrokModel(model)) {
+    return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
+  }
+  if (isKimiModel(model)) {
+    return REASONING_VARIANTS_MAX_HIGH_LOW_NONE;
+  }
+  if (model.includes('mercury')) {
+    return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
+  }
+  if (isMinimaxModel(model)) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (model.includes('mimo')) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (isMistralModel(model)) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (isMuseModel(model)) {
+    return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH;
   }
   if (isOpenAiModel(model)) {
     return Object.fromEntries(
@@ -94,38 +121,11 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (isMistralModel(model)) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  if (isKimiModel(model)) {
-    return REASONING_VARIANTS_MAX_HIGH_LOW_NONE;
-  }
   if (isQwenModel(model)) {
     return REASONING_VARIANTS_XHIGH_HIGH_MEDIUM_LOW_MINIMAL;
   }
-  if (isMinimaxModel(model)) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  if (model.includes('mimo')) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  if (model.includes('mercury')) {
-    return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
-  }
   if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
-  }
-  if (isGrokModel(model)) {
-    return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
-  }
-  if (isDeepseekModel(model)) {
-    return REASONING_VARIANTS_NONE_LOW_HIGH_MAX;
-  }
-  if (isGlmModel(model)) {
-    return REASONING_VARIANTS_NONE_HIGH_XHIGH;
-  }
-  if (isMuseModel(model)) {
-    return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH;
   }
   return undefined;
 }

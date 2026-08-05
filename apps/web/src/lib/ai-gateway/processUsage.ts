@@ -1186,7 +1186,7 @@ export async function processTokenData(
   return logMicrodollarUsage(usageStats, usageContext);
 }
 
-async function useGenerationLookup(
+export async function useGenerationLookup(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
 ): Promise<boolean> {
@@ -1196,11 +1196,11 @@ async function useGenerationLookup(
   if (!isGatewayProvider || !isSuccessStatusCode) {
     return false;
   }
+  if (await isFreeModel(usageContext.requested_model)) {
+    return false;
+  }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
-  const hasCostWhenPaid =
-    (await isFreeModel(usageContext.requested_model)) ||
-    usageContext.user_byok ||
-    (usageStats?.cost_mUsd ?? 0) > 0;
+  const hasCostWhenPaid = usageContext.user_byok || (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);
   if (!hasOutputTokens) {
     console.debug('[useGenerationLookup] token stats are missing');

@@ -10,6 +10,7 @@ import {
   logMicrodollarUsage,
   insertUsageRecord,
   processOpenRouterUsage,
+  useGenerationLookup,
   stripNulBytesInPlace,
   toInsertableDbUsageRecord,
   usageTransactionIdleTimeoutQuery,
@@ -95,6 +96,39 @@ describe('processOpenRouterUsage', () => {
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
+  });
+});
+
+describe('useGenerationLookup', () => {
+  const usageStats: MicrodollarUsageStats = {
+    messageId: 'message-id',
+    hasError: false,
+    cost_mUsd: 0,
+    inputTokens: 100,
+    outputTokens: 100,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+    model: 'provider/model:free',
+    responseContent: 'response',
+    inference_provider: 'provider',
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled: null,
+    status_code: 200,
+  };
+
+  const usageContext = {
+    provider: 'openrouter',
+    requested_model: 'provider/model:free',
+  } as MicrodollarUsageContext;
+
+  test('skips generation lookup for free models', async () => {
+    await expect(useGenerationLookup(usageStats, usageContext)).resolves.toBe(false);
   });
 });
 

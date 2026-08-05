@@ -1,6 +1,7 @@
 import { createElement, isValidElement, type ReactNode } from 'react';
 import {
   type AccessibilityActionEvent,
+  type AccessibilityRole,
   type GestureResponderEvent,
   type ImageStyle,
   Pressable,
@@ -92,10 +93,14 @@ export class MarkdownRenderer extends Renderer {
     this.onPressLink = handlers.onPressLink;
   }
 
-  private textNode(children: string | ReactNode[], styles?: TextStyle): ReactNode {
+  private textNode(
+    children: string | ReactNode[],
+    styles?: TextStyle,
+    extraProps: { accessibilityRole?: AccessibilityRole } = {}
+  ): ReactNode {
     return createElement(
       Text,
-      { selectable: this.selectable, key: this.getKey(), style: styles },
+      { selectable: this.selectable, key: this.getKey(), style: styles, ...extraProps },
       children
     );
   }
@@ -108,7 +113,12 @@ export class MarkdownRenderer extends Renderer {
   }
 
   override heading(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return this.textOrChildren(text, styles);
+    // Headings announce as headers; image-only headings stay pass-through so
+    // the image keeps its own tap target and label.
+    if (typeof text !== 'string' && text.length > 0 && containsMarkdownImage(text)) {
+      return text;
+    }
+    return this.textNode(text, styles, { accessibilityRole: 'header' });
   }
 
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface

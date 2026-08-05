@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the renderer suite keeps key-stability, image pass-through, and heading semantics together */
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';
 import { type ReactElement, type ReactNode } from 'react';
@@ -305,5 +306,34 @@ describe('MarkdownRenderer key stability', () => {
       { type: 'MarkdownImage' },
       { type: 'Text' },
     ]);
+  });
+});
+
+describe('MarkdownRenderer heading semantics', () => {
+  it('heading() renders text with the header accessibility role', async () => {
+    const renderer = await createRenderer();
+    const element = renderer.heading('Section title') as ReactElement<Record<string, unknown>>;
+    expect(element.type).toBe('Text');
+    expect(element.props.accessibilityRole).toBe('header');
+    expect(element.props.children).toBe('Section title');
+  });
+
+  it('heading() keeps image children as pass-through', async () => {
+    const renderer = await createRenderer();
+    const children: ReactNode[] = [
+      renderer.text('before '),
+      renderer.html('<img alt="a" src="https://x/a.png">'),
+    ];
+    const result = renderer.heading(children);
+    expect(Array.isArray(result)).toBe(true);
+    expect((result as ReactNode[])[1]).toMatchObject({ type: 'MarkdownImage' });
+  });
+
+  it('plain text and inline formatting keep no header role', async () => {
+    const renderer = await createRenderer();
+    const textElement = renderer.text('plain') as ReactElement<Record<string, unknown>>;
+    const strongElement = renderer.strong('bold') as ReactElement<Record<string, unknown>>;
+    expect(textElement.props.accessibilityRole).toBeUndefined();
+    expect(strongElement.props.accessibilityRole).toBeUndefined();
   });
 });

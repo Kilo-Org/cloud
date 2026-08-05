@@ -13,7 +13,7 @@ import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 let initialized = false;
 /**
  * Resolves to whether the native purchase connector is configured. Null until
- * `create()` is first called. See `ensurePurchaseConnector`.
+ * `create()` is first called. See `createPurchaseConnector`.
  */
 let connectorReady: Promise<boolean> | null = null;
 /**

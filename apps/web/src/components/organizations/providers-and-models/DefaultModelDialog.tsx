@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_EFFICIENT_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import {
   hasActiveOrganizationModelPolicy,
   isOrganizationAutoTargetModel,
@@ -189,7 +189,7 @@ export function DefaultModelDialog({
       }),
     [availableModels, hasActiveModelPolicy]
   );
-  const defaultAutoFallback = hasActiveModelPolicy ? '' : KILO_AUTO_BALANCED_MODEL.id;
+  const defaultAutoFallback = hasActiveModelPolicy ? '' : KILO_AUTO_EFFICIENT_MODEL.id;
   const fallbackUnavailable =
     !!organizationAutoFallbackModel &&
     !autoTargetModels.some(model => model.id === organizationAutoFallbackModel);

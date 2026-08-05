@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Loader2, TriangleAlert, X } from 'lucide-react';
-import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { controllerVersionOk, gatewayStatusOk } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -443,20 +443,20 @@ function ClawOnboardingFlowInner({
 
   function provisionInstance(userLocation?: string) {
     posthog?.capture('claw_create_instance_clicked', {
-      selected_model: KILO_AUTO_BALANCED_MODEL.id,
+      selected_model: KILO_AUTO_EFFICIENT_MODEL.id,
     });
     handleCreateFlowStarted();
 
     mutations.provision.mutate(
       {
-        kilocodeDefaultModel: `kilocode/${KILO_AUTO_BALANCED_MODEL.id}`,
+        kilocodeDefaultModel: `kilocode/${KILO_AUTO_EFFICIENT_MODEL.id}`,
         userTimezone: getBrowserTimeZone(),
         ...(userLocation ? { userLocation } : undefined),
       },
       {
         onError: err => {
           posthog?.capture('claw_setup_provision_failed', {
-            selected_model: KILO_AUTO_BALANCED_MODEL.id,
+            selected_model: KILO_AUTO_EFFICIENT_MODEL.id,
             reason: 'provision_request_failed',
           });
           handleCreateFlowFailed();

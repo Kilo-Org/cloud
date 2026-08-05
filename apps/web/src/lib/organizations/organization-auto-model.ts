@@ -12,7 +12,7 @@ import {
 } from '@/lib/ai-gateway/providers/direct-byok';
 import { getBYOKforOrganization } from '@/lib/ai-gateway/byok';
 import { readDb, type DrizzleTransaction } from '@/lib/drizzle';
-import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_EFFICIENT_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import { TRPCError } from '@trpc/server';
@@ -32,7 +32,7 @@ type OrganizationAutoPolicyOrganization = Pick<Organization, 'id' | 'plan' | 'se
 
 export const DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS: OrganizationAutoModelSettings = {
   routes: {},
-  fallback_model: KILO_AUTO_BALANCED_MODEL.id,
+  fallback_model: KILO_AUTO_EFFICIENT_MODEL.id,
 };
 
 export function isOrganizationAutoEligible(organization: Pick<Organization, 'plan'>): boolean {

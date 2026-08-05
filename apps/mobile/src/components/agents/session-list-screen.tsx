@@ -127,13 +127,24 @@ export function AgentSessionListScreen() {
     () =>
       selectSessionListBodyModel({
         hasHistoryContent: sections.length > 0,
+        hasStoredSessions: storedSessions.length > 0,
+        hasMoreHistory: paging.hasNextPage,
         hasPinnedActive,
         hasActiveQuery: isSearching || hasActiveFilter,
         isSearching,
         isError: contentIsError,
         activeIsError,
       }).showInlineError,
-    [activeIsError, contentIsError, hasActiveFilter, hasPinnedActive, isSearching, sections]
+    [
+      activeIsError,
+      contentIsError,
+      hasActiveFilter,
+      hasPinnedActive,
+      isSearching,
+      paging.hasNextPage,
+      sections,
+      storedSessions,
+    ]
   );
 
   const handleClearQuery = useCallback(() => {
@@ -202,6 +213,8 @@ export function AgentSessionListScreen() {
           isLoading={isLoading || !ready}
           isError={contentIsError}
           activeIsError={activeIsError}
+          hasStoredSessions={storedSessions.length > 0}
+          hasMoreHistory={paging.hasNextPage}
           isFetchingNextPage={paging.isFetchingNextPage}
           refetch={handleRefetch}
           onRetry={handleRetry}

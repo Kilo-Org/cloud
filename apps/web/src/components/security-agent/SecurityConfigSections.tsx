@@ -220,8 +220,7 @@ function OptionGrid<Value extends string>({
             htmlFor={`${name}-${option.value}`}
             className={cn(
               'border-border bg-background hover:bg-muted flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-              selected &&
-                'border-brand-primary/70 bg-brand-primary/15 hover:bg-brand-primary/20 ring-brand-primary/40 ring-1',
+              selected && 'border-border bg-surface-selected hover:bg-surface-selected',
               disabled && 'cursor-not-allowed opacity-60 hover:bg-background'
             )}
           >

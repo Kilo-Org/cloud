@@ -28,6 +28,7 @@ Updated 2026-06-05 -- KiloClaw final Commit term continuation behavior.
 Updated 2026-06-19 -- Current Coding Plan quota presentation and routing independence.
 Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
 Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan exclusivity.
+Updated 2026-08-05 -- BytePlus Coding Plan Pro catalog requirements.
 
 ## Conventions
 
@@ -332,8 +333,13 @@ historical Commit names, prices, invoices, and credit deductions.
     offering with provider name, plan name, recurring USD price, billing
     period, payment source, and catalog feature copy. MiniMax token offerings
     MUST include Token Plan Plus, Token Plan Max, and Token Plan Ultra.
-    BytePlus offerings MUST include Coding Plan Lite at $20 per 30 days. An
-    offering with assignable credential capacity MUST show a subscribe action.
+    BytePlus offerings MUST include Coding Plan Lite at $20 per 30 days and
+    Coding Plan Pro at $100 per 30 days. Lite MUST display approximately 1,900
+    requests every 5 hours, 12,000 per week, and 24,000 per subscription
+    period. Pro MUST display approximately 9,500 requests every 5 hours,
+    60,000 per week, and 120,000 per subscription period. Both offerings MUST
+    use the model IDs and exclusions defined in `.specs/coding-plans.md`.
+    An offering with assignable credential capacity MUST show a subscribe action.
     Purchase messaging MUST explain automatic BYOK setup for the selected
     provider, and purchase MUST be blocked when any personal BYOK key for that
     provider exists, including a disabled key. In that state, the system MUST direct

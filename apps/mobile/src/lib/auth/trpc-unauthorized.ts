@@ -17,7 +17,7 @@ const ShapedUnauthorizedErrorSchema = z.looseObject({
 });
 
 let unauthorizedHandler: TrpcUnauthorizedHandler | null = null;
-let isHandlingUnauthorized = false;
+let unauthorizedPromise: Promise<void> | null = null;
 
 export function isUnauthorizedTrpcError(error: unknown): boolean {
   const direct = DirectUnauthorizedErrorSchema.safeParse(error);
@@ -37,22 +37,29 @@ export function setTrpcUnauthorizedHandler(handler: TrpcUnauthorizedHandler): ()
   };
 }
 
-export function handleTrpcQueryError(error: unknown): void {
-  if (!isUnauthorizedTrpcError(error) || !unauthorizedHandler || isHandlingUnauthorized) {
+export async function handleTrpcQueryError(error: unknown): Promise<void> {
+  if (!isUnauthorizedTrpcError(error) || !unauthorizedHandler) {
+    return;
+  }
+
+  // Single-flight: if a handler is already in progress, await its outcome
+  // instead of dropping the error or starting a second rotation.
+  if (unauthorizedPromise) {
+    await unauthorizedPromise;
     return;
   }
 
   const handler = unauthorizedHandler;
-  void runUnauthorizedHandler(handler);
+  unauthorizedPromise = runUnauthorizedHandler(handler);
+  await unauthorizedPromise;
 }
 
 async function runUnauthorizedHandler(handler: TrpcUnauthorizedHandler): Promise<void> {
-  isHandlingUnauthorized = true;
   try {
     await handler();
   } catch {
     // A failed sign-out should not make every later 401 permanently ignored.
   } finally {
-    isHandlingUnauthorized = false;
+    unauthorizedPromise = null;
   }
 }

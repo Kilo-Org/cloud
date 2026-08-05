@@ -192,6 +192,43 @@ describe('admin.sessionTraces authorization', () => {
     expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(sessionId, owner.id);
   });
 
+  test('getMessages sorts v2 messages and parts by time-ordered ID like the cloud-agent-next UI', async () => {
+    const owner = await insertTestUser();
+    const viewer = await insertAdmin({ can_view_sessions: true });
+    const sessionId = `ses_${crypto.randomUUID()}`;
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: owner.id,
+    });
+
+    const caller = await createCallerForUser(viewer.id);
+    // The session-ingest export streams in ingest order, which can differ from
+    // conversation order (assistant turn ingested before its user prompt).
+    mockFetchSessionSnapshot.mockResolvedValue({
+      info: { id: sessionId },
+      messages: [
+        {
+          info: { id: 'msg_000000000002b', role: 'assistant' },
+          parts: [{ id: 'part_000000000002b' }, { id: 'part_000000000001a' }],
+        },
+        { info: { id: 'msg_000000000001a', role: 'user' }, parts: [] },
+      ],
+    });
+
+    await expect(
+      caller.admin.sessionTraces.getMessages({ session_id: sessionId })
+    ).resolves.toEqual({
+      messages: [
+        { info: { id: 'msg_000000000001a', role: 'user' }, parts: [] },
+        {
+          info: { id: 'msg_000000000002b', role: 'assistant' },
+          parts: [{ id: 'part_000000000001a' }, { id: 'part_000000000002b' }],
+        },
+      ],
+      format: 'v2',
+    });
+  });
+
   test('a session viewer can read Cloud Agent container identity, SKU, and recorded capacity', async () => {
     const owner = await insertTestUser();
     const viewer = await insertAdmin({ can_view_sessions: true });

@@ -713,7 +713,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       await addOrganizationCondition(whereConditions, ctx, input.organizationId);
 
-      const { rows } = await db.execute<{ git_url: string; last_used_at: string }>(sql`
+      const { rows } = await db.execute<{
+        git_url: string;
+        last_used_at: string;
+      }>(sql`
         SELECT ${cli_sessions_v2.git_url} AS git_url, MAX(${cli_sessions_v2.updated_at}) AS last_used_at
         FROM ${cli_sessions_v2}
         WHERE ${joinWithAnd(whereConditions)}
@@ -829,7 +832,28 @@ export const cliSessionsV2Router = createTRPCRouter({
   getSessionMessagesPage: baseProcedure
     .input(GetSessionMessagesPageInputSchema)
     .query(async ({ ctx, input }) => {
-      await getSessionWithAccessCheck(input.session_id, ctx);
+      const session = await getSessionWithAccessCheck(input.session_id, ctx);
+
+      // Read the event-log watermark from the existing getSession response
+      // before the initial history page, so the transport can use `fromId`
+      // on its first WebSocket connect instead of `replay=false`. Cursor
+      // pages skip the Cloud Agent read — the watermark is only seeded once.
+      // Failures are swallowed and return null so the page endpoint is
+      // never blocked on an optional watermark read.
+      let watermarkEventId: number | null = null;
+      if (!input.cursor && session.cloud_agent_session_id) {
+        try {
+          const authToken = generateApiToken(ctx.user);
+          const client = createCloudAgentNextClient(authToken);
+          const sessionState = await client.getSession(session.cloud_agent_session_id);
+          watermarkEventId = sessionState.latestEventId ?? null;
+        } catch (error) {
+          console.warn(
+            `Failed to fetch watermark for session ${input.session_id}:`,
+            error instanceof Error ? error.message : error
+          );
+        }
+      }
 
       let result;
       try {
@@ -866,7 +890,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      return result;
+      return { ...result, watermarkEventId };
     }),
 
   /**
@@ -1074,7 +1098,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         .limit(1);
 
       if (!row) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Session not found',
+        });
       }
 
       const { session } = row;
@@ -1217,7 +1244,10 @@ export const cliSessionsV2Router = createTRPCRouter({
       const normalizedGitUrl = normalizeGitUrl(gitUrl);
 
       const ownerValues = session.organization_id
-        ? { owned_by_organization_id: session.organization_id, owned_by_user_id: null }
+        ? {
+            owned_by_organization_id: session.organization_id,
+            owned_by_user_id: null,
+          }
         : { owned_by_organization_id: null, owned_by_user_id: ctx.user.id };
 
       const conflictTarget = session.organization_id
@@ -1369,7 +1399,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         userId: ctx.user.id,
       }).catch(error => {
         captureException(error, {
-          tags: { source: 'cli-sessions-v2-router', endpoint: 'rename-notify' },
+          tags: {
+            source: 'cli-sessions-v2-router',
+            endpoint: 'rename-notify',
+          },
           extra: { sessionId: session_id },
         });
       })

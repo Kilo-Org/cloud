@@ -49,6 +49,14 @@ function escapeSlackText(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
+function escapeSlackLabel(value: string): string {
+  return escapeSlackText(value).replaceAll('`', "'").replaceAll('\n', ' ');
+}
+
+function formatCount(count: number): string {
+  return `\`${count}\``;
+}
+
 function humanizeStatus(status: string): string {
   return status.replaceAll('_', ' ');
 }
@@ -111,42 +119,58 @@ function inventoryTotals(summaries: InventoryPlanSummary[]): CodingPlanInventory
   );
 }
 
-function formatPlanSummary(summary: InventoryPlanSummary): string {
-  const available = statusCount(summary, 'available');
-  const assigned = statusCount(summary, 'assigned');
-  const pending = statusCount(summary, 'revocation_pending');
-  const failed = statusCount(summary, 'revocation_failed');
-  const revoked = statusCount(summary, 'revoked');
-  const isCatalogPlan = getCodingPlanCatalog().some(plan => plan.planId === summary.planId);
-  const displayName = isCatalogPlan
-    ? escapeSlackText(summary.displayName)
-    : `\`${escapeSlackText(summary.displayName.replaceAll('`', "'"))}\``;
-  const lines = [
-    `*${displayName}*`,
-    `${available} available · ${assigned} assigned · ${summary.loaded} loaded`,
-  ];
+function formatInventoryTotals(totals: CodingPlanInventoryTotals): string {
+  return `*Total* · Available ${formatCount(totals.available)} · Assigned ${formatCount(totals.assigned)} · Loaded ${formatCount(totals.loaded)}`;
+}
 
-  const lifecycleParts = [
-    failed > 0 ? `${failed} failed revocation` : null,
-    pending > 0 ? `${pending} pending revocation` : null,
-    revoked > 0 ? `${revoked} revoked` : null,
-  ].filter((value): value is string => value !== null);
-  if (lifecycleParts.length > 0) {
-    lines.push(`${failed > 0 || pending > 0 ? ':warning: ' : ''}${lifecycleParts.join(' · ')}`);
+function groupSummariesByProvider(
+  summaries: InventoryPlanSummary[]
+): Map<string, InventoryPlanSummary[]> {
+  const providerGroups = new Map<string, InventoryPlanSummary[]>();
+
+  for (const summary of summaries) {
+    const providerSummaries = providerGroups.get(summary.providerName) ?? [];
+    providerSummaries.push(summary);
+    providerGroups.set(summary.providerName, providerSummaries);
   }
 
-  const unknownStatuses = Object.entries(summary.statusCounts)
-    .filter(([status]) => !KNOWN_STATUSES.has(status))
-    .sort(([left], [right]) => left.localeCompare(right));
-  if (unknownStatuses.length > 0) {
-    lines.push(
-      unknownStatuses
-        .map(([status, count]) => `${count} ${escapeSlackText(humanizeStatus(status))}`)
-        .join(' · ')
-    );
-  }
+  return providerGroups;
+}
 
-  return lines.join('\n');
+function formatProviderSummary(providerName: string, summaries: InventoryPlanSummary[]): string {
+  const planLines = summaries.map(
+    summary =>
+      `${escapeSlackLabel(summary.displayName)} · Available ${formatCount(statusCount(summary, 'available'))} · Assigned ${formatCount(statusCount(summary, 'assigned'))} · Loaded ${formatCount(summary.loaded)}`
+  );
+
+  return [`*${escapeSlackLabel(providerName)}*`, ...planLines].join('\n');
+}
+
+function formatUnknownStatuses(summaries: InventoryPlanSummary[]): string | null {
+  const unknownStatuses = summaries.flatMap(summary =>
+    Object.entries(summary.statusCounts)
+      .filter(([status]) => !KNOWN_STATUSES.has(status))
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([status, count]) => {
+        const plan = `${summary.providerName} ${summary.displayName}`;
+        return `${escapeSlackLabel(plan)}: ${formatCount(count)} ${escapeSlackText(humanizeStatus(status))}`;
+      })
+  );
+
+  return unknownStatuses.length > 0 ? `*Other statuses:* ${unknownStatuses.join(' · ')}` : null;
+}
+
+function formatRevocationCallout(totals: CodingPlanInventoryTotals): string {
+  return [
+    totals.revocationFailed > 0
+      ? `:rotating_light: *Action required:* ${formatCount(totals.revocationFailed)} credential${totals.revocationFailed === 1 ? '' : 's'} failed revocation.`
+      : null,
+    totals.revocationPending > 0
+      ? `:warning: *${formatCount(totals.revocationPending)} credential${totals.revocationPending === 1 ? ' is' : 's are'} pending revocation.*`
+      : null,
+  ]
+    .filter((value): value is string => value !== null)
+    .join('\n');
 }
 
 function formatSnapshotTime(timestamp: Date): string {
@@ -166,16 +190,23 @@ export function buildCodingPlanInventorySlackNotification(
   const providerNames = Array.from(new Set(summaries.map(summary => summary.providerName)));
   const providerLabel = providerNames.length > 0 ? providerNames.join(', ') : 'All providers';
   const planAvailability = summaries
-    .map(summary => `${summary.displayName}: ${statusCount(summary, 'available')} available`)
+    .map(
+      summary =>
+        `${summary.providerName} ${summary.displayName}: ${formatCount(statusCount(summary, 'available'))} available, ${formatCount(statusCount(summary, 'assigned'))} assigned, ${formatCount(summary.loaded)} loaded`
+    )
     .join('. ');
   const attentionFallback = [
-    totals.revocationFailed > 0 ? `${totals.revocationFailed} failed revocation` : null,
-    totals.revocationPending > 0 ? `${totals.revocationPending} pending revocation` : null,
+    totals.revocationFailed > 0
+      ? `${formatCount(totals.revocationFailed)} failed revocation`
+      : null,
+    totals.revocationPending > 0
+      ? `${formatCount(totals.revocationPending)} pending revocation`
+      : null,
   ]
     .filter((value): value is string => value !== null)
     .join(', ');
   const text = [
-    `Coding Plans inventory: ${totals.available} available, ${totals.assigned} assigned, ${totals.loaded} loaded`,
+    `Coding Plans inventory: ${formatCount(totals.available)} available, ${formatCount(totals.assigned)} assigned, ${formatCount(totals.loaded)} loaded`,
     attentionFallback || null,
     planAvailability || 'No inventory recorded',
   ]
@@ -192,15 +223,6 @@ export function buildCodingPlanInventorySlackNotification(
       type: 'context',
       elements: [{ type: 'mrkdwn', text: `${escapeSlackText(providerLabel)} · Current snapshot` }],
     },
-    {
-      type: 'section',
-      fields: [
-        { type: 'mrkdwn', text: `*${totals.available}*\nAvailable` },
-        { type: 'mrkdwn', text: `*${totals.assigned}*\nAssigned` },
-        { type: 'mrkdwn', text: `*${totals.loaded}*\nLoaded` },
-        { type: 'mrkdwn', text: `*${needsAttention}*\nNeeds attention` },
-      ],
-    },
     { type: 'divider' },
   ];
 
@@ -210,24 +232,32 @@ export function buildCodingPlanInventorySlackNotification(
       text: { type: 'mrkdwn', text: 'No Coding Plans inventory is currently recorded.' },
     });
   } else {
-    for (const summary of summaries) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: formatInventoryTotals(totals) },
+    });
+
+    for (const [providerName, providerSummaries] of groupSummariesByProvider(summaries)) {
       blocks.push({
         type: 'section',
-        text: { type: 'mrkdwn', text: formatPlanSummary(summary) },
+        text: {
+          type: 'mrkdwn',
+          text: formatProviderSummary(providerName, providerSummaries),
+        },
       });
+    }
+
+    const unknownStatuses = formatUnknownStatuses(summaries);
+    if (unknownStatuses) {
+      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: unknownStatuses } });
     }
   }
 
   if (needsAttention > 0) {
-    const attentionLines = [
-      totals.revocationFailed > 0
-        ? `:rotating_light: *Action required:* ${totals.revocationFailed} credential${totals.revocationFailed === 1 ? '' : 's'} failed revocation.`
-        : null,
-      totals.revocationPending > 0
-        ? `:warning: *${totals.revocationPending} credential${totals.revocationPending === 1 ? ' is' : 's are'} pending revocation.*`
-        : null,
-    ].filter((value): value is string => value !== null);
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: attentionLines.join('\n') } });
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: formatRevocationCallout(totals) },
+    });
   }
 
   blocks.push({

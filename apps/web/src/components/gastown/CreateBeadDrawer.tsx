@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { toast } from 'sonner';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { X, Plus, Sparkles, Loader2 } from 'lucide-react';
@@ -310,15 +310,13 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
 
             {/* Action buttons */}
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="md" type="button" onClick={handleClose}>
+              <Button variant="secondary" type="button" onClick={handleClose}>
                 Cancel
               </Button>
               <Button
-                variant="primary"
-                size="md"
+                variant="default"
                 type="submit"
                 disabled={!title.trim() || createBead.isPending}
-                className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
               >
                 {createBead.isPending ? (
                   <>

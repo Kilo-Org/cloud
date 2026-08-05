@@ -31,6 +31,9 @@ export function EmailOtpForm({
       <Text variant="muted" className="text-center text-sm">
         Enter the code sent to {email}
       </Text>
+      <Text variant="muted" className="text-center text-xs">
+        If this address is eligible, the code arrives within a minute.
+      </Text>
       <TextInput
         className="h-12 rounded-md border border-input bg-background px-3 text-lg leading-[normal] tracking-widest text-foreground"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps

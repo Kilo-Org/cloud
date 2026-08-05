@@ -12,7 +12,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import { toast } from 'sonner';
 
@@ -248,16 +248,10 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
             </div>
           </div>
           <DialogFooter>
-            <Button variant="secondary" size="md" type="button" onClick={onClose}>
+            <Button variant="secondary" type="button" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              size="md"
-              type="submit"
-              disabled={!canSubmit}
-              className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-            >
+            <Button variant="default" type="submit" disabled={!canSubmit}>
               {createRig.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>

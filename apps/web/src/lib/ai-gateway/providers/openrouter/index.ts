@@ -165,7 +165,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
           isFree: model.isFree ?? isFree,
           mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
-          opencode: model.opencode ?? getGatewayOpenCodeSettings(model.id),
+          opencode: model.opencode ?? (await getGatewayOpenCodeSettings(model.id)),
           architecture: addPdf
             ? {
                 ...model.architecture,

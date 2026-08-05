@@ -42,7 +42,6 @@ import {
 } from '@/lib/organizations/organization-auto-model';
 import { getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
-import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -238,23 +237,20 @@ async function resolveOrganizationAutoModel(
  * falls back to balanced rather than serving implicit defaults. When `variant`
  * is absent, preserve legacy effort-only behavior for rolling deploys.
  */
-function resolveEfficientDecisionModel(decision: AutoRoutingDecision): ResolvedAutoModel | null {
+async function resolveEfficientDecisionModel(
+  decision: AutoRoutingDecision
+): Promise<ResolvedAutoModel | null> {
   // `variant` is only on the benchmark decision branch of the discriminated
   // union; coding-plan defaults never carry it.
   if ('variant' in decision && decision.variant != null) {
-    const variants = getModelVariants(decision.model);
+    const variants = await getModelVariants(decision.model);
     const variantSettings: OpenCodeVariant | undefined = variants?.[decision.variant];
     if (!variantSettings) {
       return null;
     }
-    // Catalog variants are the source of truth; cast into ResolvedAutoModel's
-    // OpenRouter-shaped fields (catalog effort may include values like `max`
-    // beyond ChatCompletionReasoningEffort).
     return {
       model: decision.model,
-      ...(variantSettings.reasoning
-        ? { reasoning: { ...variantSettings.reasoning } as OpenRouterReasoningConfig }
-        : {}),
+      ...(variantSettings.reasoning ? { reasoning: { ...variantSettings.reasoning } } : {}),
       ...(variantSettings.verbosity ? { verbosity: variantSettings.verbosity } : {}),
     };
   }
@@ -307,7 +303,7 @@ export async function resolveAutoModel(
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
-      const resolvedFromDecision = resolveEfficientDecisionModel(decision);
+      const resolvedFromDecision = await resolveEfficientDecisionModel(decision);
       if (resolvedFromDecision) {
         return { kind: 'ok', resolved: resolvedFromDecision };
       }

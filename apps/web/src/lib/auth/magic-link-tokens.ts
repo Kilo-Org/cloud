@@ -4,11 +4,14 @@ import { magic_link_tokens } from '@kilocode/db/schema';
 import * as z from 'zod';
 import 'server-only';
 import { NEXTAUTH_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
-import { randomBytes, randomInt, createHash, createHmac } from 'crypto';
+import { randomBytes, randomInt, randomUUID, createHash, createHmac } from 'crypto';
 import { normalizeEmail } from '@/lib/utils';
+import { captureMessage } from '@sentry/nextjs';
 
 const SIGN_IN_CODE_EXPIRY_MINUTES = 10;
 const SIGN_IN_CODE_MAX_ATTEMPTS = 5;
+// Reservations expire on their own after two minutes — no cleanup job is needed.
+const SIGN_IN_CODE_RESERVATION_MINUTES = 2;
 
 function hashSignInCode(email: string, code: string): string {
   return createHmac('sha256', NEXTAUTH_SECRET).update(`${email}:${code}`).digest('hex');
@@ -102,13 +105,20 @@ export async function verifyAndConsumeMagicLinkToken(
  * The stored hash is an HMAC keyed by the server secret, so a database leak
  * does not permit offline enumeration of the six-digit code space.
  *
+ * A random opaque challenge_id is generated alongside the code. The client
+ * must present it when verifying, so that attempts against challenge A do
+ * not spend challenge B's budget.
+ *
  * @param email - The email address to send the code to (case-insensitive)
- * @returns The plaintext 6-digit code (for sending in email)
+ * @returns The plaintext 6-digit code and an opaque challenge identifier
  */
-export async function createSignInCode(email: string): Promise<string> {
+export async function createSignInCode(
+  email: string
+): Promise<{ code: string; challengeId: string }> {
   const normalizedEmail = normalizeEmail(email);
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const token_hash = hashSignInCode(normalizedEmail, code);
+  const challengeId = randomUUID();
   const expires_at = new Date(Date.now() + SIGN_IN_CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
   await db.transaction(async tx => {
@@ -124,43 +134,60 @@ export async function createSignInCode(email: string): Promise<string> {
           isNull(magic_link_tokens.consumed_at)
         )
       );
-    await tx
-      .insert(magic_link_tokens)
-      .values({ token_hash, email: normalizedEmail, expires_at, purpose: 'sign_in_code' });
+    await tx.insert(magic_link_tokens).values({
+      token_hash,
+      email: normalizedEmail,
+      expires_at,
+      purpose: 'sign_in_code',
+      challenge_id: challengeId,
+    });
   });
 
-  return code;
+  return { code, challengeId };
 }
 
-export type VerifySignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts';
+export type ReserveSignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts' | 'in_progress';
 
 /**
- * Verify and consume an email sign-in code atomically, scoped by email.
+ * Reserve a sign-in code for settlement. Does not consume the code.
+ * A live reservation blocks concurrent callers, who receive 'in_progress'.
+ * A failed settlement must call releaseSignInCode so the code stays usable.
  *
- * Attempt limiting is checked BEFORE the hash comparison: once the live
- * code for an email has recorded 5+ failed attempts, this returns
- * 'too_many_attempts' even for the correct code. A mismatch increments
- * attempts on the email's unconsumed row(s) and returns 'invalid'; so does
- * an expired, already-consumed, or nonexistent code.
+ * When challengeId is supplied, all lookups, the pre-check, and the increment
+ * are keyed by challenge_id instead of email. This isolates attempt budgets:
+ * guesses against challenge A do not spend challenge B's budget.
+ *
+ * When challengeId is absent, the legacy email-keyed path is used for
+ * shipped clients that do not yet send a challenge. The email-keyed path
+ * matches the live sign-in code row for the email whether or not it carries
+ * a challenge_id, so old clients can reserve codes minted by new clients.
+ *
+ * Returns 'ok' when the code is reserved, 'invalid' for a wrong/expired/consumed
+ * code, 'too_many_attempts' when the attempt budget is exhausted, and
+ * 'in_progress' when another caller already holds the reservation.
  */
-export async function verifyAndConsumeSignInCode(
+export async function reserveSignInCode(
   email: string,
-  code: string
-): Promise<VerifySignInCodeResult> {
+  code: string,
+  challengeId?: string
+): Promise<ReserveSignInCodeResult> {
   const normalizedEmail = normalizeEmail(email);
 
-  const [row] = await db
-    .select()
-    .from(magic_link_tokens)
-    .where(
-      and(
-        eq(magic_link_tokens.email, normalizedEmail),
+  const lookupWhere = challengeId
+    ? and(
+        eq(magic_link_tokens.challenge_id, challengeId),
         eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at),
         sql`${magic_link_tokens.expires_at} > NOW()`
       )
-    )
-    .limit(1);
+    : and(
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at),
+        sql`${magic_link_tokens.expires_at} > NOW()`
+      );
+
+  const [row] = await db.select().from(magic_link_tokens).where(lookupWhere).limit(1);
 
   if (!row) {
     return 'invalid';
@@ -172,13 +199,11 @@ export async function verifyAndConsumeSignInCode(
 
   const token_hash = hashSignInCode(normalizedEmail, code);
   if (row.token_hash === token_hash) {
-    // attempts < MAX is re-checked here atomically: the early read above is
-    // only a fast path, and two concurrent wrong guesses can race it past
-    // the budget. This predicate guarantees an over-budget code can never
-    // consume regardless of racing increments.
-    const consumed = await db
+    const reserved = await db
       .update(magic_link_tokens)
-      .set({ consumed_at: sql`NOW()` })
+      .set({
+        reserved_until: sql`NOW() + interval '${sql.raw(String(SIGN_IN_CODE_RESERVATION_MINUTES))} minutes'`,
+      })
       .where(
         and(
           eq(magic_link_tokens.token_hash, token_hash),
@@ -186,17 +211,21 @@ export async function verifyAndConsumeSignInCode(
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
           sql`${magic_link_tokens.expires_at} > NOW()`,
-          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
+          sql`(${magic_link_tokens.reserved_until} IS NULL OR ${magic_link_tokens.reserved_until} < NOW())`
         )
       )
       .returning();
 
-    if (consumed[0]) {
+    if (reserved[0]) {
       return 'ok';
     }
 
     const [current] = await db
-      .select({ attempts: magic_link_tokens.attempts })
+      .select({
+        attempts: magic_link_tokens.attempts,
+        reserved_until: magic_link_tokens.reserved_until,
+      })
       .from(magic_link_tokens)
       .where(
         and(
@@ -207,24 +236,151 @@ export async function verifyAndConsumeSignInCode(
         )
       )
       .limit(1);
-    return current && current.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS
-      ? 'too_many_attempts'
-      : 'invalid';
+
+    if (!current) {
+      return 'invalid';
+    }
+    if (current.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
+      return 'too_many_attempts';
+    }
+    if (current.reserved_until && new Date(current.reserved_until) > new Date()) {
+      return 'in_progress';
+    }
+    return 'invalid';
   }
 
-  await db
-    .update(magic_link_tokens)
-    .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
-    .where(
-      and(
-        eq(magic_link_tokens.email, normalizedEmail),
+  // Increment attempts: key by challenge_id when available, otherwise by email.
+  // The legacy email-keyed path matches the live row regardless of challenge_id,
+  // so a no-challenge caller cannot bypass the budget of a challenge-bound row.
+  const incrementWhere = challengeId
+    ? and(
+        eq(magic_link_tokens.challenge_id, challengeId),
         eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at),
         sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
       )
-    );
+    : and(
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at),
+        sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+      );
+
+  await db
+    .update(magic_link_tokens)
+    .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
+    .where(incrementWhere);
+
+  // ponytail: remove legacy counter and no-challenge path when
+  // native_signin_code_legacy_no_challenge_count drains to 0 for
+  // 7 consecutive days — all shipped clients must send a challengeId.
+  if (!challengeId) {
+    captureMessage('native_signin_code_legacy_no_challenge_count: 1');
+  }
 
   return 'invalid';
+}
+
+/**
+ * Commit a reserved sign-in code by setting consumed_at.
+ * Must be called only after a successful settlement.
+ * The reservation must still be live (reserved_until > NOW()).
+ *
+ * When challengeId is supplied, the commit is scoped to the challenge.
+ *
+ * Returns true when the code was committed, false when the reservation
+ * lapsed or the row was already consumed.
+ */
+export async function commitSignInCode(
+  email: string,
+  code: string,
+  challengeId?: string
+): Promise<boolean> {
+  const normalizedEmail = normalizeEmail(email);
+  const token_hash = hashSignInCode(normalizedEmail, code);
+
+  const whereClauses = [
+    eq(magic_link_tokens.token_hash, token_hash),
+    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.purpose, 'sign_in_code'),
+    isNull(magic_link_tokens.consumed_at),
+    sql`${magic_link_tokens.reserved_until} > NOW()`,
+  ];
+  if (challengeId) {
+    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
+  }
+
+  const committed = await db
+    .update(magic_link_tokens)
+    .set({ consumed_at: sql`NOW()`, reserved_until: null })
+    .where(and(...whereClauses))
+    .returning();
+
+  return committed.length > 0;
+}
+
+/**
+ * Release a reserved sign-in code without consuming it or incrementing attempts.
+ * A settlement failure is not a wrong guess — it must not cost the user an attempt.
+ *
+ * When challengeId is supplied, the release is scoped to the challenge.
+ */
+export async function releaseSignInCode(
+  email: string,
+  code: string,
+  challengeId?: string
+): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  const token_hash = hashSignInCode(normalizedEmail, code);
+
+  const whereClauses = [
+    eq(magic_link_tokens.token_hash, token_hash),
+    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.purpose, 'sign_in_code'),
+    isNull(magic_link_tokens.consumed_at),
+  ];
+  if (challengeId) {
+    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
+  }
+
+  await db
+    .update(magic_link_tokens)
+    .set({ reserved_until: null })
+    .where(and(...whereClauses));
+}
+
+/**
+ * Consume a sign-in code unconditionally, regardless of reservation status.
+ * Used when the reservation lapsed between settlement and commit — the user
+ * is legitimately settled and this prevents a second settlement with the same code.
+ *
+ * When challengeId is supplied, the consume is scoped to the challenge.
+ */
+export async function consumeSignInCode(
+  email: string,
+  code: string,
+  challengeId?: string
+): Promise<boolean> {
+  const normalizedEmail = normalizeEmail(email);
+  const token_hash = hashSignInCode(normalizedEmail, code);
+
+  const whereClauses = [
+    eq(magic_link_tokens.token_hash, token_hash),
+    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.purpose, 'sign_in_code'),
+    isNull(magic_link_tokens.consumed_at),
+  ];
+  if (challengeId) {
+    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
+  }
+
+  const consumed = await db
+    .update(magic_link_tokens)
+    .set({ consumed_at: sql`NOW()`, reserved_until: null })
+    .where(and(...whereClauses))
+    .returning();
+
+  return consumed.length > 0;
 }
 
 export async function deleteSignInCode(email: string, code: string): Promise<void> {

@@ -13,11 +13,15 @@ const PROVIDERS = {
     planId: 'byteplus-coding-plan-team-lite',
     providerId: 'byteplus-coding',
   },
+  'byteplus-pro': {
+    planId: 'byteplus-coding-plan-team-pro',
+    providerId: 'byteplus-coding',
+  },
 } as const;
 const KEY_PREFIX = 'dev-seed:coding-plans';
 const MAX_CREDENTIAL_COUNT = 20;
 
-export const usage = '<scenario> [count] [minimax|byteplus]';
+export const usage = '<scenario> [count] [minimax|byteplus|byteplus-pro]';
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed coding-plans:available-credentials ${usage}`);
@@ -32,6 +36,9 @@ function printUsage(): void {
   console.log('Examples:');
   console.log('  pnpm dev:seed coding-plans:available-credentials subscription-smoke 1');
   console.log('  pnpm dev:seed coding-plans:available-credentials byteplus-smoke 1 byteplus');
+  console.log(
+    '  pnpm dev:seed coding-plans:available-credentials byteplus-pro-smoke 1 byteplus-pro'
+  );
 }
 
 function parseCount(rawCount: string | undefined): number {
@@ -102,8 +109,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const scenario = requireScenario(rawScenario);
   const count = parseCount(rawCount);
-  if (rawProvider !== 'minimax' && rawProvider !== 'byteplus') {
-    throw new Error('provider must be minimax or byteplus');
+  if (rawProvider !== 'minimax' && rawProvider !== 'byteplus' && rawProvider !== 'byteplus-pro') {
+    throw new Error('provider must be minimax, byteplus, or byteplus-pro');
   }
   const provider = PROVIDERS[rawProvider];
   const key = requireEncryptionKey();

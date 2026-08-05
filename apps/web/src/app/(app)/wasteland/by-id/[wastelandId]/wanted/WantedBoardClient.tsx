@@ -9,6 +9,7 @@ import type { WastelandOutputs } from '@/lib/wasteland/trpc';
 import { useSetWastelandPageHeader } from '../WastelandPageHeaderContext';
 import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -452,8 +453,10 @@ export function WantedBoardClient({
     count: displayCount,
     actions: (
       <>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() =>
             openDrawer({
               type: 'post-wanted-item',
@@ -461,20 +464,20 @@ export function WantedBoardClient({
               onSuccess: invalidateBoard,
             })
           }
-          className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80"
         >
           <Plus className="size-3" />
           Post Wanted Item
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={handleRefresh}
           disabled={refreshMutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-50"
         >
           <RefreshCw className={`size-3 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
           Refresh
-        </button>
+        </Button>
       </>
     ),
   });
@@ -520,14 +523,16 @@ export function WantedBoardClient({
           </div>
 
           {/* Sort toggle */}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={toggleSort}
-            className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
+            className="ml-auto gap-1 px-2 py-1 text-[10px] font-medium text-white/30"
           >
             <ArrowUpDown className="size-3" />
             {sortField === 'priority' ? 'Priority' : 'Last activity'}
-          </button>
+          </Button>
         </div>
 
         {/* Item list */}
@@ -639,13 +644,9 @@ export function WantedBoardClient({
                 {pageLimit >= WANTED_BOARD_MAX_LIMIT ? ' Refine search to narrow results.' : ''}
               </span>
               {pageLimit < WANTED_BOARD_MAX_LIMIT && (
-                <button
-                  type="button"
-                  onClick={handleLoadMore}
-                  className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-medium text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white/85"
-                >
+                <Button type="button" variant="outline" size="sm" onClick={handleLoadMore}>
                   Load more
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -789,22 +790,22 @@ export function MarkDoneDialog({
           </div>
 
           <DialogFooter>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={handleClose}
               disabled={doneMutation.isPending}
-              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="default"
               disabled={doneMutation.isPending || !evidence.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary-hover inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
             >
               {doneMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
               Mark as done
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -989,22 +990,18 @@ export function AcceptDialog({
           </div>
 
           <DialogFooter>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={handleClose}
               disabled={acceptMutation.isPending}
-              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
             >
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={acceptMutation.isPending}
-              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="submit" variant="default" disabled={acceptMutation.isPending}>
               {acceptMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
               Accept
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -1110,22 +1107,22 @@ export function RejectDialog({
           </div>
 
           <DialogFooter>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={handleClose}
               disabled={rejectMutation.isPending}
-              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="destructive"
               disabled={rejectMutation.isPending || !reason.trim()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
             >
               {rejectMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
               Reject
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -1186,25 +1183,25 @@ export function CloseItemDialog({
         )}
 
         <DialogFooter>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={handleClose}
             disabled={closeMutation.isPending}
-            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             disabled={closeMutation.isPending || !item}
             onClick={() => {
               if (item) closeMutation.mutate({ wastelandId, itemId: item.id });
             }}
-            className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.1] px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/[0.15] disabled:opacity-50"
           >
             {closeMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
             Close item
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1269,25 +1266,25 @@ export function UnclaimDialog({
         )}
 
         <DialogFooter>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={handleClose}
             disabled={unclaimMutation.isPending}
-            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             disabled={unclaimMutation.isPending || !item}
             onClick={() => {
               if (item) unclaimMutation.mutate({ wastelandId, itemId: item.id });
             }}
-            className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:opacity-50"
           >
             {unclaimMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
             Unclaim
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1332,18 +1329,17 @@ function FilterChip({
   dotColor?: string;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium capitalize transition-colors ${
-        active
-          ? 'bg-white/[0.08] text-white/70'
-          : 'text-white/30 hover:bg-white/[0.04] hover:text-white/50'
-      }`}
+      className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium capitalize ${active ? 'bg-surface-selected hover:bg-surface-selected text-white/70' : 'text-white/30'}`}
+      aria-pressed={active}
     >
       {dotColor && <span className={`size-1.5 rounded-full ${dotColor}`} />}
       {label}
       <span className="font-mono text-[9px] opacity-60">{count}</span>
-    </button>
+    </Button>
   );
 }

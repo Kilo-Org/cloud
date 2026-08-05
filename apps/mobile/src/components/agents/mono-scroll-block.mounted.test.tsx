@@ -35,6 +35,8 @@ const NOOP_TRACK: () => () => void = () => () => {
   // Presence is asserted through spies in the registration tests.
 };
 
+type BlockProps = Parameters<typeof MonoScrollBlock>[0];
+
 function findByType(
   root: TestRenderer.ReactTestInstance,
   type: string
@@ -117,8 +119,8 @@ function withSheet(
   return <MonoScrollSheetProvider value={value}>{block}</MonoScrollSheetProvider>;
 }
 
-function blockElement(maxLength?: number): ReactElement {
-  return createElement(MonoScrollBlock, { content: LONG_LINE, maxLength });
+function blockElement(props?: Partial<BlockProps>): ReactElement {
+  return createElement(MonoScrollBlock, { content: LONG_LINE, ...props });
 }
 
 function fireLayout(text: TestRenderer.ReactTestInstance, height: number): void {
@@ -170,7 +172,7 @@ describe('MonoScrollBlock mounted', () => {
   });
 
   it('renders the truncated marker in scroll mode when maxLength is exceeded', async () => {
-    const renderer = await mount(withSheet('scroll', NOOP_TRACK, blockElement(200)));
+    const renderer = await mount(withSheet('scroll', NOOP_TRACK, blockElement({ maxLength: 200 })));
 
     expect(monoText(renderer.root)).toBeTruthy();
     expect(truncatedMarkers(renderer.root)).toHaveLength(1);
@@ -178,10 +180,26 @@ describe('MonoScrollBlock mounted', () => {
     await unmount(renderer);
   });
 
-  it('renders plain wrapped text with no scroller in wrap mode', async () => {
+  it('renders SelectableText with no scroller in wrap mode', async () => {
     const renderer = await mount(withSheet('wrap', NOOP_TRACK, blockElement()));
 
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(findByType(renderer.root, 'Text')).toHaveLength(0);
+    const text = findMonoText(renderer.root, 'SelectableText');
+    const className = propOf(text, 'className') as string;
+    expect(className).toContain('font-mono text-xs leading-4');
+    expect(className).not.toContain('shrink-0');
+
+    await unmount(renderer);
+  });
+
+  it('renders plain Text for transcript blocks in wrap mode', async () => {
+    const renderer = await mount(
+      withSheet('wrap', NOOP_TRACK, blockElement({ inTranscript: true }))
+    );
+
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SelectableText')).toHaveLength(0);
     const text = findMonoText(renderer.root, 'Text');
     expect(propOf(text, 'selectable')).toBe(true);
     const className = propOf(text, 'className') as string;
@@ -192,7 +210,7 @@ describe('MonoScrollBlock mounted', () => {
   });
 
   it('renders the truncated marker in wrap mode when maxLength is exceeded', async () => {
-    const renderer = await mount(withSheet('wrap', NOOP_TRACK, blockElement(200)));
+    const renderer = await mount(withSheet('wrap', NOOP_TRACK, blockElement({ maxLength: 200 })));
 
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
     expect(truncatedMarkers(renderer.root)).toHaveLength(1);

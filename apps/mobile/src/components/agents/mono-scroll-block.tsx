@@ -47,9 +47,11 @@ export const MonoScrollSheetProvider = MonoScrollSheetContext.Provider;
  * Two display modes:
  * - `scroll` (default outside the sheet): the RNGH horizontal ScrollView with
  *   intrinsic-width text and a measured height pin (delivery notes below).
- * - `wrap` (sheet default): plain wrapped text with no ScrollView, no `onLayout`
+ * - `wrap` (sheet default): wrapped text with no ScrollView, no `onLayout`
  *   measurement, and no height pin — the sheet's own vertical ScrollView is the
- *   only scroller, so no nested horizontal gesture exists.
+ *   only scroller, so no nested horizontal gesture exists. Selection keeps the
+ *   scroll-branch split: `SelectableText` outside transcript, plain `Text`
+ *   inside transcript.
  *
  * The mode comes from `MonoScrollSheetContext`, provided by `PartDetailSheet`.
  * Each mounted block also registers presence through that context so the sheet
@@ -100,14 +102,18 @@ export function MonoScrollBlock({
   );
 
   if (textMode === 'wrap') {
+    const wrapContentClasses = 'font-mono text-xs leading-4';
     return (
       <View className={containerClassName}>
-        <Text
-          selectable={textSelectable}
-          className={cn('font-mono text-xs leading-4', textClassName)}
-        >
-          {displayText}
-        </Text>
+        {inTranscript ? (
+          <Text selectable={textSelectable} className={cn(wrapContentClasses, textClassName)}>
+            {displayText}
+          </Text>
+        ) : (
+          <SelectableText className={cn(wrapContentClasses, textClassName)}>
+            {displayText}
+          </SelectableText>
+        )}
         {isTruncated ? (
           <Text
             accessibilityLabel="Content truncated"

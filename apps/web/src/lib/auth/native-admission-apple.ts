@@ -117,8 +117,38 @@ function parseCBOR(buf: Buffer): CBORValue {
   return value;
 }
 
-// Apple approved App Attest root CA thumbprint (SHA-1)
-const ROOT_CA_SHA1 = '58e2ae438e3b8b4ff3e4f57568d392b7da36a5db';
+// Apple App Attestation Root CA, published at
+// https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem
+// The chain must terminate at this certificate; it is pinned by SHA-256
+// fingerprint of the DER body.
+const APPLE_APP_ATTEST_ROOT_PEM = `-----BEGIN CERTIFICATE-----
+MIICITCCAaegAwIBAgIQC/O+DvHN0uD7jG5yH2IXmDAKBggqhkjOPQQDAzBSMSYw
+JAYDVQQDDB1BcHBsZSBBcHAgQXR0ZXN0YXRpb24gUm9vdCBDQTETMBEGA1UECgwK
+QXBwbGUgSW5jLjETMBEGA1UECAwKQ2FsaWZvcm5pYTAeFw0yMDAzMTgxODMyNTNa
+Fw00NTAzMTUwMDAwMDBaMFIxJjAkBgNVBAMMHUFwcGxlIEFwcCBBdHRlc3RhdGlv
+biBSb290IENBMRMwEQYDVQQKDApBcHBsZSBJbmMuMRMwEQYDVQQIDApDYWxpZm9y
+bmlhMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAERTHhmLW07ATaFQIEVwTtT4dyctdh
+NbJhFs/Ii2FdCgAHGbpphY3+d8qjuDngIN3WVhQUBHAoMeQ/cLiP1sOUtgjqK9au
+Yen1mMEvRq9Sk3Jm5X8U62H+xTD3FE9TgS41o0IwQDAPBgNVHRMBAf8EBTADAQH/
+MB0GA1UdDgQWBBSskRBTM72+aEH/pwyp5frq5eWKoTAOBgNVHQ8BAf8EBAMCAQYw
+CgYIKoZIzj0EAwMDaAAwZQIwQgFGnByvsiVbpTKwSga0kP0e8EeDS4+sQmTvb7vn
+53O5+FRXgeLhpJ06ysC5PrOyAjEAp5U4xDgEgllF7En3VcE3iexZZtKeYnpqtijV
+oyFraWVIyd/dganmrduC1bmTBGwD
+-----END CERTIFICATE-----`;
+
+const ROOT_CA_SHA256 = '1cb9823ba28ba6ad2d33a006941de2ae4f513ef1d4e831b9f7e0fa7b6242c932';
+
+// Parse the pinned root once. Fail loudly if the embedded PEM drifts from the
+// pinned fingerprint, otherwise a corrupted pin silently rejects all
+// attestations.
+const APPLE_APP_ATTEST_ROOT_CERT = (() => {
+  const cert = new X509Certificate(APPLE_APP_ATTEST_ROOT_PEM);
+  const fingerprint = createHash('sha256').update(cert.raw).digest('hex');
+  if (fingerprint !== ROOT_CA_SHA256) {
+    throw new Error('Embedded Apple App Attest root CA fingerprint mismatch');
+  }
+  return cert;
+})();
 
 export type AppleAttestError =
   | 'INVALID_ATTEST_FORMAT'
@@ -170,33 +200,46 @@ export async function verifyAppleAttestation(
   if (!(attStmt instanceof Map)) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
   const x5c = attStmt.get('x5c');
   if (!Array.isArray(x5c) || x5c.length < 2) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
-  const [credCertBuf, caCertBuf] = x5c;
-  if (!(credCertBuf instanceof Buffer) || !(caCertBuf instanceof Buffer)) {
+  const credCertBuf = x5c[0];
+  if (!(credCertBuf instanceof Buffer) || !x5c.slice(1).every(entry => entry instanceof Buffer)) {
     return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
   }
+  const chainDer: Buffer[] = [credCertBuf, ...(x5c.slice(1) as Buffer[])];
 
-  // Certificate chain verification
-  let credCert: X509Certificate;
-  let caCert: X509Certificate;
+  // Certificate chain verification. Every certificate must be signed by the
+  // next one in the array (leaf → intermediate → … → root) and the chain must
+  // terminate at Apple's pinned App Attest root. Apple emits x5c as either
+  // [leaf, intermediate, root] or [leaf, intermediate], so the terminal
+  // certificate must either be the pinned root itself or be signed by it.
+  let chain: X509Certificate[];
   try {
-    credCert = new X509Certificate(credCertBuf);
-    caCert = new X509Certificate(caCertBuf);
+    chain = chainDer.map(der => new X509Certificate(der));
   } catch {
     return { ok: false, error: 'CERT_CHAIN_INVALID' };
   }
 
-  const caFingerprint = createHash('sha1').update(caCert.raw).digest('hex');
-  if (caFingerprint !== ROOT_CA_SHA1) {
-    captureMessage(`apple_attest_unknown_ca: ${caFingerprint}`);
-    return { ok: false, error: 'CERT_CHAIN_INVALID' };
-  }
-
   try {
-    if (!credCert.verify(caCert.publicKey)) {
-      return { ok: false, error: 'CERT_CHAIN_INVALID' };
+    for (let i = 0; i < chain.length - 1; i++) {
+      if (!chain[i].verify(chain[i + 1].publicKey)) {
+        return { ok: false, error: 'CERT_CHAIN_INVALID' };
+      }
     }
   } catch {
     return { ok: false, error: 'CERT_CHAIN_INVALID' };
+  }
+
+  const terminalCert = chain[chain.length - 1];
+  const terminalFingerprint = createHash('sha256').update(terminalCert.raw).digest('hex');
+  if (terminalFingerprint !== ROOT_CA_SHA256) {
+    try {
+      if (!terminalCert.verify(APPLE_APP_ATTEST_ROOT_CERT.publicKey)) {
+        captureMessage(`apple_attest_unknown_ca: ${terminalFingerprint}`);
+        return { ok: false, error: 'CERT_CHAIN_INVALID' };
+      }
+    } catch {
+      captureMessage(`apple_attest_unknown_ca: ${terminalFingerprint}`);
+      return { ok: false, error: 'CERT_CHAIN_INVALID' };
+    }
   }
 
   // RP ID hash check — authData bytes 0-31
@@ -220,9 +263,9 @@ export async function verifyAppleAttestation(
     .digest('hex');
 
   const nonceExt = extractAppleAttestNonce(credCertBuf);
-  if (!nonceExt || nonceExt !== expectedNonce) {
+  if (!nonceExt || nonceExt.toString('hex') !== expectedNonce) {
     captureMessage(
-      `apple_attest_nonce_mismatch: expected=${expectedNonce.substring(0, 16)}... got=${nonceExt?.substring(0, 16) ?? 'null'}...`
+      `apple_attest_nonce_mismatch: expected=${expectedNonce.substring(0, 16)}... got=${nonceExt?.toString('hex').substring(0, 16) ?? 'null'}...`
     );
     return { ok: false, error: 'NONCE_MISMATCH' };
   }
@@ -257,33 +300,115 @@ export async function verifyAppleAttestation(
   return { ok: true, credentialId, publicKeySpkiBase64 };
 }
 
-/** Extract the Apple attestation nonce from the credential certificate DER. */
-function extractAppleAttestNonce(certDer: Buffer): string | null {
-  const oid = Buffer.from([0x06, 0x0a, 0x2b, 0x06, 0x01, 0x04, 0x01, 0x83, 0x3c, 0x63, 0x08, 0x02]);
-  let idx = certDer.indexOf(oid);
-  if (idx === -1) return null;
-  idx += oid.length;
-  while (idx < certDer.length) {
-    if (certDer[idx] === 0x04) {
-      const lenByte = certDer[idx + 1];
-      if (lenByte === undefined) return null;
-      let len = lenByte;
-      let dataStart = idx + 2;
-      if (len >= 0x80) {
-        const numOctets = len & 0x7f;
-        len = 0;
-        for (let i = 0; i < numOctets; i++) {
-          const octet = certDer[idx + 2 + i];
-          if (octet === undefined) return null;
-          len = (len << 8) | octet;
-        }
-        dataStart = idx + 2 + numOctets;
-      }
-      return certDer.subarray(dataStart, dataStart + len).toString('hex');
-    }
-    idx++;
+// Apple App Attest nonce extension OID 1.2.840.113635.100.8.2.
+const APPLE_ATTEST_NONCE_OID = Buffer.from([
+  0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x08, 0x02,
+]);
+
+class DERDecodeError extends Error {}
+
+interface DERTLV {
+  /** 0 = universal, 2 = context-specific. */
+  tagClass: number;
+  constructed: boolean;
+  tagNumber: number;
+  content: Buffer;
+}
+
+/**
+ * Read one DER TLV from `buf` starting at `offset`.
+ *
+ * Returns `[tlv, endOffset]`. Throws `DERDecodeError` for a malformed tag or
+ * length and for any declared length that runs past the end of the buffer, so
+ * callers can fail closed instead of reading out-of-bounds bytes.
+ */
+function readDERTLV(buf: Buffer, offset: number): [DERTLV, number] {
+  const tagByte = buf[offset];
+  if (tagByte === undefined) throw new DERDecodeError('unexpected end of buffer');
+  const tagClass = tagByte >> 6;
+  const constructed = (tagByte & 0x20) !== 0;
+  let tagNumber = tagByte & 0x1f;
+  let pos = offset + 1;
+  if (tagNumber === 0x1f) {
+    tagNumber = 0;
+    let b: number;
+    do {
+      b = buf[pos];
+      if (b === undefined) throw new DERDecodeError('unexpected end of tag');
+      if (tagNumber > 0x7fffff) throw new DERDecodeError('tag number too large');
+      tagNumber = tagNumber * 128 + (b & 0x7f);
+      pos++;
+    } while ((b & 0x80) !== 0);
   }
-  return null;
+
+  const lenByte = buf[pos];
+  if (lenByte === undefined) throw new DERDecodeError('unexpected end of length');
+  pos++;
+  let length: number;
+  if (lenByte < 0x80) {
+    length = lenByte;
+  } else {
+    const numOctets = lenByte & 0x7f;
+    if (numOctets === 0) throw new DERDecodeError('indefinite length not allowed in DER');
+    if (numOctets > 4) throw new DERDecodeError('length field too long');
+    length = 0;
+    for (let i = 0; i < numOctets; i++) {
+      const octet = buf[pos];
+      if (octet === undefined) throw new DERDecodeError('unexpected end of length');
+      length = length * 256 + octet;
+      pos++;
+    }
+  }
+  const contentEnd = pos + length;
+  if (contentEnd > buf.length) throw new DERDecodeError('length exceeds buffer');
+  return [
+    {
+      tagClass,
+      constructed,
+      tagNumber,
+      content: buf.subarray(pos, contentEnd),
+    },
+    contentEnd,
+  ];
+}
+
+/**
+ * Extract the nonce from the Apple App Attest credential certificate.
+ *
+ * The nonce extension (OID 1.2.840.113635.100.8.2) holds the DER value
+ * `SEQUENCE { [1] EXPLICIT OCTET STRING }`, where the nested OCTET STRING is
+ * the 32-byte nonce. The X.509 `extnValue` field wraps that value in an OCTET
+ * STRING, so the parser walks four DER levels and requires each element to be
+ * exactly the structure Apple emits. Returns null when the extension is
+ * missing or malformed.
+ */
+export function extractAppleAttestNonce(certDer: Buffer): Buffer | null {
+  const oidIdx = certDer.indexOf(APPLE_ATTEST_NONCE_OID);
+  if (oidIdx === -1) return null;
+  try {
+    // 1. X.509 extnValue OCTET STRING.
+    const [extn] = readDERTLV(certDer, oidIdx + APPLE_ATTEST_NONCE_OID.length);
+    if (extn.tagClass !== 0 || extn.tagNumber !== 4 || extn.constructed) return null;
+
+    // 2. Outer SEQUENCE containing exactly one element.
+    const [outerSeq, afterOuterSeq] = readDERTLV(extn.content, 0);
+    if (outerSeq.tagClass !== 0 || outerSeq.tagNumber !== 16 || !outerSeq.constructed) return null;
+    if (afterOuterSeq !== extn.content.length) return null;
+
+    // 3. [1] EXPLICIT context-specific constructed tag.
+    const [tagged, afterTagged] = readDERTLV(outerSeq.content, 0);
+    if (tagged.tagClass !== 2 || tagged.tagNumber !== 1 || !tagged.constructed) return null;
+    if (afterTagged !== outerSeq.content.length) return null;
+
+    // 4. Nested nonce OCTET STRING.
+    const [nonce, afterNonce] = readDERTLV(tagged.content, 0);
+    if (nonce.tagClass !== 0 || nonce.tagNumber !== 4 || nonce.constructed) return null;
+    if (afterNonce !== tagged.content.length) return null;
+
+    return nonce.content;
+  } catch {
+    return null;
+  }
 }
 
 /** Convert a COSE EC2 P-256 key (CBOR map with integer labels) to DER-encoded SPKI. */

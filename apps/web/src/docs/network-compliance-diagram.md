@@ -86,7 +86,7 @@ graph TB
         OPENROUTER[OpenRouter<br/>AI Model Gateway]
         ANTHROPIC[Anthropic<br/>Claude Models]
         OPENAI[OpenAI<br/>GPT Models]
-        XAI[xAI/Grok<br/>AI Models]
+        XAI[SpaceXAI/Grok<br/>AI Models]
     end
 
     subgraph "Payment & Billing"

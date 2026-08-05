@@ -48,7 +48,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   together: 'Together AI',
   unknown: 'Unknown',
   wandb: 'Weights & Biases',
-  xai: 'xAI',
+  xai: 'SpaceXAI',
   zai: 'Z.ai',
 };
 

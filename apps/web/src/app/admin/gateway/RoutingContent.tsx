@@ -10,11 +10,34 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   DEFAULT_VERCEL_PERCENTAGE,
   DEFAULT_VERCEL_PERCENTAGE_FREE,
   NOTE_MAX_LENGTH,
   VercelRoutingPercentageSchema,
 } from '@/lib/ai-gateway/gateway-config';
+import { autoFreeModels, findKiloExclusiveModel } from '@/lib/ai-gateway/models';
+
+const totalAutoFreeWeight = autoFreeModels.reduce((total, model) => total + model.weight, 0);
+const percentageFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
+
+const autoFreeConstituents = autoFreeModels.map(model => {
+  const exclusiveModel = findKiloExclusiveModel(model.model);
+  const hasVercelRoutingFlag = exclusiveModel?.flags.includes('vercel-routing') ?? null;
+
+  return {
+    ...model,
+    hasVercelRoutingFlag,
+    isVercelRoutingEnabled: exclusiveModel === null || hasVercelRoutingFlag === true,
+  };
+});
 
 export function RoutingContent() {
   const trpc = useTRPC();
@@ -94,6 +117,8 @@ export function RoutingContent() {
 
   const currentOverride = data?.vercel_routing_percentage;
   const currentFreeOverride = data?.vercel_routing_percentage_free;
+  const effectiveFreeRoutingPercentage =
+    currentFreeOverride ?? DEFAULT_VERCEL_PERCENTAGE_FREE;
   const isOverrideActive =
     (currentOverride !== null && currentOverride !== undefined) ||
     (currentFreeOverride !== null && currentFreeOverride !== undefined);
@@ -219,6 +244,61 @@ export function RoutingContent() {
                 <span className="font-medium">Previous note:</span> {data.note}
               </p>
             )}
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <div>
+              <h3 className="text-sm font-medium">Auto Free effective Vercel routing</h3>
+              <p className="text-muted-foreground text-sm">
+                Share of all Auto Free traffic based only on the active free routing percentage (
+                {percentageFormatter.format(effectiveFreeRoutingPercentage)}%), constituent
+                weights, and the vercel-routing flag. Runtime availability and request constraints
+                are not included.
+              </p>
+            </div>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Constituent</TableHead>
+                    <TableHead className="text-right">Weight</TableHead>
+                    <TableHead className="text-right">Auto Free share</TableHead>
+                    <TableHead>vercel-routing flag</TableHead>
+                    <TableHead className="text-right">Effective Vercel</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {autoFreeConstituents.map(
+                    ({ model, weight, hasVercelRoutingFlag, isVercelRoutingEnabled }) => {
+                      const weightedShare = weight / totalAutoFreeWeight;
+                      const effectiveVercelPercentage = isVercelRoutingEnabled
+                        ? effectiveFreeRoutingPercentage * weightedShare
+                        : 0;
+
+                      return (
+                        <TableRow key={model}>
+                          <TableCell className="font-mono text-xs">{model}</TableCell>
+                          <TableCell className="text-right tabular-nums">{weight}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {percentageFormatter.format(weightedShare * 100)}%
+                          </TableCell>
+                          <TableCell>
+                            {hasVercelRoutingFlag === null
+                              ? 'Not required'
+                              : hasVercelRoutingFlag
+                                ? 'Enabled'
+                                : 'Disabled'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">
+                            {percentageFormatter.format(effectiveVercelPercentage)}%
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>

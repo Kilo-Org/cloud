@@ -2028,9 +2028,10 @@ export const ModelSchema = z.object({
   reasoning: z
     .object({
       mandatory: z.boolean(),
-      supported_efforts: z.array(z.string()).optional(),
+      supported_efforts: z.array(ReasoningEffortSchema).optional(),
     })
-    .optional(),
+    .optional()
+    .catch(undefined),
 });
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });

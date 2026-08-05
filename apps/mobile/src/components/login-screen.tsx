@@ -64,6 +64,13 @@ export function LoginScreen() {
   );
 
   useEffect(() => {
+    if (sessionEnded) {
+      // id dedupes the toast if the login route remounts while still signed out
+      toast('Your session ended. Please sign in again.', { id: 'session-ended' });
+    }
+  }, [sessionEnded]);
+
+  useEffect(() => {
     if (status === 'approved' && token) {
       void persistToken(token, refreshToken, expiresIn);
     }
@@ -186,16 +193,7 @@ export function LoginScreen() {
               recovering only on relaunch — so these branches render without
               animation; status swaps are instant. */}
           <View className="w-full max-w-sm gap-3">
-            {status === 'idle' && (
-              <View className="w-full gap-3">
-                {sessionEnded && (
-                  <Text className="text-center text-sm text-muted-foreground">
-                    Your session ended. Please sign in again.
-                  </Text>
-                )}
-                <IdleAuth start={start} />
-              </View>
-            )}
+            {status === 'idle' && <IdleAuth start={start} />}
 
             {status === 'pending' && code && (
               <View className="w-full items-center gap-4">

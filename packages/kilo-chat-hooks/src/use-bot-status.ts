@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EventServiceClient } from '@kilocode/event-service';
 import {
@@ -28,16 +28,14 @@ export function reduceBotStatusOnEvent(
 export function useBotStatus(
   client: KiloChatClient,
   eventClient: EventServiceClient,
-  sandboxId: string | null
+  sandboxId: string | null,
+  active: boolean = true
 ): BotStatusRecord | null {
   const queryClient = useQueryClient();
 
-  // WS-ready gate. onConnected fires synchronously if already connected, and on every reconnect.
-  const [wsReady, setWsReady] = useState(false);
+  // On resync (reconnect or sequence gap), refetch to catch up on missed events.
   useEffect(() => {
-    return eventClient.onConnected(() => {
-      setWsReady(true);
-      // On reconnect, refetch to catch up on anything we missed while disconnected.
+    return eventClient.onResync(() => {
       if (sandboxId) {
         void queryClient.invalidateQueries({ queryKey: botStatusKey(sandboxId) });
       }
@@ -69,8 +67,8 @@ export function useBotStatus(
       });
       return queryClient.getQueryData<BotStatusRecord | null>(botStatusKey(sandboxId)) ?? null;
     },
-    enabled: sandboxId !== null && wsReady,
-    refetchInterval: POLL_INTERVAL_MS,
+    enabled: sandboxId !== null,
+    refetchInterval: active ? POLL_INTERVAL_MS : undefined,
     staleTime: 0,
   });
 

@@ -30,7 +30,8 @@ import {
   api_request_log,
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
-import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
+import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
+import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
 import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
@@ -2261,8 +2262,10 @@ export const adminRouter = createTRPCRouter({
 
           try {
             const snapshot = await fetchSessionSnapshot(input.session_id, session.kilo_user_id);
+            // The export streams messages/parts in ingest order; re-sort by the
+            // time-ordered IDs so the trace matches the cloud-agent-next UI.
             return {
-              messages: snapshot?.messages ?? ([] satisfies SessionMessage[]),
+              messages: sortSessionMessagesForDisplay(snapshot?.messages ?? []),
               format: 'v2' as const,
             };
           } catch (error) {

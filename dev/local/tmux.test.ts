@@ -61,6 +61,9 @@ test(
     const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
     const tmuxOutput = (...args: string[]) =>
       execFileSync('tmux', args, { encoding: 'utf8' }).trim();
+    // set-environment -g needs a running server; hold one open for the test.
+    const keepAliveSession = `${sessionName}-keepalive`;
+    tmux('new-session', '-d', '-s', keepAliveSession);
     const savedGlobalEnvironment = new Map<string, string | undefined>();
     for (const key of ['PWD', 'OLDPWD']) {
       try {
@@ -119,6 +122,11 @@ test(
         } catch {
           // The variable may not exist in this tmux version's environment.
         }
+      }
+      try {
+        tmux('kill-session', '-t', keepAliveSession);
+      } catch {
+        // The keep-alive session may already be gone.
       }
     }
   }

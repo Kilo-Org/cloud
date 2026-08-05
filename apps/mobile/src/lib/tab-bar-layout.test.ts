@@ -9,6 +9,7 @@ import {
   shouldShowTabLabel,
   TAB_ICON_FORWARD_FONT_SCALE,
   TAB_LABEL_WRAP_FONT_SCALE,
+  tabAccessibilityLabel,
 } from '@/lib/tab-bar-layout';
 
 describe('getTabBarOverlayHeight', () => {
@@ -128,5 +129,15 @@ describe('shouldHideTabBar', () => {
   it('keeps tabs on normal tab screens', () => {
     expect(shouldHideTabBar('/security-agent/personal')).toBe(false);
     expect(shouldHideTabBar('/security-agent/personal/findings')).toBe(false);
+  });
+});
+
+describe('tabAccessibilityLabel', () => {
+  it('reports the position and total for four tabs', () => {
+    expect(tabAccessibilityLabel('Home', 1, 4)).toBe('Home, tab, 1 of 4');
+  });
+
+  it('reports the position and total for three tabs', () => {
+    expect(tabAccessibilityLabel('Profile', 3, 3)).toBe('Profile, tab, 3 of 3');
   });
 });

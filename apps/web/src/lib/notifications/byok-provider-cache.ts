@@ -68,7 +68,7 @@ export const BYOK_PROVIDER_NOTIFICATION_LABELS: Record<string, string> = {
   novita: 'Novita AI API Key',
 
   // xAI
-  xai: 'xAI API Key',
+  xai: 'SpaceXAI API Key',
 
   // Z.ai / Zhipu (GLM)
   zai: 'GLM Coding Plan',

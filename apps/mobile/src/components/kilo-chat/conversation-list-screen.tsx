@@ -38,6 +38,7 @@ import {
 } from './hooks/use-conversations';
 import { useInstancePresence } from './hooks/use-instance-presence';
 import { useNowTicker } from './hooks/use-now-ticker';
+import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
 
 type Props = {
   sandboxId: string;
@@ -105,6 +106,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const { fontScale } = useWindowDimensions();
   const client = useKiloChatClient();
   const eventClient = useEventServiceClient();
+  const activeAndFocused = useAppActiveAndFocused();
   const listQuery = useConversations(client, sandboxId);
   const createConversation = useCreateConversation(client);
   const leaveConversation = useLeaveConversation(client);
@@ -137,7 +139,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   );
 
   useInstancePresence(sandboxId);
-  useBotStatus(client, eventClient, sandboxId);
+  useBotStatus(client, eventClient, sandboxId, activeAndFocused);
 
   function handleRowPress(conversationId: string) {
     void Haptics.selectionAsync();

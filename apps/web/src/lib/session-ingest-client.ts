@@ -133,6 +133,7 @@ export type SessionMessagesPageOptions = {
 export type SessionMessagesPageResult = {
   kiloSessionId: string;
   history: KiloSdkMessageHistory | null;
+  watermarkEventId?: number | null;
 };
 
 /**

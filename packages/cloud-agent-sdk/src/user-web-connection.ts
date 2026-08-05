@@ -66,6 +66,8 @@ type SendCommandToConnectionInput = {
   command: string;
   data: unknown;
   expectedConnectionId: string;
+  // Stable intent id forwarded to the relay for durable dedupe (D8).
+  mutationId?: string;
 };
 
 type UserWebConnection = {
@@ -94,7 +96,10 @@ type UserWebConnection = {
     sessionId: string,
     command: string,
     data: unknown,
-    expectedOwnerConnectionId?: string
+    expectedOwnerConnectionId?: string,
+    // Stable intent id forwarded to the relay for durable dedupe.
+    // Absent on legacy paths that do not re-issue (D5).
+    mutationId?: string
   ) => Promise<unknown>;
   /**
    * Send a viewer command that is scoped to a specific CLI connection and has
@@ -537,6 +542,10 @@ function createUserWebConnection(
     data: unknown;
     connectionId?: string;
     sessionId?: string;
+    // Stable intent id forwarded to the relay for durable dedupe (D8).
+    // Absent on legacy paths that do not re-issue; the relay falls back to
+    // a per-wire random correlation id.
+    mutationId?: string;
   };
 
   /**
@@ -591,6 +600,7 @@ function createUserWebConnection(
               command: wire.command,
               ...(wire.sessionId ? { sessionId: wire.sessionId } : {}),
               ...(wire.connectionId ? { connectionId: wire.connectionId } : {}),
+              ...(wire.mutationId ? { mutationId: wire.mutationId } : {}),
               data: wire.data,
             })
           );
@@ -653,7 +663,7 @@ function createUserWebConnection(
         releaseConnection();
       };
     },
-    sendCommand(sessionId, command, data, expectedOwnerConnectionId) {
+    sendCommand(sessionId, command, data, expectedOwnerConnectionId, mutationId) {
       return sendRawCommand({
         command,
         // `expectedOwnerConnectionId` undefined still flows through `connectionId`
@@ -662,6 +672,7 @@ function createUserWebConnection(
         ...(expectedOwnerConnectionId ? { connectionId: expectedOwnerConnectionId } : {}),
         sessionId,
         data,
+        ...(mutationId ? { mutationId } : {}),
       });
     },
     sendCommandToConnection(input) {
@@ -669,6 +680,7 @@ function createUserWebConnection(
         command: input.command,
         connectionId: input.expectedConnectionId,
         data: input.data,
+        ...(input.mutationId ? { mutationId: input.mutationId } : {}),
       });
     },
     onCliEvent(sessionId, listener) {

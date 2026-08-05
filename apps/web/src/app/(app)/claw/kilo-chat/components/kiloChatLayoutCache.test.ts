@@ -72,17 +72,18 @@ function createFakeKiloChatClient(): FakeKiloChatClient & {
 }
 
 function createFakeEventService() {
-  let reconnectHandler: (() => void) | null = null;
+  let resyncHandler: (() => void) | null = null;
 
   return {
-    onReconnect: (handler: () => void) => {
-      reconnectHandler = handler;
-      return () => {
-        reconnectHandler = null;
-      };
-    },
+    onReconnect: (_handler: () => void) => () => {},
     emitReconnect: () => {
-      reconnectHandler?.();
+      resyncHandler?.();
+    },
+    onResync: (handler: () => void) => {
+      resyncHandler = handler;
+      return () => {
+        resyncHandler = null;
+      };
     },
   };
 }

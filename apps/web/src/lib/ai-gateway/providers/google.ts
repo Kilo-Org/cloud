@@ -1,9 +1,5 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
-export function isGemmaModel(model: string) {
-  return model.includes('gemma');
-}
-
 export const GEMMA_4_26B_A4B_IT_ID = 'google/gemma-4-26b-a4b-it';
 
 export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
@@ -23,10 +19,6 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
 
 export function isGeminiModel(model: string) {
   return model.includes('gemini');
-}
-
-export function isGemini3Model(model: string) {
-  return model.includes('gemini-3');
 }
 
 export const GEMINI_PRO_CURRENT_MODEL_ID = 'google/gemini-3.1-pro-preview';

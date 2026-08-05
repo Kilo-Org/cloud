@@ -10,18 +10,12 @@ import { useTRPC } from '@/lib/trpc';
 
 export type { ClawInstance, InstanceContextResult };
 
-type ListPollDecider = (instances: ClawInstance[] | undefined) => number;
-
-export function useAllKiloClawInstances(refetchInterval: number | ListPollDecider = 30_000) {
+export function useAllKiloClawInstances(refetchInterval: number | false = 30_000) {
   const trpc = useTRPC();
-  const intervalOption =
-    typeof refetchInterval === 'function'
-      ? (query: { state: { data?: ClawInstance[] } }) => refetchInterval(query.state.data)
-      : refetchInterval;
   return useQuery(
     trpc.kiloclaw.listAllInstances.queryOptions(undefined, {
       staleTime: 30_000,
-      refetchInterval: intervalOption,
+      refetchInterval,
     })
   );
 }

@@ -252,12 +252,19 @@ export type SessionSnapshot = {
  * page (or `null` when the history has been fully read); `omittedItemCount`
  * reports how many individual items the worker filtered out before the page
  * left the DO so the UI can faithfully report omissions.
+ *
+ * `watermarkEventId` carries the latest persisted Cloud Agent event-log
+ * event ID at the time the page was fetched. A present watermark makes the
+ * transport use `fromId` on its first WebSocket connect, closing the gap
+ * between page-snapshot and live-stream events; a null watermark keeps the
+ * existing `replay=false` behaviour.
  */
 export type SessionSnapshotPage = {
   info: SessionInfo;
   messages: SessionSnapshot['messages'];
   nextCursor: string | null;
   omittedItemCount: number;
+  watermarkEventId?: number | null;
 };
 
 /**

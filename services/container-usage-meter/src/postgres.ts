@@ -394,17 +394,6 @@ export async function applyStartWithDb(
     }
 
     const billingMode = billingModeFor(billingConfig, input.service, input.subject);
-    if (billingMode === 'paid') {
-      const remaining = await balanceForSubject(tx, input.subject, true);
-      if (remaining <= MINIMUM_REMAINING_MICRODOLLARS) {
-        return {
-          kind: 'rejected',
-          code: 'insufficient_credits',
-          message: 'Container billing requires at least $5.00 in remaining credits',
-        };
-      }
-    }
-
     const [open] = await tx
       .select()
       .from(container_usage_interval)
@@ -422,6 +411,20 @@ export async function applyStartWithDb(
       if (open.start_epoch_ms > input.startEpochMs) {
         throw new UsageMutationConflictError('Cannot supersede a newer usage interval');
       }
+    }
+
+    if (billingMode === 'paid') {
+      const remaining = await balanceForSubject(tx, input.subject, true);
+      if (remaining <= MINIMUM_REMAINING_MICRODOLLARS) {
+        return {
+          kind: 'rejected',
+          code: 'insufficient_credits',
+          message: 'Container billing requires at least $5.00 in remaining credits',
+        };
+      }
+    }
+
+    if (open) {
       await tx
         .update(container_usage_interval)
         .set({

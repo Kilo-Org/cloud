@@ -426,6 +426,103 @@ describe('container usage PostgreSQL application', () => {
     });
   });
 
+  it('locks the open interval before the payer during paid supersede admission', async () => {
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 20_000_000, microdollars_used: 0 })
+      .where(eq(kilocode_users.id, userId));
+
+    const instanceId = `paid-lock-order-${suffix}`;
+    const paidContext = { ...context, instanceId, sku: paidSkuId };
+    const paidFingerprint = await usageContextFingerprint(paidContext);
+    const openId = `cloud-agent-next:${instanceId}:100`;
+    await applyStartWithDb(
+      client.db,
+      {
+        ...paidContext,
+        startEpochMs: 100,
+        idempotencyKey: startIdempotencyKey(paidContext.service, instanceId, 100),
+      },
+      openId,
+      paidFingerprint,
+      1_000,
+      paidBillingConfig
+    );
+
+    let releaseInterval = (): void => undefined;
+    let intervalLocked = (): void => undefined;
+    const intervalReady = new Promise<void>(resolve => {
+      intervalLocked = resolve;
+    });
+    const intervalRelease = new Promise<void>(resolve => {
+      releaseInterval = resolve;
+    });
+    const blocker = client.db.transaction(async tx => {
+      await tx
+        .select({ id: container_usage_interval.id })
+        .from(container_usage_interval)
+        .where(eq(container_usage_interval.id, openId))
+        .for('update');
+      intervalLocked();
+      await intervalRelease;
+    });
+    await intervalReady;
+
+    const nextId = `cloud-agent-next:${instanceId}:200`;
+    const nextStart = applyStartWithDb(
+      client.db,
+      {
+        ...paidContext,
+        startEpochMs: 200,
+        idempotencyKey: startIdempotencyKey(paidContext.service, instanceId, 200),
+      },
+      nextId,
+      paidFingerprint,
+      2_000,
+      paidBillingConfig
+    );
+
+    try {
+      await expect
+        .poll(async () => {
+          const result = await client.pool.query<{ count: string }>(
+            `SELECT count(*)
+               FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND wait_event_type = 'Lock'
+                AND query LIKE '%container_usage_interval%'
+                AND query LIKE '%for update%'`
+          );
+          return Number(result.rows[0]?.count ?? 0);
+        })
+        .toBeGreaterThan(0);
+
+      const payerProbe = await client.pool.connect();
+      try {
+        await payerProbe.query('BEGIN');
+        await payerProbe.query("SET LOCAL lock_timeout = '500ms'");
+        await expect(
+          payerProbe.query('SELECT id FROM kilocode_users WHERE id = $1 FOR UPDATE', [userId])
+        ).resolves.toMatchObject({ rowCount: 1 });
+      } finally {
+        await payerProbe.query('ROLLBACK');
+        payerProbe.release();
+      }
+    } finally {
+      releaseInterval();
+      await blocker;
+    }
+
+    await expect(nextStart).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+    });
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.instance_id, instanceId));
+  });
+
   it('closes stale open intervals at their last confirmed boundary', async () => {
     await client.db
       .update(cloud_billing_sku)

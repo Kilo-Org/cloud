@@ -35,6 +35,7 @@ describe('GET /api/cron/coding-plans-inventory-summary', () => {
       loaded: 263,
       assigned: 156,
       available: 83,
+      waitlist: 13,
       revocationPending: 5,
       revocationFailed: 0,
       revoked: 19,

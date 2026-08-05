@@ -105,7 +105,6 @@ export function resolveManualByokModel(
     supportsReasoning: model.supports_reasoning ?? definition.model_defaults.supports_reasoning,
     addCacheBreakpoints:
       model.add_cache_breakpoints ?? definition.model_defaults.add_cache_breakpoints,
-    variants: model.variants ?? definition.model_defaults.variants,
     contextLength,
     maxCompletionTokens: Math.min(
       model.max_completion_tokens ??

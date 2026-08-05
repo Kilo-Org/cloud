@@ -145,14 +145,12 @@ function ModelFields({
   canRemove,
   onChange,
   onRemove,
-  onJsonValidityChange,
 }: {
   model: ManualByokModel;
   index: number;
   canRemove: boolean;
   onChange(model: ManualByokModel): void;
   onRemove(): void;
-  onJsonValidityChange(id: string, valid: boolean): void;
 }) {
   return (
     <div className="bg-muted/30 space-y-4 rounded-md border p-4">
@@ -261,16 +259,6 @@ function ModelFields({
           />
         </div>
       </div>
-      <JsonField
-        id={`manual-model-variants-${index}`}
-        label="Variants"
-        value={model.variants}
-        placeholder='{"high":{"reasoning":{"enabled":true,"effort":"high"},"verbosity":"high"}}'
-        onChange={variants =>
-          onChange({ ...model, variants: variants as ManualByokModel['variants'] })
-        }
-        onValidityChange={valid => onJsonValidityChange(`model-${index}-variants`, valid)}
-      />
     </div>
   );
 }
@@ -297,10 +285,6 @@ export function ManualByokProviderFields({
   const fetchModels = useMutation(
     trpc.byok.fetchManualModels.mutationOptions({
       onSuccess: models => {
-        for (const id of invalidJsonFields.current) {
-          if (id.startsWith('model-')) invalidJsonFields.current.delete(id);
-        }
-        onJsonValidityChange(invalidJsonFields.current.size === 0);
         const fetchedIds = new Set(models.map(model => model.id.toLowerCase()));
         const existingModels = new Map(
           settings.models.map(model => [model.id.toLowerCase(), model] as const)
@@ -329,21 +313,6 @@ export function ManualByokProviderFields({
     onJsonValidityChange(invalidJsonFields.current.size === 0);
   };
 
-  const removeModelJsonValidity = (removedIndex: number) => {
-    const next = new Set<string>();
-    for (const id of invalidJsonFields.current) {
-      const match = /^model-(\d+)-variants$/.exec(id);
-      if (!match) {
-        next.add(id);
-        continue;
-      }
-      const index = Number(match[1]);
-      if (index < removedIndex) next.add(id);
-      if (index > removedIndex) next.add(`model-${index - 1}-variants`);
-    }
-    invalidJsonFields.current = next;
-    onJsonValidityChange(next.size === 0);
-  };
   const toggleApi = (api: ManualByokApiKind, enabled: boolean) => {
     onSettingsChange({
       ...settings,
@@ -530,22 +499,6 @@ export function ManualByokProviderFields({
             />
           </div>
         </div>
-        <JsonField
-          id="manual-default-variants"
-          label="Default variants"
-          value={settings.model_defaults.variants}
-          placeholder='{"high":{"reasoning":{"enabled":true,"effort":"high"},"verbosity":"high"}}'
-          onChange={variants =>
-            onSettingsChange({
-              ...settings,
-              model_defaults: {
-                ...settings.model_defaults,
-                variants: variants as ManualByokProviderDefinition['model_defaults']['variants'],
-              },
-            })
-          }
-          onValidityChange={valid => updateJsonValidity('default-variants', valid)}
-        />
       </div>
 
       <div className="space-y-4">
@@ -594,13 +547,11 @@ export function ManualByokProviderFields({
             canRemove={settings.models.length > 1}
             onChange={next => updateModel(index, next)}
             onRemove={() => {
-              removeModelJsonValidity(index);
               onSettingsChange({
                 ...settings,
                 models: settings.models.filter((_, modelIndex) => modelIndex !== index),
               });
             }}
-            onJsonValidityChange={updateJsonValidity}
           />
         ))}
       </div>

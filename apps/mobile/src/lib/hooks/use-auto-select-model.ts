@@ -1,16 +1,9 @@
 import { useRef } from 'react';
 
-import { contextKey, resolveModelForContext } from '@/lib/hooks/agent-model-preference';
+import { pickAutoSelectedModel } from '@/lib/hooks/auto-select-model';
 import { type ModelOption, useOrgDefaultModel } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
-
-function pickVariant(model: ModelOption, preferredVariant: string | undefined): string {
-  if (preferredVariant && model.variants.includes(preferredVariant)) {
-    return preferredVariant;
-  }
-  return model.variants[0] ?? '';
-}
 
 const NO_SELECTION = { model: '', variant: '' };
 
@@ -32,21 +25,17 @@ export function useAutoSelectModel(
   if (isLoading || orgDefaultIsLoading || !hasLoaded || models.length === 0) {
     return NO_SELECTION;
   }
-  const serverMatch = lastSelected ? models.find(m => m.id === lastSelected.model) : undefined;
-  const localEntry = resolveModelForContext(stored, contextKey(organizationId), models);
-  const orgDefaultMatch = orgDefaultModel ? models.find(m => m.id === orgDefaultModel) : undefined;
-  const fallback = orgDefaultMatch ?? models[0];
-  if (serverMatch) {
-    chosenRef.current = {
-      model: serverMatch.id,
-      variant: pickVariant(serverMatch, lastSelected?.variant),
-    };
-  } else if (localEntry) {
-    chosenRef.current = localEntry;
-  } else if (fallback) {
-    chosenRef.current = { model: fallback.id, variant: pickVariant(fallback, undefined) };
-  } else {
+  const picked = pickAutoSelectedModel({
+    models,
+    lastSelected,
+    stored,
+    organizationId,
+    orgDefaultModel,
+    isDev: __DEV__,
+  });
+  if (!picked) {
     return NO_SELECTION;
   }
+  chosenRef.current = picked;
   return chosenRef.current;
 }

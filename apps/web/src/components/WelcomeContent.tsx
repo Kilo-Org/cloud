@@ -147,7 +147,9 @@ export default function WelcomeContent({
               <div className="flex justify-center pt-2">
                 <Button
                   asChild
-                  className="flex h-14 w-full max-w-sm items-center justify-center rounded-xl bg-linear-to-r from-[#0078D4] to-[#106EBE] text-lg font-semibold text-white shadow transition-all duration-200 hover:scale-105 hover:from-[#1084E8] hover:to-[#0F7BD2] hover:shadow-xl focus:ring-4 focus:ring-blue-300 focus:ring-offset-2 focus:outline-none"
+                  variant="default"
+                  size="lg"
+                  className="flex w-full max-w-sm items-center justify-center gap-3 text-lg font-semibold"
                 >
                   <a
                     href={EDITOR_OPTIONS.find(e => e.source === 'vscode')?.extensionUrl}
@@ -195,7 +197,9 @@ export default function WelcomeContent({
                 <div className="flex justify-center pt-2">
                   <Button
                     asChild
-                    className="flex h-14 w-full max-w-sm items-center justify-center rounded-xl bg-linear-to-r from-[#FE315D] to-[#E91E63] text-lg font-semibold text-white shadow transition-all duration-200 hover:scale-105 hover:from-[#FF4570] hover:to-[#F02B72] hover:shadow-xl focus:ring-4 focus:ring-pink-300 focus:ring-offset-2 focus:outline-none"
+                    variant="default"
+                    size="lg"
+                    className="flex w-full max-w-sm items-center justify-center gap-3 text-lg font-semibold"
                   >
                     <a
                       href="https://plugins.jetbrains.com/plugin/28350-kilo-code"
@@ -251,7 +255,9 @@ export default function WelcomeContent({
                 <div className="flex justify-center pt-2">
                   <Button
                     asChild
-                    className="flex h-14 w-full max-w-sm items-center justify-center rounded-xl bg-linear-to-r from-[#FE315D] to-[#E91E63] text-lg font-semibold text-white shadow transition-all duration-200 hover:scale-105 hover:from-[#FF4570] hover:to-[#F02B72] hover:shadow-xl focus:ring-4 focus:ring-pink-300 focus:ring-offset-2 focus:outline-none"
+                    variant="default"
+                    size="lg"
+                    className="flex w-full max-w-sm items-center justify-center gap-3 text-lg font-semibold"
                   >
                     <a
                       href="https://plugins.jetbrains.com/plugin/28350-kilo-code"

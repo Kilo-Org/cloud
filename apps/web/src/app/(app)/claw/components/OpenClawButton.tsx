@@ -3,21 +3,12 @@
 import { useCallback, useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAccessCode } from '../hooks/useAccessCode';
-
-const ACCENT_CLASSES = {
-  header:
-    'animate-pulse-once bg-[oklch(95%_0.15_108)] text-black shadow-[0_0_20px_rgba(237,255,0,0.3)] ring-[oklch(95%_0.15_108)]/20 transition-all duration-500 ease-in-out hover:bg-[oklch(95%_0.15_108)]/90 hover:ring-[oklch(95%_0.15_108)]/40',
-  hero: 'min-w-[180px] bg-emerald-600 text-white hover:bg-emerald-700',
-} as const;
 
 type OpenClawButtonProps = {
   canShow: boolean;
   gatewayUrl: string;
-  /** "header" = yellow accent (default), "hero" = green prominent */
-  look?: keyof typeof ACCENT_CLASSES;
   label?: string;
   className?: string;
 };
@@ -25,7 +16,6 @@ type OpenClawButtonProps = {
 export function OpenClawButton({
   canShow,
   gatewayUrl,
-  look = 'header',
   label = 'Open',
   className,
 }: OpenClawButtonProps) {
@@ -59,7 +49,7 @@ export function OpenClawButton({
   return (
     <Button
       variant="primary"
-      className={cn(ACCENT_CLASSES[look], className)}
+      className={className}
       disabled={isOpening || isGenerating}
       onClick={openWithAutoAuth}
     >

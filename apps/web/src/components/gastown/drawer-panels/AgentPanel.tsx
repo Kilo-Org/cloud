@@ -5,6 +5,7 @@ import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { BeadEventTimeline } from '@/components/gastown/ActivityFeed';
 import { useTerminalBar } from '@/components/gastown/TerminalBarContext';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
+import { Button } from '@/components/ui/button';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
   Bot,
@@ -135,16 +136,18 @@ export function AgentPanel({
 
         {/* Actions */}
         <div className="mt-3 flex items-center gap-2">
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => {
               openAgentTab(agent.id, agent.name);
               close();
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[color:oklch(95%_0.15_108_/_0.12)] px-3 py-1.5 text-xs font-medium text-[color:oklch(95%_0.15_108)] ring-1 ring-[color:oklch(95%_0.15_108_/_0.2)] transition-colors hover:bg-[color:oklch(95%_0.15_108_/_0.2)]"
+            className="gap-1.5"
           >
             <Terminal className="size-3.5" />
             Connect
-          </button>
+          </Button>
         </div>
       </div>
 

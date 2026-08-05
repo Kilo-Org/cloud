@@ -3,7 +3,6 @@
 import { useState, useCallback, createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import { Shield, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 
@@ -163,13 +162,10 @@ export function PermissionCard({
         <div className="flex items-center gap-2">
           <Button
             size="sm"
+            variant="default"
             onClick={() => respond('once')}
             disabled={pending !== null}
-            className={cn(
-              'gap-1.5',
-              pending !== 'once' &&
-                'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
-            )}
+            className="gap-1.5"
           >
             {pending === 'once' && <Loader2 className="h-3 w-3 animate-spin" />}
             Allow Once

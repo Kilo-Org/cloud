@@ -2,23 +2,23 @@ jest.mock('@/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
-jest.mock('@/lib/notifications/byok-provider-cache', () => ({
-  syncByokProviderNotificationsToRedis: jest.fn(),
+jest.mock('@/lib/notifications/notification-audience-cache', () => ({
+  syncNotificationAudiencesToRedis: jest.fn(),
 }));
 
-import { syncByokProviderNotificationsToRedis } from '@/lib/notifications/byok-provider-cache';
+import { syncNotificationAudiencesToRedis } from '@/lib/notifications/notification-audience-cache';
 import { GET } from './route';
 
-const mockedSync = jest.mocked(syncByokProviderNotificationsToRedis);
+const mockedSync = jest.mocked(syncNotificationAudiencesToRedis);
 
 function makeRequest(headers?: Record<string, string>) {
-  return new Request('http://localhost:3000/api/cron/sync-byok-provider-notifications', {
+  return new Request('http://localhost:3000/api/cron/sync-notification-audiences', {
     method: 'GET',
     headers,
   });
 }
 
-describe('GET /api/cron/sync-byok-provider-notifications', () => {
+describe('GET /api/cron/sync-notification-audiences', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -39,15 +39,18 @@ describe('GET /api/cron/sync-byok-provider-notifications', () => {
   });
 
   it('runs the sync and reports counts on success', async () => {
-    mockedSync.mockResolvedValueOnce({ rowCount: 3, userCount: 2 });
+    mockedSync.mockResolvedValueOnce({
+      byokProviders: { rowCount: 3, userCount: 2 },
+      deprecatedAutoModels: { rowCount: 4, userCount: 3 },
+    });
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.success).toBe(true);
-    expect(body.rowCount).toBe(3);
-    expect(body.userCount).toBe(2);
+    expect(body.byokProviders).toEqual({ rowCount: 3, userCount: 2 });
+    expect(body.deprecatedAutoModels).toEqual({ rowCount: 4, userCount: 3 });
     expect(body.timestamp).toEqual(expect.any(String));
     expect(mockedSync).toHaveBeenCalledTimes(1);
   });

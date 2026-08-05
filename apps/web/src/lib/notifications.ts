@@ -1,4 +1,5 @@
 import { type User } from '@kilocode/db/schema';
+import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 import { type BalanceForUser, getBalanceForUser } from '@/lib/user/balance';
 import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@/lib/constants';
 import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
@@ -8,7 +9,8 @@ import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactio
 import {
   getByokProviderNotificationLabel,
   getByokProvidersForUser,
-} from '@/lib/notifications/byok-provider-cache';
+  getDeprecatedAutoModelsForUser,
+} from '@/lib/notifications/notification-audience-cache';
 
 import { fromMicrodollars } from '@/lib/utils';
 
@@ -177,6 +179,7 @@ export async function generateUserNotifications(
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
+    generateDeprecatedAutoModelsNotification,
     generateKiloPassNotification,
     generateKiloPassPromoMay29Notification,
   ];
@@ -305,7 +308,7 @@ async function generateByokProvidersNotification(
 ): Promise<KiloNotification[]> {
   try {
     // Per-user provider ids are written daily to Redis by the
-    // `sync-byok-provider-notifications` cron, so this read is tiny.
+    // `sync-notification-audiences` cron, so this read is tiny.
     const providers = await getByokProvidersForUser(user.id);
     if (providers.length === 0) {
       console.debug('[generateByokProvidersNotification] not using a BYOK supported provider');
@@ -340,6 +343,30 @@ async function generateByokProvidersNotification(
     ];
   } catch (e) {
     console.error('[generateByokProvidersNotification]', e);
+    return [];
+  }
+}
+
+async function generateDeprecatedAutoModelsNotification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  try {
+    const models = await getDeprecatedAutoModelsForUser(user.id);
+    if (models.length === 0) return [];
+
+    return [
+      {
+        id: 'deprecated-auto-models-aug-2026',
+        title: 'Auto Frontier and Auto Balanced are deprecated',
+        message:
+          'Auto Frontier and Auto Balanced are deprecated and will be removed in a future release. Switch to Auto Efficient to keep using automatic model routing.',
+        suggestModelId: KILO_AUTO_EFFICIENT_MODEL.id,
+        showIn: ['cli', 'extension'],
+      },
+    ];
+  } catch (error) {
+    console.error('[generateDeprecatedAutoModelsNotification]', error);
     return [];
   }
 }

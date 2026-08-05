@@ -38,7 +38,7 @@ export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${
 
 /**
  * Per-user list of BYOK provider ids a user has used, written daily by the
- * `sync-byok-provider-notifications` cron and read when notifications are polled.
+ * `sync-notification-audiences` cron and read when notifications are polled.
  * Storing one entry per user keeps the read tiny instead of fetching the whole
  * dataset on every poll.
  */
@@ -55,6 +55,10 @@ export const codingPlanUsageRedisKey = (input: {
   redisKey(
     `coding-plan-usage:v1:${input.userId}:${input.subscriptionId}:${input.planId}:${input.providerId}:${input.inventoryId}`
   );
+
+/** Per-user list of deprecated Auto model ids used recently. */
+export const deprecatedAutoModelsNotificationRedisKey = (userId: string) =>
+  redisKey(`notification:deprecated-auto-models:${userId}`);
 
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'

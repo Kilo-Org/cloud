@@ -1,4 +1,4 @@
-export type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
+type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
 
 export type DeviceAuthState = {
   status: DeviceAuthStatus;

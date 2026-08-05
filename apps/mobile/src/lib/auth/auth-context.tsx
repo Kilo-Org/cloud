@@ -56,16 +56,16 @@ let credentialWrite: Promise<void> = new Promise<void>(resolve => {
   resolve();
 });
 
-export type RefreshSuccess = {
+type RefreshSuccess = {
   ok: true;
   token: string;
   refreshToken: string;
   expiresIn: number;
   sessionVersion: number;
 };
-export type RefreshRefused = { ok: false; refused: true; superseded?: false };
-export type RefreshTransient = { ok: false; refused: false; superseded?: false };
-export type RefreshSuperseded = { ok: false; refused: false; superseded: true };
+type RefreshRefused = { ok: false; refused: true; superseded?: false };
+type RefreshTransient = { ok: false; refused: false; superseded?: false };
+type RefreshSuperseded = { ok: false; refused: false; superseded: true };
 export type RefreshOutcome = RefreshSuccess | RefreshRefused | RefreshTransient | RefreshSuperseded;
 
 // Proactive refresh window: refresh when the token expires within 5 minutes.

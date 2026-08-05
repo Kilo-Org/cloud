@@ -10,7 +10,6 @@ import {
   type Verbosity,
 } from '@kilocode/db/schema-types';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 export type AutoModel = {
   id: string;
@@ -112,8 +111,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Auto Free',
   description:
-    'Rotates through available free models. Limited capability and no credits required. [Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)\n\n**Warning** Prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.\n\n**In particular** ' +
-    NVIDIA_TRIAL_TOS,
+    'Rotates through available free models. Limited capability and no credits required. [Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)\n\n**Warning** Prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.',
   context_length: 256_000,
   max_completion_tokens: 10_000,
   prompt_price: '0',

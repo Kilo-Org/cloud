@@ -322,10 +322,11 @@ export function ReviewConfigForm({
 
   // Reset thinking effort when the model changes and the current selection is invalid
   useEffect(() => {
+    if (isLoadingModels) return;
     if (thinkingEffort && !availableVariants.includes(thinkingEffort)) {
       setThinkingEffort(null);
     }
-  }, [availableVariants, thinkingEffort]);
+  }, [availableVariants, isLoadingModels, thinkingEffort]);
 
   // Mutation for regenerating webhook secret. The org path is billing-gated
   // (owner/billing_manager only); the personal path is self-gated. The

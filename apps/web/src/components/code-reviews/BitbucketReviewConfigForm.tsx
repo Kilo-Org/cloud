@@ -129,10 +129,11 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
   );
 
   useEffect(() => {
+    if (isLoadingModels) return;
     if (draft.thinkingEffort && !availableThinkingEfforts.includes(draft.thinkingEffort)) {
       setDraft(current => ({ ...current, thinkingEffort: null }));
     }
-  }, [availableThinkingEfforts, draft.thinkingEffort]);
+  }, [availableThinkingEfforts, draft.thinkingEffort, isLoadingModels]);
 
   const invalidateBitbucketQueries = async () => {
     await Promise.all([

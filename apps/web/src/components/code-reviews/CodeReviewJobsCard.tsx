@@ -172,10 +172,14 @@ function selectInitialManualJobModel(params: {
 function selectInitialManualJobThinkingEffort(
   configuredThinkingEffort: string | null | undefined,
   modelSlug: string,
-  modelOptions: ModelOption[]
+  modelOptions: ModelOption[],
+  isLoadingModels: boolean
 ): string | null {
   if (!configuredThinkingEffort) {
     return null;
+  }
+  if (isLoadingModels) {
+    return configuredThinkingEffort;
   }
   return modelOptions
     .find(model => model.id === modelSlug)
@@ -310,6 +314,7 @@ export function CodeReviewJobsCard({
     manualJobCouncilBelowMin;
 
   useEffect(() => {
+    if (isLoadingModels) return;
     if (
       manualJobThinkingEffort &&
       !modelOptions
@@ -318,7 +323,7 @@ export function CodeReviewJobsCard({
     ) {
       setManualJobThinkingEffort(null);
     }
-  }, [manualJobModelSlug, manualJobThinkingEffort, modelOptions]);
+  }, [isLoadingModels, manualJobModelSlug, manualJobThinkingEffort, modelOptions]);
 
   useEffect(() => {
     if (!manualJobDialogOpen || modelOptions.length === 0 || manualJobModelAllowed) {
@@ -332,12 +337,18 @@ export function CodeReviewJobsCard({
     });
     setManualJobModelSlug(nextModelSlug);
     setManualJobThinkingEffort(
-      selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug, modelOptions)
+      selectInitialManualJobThinkingEffort(
+        defaultThinkingEffort,
+        nextModelSlug,
+        modelOptions,
+        isLoadingModels
+      )
     );
   }, [
     defaultModel,
     defaultModelSlug,
     defaultThinkingEffort,
+    isLoadingModels,
     manualJobDialogOpen,
     manualJobModelAllowed,
     modelOptions,
@@ -353,7 +364,12 @@ export function CodeReviewJobsCard({
     setManualJobUrlTouched(false);
     setManualJobModelSlug(nextModelSlug);
     setManualJobThinkingEffort(
-      selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug, modelOptions)
+      selectInitialManualJobThinkingEffort(
+        defaultThinkingEffort,
+        nextModelSlug,
+        modelOptions,
+        isLoadingModels
+      )
     );
     setManualJobInstructions('');
     setManualJobCouncilEnabled(false);

@@ -7,6 +7,12 @@ import { KILOCLAW_OWNED_KEY } from '@/lib/storage-keys';
 // The answer is therefore cached in SecureStore and read synchronously.
 let cached: boolean | undefined = undefined;
 
+// Sign-out deletes the key while the old tab layout observer is still mounted,
+// and a late list response in that teardown window could write the previous
+// account's answer back. The lock blocks persistence until the next signed-in
+// account's tab layout mounts and reads the cleared state.
+let persistenceLocked = false;
+
 export function readKiloClawOwned(): boolean {
   if (cached === undefined) {
     try {
@@ -15,6 +21,10 @@ export function readKiloClawOwned(): boolean {
       cached = false;
     }
   }
+  // The read happens on tab layout mount, which in practice is the next
+  // signed-in account, so reopening persistence here cannot unblock a stale
+  // observer that only ever calls persist.
+  persistenceLocked = false;
   return cached;
 }
 
@@ -22,6 +32,9 @@ export function readKiloClawOwned(): boolean {
 // deletes the key. An async write could land after the delete and leak the
 // previous account's answer into the next account's first frame.
 export function persistKiloClawOwned(owned: boolean): void {
+  if (persistenceLocked) {
+    return;
+  }
   if (cached === owned) {
     return;
   }
@@ -34,6 +47,7 @@ export function persistKiloClawOwned(owned: boolean): void {
 }
 
 export async function clearKiloClawOwned(): Promise<void> {
+  persistenceLocked = true;
   cached = false;
   await SecureStore.deleteItemAsync(KILOCLAW_OWNED_KEY);
 }

@@ -88,4 +88,47 @@ describe('kiloclaw tab ownership', () => {
     expect(mocks.setItem).toHaveBeenCalledTimes(1);
     expect(mocks.deleteItemAsync).toHaveBeenCalledTimes(1);
   });
+
+  it('blocks a late list reconcile from writing after sign-out begins', async () => {
+    mocks.setItem.mockReturnValue(undefined);
+    mocks.deleteItemAsync.mockResolvedValue(undefined);
+    const { clearKiloClawOwned, persistKiloClawOwned, readKiloClawOwned } =
+      await import('./kiloclaw-tab-ownership');
+
+    // The old account's resolved answer is already persisted.
+    persistKiloClawOwned(true);
+    expect(mocks.setItem).toHaveBeenCalledTimes(1);
+
+    // Sign-out starts; the delete is pending while the old tab layout's
+    // observer reconciles a late list response.
+    const clearing = clearKiloClawOwned();
+    persistKiloClawOwned(true);
+    await clearing;
+
+    // A late response after the delete finishes stays blocked too.
+    persistKiloClawOwned(false);
+
+    expect(mocks.setItem).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteItemAsync).toHaveBeenCalledTimes(1);
+    expect(readKiloClawOwned()).toBe(false);
+  });
+
+  it('lets the next signed-in account persist after reading the cleared state', async () => {
+    mocks.setItem.mockReturnValue(undefined);
+    mocks.deleteItemAsync.mockResolvedValue(undefined);
+    const { clearKiloClawOwned, persistKiloClawOwned, readKiloClawOwned } =
+      await import('./kiloclaw-tab-ownership');
+
+    persistKiloClawOwned(true);
+    await clearKiloClawOwned();
+
+    // The next account's tab layout mount reads the cleared answer.
+    expect(readKiloClawOwned()).toBe(false);
+
+    // Its list resolves and the resolved answer persists again.
+    persistKiloClawOwned(true);
+
+    expect(mocks.setItem).toHaveBeenCalledWith('kiloclaw-owned', '1');
+    expect(mocks.setItem).toHaveBeenCalledTimes(2);
+  });
 });

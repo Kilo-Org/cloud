@@ -18,6 +18,7 @@ import {
   type UsageContext,
 } from '@kilocode/container-usage';
 import { applyHeartbeat, applyStart, applyStop } from './postgres';
+import { billingConfigFromEnv } from './billing-config';
 
 function assertContextMatches(
   input: RecordHeartbeatInput | RecordStopInput,
@@ -84,7 +85,8 @@ export class ContainerUsageMeter
         parsed,
         id,
         await usageContextFingerprint(context),
-        Date.now()
+        Date.now(),
+        billingConfigFromEnv(this.env)
       );
     } catch (error) {
       logRpcOutcome('start', parsed.service, 'failed', {
@@ -120,7 +122,8 @@ export class ContainerUsageMeter
         parsed,
         id,
         await usageContextFingerprint(parsed.context),
-        Date.now()
+        Date.now(),
+        billingConfigFromEnv(this.env)
       );
     } catch (error) {
       logRpcOutcome('heartbeat', parsed.service, 'failed', {
@@ -133,7 +136,8 @@ export class ContainerUsageMeter
       intervalId: id,
       durable: 'pg',
       dedup: result.dedup,
-      budget: { verdict: 'continue' },
+      billingMode: result.billingMode,
+      budget: result.budget,
     };
   }
 
@@ -152,7 +156,8 @@ export class ContainerUsageMeter
         parsed,
         id,
         await usageContextFingerprint(parsed.context),
-        Date.now()
+        Date.now(),
+        billingConfigFromEnv(this.env)
       );
     } catch (error) {
       logRpcOutcome('stop', parsed.service, 'failed', {

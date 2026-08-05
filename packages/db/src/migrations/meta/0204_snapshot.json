@@ -1,5 +1,5 @@
 {
-  "id": "b6845133-a2c6-47ae-9ac6-8bcedb89bcac",
+  "id": "277933e8-cb5f-43d7-875c-26a406fc8f2c",
   "prevId": "13235361-1dc7-44a3-ac34-c44343d386ed",
   "version": "7",
   "dialect": "postgresql",
@@ -12947,7 +12947,7 @@
           ],
           "isUnique": true,
           "where": "\"device_auth_requests\".\"device_code_hash\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -12963,7 +12963,7 @@
           ],
           "isUnique": false,
           "where": "\"device_auth_requests\".\"user_code\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }
@@ -23142,7 +23142,7 @@
           ],
           "isUnique": true,
           "where": "\"magic_link_tokens\".\"challenge_id\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }
@@ -30534,7 +30534,7 @@
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

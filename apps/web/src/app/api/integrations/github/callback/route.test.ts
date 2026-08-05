@@ -487,6 +487,39 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
+  test('consumes a DB-minted token before legacy prefix dispatch (unambiguous routing)', async () => {
+    // A token whose base64url shape begins with the legacy user_ prefix must
+    // still route through the database flow, never the legacy plaintext flow.
+    const PREFIXED_DB_TOKEN = `user_${DB_TOKEN}`;
+    mockedConsumeInstallState.mockResolvedValue({
+      token: PREFIXED_DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: 'org-db-owner',
+      github_app_type: 'standard',
+      return_to: '/github-app',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${PREFIXED_DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?github_install=success');
+    expect(mockedConsumeInstallState).toHaveBeenCalledWith(PREFIXED_DB_TOKEN);
+    // The owner comes from the DB row (org), not from a legacy user_ parse.
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+      { type: 'org', id: 'org-db-owner' },
+      expect.objectContaining({ platform: 'github' })
+    );
+  });
+
   test('handles a database-minted token with returnTo', async () => {
     mockedConsumeInstallState.mockResolvedValue({
       token: DB_TOKEN,

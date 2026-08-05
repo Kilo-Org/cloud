@@ -606,30 +606,42 @@ describe('Magic Link Tokens', () => {
         expect(first.challengeId).not.toBe(first.code);
       });
 
-      it('R6: no-challenge wrong guesses do not lock out the challenge holder (same email)', async () => {
+      it('R6: no-challenge wrong guesses spend the challenge-bound row budget (same email)', async () => {
         const { code, challengeId } = await createSignInCode(testEmail);
         const wrongCode = code === '000000' ? '111111' : '000000';
 
-        // Five wrong guesses without challengeId — each goes to the legacy
-        // path, which filters for null challenge_id. Since the row has a
-        // challenge_id, the legacy path never finds it and returns 'invalid'
-        // without incrementing attempts.
+        // Five wrong guesses without challengeId — the legacy email-keyed path
+        // finds the challenge-bearing row and increments its attempts.
         for (let i = 0; i < 5; i++) {
           const result = await reserveSignInCode(testEmail, wrongCode);
           expect(result).toBe('invalid');
         }
 
-        // The row must have zero attempts — the no-challenge guesses did
-        // not touch it.
+        // The challenge-bound row has spent its whole budget.
         const [row] = await db
           .select({ attempts: magic_link_tokens.attempts })
           .from(magic_link_tokens)
           .where(eq(magic_link_tokens.email, testEmail));
-        expect(row?.attempts).toBe(0);
+        expect(row?.attempts).toBe(5);
 
-        // The correct code with the real challengeId still succeeds.
+        // The correct code with the real challengeId is now locked out.
         const verifyResult = await verifyAndConsumeSignInCode(testEmail, code, challengeId);
-        expect(verifyResult).toBe('ok');
+        expect(verifyResult).toBe('too_many_attempts');
+      });
+
+      it('legacy no-challenge caller can settle a challenge-bound row by email', async () => {
+        const { code } = await createSignInCode(testEmail);
+
+        // The legacy email-keyed path finds the challenge-bearing row and
+        // consumes it even though the client sends no challengeId.
+        const result = await verifyAndConsumeSignInCode(testEmail, code);
+        expect(result).toBe('ok');
+
+        const [row] = await db
+          .select({ consumed_at: magic_link_tokens.consumed_at })
+          .from(magic_link_tokens)
+          .where(eq(magic_link_tokens.email, testEmail));
+        expect(row?.consumed_at).not.toBeNull();
       });
 
       it('returns invalid for a challenge ID that matches no row', async () => {

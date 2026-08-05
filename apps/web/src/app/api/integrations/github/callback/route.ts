@@ -157,45 +157,55 @@ export async function GET(request: NextRequest) {
     const setupAction = searchParams.get('setup_action');
     const rawState = searchParams.get('state');
 
-    // 3. Legacy plaintext branch — starts with org_ or user_ prefix.
-    // Legacy states are never bot-link or database-minted tokens.
-    // They are accepted only when the GITHUB_LEGACY_INSTALL_STATE flag is enabled.
-    if (rawState && (rawState.startsWith('org_') || rawState.startsWith('user_'))) {
-      const legacyEnabled = (getEnvVariable('GITHUB_LEGACY_INSTALL_STATE') ?? 'true') !== 'false';
-
-      if (legacyEnabled) {
-        // ponytail: the legacy branch is deleted once the legacy-state counter
-        // reports zero for 30 consecutive days.
-        captureMessage('GitHub callback using legacy plaintext install state', {
-          level: 'info',
-          tags: { endpoint: 'github/callback', source: 'legacy_install_state' },
-          extra: { installationId, stateClass: classifyInstallState(rawState) },
-        });
-        return await handleLegacyInstallFlow(request, user, rawState, installationId, setupAction);
-      }
-
-      // Legacy flag disabled: refuse the legacy state.
-      captureMessage('GitHub callback with legacy state refused (flag disabled)', {
-        level: 'warning',
-        tags: { endpoint: 'github/callback', source: 'legacy_install_state_disabled' },
-        extra: { installationId, stateClass: classifyInstallState(rawState) },
-      });
-      return NextResponse.redirect(new URL('/', APP_URL));
-    }
-
-    // 4. Bot-link callback hand-off. Bot-link state tokens use a signed format,
-    // not prefix-based. Try bot-link first to avoid consuming an install token
-    // that happens to match the bot-link format.
+    // 3. New database-backed install state — atomically consume the token.
+    // Consumed before any other dispatch so a minted token is unambiguous:
+    // even if a random base64url token's shape began with a legacy org_/user_
+    // prefix, the DB row wins and the state is never misrouted to legacy or
+    // bot-link parsing.
     if (rawState) {
-      const botLinkState = verifyGitHubBotLinkState(rawState);
-      if (botLinkState) {
-        return await handleGitHubBotLinkCallback(request, user);
-      }
-
-      // 5. New database-backed install state — atomically consume the token.
       const installRow = await consumeInstallState(rawState);
       if (installRow) {
         return await handleNewInstallFlow(request, user, installRow, installationId, setupAction);
+      }
+
+      // 4. Legacy plaintext branch — starts with org_ or user_ prefix.
+      // Legacy states are never bot-link or database-minted tokens.
+      // They are accepted only when the GITHUB_LEGACY_INSTALL_STATE flag is enabled.
+      if (rawState.startsWith('org_') || rawState.startsWith('user_')) {
+        const legacyEnabled = (getEnvVariable('GITHUB_LEGACY_INSTALL_STATE') ?? 'true') !== 'false';
+
+        if (legacyEnabled) {
+          // ponytail: the legacy branch is deleted once the legacy-state counter
+          // reports zero for 30 consecutive days.
+          captureMessage('GitHub callback using legacy plaintext install state', {
+            level: 'info',
+            tags: { endpoint: 'github/callback', source: 'legacy_install_state' },
+            extra: { installationId, stateClass: classifyInstallState(rawState) },
+          });
+          return await handleLegacyInstallFlow(
+            request,
+            user,
+            rawState,
+            installationId,
+            setupAction
+          );
+        }
+
+        // Legacy flag disabled: refuse the legacy state.
+        captureMessage('GitHub callback with legacy state refused (flag disabled)', {
+          level: 'warning',
+          tags: { endpoint: 'github/callback', source: 'legacy_install_state_disabled' },
+          extra: { installationId, stateClass: classifyInstallState(rawState) },
+        });
+        return NextResponse.redirect(new URL('/', APP_URL));
+      }
+
+      // 5. Bot-link callback hand-off. Bot-link state tokens use a signed
+      // dot-separated format and never collide with database tokens, which are
+      // base64url (no dots). Tried last, after DB and legacy dispatch.
+      const botLinkState = verifyGitHubBotLinkState(rawState);
+      if (botLinkState) {
+        return await handleGitHubBotLinkCallback(request, user);
       }
     }
 

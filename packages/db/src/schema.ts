@@ -4654,6 +4654,7 @@ export const platform_integrations = pgTable(
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_github_platform_inst')
       .on(table.platform, table.github_app_type, table.platform_installation_id)
+      .concurrently()
       .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
@@ -5355,6 +5356,7 @@ export const magic_link_tokens = pgTable(
     index('idx_magic_link_tokens_expires_at').on(table.expires_at),
     uniqueIndex('UQ_magic_link_tokens_challenge_id')
       .on(table.challenge_id)
+      .concurrently()
       .where(sql`${table.challenge_id} IS NOT NULL`),
     check('check_expires_at_future', sql`${table.expires_at} > ${table.created_at}`),
   ]
@@ -6519,9 +6521,11 @@ export const device_auth_requests = pgTable(
     index('IDX_device_auth_requests_kilo_user_id').on(table.kilo_user_id),
     uniqueIndex('UQ_device_auth_requests_device_code_hash')
       .on(table.device_code_hash)
+      .concurrently()
       .where(sql`${table.device_code_hash} IS NOT NULL`),
     index('IDX_device_auth_requests_user_code')
       .on(table.user_code)
+      .concurrently()
       .where(sql`${table.user_code} IS NOT NULL`),
   ]
 );

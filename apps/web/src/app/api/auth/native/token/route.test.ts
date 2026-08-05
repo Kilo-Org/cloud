@@ -513,16 +513,18 @@ describe('POST /api/auth/native/token', () => {
     });
 
     it('rejects a serverAuthCode from a different mobile web client', async () => {
-      await expect(
-        POST(
-          createRequest({
-            provider: 'google',
-            serverAuthCode: 'auth-code',
-            googleClientId: 'wrong-client-id',
-          })
-        )
-      ).rejects.toThrow('Mobile Google client ID does not match the server OAuth client');
+      const response = await POST(
+        createRequest({
+          provider: 'google',
+          serverAuthCode: 'auth-code',
+          googleClientId: 'wrong-client-id',
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
       expect(mockExchangeNativeGoogleAuthCode).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
   });
 
@@ -924,6 +926,53 @@ describe('POST /api/auth/native/token', () => {
       ssoOrganizationId: 'workos-organization-id',
     });
     expect(mockCheckDomainSignInEligibility).toHaveBeenLastCalledWith('user@sso-required.com');
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
+  it('refuses eligibility before persisting a device session, refresh token, or attested key (apple/google)', async () => {
+    mockVerifyNativeGoogleIdToken.mockResolvedValue({
+      sub: 'google-sub-1',
+      email: 'googleuser@example.com',
+    });
+    mockCreateOrUpdateUser.mockResolvedValue({
+      success: true,
+      user: { ...fakeUser, google_user_email: 'user@sso-required.com' },
+      isNew: false,
+    } as never);
+    mockCheckDomainSignInEligibility
+      .mockResolvedValueOnce({ ok: true, existingUser: false })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        errorCode: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+    mockVerifyAdmissionAsync.mockResolvedValue({
+      ok: true,
+      platform: 'ios',
+      keyId: 'key1',
+      publicKey: 'base64pubkey',
+    });
+
+    const response = await POST(
+      createRequest({
+        provider: 'google',
+        idToken: 'google-id-token',
+        supportsRefresh: true,
+        admission: {},
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'SSO_ERROR',
+      ssoOrganizationId: 'workos-organization-id',
+    });
+    // No credential-bearing side effects may run before the refusal.
+    expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+    expect(mockPersistAttestedKey).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
   });
 

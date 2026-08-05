@@ -1435,8 +1435,19 @@ describe('database schema', () => {
     it('runs migration 0204 against duplicates before creating its unique index', async () => {
       const migrationPath = path.join(__dirname, 'migrations/0204_brainy_baron_strucker.sql');
       const fullMigration = fs.readFileSync(migrationPath, 'utf8');
-      const backfillStart = '-- Backfill:';
-      const migration = fullMigration.slice(fullMigration.indexOf(backfillStart));
+      const statements = fullMigration.split('--> statement-breakpoint');
+      // The dedup DO block is its own statement. The COMMIT/CONCURRENTLY/BEGIN
+      // markers that follow it in the migration must not run inside this test's
+      // transaction, so extract just the DO block and the unique-index DDL.
+      const migration = statements.find(stmt => stmt.includes('-- Backfill:'));
+      const createUniqueIndex = statements.find(stmt =>
+        stmt.includes(
+          'CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_platform_inst"'
+        )
+      );
+      if (migration === undefined || createUniqueIndex === undefined) {
+        throw new Error('migration 0204 backfill or unique index statement not found');
+      }
       const rollback = new Error('rollback migration test');
 
       try {
@@ -1471,6 +1482,11 @@ describe('database schema', () => {
             .returning({ id: schema.platform_integrations.id });
 
           await tx.execute(sql.raw(migration));
+
+          // The migration creates the unique index CONCURRENTLY after the
+          // backfill. Inside this transaction, use the plain form; the point is
+          // that the index now succeeds on deduped rows.
+          await tx.execute(sql.raw(createUniqueIndex.replace('CONCURRENTLY ', '')));
 
           const rows = await tx
             .select({

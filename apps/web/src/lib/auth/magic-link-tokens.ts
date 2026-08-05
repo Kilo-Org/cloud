@@ -159,7 +159,9 @@ export type VerifySignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts';
  * guesses against challenge A do not spend challenge B's budget.
  *
  * When challengeId is absent, the legacy email-keyed path is used for
- * shipped clients that do not yet send a challenge.
+ * shipped clients that do not yet send a challenge. The email-keyed path
+ * matches the live sign-in code row for the email whether or not it carries
+ * a challenge_id, so old clients can reserve codes minted by new clients.
  *
  * Returns 'ok' when the code is reserved, 'invalid' for a wrong/expired/consumed
  * code, 'too_many_attempts' when the attempt budget is exhausted, and
@@ -183,7 +185,6 @@ export async function reserveSignInCode(
         eq(magic_link_tokens.email, normalizedEmail),
         eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at),
-        isNull(magic_link_tokens.challenge_id),
         sql`${magic_link_tokens.expires_at} > NOW()`
       );
 
@@ -250,8 +251,8 @@ export async function reserveSignInCode(
   }
 
   // Increment attempts: key by challenge_id when available, otherwise by email.
-  // Legacy path only targets rows with null challenge_id so a no-challenge caller
-  // cannot spend a challenge-bound row's budget.
+  // The legacy email-keyed path matches the live row regardless of challenge_id,
+  // so a no-challenge caller cannot bypass the budget of a challenge-bound row.
   const incrementWhere = challengeId
     ? and(
         eq(magic_link_tokens.challenge_id, challengeId),
@@ -263,7 +264,6 @@ export async function reserveSignInCode(
         eq(magic_link_tokens.email, normalizedEmail),
         eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at),
-        isNull(magic_link_tokens.challenge_id),
         sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
       );
 

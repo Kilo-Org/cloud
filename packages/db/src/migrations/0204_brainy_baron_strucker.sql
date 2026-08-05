@@ -43,9 +43,11 @@ CREATE INDEX "IDX_device_refresh_tokens_expires_at" ON "device_refresh_tokens" U
 CREATE INDEX "IDX_device_sessions_kilo_user_id" ON "device_sessions" USING btree ("kilo_user_id");--> statement-breakpoint
 CREATE INDEX "IDX_device_sessions_revoked_at" ON "device_sessions" USING btree ("revoked_at");--> statement-breakpoint
 CREATE INDEX "IDX_github_install_states_expires_at" ON "github_install_states" USING btree ("expires_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_device_auth_requests_device_code_hash" ON "device_auth_requests" USING btree ("device_code_hash") WHERE "device_auth_requests"."device_code_hash" IS NOT NULL;--> statement-breakpoint
-CREATE INDEX "IDX_device_auth_requests_user_code" ON "device_auth_requests" USING btree ("user_code") WHERE "device_auth_requests"."user_code" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_magic_link_tokens_challenge_id" ON "magic_link_tokens" USING btree ("challenge_id") WHERE "magic_link_tokens"."challenge_id" IS NOT NULL;--> statement-breakpoint
+COMMIT;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_device_auth_requests_device_code_hash" ON "device_auth_requests" USING btree ("device_code_hash") WHERE "device_auth_requests"."device_code_hash" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX CONCURRENTLY "IDX_device_auth_requests_user_code" ON "device_auth_requests" USING btree ("user_code") WHERE "device_auth_requests"."user_code" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_magic_link_tokens_challenge_id" ON "magic_link_tokens" USING btree ("challenge_id") WHERE "magic_link_tokens"."challenge_id" IS NOT NULL;--> statement-breakpoint
+BEGIN;--> statement-breakpoint
 -- Backfill: survey duplicate GitHub installation rows and resolve them.
 -- Rows grouped by (platform, github_app_type, platform_installation_id)
 -- where platform = 'github' and platform_installation_id is not null.
@@ -117,6 +119,7 @@ BEGIN
       RAISE NOTICE '[github-dedup] Suspended loser id=%, original_installation_id=%', loser.id, loser.platform_installation_id;
     END LOOP;
   END LOOP;
-END $$;
---> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_github_platform_inst" ON "platform_integrations" USING btree ("platform","github_app_type","platform_installation_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."platform_installation_id" IS NOT NULL;
+END $$;--> statement-breakpoint
+COMMIT;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_platform_inst" ON "platform_integrations" USING btree ("platform","github_app_type","platform_installation_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."platform_installation_id" IS NOT NULL;--> statement-breakpoint
+BEGIN;

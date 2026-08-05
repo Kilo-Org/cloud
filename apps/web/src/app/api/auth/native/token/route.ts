@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
       if (data.serverAuthCode) {
         const { GOOGLE_CLIENT_ID } = await import('@/lib/config.server');
         if (!data.googleClientId || data.googleClientId !== GOOGLE_CLIENT_ID) {
-          throw new Error('Mobile Google client ID does not match the server OAuth client');
+          return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
         }
         verified = await exchangeNativeGoogleAuthCode(data.serverAuthCode);
       } else if (data.idToken) {
@@ -484,7 +484,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
 
-  // ── Step 5: Persist attested key after settlement ────────────────────────
+  // ── Step 5: Final eligibility check BEFORE persisting credentials ────────
+  // The resolved account email can differ from the ID-token email (provider
+  // account linking). Refuse before a device session, refresh token, or
+  // attested key is persisted so an ineligible account leaves no credentials.
+  const resolvedEligibility = await checkDomainSignInEligibility(result.user.google_user_email);
+  if (!resolvedEligibility.ok) {
+    return eligibilityResponse(resolvedEligibility);
+  }
+
+  // ── Step 6: Persist attested key after settlement ────────────────────────
   let sessionId: string | undefined;
   let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
 
@@ -545,11 +554,6 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-  }
-
-  const resolvedEligibility = await checkDomainSignInEligibility(result.user.google_user_email);
-  if (!resolvedEligibility.ok) {
-    return eligibilityResponse(resolvedEligibility);
   }
 
   // Emit deferred sign-in analytics after all gates pass.

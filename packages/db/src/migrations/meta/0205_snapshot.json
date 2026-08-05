@@ -1,6 +1,6 @@
 {
-  "id": "a35c16fd-d44b-4b3a-b9c4-607f73a2293e",
-  "prevId": "b6845133-a2c6-47ae-9ac6-8bcedb89bcac",
+  "id": "e0d0d16c-37b8-433b-b26b-250d901ddba1",
+  "prevId": "277933e8-cb5f-43d7-875c-26a406fc8f2c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -12947,7 +12947,7 @@
           ],
           "isUnique": true,
           "where": "\"device_auth_requests\".\"device_code_hash\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -12963,7 +12963,7 @@
           ],
           "isUnique": false,
           "where": "\"device_auth_requests\".\"user_code\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }
@@ -23142,7 +23142,7 @@
           ],
           "isUnique": true,
           "where": "\"magic_link_tokens\".\"challenge_id\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }
@@ -30686,7 +30686,7 @@
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

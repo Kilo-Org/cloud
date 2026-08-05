@@ -53,6 +53,14 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const hasPermissions = permission.data?.hasPermissions ?? false;
   const isEnabled = config.data?.isEnabled ?? false;
 
+  const view = selectScopeEntryView({
+    isLoading,
+    isError,
+    hasIntegration,
+    hasPermissions,
+    isEnabled,
+  });
+
   // Pre-mint a C1 install state token so the web /github-app page
   // receives it and does not mint a second token.  The return path is
   // /cloud/sessions — a claimed universal-link route that maps to the
@@ -80,25 +88,28 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     }
   }, [orgId]);
 
+  const reauthUrl = permission.data?.reauthorizeUrl;
+
+  // Mint only when the entry view actually needs a fresh GitHub install URL:
+  // connect-github always, reauthorize only when the server offered no
+  // reauthorize URL. Dashboard and disabled-settings mounts must not mint —
+  // the token is a bearer credential and churning it on every visit is
+  // wasteful.
+  const shouldMint = view === 'connect-github' || (view === 'reauthorize' && !reauthUrl);
+
   useEffect(() => {
     cancelledRef.current = false;
-    void performMint();
+    if (shouldMint) {
+      void performMint();
+    }
     return () => {
       cancelledRef.current = true;
     };
-  }, [performMint]);
+  }, [performMint, shouldMint]);
 
   // Never fall back to an unminted URL — an app-initiated open must carry a
   // pre-minted token or the connect action must fail closed.
   const connectUrl = mintUrl;
-
-  const view = selectScopeEntryView({
-    isLoading,
-    isError,
-    hasIntegration,
-    hasPermissions,
-    isEnabled,
-  });
 
   const refetchAll = async () => {
     await Promise.all([
@@ -174,7 +185,6 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       );
     }
     case 'reauthorize': {
-      const reauthUrl = permission.data?.reauthorizeUrl;
       if (!reauthUrl && mintFailed) {
         return (
           <View className="flex-1 bg-background">

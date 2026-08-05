@@ -13,7 +13,8 @@
     "./universal-links": "./src/universal-links/index.ts",
     "./opencode": "./src/opencode.gen.ts",
     "./images-schema": "./src/images-schema.ts",
-    "./cloud-agent": "./src/cloud-agent.ts"
+    "./cloud-agent": "./src/cloud-agent.ts",
+    "./analytics": "./src/analytics/index.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

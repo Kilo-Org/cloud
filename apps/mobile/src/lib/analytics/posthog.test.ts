@@ -247,6 +247,68 @@ describe('capture gate and generation scoping', () => {
   });
 });
 
+describe('captureUncataloged privacy and gates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('drops payload keys that name a prohibited data class before capture', async () => {
+    const { initPostHog, captureUncataloged } = await loadModule();
+    initPostHog();
+    captureUncataloged('onboarding-entered', {
+      surface: 'claw',
+      email: 'a@b.co',
+      session_id: 'x',
+      ok_count: 1,
+    });
+
+    expect(hoisted.client.capture).toHaveBeenCalledWith('onboarding-entered', {
+      surface: 'claw',
+      ok_count: 1,
+    });
+  });
+
+  it('keeps every allowed key on an uncataloged payload', async () => {
+    const { initPostHog, captureUncataloged } = await loadModule();
+    initPostHog();
+    captureUncataloged('provision-failed', { category: 'lock' });
+
+    expect(hoisted.client.capture).toHaveBeenCalledWith('provision-failed', { category: 'lock' });
+  });
+
+  it('passes no properties through unchanged when none are given', async () => {
+    const { initPostHog, captureUncataloged } = await loadModule();
+    initPostHog();
+    captureUncataloged('completion-reached');
+
+    expect(hoisted.client.capture).toHaveBeenCalledWith('completion-reached', undefined);
+  });
+
+  it('returns early when optional consent is not given', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog, captureUncataloged } = await loadModule();
+    initPostHog();
+    captureUncataloged('login', { surface: 'claw' });
+
+    expect(hoisted.client.capture).not.toHaveBeenCalled();
+  });
+
+  it('drops a stale-generation capture', async () => {
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+    const { initPostHog, captureUncataloged } = await loadModule();
+    initPostHog();
+
+    // Bump the generation after init.
+    hoisted.controller.currentGeneration.mockReturnValue(1);
+    captureUncataloged('login', { surface: 'claw' });
+
+    expect(hoisted.client.capture).not.toHaveBeenCalled();
+  });
+});
+
 describe('discardPostHog', () => {
   beforeEach(() => {
     vi.clearAllMocks();

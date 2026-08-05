@@ -6,7 +6,7 @@ import appsFlyer, {
   StoreKitVersion,
 } from 'react-native-appsflyer';
 
-import { captureEvent } from '@/lib/analytics/posthog';
+import { captureUncataloged } from '@/lib/analytics/posthog';
 import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
 import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 
@@ -205,8 +205,11 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
 
   // Mirror attribution events into PostHog so the onboarding funnel is
   // visible in product analytics too. Both SDKs sit behind the same consent
-  // gate; captureEvent no-ops until PostHog is initialized.
-  captureEvent(name, eventValues);
+  // gate; `captureUncataloged` no-ops until PostHog is initialized and drops
+  // any payload key that names a prohibited data class. These are dynamic
+  // funnel names, so they use the uncataloged path rather than the typed
+  // `captureEvent`.
+  captureUncataloged(name, eventValues);
 
   if (!initialized) {
     pendingEvents.push({ name, values: eventValues, generation: currentGeneration() });

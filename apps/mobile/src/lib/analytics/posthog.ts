@@ -1,3 +1,4 @@
+import { type AnalyticsEventMap, redactProhibitedProperties } from '@kilocode/app-shared/analytics';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import PostHog, { PostHogPersistedProperty } from 'posthog-react-native';
@@ -37,22 +38,25 @@ import {
  * `register()`). We do not override the reserved `$device_type`.
  */
 
-export const SESSION_VIEWED_EVENT = 'session_viewed';
-export const MESSAGE_SENT_EVENT = 'message_sent';
-export const SESSION_CREATED_EVENT = 'session_created';
-export const PERMISSION_RESPONDED_EVENT = 'permission_responded';
-export const QUESTION_ANSWERED_EVENT = 'question_answered';
-export const CONVERSATION_CREATED_EVENT = 'conversation_created';
-export const INSTANCE_ACTION_EVENT = 'instance_action';
-export const FEEDBACK_SUBMITTED_EVENT = 'feedback_submitted';
-// Matches the event name web already captures — keep in sync for shared funnels.
-export const ORGANIZATION_MEMBER_INVITED_EVENT = 'organization_member_invited';
-export const KILO_PASS_PURCHASE_STARTED_EVENT = 'kilo_pass_purchase_started';
-export const KILO_PASS_PURCHASE_COMPLETED_EVENT = 'kilo_pass_purchase_completed';
-export const KILO_PASS_PURCHASE_FAILED_EVENT = 'kilo_pass_purchase_failed';
-export const APP_STARTUP_EVENT = 'app_startup';
-
-export type AnalyticsSurface = 'claw' | 'cloud-agent' | 'remote-session';
+// Event names and the mobile surface type come from the shared analytics
+// contract (`./events`). Re-exported here so existing `@/lib/analytics/posthog`
+// imports keep working unchanged.
+export {
+  APP_STARTUP_EVENT,
+  CONVERSATION_CREATED_EVENT,
+  FEEDBACK_SUBMITTED_EVENT,
+  INSTANCE_ACTION_EVENT,
+  KILO_PASS_PURCHASE_COMPLETED_EVENT,
+  KILO_PASS_PURCHASE_FAILED_EVENT,
+  KILO_PASS_PURCHASE_STARTED_EVENT,
+  MESSAGE_SENT_EVENT,
+  ORGANIZATION_MEMBER_INVITED_EVENT,
+  PERMISSION_RESPONDED_EVENT,
+  QUESTION_ANSWERED_EVENT,
+  SESSION_CREATED_EVENT,
+  SESSION_VIEWED_EVENT,
+} from './events';
+export type { AnalyticsSurface } from './events';
 
 // PostHog feature flags. The project is shared with web, so mobile-only flags
 // are prefixed to avoid colliding with web flag keys.
@@ -190,14 +194,51 @@ export function initPostHog(): void {
   });
 }
 
+export function captureEvent<K extends keyof AnalyticsEventMap>(
+  name: K,
+  properties?: AnalyticsEventMap[K]
+): void;
+// Fallback for legacy and test-only callers that pass a literal name outside
+// the catalog. The `Exclude` keeps this overload from masking a mistyped
+// payload on a cataloged event: when `name` is a map key, `name` is `never`
+// here, so only the typed overload above can match.
+export function captureEvent<Name extends string>(
+  name: Exclude<Name, keyof AnalyticsEventMap>,
+  properties?: Record<string, string | number | boolean>
+): void;
 export function captureEvent(
+  name: string,
+  properties?: Record<string, string | number | boolean>
+): void {
+  captureWithPrivacy(name, properties);
+}
+
+/**
+ * Captures an event whose name is not in the catalog (dynamic or
+ * AppsFlyer-mirrored names). Applies the same consent and generation gates as
+ * `captureEvent`, plus the runtime privacy deny-list: property keys naming a
+ * prohibited data class are dropped before capture. The AppsFlyer mirror path
+ * (`appsflyer.ts` `trackEvent`) is the only sanctioned caller.
+ */
+export function captureUncataloged(
+  name: string,
+  properties?: Record<string, string | number | boolean>
+): void {
+  captureWithPrivacy(name, properties);
+}
+
+function captureWithPrivacy(
   name: string,
   properties?: Record<string, string | number | boolean>
 ): void {
   if (!allowsOptional() || currentGeneration() !== clientGeneration) {
     return;
   }
-  client?.capture(name, properties);
+  // Redaction is a no-op for the cataloged strict-object payloads (their keys
+  // are deny-list-safe by schema); it guards the record-shaped `app_startup`
+  // payload and every uncataloged dynamic payload at runtime.
+  const safe = properties === undefined ? undefined : redactProhibitedProperties(properties);
+  client?.capture(name, safe);
 }
 
 export function captureScreen(name: string): void {

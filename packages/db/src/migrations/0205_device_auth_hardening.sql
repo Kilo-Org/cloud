@@ -30,6 +30,25 @@ CREATE TABLE "github_install_states" (
 	CONSTRAINT "github_install_states_owner_type_check" CHECK ("github_install_states"."owner_type" IN ('org', 'user'))
 );
 --> statement-breakpoint
+CREATE TABLE "native_admission_challenges" (
+	"challenge" text PRIMARY KEY NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"consumed_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "native_attested_keys" (
+	"key_id" text PRIMARY KEY NOT NULL,
+	"kilo_user_id" text NOT NULL,
+	"platform" text NOT NULL,
+	"public_key" text NOT NULL,
+	"sign_count" integer DEFAULT 0 NOT NULL,
+	"last_used_at" timestamp with time zone,
+	"attested_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "native_attested_keys_platform_check" CHECK ("native_attested_keys"."platform" IN ('ios', 'android'))
+);
+--> statement-breakpoint
 ALTER TABLE "device_auth_requests" ADD COLUMN "consumed_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "device_auth_requests" ADD COLUMN "user_code" text;--> statement-breakpoint
 ALTER TABLE "device_auth_requests" ADD COLUMN "device_code_hash" text;--> statement-breakpoint
@@ -38,11 +57,14 @@ ALTER TABLE "magic_link_tokens" ADD COLUMN "challenge_id" uuid;--> statement-bre
 ALTER TABLE "device_refresh_tokens" ADD CONSTRAINT "device_refresh_tokens_device_session_id_device_sessions_id_fk" FOREIGN KEY ("device_session_id") REFERENCES "public"."device_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "device_sessions" ADD CONSTRAINT "device_sessions_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "github_install_states" ADD CONSTRAINT "github_install_states_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "native_attested_keys" ADD CONSTRAINT "native_attested_keys_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "IDX_device_refresh_tokens_device_session_id" ON "device_refresh_tokens" USING btree ("device_session_id");--> statement-breakpoint
 CREATE INDEX "IDX_device_refresh_tokens_expires_at" ON "device_refresh_tokens" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "IDX_device_sessions_kilo_user_id" ON "device_sessions" USING btree ("kilo_user_id");--> statement-breakpoint
 CREATE INDEX "IDX_device_sessions_revoked_at" ON "device_sessions" USING btree ("revoked_at");--> statement-breakpoint
 CREATE INDEX "IDX_github_install_states_expires_at" ON "github_install_states" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "IDX_native_admission_challenges_expires_at" ON "native_admission_challenges" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "IDX_native_attested_keys_kilo_user_id" ON "native_attested_keys" USING btree ("kilo_user_id");--> statement-breakpoint
 COMMIT;--> statement-breakpoint
 CREATE UNIQUE INDEX CONCURRENTLY "UQ_device_auth_requests_device_code_hash" ON "device_auth_requests" USING btree ("device_code_hash") WHERE "device_auth_requests"."device_code_hash" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX CONCURRENTLY "IDX_device_auth_requests_user_code" ON "device_auth_requests" USING btree ("user_code") WHERE "device_auth_requests"."user_code" IS NOT NULL;--> statement-breakpoint
@@ -105,11 +127,11 @@ BEGIN
       SET platform_installation_id = NULL,
           integration_status = 'suspended',
           suspended_at = now(),
-          suspended_by = 'migration-0204-github-dedup',
+          suspended_by = 'migration-0205-github-dedup',
           metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
             'github_dedup', jsonb_build_object(
               'suspended_at', now(),
-              'reason', 'Duplicate installation resolved by migration 0204',
+              'reason', 'Duplicate installation resolved by migration 0205',
               'original_installation_id', loser.platform_installation_id
             )
           ),

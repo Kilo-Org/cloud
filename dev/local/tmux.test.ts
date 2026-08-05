@@ -213,6 +213,7 @@ test(
   { skip: !hasTmux },
   () => {
     const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const otherSessionName = `${sessionName}-other`;
     const serviceName = 'nextjs';
     const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
     const tmuxOutput = (...args: string[]) =>
@@ -242,6 +243,12 @@ test(
         `${sessionName}:0.0`
       );
 
+      // A second active session makes the tmux current session ambiguous. The
+      // old unqualified break-pane created the new window in the current
+      // session, which could be the other session; the session-qualified
+      // production fix always targets the requested source session.
+      tmux('new-session', '-d', '-s', otherSessionName, '-n', 'other', 'sleep 120');
+
       const newWindowIndex = breakPane(sessionName, 0, 1, serviceName);
       const window = listWindows(sessionName).find(entry => entry.index === newWindowIndex);
 
@@ -256,9 +263,18 @@ test(
         ),
         '0'
       );
+      assert.ok(
+        listWindows(otherSessionName).every(entry => entry.name !== serviceName),
+        'broken-out window must not land in the other active session'
+      );
     } finally {
       try {
         tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+      try {
+        tmux('kill-session', '-t', otherSessionName);
       } catch {
         // Session may already be gone if tmux fails during setup.
       }

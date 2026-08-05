@@ -36,6 +36,14 @@ vi.mock('@/lib/config', () => ({
 
 vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
+  TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
+}));
+
+// auth-context pulls in react-native, Sentry and the telemetry modules.
+// This test only inspects link options, so stub the two symbols trpc.ts uses.
+vi.mock('@/lib/auth/auth-context', () => ({
+  performRefresh: vi.fn().mockResolvedValue({ ok: false, refused: false }),
+  REFRESH_MARGIN_MS: 60_000,
 }));
 
 afterEach(() => {

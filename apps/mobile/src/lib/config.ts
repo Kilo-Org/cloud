@@ -30,6 +30,9 @@ export const POSTHOG_API_KEY: string = required('posthogApiKey');
 
 export const GOOGLE_WEB_CLIENT_ID: string | undefined = optional('googleWebClientId');
 export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClientId');
+export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(
+  'playIntegrityProjectNumber'
+);
 export const SENTRY_ENVIRONMENT: string | undefined = optional('sentryEnvironment');
 
 function optionalLatencyMs(key: keyof typeof OPTIONAL_ENV_KEYS): number {

@@ -1,5 +1,5 @@
-import { afterAll, describe, expect, it } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { eq, sql } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateDrizzleJson, generateMigration } from 'drizzle-kit/api';
@@ -1308,6 +1308,198 @@ describe('database schema', () => {
           'kilo_pass_store_purchases_store_provider_check'
         );
       });
+    });
+  });
+
+  describe('GitHub platform integration global unique index', () => {
+    const uniqueIndexName = 'UQ_platform_integrations_github_platform_inst';
+    const installationId = `schema-github-idx-${crypto.randomUUID()}`;
+    let userIdA: string;
+    let userIdB: string;
+
+    beforeEach(async () => {
+      userIdA = `schema-github-idx-a-${crypto.randomUUID()}`;
+      userIdB = `schema-github-idx-b-${crypto.randomUUID()}`;
+
+      await schemaTestDb.db.insert(schema.kilocode_users).values([
+        {
+          id: userIdA,
+          google_user_email: `${userIdA}@example.com`,
+          google_user_name: 'GitHub Idx User A',
+          google_user_image_url: 'https://example.com/avatar.png',
+          stripe_customer_id: `cus_${crypto.randomUUID()}`,
+        },
+        {
+          id: userIdB,
+          google_user_email: `${userIdB}@example.com`,
+          google_user_name: 'GitHub Idx User B',
+          google_user_image_url: 'https://example.com/avatar.png',
+          stripe_customer_id: `cus_${crypto.randomUUID()}`,
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await schemaTestDb.db
+        .delete(schema.platform_integrations)
+        .where(eq(schema.platform_integrations.platform_installation_id, installationId));
+      await schemaTestDb.db
+        .delete(schema.kilocode_users)
+        .where(eq(schema.kilocode_users.id, userIdA));
+      await schemaTestDb.db
+        .delete(schema.kilocode_users)
+        .where(eq(schema.kilocode_users.id, userIdB));
+    });
+
+    it('rejects duplicate (platform, github_app_type, platform_installation_id) for GitHub', async () => {
+      const base = {
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        platform_account_id: '12345',
+        platform_account_login: 'test-owner',
+        integration_status: 'active',
+        repository_access: 'all',
+        github_app_type: 'standard',
+        installed_at: '2026-07-01T00:00:00.000Z',
+      } satisfies typeof schema.platform_integrations.$inferInsert;
+
+      // First insert succeeds.
+      await schemaTestDb.db.insert(schema.platform_integrations).values({
+        ...base,
+        owned_by_user_id: userIdA,
+      });
+
+      // Second insert with same installation_id but different owner must fail.
+      const duplicate = schemaTestDb.db.insert(schema.platform_integrations).values({
+        ...base,
+        owned_by_user_id: userIdB,
+      });
+
+      await expect(duplicate).rejects.toMatchObject({
+        cause: {
+          constraint: uniqueIndexName,
+        },
+      });
+    });
+
+    it('allows same platform_installation_id with different github_app_type', async () => {
+      const base = {
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        platform_account_id: '12345',
+        platform_account_login: 'test-owner',
+        integration_status: 'active',
+        repository_access: 'all',
+        installed_at: '2026-07-01T00:00:00.000Z',
+      } satisfies typeof schema.platform_integrations.$inferInsert;
+
+      // 'standard' app type.
+      await schemaTestDb.db.insert(schema.platform_integrations).values({
+        ...base,
+        github_app_type: 'standard',
+        owned_by_user_id: userIdA,
+      });
+
+      // 'lite' app type — uses a different indexed column value.
+      const lite = schemaTestDb.db.insert(schema.platform_integrations).values({
+        ...base,
+        github_app_type: 'lite',
+        owned_by_user_id: userIdB,
+      });
+
+      // Should not fail — the unique index includes github_app_type.
+      await expect(lite).resolves.not.toThrow();
+    });
+
+    it('runs migration 0204 against duplicates before creating its unique index', async () => {
+      const migrationPath = path.join(__dirname, 'migrations/0204_brainy_baron_strucker.sql');
+      const fullMigration = fs.readFileSync(migrationPath, 'utf8');
+      const statements = fullMigration.split('--> statement-breakpoint');
+      // The dedup DO block is its own statement. The COMMIT/CONCURRENTLY/BEGIN
+      // markers that follow it in the migration must not run inside this test's
+      // transaction, so extract just the DO block and the unique-index DDL.
+      const migration = statements.find(stmt => stmt.includes('-- Backfill:'));
+      const createUniqueIndex = statements.find(stmt =>
+        stmt.includes(
+          'CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_platform_inst"'
+        )
+      );
+      if (migration === undefined || createUniqueIndex === undefined) {
+        throw new Error('migration 0204 backfill or unique index statement not found');
+      }
+      const rollback = new Error('rollback migration test');
+
+      try {
+        await schemaTestDb.db.transaction(async tx => {
+          await tx.execute(sql.raw('DROP INDEX "UQ_platform_integrations_github_platform_inst"'));
+
+          const base = {
+            platform: 'github',
+            integration_type: 'app',
+            platform_installation_id: installationId,
+            platform_account_id: `dedup-${installationId}`,
+            platform_account_login: 'dedup-owner',
+            integration_status: 'active',
+            repository_access: 'all',
+            github_app_type: 'standard',
+          } satisfies typeof schema.platform_integrations.$inferInsert;
+          const [older] = await tx
+            .insert(schema.platform_integrations)
+            .values({
+              ...base,
+              owned_by_user_id: userIdA,
+              installed_at: '2026-07-01T00:00:00.000Z',
+            })
+            .returning({ id: schema.platform_integrations.id });
+          const [newer] = await tx
+            .insert(schema.platform_integrations)
+            .values({
+              ...base,
+              owned_by_user_id: userIdB,
+              installed_at: '2026-07-02T00:00:00.000Z',
+            })
+            .returning({ id: schema.platform_integrations.id });
+
+          await tx.execute(sql.raw(migration));
+
+          // The migration creates the unique index CONCURRENTLY after the
+          // backfill. Inside this transaction, use the plain form; the point is
+          // that the index now succeeds on deduped rows.
+          await tx.execute(sql.raw(createUniqueIndex.replace('CONCURRENTLY ', '')));
+
+          const rows = await tx
+            .select({
+              id: schema.platform_integrations.id,
+              status: schema.platform_integrations.integration_status,
+              installationId: schema.platform_integrations.platform_installation_id,
+              metadata: schema.platform_integrations.metadata,
+            })
+            .from(schema.platform_integrations)
+            .where(eq(schema.platform_integrations.platform_account_id, base.platform_account_id));
+          const winner = rows.find(row => row.id === newer?.id);
+          const loser = rows.find(row => row.id === older?.id);
+
+          expect(winner).toMatchObject({ status: 'active', installationId });
+          expect(loser).toMatchObject({ status: 'suspended', installationId: null });
+          expect(loser?.metadata).toMatchObject({
+            github_dedup: {
+              reason: 'Duplicate installation resolved by migration 0204',
+              original_installation_id: installationId,
+            },
+          });
+          await expect(
+            tx.insert(schema.platform_integrations).values({ ...base, owned_by_user_id: userIdA })
+          ).rejects.toMatchObject({ cause: { constraint: uniqueIndexName } });
+
+          throw rollback;
+        });
+      } catch (error) {
+        if (error !== rollback) {
+          throw error;
+        }
+      }
     });
   });
 });

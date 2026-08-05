@@ -3731,6 +3731,10 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_linear_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_github_platform_inst')
+      .on(table.platform, table.github_app_type, table.platform_installation_id)
+      .concurrently()
+      .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
       .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
@@ -4422,11 +4426,17 @@ export const magic_link_tokens = pgTable(
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     attempts: integer().default(0).notNull(),
+    reserved_until: timestamp({ withTimezone: true, mode: 'string' }),
     purpose: text().default('magic_link').notNull().$type<'magic_link' | 'sign_in_code'>(),
+    challenge_id: uuid(),
   },
   table => [
     index('idx_magic_link_tokens_email').on(table.email),
     index('idx_magic_link_tokens_expires_at').on(table.expires_at),
+    uniqueIndex('UQ_magic_link_tokens_challenge_id')
+      .on(table.challenge_id)
+      .concurrently()
+      .where(sql`${table.challenge_id} IS NOT NULL`),
     check('check_expires_at_future', sql`${table.expires_at} > ${table.created_at}`),
   ]
 );
@@ -5567,11 +5577,14 @@ export const device_auth_requests = pgTable(
       onDelete: 'cascade',
     }),
     status: text()
-      .$type<'pending' | 'approved' | 'denied' | 'expired'>()
+      .$type<'pending' | 'approved' | 'denied' | 'expired' | 'consumed'>()
       .notNull()
       .default('pending'),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     approved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    user_code: text(),
+    device_code_hash: text(),
     user_agent: text(),
     ip_address: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -5585,10 +5598,62 @@ export const device_auth_requests = pgTable(
     index('IDX_device_auth_requests_status').on(table.status),
     index('IDX_device_auth_requests_expires_at').on(table.expires_at),
     index('IDX_device_auth_requests_kilo_user_id').on(table.kilo_user_id),
+    uniqueIndex('UQ_device_auth_requests_device_code_hash')
+      .on(table.device_code_hash)
+      .concurrently()
+      .where(sql`${table.device_code_hash} IS NOT NULL`),
+    index('IDX_device_auth_requests_user_code')
+      .on(table.user_code)
+      .concurrently()
+      .where(sql`${table.user_code} IS NOT NULL`),
   ]
 );
 
 export type DeviceAuthRequest = typeof device_auth_requests.$inferSelect;
+
+export const device_sessions = pgTable(
+  'device_sessions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    device_auth_request_id: uuid(),
+    user_agent: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_reason: text(),
+  },
+  table => [
+    index('IDX_device_sessions_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_device_sessions_revoked_at').on(table.revoked_at),
+  ]
+);
+
+export type DeviceSession = typeof device_sessions.$inferSelect;
+
+export const device_refresh_tokens = pgTable(
+  'device_refresh_tokens',
+  {
+    token_hash: text().primaryKey().notNull(),
+    device_session_id: uuid()
+      .notNull()
+      .references(() => device_sessions.id, { onDelete: 'cascade' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_device_refresh_tokens_device_session_id').on(table.device_session_id),
+    index('IDX_device_refresh_tokens_expires_at').on(table.expires_at),
+  ]
+);
+
+export type DeviceRefreshToken = typeof device_refresh_tokens.$inferSelect;
 
 // App Builder Projects
 export const app_builder_projects = pgTable(
@@ -9888,4 +9953,63 @@ export const container_usage_segment = pgTable(
 );
 
 export type ContainerUsageSegment = typeof container_usage_segment.$inferSelect;
+
+export const github_install_states = pgTable(
+  'github_install_states',
+  {
+    token: text().primaryKey().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owner_type: text().notNull(),
+    owner_id: text().notNull(),
+    github_app_type: text().notNull(),
+    return_to: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_github_install_states_expires_at').on(table.expires_at),
+    check('github_install_states_owner_type_check', sql`${table.owner_type} IN ('org', 'user')`),
+  ]
+);
+
+export type GitHubInstallState = typeof github_install_states.$inferSelect;
+
+// C14: native admission attestation
+export const native_admission_challenges = pgTable(
+  'native_admission_challenges',
+  {
+    challenge: text().primaryKey().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [index('IDX_native_admission_challenges_expires_at').on(table.expires_at)]
+);
+
+export type NativeAdmissionChallenge = typeof native_admission_challenges.$inferSelect;
+
+export const native_attested_keys = pgTable(
+  'native_attested_keys',
+  {
+    key_id: text().primaryKey().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text().notNull().$type<'ios' | 'android'>(),
+    public_key: text().notNull(),
+    sign_count: integer().notNull().default(0),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    attested_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_native_attested_keys_kilo_user_id').on(table.kilo_user_id),
+    check('native_attested_keys_platform_check', sql`${table.platform} IN ('ios', 'android')`),
+  ]
+);
+
+export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;

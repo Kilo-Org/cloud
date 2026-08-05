@@ -38,6 +38,8 @@ import {
   organization_recommendation_dismissals,
   magic_link_tokens,
   device_auth_requests,
+  device_sessions,
+  native_attested_keys,
   auto_top_up_configs,
   platform_integrations,
   platform_oauth_credentials,
@@ -92,6 +94,7 @@ import {
   impact_conversion_reports,
   github_branch_pull_requests,
   user_github_app_tokens,
+  github_install_states,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -265,6 +268,12 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
+};
+
+export type DeferredSignInEvent = {
+  distinctId: string;
+  event: string;
+  properties: Record<string, unknown>;
 };
 
 export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
@@ -515,11 +524,31 @@ export async function createOrUpdateUser(
   autoLinkToExistingUser: boolean = false,
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
-  trackingContext?: CreateOrUpdateUserTrackingContext
-): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
+  trackingContext?: CreateOrUpdateUserTrackingContext,
+  deferSignInAnalytics?: boolean
+): Promise<
+  Result<{ user: User; isNew: boolean; deferredSignInEvent?: DeferredSignInEvent }, AuthErrorType>
+> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
     void fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
+
+    if (deferSignInAnalytics) {
+      return successResult({
+        user: existingUser,
+        isNew: false,
+        deferredSignInEvent: {
+          distinctId: existingUser.google_user_email,
+          event: 'user_signed_in',
+          properties: {
+            name: existingUser.google_user_name,
+            hosted_domain: existingUser.hosted_domain,
+            provider: args.provider,
+            id: existingUser.id,
+          },
+        },
+      });
+    }
 
     // User signed in or is being updated
     posthogClient.capture({
@@ -588,6 +617,28 @@ export async function createOrUpdateUser(
       }
       void fireAuthEvent(linkedUser, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
+      if (deferSignInAnalytics) {
+        return successResult({
+          user: linkedUser,
+          isNew: false,
+          deferredSignInEvent: {
+            distinctId: userByEmail.google_user_email,
+            event: 'user_signed_in_with_different_id_and_auto_linked',
+            properties: {
+              existing_name: userByEmail.google_user_name,
+              existing_hosted_domain: userByEmail.hosted_domain,
+              existing_id: userByEmail.id,
+              new_provider: args.provider,
+              new_provider_account_id: args.provider_account_id,
+              new_name: args.google_user_name,
+              new_email: args.google_user_email,
+              new_image_url: args.google_user_image_url,
+              new_hosted_domain: args.hosted_domain,
+            },
+          },
+        });
+      }
+
       posthogClient.capture({
         distinctId: userByEmail.google_user_email,
         event: 'user_signed_in_with_different_id_and_auto_linked',
@@ -1258,6 +1309,11 @@ export async function softDeleteUser(userId: string) {
       .delete(code_review_feedback_events)
       .where(eq(code_review_feedback_events.owned_by_user_id, userId));
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
+    // device_sessions cascade deletes device_refresh_tokens via FK
+    await tx.delete(device_sessions).where(eq(device_sessions.kilo_user_id, userId));
+    await tx.delete(native_attested_keys).where(eq(native_attested_keys.kilo_user_id, userId));
+    // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
+    await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
     await tx

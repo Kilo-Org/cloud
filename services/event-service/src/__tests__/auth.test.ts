@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
+import { type KiloUserPepperResult } from '@kilocode/worker-utils/kilo-token-auth';
 import { type AuthEnv, authenticateToken } from '../auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
-const currentPepperByUserId = new Map<string, string | null>();
+const currentPepperByUserId = new Map<string, KiloUserPepperResult>();
 
 function makeEnv(): AuthEnv {
   return {
@@ -13,8 +14,11 @@ function makeEnv(): AuthEnv {
   };
 }
 
-async function getUserPepper(_connectionString: string, userId: string) {
-  return currentPepperByUserId.get(userId);
+async function getUserPepper(
+  _connectionString: string,
+  userId: string
+): Promise<KiloUserPepperResult | null | undefined> {
+  return currentPepperByUserId.has(userId) ? currentPepperByUserId.get(userId)! : undefined;
 }
 
 function authenticateTestToken(token: string | null) {
@@ -25,7 +29,7 @@ describe('authenticateToken', () => {
   beforeEach(() => {
     clearSecretCacheForTest();
     currentPepperByUserId.clear();
-    currentPepperByUserId.set('user-xyz-789', 'pepper-current');
+    currentPepperByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
   });
 
   it('authenticates a kilo-chat token with the current pepper', async () => {
@@ -76,6 +80,23 @@ describe('authenticateToken', () => {
       secret: TEST_JWT_SECRET,
       expiresInSeconds: 3600,
       env: 'development',
+      extra: { tokenSource: 'kilo-chat' },
+    });
+
+    await expect(authenticateTestToken(token)).resolves.toBeNull();
+  });
+
+  it('rejects a token for a blocked user even when pepper matches', async () => {
+    currentPepperByUserId.set('user-xyz-789', {
+      pepper: 'pepper-current',
+      blockedReason: 'manual block',
+    });
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
       extra: { tokenSource: 'kilo-chat' },
     });
 

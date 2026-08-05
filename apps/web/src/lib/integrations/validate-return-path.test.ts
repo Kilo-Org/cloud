@@ -51,6 +51,26 @@ describe('validateReturnPath', () => {
     expect(validateReturnPath('/')).toBe('/');
   });
 
+  it('accepts the C13 /cloud/sessions universal-link route', () => {
+    expect(validateReturnPath('/cloud/sessions')).toBe('/cloud/sessions');
+  });
+
+  it('accepts /cloud/sessions with query params (C13 return-outcome payload)', () => {
+    expect(validateReturnPath('/cloud/sessions?github_install=success')).toBe(
+      '/cloud/sessions?github_install=success'
+    );
+  });
+
+  it('accepts /cloud/sessions with error query param', () => {
+    expect(validateReturnPath('/cloud/sessions?error=install_state_user_mismatch')).toBe(
+      '/cloud/sessions?error=install_state_user_mismatch'
+    );
+  });
+
+  it('rejects a crafted returnTo that mimics /cloud/ but redirects externally', () => {
+    expect(validateReturnPath('/cloud/\nhttps://evil.com')).toBeNull();
+  });
+
   it('rejects triple-slash paths', () => {
     expect(validateReturnPath('///foo')).toBeNull();
   });

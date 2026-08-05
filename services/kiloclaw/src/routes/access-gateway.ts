@@ -353,6 +353,11 @@ async function redeemCodeAndSetCookie(
     return { error: 'User not found.', status: 401 };
   }
 
+  // A blocked account must not receive a fresh gateway credential.
+  if (user.blocked_reason) {
+    return { error: 'Access denied', status: 401 };
+  }
+
   const token = await signKiloToken({
     userId: redeemedUserId,
     pepper: user.api_token_pepper,

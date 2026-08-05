@@ -109,6 +109,12 @@ export async function mintFreshApiKey(
     return null;
   }
 
+  // A blocked account must not receive a fresh API key.
+  if (user.blocked_reason) {
+    console.warn('[DO] mintFreshApiKey: user is blocked');
+    return null;
+  }
+
   return signKiloToken({
     userId: user.id,
     pepper: user.api_token_pepper,

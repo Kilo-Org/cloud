@@ -347,7 +347,7 @@ async function syncProviders(
     // Deduplicate models within each provider by slug
     const uniqueModelsMap = new Map<string, OpenRouterModel>();
     data.models.forEach(model => {
-      // The cards API selects one arbitrary route when a provider has policy variants (for example ZDR).
+      // A model may show a ZDR route even though the same provider also offers data-retaining routes.
       const normalizedModel = withWorstProviderDataPolicy(model, data.provider.dataPolicy);
       uniqueModelsMap.set(normalizeModelId(model.slug), normalizedModel);
     });

@@ -19,7 +19,7 @@ const baseModel = {
 };
 
 describe('model data policy', () => {
-  test('uses the worst policy when OpenRouter selects a provider route', () => {
+  test('reports prompt retention when a provider offers both standard and ZDR routes', () => {
     const response = OpenRouterSearchResponse.parse({
       data: {
         models: [
@@ -56,7 +56,7 @@ describe('model data policy', () => {
     });
   });
 
-  test('preserves a model policy that is worse than the provider policy', () => {
+  test('preserves data collection reported by a model route', () => {
     const response = OpenRouterSearchResponse.parse({
       data: {
         models: [

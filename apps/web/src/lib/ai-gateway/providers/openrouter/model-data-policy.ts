@@ -1,5 +1,9 @@
 import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
+/**
+ * OpenRouter returns one route per model even when a provider offers routes with different data
+ * policies. Report data collection if either that route or the provider-wide policy allows it.
+ */
 export function withWorstProviderDataPolicy(
   model: OpenRouterModel,
   providerPolicy: { training: boolean; retainsPrompts: boolean }

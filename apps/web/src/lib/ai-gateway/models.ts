@@ -2,10 +2,7 @@
  * Utility functions for working with AI models
  */
 
-import {
-  KILO_AUTO_EFFICIENT_MODEL,
-  KILO_AUTO_FREE_MODEL,
-} from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import {
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,

@@ -29,7 +29,7 @@ type MonoScrollBlockProps = {
  * Sheet-level mono display mode and presence tracker, provided by the tool
  * detail sheet. `null` outside the sheet (transcript/preparation blocks).
  */
-export type MonoScrollSheetContextValue = {
+type MonoScrollSheetContextValue = {
   mode: MonoScrollTextMode;
   /** Registers a mounted mono block; returns the unregister. */
   track: () => () => void;

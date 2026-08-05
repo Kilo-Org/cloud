@@ -20,8 +20,14 @@ let src = readFileSync(FILE, 'utf8');
 // 1. Replace untyped Service bindings with their RPC surfaces.
 src = src.replaceAll(/GIT_TOKEN_SERVICE:\s*Service\b[^;]*/g, 'GIT_TOKEN_SERVICE: GitTokenService');
 src = src.replaceAll(/WASTELAND_SERVICE:\s*Service\b[^;]*/g, 'WASTELAND_SERVICE: WastelandService');
-src = src.replaceAll(/CONTAINER_USAGE:\s*Service\b[^;]*/g, 'CONTAINER_USAGE: ContainerUsageService');
-src = src.replaceAll('GASTOWN_BILLING_ENABLED: "true"', 'GASTOWN_BILLING_ENABLED: "false" | "true"');
+src = src.replaceAll(
+  /CONTAINER_USAGE:\s*Service\b[^;]*/g,
+  'CONTAINER_USAGE: ContainerUsageService'
+);
+src = src.replaceAll(
+  'GASTOWN_BILLING_ENABLED: "true"',
+  'GASTOWN_BILLING_ENABLED: "false" | "true"'
+);
 
 // 2. Add SENTRY_DSN worker secret to Cloudflare.Env (if not already present)
 if (!src.includes('SENTRY_DSN')) {
@@ -83,10 +89,7 @@ type ContainerUsageService = import("@kilocode/container-usage").ContainerUsageR
 `;
 
 if (!src.includes('type GitTokenService')) {
-  src = src.replace(
-    'declare namespace Cloudflare',
-    RPC_TYPES + 'declare namespace Cloudflare'
-  );
+  src = src.replace('declare namespace Cloudflare', RPC_TYPES + 'declare namespace Cloudflare');
 }
 
 writeFileSync(FILE, src);

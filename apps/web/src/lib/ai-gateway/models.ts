@@ -43,9 +43,9 @@ export type AutoFreeModel = { model: string; weight: number };
 
 export const autoFreeModels = [
   ...(stepfun_37_flash_free_model.status === 'public'
-    ? [{ model: stepfun_37_flash_free_model.public_id, weight: 1 }]
+    ? [{ model: stepfun_37_flash_free_model.public_id, weight: 2 }]
     : []),
-  { model: 'inclusionai/ling-3.0-flash:free', weight: 1 },
+  { model: 'inclusionai/ling-3.0-flash:free', weight: 2 },
   { model: 'poolside/laguna-s-2.1:free', weight: 1 },
 ] satisfies ReadonlyArray<AutoFreeModel>;
 

@@ -9,8 +9,10 @@ import {
   View,
 } from 'react-native';
 import { Paperclip } from 'lucide-react-native';
+import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { AttachmentPasteHint } from '@/components/agents/attachment-paste-hint';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -18,11 +20,17 @@ import { resolveNewSessionPromptControlState } from '@/components/agents/new-ses
 import { QueryError } from '@/components/query-error';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSharePrefill } from '@/lib/share-prefill';
 import { cn } from '@/lib/utils';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
-import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import {
+  type AgentAttachment,
+  type AgentAttachmentCandidate,
+} from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
+import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -61,7 +69,11 @@ type NewSessionPromptProps = {
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
   onRefetchModels: () => void;
+  onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
+  shareId?: string;
   voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
+  /** Optional initial prompt text seeded into the uncontrolled input once on mount. */
+  initialPrompt?: string;
 };
 
 /**
@@ -91,10 +103,14 @@ export function NewSessionPrompt({
   onRemoveAttachment,
   onRetryAttachment,
   onRefetchModels,
+  onPrefillAttachments,
+  shareId,
   voiceInputSettlerRef,
+  initialPrompt,
 }: Readonly<NewSessionPromptProps>) {
   const colors = useThemeColors();
-  const promptRef = useRef('');
+  const promptRef = useRef(initialPrompt ?? '');
+  const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
@@ -106,6 +122,11 @@ export function NewSessionPrompt({
     lineHeight: PROMPT_INPUT_LINE_HEIGHT,
   });
 
+  const promptMeasureSetTextRef = useRef(promptMeasure.setText);
+  useEffect(() => {
+    promptMeasureSetTextRef.current(initialPromptRef.current);
+  }, []);
+
   const handlePromptChange = useCallback(
     (text: string) => {
       promptRef.current = text;
@@ -114,6 +135,14 @@ export function NewSessionPrompt({
     },
     [onChangeText, promptMeasure]
   );
+
+  useSharePrefill({
+    shareId,
+    inputRef: promptInputRef,
+    maxLength: PROMPT_INPUT_MAX_CHARS,
+    onChangeText: handlePromptChange,
+    addCandidates: onPrefillAttachments,
+  });
 
   const voiceInput = useVoiceInput({
     disabled: isCreating,
@@ -145,6 +174,16 @@ export function NewSessionPrompt({
 
   const paperclipDisabled = control.paperclipDisabled;
 
+  const hint = useClipboardImageHint({
+    enabled: !paperclipDisabled,
+    addFile: async file => {
+      await onPrefillAttachments([file]);
+    },
+    onUnreadable: () => {
+      toast.error(describeClassificationFailure('unreadable'));
+    },
+  });
+
   function handlePromptInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
@@ -165,6 +204,13 @@ export function NewSessionPrompt({
         onRemove={onRemoveAttachment}
         onRetry={onRetryAttachment}
       />
+      {hint.visible ? (
+        <AttachmentPasteHint
+          onPress={() => {
+            hint.paste();
+          }}
+        />
+      ) : null}
       <View className="px-2 pt-2">
         {promptMeasure.measureElement}
         <RNTextInput
@@ -172,6 +218,7 @@ export function NewSessionPrompt({
           placeholder="What would you like to work on?"
           placeholderTextColor={colors.mutedForeground}
           multiline
+          defaultValue={initialPrompt}
           className={cn(
             'w-full px-2 py-2 text-base leading-6 text-foreground',
             isCreating && 'opacity-50'
@@ -190,8 +237,11 @@ export function NewSessionPrompt({
           maxLength={PROMPT_INPUT_MAX_CHARS}
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           autoFocus
+          onFocus={() => {
+            hint.refresh();
+          }}
         />
-        <View className="flex-row items-center justify-between pb-1">
+        <View className="flex-row items-center justify-between pb-2">
           <Pressable
             onPress={handlePaperclipPress}
             disabled={paperclipDisabled}
@@ -207,6 +257,11 @@ export function NewSessionPrompt({
             <Paperclip size={18} color={colors.mutedForeground} />
           </Pressable>
           {voiceInput.available ? (
+            <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
+              <VoiceInputStatus status={voiceInput.status} />
+            </View>
+          ) : null}
+          {voiceInput.available ? (
             <VoiceInputButton
               disabled={control.voiceDisabled}
               size="md"
@@ -216,11 +271,6 @@ export function NewSessionPrompt({
           ) : null}
         </View>
       </View>
-      {voiceInput.available ? (
-        <View className="min-h-[20px] px-3 pb-1">
-          <VoiceInputStatus status={voiceInput.status} />
-        </View>
-      ) : null}
       {isModelsError && modelOptions.length === 0 ? (
         <QueryError
           placement="top"

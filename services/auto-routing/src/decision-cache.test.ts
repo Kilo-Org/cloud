@@ -126,20 +126,49 @@ describe('sticky decision storage', () => {
     return { env, cacheDO, storage };
   }
 
-  it('round-trips the sticky model and route for a conversation', async () => {
+  it('round-trips the sticky model, variant, and route for a conversation', async () => {
     const { env } = createStickyEnv();
     await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
 
-    await putStickyDecision(env, 'conversation-1', 'mid/chat', 'implementation/code_generation');
+    await putStickyDecision(
+      env,
+      'conversation-1',
+      'mid/chat',
+      'thinking',
+      'implementation/code_generation'
+    );
     await expect(getStickyDecision(env, 'conversation-1')).resolves.toEqual({
       model: 'mid/chat',
+      variant: 'thinking',
+      routeKey: 'implementation/code_generation',
+    });
+  });
+
+  it('round-trips a null sticky variant', async () => {
+    const { env } = createStickyEnv();
+    await putStickyDecision(
+      env,
+      'conversation-1',
+      'mid/chat',
+      null,
+      'implementation/code_generation'
+    );
+    await expect(getStickyDecision(env, 'conversation-1')).resolves.toEqual({
+      model: 'mid/chat',
+      variant: null,
       routeKey: 'implementation/code_generation',
     });
   });
 
   it('expires sticky entries after the TTL', async () => {
     const { env } = createStickyEnv();
-    await putStickyDecision(env, 'conversation-1', 'mid/chat', 'implementation/code_generation');
+    await putStickyDecision(
+      env,
+      'conversation-1',
+      'mid/chat',
+      null,
+      'implementation/code_generation'
+    );
 
     vi.advanceTimersByTime(31 * 60 * 1000);
     await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
@@ -152,13 +181,14 @@ describe('sticky decision storage', () => {
     await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
   });
 
-  it('serves entries written before the routeKey field existed', async () => {
+  it('serves entries written before the routeKey and variant fields existed', async () => {
     const { env, cacheDO } = createStickyEnv();
     await cacheDO.putEntry('sticky', { model: 'mid/chat' } as unknown as ClassifierOutput);
 
     await expect(getStickyDecision(env, 'conversation-1')).resolves.toEqual({
       model: 'mid/chat',
       routeKey: null,
+      variant: null,
     });
   });
 });

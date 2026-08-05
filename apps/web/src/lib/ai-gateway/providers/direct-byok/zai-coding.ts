@@ -18,6 +18,7 @@ export default {
       {
         id: 'glm-5.2',
         name: 'GLM-5.2',
+        flags: ['reasoning'],
         context_length: 1000000,
         max_completion_tokens: 131072,
       },

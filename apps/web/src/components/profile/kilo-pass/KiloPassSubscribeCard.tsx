@@ -1,8 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Check, Crown, Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 
+import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -136,7 +137,7 @@ export function KiloPassSubscribeCard(props: {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <CardTitle className="flex items-center gap-2">
               <span className="bg-muted/40 ring-border/60 grid size-9 place-items-center rounded-lg ring-1">
-                <Crown className="size-5" />
+                <KiloPassIcon className="size-5" />
               </span>
 
               <span className="leading-none">

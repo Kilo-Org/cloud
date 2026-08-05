@@ -1,11 +1,18 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 
+import { sortActiveSessionsByCreatedAt } from '@/lib/active-session-order';
+import {
+  buildActiveSessionsTrayInput,
+  filterActiveSessionsByOrganization,
+} from '@/lib/active-sessions-live';
+import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import {
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
+import { collectSearchPages, collectUnfilteredPages } from '@/lib/agent-session-pages';
 import { groupAgentSessionsByDate } from '@/lib/agent-session-groups';
 import {
   type AgentSessionSortBy,
@@ -17,7 +24,7 @@ import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-s
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 export type StoredSession = RouterOutputs['cliSessionsV2']['list']['cliSessions'][number];
 
@@ -85,15 +92,19 @@ function useStoredSessions(options?: UseAgentSessionsOptions) {
 
 function useActiveSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
-  // While the shared WS is connected, the app-level `ActiveSessionsLiveSync`
-  // owner pushes tray updates through `setQueryData` and triggers refreshes
-  // on connect/enrichment/etc. — the 10s poll would only mask the WS as
-  // the source of truth. When the socket is down, fall back to the 10s
-  // interval so a transient outage still updates the tray.
+  // Cloud rows have no WS channel — discovery from other devices and departure
+  // on session stop need a floor poll even while connected. WS writes remain
+  // the instant path for CLI rows; the poll uses the same wholesale-replace
+  // semantics as the existing enrichment refresh. When the socket is down,
+  // poll every 10s so a transient outage still updates the tray.
   const wsConnected = useUserWebConnectionState();
+  const input = useMemo(
+    () => buildActiveSessionsTrayInput(options?.organizationId),
+    [options?.organizationId]
+  );
   return useQuery(
-    trpc.activeSessions.list.queryOptions(undefined, {
-      refetchInterval: wsConnected ? false : 10_000,
+    trpc.activeSessions.list.queryOptions(input, {
+      refetchInterval: wsConnected ? 30_000 : 10_000,
       staleTime: 5000,
       enabled: options?.enabled,
     })
@@ -122,30 +133,38 @@ type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
 };
 
 /**
- * Server-side session search. The list itself is cursor-paginated, so
- * client-side filtering would only see the pages loaded so far — this
- * searches the user's full history instead.
+ * Server-side session search, now cursor-paginated for consistent
+ * page size and dedupe across pages. Uses `useInfiniteQuery` with
+ * `keepPreviousData` so stale rows stay visible during a search-text
+ * refinement while the footer spinner signals the next-page fetch.
  */
 export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const trpc = useTRPC();
   const sortBy = resolveSortBy(options.sortBy);
 
-  const query = useQuery(
-    trpc.cliSessionsV2.search.queryOptions(buildAgentSessionSearchInput(options), {
+  const query = useInfiniteQuery(
+    trpc.cliSessionsV2.search.infiniteQueryOptions(buildAgentSessionSearchInput(options), {
       staleTime: 30_000,
       enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
       placeholderData: keepPreviousData,
+      getNextPageParam: lastPage => lastPage.nextCursor,
     })
   );
 
-  const sessions = useMemo(() => query.data?.results ?? [], [query.data]);
+  const sessions = useMemo(() => collectSearchPages(query.data?.pages), [query.data]);
   const dateGroups = useMemo(() => groupAgentSessionsByDate(sessions, sortBy), [sessions, sortBy]);
 
   return {
     dateGroups,
     isPending: query.isPending,
+    // Header-level fetch only — footer spinner has its own flag.
+    isFetching: query.isFetching && !query.isFetchingNextPage,
     isError: query.isError,
     refetch: query.refetch,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    isPlaceholderData: query.isPlaceholderData,
+    fetchNextPage: query.fetchNextPage,
   };
 }
 
@@ -157,23 +176,23 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const active = useActiveSessions(options);
 
   // A session can repeat across pages when it is updated while older pages
-  // load (the cursor follows the selected sort field), so dedupe by
-  // session_id.
-  const storedSessions = useMemo(() => {
-    const seen = new Set<string>();
-    const sessions: StoredSession[] = [];
-    for (const page of stored.data?.pages ?? []) {
-      for (const session of page.cliSessions) {
-        if (!seen.has(session.session_id)) {
-          seen.add(session.session_id);
-          sessions.push(session);
-        }
-      }
-    }
-    return sessions;
-  }, [stored.data]);
+  // load (the cursor follows the selected sort field). Dedupe by session_id
+  // using the shared collection helper.
+  const storedSessions = useMemo(() => collectUnfilteredPages(stored.data?.pages), [stored.data]);
 
-  const activeSessions = useMemo(() => active.data?.sessions ?? [], [active.data]);
+  // The server already filters by context; this covers the window where a WS
+  // heartbeat has introduced a row the client has not enriched yet (see
+  // `filterActiveSessionsByOrganization`).
+  const activeSessions = useMemo(
+    () =>
+      sortActiveSessionsByCreatedAt(
+        filterActiveSessionsByOrganization(
+          active.data?.sessions ?? [],
+          options?.organizationId ?? null
+        )
+      ),
+    [active.data, options?.organizationId]
+  );
 
   const activeSessionIds = useMemo(() => new Set(activeSessions.map(s => s.id)), [activeSessions]);
 
@@ -233,7 +252,19 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage: stored.fetchNextPage,
     refetch: async () => {
-      await Promise.all([stored.refetch(), active.refetch()]);
+      await Promise.all([
+        stored.refetch(),
+        (async () => {
+          // The live-sync owner writes and cancels this same query key, so a
+          // plain refetch alone can be swallowed by it. Drive the owner when
+          // one is attached — it is keyed to the same organization context
+          // this hook is given — and fall back to the plain refetch otherwise.
+          if (await refreshActiveSessionsNow()) {
+            return;
+          }
+          await active.refetch();
+        })(),
+      ]);
     },
   };
 }

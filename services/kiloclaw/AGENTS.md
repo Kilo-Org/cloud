@@ -198,13 +198,13 @@ pnpm start            # wrangler dev
 When working on machine-side controller behavior, use the Docker smoke scripts in
 `scripts/` (build image first: `docker buildx build --build-context workspace=../.. --load -t kiloclaw:controller .`):
 
-- `scripts/tests/smoke-controller.sh`
+- `scripts/tests/single-image/controller.sh`
   - Fresh container (onboard path). Tests auth, env patch, version endpoints.
   - Best for quick auth/proxy sanity checks.
-- `scripts/tests/smoke-entrypoint.sh`
+- `scripts/tests/single-image/entrypoint.sh`
   - Volume-mounted container with pre-seeded config (doctor path).
   - Best for startup/Docker integration changes.
-- `scripts/tests/smoke-proxy-auth.sh`
+- `scripts/tests/single-image/proxy-auth.sh`
   - Confirms proxy-token enforcement semantics (`401` without token, pass-through with token).
   - Best for proxy auth and routing-order validation.
 

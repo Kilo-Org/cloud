@@ -37,7 +37,7 @@ Before editing or reviewing, read:
    credentialed live smoke). Phase 2 compares refreshed `origin/main` by default, or
    an intentionally justified `BASE_REF`, to committed `HEAD` and retains `/root`
    between image phases. Set `KILOCODE_API_KEY` for Phase 2. (Run
-   `openclaw-upgrade-smoke.sh` directly only when you specifically need the live
+   `upgrade/smoke.sh` directly only when you specifically need the live
    smoke alone, without Phase 1.)
 6. Run required final KiloClaw submission gates and review output, diagnostics, and
    PR documentation before making the PR ready.

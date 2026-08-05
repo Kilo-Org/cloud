@@ -134,9 +134,17 @@ function buildInfraLogCommand(serviceName: string): string {
   return `docker compose ${profileArg}-f dev/docker-compose.yml logs -f ${shellQuote(serviceName)}`;
 }
 
-function buildLogPipeCommand(logPath: string): string {
+export function buildLogPipeCommand(logPath: string): string {
   const filterPath = path.join(findRepoRoot(), 'dev', 'local', 'log-filter.ts');
-  return `tsx ${shellQuote(filterPath)} >> ${shellQuote(logPath)}`;
+  // Absolute tsx path: tmux pipe-pane commands inherit the tmux *server's*
+  // PATH, not the caller's, and a server started outside a direnv shell has
+  // no node_modules/.bin on it.
+  const tsxPath = path.join(findRepoRoot(), 'node_modules', '.bin', 'tsx');
+  return `${shellQuote(tsxPath)} ${shellQuote(filterPath)} >> ${shellQuote(logPath)}`;
+}
+
+export function buildFollowLogPipeCommand(logPath: string, followPath: string): string {
+  return `tee -a ${shellQuote(followPath)} | ${buildLogPipeCommand(logPath)}`;
 }
 
 function shellQuote(value: string): string {
@@ -419,10 +427,12 @@ export async function startInfra(repoRoot: string, serviceNames: string[]): Prom
 
   // Pass --env-file so docker compose substitution sees secrets like
   // CF_AE_TOKEN without polluting the runner's process.env or exposing
-  // every .env.local value to sibling child processes.
-  const envFileArg = fs.existsSync(path.join(repoRoot, '.env.local'))
-    ? ['--env-file', '.env.local']
-    : [];
+  // every .env.local value to sibling child processes. Naming any file
+  // replaces Compose's default lookup, so name dev/.env too — it carries this
+  // worktree's Compose project and its infra ports.
+  const envFileArg = ['dev/.env', '.env.local'].flatMap(file =>
+    fs.existsSync(path.join(repoRoot, file)) ? ['--env-file', file] : []
+  );
 
   const args = ['compose', ...envFileArg, '-f', 'dev/docker-compose.yml'];
   args.push(...profileArgs, 'up', '-d');

@@ -1,0 +1,137 @@
+import { stripPartContentIfFile } from './part-utils';
+import type { ChatEvent } from './normalizer';
+import type { SessionStorage } from './storage/types';
+import type { UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
+
+type ChatProcessor = {
+  process(event: ChatEvent): void;
+  /**
+   * Materialize a synthetic user message from a `cloud.message.queued` server
+   * event, unless an authoritative message with the same id already exists.
+   * The synthetic message is overwritten when the wrapper later emits the
+   * real `message.updated` payload for the same id.
+   */
+  synthesizeQueuedUserMessage(input: {
+    messageId: string;
+    sessionId: string;
+    content: string | undefined;
+  }): void;
+};
+
+type ChatProcessorOptions = {
+  /**
+   * Optional sink for tool attachment bytes, called just before the chat
+   * processor strips completed tool part attachment data URLs for storage.
+   *
+   * - Images (any tool): emitted unchanged.
+   * - Non-images: emitted only when `part.tool === 'send_file'`.
+   *
+   * The callback receives the raw data URL exactly once per processor pass;
+   * consumers use it to persist bytes outside the in-memory store (e.g.
+   * mobile's file-system cache). Web never passes it, so web behaviour is
+   * unchanged. Sink failures are caught and must not interrupt processing.
+   */
+  onToolAttachment?:
+    | ((partId: string, attachment: { mime: string; filename?: string; dataUrl: string }) => void)
+    | undefined;
+};
+
+function hasTextField(part: { text?: string } | unknown): part is { text: string } {
+  return typeof part === 'object' && part !== null && 'text' in part;
+}
+
+function isSyntheticPart(part: unknown): boolean {
+  return (
+    typeof part === 'object' && part !== null && 'synthetic' in part && part.synthetic === true
+  );
+}
+
+function emitToolAttachmentsBeforeStrip(
+  part: Part,
+  onToolAttachment: NonNullable<ChatProcessorOptions['onToolAttachment']>
+): void {
+  if (part.type !== 'tool') return;
+  const toolPart = part;
+  if (toolPart.state.status !== 'completed' || !toolPart.state.attachments) return;
+
+  for (const attachment of toolPart.state.attachments) {
+    const isImage = attachment.mime.startsWith('image/');
+    if (!isImage && toolPart.tool !== 'send_file') continue;
+    if (attachment.url === '') continue;
+    try {
+      onToolAttachment(toolPart.id, {
+        mime: attachment.mime,
+        ...(attachment.filename ? { filename: attachment.filename } : {}),
+        dataUrl: attachment.url,
+      });
+    } catch {
+      // Sink failures must not break chat processing.
+    }
+  }
+}
+
+function createChatProcessor(
+  sessionStorage: SessionStorage,
+  options?: ChatProcessorOptions
+): ChatProcessor {
+  return {
+    process(event) {
+      switch (event.type) {
+        case 'message.updated':
+          sessionStorage.upsertMessage(event.info);
+          break;
+        case 'message.part.updated': {
+          if (options?.onToolAttachment) {
+            emitToolAttachmentsBeforeStrip(event.part, options.onToolAttachment);
+          }
+          const stripped = stripPartContentIfFile(event.part);
+          if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {
+            const existingParts = sessionStorage.getParts(stripped.messageID);
+            const existing = existingParts.find(p => p.id === stripped.id);
+            if (existing && hasTextField(existing) && existing.text.length > 0) {
+              break;
+            }
+          }
+          sessionStorage.upsertPart(stripped.messageID, stripped);
+          break;
+        }
+        case 'message.part.delta':
+          sessionStorage.applyPartDelta(event.messageId, event.partId, event.field, event.delta);
+          break;
+        case 'message.part.removed':
+          sessionStorage.deletePart(event.messageId, event.partId);
+          break;
+      }
+    },
+
+    synthesizeQueuedUserMessage({ messageId, sessionId, content }) {
+      // Empty or missing content can't form a renderable user message; wait for
+      // the authoritative `message.updated` payload from the wrapper instead.
+      if (!content) return;
+      if (sessionStorage.getMessageInfo(messageId)) return;
+
+      const syntheticMessage: UserMessage = {
+        id: messageId,
+        sessionID: sessionId,
+        role: 'user',
+        time: { created: Date.now() },
+        agent: '',
+        model: { providerID: '', modelID: '' },
+      };
+      sessionStorage.upsertMessage(syntheticMessage);
+
+      const syntheticPart: TextPart = {
+        id: `${messageId}-text`,
+        sessionID: sessionId,
+        messageID: messageId,
+        type: 'text',
+        text: content,
+        synthetic: true,
+      };
+      sessionStorage.upsertPart(messageId, syntheticPart);
+    },
+  };
+}
+
+export { createChatProcessor };
+export type { ChatProcessor, ChatProcessorOptions };

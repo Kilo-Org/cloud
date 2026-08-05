@@ -5,9 +5,11 @@ import {
   AGENT_ATTACHMENT_MAX_BYTES,
   AGENT_ATTACHMENT_MAX_FILES,
   AGENT_ATTACHMENT_MIME_BY_EXTENSION,
+  AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH,
   type AgentAttachmentExtension,
   type AgentAttachmentMime,
 } from './constants';
+import { truncateUtf8, utf8ByteLength } from '../utf8-utils';
 
 const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>(['png', 'jpg', 'jpeg', 'webp', 'gif']);
 
@@ -49,6 +51,91 @@ export function mimeForExtension(extension: string): AgentAttachmentMime {
   const mimeByExtension: Readonly<Record<string, AgentAttachmentMime | undefined>> =
     AGENT_ATTACHMENT_MIME_BY_EXTENSION;
   return mimeByExtension[extension] ?? 'application/octet-stream';
+}
+
+/**
+ * Sanitize a picker filename for the remote CLI wire payload.
+ *
+ * The original picker name reaches CLI filesystem materialization.
+ * This function strips path separators, traversal sequences,
+ * control characters, and excess length so the emitted filename
+ * cannot create an unsafe path.
+ *
+ * - Strips leading path components (basename only).
+ * - Strips control characters (ASCII 0x00–0x1f, 0x7f).
+ * - Strips path separators (`/`, `\`).
+ * - Truncates to {@link AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH}
+ *   UTF-8 bytes without splitting Unicode characters.
+ * - When truncation removes name characters, the extension is
+ *   retained so the receiving CLI can still identify the file type.
+ * - Preserves safe basename names byte-for-byte, including repeated
+ *   and trailing dots.
+ * - Falls back to "file.bin" when sanitization produces an empty string
+ *   or a bare traversal token (`.` or `..`).
+ */
+export function sanitizeAttachmentFilename(raw: string): string {
+  // Strip to basename only — drop any directory prefix
+  let sanitized = raw.replace(/^.*[/\\]/, '');
+
+  // Strip control characters
+  {
+    let out = '';
+    for (const c of sanitized) {
+      const code = c.codePointAt(0);
+      // eslint-disable-next-line eslint-plugin-unicorn/number-literal-case — oxfmt prefers lowercase hex
+      if (code !== undefined && code > 0x1f && code !== 0x7f) {
+        out += c;
+      }
+    }
+    sanitized = out;
+  }
+
+  // Strip any remaining path separators
+  sanitized = sanitized.replaceAll('/', '').replaceAll('\\', '');
+
+  // Truncate to the byte budget, preserving the extension when
+  // truncation removes characters from the name part.
+  if (utf8ByteLength(sanitized) > AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH) {
+    const dot = sanitized.lastIndexOf('.');
+    if (dot > 0 && dot < sanitized.length - 1) {
+      // Filename has a non-leading, non-trailing dot → extension present.
+      const ext = sanitized.slice(dot + 1);
+      const name = sanitized.slice(0, dot);
+      const extBytes = utf8ByteLength(ext);
+      const dotByte = 1;
+      const nameBudget = AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH - extBytes - dotByte;
+      if (nameBudget > 0) {
+        const truncatedName = truncateUtf8(name, nameBudget);
+        // When no complete code point fits in the name budget, the
+        // truncated name is empty. Emitting `.ext` alone would create a
+        // leading-dot name — fall back to unadorned truncation instead.
+        sanitized =
+          truncatedName.length > 0
+            ? `${truncatedName}.${ext}`
+            : truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+      } else {
+        sanitized = truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+      }
+    } else {
+      // No parsable extension — truncate the whole string.
+      sanitized = truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
+    }
+  }
+
+  // If empty, use the safe fallback
+  if (sanitized.length === 0) {
+    return `file.${AGENT_ATTACHMENT_FALLBACK_EXTENSION}`;
+  }
+
+  // Reject bare traversal tokens (`.` and `..`).
+  // These survive basename extraction when the original name IS the
+  // traversal token — e.g. `..`, `a/..`, or `../..` — and must never
+  // reach the remote wire field.
+  if (sanitized === '.' || sanitized === '..') {
+    return `file.${AGENT_ATTACHMENT_FALLBACK_EXTENSION}`;
+  }
+
+  return sanitized;
 }
 
 type ClassifiedAttachment =
@@ -105,13 +192,16 @@ export function canAddAttachments(
 const CLASSIFICATION_FAILURE_MESSAGES = {
   denied: "Executable files can't be attached",
   empty: 'File is empty',
-  'too-large': 'Files must be 5 MB or smaller',
-} as const satisfies Record<'denied' | 'empty' | 'too-large', string>;
+  'too-large': 'Files must be 20 MB or smaller',
+  unreadable: "Couldn't read this file",
+} as const satisfies Record<'denied' | 'empty' | 'too-large' | 'unreadable', string>;
 
 /**
  * Human-readable copy for a single classification outcome. Centralized so
  * the picker, the upload hook, and the chip surface use the same strings.
  */
-export function describeClassificationFailure(reason: 'denied' | 'empty' | 'too-large'): string {
+export function describeClassificationFailure(
+  reason: 'denied' | 'empty' | 'too-large' | 'unreadable'
+): string {
   return CLASSIFICATION_FAILURE_MESSAGES[reason];
 }

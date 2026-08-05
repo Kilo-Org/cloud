@@ -1,19 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import type { ClassifierOutput, RoutingTable } from '@kilocode/auto-routing-contracts';
-import { computeDecision } from './decision-engine';
+import { computeDecision, type DecisionIncumbent } from './decision-engine';
 import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
 
 function makeCaps(
-  rows: Record<string, { inputModalities?: string[]; contextLength?: number | null }>
+  rows: Record<
+    string,
+    { inputModalities?: string[]; contextLength?: number | null; isActive?: boolean | null }
+  >
 ): ModelCapabilitiesMap {
   const map = new Map<string, ModelCapabilities>();
   for (const [id, row] of Object.entries(rows)) {
     map.set(id, {
       inputModalities: new Set(row.inputModalities ?? []),
       contextLength: row.contextLength ?? null,
+      isActive: row.isActive ?? true,
     });
   }
   return map;
+}
+
+function inc(model: string | null, variant: string | null = null): DecisionIncumbent | null {
+  return model === null ? null : { model, variant };
 }
 
 const classification: ClassifierOutput = {
@@ -113,7 +121,13 @@ describe('computeDecision', () => {
     });
   });
   it('does not keep a lower-accuracy incumbent in best accuracy mode', () => {
-    const decision = computeDecision(classification, table, 'mid/chat', new Set(), 'best_accuracy');
+    const decision = computeDecision(
+      classification,
+      table,
+      inc('mid/chat'),
+      new Set(),
+      'best_accuracy'
+    );
     expect(decision).toMatchObject({ model: 'pricey/chat', sticky: false, switchReason: 'cost' });
   });
   it('keeps a best-accuracy incumbent when the fresh pick is less than five points better', () => {
@@ -142,7 +156,7 @@ describe('computeDecision', () => {
     const decision = computeDecision(
       classification,
       nearTieTable,
-      'incumbent/chat',
+      inc('incumbent/chat'),
       new Set(),
       'best_accuracy'
     );
@@ -174,7 +188,7 @@ describe('computeDecision', () => {
     const decision = computeDecision(
       classification,
       betterTable,
-      'incumbent/chat',
+      inc('incumbent/chat'),
       new Set(),
       'best_accuracy'
     );
@@ -244,7 +258,7 @@ describe('computeDecision', () => {
     it('keeps the incumbent on route changes when it is within the switch-cost factor', () => {
       // Fresh pick cheap/chat at 0.002; mid/chat at 0.005 is not cheaper by
       // more than 3x (0.002 * 3 = 0.006 >= 0.005), so the session stays put.
-      const decision = computeDecision(classification, table, 'mid/chat');
+      const decision = computeDecision(classification, table, inc('mid/chat'));
       expect(decision).toEqual({
         model: 'mid/chat',
         taskType: 'implementation',
@@ -278,16 +292,21 @@ describe('computeDecision', () => {
           ],
         },
       };
-      const decision = computeDecision(classification, boundaryTable, 'incumbent/chat');
+      const decision = computeDecision(classification, boundaryTable, inc('incumbent/chat'));
       expect(decision).toMatchObject({ model: 'incumbent/chat', sticky: true });
     });
     it('switches when the fresh pick is cheaper by more than the factor', () => {
       // pricey/chat at 0.02 vs fresh 0.002 * 3 = 0.006: switch pays off.
-      const decision = computeDecision(classification, table, 'pricey/chat');
+      const decision = computeDecision(classification, table, inc('pricey/chat'));
       expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false, switchReason: 'cost' });
     });
     it('does not keep a denied incumbent', () => {
-      const decision = computeDecision(classification, table, 'mid/chat', new Set(['mid/chat']));
+      const decision = computeDecision(
+        classification,
+        table,
+        inc('mid/chat'),
+        new Set(['mid/chat'])
+      );
       expect(decision).toMatchObject({
         model: 'cheap/chat',
         sticky: false,
@@ -295,7 +314,7 @@ describe('computeDecision', () => {
       });
     });
     it('switches when the incumbent no longer meets the route threshold', () => {
-      const decision = computeDecision(classification, table, 'weak/chat');
+      const decision = computeDecision(classification, table, inc('weak/chat'));
       expect(decision).toMatchObject({
         model: 'cheap/chat',
         sticky: false,
@@ -303,7 +322,7 @@ describe('computeDecision', () => {
       });
     });
     it('serves the fresh pick when the incumbent is not in the route', () => {
-      const decision = computeDecision(classification, table, 'gone/model');
+      const decision = computeDecision(classification, table, inc('gone/model'));
       expect(decision).toMatchObject({
         model: 'cheap/chat',
         sticky: false,
@@ -311,8 +330,214 @@ describe('computeDecision', () => {
       });
     });
     it('is not sticky when the incumbent is the fresh pick', () => {
-      const decision = computeDecision(classification, table, 'cheap/chat');
+      const decision = computeDecision(classification, table, inc('cheap/chat'));
       expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false, switchReason: null });
+    });
+  });
+
+  describe('benchmark noise band', () => {
+    // Every fixture below is taken verbatim from the live routing table
+    // (decider-2026-07-22T10-51-06-305Z, minAccuracy 0.95): accuracies are the
+    // published k/30 roundings and costs the published avgCostUsd. In
+    // cost_per_accuracy mode the fresh pick is candidates[0] after filtering,
+    // so each route array lists the named fresh pick first.
+    const liveClassification = (
+      taskType: ClassifierOutput['taskType'],
+      subtaskType: ClassifierOutput['subtaskType']
+    ): ClassifierOutput => ({ ...classification, taskType, subtaskType });
+
+    it('keeps the incumbent on a zero-passer route when it sits inside the band', () => {
+      // investigation/codebase_understanding has no threshold-meeting
+      // candidate. kimi-k2.7-code is less accurate AND ~1.16x more expensive
+      // per benchmark case than the fresh pick, yet it is kept: 0.8667 clears
+      // the 0.85 band floor, and 0.01094 * 3 is not less than 0.01272, so the
+      // cost condition does not fire either.
+      const zeroPasserTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'investigation/codebase_understanding': [
+            {
+              model: 'moonshotai/kimi-k3',
+              accuracy: 0.9333,
+              avgCostUsd: 0.01094,
+              meetsThreshold: false,
+            },
+            {
+              model: 'moonshotai/kimi-k2.7-code',
+              accuracy: 0.8667,
+              avgCostUsd: 0.01272,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('investigation', 'codebase_understanding'),
+        zeroPasserTable,
+        inc('moonshotai/kimi-k2.7-code')
+      );
+      expect(decision).toMatchObject({
+        model: 'moonshotai/kimi-k2.7-code',
+        sticky: true,
+        switchReason: null,
+      });
+    });
+
+    it('keeps an in-band incumbent when the route’s sole passer is far more expensive', () => {
+      // planning_design/technical_planning has exactly one passer,
+      // claude-sonnet-5 at $0.0394/case. Keeping inkling (0.9333, $0.0061)
+      // gives up +0.033 accuracy — one graded case out of thirty — and the
+      // cost escape cannot help here: 0.0394 * 3 = 0.1182 is not less than
+      // 0.0061, so the band is the only thing preventing the switch onto a
+      // model 6.5x more expensive.
+      const solePasserTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'planning_design/technical_planning': [
+            {
+              model: 'anthropic/claude-sonnet-5',
+              accuracy: 0.9667,
+              avgCostUsd: 0.0394,
+              meetsThreshold: true,
+            },
+            {
+              model: 'thinkingmachines/inkling',
+              accuracy: 0.9333,
+              avgCostUsd: 0.0061,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('planning_design', 'technical_planning'),
+        solePasserTable,
+        inc('thinkingmachines/inkling')
+      );
+      expect(decision).toMatchObject({
+        model: 'thinkingmachines/inkling',
+        sticky: true,
+        switchReason: null,
+      });
+    });
+
+    it('keeps a below-bar incumbent over a threshold-clearing fresh pick when the gap is 2/30 graded cases', () => {
+      // debugging/root_cause_analysis, the modal live case: the fresh pick
+      // clears the bar and costs the same to four decimal places
+      // ($0.00274548 vs $0.00274055), so the entire benefit of keeping
+      // kimi-k2.7-code is prompt-cache continuity. At n=10 distinct graded
+      // cases, 27/30 vs 29/30 is a difference the benchmark cannot resolve.
+      const modalTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'debugging/root_cause_analysis': [
+            {
+              model: 'minimax/minimax-m3',
+              accuracy: 0.9667,
+              avgCostUsd: 0.00275,
+              meetsThreshold: true,
+            },
+            {
+              model: 'moonshotai/kimi-k2.7-code',
+              accuracy: 0.9,
+              avgCostUsd: 0.00274,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('debugging', 'root_cause_analysis'),
+        modalTable,
+        inc('moonshotai/kimi-k2.7-code')
+      );
+      expect(decision).toMatchObject({
+        model: 'moonshotai/kimi-k2.7-code',
+        sticky: true,
+        switchReason: null,
+      });
+    });
+
+    it("labels an in-band incumbent's cost-driven ejection as switchReason 'cost', not 'threshold'", () => {
+      // planning_design/architecture_design: the incumbent is inside the
+      // band, so the old code would have ejected it as 'threshold'; the band
+      // makes it eligible, and the ejection is then caused by the unchanged
+      // cost condition: 0.00660620 * 3 = 0.01981860 < 0.03943792. Telemetry
+      // must therefore read 'cost' — otherwise the before/after measurement
+      // of this change reads its own relabels backwards.
+      const relabelTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'planning_design/architecture_design': [
+            {
+              model: 'thinkingmachines/inkling',
+              accuracy: 0.9,
+              avgCostUsd: 0.0066062,
+              meetsThreshold: false,
+            },
+            {
+              model: 'anthropic/claude-sonnet-5',
+              accuracy: 0.9,
+              avgCostUsd: 0.03943792,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('planning_design', 'architecture_design'),
+        relabelTable,
+        inc('anthropic/claude-sonnet-5')
+      );
+      expect(decision).toMatchObject({
+        model: 'thinkingmachines/inkling',
+        sticky: false,
+        switchReason: 'cost',
+      });
+    });
+
+    it('best_accuracy mode still ejects an in-band incumbent below the threshold', () => {
+      // Same route and incumbent as the sole-passer keep case above, with
+      // the mode flipped and the outcome inverted: the accuracy gap is
+      // 0.0334, below the 0.05 bestAccuracySwitchThreshold, so the gap
+      // condition alone would keep inkling — only best_accuracy still
+      // requiring meetsThreshold can eject it.
+      const solePasserTable: RoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        routes: {
+          'planning_design/technical_planning': [
+            {
+              model: 'anthropic/claude-sonnet-5',
+              accuracy: 0.9667,
+              avgCostUsd: 0.0394,
+              meetsThreshold: true,
+            },
+            {
+              model: 'thinkingmachines/inkling',
+              accuracy: 0.9333,
+              avgCostUsd: 0.0061,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        liveClassification('planning_design', 'technical_planning'),
+        solePasserTable,
+        inc('thinkingmachines/inkling'),
+        new Set(),
+        'best_accuracy'
+      );
+      expect(decision).toMatchObject({
+        model: 'anthropic/claude-sonnet-5',
+        sticky: false,
+        switchReason: 'threshold',
+      });
     });
   });
 
@@ -452,7 +677,7 @@ describe('computeDecision', () => {
       const decision = computeDecision(
         classification,
         visionTable,
-        'text-only/chat',
+        inc('text-only/chat'),
         new Set(),
         'cost_per_accuracy',
         {
@@ -543,7 +768,7 @@ describe('computeDecision', () => {
       const decision = computeDecision(
         classification,
         sizedTable,
-        'large/chat',
+        inc('large/chat'),
         new Set(),
         'cost_per_accuracy',
         {
@@ -641,7 +866,7 @@ describe('computeDecision', () => {
       const decision = computeDecision(
         classification,
         sizedTable,
-        'b/chat',
+        inc('b/chat'),
         new Set(),
         'cost_per_accuracy',
         {
@@ -717,6 +942,207 @@ describe('computeDecision', () => {
         }
       );
       expect(emptyConstraints).toEqual(noConstraints);
+    });
+  });
+
+  describe('exact-pair stickiness and variant emission', () => {
+    const variantTable: RoutingTable = {
+      ...table,
+      routes: {
+        'implementation/code_generation': [
+          {
+            model: 'shared/chat',
+            accuracy: 0.9,
+            avgCostUsd: 0.002,
+            meetsThreshold: true,
+            variant: 'instant',
+          },
+          {
+            model: 'shared/chat',
+            accuracy: 0.85,
+            avgCostUsd: 0.005,
+            meetsThreshold: true,
+            variant: 'thinking',
+          },
+          {
+            model: 'other/chat',
+            accuracy: 0.8,
+            avgCostUsd: 0.01,
+            meetsThreshold: true,
+            variant: null,
+          },
+        ],
+      },
+    };
+
+    it('keeps an exact-pair incumbent over a cheaper different variant of the same model', () => {
+      const decision = computeDecision(
+        classification,
+        variantTable,
+        inc('shared/chat', 'thinking')
+      );
+      expect(decision).toMatchObject({
+        model: 'shared/chat',
+        variant: 'thinking',
+        sticky: true,
+      });
+      expect(decision).not.toHaveProperty('reasoningEffort');
+    });
+
+    it('switches when the exact-pair incumbent was removed from the candidate set', () => {
+      const decision = computeDecision(
+        classification,
+        variantTable,
+        inc('shared/chat', 'gone-variant')
+      );
+      expect(decision).toMatchObject({
+        model: 'shared/chat',
+        variant: 'instant',
+        sticky: false,
+        switchReason: 'threshold',
+      });
+    });
+
+    it('legacy model-only sticky matches a single candidate with that model', () => {
+      // Fresh pick is cheaper but not by more than switchCostFactor (3x), so
+      // the unique model-only sticky match is kept.
+      const singleVariantTable: RoutingTable = {
+        ...table,
+        routes: {
+          'implementation/code_generation': [
+            {
+              model: 'fresh/chat',
+              accuracy: 0.9,
+              avgCostUsd: 0.002,
+              meetsThreshold: true,
+              variant: null,
+            },
+            {
+              model: 'only/chat',
+              accuracy: 0.85,
+              avgCostUsd: 0.005,
+              meetsThreshold: true,
+              variant: 'max',
+            },
+          ],
+        },
+      };
+      const decision = computeDecision(classification, singleVariantTable, inc('only/chat', null));
+      expect(decision).toMatchObject({
+        model: 'only/chat',
+        variant: 'max',
+        sticky: true,
+      });
+    });
+
+    it('legacy model-only sticky is ignored when two variants of the model are candidates', () => {
+      const decision = computeDecision(classification, variantTable, inc('shared/chat', null));
+      // No unique model match → no incumbent → fresh pick
+      expect(decision).toMatchObject({
+        model: 'shared/chat',
+        variant: 'instant',
+        sticky: false,
+        switchReason: null,
+      });
+    });
+
+    it('emits variant without reasoningEffort for new-style candidates', () => {
+      const decision = computeDecision(classification, variantTable, null);
+      expect(decision).toEqual({
+        model: 'shared/chat',
+        taskType: 'implementation',
+        subtaskType: 'code_generation',
+        source: 'benchmark',
+        tableVersion: 'run-1',
+        variant: 'instant',
+        sticky: false,
+        switchReason: null,
+      });
+    });
+
+    it('emits reasoningEffort without variant for legacy candidates', () => {
+      const decision = computeDecision(classification, table, null, new Set(['cheap/chat']));
+      expect(decision).toEqual({
+        model: 'mid/chat',
+        taskType: 'implementation',
+        subtaskType: 'code_generation',
+        source: 'benchmark',
+        tableVersion: 'run-1',
+        reasoningEffort: 'medium',
+        sticky: false,
+        switchReason: null,
+      });
+    });
+  });
+
+  describe('custom fail-closed on inactive', () => {
+    const activeTable: RoutingTable = {
+      ...table,
+      routes: {
+        'implementation/code_generation': [
+          {
+            model: 'inactive/chat',
+            accuracy: 0.95,
+            avgCostUsd: 0.001,
+            meetsThreshold: true,
+            variant: 'max',
+          },
+          {
+            model: 'active/chat',
+            accuracy: 0.85,
+            avgCostUsd: 0.002,
+            meetsThreshold: true,
+            variant: 'max',
+          },
+        ],
+      },
+    };
+
+    it('drops missing-row and isActive !== true candidates when failClosedOnInactive', () => {
+      const caps = makeCaps({
+        'inactive/chat': { inputModalities: [], isActive: false },
+        'active/chat': { inputModalities: [], isActive: true },
+      });
+      const decision = computeDecision(
+        classification,
+        activeTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { capabilityMap: caps, failClosedOnInactive: true }
+      );
+      expect(decision).toMatchObject({ model: 'active/chat', variant: 'max' });
+    });
+
+    it('returns null when every custom candidate is inactive or missing', () => {
+      const caps = makeCaps({
+        'inactive/chat': { inputModalities: [], isActive: false },
+      });
+      const decision = computeDecision(
+        classification,
+        activeTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { capabilityMap: caps, failClosedOnInactive: true }
+      );
+      expect(decision).toBeNull();
+    });
+
+    it('does not drop inactive candidates on the platform path', () => {
+      const caps = makeCaps({
+        'inactive/chat': { inputModalities: [], isActive: false },
+        'active/chat': { inputModalities: [], isActive: true },
+      });
+      const decision = computeDecision(
+        classification,
+        activeTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { capabilityMap: caps }
+      );
+      expect(decision).toMatchObject({ model: 'inactive/chat' });
     });
   });
 });

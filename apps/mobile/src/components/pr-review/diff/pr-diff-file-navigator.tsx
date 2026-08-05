@@ -79,7 +79,7 @@ export function PrDiffFileNavigator({
   const [searchVersion, setSearchVersion] = useState(0);
   const inputRef = useRef<TextInput | null>(null);
 
-  const { query, firstPageErrorState } = usePrReviewFileListQuery({
+  const { query, files, firstPageErrorState } = usePrReviewFileListQuery({
     owner,
     repo,
     number,
@@ -100,16 +100,6 @@ export function PrDiffFileNavigator({
       void runRef.current();
     }
   }, [query.isFetching, query.hasNextPage, fetchAll.isRunning, fetchAll.error]);
-
-  const files = useMemo(() => {
-    const all: PrReviewFile[] = [];
-    for (const page of query.data?.pages ?? []) {
-      for (const f of page.files) {
-        all.push(f);
-      }
-    }
-    return all;
-  }, [query.data]);
 
   const filtered = useMemo(
     () => filterFiles(files, searchRef.current),
@@ -194,7 +184,7 @@ export function PrDiffFileNavigator({
               placeholder="Filter files by path"
               placeholderTextColor={colors.mutedForeground}
               accessibilityLabel="Filter files by path"
-              className="flex-1 text-sm leading-5 text-foreground"
+              className="flex-1 text-sm leading-[normal] text-foreground"
             />
           </View>
           {[0, 1, 2, 3, 4].map(index => (
@@ -242,7 +232,7 @@ export function PrDiffFileNavigator({
             searchRef.current = value;
             setSearchVersion(version => version + 1);
           }}
-          className="flex-1 text-sm leading-5 text-foreground"
+          className="flex-1 text-sm leading-[normal] text-foreground"
           returnKeyType="search"
           autoCorrect={false}
           autoCapitalize="none"

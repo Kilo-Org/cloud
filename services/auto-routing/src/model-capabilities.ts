@@ -8,9 +8,11 @@ import { getRoutingTable } from './routing-table';
 // folded set (e.g. an `image_url` row is mapped to `image` so callers do not
 // have to know the original vocabulary). `contextLength` is the published
 // maximum input tokens, or `null` when the row is missing the column.
+// `isActive` is the model_stats soft-active flag; null when unknown/absent.
 export type ModelCapabilities = {
   inputModalities: ReadonlySet<string>;
   contextLength: number | null;
+  isActive: boolean | null;
 };
 
 // An empty Map signals "no capability data" to callers: a request carrying
@@ -46,14 +48,16 @@ function foldModalities(raw: ReadonlyArray<string> | null | undefined): Set<stri
 
 // CACHE LAYOUT
 //
-// `model_capabilities_v1` is a JSON object keyed by `openrouter_id` mapping
-// to a `{ inputModalities: string[], contextLength: number | null }` row.
+// `model_capabilities_v2` is a JSON object keyed by `openrouter_id` mapping
+// to a `{ inputModalities, contextLength, isActive }` row. Bumped from v1 so
+// the first read after deploy repopulates rows including `isActive` (old v1
+// rows lack it and would fail custom candidates closed for up to the KV TTL).
 // The 1-hour KV TTL means a brand-new routing-table candidate can be
 // fail-closed on constrained requests for up to an hour after publication;
 // this is accepted as safe because the gateway's balanced fallback remains
 // image-capable. The 60s in-memory TTL bounds the same fetch across
 // requests within a warm isolate.
-const MODEL_CAPABILITIES_KV_KEY = 'model_capabilities_v1';
+const MODEL_CAPABILITIES_KV_KEY = 'model_capabilities_v2';
 const MODEL_CAPABILITIES_IN_MEMORY_TTL_MS = 60_000;
 const MODEL_CAPABILITIES_KV_TTL_SECONDS = 3_600;
 
@@ -64,6 +68,17 @@ const MODEL_CAPABILITIES_KV_TTL_SECONDS = 3_600;
 // request budget.
 const MODEL_CAPABILITIES_LOOKUP_BUDGET_MS = 500;
 
+// Keep this in sync with the BytePlus Coding Plan default in
+// apps/web/src/lib/ai-gateway/providers/direct-byok/byteplus-coding.ts.
+// Direct BYOK models are absent from the OpenRouter model_stats sync, so this
+// narrow fallback lets the recognized Coding Plan default satisfy constraints.
+const BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID = 'byteplus-coding/bytedance-seed-code';
+const BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES: ModelCapabilities = {
+  inputModalities: new Set(['image']),
+  contextLength: 262_144,
+  isActive: true,
+};
+
 type ModelCapabilitiesEnv = Pick<
   Env,
   'AUTO_ROUTING_CONFIG' | 'HYPERDRIVE' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
@@ -71,7 +86,7 @@ type ModelCapabilitiesEnv = Pick<
 
 type ModelCapabilitiesCacheValue = Record<
   string,
-  { inputModalities: string[]; contextLength: number | null }
+  { inputModalities: string[]; contextLength: number | null; isActive: boolean | null }
 >;
 
 function isCacheValue(value: unknown): value is ModelCapabilitiesCacheValue {
@@ -79,9 +94,17 @@ function isCacheValue(value: unknown): value is ModelCapabilitiesCacheValue {
   for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
     if (typeof key !== 'string' || key.length === 0) return false;
     if (typeof entry !== 'object' || entry === null) return false;
-    const row = entry as { inputModalities?: unknown; contextLength?: unknown };
+    const row = entry as {
+      inputModalities?: unknown;
+      contextLength?: unknown;
+      isActive?: unknown;
+    };
     if (!Array.isArray(row.inputModalities)) return false;
     if (row.contextLength !== null && typeof row.contextLength !== 'number') return false;
+    // Accept boolean, null, or absent (absent → null on merge).
+    if (row.isActive !== undefined && row.isActive !== null && typeof row.isActive !== 'boolean') {
+      return false;
+    }
   }
   return true;
 }
@@ -97,6 +120,7 @@ async function queryModelCapabilities(
       openrouterId: modelStats.openrouterId,
       inputModalities: modelStats.inputModalities,
       contextLength: modelStats.contextLength,
+      isActive: modelStats.isActive,
     })
     .from(modelStats)
     .where(inArray(modelStats.openrouterId, modelIds as string[]));
@@ -106,6 +130,7 @@ async function queryModelCapabilities(
     out[row.openrouterId] = {
       inputModalities: Array.isArray(row.inputModalities) ? row.inputModalities : [],
       contextLength: typeof row.contextLength === 'number' ? row.contextLength : null,
+      isActive: typeof row.isActive === 'boolean' ? row.isActive : null,
     };
   }
   return out;
@@ -124,6 +149,7 @@ function mergeInto(
     target.set(modelId, {
       inputModalities: foldModalities(row.inputModalities),
       contextLength: row.contextLength,
+      isActive: row.isActive ?? null,
     });
   }
 }
@@ -153,7 +179,16 @@ async function loadAll(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCach
           console.warn(JSON.stringify({ event: 'kv_model_capabilities_corrupt' }));
           return null;
         }
-        return parsed;
+        // Normalize absent isActive → null so mergeInto is consistent.
+        const normalized: ModelCapabilitiesCacheValue = {};
+        for (const [id, row] of Object.entries(parsed)) {
+          normalized[id] = {
+            inputModalities: row.inputModalities,
+            contextLength: row.contextLength,
+            isActive: row.isActive ?? null,
+          };
+        }
+        return normalized;
       } catch (error) {
         console.warn(
           JSON.stringify({ event: 'kv_model_capabilities_corrupt', ...formatError(error) })
@@ -180,14 +215,16 @@ async function queryAllIds(env: ModelCapabilitiesEnv): Promise<ModelCapabilities
 }
 
 // Look up capability rows for the union of: every model in the published
-// routing table, plus the coding-plan default model id when provided. The
-// whole lookup (routing-table fetch + id derivation + in-memory check + KV
-// read + DB query) is raced against a 500ms budget; on timeout or thrown
-// error the returned Map is empty, which the caller treats as "no capability
-// data".
+// routing table, plus the coding-plan default model id when provided, plus
+// any additional model ids (custom pool entries). The whole lookup is raced
+// against a 500ms budget; on timeout or thrown error the returned Map is
+// empty, which the caller treats as "no capability data".
 export async function getModelCapabilities(
   env: ModelCapabilitiesEnv,
-  options: { codingPlanModelId?: string | null } = {}
+  options: {
+    codingPlanModelId?: string | null;
+    additionalModelIds?: ReadonlyArray<string>;
+  } = {}
 ): Promise<ModelCapabilitiesMap> {
   const load = async (): Promise<Map<string, ModelCapabilities>> => {
     // We derive the id set inside the module so the caller (decide.ts) does
@@ -208,6 +245,11 @@ export async function getModelCapabilities(
     if (options.codingPlanModelId) {
       ids.add(options.codingPlanModelId);
     }
+    if (options.additionalModelIds) {
+      for (const id of options.additionalModelIds) {
+        ids.add(id);
+      }
+    }
     const idList = Array.from(ids);
     if (idList.length === 0) {
       return new Map();
@@ -216,6 +258,12 @@ export async function getModelCapabilities(
     const result = new Map<string, ModelCapabilities>();
     const all = await cache.get(env);
     mergeInto(result, all);
+    if (
+      options.codingPlanModelId === BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID &&
+      !result.has(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID)
+    ) {
+      result.set(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID, BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES);
+    }
     // The cache stores the union of all ids ever requested; fill the
     // remainder from the DB. We don't write the partial-fill back to KV —
     // a true cache miss above already wrote the full union, and a partial

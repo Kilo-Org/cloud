@@ -1,4 +1,4 @@
-import type { MessageDeliveryState } from '@/lib/cloud-agent-sdk';
+import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
 
 export type DeliveryBadge = {
   label: 'Queued' | 'Failed to deliver';

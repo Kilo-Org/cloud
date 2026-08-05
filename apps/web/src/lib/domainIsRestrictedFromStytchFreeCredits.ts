@@ -8,6 +8,7 @@ import { count, eq } from 'drizzle-orm';
 export const domainIsRestrictedFromStytchFreeCredits = async (user: User): Promise<boolean> => {
   if (
     user.hosted_domain === hosted_domain_specials.non_workspace_google_account ||
+    user.hosted_domain === hosted_domain_specials.anaconda ||
     user.hosted_domain === hosted_domain_specials.github ||
     user.hosted_domain === hosted_domain_specials.fake_devonly
   ) {

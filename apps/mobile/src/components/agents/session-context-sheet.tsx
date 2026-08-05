@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, ChevronRight } from 'lucide-react-native';
-import { type StoredMessage } from 'cloud-agent-sdk';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
@@ -22,6 +22,7 @@ import {
 } from './context-usage-display';
 import {
   getModelsSectionCount,
+  getOlderActivityCostUsd,
   getSessionCostBreakdown,
   getVisibleSessionCostModels,
   type SessionCostBreakdown,
@@ -34,7 +35,8 @@ type SessionContextSheetProps = {
   info: SessionContextInfo;
   modelDisplay: string;
   providerDisplay: string;
-  totalCost: number;
+  totalCostMicrodollars: number | null;
+  breakdownCostUsd: number;
   messages: StoredMessage[];
   modelOptions: SessionModelOption[];
   onClose: () => void;
@@ -59,25 +61,31 @@ export function SessionContextSheet({
   info,
   modelDisplay,
   providerDisplay,
-  totalCost,
+  totalCostMicrodollars,
+  breakdownCostUsd,
   messages,
   modelOptions,
   onClose,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
-  const content = getContextSheetContent(info, totalCost);
+  const content = getContextSheetContent(info, totalCostMicrodollars);
   const tone = getContextTone(info.percentage);
   const arcFraction = getArcFraction(info.percentage);
   const breakdown = useMemo<SessionCostBreakdown>(
-    () => getSessionCostBreakdown(messages, totalCost),
-    [messages, totalCost]
+    () => getSessionCostBreakdown(messages, breakdownCostUsd),
+    [messages, breakdownCostUsd]
   );
   // Render-only filter: totals/subagent residual still use the full breakdown.
   const visibleModels = useMemo(
     () => getVisibleSessionCostModels(breakdown.models),
     [breakdown.models]
   );
-  const modelsSectionCount = getModelsSectionCount(breakdown.models, breakdown.subagentCostUsd);
+  const olderActivityCostUsd = getOlderActivityCostUsd(totalCostMicrodollars, breakdownCostUsd);
+  const modelsSectionCount = getModelsSectionCount(
+    breakdown.models,
+    breakdown.subagentCostUsd,
+    olderActivityCostUsd
+  );
 
   return (
     <Modal
@@ -147,11 +155,13 @@ export function SessionContextSheet({
               <Text className="text-base font-medium text-foreground">{providerDisplay}</Text>
             </Row>
 
-            <Row label="Total cost">
-              <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.cost}
-              </Text>
-            </Row>
+            {content.cost !== null ? (
+              <Row label="Total cost">
+                <Text className="text-base font-medium text-foreground tabular-nums">
+                  {content.cost}
+                </Text>
+              </Row>
+            ) : null}
 
             <Text className="text-xs text-muted-foreground">
               Usage reflects the latest completed assistant response.
@@ -192,6 +202,9 @@ export function SessionContextSheet({
                 ))}
                 {breakdown.subagentCostUsd > 0 ? (
                   <SubagentRow costUsd={breakdown.subagentCostUsd} />
+                ) : null}
+                {olderActivityCostUsd > 0 ? (
+                  <OlderActivityRow costUsd={olderActivityCostUsd} />
                 ) : null}
               </View>
               <Text className="mt-1 text-xs text-muted-foreground">
@@ -286,6 +299,22 @@ function SubagentRow({ costUsd }: Readonly<{ costUsd: number }>) {
       <View className="gap-0.5">
         <Text className="text-sm font-medium text-foreground">Subagents</Text>
         <Text className="text-xs text-muted-foreground">Residual cost from child sessions</Text>
+      </View>
+      <Text className="text-sm font-medium text-foreground tabular-nums">
+        {formatCost(costUsd)}
+      </Text>
+    </View>
+  );
+}
+
+function OlderActivityRow({ costUsd }: Readonly<{ costUsd: number }>) {
+  return (
+    <View className="flex-row items-center justify-between rounded-md border border-border px-3 py-3">
+      <View className="gap-0.5">
+        <Text className="text-sm font-medium text-foreground">Older activity</Text>
+        <Text className="text-xs text-muted-foreground">
+          Cost not attributed to the loaded history
+        </Text>
       </View>
       <Text className="text-sm font-medium text-foreground tabular-nums">
         {formatCost(costUsd)}

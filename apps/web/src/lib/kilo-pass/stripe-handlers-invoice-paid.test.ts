@@ -33,6 +33,22 @@ import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';
 import { randomUUID } from 'node:crypto';
 import { digestCardFingerprint } from '@/lib/kilo-pass/card-fingerprint-gate';
 
+jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
+  runAfterResponse: async (work: () => Promise<void>) => {
+    await work();
+  },
+  trackKiloPassPurchaseCompleted: jest.fn(),
+}));
+
+type PosthogTrackingMock = {
+  trackKiloPassPurchaseCompleted: jest.Mock;
+  runAfterResponse: (work: () => Promise<void>) => Promise<void>;
+};
+
+function getPosthogTrackingMock(): PosthogTrackingMock {
+  return jest.requireMock('@/lib/kilo-pass/posthog-tracking') as PosthogTrackingMock;
+}
+
 function ensureKiloPassStripePriceIdEnv(): void {
   // These env vars are required at module-load time by [`getKnownStripePriceIdsForKiloPass()`](src/lib/kilo-pass/stripe-price-ids.server.ts:24).
   // If the host env already provides them, don't overwrite.
@@ -105,6 +121,7 @@ function makeStripeInvoice(params: {
     amount_paid: params.amount_paid_cents,
     billing_reason: params.billingReason ?? null,
     currency: params.currency ?? 'usd',
+    livemode: false,
     period_start: params.period_start_seconds,
     created: params.created_seconds,
     status_transitions:
@@ -333,10 +350,412 @@ function makeInvoicesListMock(params: {
 
 beforeEach(async () => {
   ensureKiloPassStripePriceIdEnv();
+  getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockClear();
   await cleanupDbForTest();
 });
 
 describe('handleKiloPassInvoicePaid', () => {
+  describe('kilo_pass_purchase_completed tracking', () => {
+    test('first invoice.paid emits one track call with stripe properties', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_track_first_${Math.random()}`;
+      const invoiceId = `inv_track_first_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_735_689_600,
+        metadata: meta,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_first_${Math.random()}`,
+        invoice: makeStripeInvoice({
+          id: invoiceId,
+          amount_paid_cents: 1900,
+          created_seconds: 1_735_689_600,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+          billingReason: 'subscription_create',
+        }),
+        stripe: {
+          subscriptions: { retrieve: jest.fn(async () => subscription) },
+        } as unknown as Stripe,
+      });
+
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith({
+        channel: 'stripe',
+        distinctId: user.google_user_email,
+        userId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        purchaseKind: 'initial',
+        stripeInvoiceId: invoiceId,
+        amountPaidUsd: 19,
+        currency: 'usd',
+        livemode: false,
+      });
+    });
+
+    test('sequentially redelivered webhook does not track again', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_track_redeliver_${Math.random()}`;
+      const invoiceId = `inv_track_redeliver_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_735_689_600,
+        metadata: meta,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const invoice = makeStripeInvoice({
+        id: invoiceId,
+        amount_paid_cents: 1900,
+        created_seconds: 1_735_689_600,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+        billingReason: 'subscription_create',
+      });
+      const stripe = {
+        subscriptions: { retrieve: jest.fn(async () => subscription) },
+      } as unknown as Stripe;
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_redeliver_a_${Math.random()}`,
+        invoice,
+        stripe,
+      });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+
+      trackingMock.trackKiloPassPurchaseCompleted.mockClear();
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_redeliver_b_${Math.random()}`,
+        invoice,
+        stripe,
+      });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(0);
+    });
+
+    test('second paid invoice in the same issue month still emits once', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_track_same_month_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_735_689_600,
+        metadata: meta,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const stripe = {
+        subscriptions: { retrieve: jest.fn(async () => subscription) },
+      } as unknown as Stripe;
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_same_month_a_${Math.random()}`,
+        invoice: makeStripeInvoice({
+          id: `inv_track_same_month_a_${Math.random()}`,
+          amount_paid_cents: 1900,
+          created_seconds: 1_735_689_600,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+          billingReason: 'subscription_create',
+        }),
+        stripe,
+      });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+
+      trackingMock.trackKiloPassPurchaseCompleted.mockClear();
+      const secondInvoiceId = `inv_track_same_month_b_${Math.random()}`;
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_same_month_b_${Math.random()}`,
+        invoice: makeStripeInvoice({
+          id: secondInvoiceId,
+          amount_paid_cents: 3000,
+          created_seconds: 1_735_689_600,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+          billingReason: 'subscription_update',
+        }),
+        stripe,
+      });
+
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stripeInvoiceId: secondInvoiceId,
+          purchaseKind: 'upgrade',
+          amountPaidUsd: 30,
+        })
+      );
+    });
+
+    test('$0 invoice still emits once', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_track_zero_${Math.random()}`;
+      const invoiceId = `inv_track_zero_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_735_689_600,
+        metadata: meta,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_zero_${Math.random()}`,
+        invoice: makeStripeInvoice({
+          id: invoiceId,
+          amount_paid_cents: 0,
+          created_seconds: 1_735_689_600,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+          billingReason: 'subscription_create',
+        }),
+        stripe: {
+          subscriptions: { retrieve: jest.fn(async () => subscription) },
+        } as unknown as Stripe,
+      });
+
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stripeInvoiceId: invoiceId,
+          amountPaidUsd: 0,
+          purchaseKind: 'initial',
+        })
+      );
+    });
+
+    test('blocked duplicate-card purchase does not track', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const firstClaimant = await insertTestUser();
+      const fingerprint = `fp_track_blocked_${Math.random()}`;
+      const winnerSubId = `sub_track_winner_${Math.random()}`;
+      const winnerInvoiceId = `in_track_winner_${Math.random()}`;
+      const [firstClaimantSubscription] = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: firstClaimant.id,
+          payment_provider: KiloPassPaymentProvider.Stripe,
+          provider_subscription_id: winnerSubId,
+          stripe_subscription_id: winnerSubId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+        })
+        .returning({ id: kilo_pass_subscriptions.id });
+      await db.insert(kilo_pass_issuances).values({
+        kilo_pass_subscription_id: firstClaimantSubscription.id,
+        issue_month: '2026-06-01',
+        source: KiloPassIssuanceSource.StripeInvoice,
+        stripe_invoice_id: winnerInvoiceId,
+      });
+      await db.insert(kilo_pass_welcome_promo_payment_fingerprint_claims).values({
+        stripe_payment_method_type: KiloPassWelcomePromoPaymentFingerprintType.Card,
+        stripe_fingerprint: fingerprint,
+        source_stripe_invoice_id: winnerInvoiceId,
+      });
+
+      const stripeSubscriptionId = `sub_track_blocked_${Math.random()}`;
+      const stripeInvoiceId = `in_track_blocked_${Math.random()}`;
+      const metadata = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_blocked_${Math.random()}`,
+        invoice: makeStripeInvoice({
+          id: stripeInvoiceId,
+          amount_paid_cents: 1900,
+          created_seconds: 1_780_272_000,
+          paid_seconds: 1_780_272_000,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubscriptionId,
+          metadata,
+          invoicePaymentId: `inpay_track_blocked_${Math.random()}`,
+          invoicePayment: {
+            type: 'charge',
+            charge: makeFingerprintCharge(`ch_track_blocked_${Math.random()}`, 'card', fingerprint),
+          },
+          billingReason: 'subscription_create',
+        }),
+        stripe: {
+          subscriptions: {
+            retrieve: jest.fn(async () =>
+              makeStripeSubscription({
+                id: stripeSubscriptionId,
+                start_date_seconds: 1_780_272_000,
+                metadata,
+              })
+            ),
+            cancel: jest.fn(async () => ({ id: stripeSubscriptionId })),
+          },
+          refunds: { create: jest.fn(async () => ({ id: 're_track_blocked' })) },
+        } as unknown as Stripe,
+      });
+
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(0);
+    });
+
+    test('billing_reason subscription_create with pre-existing subscription row maps to initial', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_track_preexist_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      await db.insert(kilo_pass_subscriptions).values({
+        kilo_user_id: user.id,
+        payment_provider: KiloPassPaymentProvider.Stripe,
+        provider_subscription_id: stripeSubId,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        started_at: '2026-01-01T00:00:00.000Z',
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_735_689_600,
+        metadata: meta,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_preexist_${Math.random()}`,
+        invoice: makeStripeInvoice({
+          id: `inv_track_preexist_${Math.random()}`,
+          amount_paid_cents: 1900,
+          created_seconds: 1_735_689_600,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+          billingReason: 'subscription_create',
+        }),
+        stripe: {
+          subscriptions: { retrieve: jest.fn(async () => subscription) },
+        } as unknown as Stripe,
+      });
+
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({ purchaseKind: 'initial' })
+      );
+    });
+
+    test('null billing_reason maps to unknown and still emits', async () => {
+      const trackingMock = getPosthogTrackingMock();
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_track_unknown_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_735_689_600,
+        metadata: meta,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_track_unknown_${Math.random()}`,
+        invoice: makeStripeInvoice({
+          id: `inv_track_unknown_${Math.random()}`,
+          amount_paid_cents: 1900,
+          created_seconds: 1_735_689_600,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+          billingReason: null,
+        }),
+        stripe: {
+          subscriptions: { retrieve: jest.fn(async () => subscription) },
+        } as unknown as Stripe,
+      });
+
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({ purchaseKind: 'unknown' })
+      );
+    });
+  });
+
   test('returns early when invoice does not look like Kilo Pass (no DB side effects)', async () => {
     const { handleKiloPassInvoicePaid } =
       await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');

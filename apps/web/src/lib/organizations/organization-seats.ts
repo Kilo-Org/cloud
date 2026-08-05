@@ -35,6 +35,7 @@ import {
 } from '@/lib/organizations/organization-types';
 import { client as stripeClient } from '@/lib/stripe-client';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
+import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 
@@ -358,6 +359,7 @@ async function handleSubscriptionEventInternal(
 
     const plan = getPlanTypeFromSubscription(subscription);
     if (plan !== null) {
+      await bumpOrganizationGroupPolicyRevision(tx, meta.organizationId, meta.kiloUserId);
       await tx.update(organizations).set({ plan }).where(eq(organizations.id, meta.organizationId));
     }
 

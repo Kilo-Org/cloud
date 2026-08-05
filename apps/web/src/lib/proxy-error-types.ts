@@ -11,7 +11,7 @@ export const proxyErrorTypeSchema = z.enum([
   'byok_error',
   'context_length_exceeded',
   'model_not_allowed',
-  'discontinued_free_model',
+  'unavailable_model',
   'model_not_found',
   'unsupported_field',
   'authentication_required',
@@ -29,6 +29,7 @@ export const proxyErrorTypeSchema = z.enum([
   'abuse_blocked',
   'organization_auto_configuration',
   'upstream_disconnect',
+  'client_disconnect',
 ]);
 
 export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;

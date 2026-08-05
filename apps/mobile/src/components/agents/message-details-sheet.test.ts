@@ -6,7 +6,7 @@ import {
   type StepFinishPart,
   type StoredMessage,
   type UserMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -131,6 +131,10 @@ describe('formatMessageSentTime', () => {
     expect(formatMessageSentTime(0)).toBeNull();
     expect(formatMessageSentTime(Number.NaN)).toBeNull();
     expect(formatMessageSentTime(-1)).toBeNull();
+  });
+
+  it('returns null for an out-of-range finite epoch without throwing', () => {
+    expect(formatMessageSentTime(Number.MAX_VALUE)).toBeNull();
   });
 });
 

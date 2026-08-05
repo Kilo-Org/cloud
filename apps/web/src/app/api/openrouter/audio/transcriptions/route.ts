@@ -15,6 +15,7 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
+  modelNotAllowedResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -30,8 +31,9 @@ import {
   TranscriptionRequestSchema,
 } from '@/lib/ai-gateway/transcriptions/transcription-request';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
@@ -180,7 +182,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
   if (modelRestrictionError) return modelRestrictionError;
 
-  if (providerConfig) {
+  if (organizationId) {
+    const { decision } = await resolveOrganizationMemberModelDecision({
+      organizationId,
+      kiloUserId: user.id,
+      modelId: requestedModelLowerCased,
+    });
+    if (!decision.allowed) return modelNotAllowedResponse();
+    if (decision.eligibleProviderRoutes) {
+      const currentOnly = providerConfig?.only;
+      const only = currentOnly
+        ? currentOnly.filter(route => decision.eligibleProviderRoutes?.has(route))
+        : [...decision.eligibleProviderRoutes];
+      if (only.length === 0) return modelNotAllowedResponse();
+      body.provider = { ...body.provider, ...providerConfig, only };
+    } else if (providerConfig) {
+      body.provider = { ...body.provider, ...providerConfig };
+    }
+  } else if (providerConfig) {
     body.provider = { ...body.provider, ...providerConfig };
   }
 

@@ -29,7 +29,10 @@ import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
-import { CodeReviewCouncilConfigSchema } from '@kilocode/db/schema-types';
+import {
+  CodeReviewCouncilConfigSchema,
+  type CodeReviewCouncilConfig,
+} from '@kilocode/db/schema-types';
 import { isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
@@ -44,6 +47,7 @@ import {
   getCodeReviewActionRequiredState,
 } from '@/lib/code-reviews/action-required';
 import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
+import { randomBytes } from 'node:crypto';
 import {
   createManualCodeReviewJob,
   ManualCodeReviewJobInputSchema,
@@ -59,6 +63,11 @@ import {
   ManualBitbucketCodeReviewTriggerError,
   triggerManualBitbucketCodeReview,
 } from '@/lib/integrations/platforms/bitbucket/manual-code-review-trigger';
+import {
+  applyCodeReviewConfigPatch,
+  type CodeReviewFieldMergePatch,
+  type CodeReviewStoredConfig,
+} from '@kilocode/app-shared/code-review';
 
 const PlatformSchema = z.enum(['github', 'gitlab', 'bitbucket']).default('github');
 
@@ -133,6 +142,8 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  // Feature-level guardrail: skip automated reviews of bot-authored PRs. Defaults to true.
+  skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // Org-level council config (specialists + governance), shared by every council-enabled repo.
   // `null`/absent leaves council unset. Persisted only for entitled orgs (checked in the handler).
@@ -141,6 +152,40 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   councilEnabledRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
   // GitLab-specific: auto-configure webhooks
   autoConfigureWebhooks: z.boolean().optional().default(true),
+});
+
+// Field-merge PATCH schema for organization review agent configurations.
+// Strict subset of SaveReviewConfigInputSchema: every field is optional
+// (omission = preserve stored value), no defaults, no Bitbucket-cache
+// validation. Reuses the same per-field bounds as the full save so a
+// partial update can't smuggle in values the full save would reject.
+const PatchReviewConfigInputSchema = OrganizationIdInputSchema.extend({
+  platform: PlatformSchema,
+  reviewStyle: z.enum(['strict', 'balanced', 'lenient', 'roast']).optional(),
+  focusAreas: z.array(z.string()).optional(),
+  customInstructions: z.string().optional(),
+  modelSlug: z.string().optional(),
+  thinkingEffort: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .nullable()
+    .optional(),
+  repositorySelectionMode: z.enum(['all', 'selected']).optional(),
+  selectedRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
+  manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
+  repositoryModelOverrides: z
+    .array(RepositoryModelOverrideInputSchema)
+    .max(MAX_REPOSITORY_MODEL_OVERRIDES)
+    .superRefine(rejectDuplicateRepositoryModelOverrides)
+    .optional(),
+  disableReviewMd: z.boolean().optional(),
+  gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  council: CodeReviewCouncilConfigSchema.nullable().optional(),
+  councilEnabledRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
+  // GitLab-specific: only consulted when `selectedRepositoryIds` is also
+  // present in the patch.
+  autoConfigureWebhooks: z.boolean().optional(),
 });
 
 const CreateManualReviewJobInputSchema = OrganizationIdInputSchema.extend(
@@ -438,9 +483,12 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       };
     }
 
-    // Extract webhook secret from metadata for display
+    // NOTE: The webhook secret is intentionally NOT returned here. The
+    // previous shape leaked it to every org member. The secret is now
+    // surfaced only via the billing-gated `rotateGitLabWebhookSecret`
+    // mutation (returned once, on demand) and the manual webhook setup
+    // instructions in the UI. See P1-D-32.
     const metadata = integration.metadata as Record<string, unknown> | null;
-    const webhookSecret = metadata?.webhook_secret as string | undefined;
 
     return {
       connected: true,
@@ -449,7 +497,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
         isValid: true,
-        webhookSecret, // Include webhook secret for user to configure in GitLab
         instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
       },
     };
@@ -499,6 +546,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           council: null,
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
+          skipBotPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
         };
@@ -539,6 +587,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: isBitbucket ? true : (cfg.disable_review_md ?? true),
+        skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
         council: cfg.council ?? null,
         councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
         reviewMemoryEnabled: isBitbucket ? false : getReviewMemoryEnabledFromConfig(config.config),
@@ -632,6 +681,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council,
             council_enabled_repository_ids: input.councilEnabledRepositoryIds ?? [],
             disable_review_md: isBitbucket ? true : (input.disableReviewMd ?? true),
+            skip_bot_pull_requests: input.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },
@@ -743,6 +793,307 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to save review configuration',
+        });
+      }
+    }),
+
+  /**
+   * Field-merge PATCH for the organization's review agent configuration.
+   *
+   * Unlike `saveReviewConfig` (full-document overwrite), this procedure READS
+   * the current stored config and applies ONLY the fields present in the
+   * patch — every unlisted field is preserved verbatim. Designed for the
+   * mobile app, which edits one or two settings at a time and must not
+   * clobber `council`, `councilEnabledRepositoryIds`, `manuallyAddedRepositories`,
+   * `repositoryModelOverrides`, or feature flags the mobile UI doesn't surface.
+   *
+   * Platform forcing from the full save is re-applied post-merge:
+   *   - GitLab forces `repository_selection_mode = 'selected'`
+   *   - Bitbucket forces 'selected' + `gate_threshold = 'off'` +
+   *     `disable_review_md = true` + `manually_added_repositories = []`
+   * The PATCH intentionally does NOT re-validate Bitbucket selections
+   * against the workspace cache (that's a save-level concern handled by
+   * the full save) and does NOT ensure the Bitbucket workspace webhook
+   * (also save-level). Callers that change `selectedRepositoryIds` for
+   * Bitbucket via PATCH are expected to have already saved a valid
+   * configuration.
+   *
+   * GitLab webhook sync runs ONLY when `selectedRepositoryIds` is present
+   * in the patch, so an unrelated edit (e.g. `focusAreas` only) never
+   * touches integration metadata.
+   *
+   * The council entitlement gate (`isCouncilActive + isCouncilEntitledForOrganization`)
+   * fires ONLY when the patch actually carries a `council` key. An omitted
+   * council must not re-trigger the gate, matching the full-save
+   * `council ?? undefined` behavior — a non-entitled org can keep its
+   * existing council config untouched.
+   *
+   * Throws `NOT_FOUND` if no stored config exists — a PATCH cannot
+   * bootstrap a row (use `saveReviewConfig` for that).
+   */
+  patchReviewConfig: organizationBillingMutationProcedure
+    .input(PatchReviewConfigInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const platform = input.platform;
+        const isBitbucket = platform === PLATFORM.BITBUCKET;
+        const isGitLab = platform === PLATFORM.GITLAB;
+
+        const previousConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
+        if (!previousConfig) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message:
+              'No existing review agent configuration to patch. Save one with saveReviewConfig first.',
+          });
+        }
+        const previousRepoIds =
+          ((previousConfig.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids as
+            | Array<number | string>
+            | undefined) || [];
+
+        const prevCfg = previousConfig.config as CodeReviewAgentConfig;
+        const stored: CodeReviewStoredConfig = {
+          reviewStyle: prevCfg.review_style || 'balanced',
+          focusAreas: prevCfg.focus_areas || [],
+          customInstructions: prevCfg.custom_instructions ?? null,
+          modelSlug: prevCfg.model_slug || PRIMARY_DEFAULT_MODEL,
+          thinkingEffort: prevCfg.thinking_effort ?? null,
+          gateThreshold: isBitbucket ? 'off' : (prevCfg.gate_threshold ?? 'off'),
+          repositorySelectionMode: isBitbucket
+            ? 'selected'
+            : prevCfg.repository_selection_mode || 'all',
+          selectedRepositoryIds: prevCfg.selected_repository_ids ?? [],
+          repositoryModelOverrides: (prevCfg.repository_model_overrides ?? []).map(o => ({
+            repositoryId: o.repository_id,
+            repoFullName: o.repo_full_name,
+            modelSlug: o.model_slug,
+            thinkingEffort: o.thinking_effort ?? null,
+          })),
+          disableReviewMd: isBitbucket ? true : (prevCfg.disable_review_md ?? true),
+          manuallyAddedRepositories: isBitbucket ? [] : prevCfg.manually_added_repositories || [],
+          // Council is org-only and Bitbucket never carries one; preserve as-is
+          // otherwise. The patch input accepts `null` to clear and an object
+          // to replace — both are handled by the merge helper.
+          council: isBitbucket
+            ? null
+            : ((prevCfg.council ?? null) as CodeReviewCouncilConfig | null),
+          councilEnabledRepositoryIds: isBitbucket
+            ? []
+            : (prevCfg.council_enabled_repository_ids ?? []),
+        };
+
+        // Field-merge: every key absent from `input` is preserved from
+        // `stored`. `null` is an explicit "clear" (e.g. `council: null`).
+        const { organizationId: _orgId, platform: _platform, ...rest } = input;
+        const patch: CodeReviewFieldMergePatch = rest;
+        const merged = applyCodeReviewConfigPatch(stored, patch);
+
+        // Council entitlement gate: ONLY when the patch actually carries a
+        // `council` key. An omitted council must not re-trigger the gate —
+        // a non-entitled org keeps its existing (un)set council untouched.
+        // `Object.prototype.hasOwnProperty` distinguishes a real patch key
+        // (including `null`) from a missing one, which `Object.keys` already
+        // filters but we re-check explicitly for the gate decision.
+        if (
+          Object.prototype.hasOwnProperty.call(patch, 'council') &&
+          patch.council &&
+          isCouncilActive(patch.council as CodeReviewCouncilConfig | null)
+        ) {
+          const entitled = await isCouncilEntitledForOrganization(input.organizationId);
+          if (!entitled) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Council review requires an enterprise plan with an active subscription.',
+            });
+          }
+        }
+
+        // Re-apply platform forcing post-merge. Mirrors the full save
+        // exactly so a save→patch round-trip preserves the same invariant:
+        //   - GitLab: 'selected' only
+        //   - Bitbucket: 'selected' + gateThreshold='off' +
+        //     disableReviewMd=true + manuallyAddedRepositories=[]
+        // repositoryModelOverrides are pruned to the platform's id type, same
+        // as the full save.
+        const repositorySelectionMode: 'all' | 'selected' =
+          isBitbucket || isGitLab ? 'selected' : (merged.repositorySelectionMode ?? 'all');
+        const gateThreshold: 'off' | 'all' | 'warning' | 'critical' = isBitbucket
+          ? 'off'
+          : (merged.gateThreshold ?? 'off');
+        const disableReviewMd = isBitbucket ? true : (merged.disableReviewMd ?? true);
+        const manuallyAddedRepositories: typeof merged.manuallyAddedRepositories = isBitbucket
+          ? []
+          : (merged.manuallyAddedRepositories ?? []);
+        // `merged.council` is statically typed as the loose shared-helper
+        // shape (`CodeReviewCouncilConfigInput | null | undefined`). At
+        // runtime it is always the canonical `CodeReviewCouncilConfig` —
+        // the stored config is validated by `CodeReviewAgentConfigSchema`
+        // on read, and the patch input is validated by
+        // `CodeReviewCouncilConfigSchema` at the route boundary, so the
+        // merge helper can only ever produce the strict shape. Cast to
+        // satisfy `upsertAgentConfig`'s strict config type.
+        const council = isBitbucket
+          ? undefined
+          : Object.prototype.hasOwnProperty.call(patch, 'council')
+            ? ((patch.council as CodeReviewCouncilConfig | null) ?? undefined)
+            : ((merged.council as CodeReviewCouncilConfig | null | undefined) ?? undefined);
+        const councilEnabledRepositoryIds: Array<number | string> = isBitbucket
+          ? []
+          : (merged.councilEnabledRepositoryIds ?? []);
+
+        const repositoryModelOverrides: RepositoryModelOverride[] = (
+          merged.repositoryModelOverrides ?? []
+        )
+          .filter(override =>
+            isBitbucket
+              ? typeof override.repositoryId === 'string'
+              : typeof override.repositoryId === 'number'
+          )
+          .map(override => ({
+            repository_id: override.repositoryId,
+            repo_full_name: override.repoFullName,
+            model_slug: override.modelSlug,
+            thinking_effort: override.thinkingEffort ?? null,
+          }));
+
+        await upsertAgentConfig({
+          organizationId: input.organizationId,
+          agentType: 'code_review',
+          platform,
+          config: {
+            review_style: merged.reviewStyle ?? 'balanced',
+            focus_areas: merged.focusAreas ?? [],
+            custom_instructions: merged.customInstructions ?? null,
+            model_slug: merged.modelSlug ?? PRIMARY_DEFAULT_MODEL,
+            thinking_effort: merged.thinkingEffort ?? null,
+            gate_threshold: gateThreshold,
+            repository_selection_mode: repositorySelectionMode,
+            selected_repository_ids: (merged.selectedRepositoryIds ?? []) as Array<number | string>,
+            manually_added_repositories: manuallyAddedRepositories,
+            repository_model_overrides: repositoryModelOverrides,
+            council,
+            council_enabled_repository_ids: councilEnabledRepositoryIds,
+            disable_review_md: disableReviewMd,
+            // The patch schema never carries `skipBotPullRequests` (a
+            // web-only setting from the full save). Pass the stored value
+            // through so a mobile PATCH can't silently reset it to the
+            // default — same field-merge contract as every other omitted
+            // field.
+            skip_bot_pull_requests: prevCfg.skip_bot_pull_requests ?? true,
+            review_memory_enabled: false,
+            review_analytics_enabled: false,
+          },
+          preserveCodeReviewFeatureSettings: !isBitbucket,
+          createdBy: ctx.user.id,
+        });
+
+        // GitLab webhook sync runs ONLY when the patch actually carries
+        // `selectedRepositoryIds`. A patch that doesn't touch selection
+        // (e.g. mobile updating `focusAreas`) must not mutate integration
+        // metadata. Auto-configure is honored when present, defaulting to
+        // true to match the full-save default.
+        let webhookSyncResult = null;
+        if (
+          isGitLab &&
+          input.selectedRepositoryIds !== undefined &&
+          (input.autoConfigureWebhooks ?? true) &&
+          repositorySelectionMode === 'selected'
+        ) {
+          const integration = await getIntegrationForOrganization(
+            input.organizationId,
+            PLATFORM.GITLAB
+          );
+          if (integration) {
+            const metadata = integration.metadata as Record<string, unknown> | null;
+            const webhookSecret = metadata?.webhook_secret as string | undefined;
+            const instanceUrl =
+              (metadata?.gitlab_instance_url as string | undefined) || 'https://gitlab.com';
+            const configuredWebhooks =
+              (metadata?.configured_webhooks as Record<string, ConfiguredWebhook>) || {};
+
+            if (webhookSecret) {
+              try {
+                const accessToken = await getValidGitLabToken(integration, {
+                  userId: ctx.user.id,
+                  organizationId: input.organizationId,
+                });
+
+                const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
+                  (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+                );
+                const previousSelectedRepositoryIds = previousRepoIds.filter(
+                  (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+                );
+                const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+                  accessToken,
+                  webhookSecret,
+                  selectedRepositoryIds,
+                  previousSelectedRepositoryIds,
+                  configuredWebhooks,
+                  instanceUrl
+                );
+
+                const existingMetadata = (integration.metadata as Record<string, unknown>) || {};
+                await updateIntegrationMetadata(integration.id, {
+                  ...existingMetadata,
+                  configured_webhooks: updatedWebhooks,
+                });
+
+                webhookSyncResult = {
+                  created: result.created.length,
+                  updated: result.updated.length,
+                  deleted: result.deleted.length,
+                  errors: result.errors,
+                };
+
+                logExceptInTest(
+                  '[patchReviewConfig] Webhook sync completed for organization',
+                  webhookSyncResult
+                );
+              } catch (webhookError) {
+                logExceptInTest('[patchReviewConfig] Webhook sync failed for organization', {
+                  error:
+                    webhookError instanceof Error ? webhookError.message : String(webhookError),
+                });
+                webhookSyncResult = {
+                  created: 0,
+                  updated: 0,
+                  deleted: 0,
+                  errors: [
+                    {
+                      projectId: 0,
+                      error: webhookError instanceof Error ? webhookError.message : 'Unknown error',
+                      operation: 'sync' as const,
+                    },
+                  ],
+                };
+              }
+            }
+          }
+        }
+
+        // Audit log identifies this as a PATCH action so reviewers can tell
+        // it apart from the full-save audit message.
+        await createAuditLog({
+          organization_id: input.organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: `Patched Review Agent configuration for ${platform} (style: ${merged.reviewStyle ?? 'unknown'})${webhookSyncResult ? `, webhooks: ${webhookSyncResult.created} created, ${webhookSyncResult.deleted} deleted` : ''}`,
+        });
+
+        return {
+          success: true,
+          webhookSync: webhookSyncResult,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('Error patching review config:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to patch review configuration',
         });
       }
     }),
@@ -894,5 +1245,157 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           message: 'Failed to toggle review agent',
         });
       }
+    }),
+
+  /**
+   * Rotate the GitLab webhook secret for the org integration and re-sync
+   * the Kilo-managed webhooks so they keep validating with the new secret.
+   *
+   * Admin-gated (owner or billing_manager) — the previous shape leaked the
+   * secret to every org member via `getGitLabStatus`. The new secret is
+   * returned ONCE, only to the caller, for manual reconfiguration. When
+   * Kilo-managed webhooks exist they are all UPDATED in place (the
+   * `previous = []` trick makes every currently-configured repo an
+   * "added" repo, which the sync helper handles as an update of the
+   * existing webhook). When no webhooks are configured (manual-only
+   * setup) the sync is skipped and the secret is still returned once.
+   *
+   * Scope is per-org: only this integration's metadata is touched. See
+   * P1-D-32.
+   */
+  rotateGitLabWebhookSecret: organizationBillingMutationProcedure
+    .input(OrganizationIdInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const organizationId = input.organizationId;
+      const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
+
+      if (!integration) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'GitLab integration not found for this organization',
+        });
+      }
+
+      const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
+      const configuredWebhooks =
+        (existingMetadata.configured_webhooks as Record<string, ConfiguredWebhook> | undefined) ??
+        {};
+      const instanceUrl =
+        (existingMetadata.gitlab_instance_url as string | undefined) || 'https://gitlab.com';
+
+      // Persist a brand-new secret. We generate it here (rather than via
+      // gitlab-service.regenerateWebhookSecret) so the re-sync and the
+      // metadata write happen against a single secret in a single
+      // operation. Never log the secret or the full metadata.
+      const newSecret = randomBytes(32).toString('hex');
+
+      // If no Kilo-managed webhooks are configured, skip the network
+      // round-trip entirely and just persist + return the new secret.
+      if (Object.keys(configuredWebhooks).length === 0) {
+        await updateIntegrationMetadata(integration.id, {
+          ...existingMetadata,
+          webhook_secret: newSecret,
+        });
+        await createAuditLog({
+          organization_id: organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
+        });
+        return {
+          webhookSecret: newSecret,
+          webhookSync: {
+            created: 0,
+            updated: 0,
+            deleted: 0,
+            errors: [] as Array<{ projectId: number; error: string; operation: string }>,
+          },
+          configuredWebhookCount: 0,
+        };
+      }
+
+      let webhookSyncResult: {
+        created: number;
+        updated: number;
+        deleted: number;
+        errors: Array<{ projectId: number; error: string; operation: string }>;
+      } = { created: 0, updated: 0, deleted: 0, errors: [] };
+      let updatedWebhooks: Record<string, ConfiguredWebhook> = configuredWebhooks;
+
+      try {
+        const accessToken = await getValidGitLabToken(integration, {
+          userId: ctx.user.id,
+          organizationId,
+        });
+        const configuredRepoIds = Object.keys(configuredWebhooks)
+          .map(id => Number.parseInt(id, 10))
+          .filter(id => Number.isFinite(id));
+
+        // Pass `previous = []` so the sync helper treats every currently
+        // configured repo as newly added and UPDATES its existing Kilo
+        // webhook in place with the new secret — nothing is deleted.
+        const syncOutcome = await syncWebhooksForRepositories(
+          accessToken,
+          newSecret,
+          configuredRepoIds,
+          [],
+          configuredWebhooks,
+          instanceUrl
+        );
+        updatedWebhooks = syncOutcome.updatedWebhooks;
+        webhookSyncResult = {
+          created: syncOutcome.result.created.length,
+          updated: syncOutcome.result.updated.length,
+          deleted: syncOutcome.result.deleted.length,
+          errors: syncOutcome.result.errors,
+        };
+        logExceptInTest('[rotateGitLabWebhookSecret] Webhook re-sync completed for organization', {
+          created: webhookSyncResult.created,
+          updated: webhookSyncResult.updated,
+          deleted: webhookSyncResult.deleted,
+          errorCount: webhookSyncResult.errors.length,
+        });
+      } catch (webhookError) {
+        // Re-sync failure MUST NOT lose the new secret: persist it
+        // anyway so the operator can recover via manual reconfiguration.
+        logExceptInTest('[rotateGitLabWebhookSecret] Webhook re-sync failed for organization', {
+          error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+        });
+        webhookSyncResult = {
+          created: 0,
+          updated: 0,
+          deleted: 0,
+          errors: [
+            {
+              projectId: 0,
+              error: webhookError instanceof Error ? webhookError.message : 'Unknown error',
+              operation: 'sync' as const,
+            },
+          ],
+        };
+      }
+
+      await updateIntegrationMetadata(integration.id, {
+        ...existingMetadata,
+        webhook_secret: newSecret,
+        configured_webhooks: updatedWebhooks,
+      });
+
+      await createAuditLog({
+        organization_id: organizationId,
+        action: 'organization.settings.change',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
+      });
+
+      return {
+        webhookSecret: newSecret,
+        webhookSync: webhookSyncResult,
+        configuredWebhookCount: Object.keys(updatedWebhooks).length,
+      };
     }),
 });

@@ -4,7 +4,12 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mockKiloApi } from './kilo-api-fixture';
+import {
+  dangerousToolNames,
+  mockKiloApi,
+  safeToolNames,
+  workflowToolNames,
+} from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -55,13 +60,7 @@ test('safe mode conversation reads the selected tab with safe tools', async () =
           ],
         },
       ],
-      toolNames: [
-        'get_page_snapshot',
-        'get_element_details',
-        'find_in_page',
-        'search_memories',
-        'get_memory',
-      ],
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -127,13 +126,7 @@ test('safe mode conversation completes a tool call streamed with empty arguments
           ],
         },
       ],
-      toolNames: [
-        'get_page_snapshot',
-        'get_element_details',
-        'find_in_page',
-        'search_memories',
-        'get_memory',
-      ],
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -209,6 +202,7 @@ test('viewport screenshot tool output expands to a captured image preview', asyn
         'search_memories',
         'get_memory',
         'get_viewport_screenshot',
+        ...workflowToolNames,
       ],
     });
 
@@ -293,6 +287,7 @@ test('safe mode can capture a viewport screenshot from a local image file tab', 
         'search_memories',
         'get_memory',
         'get_viewport_screenshot',
+        ...workflowToolNames,
       ],
     });
 
@@ -356,6 +351,7 @@ test('dangerous mode conversation can use safe read tools', async () => {
           ],
         },
       ],
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();

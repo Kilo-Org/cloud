@@ -1,5 +1,7 @@
 export const AGENT_ATTACHMENT_MAX_FILES = 5;
-export const AGENT_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+export const AGENT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+/** Maximum UTF-8 byte count for a sanitized filename emitted by sanitizeAttachmentFilename. */
+export const AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH = 255;
 
 /**
  * Extensions that are NEVER allowed regardless of the picker's reported MIME

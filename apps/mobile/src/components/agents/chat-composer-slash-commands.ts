@@ -1,5 +1,5 @@
-import { type ActiveSessionType, type SlashCommandInfo } from 'cloud-agent-sdk';
-import { type RemoteCommandState } from 'cloud-agent-sdk/remote-command-catalog';
+import { type ActiveSessionType, type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 
 /**
  * Local reserved /new command — surfaced only for remote sessions, never
@@ -19,9 +19,28 @@ export const LOCAL_EXIT_SLASH_COMMAND: SlashCommandInfo = {
   hints: [],
 };
 
+/**
+ * Local reserved /clear command — closes the current remote session and
+ * opens a new one on the same screen. Capability-gated: the CLI must report
+ * `canExitSession === true` because /clear needs both create_session and
+ * exit_cli.
+ */
+export const LOCAL_CLEAR_SLASH_COMMAND: SlashCommandInfo = {
+  name: 'clear',
+  description: 'End this session and start a new one',
+  hints: [],
+};
+
 const NEW_COMMAND_NAME = 'new';
 const EXIT_COMMAND_NAME = 'exit';
-const LOCAL_COMMAND_NAMES = new Set([NEW_COMMAND_NAME, EXIT_COMMAND_NAME, 'quit', 'q']);
+const CLEAR_COMMAND_NAME = 'clear';
+const LOCAL_COMMAND_NAMES = new Set([
+  NEW_COMMAND_NAME,
+  EXIT_COMMAND_NAME,
+  CLEAR_COMMAND_NAME,
+  'quit',
+  'q',
+]);
 const SLASH_PREFIX_PATTERN = /^\/[\w.-]*$/;
 const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
 
@@ -32,11 +51,16 @@ const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
  * dynamic command list for fail-closed upgrade handling. This set is the
  * explicit mobile promise: any new mobile-reserved slash commands must be
  * added here; do not refactor the SDK to assume this list.
+ *
+ * `/clear` is intentionally gated — it needs both create_session and
+ * exit_cli and must surface the upgrade message instead of falling through
+ * as a prompt.
  */
 const RESERVED_UPGRADE_REQUIRED_COMMANDS = new Set([
   'compact',
   NEW_COMMAND_NAME,
   EXIT_COMMAND_NAME,
+  CLEAR_COMMAND_NAME,
 ]);
 
 type ChatComposerParseContext = {
@@ -50,6 +74,7 @@ export type ChatComposerParseResult =
   | { type: 'command'; command: string; arguments: string }
   | { type: 'create-session' }
   | { type: 'exit-session' }
+  | { type: 'restart-session' }
   | { type: 'attachment-error' }
   | { type: 'argument-error'; message: string }
   | { type: 'upgrade-required'; message: string };
@@ -61,21 +86,22 @@ const UPGRADE_REQUIRED_FALLBACK_MESSAGE = 'Please upgrade your CLI to use this c
  * with no CTA: the user must upgrade the CLI before `/exit` is safe to send.
  */
 const EXIT_CAPABILITY_UNAVAILABLE_MESSAGE = 'Update your CLI to exit the session.';
+const CLEAR_CAPABILITY_UNAVAILABLE_MESSAGE = 'Update your CLI to restart the session.';
 
 /**
  * Select the slash command catalog the mobile composer should surface.
  *
  * - `cloud-agent` sessions use the live reported catalog verbatim — empty
  *   stays empty and the Cloud Agent defaults live in the worker, not here.
- * - `remote` sessions strip CLI-reported `new`, `exit`, `quit`, and `q`, then
- *   append the locally reserved `/new` and capability-gated local `/exit` when
- *   the live catalog advertises `canExitSession: true`.
+ * - `remote` sessions strip CLI-reported `new`, `exit`, `quit`, `q`, and
+ *   `clear`, then append the locally reserved `/new`, capability-gated local
+ *   `/exit` and `/clear` when the live catalog advertises `canExitSession: true`.
  * - `read-only` and `null` (unresolved) sessions expose no commands.
  *
- * The `/exit` suggestion is gated on `canExitSession === true` rather than
- * the synthetic `exit` command presence, so an old / unknown CLI that
- * reports a catalog but lacks the safe-detach capability never advertises
- * the action. `canExitSession === undefined` (old CLI) and
+ * The `/exit` and `/clear` suggestions are gated on `canExitSession === true`
+ * rather than the synthetic `exit` command presence, so an old / unknown CLI
+ * that reports a catalog but lacks the safe-detach capability never advertises
+ * the actions. `canExitSession === undefined` (old CLI) and
  * `canExitSession === false` (CLI explicitly opts out) both fail closed.
  */
 export function createMobileSlashCommandList(
@@ -96,7 +122,7 @@ export function createMobileSlashCommandList(
   return [
     ...remoteCommands,
     LOCAL_NEW_SLASH_COMMAND,
-    ...(supportsExit ? [LOCAL_EXIT_SLASH_COMMAND] : []),
+    ...(supportsExit ? [LOCAL_EXIT_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND] : []),
   ];
 }
 
@@ -132,20 +158,21 @@ function findCommand(commands: SlashCommandInfo[], name: string): SlashCommandIn
 /**
  * Classify a composer input into the action the composer should take.
  *
- * Order matters: the upgrade-required short-circuit runs before recognition so
- * that the reserved commands mobile promises to handle (`compact`, `new`, and `exit`)
- * are surfaced to the user when the remote CLI requires an upgrade, instead of
- * silently falling through as ordinary prompts. Unknown slash inputs (`/foo`)
- * still fall through to `prompt` so the user can send arbitrary text the CLI
- * may know about.
+ * Order matters:
+ * 1. The upgrade-required short-circuit runs before recognition so that
+ *    the reserved commands mobile promises to handle (`compact`, `new`,
+ *    `exit`, and `clear`) are surfaced when the remote CLI requires an
+ *    upgrade, instead of silently falling through as ordinary prompts.
+ *    Unknown slash inputs (`/foo`) still fall through to `prompt` so the
+ *    user can send arbitrary text the CLI may know about.
  *
- * The `/exit` interception is also capability-gated: the parser rejects the
- * exact-typed `/exit` with an upgrade-required upgrade message when the live
- * remote catalog lacks `canExitSession === true`. That is the same fail-closed
- * gate the suggestion list enforces, and it runs even when the suggestion
- * list omits the command (e.g. an empty catalog) so the composer never sends
- * `/exit` as a plain prompt to a CLI that does not advertise safe session
- * detach.
+ * The `/exit` and `/clear` interceptions are also capability-gated: the
+ * parser rejects the exact-typed `/exit` or `/clear` with an upgrade-required
+ * message when the live remote catalog lacks `canExitSession === true`. That
+ * is the same fail-closed gate the suggestion list enforces, and it runs even
+ * when the suggestion list omits the command (e.g. an empty catalog) so the
+ * composer never sends a gated command as a plain prompt to a CLI that does
+ * not advertise safe session detach.
  */
 export function parseChatComposerSubmission(
   input: string,
@@ -201,6 +228,25 @@ export function parseChatComposerSubmission(
       return { type: 'argument-error', message: '/exit does not take arguments.' };
     }
     return { type: 'exit-session' };
+  }
+
+  if (commandName === CLEAR_COMMAND_NAME && context.sessionType === 'remote') {
+    // /clear ends this session and opens a new one, so it needs both
+    // create_session and exit_cli. Fail closed on the same capability the
+    // /exit gate uses; an old CLI cannot honour the new meaning.
+    if (context.remoteCommandState?.canExitSession !== true) {
+      return {
+        type: 'upgrade-required',
+        message: context.remoteCommandState?.message ?? CLEAR_CAPABILITY_UNAVAILABLE_MESSAGE,
+      };
+    }
+    if (context.hasAttachments) {
+      return { type: 'attachment-error' };
+    }
+    if (argumentsText.length > 0) {
+      return { type: 'argument-error', message: '/clear does not take arguments.' };
+    }
+    return { type: 'restart-session' };
   }
 
   if (commandName && findCommand(commands, commandName)) {

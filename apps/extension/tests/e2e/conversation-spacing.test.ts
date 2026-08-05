@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames, workflowToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -10,14 +10,6 @@ import {
 } from './extension-context-fixture';
 
 const messageRowSelector = 'section[aria-label="Agent conversation"] [data-index]';
-const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'search_memories',
-  'get_memory',
-];
-
 const startConversationGapSampler = (sidePanel: Page): Promise<void> =>
   sidePanel.evaluate(() => {
     Reflect.set(globalThis, '__kiloMaxConversationGap', 0);
@@ -210,6 +202,7 @@ test('tool rows stay spaced without overlapping message bubbles', async () => {
         'search_memories',
         'get_memory',
         'get_viewport_screenshot',
+        ...workflowToolNames,
       ],
     });
 

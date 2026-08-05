@@ -16,7 +16,7 @@ import {
 } from 'lucide-react-native';
 import { Alert, Platform, View } from 'react-native';
 import { toast } from 'sonner-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
 import { ActionTile } from '@/components/profile-action-tile';
@@ -228,8 +228,11 @@ export function ProfileScreen() {
 
         {/* Linked accounts — hide the whole section when there are no linked
             providers (and we're not loading/erroring) so the header never dangles. */}
+        {/* No layout animation on this section: siblings above mount/resize
+            asynchronously; LinearTransition would animate this container's
+            position lag as a visible header overlap. Opacity fades are safe. */}
         {(isLoading || providersError || (data?.providers.length ?? 0) > 0) && (
-          <Animated.View className="mt-6 gap-3" layout={LinearTransition}>
+          <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               Linked accounts
             </Text>
@@ -255,11 +258,11 @@ export function ProfileScreen() {
               return (
                 <Animated.View
                   key={`${p.provider}-${p.email}`}
-                  className="flex-row items-center gap-3 rounded-lg bg-secondary p-3"
+                  className="flex-row items-start gap-3 rounded-lg bg-secondary p-3"
                   entering={FadeIn.duration(200)}
                 >
                   <Icon size={18} color={colors.secondaryForeground} />
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Text className="text-sm font-medium capitalize">{p.provider}</Text>
                     <Text variant="muted" className="text-xs">
                       {p.email}
@@ -268,7 +271,7 @@ export function ProfileScreen() {
                 </Animated.View>
               );
             })}
-          </Animated.View>
+          </View>
         )}
 
         {/* Appearance */}
@@ -312,40 +315,36 @@ export function ProfileScreen() {
           </View>
         ) : null}
 
-        {/* Actions */}
+        {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
-          <View className="flex-row gap-3">
-            <ActionTile
-              icon={MessageSquare}
-              label="Feedback"
-              color={colors.mutedForeground}
-              onPress={() => {
-                showFeedbackPrompt(userId);
-              }}
-            />
-            <ActionTile
-              icon={Lock}
-              label="Privacy choices"
-              color={colors.mutedForeground}
-              onPress={showPrivacyChoices}
-            />
-          </View>
-          <View className="flex-row gap-3">
-            <ActionTile
-              icon={LogOut}
-              label="Sign Out"
-              color={colors.mutedForeground}
-              onPress={confirmSignOut}
-            />
-            <ActionTile
-              icon={Trash2}
-              label="Delete Account"
-              color={colors.destructive}
-              destructive
-              disabled={deleteAccount.isPending}
-              onPress={confirmDeleteAccount}
-            />
-          </View>
+          <ActionTile
+            icon={MessageSquare}
+            label="Feedback"
+            color={colors.mutedForeground}
+            onPress={() => {
+              showFeedbackPrompt(userId);
+            }}
+          />
+          <ActionTile
+            icon={Lock}
+            label="Privacy choices"
+            color={colors.mutedForeground}
+            onPress={showPrivacyChoices}
+          />
+          <ActionTile
+            icon={LogOut}
+            label="Sign Out"
+            color={colors.mutedForeground}
+            onPress={confirmSignOut}
+          />
+          <ActionTile
+            icon={Trash2}
+            label="Delete Account"
+            color={colors.destructive}
+            destructive
+            disabled={deleteAccount.isPending}
+            onPress={confirmDeleteAccount}
+          />
 
           <Text className="text-center text-xs text-muted-foreground">
             v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})

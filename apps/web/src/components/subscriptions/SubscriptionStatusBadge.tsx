@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-green-500/10 text-green-300 border-green-500/20',
+  pending_payment: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
   pending_settlement: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
   trialing: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
   past_due: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
@@ -10,6 +11,7 @@ const statusStyles: Record<string, string> = {
   paused: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
   suspended: 'bg-red-500/10 text-red-300 border-red-500/20',
   pending_cancellation: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
+  cancel_at_period_end: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
   canceled: 'bg-muted text-muted-foreground border-border',
   cancelled: 'bg-muted text-muted-foreground border-border',
   ended: 'bg-muted text-muted-foreground border-border',
@@ -19,6 +21,8 @@ const statusStyles: Record<string, string> = {
 
 function formatStatusLabel(status: string): string {
   if (status === 'pending_cancellation') return 'Cancellation Pending';
+  if (status === 'cancel_at_period_end') return 'Cancellation Scheduled';
+  if (status === 'pending_payment') return 'Awaiting Payment';
   return status.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
 }
 

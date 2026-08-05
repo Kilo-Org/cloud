@@ -17,6 +17,7 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
   return {
     run_id: 'run-1',
     model: 'model/a',
+    variant: '',
     case_id: 'case-1',
     route_key: null,
     score: 1,
@@ -121,6 +122,41 @@ describe('summarize — classifier kind', () => {
     expect(s.errors).toBe(2);
     // error rows have score 0 which drags accuracy down
     expect(s.accuracy).toBe(Number((1 / 3).toFixed(4)));
+  });
+});
+
+describe('summarize — exact-pair identity', () => {
+  it('groups two variants of one model separately', () => {
+    const rows: CaseResultRow[] = [
+      makeRow({
+        model: 'model/a',
+        variant: 'xhigh',
+        case_id: 'c1',
+        route_key: 'implementation/code_generation',
+        score: 1,
+      }),
+      makeRow({
+        model: 'model/a',
+        variant: 'max',
+        case_id: 'c1',
+        route_key: 'implementation/code_generation',
+        score: 0,
+      }),
+    ];
+    const summaries = summarize(rows, 'decider');
+    expect(summaries).toHaveLength(2);
+    const xhigh = summaries.find(s => s.variant === 'xhigh');
+    const max = summaries.find(s => s.variant === 'max');
+    expect(xhigh?.accuracy).toBe(1);
+    expect(max?.accuracy).toBe(0);
+  });
+
+  it('emits null variant when stored as empty string', () => {
+    const [s] = summarize(
+      [makeRow({ variant: '', route_key: 'implementation/code_generation' })],
+      'decider'
+    );
+    expect(s.variant).toBeNull();
   });
 });
 
@@ -540,15 +576,105 @@ describe('decider message fan-out', () => {
   });
 
   it('getDeciderContainerInstanceName reuses one container per model repetition shard', () => {
-    const base = { runId: 'run-test', kind: 'decider' as const, model: 'model/a', rep: 2 };
+    const base = {
+      runId: 'run-test',
+      kind: 'decider' as const,
+      model: 'model/a',
+      variant: null as string | null,
+      rep: 2,
+    };
     expect(getDeciderContainerInstanceName({ ...base, chunk: 0, shard: 0 })).toBe(
-      'run-test:model/a:2:0'
+      'run-test:model/a::2:0'
     );
     expect(getDeciderContainerInstanceName({ ...base, chunk: 16, shard: 0 })).toBe(
-      'run-test:model/a:2:0'
+      'run-test:model/a::2:0'
     );
     expect(getDeciderContainerInstanceName({ ...base, chunk: 1, shard: 1 })).toBe(
-      'run-test:model/a:2:1'
+      'run-test:model/a::2:1'
+    );
+  });
+
+  it('two variants of one model get distinct queue messages and container lanes', () => {
+    const chunks = chunkArray(
+      Array.from({ length: 10 }, (_, i) => ({ id: `c${i}` })),
+      5
+    );
+    const entries = [
+      { model: 'model/a', variant: 'xhigh' as string | null },
+      { model: 'model/a', variant: 'max' as string | null },
+    ];
+    const messages = buildDeciderMessages('run-v', 'decider', entries, 1, chunks, 100);
+    const models = messages.map(m => m.body.model);
+    const variants = messages.map(m => m.body.variant);
+    expect(new Set(models)).toEqual(new Set(['model/a']));
+    expect(new Set(variants)).toEqual(new Set(['xhigh', 'max']));
+    expect(
+      getDeciderContainerInstanceName({
+        runId: 'run-v',
+        model: 'model/a',
+        variant: 'xhigh',
+        rep: 0,
+        shard: 0,
+      })
+    ).not.toBe(
+      getDeciderContainerInstanceName({
+        runId: 'run-v',
+        model: 'model/a',
+        variant: 'max',
+        rep: 0,
+        shard: 0,
+      })
+    );
+  });
+
+  it('message schema accepts optional nullable variant', () => {
+    expect(
+      BenchmarkJobMessageSchema.parse({
+        runId: 'r1',
+        kind: 'decider',
+        model: 'm1',
+        variant: 'xhigh',
+      }).variant
+    ).toBe('xhigh');
+    expect(
+      BenchmarkJobMessageSchema.parse({
+        runId: 'r1',
+        kind: 'decider',
+        model: 'm1',
+        variant: null,
+      }).variant
+    ).toBeNull();
+  });
+});
+
+describe('migration 0005 exact-pair backfill', () => {
+  it('rebuild SQL copies rows and backfills variant from reasoning_effort', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const migrationPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../migrations/0005_fuzzy_senator_kelly.sql'
+    );
+    const sql = await fs.readFile(migrationPath, 'utf8');
+
+    // Table rebuilds preserve existing columns via INSERT…SELECT.
+    expect(sql).toContain('CREATE TABLE `__new_run_models`');
+    expect(sql).toContain('CREATE TABLE `__new_model_summaries`');
+    expect(sql).toContain('CREATE TABLE `__new_case_results`');
+    expect(sql).toMatch(/INSERT INTO `__new_run_models`[\s\S]*COALESCE\("reasoning_effort", ''\)/);
+    expect(sql).toMatch(
+      /INSERT INTO `__new_model_summaries`[\s\S]*COALESCE\(rm\."reasoning_effort", ''\)/
+    );
+    expect(sql).toMatch(
+      /INSERT INTO `__new_case_results`[\s\S]*COALESCE\(rm\."reasoning_effort", ''\)/
+    );
+    // routing_table_candidates: additive column + backfill from effort.
+    expect(sql).toContain(
+      "ALTER TABLE `routing_table_candidates` ADD `variant` text DEFAULT '' NOT NULL"
+    );
+    expect(sql).toContain(
+      "UPDATE `routing_table_candidates` SET `variant` = COALESCE(`reasoning_effort`, '')"
     );
   });
 });

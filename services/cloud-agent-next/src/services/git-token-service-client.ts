@@ -345,6 +345,44 @@ export async function resolveManagedBitbucketToken(
   }
 }
 
+export type ResolvedCloudAgentBitbucketCapability = {
+  capability: string;
+  gitUrl: string;
+};
+
+export async function issueCloudAgentBitbucketSessionCapability(
+  env: GitTokenServiceEnv,
+  params: {
+    userId: string;
+    orgId: string;
+    outboundContainerId: string;
+    expectedIntegrationId?: string;
+    workspaceUuid: string;
+    repositoryUuid: string;
+    repositoryUrl: string;
+  }
+): Promise<
+  | { success: true; value: ResolvedCloudAgentBitbucketCapability }
+  | {
+      success: false;
+      reason: ManagedBitbucketTokenFailureReason | 'capability_configuration_error';
+    }
+> {
+  if (!env.GIT_TOKEN_SERVICE?.issueBitbucketSessionCapability) {
+    return { success: false, reason: 'service_not_configured' };
+  }
+  try {
+    const result = await env.GIT_TOKEN_SERVICE.issueBitbucketSessionCapability(params);
+    if (!result.success) return { success: false, reason: result.reason };
+    logger.info('Issued Bitbucket session capability via git-token-service');
+    return { success: true, value: { capability: result.capability, gitUrl: result.gitUrl } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.withFields({ error: message }).error('Failed to issue Bitbucket session capability');
+    return { success: false, reason: 'rpc_error' };
+  }
+}
+
 export async function issueCloudAgentGitLabSessionCapability(
   env: GitTokenServiceEnv,
   params: {

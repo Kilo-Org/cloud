@@ -1,6 +1,9 @@
 import * as z from 'zod';
 import {
   BenchmarkConfigSchema,
+  BenchmarkProfileStatusesRequestSchema,
+  CustomRoutingTableRequestSchema,
+  RegisterBenchmarkProfilesRequestSchema,
   resolveBenchmarkIdentity,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
@@ -9,6 +12,14 @@ import { zodJsonValidator } from '@kilocode/worker-utils';
 import type { Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
+import { assembleCustomRoutingTable } from './custom-routing-table';
+import {
+  lookupProfileStatuses,
+  ProfileConfigMissingError,
+  ProfileQuotaExceededError,
+  ProfileValidationError,
+  registerProfiles,
+} from './profiles';
 import {
   BenchmarkRunConfigError,
   fetchBenchmarkUserToken,
@@ -110,6 +121,104 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         orgId: benchmarkIdentity.benchmarkOrgId,
       });
       return c.json(result);
+    }
+  );
+
+  // Atomically admit missing/stale/retried Benchmark profiles for an owner.
+  app.post(
+    '/admin/profiles/register',
+    zodJsonValidator(RegisterBenchmarkProfilesRequestSchema, {
+      errorMessage: 'Invalid profile register request',
+    }),
+    async c => {
+      const body = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      if (!config) {
+        return c.json(
+          {
+            error:
+              'benchmark config not set: save it in the admin panel before registering profiles',
+          },
+          400
+        );
+      }
+      try {
+        const result = await registerProfiles(c.env.BENCH_DB, config, {
+          ownerType: body.ownerType,
+          ownerId: body.ownerId,
+          entries: body.entries,
+          retryEntries: body.retryEntries,
+        });
+        return c.json(result);
+      } catch (error) {
+        if (error instanceof ProfileQuotaExceededError) {
+          return c.json(error.quota, 429);
+        }
+        if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
+      }
+    }
+  );
+
+  // Current per-entry Benchmark-profile statuses (may free-admit stale rows).
+  app.post(
+    '/admin/profiles/status',
+    zodJsonValidator(BenchmarkProfileStatusesRequestSchema, {
+      errorMessage: 'Invalid profile status request',
+    }),
+    async c => {
+      const body = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      if (!config) {
+        return c.json(
+          {
+            error:
+              'benchmark config not set: save it in the admin panel before looking up profiles',
+          },
+          400
+        );
+      }
+      try {
+        return c.json(
+          await lookupProfileStatuses(c.env.BENCH_DB, config, { entries: body.entries })
+        );
+      } catch (error) {
+        if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
+      }
+    }
+  );
+
+  // Sparse custom routing table for ready/current pool entries only.
+  app.post(
+    '/admin/custom-routing-table',
+    zodJsonValidator(CustomRoutingTableRequestSchema, {
+      errorMessage: 'Invalid custom routing table request',
+    }),
+    async c => {
+      const body = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      if (!config) {
+        return c.json(
+          {
+            error:
+              'benchmark config not set: save it in the admin panel before assembling a custom routing table',
+          },
+          400
+        );
+      }
+      try {
+        return c.json(await assembleCustomRoutingTable(c.env.BENCH_DB, config, body.entries));
+      } catch (error) {
+        if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
+      }
     }
   );
 }

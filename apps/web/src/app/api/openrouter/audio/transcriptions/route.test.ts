@@ -77,6 +77,17 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it('allows generation usage processing to run for every route alias', async () => {
+    const routes = await Promise.all([
+      import('./route'),
+      import('@/app/api/openrouter/v1/audio/transcriptions/route'),
+      import('@/app/api/gateway/audio/transcriptions/route'),
+      import('@/app/api/gateway/v1/audio/transcriptions/route'),
+    ]);
+
+    expect(routes.map(route => route.maxDuration)).toEqual([800, 800, 800, 800]);
+  });
+
   it('proxies transcription requests to OpenRouter', async () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(

@@ -14,14 +14,40 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
+import { parseGitHubOwnerRepo, computeSearchNextCursor } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
+import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
+import { captureException } from '@sentry/nextjs';
 
 jest.mock('@/lib/config.server', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
   return {
     ...actual,
     SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',
+  };
+});
+
+// `after()` only works inside a Next request scope. Capture callbacks so rename
+// notify tests can flush them outside a request context.
+const afterCallbacks: Array<() => void | Promise<void>> = [];
+jest.mock('next/server', () => {
+  return {
+    ...(jest.requireActual('next/server') as Record<string, unknown>),
+    after: (fn: () => void | Promise<void>) => {
+      afterCallbacks.push(fn);
+    },
+  };
+});
+
+jest.mock('@/lib/cloud-agent/session-events', () => ({
+  notifyCliSessionRenamed: jest.fn().mockResolvedValue({ delivered: true }),
+}));
+
+jest.mock('@sentry/nextjs', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@sentry/nextjs');
+  return {
+    ...actual,
+    captureException: jest.fn(),
   };
 });
 
@@ -49,6 +75,16 @@ jest.mock('@/lib/session-ingest-client', () => {
   };
 });
 
+const mockedNotifyCliSessionRenamed = notifyCliSessionRenamed as jest.MockedFunction<
+  typeof notifyCliSessionRenamed
+>;
+const mockedCaptureException = captureException as jest.MockedFunction<typeof captureException>;
+
+async function flushAfterCallbacks(): Promise<void> {
+  const pending = afterCallbacks.splice(0);
+  await Promise.all(pending.map(fn => Promise.resolve(fn())));
+}
+
 const mockedFetchPullRequestForBranch =
   githubAdapter.fetchPullRequestForBranch as jest.MockedFunction<
     typeof githubAdapter.fetchPullRequestForBranch
@@ -60,6 +96,12 @@ let adminUser: User;
 let testOrganization: Organization;
 
 describe('cli-sessions-v2-router', () => {
+  beforeEach(() => {
+    afterCallbacks.length = 0;
+    mockedNotifyCliSessionRenamed.mockReset().mockResolvedValue({ delivered: true });
+    mockedCaptureException.mockClear();
+  });
+
   beforeAll(async () => {
     regularUser = await insertTestUser({
       google_user_email: 'cli-sessions-v2-user@example.com',
@@ -855,6 +897,36 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.title).toBe('renamed by current member');
+    });
+
+    it('rename always overwrites the title, whether it is still the creation placeholder or an existing (e.g. agent-generated) title', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // Session starts with title NULL (the creation placeholder) — rename must succeed.
+      const [beforeAnyTitle] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(beforeAnyTitle?.title).toBeNull();
+
+      const firstRename = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'agent-generated title',
+      });
+      expect(firstRename.title).toBe('agent-generated title');
+
+      // A subsequent user rename must overwrite an already non-null (agent-generated) title too.
+      const secondRename = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'user renamed title',
+      });
+      expect(secondRename.title).toBe('user renamed title');
+
+      const [persisted] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(persisted?.title).toBe('user renamed title');
     });
 
     it('rename rejects an organization session after its creator loses membership', async () => {
@@ -1711,6 +1783,340 @@ describe('cli-sessions-v2-router', () => {
         newerCreatedOlderUpdated,
         olderCreatedNewerUpdated,
       ]);
+    });
+  });
+
+  describe('search cursor paging', () => {
+    const needle = 'cursor-paging-search-fixture';
+    const sessionA = 'ses_cursor_paging_a_0001';
+    const sessionB = 'ses_cursor_paging_b_0001';
+    const sessionC = 'ses_cursor_paging_c_0001';
+    const allIds = [sessionA, sessionB, sessionC];
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: sessionA,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} alpha`,
+          updated_at: '2026-01-03T10:00:00.000Z',
+        },
+        {
+          session_id: sessionB,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} beta`,
+          updated_at: '2026-01-02T10:00:00.000Z',
+        },
+        {
+          session_id: sessionC,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} gamma`,
+          updated_at: '2026-01-01T10:00:00.000Z',
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, allIds));
+    });
+
+    it('returns the first page with nextCursor pointing at the remaining rows', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
+
+      expect(result.results).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.offset).toBe(0);
+      expect(result.nextCursor).toBe(2);
+      // Default sort is updated_at descending.
+      expect(result.results.map(s => s.session_id)).toEqual([sessionA, sessionB]);
+    });
+
+    it('returns the remaining row with nextCursor null on the cursor page', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const page1 = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
+      const page1Ids = new Set(page1.results.map(s => s.session_id));
+
+      const page2 = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 2,
+      });
+
+      expect(page2.results).toHaveLength(1);
+      expect(page2.total).toBe(3);
+      expect(page2.offset).toBe(2);
+      expect(page2.nextCursor).toBeNull();
+      expect(page1Ids.has(page2.results[0].session_id)).toBe(false);
+      expect(page2.results[0].session_id).toBe(sessionC);
+    });
+
+    it('prefers cursor over legacy offset when both arrive', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 2,
+        offset: 0,
+      });
+
+      expect(result.offset).toBe(2);
+      expect(result.results).toHaveLength(1);
+    });
+
+    it('offsets from zero when only legacy offset is supplied', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        offset: 0,
+      });
+
+      expect(result.results).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.offset).toBe(0);
+    });
+
+    it('returns null nextCursor on an empty page even when nextOffset < total', () => {
+      // Empty page: results.length === 0, nextOffset === pageOffset.
+      // When pageOffset (2) < total (3), the naive formula
+      //   nextOffset < total ? nextOffset : null
+      // returns 2 — a non-null cursor that would cause an infinite loop.
+      // The empty-results guard prevents this.
+      const resultsLength = 0;
+      const nextOffset = 2;
+      const total = 3;
+
+      const withGuard = computeSearchNextCursor(resultsLength, nextOffset, total);
+      expect(withGuard).toBeNull();
+
+      // Old formula:  nextOffset < total → truthy, returns nextOffset (wrong)
+      // Empty guard:  resultsLength > 0 → false → null (correct)
+      const oldFormula: number | null = nextOffset < total ? nextOffset : null;
+      expect(oldFormula).toBe(nextOffset);
+      expect(withGuard).not.toBe(oldFormula);
+    });
+  });
+
+  describe('list / search hide never-ingested placeholders', () => {
+    // Bare POST /api/session placeholders: title/status/cost NULL and platform
+    // still at the column default 'unknown'. Content may still exist in DO/R2;
+    // the four-column conjunction is only a list/search visibility predicate.
+    const placeholderId = 'ses_hide_placeholder_bare_0001';
+    const titledUnknownId = 'ses_hide_placeholder_titled_0001';
+    const statusUnknownId = 'ses_hide_placeholder_status_0001';
+    const costOnlyZeroId = 'ses_hide_placeholder_cost0_0001';
+    const normalCliId = 'ses_hide_placeholder_cli_0001';
+    const allSessionIds = [
+      placeholderId,
+      titledUnknownId,
+      statusUnknownId,
+      costOnlyZeroId,
+      normalCliId,
+    ];
+
+    beforeEach(async () => {
+      const baseTime = Date.parse('2026-06-01T12:00:00.000Z');
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: placeholderId,
+          kilo_user_id: regularUser.id,
+          // defaults: created_on_platform 'unknown', title/status/cost NULL
+          created_at: new Date(baseTime).toISOString(),
+          updated_at: new Date(baseTime).toISOString(),
+        },
+        {
+          session_id: titledUnknownId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'unknown',
+          title: 'titled but still unknown platform',
+          created_at: new Date(baseTime + 1000).toISOString(),
+          updated_at: new Date(baseTime + 1000).toISOString(),
+        },
+        {
+          session_id: statusUnknownId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'unknown',
+          status: 'running',
+          created_at: new Date(baseTime + 2000).toISOString(),
+          updated_at: new Date(baseTime + 2000).toISOString(),
+        },
+        {
+          session_id: costOnlyZeroId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'unknown',
+          // Metrics emission can persist 0 (writer clamps with Math.max(0, …))
+          // while no metadata projection ever succeeded.
+          total_cost_microdollars: 0,
+          created_at: new Date(baseTime + 3000).toISOString(),
+          updated_at: new Date(baseTime + 3000).toISOString(),
+        },
+        {
+          session_id: normalCliId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'normal cli session',
+          status: 'completed',
+          created_at: new Date(baseTime + 4000).toISOString(),
+          updated_at: new Date(baseTime + 4000).toISOString(),
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, allSessionIds));
+    });
+
+    it('list omits bare placeholder rows', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).not.toContain(placeholderId);
+    });
+
+    it('list returns a row with a title even when platform is still unknown', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).toContain(titledUnknownId);
+    });
+
+    it('list returns a row with a status even when title is null and platform is unknown', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).toContain(statusUnknownId);
+    });
+
+    it('list returns a row with only total_cost_microdollars set (including zero)', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).toContain(costOnlyZeroId);
+      const costOnly = result.cliSessions.find(session => session.session_id === costOnlyZeroId);
+      expect(costOnly?.total_cost_microdollars).toBe(0);
+    });
+
+    it('list returns a normal cli session and keeps pagination stable with placeholders interleaved', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      // Fixtures are ordered by created_at; placeholders sit between visible
+      // rows. limit=2 over created_at should page only visible rows.
+      const page1 = await caller.cliSessionsV2.list({ limit: 2, orderBy: 'created_at' });
+      const page1Ids = page1.cliSessions.map(session => session.session_id);
+
+      expect(page1Ids).toEqual([normalCliId, costOnlyZeroId]);
+      expect(page1Ids).not.toContain(placeholderId);
+      expect(page1.nextCursor).not.toBeNull();
+
+      const page2 = await caller.cliSessionsV2.list({
+        limit: 2,
+        orderBy: 'created_at',
+        cursor: page1.nextCursor!,
+      });
+      const page2Ids = page2.cliSessions.map(session => session.session_id);
+
+      expect(page2Ids).toEqual([statusUnknownId, titledUnknownId]);
+      expect(page2Ids).not.toContain(placeholderId);
+    });
+
+    it('search by exact session_id does not return a bare placeholder', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: placeholderId });
+
+      expect(result.results.map(session => session.session_id)).not.toContain(placeholderId);
+      expect(result.total).toBe(0);
+    });
+  });
+
+  describe('rename CLI notify', () => {
+    const sessionId = 'ses_rename_notify_test_abc12';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cli',
+        title: 'original title',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('notifies session-ingest with the renamed sessionId, title, and user after success', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.rename({
+        session_id: sessionId,
+        title: 'web renamed title',
+      });
+
+      expect(result).toEqual({ title: 'web renamed title' });
+      expect(mockedNotifyCliSessionRenamed).not.toHaveBeenCalled();
+
+      await flushAfterCallbacks();
+
+      expect(mockedNotifyCliSessionRenamed).toHaveBeenCalledTimes(1);
+      expect(mockedNotifyCliSessionRenamed).toHaveBeenCalledWith({
+        sessionId,
+        title: 'web renamed title',
+        userId: regularUser.id,
+      });
+    });
+
+    it('still returns the renamed title when the CLI notify helper fails', async () => {
+      const notifyError = new Error('ingest unavailable');
+      mockedNotifyCliSessionRenamed.mockRejectedValue(notifyError);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.rename({
+        session_id: sessionId,
+        title: 'still renamed',
+      });
+
+      expect(result).toEqual({ title: 'still renamed' });
+
+      await flushAfterCallbacks();
+
+      expect(mockedNotifyCliSessionRenamed).toHaveBeenCalledWith({
+        sessionId,
+        title: 'still renamed',
+        userId: regularUser.id,
+      });
+      expect(mockedCaptureException).toHaveBeenCalledWith(
+        notifyError,
+        expect.objectContaining({
+          tags: { source: 'cli-sessions-v2-router', endpoint: 'rename-notify' },
+          extra: { sessionId },
+        })
+      );
+
+      const [persisted] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(persisted?.title).toBe('still renamed');
+    });
+
+    it('does not notify when the session is not found', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.rename({
+          session_id: 'ses_does_not_exist_zzzzzz',
+          title: 'nope',
+        })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+      await flushAfterCallbacks();
+      expect(mockedNotifyCliSessionRenamed).not.toHaveBeenCalled();
     });
   });
 });

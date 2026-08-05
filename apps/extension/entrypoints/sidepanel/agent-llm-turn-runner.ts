@@ -8,7 +8,6 @@ import {
 } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
 import type { OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
-import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 import type { FetchLike } from '@/src/shared/auth';
 import type {
   KiloGatewayToolCallRequest,
@@ -20,8 +19,11 @@ import { executeSafeToolCall } from './agent-safe-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
+  isWorkflowToolCallEvent,
   toDangerousToolCallEvents,
 } from './agent-tool-call-events';
+import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
+import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
 
 interface RunDangerousLlmTurnOptions {
   readonly apiBaseUrl: string;
@@ -46,6 +48,9 @@ interface RunDangerousLlmTurnOptions {
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
   readonly onAssistantStreaming?: ((eventId: string | undefined) => void) | undefined;
+  readonly workflowTools?: KiloGatewayToolDefinition[] | undefined;
+  readonly workflowToolContext?: WorkflowToolContext | undefined;
+  readonly maxToolRounds?: number | undefined;
 }
 
 type DangerousToolCallEvent =
@@ -54,16 +59,29 @@ type DangerousToolCallEvent =
 
 export const runDangerousLlmTurn = ({
   executeRemoteMcpToolCall,
+  maxToolRounds = 20,
   remoteMcpTools = [],
   selectedTabId,
   supportsImages = false,
   toRemoteMcpToolCallEvents,
+  workflowToolContext,
+  workflowTools = [],
   ...options
 }: RunDangerousLlmTurnOptions): Promise<void> =>
   runLlmTurn<DangerousToolCallEvent>({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
+      if (isWorkflowToolCallEvent(toolCall)) {
+        if (workflowToolContext === undefined) {
+          return {
+            error: `Workflow tool ${toolCall.name} is no longer available.`,
+            ok: false,
+          };
+        }
+        return executeWorkflowToolCall(toolCall, workflowToolContext);
+      }
+
       if (isRemoteMcpToolCallEvent(toolCall)) {
         return executeRemoteMcpToolCall === undefined
           ? { error: `Remote MCP tool ${toolCall.name} is no longer available.`, ok: false }
@@ -76,7 +94,7 @@ export const runDangerousLlmTurn = ({
     },
     failureMessage: error =>
       `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    maxToolRounds: maxAgentToolRounds,
+    maxToolRounds,
     noResponseMessage: 'The model did not return a response.',
     supportsImages,
     toToolCallEvents: toolCalls =>
@@ -90,6 +108,7 @@ export const runDangerousLlmTurn = ({
     tools: [
       ...createSafeToolDefinitions({ supportsImages }),
       createEvalToolDefinition(),
+      ...workflowTools,
       ...remoteMcpTools,
     ],
   });

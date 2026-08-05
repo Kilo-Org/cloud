@@ -1,5 +1,11 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, findKiloExclusiveModel, kiloExclusiveModels } from './models';
+import {
+  autoFreeModels,
+  findKiloExclusiveModel,
+  isKiloExclusiveRateLimitedModel,
+  kiloExclusiveModels,
+  selectAutoFreeModel,
+} from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import { getAiSdkProvider } from './providers/model-settings';
@@ -9,6 +15,19 @@ import {
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
+import { tencent_hy3_free_model } from './providers/tencent';
+import { gemma_4_26b_a4b_it_free_model } from './providers/google';
+import { getRandomNumber } from './getRandomNumber';
+
+describe('rate-limited Kilo-exclusive models', () => {
+  test('only includes free Gemma', () => {
+    expect(kiloExclusiveModels.filter(model => model.flags.includes('rate-limited'))).toEqual([
+      gemma_4_26b_a4b_it_free_model,
+    ]);
+    expect(isKiloExclusiveRateLimitedModel(gemma_4_26b_a4b_it_free_model.public_id)).toBe(true);
+    expect(isKiloExclusiveRateLimitedModel(tencent_hy3_free_model.public_id)).toBe(false);
+  });
+});
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -54,6 +73,15 @@ describe('isFreeModel', () => {
     test('does not register discounted OpenRouter Qwen models as Kilo exclusive', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-max')).toBeNull();
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
+    });
+
+    test('registers Tencent Hy3 as free without adding it to Auto Free', () => {
+      expect(findKiloExclusiveModel('tencent/hy3:free')).toBe(tencent_hy3_free_model);
+      expect(tencent_hy3_free_model.internal_id).toBe('tencent/hy3');
+      expect(tencent_hy3_free_model.inference_provider_restriction).toEqual(['tencent']);
+      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
+        tencent_hy3_free_model.public_id
+      );
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
@@ -120,14 +148,47 @@ describe('isFreeModel', () => {
 
     test('all autoFreeModels should pass isFreeModel', async () => {
       expect(autoFreeModels.length).toBeGreaterThan(0);
-      for (const model of autoFreeModels) {
+      for (const { model } of autoFreeModels) {
         expect(await isFreeModel(model)).toBe(true);
       }
     });
 
+    test('all autoFreeModels should have positive integer weights', () => {
+      for (const { weight } of autoFreeModels) {
+        expect(Number.isInteger(weight)).toBe(true);
+        expect(weight).toBeGreaterThan(0);
+      }
+    });
+
+    test('weights non-Laguna auto-free models higher than Laguna', () => {
+      const lagunaModel = autoFreeModels.find(({ model }) => model.includes('laguna'));
+      expect(lagunaModel?.weight).toBe(1);
+
+      for (const candidate of autoFreeModels) {
+        if (!candidate.model.includes('laguna')) {
+          expect(candidate.weight).toBe(2);
+        }
+      }
+    });
+
+    test('uses autoFreeModels weights when selecting a model', () => {
+      const candidates = [
+        { model: 'preferred/model', weight: 3 },
+        { model: 'other/model', weight: 1 },
+      ];
+      const randomSeed = Array.from({ length: 100 }, (_, index) => `weight-test-${index}`).find(
+        seed => getRandomNumber(seed, 4) === 1
+      );
+      expect(randomSeed).toBeDefined();
+      if (!randomSeed) return;
+
+      expect(getRandomNumber(randomSeed, 4)).toBe(1);
+      expect(selectAutoFreeModel(candidates, randomSeed)).toBe('preferred/model');
+    });
+
     test('all autoFreeModels should use the same AI SDK provider', () => {
       expect(autoFreeModels.length).toBeGreaterThan(0);
-      const providers = new Set(autoFreeModels.map(model => getAiSdkProvider(model, null)));
+      const providers = new Set(autoFreeModels.map(({ model }) => getAiSdkProvider(model, null)));
       expect(providers.size).toBe(1);
     });
 

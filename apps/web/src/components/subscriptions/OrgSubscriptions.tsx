@@ -8,6 +8,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { isSeatsTerminal } from './helpers';
 import { TerminalToggle } from './TerminalToggle';
 import { SeatsGroup } from './seats/SeatsGroup';
+import { OrgKiloPassGroup } from './org-kilo-pass/OrgKiloPassGroup';
 
 export function OrgSubscriptions({ organizationId }: { organizationId: string }) {
   const [showTerminal, setShowTerminal] = useState(false);
@@ -21,10 +22,19 @@ export function OrgSubscriptions({ organizationId }: { organizationId: string })
       { enabled: !!organizationId }
     )
   );
+  // Shares the OrgKiloPassGroup summary query cache; used only to surface the
+  // "Show ended" toggle when an ended org-pass agreement exists.
+  const kiloPassSummaryQuery = useQuery(
+    trpc.organizations.kiloPass.summary.queryOptions(
+      { organizationId },
+      { enabled: !!organizationId }
+    )
+  );
 
   const hasTerminalSubscriptions =
-    subscriptionQuery.data?.subscription != null &&
-    isSeatsTerminal(subscriptionQuery.data.subscription.status);
+    (subscriptionQuery.data?.subscription != null &&
+      isSeatsTerminal(subscriptionQuery.data.subscription.status)) ||
+    kiloPassSummaryQuery.data?.commercialState === 'ended';
 
   return (
     <PageLayout
@@ -44,6 +54,9 @@ export function OrgSubscriptions({ organizationId }: { organizationId: string })
         organizationId={organizationId}
         organizationPlan={organizationQuery.data?.plan ?? 'teams'}
         showTerminal={showTerminal}
+        addOn={
+          <OrgKiloPassGroup organizationId={organizationId} showTerminal={showTerminal} unframed />
+        }
       />
     </PageLayout>
   );

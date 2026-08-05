@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
+import type * as nextServerModule from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
 import type * as analyticsDbModule from '@/lib/code-reviews/analytics/db';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
@@ -95,6 +96,23 @@ const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
 const mockDisableCodeReviewForRepeatedCloneTimeoutsToday = jest.fn<any>();
 
 // --- Module mocks ---
+
+jest.mock('next/server', () => {
+  const actual = jest.requireActual<typeof nextServerModule>('next/server');
+  return {
+    ...actual,
+    // The route hands `after()` an already-started promise (dispatch is
+    // kicked off immediately, not deferred behind it) so it can keep the
+    // serverless invocation alive until the promise settles. Outside a real
+    // request scope `after()` throws, so just swallow the task here; the
+    // dispatch call itself already ran by the time this is invoked.
+    after: (task: Promise<unknown> | (() => Promise<void> | void)) => {
+      if (typeof task === 'function') {
+        void task();
+      }
+    },
+  };
+});
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
@@ -1306,6 +1324,86 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         REVIEW_ID,
         'completed',
         expect.objectContaining({ terminalReason: undefined })
+      );
+    });
+
+    it('derives the terminal reason from the structured failure payload', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Agent wrapper failed while processing the message',
+          failure: { stage: 'agent_activity', code: 'wrapper_error_after_activity' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'wrapper_failed' })
+      );
+    });
+
+    it('keeps rate limiting distinct from generic assistant failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          failure: { code: 'assistant_error', message: 'Assistant request was rate limited' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'assistant_rate_limited' })
+      );
+    });
+
+    // model_missing arrives with the generic message 'No model was selected',
+    // which the message-based model-not-found check cannot match. Without the
+    // structured path re-applying normalization the row would stay 'failed' and
+    // the customer would get generic copy instead of the actionable message.
+    it('normalizes status to cancelled for a structured model_missing failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'No model was selected',
+          failure: { stage: 'pre_dispatch', code: 'model_missing' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'cancelled', terminalReason: 'model_not_found' })
+      );
+    });
+
+    // errorMessage is deliberately omitted. The real payment_required safe
+    // message contains 'insufficient credits', which the earlier text-based
+    // billing heuristic matches, so including it would set terminalReason before
+    // the structured branch runs and the assertion would pass even if the
+    // payment_required mapping were deleted.
+    it('normalizes status to failed for a structured payment_required failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'interrupted',
+          failure: { code: 'payment_required' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'billing' })
       );
     });
   });
@@ -2873,6 +2971,99 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    // Notification only: the customer is told the cause, but the check stays a
+    // plain failure and Code Reviewer is not disabled. A provider rate limit is
+    // transient and there is nothing to reconfigure.
+    it('names the customer key for a byok rate limit without requiring action', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'failure',
+          output: expect.objectContaining({
+            title: 'Kilo Code Review rate limited',
+            summary: 'Your provider API key hit its rate limit.',
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    // A customer's exhausted quota will still be exhausted a moment later, so
+    // retrying burns a second review against the same closed door.
+    it('does not auto-retry a byok rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+    });
+
+    // The GitLab commit status is built by a separate function from the GitHub
+    // check run, so it needs its own coverage.
+    it('names the customer key in the GitLab commit status', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Your provider API key hit its rate limit.',
+        }),
+        'https://gitlab.com'
+      );
+    });
+
+    // Our own capacity can free up, so this one stays retryable.
+    it('still auto-retries a managed key rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_managed',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalled();
+    });
+
     it('uses failure conclusion for non-billing failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
@@ -3287,7 +3478,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.any(Error),
         expect.objectContaining({
-          tags: { source: 'code-review-status-model-not-found-summary' },
+          tags: { source: 'code-review-status-failure-summary' },
         })
       );
     });
@@ -3576,6 +3767,141 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         reviewGuidance: { used: false, ref: null, truncated: false },
       });
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('failure summary comment', () => {
+    // `cloudAgentSessionId` is what gates structured failure parsing on the
+    // route, so a payload without it never resolves a terminal reason.
+    const byokRateLimitRequest = {
+      cloudAgentSessionId: 'agent_1',
+      status: 'failed',
+      failure: {
+        code: 'assistant_error',
+        assistantReason: 'rate_limited',
+        providerOwnership: 'byok',
+      },
+    };
+
+    it('replaces the GitHub summary with the authored notice and collapses history', async () => {
+      const review = makeReview({
+        previous_summary_body: '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings',
+        previous_summary_head_sha: 'previous-head-sha',
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+      mockAppendPreviousReviewSummaryHistory.mockReturnValue('notice with history');
+
+      await POST(makeRequest(byokRateLimitRequest), makeParams(REVIEW_ID));
+
+      expect(mockAppendPreviousReviewSummaryHistory).toHaveBeenCalledWith(
+        expect.stringContaining('<!-- kilo-review -->'),
+        review.previous_summary_body,
+        'previous-head-sha',
+        { maxBodyCharacters: 65_536 }
+      );
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        99,
+        'notice with history',
+        'standard'
+      );
+    });
+
+    it('creates the summary comment when the pull request has none yet', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+      mockAppendPreviousReviewSummaryHistory.mockReturnValue('notice only');
+
+      await POST(makeRequest(byokRateLimitRequest), makeParams(REVIEW_ID));
+
+      expect(mockCreatePRComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        'notice only',
+        'standard'
+      );
+    });
+
+    it('replaces the GitLab note with the authored notice', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockAppendPreviousReviewSummaryHistory.mockReturnValue('notice with history');
+
+      await POST(makeRequest(byokRateLimitRequest), makeParams(REVIEW_ID));
+
+      expect(mockUpdateKiloReviewNote).toHaveBeenCalledWith(
+        'mock-token',
+        'owner/repo',
+        1,
+        88,
+        'notice with history',
+        'https://gitlab.com'
+      );
+    });
+
+    // The notice is published to a pull request that may be public, so only
+    // reasons with reviewed copy are allowed to write one. Everything else must
+    // stay in the checks tab rather than leak an internal error string.
+    it('writes nothing for a failure without authored copy', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          failure: { stage: 'agent_activity', code: 'wrapper_error_after_activity' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockCreatePRComment).not.toHaveBeenCalled();
+    });
+
+    // A managed-key rate limit is Kilo's own quota. Telling the customer to
+    // check their provider key would be wrong.
+    it('writes nothing for a managed key rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          failure: {
+            code: 'assistant_error',
+            assistantReason: 'rate_limited',
+            providerOwnership: 'managed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockCreatePRComment).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing on a successful review', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockCreatePRComment).not.toHaveBeenCalled();
+    });
+
+    it('leaves Bitbucket untouched', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'bitbucket', check_run_id: null })
+      );
+
+      await POST(makeRequest(byokRateLimitRequest), makeParams(REVIEW_ID));
+
+      expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockCreatePRComment).not.toHaveBeenCalled();
     });
   });
 });

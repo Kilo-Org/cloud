@@ -156,4 +156,86 @@ describe('system environment builder', () => {
     expect(context).toContain('[memory-1]');
     expect(context).toContain('</system_environment>');
   });
+
+  it('includes the workflows index when workflows and a tab are present', () => {
+    const context = formatSystemEnvironment({
+      memories: [],
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+      workflows: [
+        {
+          createdAt: 1_700_000_000_000,
+          description: 'Test workflow',
+          id: 'wf-1',
+          name: 'Test Workflow',
+          scopeOrigin: 'https://example.com',
+          script: 'return { done: true };',
+          updatedAt: 1_700_000_000_000,
+        },
+      ],
+    });
+
+    expect(context).toContain('<workflows count="1">');
+    expect(context).toContain('[wf-1]');
+    expect(context).toContain('Test Workflow');
+    expect(context).toContain('</system_environment>');
+  });
+
+  it('omits the workflows block when no workflows match the tab scope', () => {
+    const context = formatSystemEnvironment({
+      memories: [],
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+      workflows: [
+        {
+          createdAt: 1_700_000_000_000,
+          description: 'Test',
+          id: 'wf-1',
+          name: 'Test',
+          scopeOrigin: 'https://other.example.com',
+          script: 'return { done: true };',
+          updatedAt: 1_700_000_000_000,
+        },
+      ],
+    });
+
+    expect(context).not.toContain('<workflows');
+  });
+
+  it('omits the workflows block when workflows param is undefined', () => {
+    const context = formatSystemEnvironment({
+      memories: [],
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+    });
+
+    expect(context).not.toContain('<workflows');
+  });
+
+  it('includes both memories and workflows indices together', () => {
+    const context = formatSystemEnvironment({
+      memories: [
+        {
+          createdAt: 1_700_000_000_000,
+          id: 'memory-1',
+          pageTitle: 'Example',
+          pageUrl: 'https://example.com/',
+          text: 'saved',
+        },
+      ],
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+      workflows: [
+        {
+          createdAt: 1_700_000_000_000,
+          description: 'Test workflow',
+          id: 'wf-1',
+          name: 'Test Workflow',
+          scopeOrigin: 'https://example.com',
+          script: 'return { done: true };',
+          updatedAt: 1_700_000_000_000,
+        },
+      ],
+    });
+
+    expect(context).toContain('<memories count="1">');
+    expect(context).toContain('<workflows count="1">');
+    expect(context).toContain('</system_environment>');
+  });
 });

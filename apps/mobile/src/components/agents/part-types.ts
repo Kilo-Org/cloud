@@ -5,7 +5,7 @@ import {
   type ReasoningPart,
   type TextPart,
   type ToolPart,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 export function isTextPart(part: Part): part is TextPart {
   return part.type === 'text';
@@ -45,12 +45,9 @@ export function isPartStreaming(part: Part): boolean {
   return false;
 }
 
-export function shouldRenderReasoningPart(part: Part, isStreaming: boolean): boolean {
+export function shouldRenderReasoningPart(part: Part, _isStreaming: boolean): boolean {
   if (!isReasoningPart(part)) {
     return false;
   }
-  if (part.text.trim() !== '') {
-    return true;
-  }
-  return isStreaming && isPartStreaming(part);
+  return part.text.trim() !== '';
 }

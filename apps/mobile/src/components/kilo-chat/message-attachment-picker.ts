@@ -4,7 +4,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert, Linking } from 'react-native';
 import { type AddFileInput } from '@kilocode/kilo-chat-hooks';
 
+import { type ClipboardImageFile } from '@/lib/agent-attachments/clipboard-image';
+
 import {
+  type MessageAttachment,
   type NativeAttachmentSelection,
   normalizeAttachmentSelection,
 } from './message-attachment-state';
@@ -21,31 +24,52 @@ const IMAGE_PICKER_OPTIONS = {
   quality: 1,
 } satisfies ImagePicker.ImagePickerOptions;
 
-async function assetToPickedAttachment(asset: LocalAttachmentAsset): Promise<PickedAttachment> {
+function assetToSelection(asset: LocalAttachmentAsset): MessageAttachment {
   const file = new File(asset.uri);
-  const attachment = normalizeAttachmentSelection({
+  return normalizeAttachmentSelection({
     uri: asset.uri,
     name: asset.name,
     fileName: asset.fileName ?? file.name,
     mimeType: asset.mimeType ?? file.type,
-    size: asset.size ?? asset.fileSize ?? file.size,
+    // Never trust the smaller number. `File.size` is `0` when the file does not
+    // exist or cannot be read, and picker-reported sizes are unreliable (the
+    // cloud-agent path re-measures for the same reason, see
+    // `lib/agent-attachments/validate.ts`). Taking the max keeps the gate
+    // fail-closed both ways: an unreadable file with no reported size lands on
+    // 0 and is rejected before any bytes are read, and a file the picker
+    // reports as larger than the stat is judged on the larger figure.
+    size: Math.max(file.size, asset.size ?? 0, asset.fileSize ?? 0),
     fileSize: asset.fileSize,
   });
+}
 
-  // expo-file-system's `File` is not a `Blob`, so XHR's `send(...)` cannot
-  // upload it. Materialize a real `Blob` from the file:// URI here so the
-  // upload PUT carries the correct body and matches the signed Content-Length.
-  const response = await fetch(asset.uri);
+/**
+ * Materialize a real `Blob` from the file:// URI so the upload PUT carries the
+ * correct body and matches the signed Content-Length. expo/fetch (global since
+ * SDK 56) supports file:// on iOS (NativeResponse.swift) and Android
+ * (OkHttpFileUrlInterceptor.kt); File implements Blob but XHR still needs a
+ * store-backed Blob for the signed PUT.
+ *
+ * Only ever called for attachments that already passed
+ * `selectAllowedAttachments` — this reads the whole file into memory.
+ */
+export async function materializeAttachment(
+  attachment: MessageAttachment
+): Promise<PickedAttachment> {
+  const response = await fetch(attachment.uri);
   const blob = await response.blob();
-
   return {
-    input: {
-      blob,
-      filename: attachment.filename,
-      mimeType: attachment.mimeType,
-    },
-    localUri: asset.uri,
+    input: { blob, filename: attachment.filename, mimeType: attachment.mimeType },
+    localUri: attachment.uri,
   };
+}
+
+export function clipboardImageToSelection(file: ClipboardImageFile): MessageAttachment {
+  return assetToSelection({
+    uri: file.uri,
+    name: file.name,
+    mimeType: file.mimeType,
+  });
 }
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
@@ -55,7 +79,7 @@ function showPermissionSettingsAlert({ message, title }: { message: string; titl
   ]);
 }
 
-export async function pickCameraImage(): Promise<PickedAttachment[]> {
+export async function pickCameraImage(): Promise<MessageAttachment[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
@@ -71,10 +95,10 @@ export async function pickCameraImage(): Promise<PickedAttachment[]> {
     return [];
   }
 
-  return Promise.all(result.assets.map(imageAssetToPicked));
+  return result.assets.map(imageAssetToSelection);
 }
 
-export async function pickLibraryImages(): Promise<PickedAttachment[]> {
+export async function pickLibraryImages(): Promise<MessageAttachment[]> {
   const result = await ImagePicker.launchImageLibraryAsync({
     ...IMAGE_PICKER_OPTIONS,
     allowsMultipleSelection: true,
@@ -84,10 +108,10 @@ export async function pickLibraryImages(): Promise<PickedAttachment[]> {
     return [];
   }
 
-  return Promise.all(result.assets.map(imageAssetToPicked));
+  return result.assets.map(imageAssetToSelection);
 }
 
-export async function pickFiles(): Promise<PickedAttachment[]> {
+export async function pickFiles(): Promise<MessageAttachment[]> {
   const result = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
     multiple: true,
@@ -98,17 +122,16 @@ export async function pickFiles(): Promise<PickedAttachment[]> {
     return [];
   }
 
-  return Promise.all(result.assets.map(documentAssetToPicked));
+  return result.assets.map(documentAssetToSelection);
 }
 
-// eslint-disable-next-line typescript-eslint/promise-function-async -- thin pass-through; making it async only to satisfy this rule conflicts with `require-await`.
-function imageAssetToPicked(asset: {
+function imageAssetToSelection(asset: {
   uri: string;
   fileName?: string | null;
   mimeType?: string | null;
   fileSize?: number | null;
-}): Promise<PickedAttachment> {
-  return assetToPickedAttachment({
+}): MessageAttachment {
+  return assetToSelection({
     uri: asset.uri,
     fileName: asset.fileName,
     mimeType: asset.mimeType,
@@ -116,14 +139,13 @@ function imageAssetToPicked(asset: {
   });
 }
 
-// eslint-disable-next-line typescript-eslint/promise-function-async -- thin pass-through; making it async only to satisfy this rule conflicts with `require-await`.
-function documentAssetToPicked(asset: {
+function documentAssetToSelection(asset: {
   uri: string;
   name: string;
   mimeType?: string;
   size?: number;
-}): Promise<PickedAttachment> {
-  return assetToPickedAttachment({
+}): MessageAttachment {
+  return assetToSelection({
     uri: asset.uri,
     name: asset.name,
     mimeType: asset.mimeType,

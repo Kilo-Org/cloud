@@ -8,7 +8,7 @@ import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Builder, By, Key } from 'selenium-webdriver';
 import type { WebDriver, WebElement } from 'selenium-webdriver';
-import firefox from 'selenium-webdriver/firefox';
+import firefox, { ServiceBuilder } from 'selenium-webdriver/firefox';
 import { z } from 'zod';
 
 const extensionRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -55,6 +55,8 @@ const chromeWorkflowNames = [
   'memory index is included in the chat request context',
   'memory tools search and read saved memories',
   'settings memories list supports delete and shows the empty state',
+  'model picker search filters and selects by model id',
+  'workflow create, approve, and run returns result',
 ] as const;
 
 const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
@@ -62,12 +64,20 @@ const AGENT_MEMORIES_KEY = 'kiloAgentMemories';
 const EMPTY_MEMORIES_MESSAGE =
   'No memories yet. Highlight text on any page, right-click, and choose Add to memory.';
 const CONFIRMATION_MESSAGE = 'Saved to memory';
+const workflowToolNames = [
+  'search_workflows',
+  'get_workflow',
+  'save_workflow',
+  'save_memory',
+] as const;
+
 const safeToolNames = [
   'get_page_snapshot',
   'get_element_details',
   'find_in_page',
   'search_memories',
   'get_memory',
+  ...workflowToolNames,
 ] as const;
 
 interface ServerHandle {
@@ -164,6 +174,9 @@ const dangerousToolNames = [
   'search_memories',
   'get_memory',
   'eval',
+  ...workflowToolNames,
+  'run_workflow',
+  'delete_workflow',
 ];
 
 const defaultFirstCompletionEvents = (): unknown[] => [
@@ -324,6 +337,27 @@ const startKiloApiServer = async (): Promise<KiloApiHandle> => {
         if (request.url === '/api/organizations') {
           sendJson(response, { organizations: options.organizations ?? [] });
           return;
+        }
+
+        {
+          const requestPath = (request.url ?? '').split('?')[0] ?? '';
+
+          if (requestPath.startsWith('/api/trpc/modelPreferences.')) {
+            if (requestPath.endsWith('/modelPreferences.get')) {
+              sendJson(response, {
+                result: { data: { favorites: [], lastSelected: null } },
+              });
+              return;
+            }
+
+            if (
+              requestPath.endsWith('/modelPreferences.addFavorite') ||
+              requestPath.endsWith('/modelPreferences.removeFavorite')
+            ) {
+              sendJson(response, { result: { data: { success: true } } });
+              return;
+            }
+          }
         }
 
         if (request.url === '/api/gateway/models') {
@@ -763,9 +797,12 @@ const startFirefoxSession = async (): Promise<FirefoxSession> => {
   options.setPreference('extensions.install.requireBuiltInCerts', false);
   options.setPreference('xpinstall.signatures.required', false);
 
+  const service = new ServiceBuilder().addArguments('--allow-system-access');
+
   const sessionDriver = await new Builder()
     .forBrowser('firefox')
     .setFirefoxOptions(options)
+    .setFirefoxService(service)
     .build();
 
   const targetServers: ServerHandle[] = [];
@@ -908,6 +945,92 @@ const getSelectText = async (driver: WebDriver, ariaLabel: string): Promise<stri
   }, ariaLabel);
 
   return String(result);
+};
+
+const modelTriggerSelector = 'button[aria-label="Model"]';
+const modelDialogSelector = '[role="dialog"][aria-modal="true"][aria-label="Select model"]';
+
+const getModelTriggerText = async (driver: WebDriver): Promise<string> => {
+  const result = await driver.executeScript((selector: string) => {
+    const trigger = document.querySelector(selector);
+
+    if (!(trigger instanceof HTMLButtonElement)) {
+      return '';
+    }
+
+    return trigger.textContent?.trim() ?? '';
+  }, modelTriggerSelector);
+
+  return String(result);
+};
+
+/** Selected model id from the Model trigger (`data-model-id`). Ready for M3. */
+const getModelTriggerSelectedId = async (driver: WebDriver): Promise<string | null> => {
+  const result: unknown = await driver.executeScript((selector: string) => {
+    const trigger = document.querySelector(selector);
+
+    if (!(trigger instanceof HTMLButtonElement)) {
+      return null;
+    }
+
+    return trigger.dataset['modelId'] ?? null;
+  }, modelTriggerSelector);
+
+  if (typeof result === 'string') {
+    return result;
+  }
+
+  return null;
+};
+
+const modelOptionByIdLocator = (modelId: string): ReturnType<typeof By.xpath> =>
+  By.xpath(
+    `//*[@role="dialog" and @aria-modal="true" and @aria-label="Select model"]//button[@data-model-id=${JSON.stringify(modelId)}]`
+  );
+
+/** Select model by `data-model-id` (never by name). Mirrors Playwright helper. */
+const selectModelByIdFirefox = async (driver: WebDriver, modelId: string): Promise<void> => {
+  const dialogAlreadyOpen = async (): Promise<boolean> => {
+    const dialogs = await driver.findElements(By.css(modelDialogSelector));
+
+    return dialogs.length > 0 && (await dialogs[0]?.isDisplayed()) === true;
+  };
+
+  if (!(await dialogAlreadyOpen())) {
+    await waitUntil(
+      driver,
+      async () => {
+        const elements = await driver.findElements(By.css(modelTriggerSelector));
+
+        return elements.length > 0 && (await elements[0]?.isDisplayed()) === true;
+      },
+      'Timed out waiting for Model trigger'
+    );
+    await driver.findElement(By.css(modelTriggerSelector)).click();
+  }
+
+  const optionLocator = modelOptionByIdLocator(modelId);
+
+  await waitUntil(
+    driver,
+    async () => {
+      const elements = await driver.findElements(optionLocator);
+
+      return elements.length > 0 && (await elements[0]?.isDisplayed()) === true;
+    },
+    `Timed out waiting for model option ${modelId}`
+  );
+  await driver.findElement(optionLocator).click();
+
+  await waitUntil(
+    driver,
+    async () => {
+      const dialogs = await driver.findElements(By.css(modelDialogSelector));
+
+      return dialogs.length === 0;
+    },
+    `Timed out waiting for model dialog to close after selecting ${modelId}`
+  );
 };
 
 const getSelectOptionsText = async (driver: WebDriver, ariaLabel: string): Promise<string> => {
@@ -1173,9 +1296,9 @@ const waitForModel = async (driver: WebDriver, text = 'Claude Sonnet 4'): Promis
   await waitUntil(
     driver,
     async () => {
-      const selectText = await getSelectText(driver, 'Model');
+      const triggerText = await getModelTriggerText(driver);
 
-      return selectText.includes(text);
+      return triggerText.includes(text);
     },
     `Timed out waiting for model ${text}`
   );
@@ -1322,6 +1445,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1367,6 +1491,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1403,6 +1528,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1487,6 +1613,7 @@ const scenarios: FirefoxScenario[] = [
         },
         async session => {
           await submitDangerousPrompt(session, 'Show markdown');
+          await waitForText(session.driver, 'Markdown title');
           await session.driver.findElement(By.xpath('//h3[normalize-space(.)="Markdown title"]'));
           await session.driver.findElement(By.xpath('//strong[normalize-space(.)="bold text"]'));
 
@@ -1683,6 +1810,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1833,6 +1961,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -1978,6 +2107,7 @@ const scenarios: FirefoxScenario[] = [
         await waitForTextMatch(session.driver, /The selected tab HTML length is [0-9]+\./u);
         await clickButtonByLabel(session.driver, 'New conversation');
         await waitForTextGone(session.driver, 'eval completed');
+        // Empty transcript state (not a seeded assistant message).
         await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
       }),
   },
@@ -2018,6 +2148,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -2068,6 +2199,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -2256,8 +2388,8 @@ const scenarios: FirefoxScenario[] = [
           await session.openSidePanel();
           await seedFirefoxAuth(session.driver);
           await session.driver.navigate().refresh();
-          assert.equal(await isControlDisabled(session.driver, 'select[aria-label="Model"]'), true);
-          assert.match(await getSelectText(session.driver, 'Model'), /Loading models/u);
+          assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
+          assert.match(await getModelTriggerText(session.driver), /Loading models/u);
           assert.equal(
             await isControlDisabled(session.driver, 'select[aria-label="Thinking effort"]'),
             true
@@ -2267,10 +2399,7 @@ const scenarios: FirefoxScenario[] = [
 
           releaseModels();
           await waitForModel(session.driver);
-          assert.equal(
-            await isControlDisabled(session.driver, 'select[aria-label="Model"]'),
-            false
-          );
+          assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), false);
           assert.equal(
             await isControlDisabled(session.driver, 'select[aria-label="Thinking effort"]'),
             false
@@ -2287,10 +2416,10 @@ const scenarios: FirefoxScenario[] = [
       withSession(context.api, { modelFailuresBeforeSuccess: 1 }, async session => {
         await openAuthenticatedPanel(session);
         await waitForText(session.driver, 'Could not load models.');
-        assert.equal(await isControlDisabled(session.driver, 'select[aria-label="Model"]'), true);
+        assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
         await clickButtonByText(session.driver, 'Retry models');
         await waitForModel(session.driver);
-        assert.equal(await isControlDisabled(session.driver, 'select[aria-label="Model"]'), false);
+        assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), false);
       }),
   },
   {
@@ -2326,11 +2455,8 @@ const scenarios: FirefoxScenario[] = [
             await setSelectByValue(session.driver, 'Credit account', 'org-2');
             await orgTwoModelsRequested;
             await clickButtonByLabel(session.driver, 'Close settings');
-            assert.equal(
-              await isControlDisabled(session.driver, 'select[aria-label="Model"]'),
-              true
-            );
-            assert.match(await getSelectText(session.driver, 'Model'), /Loading models/u);
+            assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
+            assert.match(await getModelTriggerText(session.driver), /Loading models/u);
             assert.equal(await isControlDisabled(session.driver, 'button[type="submit"]'), true);
             releaseOrgTwoModels();
             await waitForModel(session.driver, 'Org Two Model');
@@ -2392,7 +2518,7 @@ const scenarios: FirefoxScenario[] = [
             await new Promise(resolve => {
               setTimeout(resolve, 250);
             });
-            assert.match(await getSelectText(session.driver, 'Model'), /Org Two Model/u);
+            assert.match(await getModelTriggerText(session.driver), /Org Two Model/u);
           } finally {
             releaseOrgOneModels();
           }
@@ -2417,6 +2543,7 @@ const scenarios: FirefoxScenario[] = [
             'find_in_page',
             'search_memories',
             'get_memory',
+            ...workflowToolNames,
           ],
         },
         async session => {
@@ -2428,6 +2555,7 @@ const scenarios: FirefoxScenario[] = [
             await sendMessage(session.driver, 'Original tab');
             await waitForText(session.driver, 'Stop');
             await clickButtonByLabel(session.driver, 'New conversation');
+            // Empty transcript state on the new conversation tab.
             await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
             await clickButtonByText(session.driver, 'Original tab');
             await waitForText(session.driver, 'Stop');
@@ -2758,6 +2886,196 @@ const scenarios: FirefoxScenario[] = [
         assert.equal(regionButtons.length, 0);
         await closeFirefoxSettings(session.driver);
       }),
+  },
+  {
+    name: 'model picker search filters and selects by model id',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        const modelId = 'anthropic/claude-sonnet-4';
+
+        await openAuthenticatedPanel(session);
+        await waitForModel(session.driver);
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const elements = await session.driver.findElements(By.css(modelTriggerSelector));
+
+            return elements.length > 0 && (await elements[0]?.isEnabled()) === true;
+          },
+          'Timed out waiting for Model trigger to enable'
+        );
+
+        await session.driver.findElement(By.css(modelTriggerSelector)).click();
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const dialogs = await session.driver.findElements(By.css(modelDialogSelector));
+
+            return dialogs.length > 0 && (await dialogs[0]?.isDisplayed()) === true;
+          },
+          'Timed out waiting for model picker dialog'
+        );
+
+        const searchInput = await session.driver.findElement(
+          By.css(`${modelDialogSelector} input[aria-label="Search models"]`)
+        );
+        await searchInput.clear();
+        await searchInput.sendKeys('claude-sonnet');
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const options = await session.driver.findElements(modelOptionByIdLocator(modelId));
+
+            return options.length > 0 && (await options[0]?.isDisplayed()) === true;
+          },
+          `Timed out waiting for filtered model option ${modelId}`
+        );
+
+        await selectModelByIdFirefox(session.driver, modelId);
+        assert.equal(await getModelTriggerSelectedId(session.driver), modelId);
+      }),
+  },
+  {
+    name: 'workflow create, approve, and run returns result',
+    run: async context => {
+      const simpleReadScript = `
+  const heading = await page.text('h1');
+  return { done: true, result: { heading } };
+`;
+
+      const targetServer = await startTargetPageServer();
+      const scopeOrigin = new URL(targetServer.url).origin;
+
+      try {
+        await withSession(
+          context.api,
+          {
+            firstCompletionEvents: [
+              {
+                choices: [
+                  {
+                    delta: {
+                      tool_calls: [
+                        {
+                          function: {
+                            arguments: JSON.stringify({
+                              description: 'Read the page heading.',
+                              name: 'Read heading',
+                              scopeOrigin,
+                              script: simpleReadScript,
+                            }),
+                            name: 'save_workflow',
+                          },
+                          id: 'call_save_wf_firefox',
+                          index: 0,
+                          type: 'function',
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+            secondCompletionEvents: contentOnlyCompletion('Workflow saved and ready to run.'),
+            toolNames: dangerousToolNames,
+          },
+          async session => {
+            // Navigate to the pre-started target page.
+            await session.driver.switchTo().newWindow('tab');
+            await session.driver.get(targetServer.url);
+
+            // Open side panel on extension origin before any storage access.
+            await openAuthenticatedPanel(session);
+            await waitForModel(session.driver);
+            await waitForTargetTab(session.driver, 'Kilo extension fixture');
+            await switchToDangerousMode(session.driver);
+
+            // Turn 1: save_workflow — true create (no workflowId, storage starts empty).
+            await sendMessage(session.driver, 'Save a workflow to read the heading');
+
+            // The tool call triggers the approval card.
+            await waitUntil(
+              session.driver,
+              async () => {
+                const dialogs = await session.driver.findElements(
+                  By.css('[role="dialog"][aria-label="Save workflow"]')
+                );
+                return dialogs.length > 0;
+              },
+              'Timed out waiting for Save workflow dialog'
+            );
+
+            // Approve the workflow.
+            await clickButtonByText(session.driver, 'Approve and save');
+            await waitForText(session.driver, 'Workflow saved and ready to run.');
+
+            // Read the created workflow from storage to get its assigned ID.
+            const storedWorkflows = await readFirefoxStorage(session.driver, [
+              'kiloAgentWorkflows',
+            ]);
+            const workflowsArray = z
+              .array(z.object({ id: z.string() }))
+              .parse(storedWorkflows['kiloAgentWorkflows']);
+            const createdWorkflowId = workflowsArray[0]?.id;
+            assert.ok(
+              typeof createdWorkflowId === 'string',
+              'Expected a created workflow in storage'
+            );
+
+            // Reset the API with the real workflow ID for the run_workflow turn.
+            context.api.reset({
+              firstCompletionEvents: [
+                {
+                  choices: [
+                    {
+                      delta: {
+                        tool_calls: [
+                          {
+                            function: {
+                              arguments: JSON.stringify({
+                                dryRun: false,
+                                workflowId: createdWorkflowId,
+                              }),
+                              name: 'run_workflow',
+                            },
+                            id: 'call_run_wf_firefox',
+                            index: 0,
+                            type: 'function',
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              ],
+              secondCompletionEvents: contentOnlyCompletion(
+                'The workflow read the heading: Kilo extension fixture.'
+              ),
+              toolNames: dangerousToolNames,
+            });
+
+            // Turn 2: the model returns run_workflow — the extension executes it.
+            await sendMessage(session.driver, 'Run the workflow now');
+
+            // The workflow result appears in the conversation.
+            await waitForText(session.driver, 'run_workflow completed');
+            const wfResultBody = await expandToolExchange(session.driver, 'run_workflow');
+            assert.match(wfResultBody, /"heading"\s*:\s*"Kilo extension fixture"/u);
+
+            // The follow-up assistant turn receives explicit content, not the generic fallback.
+            await waitForText(
+              session.driver,
+              'The workflow read the heading: Kilo extension fixture.'
+            );
+          }
+        );
+      } finally {
+        await targetServer.close();
+      }
+    },
   },
 ];
 

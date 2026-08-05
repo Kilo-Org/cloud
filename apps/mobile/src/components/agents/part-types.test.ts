@@ -1,4 +1,4 @@
-import { type ReasoningPart, type TextPart } from 'cloud-agent-sdk';
+import { type ReasoningPart, type TextPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import { isPartStreaming, isSnapshotProgressPart, shouldRenderReasoningPart } from './part-types';
@@ -67,16 +67,16 @@ describe('shouldRenderReasoningPart', () => {
     expect(shouldRenderReasoningPart(part, false)).toBe(true);
   });
 
-  it('renders a reasoning part that is empty while effectively streaming', () => {
+  it('does not render a reasoning part that is empty while effectively streaming', () => {
     const part = makeReasoningPart('', false);
     expect(isPartStreaming(part)).toBe(true);
-    expect(shouldRenderReasoningPart(part, true)).toBe(true);
+    expect(shouldRenderReasoningPart(part, true)).toBe(false);
   });
 
-  it('renders a whitespace-only unfinished reasoning part while the parent is streaming', () => {
+  it('does not render a whitespace-only unfinished reasoning part while the parent is streaming', () => {
     const part = makeReasoningPart('   \n\t  ', false);
     expect(isPartStreaming(part)).toBe(true);
-    expect(shouldRenderReasoningPart(part, true)).toBe(true);
+    expect(shouldRenderReasoningPart(part, true)).toBe(false);
   });
 
   it('does not render a non-reasoning part', () => {

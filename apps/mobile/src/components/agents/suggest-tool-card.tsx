@@ -1,12 +1,13 @@
 import { useAtomValue } from 'jotai';
 import { Sparkles } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { useSessionManager } from '@/components/agents/session-provider';
 
+import { FixedPartRow } from './fixed-part-row';
 import { resolveSuggestionPresentation } from './suggestion-card-state';
 import { SuggestionCard } from './suggestion-card';
-import { ToolCardShell } from './tool-card-shell';
+import { getToolDisplay } from './tool-card-display';
 
 export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const manager = useSessionManager();
@@ -33,12 +34,15 @@ export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
     );
   }
 
+  const display = getToolDisplay(part);
+  const label = display.subtitle ?? display.title;
+
   return (
-    <ToolCardShell
+    <FixedPartRow
       icon={Sparkles}
-      title="Suggestion"
-      subtitle={part.state.status === 'error' ? 'Suggestion dismissed' : 'Suggestion'}
+      label={label}
       status={part.state.status}
+      accessibilityLabel={`${label} tool, ${part.state.status}`}
     />
   );
 }

@@ -69,6 +69,9 @@ export function ScreenHeader({
         {title}
       </Text>
     );
+    // Title caret removed: rename stays available via the pressable title
+    // itself. The backIcon === 'close' ChevronDown on the back control is
+    // unrelated and stays.
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
@@ -77,10 +80,9 @@ export function ScreenHeader({
         accessibilityLabel={
           onTitlePressAccessibilityLabel ?? (title ? `Open menu for ${title}` : 'Open menu')
         }
-        className="flex-row items-center gap-1 active:opacity-70"
+        className="active:opacity-70"
       >
         {titleText}
-        <ChevronDown size={16} color={colors.mutedForeground} />
       </Pressable>
     ) : (
       titleText
@@ -103,7 +105,7 @@ export function ScreenHeader({
               hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel={resolvedBackIcon === 'close' ? 'Close' : 'Go back'}
-              className="-ml-1 mr-1 active:opacity-70"
+              className="-ml-1 mr-1 shrink-0 active:opacity-70"
             >
               {resolvedBackIcon === 'close' ? (
                 <ChevronDown size={24} color={colors.foreground} />
@@ -112,7 +114,7 @@ export function ScreenHeader({
               )}
             </Pressable>
           )}
-          <View className="flex-1">
+          <View className="min-w-0 flex-1">
             {eyebrow ? <Eyebrow className="mb-0.5">{eyebrow}</Eyebrow> : null}
             {titleNode}
           </View>

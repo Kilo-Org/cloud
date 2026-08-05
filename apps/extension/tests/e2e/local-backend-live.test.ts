@@ -4,8 +4,9 @@ import type { BrowserContext, Page, Request } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
+import { expectSelectedModelId, selectModelById } from './model-picker-e2e-helpers';
 
-const localBackendUrl = 'http://localhost:3000';
+const localBackendUrl = process.env['LOCAL_BACKEND_ORIGIN'] ?? 'http://localhost:3000';
 const localUserEmail = 'fl@fl.fl';
 const frontierModel = 'kilo-auto/frontier';
 
@@ -212,9 +213,30 @@ const signInWithLocalDeviceAuth = async ({
 
   const authPage = await context.newPage();
   const callbackPath = `/device-auth?code=${encodeURIComponent(code)}&app=1`;
+  // Shared stack may run with APP_URL_OVERRIDE at a LAN IP.
+  // Cookies set off-origin make the post-login redirect silently drop authentication.
+  let authOrigin = localBackendUrl;
+
+  try {
+    const probe = await context.request.get(`${localBackendUrl}/users/after-sign-in`, {
+      maxRedirects: 0,
+    });
+    const { location } = probe.headers();
+
+    if (
+      probe.status() >= 300 &&
+      probe.status() < 400 &&
+      location !== undefined &&
+      location !== ''
+    ) {
+      authOrigin = new URL(location).origin;
+    }
+  } catch {
+    // Fall back to localBackendUrl on non-redirect, missing/invalid location, or request error.
+  }
 
   await authPage.goto(
-    `${localBackendUrl}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
+    `${authOrigin}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
   );
   await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 60_000 });
   await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
@@ -222,20 +244,7 @@ const signInWithLocalDeviceAuth = async ({
 };
 
 const selectFrontierModel = async (sidePanel: Page): Promise<void> => {
-  await expect
-    .poll(
-      () =>
-        sidePanel
-          .getByLabel('Model')
-          .locator('option')
-          .evaluateAll(options =>
-            options.map(option => (option instanceof HTMLOptionElement ? option.value : ''))
-          ),
-      { timeout: 30_000 }
-    )
-    .toContain(frontierModel);
-
-  await sidePanel.getByLabel('Model').selectOption(frontierModel);
+  await selectModelById(sidePanel, frontierModel);
 
   const thinkingValues = await sidePanel
     .getByLabel('Thinking effort')
@@ -402,7 +411,7 @@ test('live local backend keeps frontier conversations stable across modes, reloa
 
     await sidePanel.getByLabel('New conversation').click();
     await expect(sidePanel.getByLabel(/Danger mode/u)).toBeVisible();
-    await expect(sidePanel.getByLabel('Model')).toHaveValue(frontierModel);
+    await expectSelectedModelId(sidePanel, frontierModel);
     await sidePanel.getByLabel(/Danger mode/u).click();
     await sidePanel.getByRole('button', { name: /^Safe/u }).click();
     await sidePanel.getByRole('tab').nth(0).click();
@@ -417,7 +426,7 @@ test('live local backend keeps frontier conversations stable across modes, reloa
 
     await sidePanel.reload();
     await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
-    await expect(sidePanel.getByLabel('Model')).toHaveValue(frontierModel);
+    await expectSelectedModelId(sidePanel, frontierModel);
     await expect(sidePanel.getByLabel(/Danger mode/u)).toBeVisible();
     await expect(
       getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations'])
@@ -720,7 +729,7 @@ test('live local backend recovers after side panel reload during an active reque
       sidePanel.getByLabel('Agent conversation').getByText('LOCAL_RELOAD_ABORT')
     ).toBeVisible();
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
-    await expect(sidePanel.getByLabel('Model')).toHaveValue(frontierModel);
+    await expectSelectedModelId(sidePanel, frontierModel);
     await expect(
       getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations'])
     ).resolves.toHaveProperty('kiloAuth');
@@ -964,6 +973,127 @@ test('live local backend manual Compact now compacts a frontier conversation', a
   } finally {
     await context.close();
     await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+const restoreFrontierFavoriteIfNeeded = async (
+  sidePanel: Page,
+  wasFavoriteBefore: 'unknown' | boolean
+): Promise<void> => {
+  // Only undo a starring we performed after observing prior state as non-favorite.
+  if (wasFavoriteBefore !== false) {
+    return;
+  }
+
+  // Best-effort: the panel may have crashed or closed after a test-level timeout.
+  // A throw here would mask the original failure and skip context cleanup in the caller.
+  try {
+    const dialog = sidePanel.locator(
+      '[role="dialog"][aria-modal="true"][aria-label="Select model"]'
+    );
+    const isOpen = (await dialog.count()) > 0;
+
+    if (!isOpen) {
+      const trigger = sidePanel.getByLabel('Model');
+      const canOpen = await trigger.isEnabled().catch(() => false);
+
+      if (!canOpen) {
+        return;
+      }
+
+      await trigger.click().catch(() => null);
+      await dialog.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => null);
+    }
+
+    if ((await dialog.count()) === 0) {
+      return;
+    }
+
+    const frontierRow = dialog.locator(`button[data-model-id="${frontierModel}"]`);
+    const frontierName = (await frontierRow.getAttribute('aria-label').catch(() => null)) ?? '';
+
+    if (frontierName.length === 0) {
+      return;
+    }
+
+    const removeStar = dialog.getByLabel(`Remove ${frontierName} from favorites`);
+
+    if ((await removeStar.count()) === 0) {
+      return;
+    }
+
+    await removeStar.click().catch(() => null);
+    await expect(dialog.getByLabel(`Add ${frontierName} to favorites`))
+      .toBeVisible({ timeout: 30_000 })
+      .catch(() => null);
+  } catch {
+    // Restore is best-effort; the original test outcome stands.
+  }
+};
+
+test('live local backend personal favorites round-trip for frontier', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+  const sidePanel = await context.newPage();
+  // Tri-state prior: never default to "not favorite"; restore only when observed false.
+  let wasFavoriteBefore: 'unknown' | boolean = 'unknown';
+
+  try {
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
+
+    await sidePanel.getByLabel('Model').click();
+    const dialog = sidePanel.locator(
+      '[role="dialog"][aria-modal="true"][aria-label="Select model"]'
+    );
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+
+    const frontierRow = dialog.locator(`button[data-model-id="${frontierModel}"]`);
+    await expect(frontierRow).toBeVisible({ timeout: 30_000 });
+
+    const frontierName = (await frontierRow.getAttribute('aria-label')) ?? '';
+    expect(frontierName.length).toBeGreaterThan(0);
+
+    const addLabel = `Add ${frontierName} to favorites`;
+    const removeLabel = `Remove ${frontierName} from favorites`;
+    const removeStar = dialog.getByLabel(removeLabel);
+    const addStar = dialog.getByLabel(addLabel);
+
+    // Sample prior only when preferences are ready: star enabled and no retryable banner.
+    // Stars also enable in retryable (empty in-memory set + "Couldn't load favorites.").
+    const favoritesBanner = dialog.getByText("Couldn't load favorites.");
+    await expect(addStar.or(removeStar)).toBeEnabled({ timeout: 60_000 });
+    await expect(favoritesBanner).toHaveCount(0, { timeout: 60_000 });
+
+    wasFavoriteBefore = (await removeStar.count()) > 0;
+
+    if (wasFavoriteBefore) {
+      await expect(removeStar).toHaveAttribute('aria-pressed', 'true');
+    } else {
+      await expect(addStar).toBeVisible();
+      await addStar.click();
+      await expect(dialog.getByLabel(removeLabel)).toHaveAttribute('aria-pressed', 'true', {
+        timeout: 30_000,
+      });
+    }
+
+    await sidePanel.getByLabel('Close model picker').click();
+    await expect(dialog).toHaveCount(0);
+
+    await sidePanel.reload();
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
+    await sidePanel.getByLabel('Model').click();
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.locator(`button[data-model-id="${frontierModel}"]`)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(dialog.getByLabel(removeLabel)).toHaveAttribute('aria-pressed', 'true', {
+      timeout: 30_000,
+    });
+    await expect(dialog.locator('p.type-eyebrow', { hasText: /^FAVORITES$/u })).toBeVisible();
+  } finally {
+    await restoreFrontierFavoriteIfNeeded(sidePanel, wasFavoriteBefore);
+    await context.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

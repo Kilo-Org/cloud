@@ -1,7 +1,7 @@
 /* eslint-disable import/no-nodejs-modules, max-lines */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import type { Page } from '@playwright/test';
 import {
   launchExtensionContext,
@@ -10,14 +10,6 @@ import {
   startFixtureServer,
   waitForStoredConversationText,
 } from './extension-context-fixture';
-
-const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'search_memories',
-  'get_memory',
-];
 
 /*
  * Read the persisted conversation store as a JSON string. Storage is the source of truth and is
@@ -141,17 +133,26 @@ test('auto-compaction fires when usage exceeds 85% threshold', async () => {
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+    // Wait for the panel to fully hydrate before seeding storage. During boot the panel
+    // Writes its default conversation store, which would clobber any seed written earlier.
+    // The Model trigger settles once the conversation store is loaded (and models resolve).
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
     // Seed a conversation with 3 user messages so splitEventsForCompaction has something to compact
     await setExtensionStorage(sidePanel, { kiloAgentConversations: seededConversationStore });
     await sidePanel.reload();
+    // After reload the seeded transcript must render; the Model label settles first.
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
 
     await sidePanel.getByLabel('Message agent').fill('Trigger compact');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
     await sidePanel.getByLabel('Message agent').press('Enter');
 
     /*
-     * Auto-compaction fires in the run's finally. Assert against persisted storage rather than the
-     * virtualized list, which can momentarily unmount rows while compaction rewrites events.
+     * Auto-compaction fires in the run's finally, after the turn completes. The keep-window
+     * preserves the last KEEP_RECENT_EXCHANGES exchanges, so the "Threshold reply." assistant
+     * message is not compacted. Wait for the compacted prefix summary in persisted storage, then
+     * assert the oldest messages are gone.
      */
     await waitForStoredConversationText(sidePanel, 'Compacted earlier context');
 
@@ -208,8 +209,14 @@ test('manual "Compact now" compacts the conversation', async () => {
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+    // Wait for the panel to fully hydrate before seeding storage so the panel's default
+    // Store write does not clobber the seed (see design-tokens.test.ts for the same pattern).
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
     await setExtensionStorage(sidePanel, { kiloAgentConversations: seededConversationStore });
     await sidePanel.reload();
+    // After reload the seeded transcript must render; the Model label settles first.
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
 
     await sidePanel.getByLabel('Message agent').fill('Manual compact trigger');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();

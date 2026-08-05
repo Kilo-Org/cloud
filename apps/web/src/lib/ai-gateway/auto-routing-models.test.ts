@@ -90,7 +90,29 @@ describe('addAutoRoutingModels', () => {
       ...efficientModel,
       autoRouting: { models: ['google/gemini-2.5-flash', 'openai/gpt-5.4-mini'] },
     });
-    expect(result.slice(1)).toEqual([balancedModel, geminiModel, gptModel]);
+    expect(result.slice(1)).toEqual([
+      {
+        ...balancedModel,
+        autoRouting: { models: ['google/gemini-2.5-flash', 'openai/gpt-5.4-mini'] },
+      },
+      geminiModel,
+      gptModel,
+    ]);
+  });
+
+  test('annotates balanced as an alias of efficient routing', async () => {
+    const balancedModel = makeModel('kilo-auto/balanced');
+    const efficientModel = makeModel('kilo-auto/efficient');
+    const visibleModel = makeModel('google/gemini-2.5-flash');
+    mockedGetCachedRoutingTable.mockResolvedValue(routingTable([visibleModel.id]));
+
+    const result = await addAutoRoutingModels([balancedModel, efficientModel, visibleModel]);
+
+    expect(result).toEqual([
+      { ...balancedModel, autoRouting: { models: [visibleModel.id] } },
+      { ...efficientModel, autoRouting: { models: [visibleModel.id] } },
+      visibleModel,
+    ]);
   });
 
   test('annotates the free auto model from its candidate source', async () => {

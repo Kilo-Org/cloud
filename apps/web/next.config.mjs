@@ -65,6 +65,14 @@ const nextConfig = {
               destination: 'https://global-api.kilo.ai/api/edit/completions',
             },
             {
+              source: '/api/gateway/:path*',
+              destination: 'https://global-api.kilo.ai/api/gateway/:path*',
+            },
+            {
+              source: '/api/openrouter/:path*',
+              destination: 'https://global-api.kilo.ai/api/openrouter/:path*',
+            },
+            {
               source: '/api/exa/:path*',
               destination: 'https://global-api.kilo.ai/api/exa/:path*',
             },
@@ -131,6 +139,11 @@ const nextConfig = {
   // Security headers
   async headers() {
     return [
+      {
+        // Extensionless AASA file gets no inferred type; Apple requires application/json.
+        source: '/.well-known/apple-app-site-association',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+      },
       {
         source: '/api-docs/swagger-ui/:path*',
         headers: [

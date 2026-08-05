@@ -36,7 +36,8 @@ function getSessionName(): string {
 function sessionExists(sessionName?: string): boolean {
   const name = sessionName ?? getSessionName();
   try {
-    execSync(`tmux has-session -t ${name}`, { stdio: 'ignore' });
+    // `=` forces an exact match; a bare -t prefix-matches sibling sessions.
+    execSync(`tmux has-session -t '=${name}'`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -116,7 +117,7 @@ function setSessionEnvironment(sessionName: string, env: Record<string, string>)
 
 function killSession(sessionName: string): void {
   try {
-    execSync(`tmux kill-session -t ${sessionName}`, { stdio: 'ignore' });
+    execSync(`tmux kill-session -t '=${sessionName}'`, { stdio: 'ignore' });
   } catch {
     // Session doesn't exist — that's fine
   }
@@ -356,23 +357,40 @@ function breakPane(
   newWindowName: string
 ): number {
   const output = execSync(
-    `tmux break-pane -d -s ${sessionName}:${windowTarget}.${pane} -n ${escapeForShell(
+    `tmux break-pane -d -s ${sessionName}:${windowTarget}.${pane} -t ${sessionName}: -n ${escapeForShell(
       newWindowName
-    )} -P -F "#{window_index}"`,
+    )} -P -F "#{window_id}"`,
     { encoding: 'utf-8' }
   ).trim();
-  const windowIndex = parseInt(output, 10);
+  const windowId = output; // e.g., "@8" — globally unique window ID
+
+  // break-pane may create the new window in the attached session instead
+  // of the source pane's session when the process inherits TMUX from its
+  // parent. Move the window into the correct session unconditionally;
+  // move-window within the same session is a harmless no-op (it may
+  // renumber the window index).
+  execSync(`tmux move-window -s ${windowId} -t ${sessionName}`, {
+    stdio: 'ignore',
+  });
 
   // tmux creates windows from break-pane with automatic-rename enabled. On
   // tmux 3.7, the new window is immediately renamed to the shell command
   // (for example "zsh"), even when -n is provided. The dev dashboard later
   // finds service panes by window name, so pin the service name after moving.
-  execSync(`tmux set-window-option -t ${sessionName}:${windowIndex} automatic-rename off`, {
+  execSync(`tmux set-window-option -t ${windowId} automatic-rename off`, {
     stdio: 'ignore',
   });
-  renameWindow(sessionName, windowIndex, newWindowName);
+  execSync(`tmux rename-window -t ${windowId} ${escapeForShell(newWindowName)}`, {
+    stdio: 'ignore',
+  });
 
-  return windowIndex;
+  // Resolve the session-relative window index from the globally unique
+  // window ID. The raw #{window_index} from break-pane -P is unreliable
+  // when the window was created in a different session.
+  const indexOutput = execSync(`tmux display-message -t ${windowId} -p "#{window_index}"`, {
+    encoding: 'utf-8',
+  }).trim();
+  return parseInt(indexOutput, 10);
 }
 
 /** Count panes in a window */
@@ -452,6 +470,16 @@ function captureServicePane(sessionName: string, serviceName: string, historyLin
       `-${historyLines}`,
     ],
     { encoding: 'utf8' }
+  );
+}
+
+function pipeServicePane(sessionName: string, serviceName: string, command: string): void {
+  const pane = findServicePane(sessionName, serviceName);
+  if (!pane) throw new Error(`Service ${serviceName} is not running in ${sessionName}`);
+  execFileSync(
+    'tmux',
+    ['pipe-pane', '-t', `${sessionName}:${pane.windowIndex}.${pane.paneIndex}`, command],
+    { stdio: 'ignore' }
   );
 }
 
@@ -590,6 +618,7 @@ export {
   countPanes,
   findServicePane,
   captureServicePane,
+  pipeServicePane,
   isPaneRunningCommand,
   paneHasRunningChild,
   selectPane,

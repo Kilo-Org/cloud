@@ -17,6 +17,14 @@ vi.mock('./db', async importOriginal => {
     replaceModelSummaries: vi.fn(),
     saveRoutingTable: vi.fn(),
     upsertCaseResult: vi.fn(),
+    listPendingCurrentProfiles: vi.fn(),
+    listStaleRunningDeciderRunIds: vi.fn(),
+    markProfilesFailedForRun: vi.fn(),
+    markProfilesReadyForRun: vi.fn(),
+    markProfilesRunningForRun: vi.fn(),
+    markStaleRunsFailed: vi.fn(),
+    getRunningRun: vi.fn(),
+    getLatestSummariesByModel: vi.fn(),
   };
 });
 
@@ -69,7 +77,14 @@ const env = {
   AUTO_ROUTING_CONFIG: { delete: vi.fn() },
 } as unknown as Env;
 
-function mockRunSnapshot(): void {
+function mockRunSnapshot(
+  models: Array<{
+    model: string;
+    variant: string;
+    enqueued?: boolean;
+    reasoning_effort?: string | null;
+  }> = [{ model, variant: '', enqueued: true, reasoning_effort: null }]
+): void {
   vi.mocked(getRunWithModels).mockResolvedValue({
     run: {
       max_concurrency: 4,
@@ -81,19 +96,25 @@ function mockRunSnapshot(): void {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       started_at: '2026-06-16T00:00:00.000Z',
+      purpose: 'platform',
     },
-    models: [{ model, enqueued: true, reasoning_effort: null }],
+    models: models.map(m => ({
+      enqueued: true,
+      reasoning_effort: null,
+      ...m,
+    })),
   } as never);
 }
 
-function deciderMessage() {
+function deciderMessage(overrides: { variant?: string | null } = {}) {
   return {
     runId,
-    kind: 'decider',
+    kind: 'decider' as const,
     model,
     caseIds: [benchCase.id],
     chunk: 0,
     rep: 0,
+    ...overrides,
   };
 }
 
@@ -117,6 +138,98 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('processJob — decider exact-pair snapshot resolution', () => {
+  it('throws when an explicit-variant message has no exact snapshot row', async () => {
+    mockRunSnapshot([
+      { model, variant: 'high', reasoning_effort: 'high' },
+      { model, variant: 'low', reasoning_effort: 'low' },
+    ]);
+
+    await expect(processJob(env, deciderMessage({ variant: 'medium' }))).rejects.toThrow(
+      /no snapshot row for model/
+    );
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+  });
+
+  it('resolves the exact snapshot row for an explicit (model, variant) pair', async () => {
+    mockRunSnapshot([
+      { model, variant: 'high', reasoning_effort: 'high' },
+      { model, variant: 'low', reasoning_effort: 'low' },
+    ]);
+
+    await processJob(env, deciderMessage({ variant: 'low' }));
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        model,
+        variant: 'low',
+        instanceName: `${runId}:${model}:low:0:0`,
+      })
+    );
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        model,
+        variant: 'low',
+      })
+    );
+  });
+
+  it('legacy no-variant message resolves the unique snapshot row for the model', async () => {
+    mockRunSnapshot([{ model, variant: 'high', reasoning_effort: 'high' }]);
+
+    // Omit variant entirely (legacy pre-deploy message shape).
+    await processJob(env, {
+      runId,
+      kind: 'decider',
+      model,
+      caseIds: [benchCase.id],
+      chunk: 0,
+      rep: 0,
+    });
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        model,
+        variant: 'high',
+        instanceName: `${runId}:${model}:high:0:0`,
+      })
+    );
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        model,
+        variant: 'high',
+      })
+    );
+  });
+
+  it('throws when a legacy no-variant message has multiple snapshot rows for the model', async () => {
+    mockRunSnapshot([
+      { model, variant: 'high', reasoning_effort: 'high' },
+      { model, variant: 'low', reasoning_effort: 'low' },
+    ]);
+
+    await expect(
+      processJob(env, {
+        runId,
+        kind: 'decider',
+        model,
+        caseIds: [benchCase.id],
+        chunk: 0,
+        rep: 0,
+      })
+    ).rejects.toThrow(/requires exactly one snapshot row/);
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+  });
 });
 
 describe('processJob — decider container availability failures', () => {
@@ -155,10 +268,12 @@ describe('processJob — decider chunk chaining', () => {
 
     await processJob(env, message);
 
+    // Instance names include the stored variant segment ('' → empty between colons).
+    const instanceName = `${runId}:${model}::0:0`;
     expect(warmUpCliContainer).toHaveBeenCalledWith(
       env,
       expect.objectContaining({
-        instanceName: `${runId}:${model}:0:0`,
+        instanceName,
         kiloApiUrl: 'http://host.docker.internal:3000',
         orgId: 'benchmark-org',
       })
@@ -166,7 +281,7 @@ describe('processJob — decider chunk chaining', () => {
     expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
       env,
       expect.objectContaining({
-        instanceName: `${runId}:${model}:0:0`,
+        instanceName,
         kiloApiUrl: 'http://host.docker.internal:3000',
         orgId: 'benchmark-org',
       })
@@ -177,6 +292,7 @@ describe('processJob — decider chunk chaining', () => {
           runId,
           kind: 'decider',
           model,
+          variant: null,
           chunk: 1,
           shard: 0,
           shardCount: 1,
@@ -206,7 +322,7 @@ describe('processJob — decider chunk chaining', () => {
 
     expect(warmUpCliContainer).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ instanceName: `${runId}:${model}:0:2` })
+      expect.objectContaining({ instanceName: `${runId}:${model}::0:2` })
     );
     expect(queueSendBatch).toHaveBeenCalledWith([
       {
@@ -214,6 +330,7 @@ describe('processJob — decider chunk chaining', () => {
           runId,
           kind: 'decider',
           model,
+          variant: null,
           chunk: nextChunk,
           shard,
           shardCount,
@@ -258,6 +375,7 @@ describe('processJob — decider chunk chaining', () => {
           runId,
           kind: 'decider',
           model,
+          variant: null,
           chunk: 1,
           shard: 0,
           shardCount: 1,
@@ -282,7 +400,7 @@ describe('processJob — decider chunk chaining', () => {
 
     expect(queueSendBatch).not.toHaveBeenCalled();
     expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
-      instanceName: `${runId}:${model}:0:3`,
+      instanceName: `${runId}:${model}::0:3`,
     });
     expect(countCaseResults).toHaveBeenCalled();
   });
@@ -302,7 +420,7 @@ describe('processJob — decider chunk chaining', () => {
     });
 
     expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
-      instanceName: `${runId}:${model}:0:3`,
+      instanceName: `${runId}:${model}::0:3`,
     });
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('benchmark_container_destroy_failed')

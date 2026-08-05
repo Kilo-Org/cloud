@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
@@ -11,8 +12,9 @@ if (missing.length > 0) {
   }
 }
 
-// ponytail: Google OAuth client IDs aren't created yet — plugin/config below tolerate absence
-// so the app still builds; the native Google button (Task 6) hides itself when undefined.
+// Google OAuth client IDs are public identifiers (committed .env, all EAS
+// environments). The conditional below tolerates their absence so the app still builds when a
+// checkout lacks them; the native Google button hides itself when undefined.
 const googleIosClientId = process.env[OPTIONAL_ENV_KEYS.googleIosClientId];
 const googleIosUrlScheme = googleIosClientId
   ? `com.googleusercontent.apps.${googleIosClientId.replace(/\.apps\.googleusercontent\.com$/, '')}`
@@ -26,16 +28,30 @@ const config: ExpoConfig = {
   owner: 'kilocode',
   slug: 'kilo-app',
   version: '1.0.3',
+  // Portrait-only is an accepted, documented product deviation from WCAG 1.3.4
+  // (Orientation). Landscape layouts and iPad split-view/multitasking are out
+  // of scope; `ios.requireFullScreen` below enforces that. This is not claimed
+  // as a WCAG "essential" exception, which requires functionality to
+  // fundamentally change with orientation.
   orientation: 'portrait',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
   ios: {
-    icon: './assets/images/logo.png',
+    // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
+    // canonical mobile brand yellow on a dark backdrop; `tinted` is grayscale because iOS
+    // applies its own tint. All three are opaque 1024x1024 — Expo requires the icon to fill
+    // the square with no transparent pixels.
+    icon: {
+      light: './assets/images/logo.png',
+      dark: './assets/images/logo-dark.png',
+      tinted: './assets/images/logo-tinted.png',
+    },
     bundleIdentifier: 'com.kilocode.kiloapp',
     requireFullScreen: true,
     supportsTablet: true,
     usesAppleSignIn: true,
+    associatedDomains: ['applinks:app.kilo.ai'],
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
@@ -50,11 +66,6 @@ const config: ExpoConfig = {
       UIFileSharingEnabled: true,
       LSSupportsOpeningDocumentsInPlace: true,
     },
-  },
-  splash: {
-    image: './assets/images/logo.png',
-    resizeMode: 'contain',
-    backgroundColor: '#FAF74F',
   },
   android: {
     googleServicesFile: './google-services.json',
@@ -71,6 +82,18 @@ const config: ExpoConfig = {
       'android.permission.READ_MEDIA_VIDEO',
       'android.permission.READ_MEDIA_AUDIO',
     ],
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: UNIVERSAL_LINK_PATH_PATTERNS.map(pathPattern => ({
+          scheme: 'https',
+          host: 'app.kilo.ai',
+          pathPattern,
+        })),
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
   },
   plugins: [
     ['expo-dev-client', { toolsButton: false }],
@@ -78,9 +101,11 @@ const config: ExpoConfig = {
       'expo-build-properties',
       {
         android: {
-          enableProguardInReleaseBuilds: true,
+          enableMinifyInReleaseBuilds: true,
+          usePrecompiledHeaders: true,
         },
         ios: {
+          ccacheEnabled: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
           // modules, so pod install fails unless we force module maps on them. Unconditional
@@ -149,9 +174,28 @@ const config: ExpoConfig = {
       },
     ],
     ['react-native-appsflyer', { shouldUsePurchaseConnector: true }],
+    // Local wrapper: pnpm isolation + Kilo target-name collision (see plugin).
+    [
+      './plugins/withExpoShareIntent',
+      {
+        iosActivationRules: {
+          NSExtensionActivationSupportsText: true,
+          NSExtensionActivationSupportsWebURLWithMaxCount: 1,
+          NSExtensionActivationSupportsWebPageWithMaxCount: 1,
+          NSExtensionActivationSupportsImageWithMaxCount: 5,
+          NSExtensionActivationSupportsFileWithMaxCount: 5,
+        },
+        androidIntentFilters: ['text/*', '*/*'],
+        androidMultiIntentFilters: ['*/*'],
+        iosAppGroupIdentifier: 'group.com.kilocode.kiloapp',
+        // Display name "Kilo" is applied by the wrapper; target is ShareExtension
+        // because iosShareExtensionName "Kilo" collides with the main app target.
+        iosShareExtensionName: 'Kilo',
+      },
+    ],
     './plugins/withAndroidManifestFix',
-    // ponytail: only registered when GOOGLE_IOS_CLIENT_ID is set, so prebuild works before the
-    // Google OAuth clients exist.
+    // Registered only when GOOGLE_IOS_CLIENT_ID is set — a guard for checkouts
+    // whose environment does not provide it.
     ...googleSignInPlugins,
   ],
   experiments: {

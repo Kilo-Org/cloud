@@ -99,6 +99,65 @@ export enum KiloPassScheduledChangeStatus {
   Canceled = 'canceled',
 }
 
+// --- Kilo Pass for Organizations enums ---
+
+export const KiloPassOrgAgreementState = {
+  PendingPayment: 'pending_payment',
+  Active: 'active',
+  CancelAtPeriodEnd: 'cancel_at_period_end',
+  Ended: 'ended',
+} as const;
+
+export type KiloPassOrgAgreementState =
+  (typeof KiloPassOrgAgreementState)[keyof typeof KiloPassOrgAgreementState];
+
+export const KiloPassOrgProcessingCondition = {
+  Ready: 'ready',
+  Manual: 'manual',
+  Blocked: 'blocked',
+  Overallocated: 'overallocated',
+  Failed: 'failed',
+  SuspendedForReview: 'suspended_for_review',
+} as const;
+
+export type KiloPassOrgProcessingCondition =
+  (typeof KiloPassOrgProcessingCondition)[keyof typeof KiloPassOrgProcessingCondition];
+
+export const KiloPassOrgPurchaseChannel = {
+  SelfServe: 'self_serve',
+  Manual: 'manual',
+} as const;
+
+export type KiloPassOrgPurchaseChannel =
+  (typeof KiloPassOrgPurchaseChannel)[keyof typeof KiloPassOrgPurchaseChannel];
+
+export const KiloPassOrgProcessingRunState = {
+  Pending: 'pending',
+  Running: 'running',
+  Succeeded: 'succeeded',
+  Blocked: 'blocked',
+  Failed: 'failed',
+} as const;
+
+export type KiloPassOrgProcessingRunState =
+  (typeof KiloPassOrgProcessingRunState)[keyof typeof KiloPassOrgProcessingRunState];
+
+export const KiloPassOrgBonusMode = {
+  AfterBase: 'after_base',
+  Upfront: 'upfront',
+} as const;
+
+export type KiloPassOrgBonusMode = (typeof KiloPassOrgBonusMode)[keyof typeof KiloPassOrgBonusMode];
+
+export const KiloPassOrgIssuanceKind = {
+  Regular: 'regular',
+  Bridge: 'bridge',
+  Supplement: 'supplement',
+} as const;
+
+export type KiloPassOrgIssuanceKind =
+  (typeof KiloPassOrgIssuanceKind)[keyof typeof KiloPassOrgIssuanceKind];
+
 // --- Feedback consts ---
 
 export const FeedbackFor = {
@@ -596,75 +655,6 @@ export const CodingPlanTermKind = {
 
 export type CodingPlanTermKind = (typeof CodingPlanTermKind)[keyof typeof CodingPlanTermKind];
 
-// --- Cost Insights enums ---
-
-export const CostInsightSpendCategory = {
-  Variable: 'variable',
-  Scheduled: 'scheduled',
-} as const;
-
-export type CostInsightSpendCategory =
-  (typeof CostInsightSpendCategory)[keyof typeof CostInsightSpendCategory];
-
-export const CostInsightSpendSource = {
-  AiGateway: 'ai_gateway',
-  KiloClaw: 'kiloclaw',
-  CodingPlan: 'coding_plan',
-  Other: 'other',
-} as const;
-
-export type CostInsightSpendSource =
-  (typeof CostInsightSpendSource)[keyof typeof CostInsightSpendSource];
-
-export const CostInsightRollupDegradedReason = {
-  CaptureBypass: 'capture_bypass',
-  ReconciliationMismatch: 'reconciliation_mismatch',
-  LateSourceData: 'late_source_data',
-} as const;
-
-export type CostInsightRollupDegradedReason =
-  (typeof CostInsightRollupDegradedReason)[keyof typeof CostInsightRollupDegradedReason];
-
-export const CostInsightEventType = {
-  ConfigChanged: 'config_changed',
-  AnomalyAlert: 'anomaly_alert',
-  ThresholdCrossed: 'threshold_crossed',
-  AlertReviewed: 'alert_reviewed',
-  SuggestionCreated: 'suggestion_created',
-  SuggestionDismissed: 'suggestion_dismissed',
-  Disabled: 'disabled',
-} as const;
-
-export type CostInsightEventType = (typeof CostInsightEventType)[keyof typeof CostInsightEventType];
-
-export const CostInsightAlertKind = {
-  Anomaly: 'anomaly',
-  Threshold: 'threshold',
-  Threshold7Day: 'threshold_7d',
-  Threshold30Day: 'threshold_30d',
-} as const;
-
-export type CostInsightAlertKind = (typeof CostInsightAlertKind)[keyof typeof CostInsightAlertKind];
-
-export const CostInsightSuggestionKind = {
-  CodingPlan: 'coding_plan',
-  KiloPass: 'kilo_pass',
-} as const;
-
-export type CostInsightSuggestionKind =
-  (typeof CostInsightSuggestionKind)[keyof typeof CostInsightSuggestionKind];
-
-export const CostInsightNotificationStatus = {
-  Pending: 'pending',
-  Sending: 'sending',
-  Sent: 'sent',
-  Failed: 'failed',
-  Skipped: 'skipped',
-} as const;
-
-export type CostInsightNotificationStatus =
-  (typeof CostInsightNotificationStatus)[keyof typeof CostInsightNotificationStatus];
-
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',
@@ -874,6 +864,27 @@ const OrganizationSettingsSchema = z.object({
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
 
+export const MAX_ORGANIZATION_GROUPS = 100;
+export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
+
+// Persisted shape of organization group policies. The runtime Zod contracts,
+// per-policy schemas, limits, defaults, and helpers live in the web app
+// (`apps/web/src/lib/organizations/group-policies`) so this package stays
+// focused on database concerns. These structural types exist only to type the
+// `jsonb` columns in `schema.ts`; the app-side schemas assert compatibility.
+export type OrganizationGroupPolicyType = 'model_access';
+
+export type OrganizationGroupModelAccessPolicy = {
+  type: 'model_access';
+  data:
+    | { mode: 'all' }
+    | { mode: 'none' }
+    | { mode: 'selected'; model_allow_list: string[]; provider_allow_list: string[] };
+};
+
+export type OrganizationGroupPolicy = OrganizationGroupModelAccessPolicy;
+export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
+
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);
 
 const EditGroupConfigSchema = z.object({
@@ -1025,6 +1036,17 @@ export const AuditLogAction = z.enum([
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
+  'organization.group.create',
+  'organization.group.update',
+  'organization.group.delete',
+  'organization.group.members.set',
+  'organization.group.member_groups.set',
+  'organization.group.policy.set',
+  'organization.group.policy.remove',
+  'organization.group.default_policy.set',
+  'organization.group.default_policy.remove',
+  'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
+  'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
@@ -1044,6 +1066,7 @@ export type AuthProviderId =
   | 'apple'
   | 'email'
   | 'google'
+  | 'anaconda'
   | 'github'
   | 'gitlab'
   | 'linkedin'
@@ -1512,6 +1535,13 @@ export const CodeReviewAgentConfigSchema = z.object({
   // council-entitled and `council` is configured + active; the automated trigger re-checks both.
   // Matched against the platform repository ID the same way as `selected_repository_ids`.
   council_enabled_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
+  // Feature-level guardrail: when true (the default when absent), skip automated (webhook) code
+  // reviews for bot-authored pull requests (dependabot/renovate/etc.). Applies to standard and
+  // council reviews alike; manual reviews are unaffected. Set false to review bot PRs.
+  // Enforced on GitHub, where the bot signal (`user.type`) is in the webhook payload. GitLab and
+  // Bitbucket do not expose an authoritative bot flag in their webhooks, so the setting has no
+  // effect there yet.
+  skip_bot_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
@@ -1926,6 +1956,13 @@ export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  reasoning: z
+    .object({
+      mandatory: z.boolean(),
+      supported_efforts: z.array(ReasoningEffortSchema).optional(),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
@@ -2001,6 +2038,40 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'upstream_error',
   'sandbox_error',
   'workspace_capacity',
+  // Derived from the structured CloudAgentSafeFailure payload cloud-agent-next
+  // already sends on the status callback. Before these existed the callback
+  // dropped `failure.code` for every case except sandbox_storage_full, so these
+  // outcomes landed with a NULL terminal_reason and were only recoverable by
+  // pattern-matching the human-readable error_message in the admin router.
+  // See apps/web/src/lib/code-reviews/terminal-reason-from-failure.ts.
+  'assistant_failed',
+  // Rate limiting is the single largest failure bucket, and who was throttled
+  // decides whether it is actionable. Split by the provider ownership
+  // cloud-agent-next now reports; the unqualified value remains for payloads
+  // that carry no ownership.
+  'assistant_rate_limited',
+  'assistant_rate_limited_byok',
+  'assistant_rate_limited_managed',
+  'assistant_unavailable',
+  'assistant_timeout',
+  'assistant_unauthorized',
+  'assistant_invalid_request',
+  'assistant_no_reply',
+  'wrapper_failed',
+  'runtime_startup_failed',
+  'sandbox_connection',
+  'delivery_failed',
+  'workspace_setup_failed',
+  'repository_clone_failed',
+  'repository_auth_failed',
+  'repository_checkout_failed',
+  'session_import_failed',
+  'setup_command_failed',
+  'container_shutdown',
+  // Closed out by the stale review reaper because it sat in a non-terminal state
+  // past the reap threshold. Distinct from 'timeout', which means the agent
+  // itself timed out; this one means nothing ever reported back at all.
+  'abandoned',
   'unknown',
 ] as const;
 
@@ -2025,6 +2096,26 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'selected_model_unavailable',
   'user_cancelled',
   'superseded',
+  // The repository's own setup command failed. That is the customer's script,
+  // not our infrastructure, so it must not page us. Every other new reason is
+  // deliberately left as a system failure: under-alerting is how the Jul 2026
+  // publish-rate collapse ran for three days unnoticed.
+  'setup_command_failed',
+  // The customer's own provider key hit its own quota. Nothing on our side is
+  // broken and nothing on our side can fix it, so it must not page us.
+  // 'assistant_rate_limited_managed' is deliberately NOT benign: that is our
+  // key or our quota, and it is the case worth waking someone for. The
+  // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
+  // ownership could be either.
+  'assistant_rate_limited_byok',
+  // Set only by the stale review reaper, which measures cleanup rather than the
+  // fault that stranded the review, so alerting on it would count janitorial work
+  // as incidents. Every stranded pending review measured on 2026-08-04 traced to
+  // customer-side state: Code Reviewer disabled, the platform integration
+  // suspended, or an action-required disable. The signal for genuinely stuck work
+  // is the live "Running > 90m" queue health counter, which is unaffected by this
+  // and does not depend on a review having been reaped yet.
+  'abandoned',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

@@ -1,4 +1,4 @@
-import { type StoredMessage } from 'cloud-agent-sdk';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -125,5 +125,9 @@ export function formatMessageSentTime(created: number | undefined | null): strin
   if (created === undefined || created === null || !Number.isFinite(created) || created <= 0) {
     return null;
   }
-  return SENT_TIME_FORMATTER.format(new Date(created));
+  const date = new Date(created);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return SENT_TIME_FORMATTER.format(date);
 }

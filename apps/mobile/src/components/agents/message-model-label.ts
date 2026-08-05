@@ -1,6 +1,6 @@
-import { getStepFinishRoutedModel } from 'cloud-agent-sdk/part-utils';
+import { getStepFinishRoutedModel } from '@kilocode/cloud-agent-sdk/part-utils';
 
-import { type StoredMessage } from 'cloud-agent-sdk';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 /**
  * Resolve the concrete (providerID, modelID) for one assistant message.

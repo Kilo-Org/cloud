@@ -1,7 +1,7 @@
 import { type RefObject, useCallback, useRef } from 'react';
 import { type Href, useNavigation, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { generateMessageId } from 'cloud-agent-sdk/message-id';
+import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
 

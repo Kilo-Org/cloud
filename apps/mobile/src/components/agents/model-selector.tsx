@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import * as Haptics from 'expo-haptics';
-import { type Href, type Router, useRouter } from 'expo-router';
+import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
 import { BookOpenCheck, Brain, Check, ChevronDown, Star } from 'lucide-react-native';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -18,6 +18,7 @@ import {
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { modelPickerCostLabel } from '@/lib/model-cost';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type ModelPickerSelection,
@@ -97,7 +98,7 @@ function compactThinkingEffortLabel(variant: string) {
 }
 
 export function openModelPicker(
-  router: Router,
+  router: ImperativeRouter,
   params: {
     options: (ModelOption | SessionModelOption)[];
     value: string;
@@ -229,6 +230,7 @@ export function ModelPickerOptionRow({
   const free = option.showGatewayMetadata && isFreeModelOption(option);
   const byok = option.showGatewayMetadata && hasUserByokAvailable(option);
   const collectsData = option.showGatewayMetadata && mayTrainOnYourPrompts(option);
+  const costLabel = modelPickerCostLabel(option);
   const accessibilityLabel = [
     option.provider?.name,
     option.name,
@@ -236,6 +238,7 @@ export function ModelPickerOptionRow({
     byok ? BYOK_MODEL_LABEL : undefined,
     free && !byok ? FREE_MODEL_FREE_LABEL : undefined,
     collectsData ? FREE_MODEL_DATA_LABEL : undefined,
+    costLabel ?? undefined,
     option.unavailable ? 'unavailable' : undefined,
     selected ? 'selected' : undefined,
   ]
@@ -269,6 +272,7 @@ export function ModelPickerOptionRow({
               {option.modelRef ? `Model ${option.displayId}` : option.displayId}
             </Text>
           ) : null}
+          {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
           {option.unavailable ? (
             <Text className="mt-1 text-xs text-muted-foreground">Unavailable</Text>
           ) : null}

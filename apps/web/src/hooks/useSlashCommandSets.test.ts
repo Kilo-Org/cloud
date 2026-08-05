@@ -1,7 +1,7 @@
-import type { SlashCommandInfo } from '@/lib/cloud-agent-sdk';
-import type { ActiveSessionType } from '@/lib/cloud-agent-sdk';
+import type { SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import type { ActiveSessionType } from '@kilocode/cloud-agent-sdk';
 import { atom, createStore } from 'jotai';
-import type { SessionManager } from '@/lib/cloud-agent-sdk';
+import type { SessionManager } from '@kilocode/cloud-agent-sdk';
 import { selectSlashCommands } from './slash-command-selection';
 import { useSlashCommandSets } from './useSlashCommandSets';
 

@@ -15,9 +15,24 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
+import {
+  assertMergeResult,
+  type MergePullRequestResult,
+} from '@/lib/pr-review/merge/merge-result-gate';
 
 type PrRef = { owner: string; repo: string; number: number };
+
+type MergePullRequestInput = {
+  owner: string;
+  repo: string;
+  number: number;
+  method: 'merge' | 'squash' | 'rebase';
+  commitTitle?: string;
+  commitMessage?: string;
+  deleteBranch: boolean;
+  expectedHeadSha: string;
+};
 
 function usePrRefKeys(ref: PrRef) {
   const trpc = useTRPC();
@@ -40,20 +55,33 @@ async function invalidatePrCaches(
 }
 
 export function useMergePullRequestMutation(ref: PrRef) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const keys = usePrRefKeys(ref);
 
-  return useMutation(
-    trpc.githubPrReview.mergePullRequest.mutationOptions({
-      onError: (error: { message: string }) => {
-        toast.error(error.message);
-      },
-      onSettled: async () => {
-        await invalidatePrCaches(queryClient, keys);
-      },
-    })
-  );
+  // P0-B-08: gate success on the authoritative `merged: true` result
+  // BEFORE React Query resolves the mutation. The server only treats
+  // `merged: true` as a real merge — a `merged: false` reply (e.g. a 405
+  // "not mergeable" where GitHub refuses) must NOT be celebrated as a
+  // success. `assertMergeResult` throws `MergeNotCompletedError` on
+  // `merged !== true`; that throw lands in `onError` and the sheet's
+  // existing classification effect treats it as RETRYABLE (NOT terminal
+  // bad-request), so the submit button stays enabled and the user can
+  // retry. The typed return is preserved so `performSubmit` can read
+  // the sha / branchDeleted / branchDeleteError off the resolved value.
+  return useMutation<MergePullRequestResult, Error, MergePullRequestInput>({
+    mutationFn: async input => {
+      const result = await trpcClient.githubPrReview.mergePullRequest.mutate(input);
+      // Throws on `merged: false`; returns the gate on clean / partial.
+      assertMergeResult(result);
+      return result;
+    },
+    onError: (error: { message: string }) => {
+      toast.error(error.message);
+    },
+    onSettled: async () => {
+      await invalidatePrCaches(queryClient, keys);
+    },
+  });
 }
 
 export function useUpdateBranchMutation(ref: PrRef) {

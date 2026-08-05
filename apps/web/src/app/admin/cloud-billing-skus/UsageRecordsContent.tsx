@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ChevronDown, ChevronRight, Cloud, Copy, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useTRPC } from '@/lib/trpc/utils';
+import type { ReconciliationStatus } from '@/routers/admin/cloud-billing-skus-router';
 
 type SearchKind = 'interval' | 'user' | 'org';
 type CloseReason =
@@ -44,16 +46,111 @@ type SearchRequest =
       skuId?: string;
     }
   | {
-      kind: SearchKind;
+      kind: 'interval';
       value: string;
       status?: 'open' | 'closed';
       closeReason?: CloseReason;
       skuId?: string;
+    }
+  | {
+      kind: 'user' | 'org';
+      value: string;
+      status?: 'open' | 'closed';
+      closeReason?: CloseReason;
+      skuId?: string;
+      summaryStart?: string;
+      summaryEnd?: string;
     };
 type Cursor = { startedAt: string; id: string };
+type UsageSummaryRequest = {
+  subjectType: 'user' | 'org';
+  subjectId: string;
+  start: string;
+  end: string;
+};
+type UsageReconciliationRequest = UsageSummaryRequest & { intervalIds: string[] };
 
 function formatTimestamp(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—';
+}
+
+function formatProviderNumber(value: number | null): string {
+  return value === null
+    ? 'Unavailable'
+    : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unexpected reconciliation status: ${value}`);
+}
+
+function reconciliationStatusLabel(status: ReconciliationStatus): string {
+  switch (status) {
+    case 'compared':
+      return 'Compared';
+    case 'missing_from_cloudflare':
+      return 'Missing from Cloudflare';
+    case 'ambiguous_application':
+      return 'Ambiguous application';
+    case 'provider_partial':
+      return 'Provider partial';
+    case 'comparison_unavailable':
+      return 'Comparison unavailable';
+  }
+  return assertNever(status);
+}
+
+function reconciliationStatusVariant(status: ReconciliationStatus) {
+  switch (status) {
+    case 'compared':
+      return 'new' as const;
+    case 'missing_from_cloudflare':
+      return 'destructive' as const;
+    case 'ambiguous_application':
+      return 'beta' as const;
+    case 'provider_partial':
+      return 'secondary-outline' as const;
+    case 'comparison_unavailable':
+      return 'secondary' as const;
+  }
+  return assertNever(status);
+}
+
+function sameReconciliationRequest(
+  first: UsageReconciliationRequest | null | undefined,
+  second: UsageReconciliationRequest | null | undefined
+): boolean {
+  return (
+    first !== null &&
+    first !== undefined &&
+    second !== null &&
+    second !== undefined &&
+    first.subjectType === second.subjectType &&
+    first.subjectId === second.subjectId &&
+    first.start === second.start &&
+    first.end === second.end &&
+    first.intervalIds.length === second.intervalIds.length &&
+    first.intervalIds.every((intervalId, index) => intervalId === second.intervalIds[index])
+  );
+}
+
+function formatProvisionedCapacity(memoryBytes: number | null, diskBytes: number | null) {
+  if (memoryBytes === null || diskBytes === null) return null;
+  return `${formatProviderNumber(memoryBytes / 1024 ** 3)} GiB memory · ${formatProviderNumber(diskBytes / 1_000_000_000)} GB disk`;
+}
+
+function formatVariance(seconds: number | null, percent: number | null): string {
+  if (seconds === null) return 'Variance unavailable';
+  const secondsSign = seconds > 0 ? '+' : '';
+  if (percent === null)
+    return `${secondsSign}${formatProviderNumber(seconds)}s (no meter baseline)`;
+  const percentSign = percent > 0 ? '+' : '';
+  return `${secondsSign}${formatProviderNumber(seconds)}s (${percentSign}${formatProviderNumber(percent)}%)`;
+}
+
+function toDateTimeLocalValue(value: Date): string {
+  const offset = value.getTimezoneOffset() * 60_000;
+  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function adminSubjectHref(type: 'user' | 'org', id: string): string {
@@ -200,6 +297,14 @@ export default function UsageRecordsContent() {
   const [cursor, setCursor] = useState<Cursor | undefined>();
   const [previousCursors, setPreviousCursors] = useState<Array<Cursor | undefined>>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [summaryStart, setSummaryStart] = useState(() =>
+    toDateTimeLocalValue(new Date(Date.now() - 24 * 60 * 60 * 1_000))
+  );
+  const [summaryEnd, setSummaryEnd] = useState(() => toDateTimeLocalValue(new Date()));
+  const [summaryRequest, setSummaryRequest] = useState<UsageSummaryRequest | null>(null);
+  const [summaryInputError, setSummaryInputError] = useState<string | null>(null);
+  const [rawResponseOpen, setRawResponseOpen] = useState(false);
+  const [rawCopyStatus, setRawCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const input = {
     search:
@@ -211,15 +316,44 @@ export default function UsageRecordsContent() {
               kind: 'subject',
               subjectType: submitted.kind,
               subjectId: submitted.value,
+              start: submitted.summaryStart ?? '',
+              end: submitted.summaryEnd ?? '',
             } as const),
     status: submitted.status,
     closeReason: submitted.closeReason,
     skuId: submitted.skuId,
     cursor,
-    limit: submitted.kind === 'recent' ? 10 : 25,
+    limit: submitted.kind === 'recent' ? 10 : 15,
   };
   const results = useQuery(trpc.admin.cloudBillingSkus.searchUsageIntervals.queryOptions(input));
   const rows = results.data?.items ?? [];
+  const summary = useQuery({
+    ...trpc.admin.cloudBillingSkus.getUsageSummary.queryOptions(
+      summaryRequest ?? {
+        subjectType: 'user',
+        subjectId: 'not-submitted',
+        start: new Date(0).toISOString(),
+        end: new Date(1).toISOString(),
+      }
+    ),
+    enabled: summaryRequest !== null,
+  });
+  // This read is intentionally imperative: Cloudflare must only be queried after an admin click.
+  const reconciliation = useMutation(
+    trpc.admin.cloudBillingSkus.reconcileUsageWithCloudflare.mutationOptions()
+  );
+  const resetReconciliation = reconciliation.reset;
+  const reconciliationRequest =
+    summaryRequest && results.isSuccess && rows.length > 0
+      ? { ...summaryRequest, intervalIds: rows.map(row => row.id) }
+      : null;
+  const reconciliationMatchesScope = sameReconciliationRequest(
+    reconciliation.variables,
+    reconciliationRequest
+  );
+  const reconciliationErrorCode = reconciliation.error?.data?.code;
+  const reconciliationCanRetry =
+    reconciliationErrorCode !== 'BAD_REQUEST' && reconciliationErrorCode !== 'PRECONDITION_FAILED';
 
   const resetResultNavigation = () => {
     setCursor(undefined);
@@ -247,6 +381,12 @@ export default function UsageRecordsContent() {
     resetResultNavigation();
   }, [urlCloseReason]);
 
+  useEffect(() => {
+    resetReconciliation();
+    setRawResponseOpen(false);
+    setRawCopyStatus('idle');
+  }, [summaryRequest, resetReconciliation]);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -258,159 +398,650 @@ export default function UsageRecordsContent() {
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-4 lg:grid-cols-3 lg:items-start xl:grid-cols-[9rem_minmax(12.5rem,1fr)_7rem_10rem_10rem_auto] xl:gap-3"
+            className="space-y-4"
             onSubmit={event => {
               event.preventDefault();
               const trimmed = value.trim();
               if (!trimmed) return;
+              let summaryWindow: { summaryStart?: string; summaryEnd?: string } = {};
+              if (kind === 'user' || kind === 'org') {
+                const start = new Date(summaryStart);
+                const end = new Date(summaryEnd);
+                const windowMs = end.getTime() - start.getTime();
+                if (
+                  Number.isNaN(start.getTime()) ||
+                  Number.isNaN(end.getTime()) ||
+                  windowMs <= 0 ||
+                  windowMs > 31 * 24 * 60 * 60 * 1_000
+                ) {
+                  setSummaryInputError('Choose a valid window of no more than 31 days.');
+                  return;
+                }
+                summaryWindow = {
+                  summaryStart: start.toISOString(),
+                  summaryEnd: end.toISOString(),
+                };
+              }
               const next: SearchRequest = {
                 kind,
                 value: trimmed,
                 status: status === 'all' ? undefined : status,
                 closeReason: closeReason === 'all' ? undefined : closeReason,
                 skuId: skuId === 'all' ? undefined : skuId,
+                ...summaryWindow,
               };
+              const submittedValue = submitted.kind === 'recent' ? undefined : submitted.value;
+              const nextValue = next.kind === 'recent' ? undefined : next.value;
+              const nextSummaryStart =
+                next.kind === 'user' || next.kind === 'org' ? next.summaryStart : undefined;
+              const nextSummaryEnd =
+                next.kind === 'user' || next.kind === 'org' ? next.summaryEnd : undefined;
+              const submittedSummaryStart =
+                submitted.kind === 'user' || submitted.kind === 'org'
+                  ? submitted.summaryStart
+                  : undefined;
+              const submittedSummaryEnd =
+                submitted.kind === 'user' || submitted.kind === 'org'
+                  ? submitted.summaryEnd
+                  : undefined;
               const unchanged =
                 cursor === undefined &&
                 submitted.kind === next.kind &&
-                submitted.value === next.value &&
+                submittedValue === nextValue &&
                 submitted.status === next.status &&
                 submitted.closeReason === next.closeReason &&
-                submitted.skuId === next.skuId;
+                submitted.skuId === next.skuId &&
+                submittedSummaryStart === nextSummaryStart &&
+                submittedSummaryEnd === nextSummaryEnd;
+              setSummaryInputError(null);
+              reconciliation.reset();
+              setRawResponseOpen(false);
+              setRawCopyStatus('idle');
+              setSummaryRequest(
+                next.kind === 'user' || next.kind === 'org'
+                  ? {
+                      subjectType: next.kind,
+                      subjectId: next.value,
+                      start: next.summaryStart ?? '',
+                      end: next.summaryEnd ?? '',
+                    }
+                  : null
+              );
+              // Sync the URL to the applied filter (not the draft dropdown value) so a
+              // submitted search can be bookmarked/deep-linked without re-triggering a
+              // search merely from changing the Close reason dropdown before submitting.
+              replaceCloseReasonParam(next.closeReason);
               setSubmitted(next);
               resetResultNavigation();
               if (unchanged) void results.refetch();
             }}
           >
-            <div className="space-y-1.5">
-              <Label htmlFor="usage-search-kind">Search by</Label>
-              <Select value={kind} onValueChange={next => setKind(next as SearchKind)}>
-                <SelectTrigger id="usage-search-kind" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="interval">Interval ID</SelectItem>
-                  <SelectItem value="user">User ID</SelectItem>
-                  <SelectItem value="org">Organization ID</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Primary bar: what to search for, and the actions that trigger it.
+                items-start (not items-end): every column below shares the same
+                label + gap + control rhythm, so their controls line up on the
+                same top edge regardless of any incidental height differences
+                inside a column (e.g. Radix Select's hidden native <select>). */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+              <div className="w-full space-y-1.5 sm:w-40 sm:shrink-0">
+                <Label htmlFor="usage-search-kind">Search by</Label>
+                <Select value={kind} onValueChange={next => setKind(next as SearchKind)}>
+                  <SelectTrigger id="usage-search-kind" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="interval">Interval ID</SelectItem>
+                    <SelectItem value="user">User ID</SelectItem>
+                    <SelectItem value="org">Organization ID</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full flex-1 space-y-1.5">
+                <Label htmlFor="usage-search-value">Exact value</Label>
+                <Input
+                  id="usage-search-value"
+                  value={value}
+                  required
+                  maxLength={kind === 'interval' ? 512 : 256}
+                  placeholder={kind === 'interval' ? 'service:instance:startEpochMs' : 'Exact ID'}
+                  onChange={event => setValue(event.target.value)}
+                />
+              </div>
+              <div className="w-full space-y-1.5 sm:w-auto sm:shrink-0">
+                <Label className="invisible" aria-hidden="true">
+                  Actions
+                </Label>
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <Button type="submit" disabled={results.isFetching || !value.trim()}>
+                    <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setValue('');
+                      setStatus('all');
+                      setCloseReason('all');
+                      setSkuId('all');
+                      setSummaryInputError(null);
+                      reconciliation.reset();
+                      setRawResponseOpen(false);
+                      setRawCopyStatus('idle');
+                      setSummaryRequest(null);
+                      setSubmitted({ kind: 'recent' });
+                      replaceCloseReasonParam(undefined);
+                      resetResultNavigation();
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="usage-search-value">Exact value</Label>
-              <Input
-                id="usage-search-value"
-                value={value}
-                required
-                maxLength={kind === 'interval' ? 512 : 256}
-                placeholder={kind === 'interval' ? 'service:instance:startEpochMs' : 'Exact ID'}
-                onChange={event => setValue(event.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="usage-search-status">Status</Label>
-              <Select
-                value={status}
-                onValueChange={next => {
-                  const selected = next as typeof status;
-                  const selectedStatus = selected === 'all' ? undefined : selected;
-                  const selectedCloseReason =
-                    selected === 'open' ? undefined : submitted.closeReason;
-                  setStatus(selected);
-                  if (selected === 'open' && closeReason !== 'all') {
-                    setCloseReason('all');
-                    replaceCloseReasonParam(undefined);
-                  }
-                  setSubmitted(current => ({
-                    ...current,
-                    status: selectedStatus,
-                    closeReason: selectedCloseReason,
-                  }));
-                  resetResultNavigation();
-                }}
-              >
-                <SelectTrigger id="usage-search-status" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any status</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="usage-search-close-reason">Close reason</Label>
-              <Select
-                value={closeReason}
-                onValueChange={next => {
-                  const selected = next as typeof closeReason;
-                  const selectedReason = selected === 'all' ? undefined : selected;
-                  if (selectedReason && status === 'open') setStatus('closed');
-                  setCloseReason(selected);
-                  replaceCloseReasonParam(selectedReason);
-                  setSubmitted(current => ({
-                    ...current,
-                    status: selectedReason && current.status === 'open' ? 'closed' : current.status,
-                    closeReason: selectedReason,
-                  }));
-                  resetResultNavigation();
-                }}
-              >
-                <SelectTrigger id="usage-search-close-reason" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any reason</SelectItem>
-                  <SelectItem value="exit">Exit</SelectItem>
-                  <SelectItem value="runtime_signal">Runtime signal</SelectItem>
-                  <SelectItem value="activity_expired">Activity expired</SelectItem>
-                  <SelectItem value="unconfirmed">Unconfirmed (15m timeout)</SelectItem>
-                  <SelectItem value="superseded">Superseded</SelectItem>
-                  <SelectItem value="reconciled">Reconciled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="usage-search-sku">SKU</Label>
-              <Select
-                value={skuId}
-                onValueChange={selected => {
-                  setSkuId(selected);
-                  setSubmitted(current => ({
-                    ...current,
-                    skuId: selected === 'all' ? undefined : selected,
-                  }));
-                  resetResultNavigation();
-                }}
-              >
-                <SelectTrigger id="usage-search-sku" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any SKU</SelectItem>
-                  {(catalog.data ?? []).map(sku => (
-                    <SelectItem key={sku.id} value={sku.id}>
-                      {sku.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="invisible" aria-hidden="true">
-                Action
-              </Label>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={results.isFetching || !value.trim()}
-              >
-                <Search className="size-4" /> {results.isFetching ? 'Searching...' : 'Search'}
-              </Button>
+
+            {/* Filters: narrow the search above. Wraps freely; never forces the actions off-card. */}
+            <div className="flex flex-wrap items-start gap-4 border-t border-border pt-4">
+              <div className="w-36 space-y-1.5">
+                <Label htmlFor="usage-search-status">Status</Label>
+                <Select
+                  value={status}
+                  onValueChange={next => {
+                    const selected = next as typeof status;
+                    setStatus(selected);
+                    if (selected === 'open' && closeReason !== 'all') {
+                      setCloseReason('all');
+                    }
+                  }}
+                >
+                  <SelectTrigger id="usage-search-status" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any status</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-44 space-y-1.5">
+                <Label htmlFor="usage-search-close-reason">Close reason</Label>
+                <Select
+                  value={closeReason}
+                  onValueChange={next => {
+                    const selected = next as typeof closeReason;
+                    const selectedReason = selected === 'all' ? undefined : selected;
+                    if (selectedReason && status === 'open') setStatus('closed');
+                    setCloseReason(selected);
+                  }}
+                >
+                  <SelectTrigger id="usage-search-close-reason" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any reason</SelectItem>
+                    <SelectItem value="exit">Exit</SelectItem>
+                    <SelectItem value="runtime_signal">Runtime signal</SelectItem>
+                    <SelectItem value="activity_expired">Activity expired</SelectItem>
+                    <SelectItem value="unconfirmed">Unconfirmed (15m timeout)</SelectItem>
+                    <SelectItem value="superseded">Superseded</SelectItem>
+                    <SelectItem value="reconciled">Reconciled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-40 space-y-1.5">
+                <Label htmlFor="usage-search-sku">SKU</Label>
+                <Select
+                  value={skuId}
+                  onValueChange={selected => {
+                    setSkuId(selected);
+                  }}
+                >
+                  <SelectTrigger id="usage-search-sku" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any SKU</SelectItem>
+                    {(catalog.data ?? []).map(sku => (
+                      <SelectItem key={sku.id} value={sku.id}>
+                        {sku.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(kind === 'user' || kind === 'org') && (
+                <div className="w-full space-y-1.5 sm:w-auto">
+                  <Label>Usage window</Label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      id="usage-summary-start"
+                      type="datetime-local"
+                      aria-label="Window start"
+                      value={summaryStart}
+                      max={summaryEnd}
+                      aria-describedby={
+                        summaryInputError ? 'usage-summary-window-error' : undefined
+                      }
+                      className="w-full cursor-pointer sm:w-52 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                      onClick={event => event.currentTarget.showPicker?.()}
+                      onChange={event => setSummaryStart(event.target.value)}
+                    />
+                    <Input
+                      id="usage-summary-end"
+                      type="datetime-local"
+                      aria-label="Window end"
+                      value={summaryEnd}
+                      min={summaryStart}
+                      aria-describedby={
+                        summaryInputError ? 'usage-summary-window-error' : undefined
+                      }
+                      className="w-full cursor-pointer sm:w-52 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                      onClick={event => event.currentTarget.showPicker?.()}
+                      onChange={event => setSummaryEnd(event.target.value)}
+                    />
+                  </div>
+                  {summaryInputError && (
+                    <p
+                      id="usage-summary-window-error"
+                      className="text-destructive type-label"
+                      role="alert"
+                    >
+                      {summaryInputError}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </form>
         </CardContent>
       </Card>
+
+      {(submitted.kind === 'user' || submitted.kind === 'org') && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Usage summary</CardTitle>
+            <CardDescription>
+              Accepted seconds and shadow estimated cents for this exact subject. This does not
+              debit credits.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {summaryRequest && (
+              <p className="text-muted-foreground break-all type-label">
+                {summaryRequest.subjectType} {summaryRequest.subjectId} ·{' '}
+                {formatTimestamp(summaryRequest.start)} to {formatTimestamp(summaryRequest.end)} ·
+                window is [start, end)
+              </p>
+            )}
+
+            {summary.isFetching && (
+              <p className="text-muted-foreground type-body" role="status" aria-live="polite">
+                Calculating usage summary...
+              </p>
+            )}
+
+            {summary.isError && (
+              <Alert variant="destructive">
+                <AlertTitle>Usage summary could not be calculated</AlertTitle>
+                <AlertDescription className="space-y-3">
+                  <p>{summary.error.message}</p>
+                  {summary.error.data?.code !== 'BAD_REQUEST' && (
+                    <Button variant="outline" size="sm" onClick={() => void summary.refetch()}>
+                      Retry
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {summary.isSuccess && (
+              <div className="space-y-3" aria-live="polite">
+                <p className="text-muted-foreground type-label">
+                  {summary.data.acceptedSeconds.toLocaleString()} accepted seconds across{' '}
+                  {summary.data.items
+                    .reduce((total, item) => total + item.intervals, 0)
+                    .toLocaleString()}{' '}
+                  interval
+                  {summary.data.items.reduce((total, item) => total + item.intervals, 0) === 1
+                    ? ''
+                    : 's'}
+                </p>
+                {summary.data.items.length === 0 ? (
+                  <p className="text-muted-foreground type-body">
+                    No accepted usage was recorded in this window.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <Table>
+                      <caption className="sr-only">
+                        Usage summary for {summary.data.subjectType} {summary.data.subjectId} from{' '}
+                        {formatTimestamp(summary.data.start)} to {formatTimestamp(summary.data.end)}
+                      </caption>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Accepted seconds</TableHead>
+                          <TableHead>Rate</TableHead>
+                          <TableHead>Estimated cents</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {summary.data.items.map(item => (
+                          <TableRow key={item.skuId}>
+                            <TableCell>
+                              <code className="type-code">{item.skuId}</code>
+                              <p className="text-muted-foreground type-label">{item.skuName}</p>
+                            </TableCell>
+                            <TableCell className="tabular-nums type-code">
+                              {item.acceptedSeconds.toLocaleString()}s
+                            </TableCell>
+                            <TableCell className="tabular-nums type-code">
+                              {item.rateCentsPerSecond} cents/s
+                            </TableCell>
+                            <TableCell className="tabular-nums type-code">
+                              {item.estimatedCents} cents
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow>
+                          <TableCell className="font-medium">Total</TableCell>
+                          <TableCell className="tabular-nums font-medium type-code">
+                            {summary.data.acceptedSeconds.toLocaleString()}s
+                          </TableCell>
+                          <TableCell />
+                          <TableCell className="tabular-nums font-medium type-code">
+                            {summary.data.estimatedCents} cents
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {summary.isSuccess && summaryRequest && (
+              <div className="space-y-4 border-t border-border pt-4">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                  <div className="max-w-2xl space-y-1">
+                    <h3 className="font-medium type-body">Cloudflare reconciliation</h3>
+                    <p className="text-muted-foreground type-label">
+                      Query Cloudflare only for physical instance IDs in the usage records currently
+                      displayed below. This is shadow validation and does not change usage or
+                      billing.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full sm:w-auto sm:shrink-0"
+                    disabled={reconciliation.isPending || !reconciliationRequest}
+                    onClick={() => {
+                      if (reconciliationRequest) reconciliation.mutate(reconciliationRequest);
+                    }}
+                  >
+                    <Cloud className="size-4" />
+                    {reconciliation.isPending
+                      ? 'Reconciling with Cloudflare...'
+                      : 'Reconcile displayed records'}
+                  </Button>
+                </div>
+
+                {reconciliationMatchesScope && reconciliation.isError && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Cloudflare reconciliation could not be completed</AlertTitle>
+                    <AlertDescription className="space-y-3">
+                      <p>{reconciliation.error.message}</p>
+                      {reconciliationCanRetry && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={reconciliation.isPending}
+                          onClick={() => {
+                            if (reconciliationRequest) reconciliation.mutate(reconciliationRequest);
+                          }}
+                        >
+                          Retry reconciliation
+                        </Button>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {reconciliationMatchesScope && reconciliation.isSuccess && (
+                  <div className="space-y-4" aria-live="polite">
+                    {reconciliation.data.rows.length === 0 ? (
+                      <p className="text-muted-foreground type-body">
+                        No accepted meter usage was recorded for this subject in the applied window.
+                        Cloudflare was not queried.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-muted-foreground type-label">
+                          {reconciliation.data.comparison.description}
+                        </p>
+
+                        <dl className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2">
+                          <div className="bg-surface-inset p-3">
+                            <dt className="text-muted-foreground type-label">
+                              Meter accepted seconds
+                            </dt>
+                            <dd className="mt-1 tabular-nums type-code">
+                              {reconciliation.data.totals.meterAcceptedSeconds.toLocaleString()}s
+                            </dd>
+                          </div>
+                          <div className="bg-surface-inset p-3">
+                            <dt className="text-muted-foreground type-label">Runs queried</dt>
+                            <dd className="mt-1 tabular-nums type-code">
+                              {reconciliation.data.totals.queriedCloudflareRuns.toLocaleString()}
+                            </dd>
+                          </div>
+                        </dl>
+
+                        <p className="text-muted-foreground type-label">
+                          {reconciliation.data.counts.compared} compared ·{' '}
+                          {reconciliation.data.counts.missing} missing ·{' '}
+                          {reconciliation.data.counts.ambiguous} ambiguous ·{' '}
+                          {reconciliation.data.counts.partial} partial ·{' '}
+                          {reconciliation.data.counts.comparisonUnavailable} comparison unavailable
+                        </p>
+
+                        {reconciliation.data.provider.issues.length > 0 && (
+                          <Alert variant="warning">
+                            <AlertTitle>Cloudflare returned partial data</AlertTitle>
+                            <AlertDescription>
+                              {reconciliation.data.provider.issues.map(issue => (
+                                <p key={issue}>{issue}</p>
+                              ))}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                          <Table>
+                            <caption className="sr-only">
+                              Cloudflare reconciliation for {reconciliation.data.subjectType}{' '}
+                              {reconciliation.data.subjectId} from{' '}
+                              {formatTimestamp(reconciliation.data.start)} to{' '}
+                              {formatTimestamp(reconciliation.data.end)}
+                            </caption>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Instance</TableHead>
+                                <TableHead>Application / service</TableHead>
+                                <TableHead>SKU(s)</TableHead>
+                                <TableHead>Meter run</TableHead>
+                                <TableHead>Cloudflare memory / disk</TableHead>
+                                <TableHead>Cloudflare CPU (diagnostic)</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {reconciliation.data.rows.map(row => (
+                                <TableRow key={row.intervalIds.join(',')}>
+                                  <TableCell>
+                                    <code className="block max-w-56 break-all type-code">
+                                      {row.instanceId}
+                                    </code>
+                                    <p className="text-muted-foreground type-label">
+                                      {row.intervalCount} interval
+                                      {row.intervalCount === 1 ? '' : 's'}
+                                    </p>
+                                  </TableCell>
+                                  <TableCell>
+                                    <p className="type-code">
+                                      {row.providerApplicationIds.join(', ') || 'No provider match'}
+                                    </p>
+                                    <p className="text-muted-foreground type-label">
+                                      {row.services.join(', ')}
+                                    </p>
+                                    {row.provisionedMemoryBytes !== null &&
+                                      row.provisionedDiskBytes !== null && (
+                                        <p className="text-muted-foreground type-label">
+                                          {formatProvisionedCapacity(
+                                            row.provisionedMemoryBytes,
+                                            row.provisionedDiskBytes
+                                          )}
+                                        </p>
+                                      )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <code className="block max-w-56 break-all type-code">
+                                      {row.skuIds.join(', ')}
+                                    </code>
+                                  </TableCell>
+                                  <TableCell className="tabular-nums type-code">
+                                    <span className="block">
+                                      {row.meterAcceptedSeconds.toLocaleString()}s accepted
+                                    </span>
+                                    <span className="block text-muted-foreground type-label">
+                                      {formatTimestamp(row.meterStartedAt)}
+                                    </span>
+                                    <span className="block text-muted-foreground type-label">
+                                      to {formatTimestamp(row.meterEndedAt)}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="tabular-nums type-code">
+                                    <span className="block">
+                                      Memory {formatProviderNumber(row.providerMemorySeconds)}
+                                      {row.providerMemorySeconds === null ? '' : 's'}
+                                    </span>
+                                    <span className="block text-muted-foreground type-label">
+                                      {formatVariance(
+                                        row.providerMemoryDifferenceSeconds,
+                                        row.providerMemoryDifferencePercent
+                                      )}
+                                    </span>
+                                    <span className="mt-1 block">
+                                      Disk {formatProviderNumber(row.providerDiskSeconds)}
+                                      {row.providerDiskSeconds === null ? '' : 's'}
+                                    </span>
+                                    <span className="block text-muted-foreground type-label">
+                                      {formatVariance(
+                                        row.providerDiskDifferenceSeconds,
+                                        row.providerDiskDifferencePercent
+                                      )}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="tabular-nums type-code">
+                                    {formatProviderNumber(row.providerCpuTimeSec)}
+                                    {row.providerCpuTimeSec === null ? '' : 's'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={reconciliationStatusVariant(row.status)}>
+                                      {reconciliationStatusLabel(row.status)}
+                                    </Badge>
+                                    <p className="mt-2 min-w-64 text-muted-foreground type-label">
+                                      {row.statusDetail}
+                                    </p>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        {reconciliation.data.provider.rawResponses.length > 0 && (
+                          <Collapsible
+                            open={rawResponseOpen}
+                            onOpenChange={open => {
+                              setRawResponseOpen(open);
+                              setRawCopyStatus('idle');
+                            }}
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                              <CollapsibleTrigger asChild>
+                                <Button type="button" variant="outline" size="sm">
+                                  <ChevronRight
+                                    className={`size-4 transition-transform ${rawResponseOpen ? 'rotate-90' : ''}`}
+                                  />
+                                  {rawResponseOpen
+                                    ? 'Hide raw Cloudflare response'
+                                    : 'View raw Cloudflare response'}
+                                </Button>
+                              </CollapsibleTrigger>
+                              {rawResponseOpen && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (!navigator.clipboard) {
+                                      setRawCopyStatus('failed');
+                                      return;
+                                    }
+                                    const rawJson = JSON.stringify(
+                                      reconciliation.data.provider.rawResponses,
+                                      null,
+                                      2
+                                    );
+                                    void navigator.clipboard.writeText(rawJson).then(
+                                      () => setRawCopyStatus('copied'),
+                                      () => setRawCopyStatus('failed')
+                                    );
+                                  }}
+                                >
+                                  <Copy className="size-4" /> Copy raw JSON
+                                </Button>
+                              )}
+                              {rawCopyStatus !== 'idle' && (
+                                <span
+                                  className="text-muted-foreground type-label"
+                                  role="status"
+                                  aria-live="polite"
+                                >
+                                  {rawCopyStatus === 'copied' ? 'Raw JSON copied.' : 'Copy failed.'}
+                                </span>
+                              )}
+                            </div>
+                            <CollapsibleContent className="mt-3 space-y-3">
+                              {reconciliation.data.provider.rawResponses.map((raw, index) => (
+                                <section
+                                  key={`${raw.dataset}:${raw.batchIndex}:${index}`}
+                                  className="space-y-2"
+                                >
+                                  <h4 className="text-muted-foreground type-label">
+                                    {raw.dataset}
+                                    {raw.queries.length > 0
+                                      ? ` · batch ${raw.batchIndex} · ${raw.queries.length} window${raw.queries.length === 1 ? '' : 's'}`
+                                      : ''}
+                                  </h4>
+                                  <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface-inset p-4 whitespace-pre type-code">
+                                    {JSON.stringify(raw.body, null, 2)}
+                                  </pre>
+                                </section>
+                              ))}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {results.isError && (
         <Alert variant="destructive">

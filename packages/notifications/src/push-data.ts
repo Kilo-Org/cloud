@@ -38,6 +38,15 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     cliSessionId: nonEmptyStringSchema,
     category: cloudAgentSessionCategorySchema.optional(),
   }),
+  z.object({
+    type: z.literal('low_balance'),
+    organizationId: nonEmptyStringSchema,
+  }),
+  z.object({
+    type: z.literal('security_finding'),
+    findingId: nonEmptyStringSchema,
+    scope: nonEmptyStringSchema,
+  }),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

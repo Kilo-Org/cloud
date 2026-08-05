@@ -20,20 +20,17 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
-  BALANCED_CLAW_SETUP_MODEL,
   BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
-  KILO_AUTO_LEGACY_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
-import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
-import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {
   autoFreeModels,
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
+  selectAutoFreeModel,
 } from '@/lib/ai-gateway/models';
 import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
@@ -43,6 +40,9 @@ import {
   isOrganizationAutoTargetModel,
   validateOrganizationAutoTarget,
 } from '@/lib/organizations/organization-auto-model';
+import { getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
+import type { OpenCodeVariant } from '@kilocode/db/schema-types';
+import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -51,8 +51,7 @@ type ResolveAutoModelParams = {
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
-  // Lazily fetches the auto-routing worker's decision; only set for
-  // kilo-auto/efficient requests (route.ts owns the request-body capture).
+  // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   organizationContext?: Promise<{
     organizationId?: string;
@@ -81,7 +80,7 @@ export async function getAutoFreeCandidates(
 ): Promise<ReadonlyArray<string>> {
   const openRouterModels = await getOpenRouterModelsFromRedis();
   const candidates = new Set<string>();
-  for (const model of autoFreeModels) {
+  for (const { model } of autoFreeModels) {
     if (isKiloExclusiveFreeModel(model)) {
       const kiloModel = findKiloExclusiveModel(model);
       if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
@@ -231,6 +230,44 @@ async function resolveOrganizationAutoModel(
   };
 }
 
+/**
+ * Map an efficient routing decision onto a concrete model + catalog settings.
+ *
+ * Prefer canonical `variant` (complete OpenCode variant settings). When the
+ * variant key is absent from the model's catalog, return null so the caller
+ * falls back to balanced rather than serving implicit defaults. When `variant`
+ * is absent, preserve legacy effort-only behavior for rolling deploys.
+ */
+function resolveEfficientDecisionModel(decision: AutoRoutingDecision): ResolvedAutoModel | null {
+  // `variant` is only on the benchmark decision branch of the discriminated
+  // union; coding-plan defaults never carry it.
+  if ('variant' in decision && decision.variant != null) {
+    const variants = getModelVariants(decision.model);
+    const variantSettings: OpenCodeVariant | undefined = variants?.[decision.variant];
+    if (!variantSettings) {
+      return null;
+    }
+    // Catalog variants are the source of truth; cast into ResolvedAutoModel's
+    // OpenRouter-shaped fields (catalog effort may include values like `max`
+    // beyond ChatCompletionReasoningEffort).
+    return {
+      model: decision.model,
+      ...(variantSettings.reasoning
+        ? { reasoning: { ...variantSettings.reasoning } as OpenRouterReasoningConfig }
+        : {}),
+      ...(variantSettings.verbosity ? { verbosity: variantSettings.verbosity } : {}),
+    };
+  }
+
+  // Legacy effort-only decisions (old workers during rolling deploy).
+  return {
+    model: decision.model,
+    ...('reasoningEffort' in decision && decision.reasoningEffort
+      ? { reasoning: { enabled: true, effort: decision.reasoningEffort } }
+      : {}),
+  };
+}
+
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
@@ -245,11 +282,16 @@ export async function resolveAutoModel(
     if (candidates.length === 0) {
       return { kind: 'no_free_models_available' };
     }
-    const randomNumber = getRandomNumber(
-      'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp),
-      candidates.length
+    const candidateIds = new Set(candidates);
+    const selectedModel = selectAutoFreeModel(
+      autoFreeModels
+        .filter(candidate => candidateIds.has(candidate.model))
+        .toSorted((a, b) => a.model.localeCompare(b.model)),
+      'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp)
     );
-    return { kind: 'ok', resolved: { model: candidates[randomNumber] } };
+    return selectedModel
+      ? { kind: 'ok', resolved: { model: selectedModel } }
+      : { kind: 'no_free_models_available' };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {
@@ -262,36 +304,21 @@ export async function resolveAutoModel(
       },
     };
   }
-  if (model === KILO_AUTO_EFFICIENT_MODEL.id) {
+  if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
-      // Apply the candidate's pinned reasoning effort so the model runs under
-      // the same conditions the benchmark measured it at.
-      return {
-        kind: 'ok',
-        resolved: {
-          model: decision.model,
-          ...(decision.reasoningEffort
-            ? { reasoning: { enabled: true, effort: decision.reasoningEffort } }
-            : {}),
-        },
-      };
+      const resolvedFromDecision = resolveEfficientDecisionModel(decision);
+      if (resolvedFromDecision) {
+        return { kind: 'ok', resolved: resolvedFromDecision };
+      }
+      // Exact catalog variant missing or removed: never serve the chosen model
+      // with implicit defaults — same balanced fallback as the no-decision path.
+      return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
     }
-    // Static fallback when the worker is slow/unavailable: same model as
-    // balanced so an efficient request never degrades below balanced.
+    // Static fallback when the worker is slow or unavailable.
     return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
   }
   const mode = resolveMode(modeHeader, featureHeader);
-  if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
-    if (mode === 'claw' && featureHeader === 'kiloclaw') {
-      const user = await userPromise;
-      if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
-        return { kind: 'ok', resolved: BALANCED_CLAW_SETUP_MODEL };
-      }
-    }
-
-    return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
-  }
   return {
     kind: 'ok',
     resolved: (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL,

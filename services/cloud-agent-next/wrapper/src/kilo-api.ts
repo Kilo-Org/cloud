@@ -3,10 +3,11 @@
  *
  * Provides a stable `WrapperKiloClient` interface that all wrapper modules use.
  * Session methods use the v1 SDK client (passed in from main.ts, which uses
- * createKilo() from the root @kilocode/sdk). Global event subscription and
- * methods only available in the v2 API (permission reply, question
- * reply/reject, commit message) use a v2 client created internally from the
- * same server URL.
+ * createKilo() from the root @kilocode/sdk). Global event subscription,
+ * question reply/reject, and commit message use a v2 client created
+ * internally from the same server URL. Permission reply POSTs
+ * /permission/{id}/reply directly so it can carry `interactive` — the pinned
+ * SDK client strips unknown body keys.
  *
  * The raw SDK client is not exposed on the returned interface — all access
  * goes through named methods.
@@ -260,7 +261,8 @@ export type WrapperKiloClient = {
   answerPermission: (
     permissionId: string,
     response: PermissionResponse,
-    message?: string
+    message?: string,
+    interactive?: boolean
   ) => Promise<boolean>;
   answerQuestion: (questionId: string, answers: string[][]) => Promise<boolean>;
   rejectQuestion: (questionId: string) => Promise<boolean>;
@@ -442,8 +444,28 @@ export function createWrapperKiloClient(
       return commands;
     },
 
-    answerPermission: async (permissionId, response, message) => {
-      await v2Client.permission.reply({ requestID: permissionId, reply: response, message });
+    answerPermission: async (permissionId, response, message, interactive) => {
+      // The pinned @kilocode/sdk 7.3.54 client whitelists body keys at runtime and
+      // would silently drop `interactive` (needs SDK >= 7.4.19). POST directly: old
+      // kilo servers ignore the unknown body key; >= 7.4.18 requires it to accept a
+      // human skill-shell approval.
+      const res = await fetch(
+        // `serverUrl` is passed through from the bootstrap; strip trailing slashes so
+        // both `http://host:port` and `http://host:port/` join to the same path.
+        `${serverUrl.replace(/\/+$/, '')}/permission/${encodeURIComponent(permissionId)}/reply`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reply: response,
+            ...(message !== undefined ? { message } : {}),
+            ...(interactive === true ? { interactive: true } : {}),
+          }),
+        }
+      );
+      if (!res.ok) {
+        throw new Error(`Permission reply ${permissionId} failed: HTTP ${res.status}`);
+      }
       return true;
     },
 

@@ -138,13 +138,14 @@ function makeDbFakes() {
     leftJoin: vi.fn(() => select),
     where: vi.fn((_condition: unknown) => select),
     limit: vi.fn(() => select),
+    for: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
   };
 
   // Drizzle update chain: db.update(table).set({}).where().returning()
   const updateResult = vi.fn<() => Promise<unknown>>(async () => undefined);
   const updateSet = vi.fn(() => update);
-  const updateWhere = vi.fn(() => update);
+  const updateWhere = vi.fn((_condition: unknown) => update);
   const updateReturning = vi.fn(() => update);
   const update = {
     set: updateSet,
@@ -191,6 +192,7 @@ function makeDbFakes() {
       insertResult,
       select: selectFn,
       selectWhere: select.where,
+      selectFor: select.for,
       update: updateFn,
       updateSet,
       updateWhere,
@@ -212,6 +214,7 @@ describe('api routes', () => {
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentSessionScopeId: null,
     });
   });
 
@@ -400,6 +403,7 @@ describe('api routes', () => {
     expect(sessionCache.putValidated).toHaveBeenCalledWith({
       sessionId: 'ses_12345678901234567890123456',
       organizationId: null,
+      cloudAgentSessionScopeId: null,
     });
 
     const json = await res.json();
@@ -1330,6 +1334,11 @@ describe('api routes', () => {
     const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
+      kiloSessionId: parentSessionId,
+      organizationId: null,
+      cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
+    });
     // Recursive CTE
     fns.executeResult.mockResolvedValueOnce({
       rows: [
@@ -1346,6 +1355,7 @@ describe('api routes', () => {
         git_url: null,
         git_branch: null,
         created_on_platform: null,
+        cloud_agent_session_scope_id: 'cloud-agent-session-scope-1',
       },
       {
         session_id: childSessionId,
@@ -1354,6 +1364,7 @@ describe('api routes', () => {
         git_url: null,
         git_branch: null,
         created_on_platform: null,
+        cloud_agent_session_scope_id: 'cloud-agent-session-scope-1',
       },
     ]);
 
@@ -1392,6 +1403,7 @@ describe('api routes', () => {
       '"cli_sessions_v2"."session_id" in ($1, $2) and "cli_sessions_v2"."kilo_user_id" = $3'
     );
     expect(deletedRowsQuery.params).toEqual([childSessionId, parentSessionId, 'usr_test']);
+    expect(fns.selectFor).toHaveBeenCalledWith('update');
 
     expect(fns.deleteWhere).toHaveBeenCalledTimes(2);
     const deletedSessionParams = fns.deleteWhere.mock.calls.map(([predicate]) => {
@@ -1900,6 +1912,390 @@ describe('api routes', () => {
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ instances: [] });
+    });
+  });
+
+  describe('POST /session/:sessionId/rename-notify', () => {
+    const sessionId = 'ses_12345678901234567890123456';
+
+    it('returns 200 {delivered} from the UserConnectionDO RPC', async () => {
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'From Web' }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ delivered: true });
+      expect(notifySessionRenamed).toHaveBeenCalledWith(sessionId, 'From Web');
+      expect(resolveAccessibleKiloSession).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ kiloUserId: 'usr_test', kiloSessionId: sessionId })
+      );
+    });
+
+    it('returns 404 when the session is not accessible', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce(null);
+      const notifySessionRenamed = vi.fn();
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'From Web' }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(404);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for invalid sessionId or body', async () => {
+      const app = makeApiApp();
+      const badId = await app.fetch(
+        new Request('http://local/session/not-a-session/rename-notify', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x' }),
+        }),
+        makeTestEnv()
+      );
+      expect(badId.status).toBe(400);
+
+      const badBody = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: '' }),
+        }),
+        makeTestEnv()
+      );
+      expect(badBody.status).toBe(400);
+    });
+  });
+
+  describe('POST /session/:sessionId/title', () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const defaultTitle = 'New session - 2026-07-30T12:00:00.000Z';
+
+    function fullRow(overrides: Record<string, unknown> = {}) {
+      return {
+        session_id: sessionId,
+        kilo_user_id: 'usr_test',
+        created_at: '2026-07-30T12:00:00.000Z',
+        updated_at: '2026-07-30T12:00:00.000Z',
+        title: null as string | null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+        ...overrides,
+      };
+    }
+
+    it('generated applies over NULL title and emits session.updated', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      const existingUpdatedAt = '2026-07-30T12:00:00.000Z';
+      fns.selectResult.mockResolvedValueOnce([
+        fullRow({ title: null, updated_at: existingUpdatedAt }),
+      ]);
+      const updated = fullRow({
+        title: 'Auto Title',
+        updated_at: existingUpdatedAt,
+      });
+      fns.updateResult.mockResolvedValueOnce([updated]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'Auto Title', generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ title: 'Auto Title', applied: true });
+      expect(fns.updateSet).toHaveBeenCalledWith({
+        title: 'Auto Title',
+        updated_at: existingUpdatedAt,
+      });
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        'usr_test',
+        expect.objectContaining({
+          type: 'session.updated',
+          data: expect.objectContaining({
+            source: 'v2',
+            changedAt: existingUpdatedAt,
+            session: expect.objectContaining({
+              sessionId,
+              title: 'Auto Title',
+              updatedAt: existingUpdatedAt,
+            }),
+          }),
+        })
+      );
+    });
+
+    it('generated applies over a default-pattern title', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      const existingUpdatedAt = '2026-07-30T12:00:00.000Z';
+      fns.selectResult.mockResolvedValueOnce([
+        fullRow({ title: defaultTitle, updated_at: existingUpdatedAt }),
+      ]);
+      fns.updateResult.mockResolvedValueOnce([
+        fullRow({ title: 'Generated', updated_at: existingUpdatedAt }),
+      ]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'Generated', generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ title: 'Generated', applied: true });
+      expect(fns.updateSet).toHaveBeenCalledWith({
+        title: 'Generated',
+        updated_at: existingUpdatedAt,
+      });
+    });
+
+    it('generated refused over a rename returns applied:false with no event or update', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: 'User Rename' })]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'Would Clobber', generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      expect(fns.update).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('generated refuses when an intervening rename wins the title CAS', async () => {
+      // Select still sees NULL/default; update returns zero rows because the
+      // conditional WHERE (title IS NULL / title = read value) no longer matches.
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: null })]);
+      fns.updateResult.mockResolvedValueOnce([]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'Would Clobber', generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      expect(fns.updateWhere).toHaveBeenCalled();
+      const whereArg = fns.updateWhere.mock.calls[0]?.[0] as SQL | undefined;
+      expect(whereArg).toBeInstanceOf(SQL);
+      const compiled = new PgDialect().sqlToQuery(whereArg!);
+      expect(compiled.sql).toMatch(/"title"\s+is\s+null/i);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('generated CAS guards a previously-read default title value', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: defaultTitle })]);
+      fns.updateResult.mockResolvedValueOnce([]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'Would Clobber', generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      const whereArg = fns.updateWhere.mock.calls[0]?.[0] as SQL | undefined;
+      expect(whereArg).toBeInstanceOf(SQL);
+      const compiled = new PgDialect().sqlToQuery(whereArg!);
+      // CAS on the exact title observed at read time (not merely ownership).
+      expect(compiled.sql).toMatch(/"title"\s*=/i);
+      expect(compiled.params).toContain(defaultTitle);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('non-generated last-write-wins including over a rename', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      const existingUpdatedAt = '2026-07-30T12:00:00.000Z';
+      fns.selectResult.mockResolvedValueOnce([
+        fullRow({ title: 'Previous Rename', updated_at: existingUpdatedAt }),
+      ]);
+      fns.updateResult.mockResolvedValueOnce([
+        fullRow({ title: 'CLI Rename', updated_at: existingUpdatedAt }),
+      ]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'CLI Rename', generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ title: 'CLI Rename', applied: true });
+      expect(fns.updateSet).toHaveBeenCalledWith({
+        title: 'CLI Rename',
+        updated_at: existingUpdatedAt,
+      });
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        'usr_test',
+        expect.objectContaining({
+          type: 'session.updated',
+          data: expect.objectContaining({ changedAt: existingUpdatedAt }),
+        })
+      );
+    });
+
+    it('preserves existing updated_at on title writes', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      const existingUpdatedAt = '2026-07-01T08:00:00.000Z';
+      fns.selectResult.mockResolvedValueOnce([
+        fullRow({ title: 'Before', updated_at: existingUpdatedAt }),
+      ]);
+      fns.updateResult.mockResolvedValueOnce([
+        fullRow({ title: 'After', updated_at: existingUpdatedAt }),
+      ]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'After', generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(fns.updateSet).toHaveBeenCalledWith({
+        title: 'After',
+        updated_at: existingUpdatedAt,
+      });
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        'usr_test',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            changedAt: existingUpdatedAt,
+            session: expect.objectContaining({ updatedAt: existingUpdatedAt }),
+          }),
+        })
+      );
+    });
+
+    it('returns 400 when title exceeds 200 characters', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(201), generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(400);
+      expect(fns.select).not.toHaveBeenCalled();
+      expect(fns.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for unknown session and 400 for invalid body', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([]);
+
+      const app = makeApiApp();
+      const notFound = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'X', generated: false }),
+        }),
+        makeTestEnv()
+      );
+      expect(notFound.status).toBe(404);
+
+      const badBody = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'X' }),
+        }),
+        makeTestEnv()
+      );
+      expect(badBody.status).toBe(400);
+    });
+
+    it('returns 404 for a session owned by another user', async () => {
+      // Ownership is enforced by the select filter on kilo_user_id; empty result → 404.
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'Nope', generated: false }),
+        }),
+        makeTestEnv()
+      );
+      expect(res.status).toBe(404);
+      expect(fns.update).not.toHaveBeenCalled();
     });
   });
 });

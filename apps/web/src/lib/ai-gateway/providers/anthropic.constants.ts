@@ -5,6 +5,7 @@ import type {
 
 export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-5';
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-5';
+export const CLAUDE_OPUS_FALLBACK_MODEL_ID = 'anthropic/claude-opus-4.8';
 export const CLAUDE_HAIKU_CURRENT_MODEL_ID = 'anthropic/claude-haiku-4.5';
 export const CLAUDE_FABLE_CURRENT_MODEL_ID = 'anthropic/claude-fable-5';
 export const CLAUDE_OPUS_4_8_STEALTH_MODEL_ID = 'stealth/claude-opus-4.8';
@@ -101,24 +102,14 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   inference_provider_restriction: [],
 };
 
-export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
-  public_id: CLAUDE_SONNET_CURRENT_MODEL_ID + ':clawsetup',
-  internal_id: CLAUDE_SONNET_CURRENT_MODEL_ID,
-  display_name: 'Claude Sonnet KiloClaw Setup Promo',
-  description: 'Claude Sonnet KiloClaw Setup Promo',
-  status: 'hidden', // only usable through kilo-auto
-  context_length: 1_000_000,
-  max_completion_tokens: 128_000,
-  gateway: 'openrouter',
-  flags: ['reasoning', 'vision', 'vercel-routing'],
-  pricing: null,
-  inference_provider_restriction: [],
-};
-
 export function isClaudeModel(requestedModel: string) {
   return requestedModel.includes('claude');
 }
 
 export function isFableModel(requestedModel: string) {
   return requestedModel.includes('claude-fable');
+}
+
+export function isOpus5Model(requestedModel: string) {
+  return requestedModel.includes('claude-opus-5');
 }

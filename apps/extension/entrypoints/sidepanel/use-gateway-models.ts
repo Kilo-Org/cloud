@@ -18,10 +18,12 @@ export const useGatewayModels = ({
   organizationId: string | undefined;
 }): {
   readonly modelLoadError: string | undefined;
+  readonly isLoading: boolean;
   readonly modelOptions: KiloGatewayModelOption[];
   readonly refetchModels: () => Promise<unknown>;
 } => {
   const query = useQuery({
+    enabled: auth.token !== '',
     queryFn: ({ signal }) =>
       fetchKiloGatewayModels({
         apiBaseUrl,
@@ -34,6 +36,7 @@ export const useGatewayModels = ({
   });
 
   return {
+    isLoading: query.isLoading,
     modelLoadError: query.isError ? 'Could not load models.' : undefined,
     modelOptions: query.data ?? emptyModelOptions,
     refetchModels: query.refetch,

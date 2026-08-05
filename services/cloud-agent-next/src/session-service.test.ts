@@ -47,6 +47,7 @@ vi.mock('./workspace.js', () => ({
 const tokenMocks = vi.hoisted(() => ({
   issueCloudAgentGitHubSessionCapability: vi.fn(),
   issueCloudAgentGitLabSessionCapability: vi.fn(),
+  issueCloudAgentBitbucketSessionCapability: vi.fn(),
   resolveCloudAgentGitHubAuthForRepo: vi.fn(),
   resolveManagedBitbucketToken: vi.fn(),
   resolveManagedGitLabToken: vi.fn(),
@@ -452,7 +453,8 @@ function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
 
 function createBitbucketMetadata(
   isCodeReview: boolean,
-  orgId: string | null = '123e4567-e89b-12d3-a456-426614174030'
+  orgId: string | null = '123e4567-e89b-12d3-a456-426614174030',
+  credentialContainment?: CredentialContainment
 ): CloudAgentSessionState {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -462,6 +464,7 @@ function createBitbucketMetadata(
       ...(orgId ? { orgId } : {}),
       createdOnPlatform: isCodeReview ? 'code-review' : 'cloud-agent-web',
     },
+    ...(credentialContainment ? { workspace: { credentialContainment } } : {}),
     auth: {
       kilocodeToken: 'kilo-token',
       kiloSessionId: 'kilo-session',
@@ -755,6 +758,41 @@ describe('SessionService.prepareWorkspace', () => {
     expect(workspaceMocks.updateGitRemoteUrl.mock.invocationCallOrder[0]).toBeLessThan(
       session.exec.mock.invocationCallOrder[restoreCallIndex] ?? 0
     );
+  });
+
+  it('preserves the capability origin (no strip) for a contained cold Bitbucket review', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const metadata = createBitbucketMetadata(true, '123e4567-e89b-12d3-a456-426614174030', {
+      github: false,
+      gitlab: false,
+      bitbucket: true,
+      kilocode: false,
+    });
+    tokenMocks.issueCloudAgentBitbucketSessionCapability.mockResolvedValue({
+      success: true,
+      value: {
+        capability: 'kbb1.opaque-capability',
+        gitUrl: 'https://bitbucket.org/acme-team/widgets.git',
+      },
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(tokenMocks.issueCloudAgentBitbucketSessionCapability).toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedBitbucketToken).not.toHaveBeenCalled();
+    // A kbb1. capability origin stays authenticated through the outbound
+    // interceptor, so it must NOT be stripped (unlike a raw-token session).
+    expect(workspaceMocks.updateGitRemoteUrl).not.toHaveBeenCalled();
   });
 
   it('writes the opaque Kilo capability to the sandbox auth file, never the raw token', async () => {
@@ -1142,6 +1180,41 @@ describe('SessionService.prepareWorkspace', () => {
       '/workspace/user/sessions/agent_test',
       'https://bitbucket.org/acme-team/widgets.git'
     );
+  });
+
+  it('preserves the capability origin (no strip, no refresh) for a contained warm Bitbucket review', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = createBitbucketMetadata(true, '123e4567-e89b-12d3-a456-426614174030', {
+      github: false,
+      gitlab: false,
+      bitbucket: true,
+      kilocode: false,
+    });
+    tokenMocks.issueCloudAgentBitbucketSessionCapability.mockResolvedValue({
+      success: true,
+      value: {
+        capability: 'kbb1.opaque-capability',
+        gitUrl: 'https://bitbucket.org/acme-team/widgets.git',
+      },
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
+    // A capability origin is preserved: no strip, and the warm-resume token
+    // refresh is skipped because sanitize reports the remote as handled.
+    expect(workspaceMocks.updateGitRemoteUrl).not.toHaveBeenCalled();
+    expect(workspaceMocks.updateGitRemoteToken).not.toHaveBeenCalled();
   });
 
   it('refreshes prepared GitHub workspace metadata with a managed capability', async () => {

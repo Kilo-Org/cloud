@@ -507,6 +507,36 @@ describe('Organizations', () => {
       expect(added).toBe(false);
       expect(await getUserOrganizationsWithSeats(member.id)).toHaveLength(0);
     });
+
+    test('disables the personal account for a brand-new user provisioned via SSO', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('SSO Org', owner.id);
+
+      const added = await addSsoUserToOrganization(organization.id, member.id, {
+        isNewUser: true,
+      });
+
+      expect(added).toBe(true);
+      const updatedMember = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, member.id),
+      });
+      expect(updatedMember?.personal_account_disabled).toBe(true);
+    });
+
+    test('leaves the personal account untouched for an existing user authenticating via SSO', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('SSO Org', owner.id);
+
+      const added = await addSsoUserToOrganization(organization.id, member.id);
+
+      expect(added).toBe(true);
+      const updatedMember = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, member.id),
+      });
+      expect(updatedMember?.personal_account_disabled).toBe(false);
+    });
   });
 
   describe('updateUserRoleInOrganization', () => {
@@ -1672,6 +1702,48 @@ describe('Organizations', () => {
           where: eq(kilocode_users.id, invitee.id),
         });
         expect(updatedInvitee?.personal_account_disabled).toBe(false);
+      });
+
+      test('skips the customer-source survey when a user joins via invitation', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({ customer_source: null });
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        const updatedInvitee = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, invitee.id),
+        });
+        expect(updatedInvitee?.customer_source).toBe('');
+      });
+
+      test('does not overwrite an existing customer-source answer when accepting an invite', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({ customer_source: 'GitHub' });
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        const updatedInvitee = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, invitee.id),
+        });
+        expect(updatedInvitee?.customer_source).toBe('GitHub');
       });
 
       test('rejects accepting a pre-existing invitation into a child organization', async () => {

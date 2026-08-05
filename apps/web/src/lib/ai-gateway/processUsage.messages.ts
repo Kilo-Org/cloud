@@ -16,6 +16,7 @@ import {
   computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelIsByok,
+  extractVercelUpstreamId,
 } from '@/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -222,7 +223,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     responseContent,
     inference_provider,
     finish_reason,
-    upstream_id: null,
+    upstream_id: extractVercelUpstreamId(providerMetadata),
     latency: null,
     moderation_latency: null,
     generation_time: null,
@@ -260,7 +261,7 @@ export function parseMessagesMicrodollarUsageFromString(
     model: getVercelResolvedModel(providerMetadata) ?? responseJson?.model ?? null,
     responseContent,
     inference_provider,
-    upstream_id: null,
+    upstream_id: extractVercelUpstreamId(providerMetadata),
     finish_reason,
     latency: null,
     moderation_latency: null,

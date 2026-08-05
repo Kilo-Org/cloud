@@ -457,6 +457,48 @@ describe('processTopUp credit top-up email', () => {
     expect(marker).toEqual({ idempotency_key: stripePaymentId });
   });
 
+  test('does not duplicate the email after an ambiguous provider exception on retry', async () => {
+    // Regression test: an exception thrown by the provider send (e.g. a
+    // network timeout after Mailgun already accepted the message) must not
+    // roll back the transactional_email_log marker. Rolling it back let a
+    // Stripe webhook retry re-send a duplicate confirmation email even
+    // though the first send may have already been delivered.
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_ambiguous_${Date.now()}_${Math.random()}`;
+    sendViaMailgunMock.mockRejectedValueOnce(new Error('ambiguous network failure'));
+
+    const first = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(first).toBe(true);
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+
+    // The marker must still exist despite the send throwing — this is what
+    // prevents a webhook retry from re-attempting the send.
+    const [marker] = await db
+      .select({ idempotency_key: transactional_email_log.idempotency_key })
+      .from(transactional_email_log)
+      .where(eq(transactional_email_log.idempotency_key, stripePaymentId))
+      .limit(1);
+    expect(marker).toEqual({ idempotency_key: stripePaymentId });
+
+    sendViaMailgunMock.mockClear();
+
+    // Simulate a Stripe webhook retry for the same charge/invoice hitting
+    // the duplicate-credit-transaction recovery path.
+    const retry = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(retry).toBe(false);
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+  });
+
   test('recovery path skips email when skipPostTopUpFreeStuff is true on retry', async () => {
     const user = await insertTestUser({
       total_microdollars_acquired: 0,

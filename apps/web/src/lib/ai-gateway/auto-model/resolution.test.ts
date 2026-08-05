@@ -4,14 +4,11 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsFromRedis: jest.fn(async () => new Set<string>()),
 }));
 
-jest.mock('@/lib/kiloclaw/setup-promo', () => ({
-  userIsWithinFirstKiloClawInstanceWindow: jest.fn(async () => false),
-}));
-
 import { resolveAutoModel } from './resolution';
 import {
   BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
+  KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
@@ -38,6 +35,21 @@ const sampleDecision: AutoRoutingDecision = {
 };
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {
+  it('resolves kilo-auto/balanced as an alias of kilo-auto/efficient', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_BALANCED_MODEL.id,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => sampleDecision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: { model: sampleDecision.model } });
+  });
+
   it('resolves to decision.model when the thunk returns a decision', async () => {
     const result = await resolveAutoModel(
       {
@@ -161,6 +173,228 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     );
 
     expect(thunk).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies complete catalog settings for variant xhigh (distinct from max)', async () => {
+    // Claude catalog: xhigh → effort xhigh + verbosity xhigh; max → effort xhigh + verbosity max
+    const claudeModel = 'anthropic/claude-sonnet-5';
+    const xhighResult = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: claudeModel,
+          variant: 'xhigh',
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    const maxResult = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: claudeModel,
+          variant: 'max',
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(xhighResult).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: claudeModel,
+        reasoning: { enabled: true, effort: 'xhigh' },
+        verbosity: 'xhigh',
+      },
+    });
+    expect(maxResult).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: claudeModel,
+        reasoning: { enabled: true, effort: 'xhigh' },
+        verbosity: 'max',
+      },
+    });
+    expect(xhighResult).not.toEqual(maxResult);
+  });
+
+  it('applies Claude max variant with both reasoning and verbosity', async () => {
+    const claudeModel = 'anthropic/claude-haiku-4.5';
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: claudeModel,
+          variant: 'max',
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: claudeModel,
+        reasoning: { enabled: true, effort: 'xhigh' },
+        verbosity: 'max',
+      },
+    });
+  });
+
+  it('falls back to BALANCED_QWEN_MODEL when variant is absent from the model catalog', async () => {
+    // Claude has no "thinking" key — only none/low/medium/high/xhigh/max
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: 'anthropic/claude-sonnet-5',
+          variant: 'thinking',
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+  });
+
+  it('falls back to BALANCED_QWEN_MODEL when the model exposes no variants but decision has a variant', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: 'some-provider/unknown-model-without-variants',
+          variant: 'high',
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+  });
+
+  it('applies exact thinking and instant variant settings', async () => {
+    // kimi-k2 uses REASONING_VARIANTS_BINARY: instant + thinking
+    const kimiModel = 'moonshotai/kimi-k2.5';
+    const thinkingResult = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: kimiModel,
+          variant: 'thinking',
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    const instantResult = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: kimiModel,
+          variant: 'instant',
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(thinkingResult).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: kimiModel,
+        reasoning: { enabled: true, effort: 'high' },
+      },
+    });
+    expect(instantResult).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: kimiModel,
+        reasoning: { enabled: false, effort: 'none' },
+      },
+    });
+  });
+
+  it('preserves legacy effort-only behavior when variant is absent', async () => {
+    const withEffort = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({ ...sampleDecision, reasoningEffort: 'high' }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    const withoutEffort = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => sampleDecision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    const nullEffort = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({ ...sampleDecision, reasoningEffort: null }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(withEffort).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: 'anthropic/claude-haiku-4',
+        reasoning: { enabled: true, effort: 'high' },
+      },
+    });
+    expect(withoutEffort).toEqual({
+      kind: 'ok',
+      resolved: { model: 'anthropic/claude-haiku-4' },
+    });
+    expect(nullEffort).toEqual({
+      kind: 'ok',
+      resolved: { model: 'anthropic/claude-haiku-4' },
+    });
+  });
+
+  it('still falls back when the decision model is a virtual auto model even with a variant', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: KILO_AUTO_EFFICIENT_MODEL.id,
+          variant: 'high',
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
   });
 });
 

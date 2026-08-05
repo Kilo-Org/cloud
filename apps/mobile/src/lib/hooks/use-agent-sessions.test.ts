@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildActiveSessionsInput,
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
@@ -64,12 +65,32 @@ describe('buildAgentSessionListInput', () => {
   });
 });
 
+describe('buildActiveSessionsInput', () => {
+  it('collapses null to { organizationId: null }', () => {
+    expect(buildActiveSessionsInput(null)).toEqual({ organizationId: null });
+  });
+
+  it('passes a uuid through unchanged', () => {
+    expect(buildActiveSessionsInput('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toEqual({
+      organizationId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    });
+  });
+
+  it('collapses undefined to { organizationId: null }', () => {
+    expect(buildActiveSessionsInput(undefined)).toEqual({ organizationId: null });
+  });
+
+  it('produces the same key for null and undefined (key-stability rule)', () => {
+    expect(buildActiveSessionsInput(null)).toEqual(buildActiveSessionsInput(undefined));
+  });
+});
+
 describe('buildAgentSessionSearchInput', () => {
   it('defaults to updated_at when sortBy is omitted', () => {
     expect(buildAgentSessionSearchInput({ searchQuery: 'hello' })).toMatchObject({
       search_string: 'hello',
       orderBy: 'updated_at',
-      limit: 50,
+      limit: 30,
       includeChildren: false,
     });
   });
@@ -80,7 +101,7 @@ describe('buildAgentSessionSearchInput', () => {
     ).toMatchObject({
       search_string: 'hello',
       orderBy: 'created_at',
-      limit: 50,
+      limit: 30,
     });
   });
 
@@ -104,12 +125,20 @@ describe('buildAgentSessionSearchInput', () => {
       })
     ).toEqual({
       search_string: 'hello',
-      limit: 50,
+      limit: 30,
       orderBy: 'created_at',
       includeChildren: false,
       createdOnPlatform: 'cli',
       gitUrl: 'https://github.com/foo/bar',
       organizationId: 'org-1',
     });
+  });
+
+  it('has no cursor key — the query framework injects it', () => {
+    const input = buildAgentSessionSearchInput({
+      searchQuery: 'hello',
+      organizationId: 'org-1',
+    });
+    expect(input).not.toHaveProperty('cursor');
   });
 });

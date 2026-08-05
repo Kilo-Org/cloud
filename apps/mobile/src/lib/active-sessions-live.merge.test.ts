@@ -34,14 +34,21 @@ describe('mergeSnapshotForActiveSessions', () => {
     expect(result[1]?.title).toBe('C');
   });
 
-  it('preserves ONLY the three enrichment fields for known ids', () => {
-    const current: CachedActiveSession[] = [
+  it('preserves the enrichment fields and the DB title for known ids', () => {
+    const enriched: CachedActiveSession[] = [
       makeCached({
         id: 'a',
         title: 'cached-title',
         createdOnPlatform: 'cli',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-02T00:00:00Z',
+        gitUrl: 'git@cached',
+      }),
+    ];
+    const unenriched: CachedActiveSession[] = [
+      makeCached({
+        id: 'a',
+        title: 'cached-title',
         gitUrl: 'git@cached',
       }),
     ];
@@ -54,14 +61,26 @@ describe('mergeSnapshotForActiveSessions', () => {
         gitUrl: 'git@ws',
       },
     ];
-    const result = mergeSnapshotForActiveSessions(current, snapshot);
-    expect(result).toHaveLength(1);
-    expect(result[0]?.title).toBe('ws-title');
-    expect(result[0]?.connectionId).toBe('c1');
-    expect(result[0]?.gitUrl).toBe('git@ws');
-    expect(result[0]?.createdOnPlatform).toBe('cli');
-    expect(result[0]?.createdAt).toBe('2024-01-01T00:00:00Z');
-    expect(result[0]?.updatedAt).toBe('2024-01-02T00:00:00Z');
+
+    const enrichedResult = mergeSnapshotForActiveSessions(enriched, snapshot);
+    expect(enrichedResult).toHaveLength(1);
+    // Enriched: DB title sticky; enrichment fields sticky; other fields from wire.
+    expect(enrichedResult[0]?.title).toBe('cached-title');
+    expect(enrichedResult[0]?.connectionId).toBe('c1');
+    expect(enrichedResult[0]?.gitUrl).toBe('git@ws');
+    expect(enrichedResult[0]?.createdOnPlatform).toBe('cli');
+    expect(enrichedResult[0]?.createdAt).toBe('2024-01-01T00:00:00Z');
+    expect(enrichedResult[0]?.updatedAt).toBe('2024-01-02T00:00:00Z');
+
+    const unenrichedResult = mergeSnapshotForActiveSessions(unenriched, snapshot);
+    expect(unenrichedResult).toHaveLength(1);
+    // Unenriched: wire title wins so a just-spawned session shows something.
+    expect(unenrichedResult[0]?.title).toBe('ws-title');
+    expect(unenrichedResult[0]?.connectionId).toBe('c1');
+    expect(unenrichedResult[0]?.gitUrl).toBe('git@ws');
+    expect(unenrichedResult[0]?.createdOnPlatform).toBeUndefined();
+    expect(unenrichedResult[0]?.createdAt).toBeUndefined();
+    expect(unenrichedResult[0]?.updatedAt).toBeUndefined();
   });
 
   it('drops rows absent from the snapshot', () => {
@@ -106,6 +125,22 @@ describe('mergeSnapshotForActiveSessions', () => {
     expect(found?.createdAt).toBe('2024-01-01T00:00:00Z');
     expect(found?.updatedAt).toBe('2024-01-02T00:00:00Z');
   });
+
+  it('preserves a numeric totalCostMicrodollars through snapshot merge', () => {
+    const current: CachedActiveSession[] = [
+      makeCached({ id: 'a', totalCostMicrodollars: 12_000_000 }),
+    ];
+    const snapshot = [{ id: 'a', status: 'running', title: 'A', connectionId: 'c1' }];
+    const result = mergeSnapshotForActiveSessions(current, snapshot);
+    expect(result[0]?.totalCostMicrodollars).toBe(12_000_000);
+  });
+
+  it('leaves totalCostMicrodollars absent for a never-enriched snapshot row', () => {
+    const current: CachedActiveSession[] = [];
+    const snapshot = [{ id: 'new', status: 'running', title: 'New', connectionId: 'c1' }];
+    const result = mergeSnapshotForActiveSessions(current, snapshot);
+    expect(result[0]?.totalCostMicrodollars).toBeUndefined();
+  });
 });
 
 // ── Heartbeat merge ──────────────────────────────────────────────────
@@ -133,6 +168,7 @@ describe('mergeHeartbeatForActiveSessions', () => {
       makeCached({
         id: 'a',
         connectionId: 'c1',
+        title: 'cached-title',
         createdOnPlatform: 'cli',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-02T00:00:00Z',
@@ -144,7 +180,8 @@ describe('mergeHeartbeatForActiveSessions', () => {
     };
     const result = mergeHeartbeatForActiveSessions(current, payload);
     expect(result[0]).toBeDefined();
-    expect(result[0]?.title).toBe('A2');
+    // Enriched row: DB title sticky; enrichment fields sticky.
+    expect(result[0]?.title).toBe('cached-title');
     expect(result[0]?.createdOnPlatform).toBe('cli');
     expect(result[0]?.createdAt).toBe('2024-01-01T00:00:00Z');
     expect(result[0]?.updatedAt).toBe('2024-01-02T00:00:00Z');
@@ -213,6 +250,28 @@ describe('mergeHeartbeatForActiveSessions', () => {
     };
     const result = mergeHeartbeatForActiveSessions(current, payload);
     expect(result.map(r => r.id)).toEqual(['a']);
+  });
+
+  it('preserves a numeric totalCostMicrodollars through heartbeat merge', () => {
+    const current: CachedActiveSession[] = [
+      makeCached({ id: 'a', connectionId: 'c1', totalCostMicrodollars: 5_000_000 }),
+    ];
+    const payload = {
+      connectionId: 'c1',
+      sessions: [{ id: 'a', status: 'running', title: 'A' }],
+    };
+    const result = mergeHeartbeatForActiveSessions(current, payload);
+    expect(result[0]?.totalCostMicrodollars).toBe(5_000_000);
+  });
+
+  it('leaves totalCostMicrodollars absent for a new heartbeat-only row', () => {
+    const current: CachedActiveSession[] = [];
+    const payload = {
+      connectionId: 'c1',
+      sessions: [{ id: 'new', status: 'running', title: 'New' }],
+    };
+    const result = mergeHeartbeatForActiveSessions(current, payload);
+    expect(result[0]?.totalCostMicrodollars).toBeUndefined();
   });
 });
 

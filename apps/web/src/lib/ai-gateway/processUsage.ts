@@ -35,10 +35,6 @@ import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
 import {
-  acknowledgeCostInsightRollupCapture,
-  enqueueCostInsightRollupRepair,
-} from '@/lib/cost-insights/rollup-repairs';
-import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
 } from './usage-post-commit-work';
@@ -76,6 +72,7 @@ import {
   computeOpenRouterCostFields,
   drainSseStream,
   extractVercelIsByok,
+  extractVercelUpstreamId,
   isResponseInterruptedError,
 } from '@/lib/ai-gateway/processUsage.shared';
 import {
@@ -83,18 +80,8 @@ import {
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
-import {
-  acquireCostInsightOwnerHourLock,
-  acquireCostInsightOwnerHourSharedLock,
-  captureCostInsightSpend,
-  getCostInsightUtcHourStart,
-} from '@kilocode/db/cost-insights-rollups';
-import {
-  getAiGatewayCostInsightFeatureKey,
-  getAiGatewayCostInsightProductKey,
-} from '@/lib/cost-insights/canonical-sources';
-import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
+import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
 
 const posthogClient = PostHogClient();
 
@@ -439,6 +426,7 @@ type UsageStatementExecutor = Pick<DrizzleTransaction, 'execute'>;
 
 type UsageStatementResult = UsageRecordInsertResult & {
   kiloPassThreshold: number | null;
+  organizationUsage?: OrganizationUsageMutationResult;
 };
 
 type UsageTransactionResult = {
@@ -468,21 +456,26 @@ async function insertUsageTransaction(
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
     await setUsageTransactionIdleTimeout(tx);
-    if (coreUsageFields.cost > 0) {
-      const owner = coreUsageFields.organization_id
-        ? { type: 'organization' as const, id: coreUsageFields.organization_id }
-        : { type: 'user' as const, id: coreUsageFields.kilo_user_id };
-      await acquireCostInsightOwnerHourSharedLock(
-        tx,
-        owner,
-        getCostInsightUtcHourStart(coreUsageFields.created_at)
-      );
-    }
     const inserted = await insertUsageAndMetadataWithBalanceUpdate(
       tx,
       coreUsageFields,
       metadataFields
     );
+    if (coreUsageFields.organization_id) {
+      if (coreUsageFields.cost > 0) {
+        const consumption = await recordOrganizationConsumption(tx, {
+          organizationId: coreUsageFields.organization_id,
+          kiloUserId: coreUsageFields.kilo_user_id,
+          amountMicrodollars: coreUsageFields.cost,
+          occurredAt: coreUsageFields.created_at,
+          source: 'ai-gateway',
+          sourceId: coreUsageFields.id,
+        });
+        inserted.organizationUsage = consumption.organizationUsage;
+      } else if (coreUsageFields.cost < 0) {
+        inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
+      }
+    }
     if (coreUsageFields.cost !== 0) {
       await enqueueDailyUsageRollupRepair(tx, {
         usageId: coreUsageFields.id,
@@ -491,43 +484,8 @@ async function insertUsageTransaction(
         createdAt: coreUsageFields.created_at,
       });
     }
-    if (coreUsageFields.cost > 0) {
-      const owner = coreUsageFields.organization_id
-        ? { type: 'organization' as const, id: coreUsageFields.organization_id }
-        : { type: 'user' as const, id: coreUsageFields.kilo_user_id };
-      await enqueueCostInsightRollupRepair(tx, {
-        usageId: coreUsageFields.id,
-        owner,
-        occurredAt: coreUsageFields.created_at,
-      });
-    }
     return { inserted };
   });
-}
-
-const COST_INSIGHT_CAPTURE_LOCK_TIMEOUT_MS = 2_000;
-const COST_INSIGHT_CAPTURE_STATEMENT_TIMEOUT_MS = 5_000;
-const COST_INSIGHT_CAPTURE_IDLE_TRANSACTION_TIMEOUT_MS = 10_000;
-
-async function setCostInsightCaptureTimeouts(tx: UsageStatementExecutor): Promise<void> {
-  await tx.execute(sql`
-    SELECT
-      pg_catalog.set_config(
-        'lock_timeout',
-        ${`${COST_INSIGHT_CAPTURE_LOCK_TIMEOUT_MS}ms`},
-        true
-      ),
-      pg_catalog.set_config(
-        'statement_timeout',
-        ${`${COST_INSIGHT_CAPTURE_STATEMENT_TIMEOUT_MS}ms`},
-        true
-      ),
-      pg_catalog.set_config(
-        'idle_in_transaction_session_timeout',
-        ${`${COST_INSIGHT_CAPTURE_IDLE_TRANSACTION_TIMEOUT_MS}ms`},
-        true
-      )
-  `);
 }
 
 function getPostgresErrorCode(error: unknown): string | null {
@@ -552,37 +510,16 @@ function reportPostCommitFailure(
   });
 }
 
-function scheduleCostInsightEvaluationSafely(
-  owner: Parameters<typeof scheduleCostInsightEvaluationAfterSpend>[0],
-  usageId: string
-): void {
-  try {
-    scheduleCostInsightEvaluationAfterSpend(owner);
-  } catch (error) {
-    reportPostCommitFailure(
-      'post-commit cost insight evaluation scheduling failed',
-      error,
-      {
-        source: 'postCommitCostInsightEvaluationScheduling',
-        ownerType: owner.type,
-      },
-      usageId
-    );
-  }
-}
-
-function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostCommitTask | null {
+function organizationUsageMutationTask(
+  usage: MicrodollarUsage,
+  result: UsageStatementResult
+): BestEffortPostCommitTask | null {
   const organizationId = usage.organization_id;
-  if (!organizationId) return null;
+  const organizationUsage = result.organizationUsage;
+  if (!organizationId || !organizationUsage) return null;
 
   return {
-    run: async () => {
-      const result: OrganizationUsageMutationResult = await db.transaction(async tx => {
-        await setCostInsightCaptureTimeouts(tx);
-        return mutateOrganizationUsage(tx, usage);
-      });
-      scheduleOrganizationLowBalanceAlert(organizationId, result);
-    },
+    run: async () => scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage),
     reportError: error => {
       reportPostCommitFailure(
         'post-commit organization usage mutation failed',
@@ -594,65 +531,11 @@ function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostC
   };
 }
 
-function costInsightSpendCaptureTask(
-  usage: MicrodollarUsage,
-  metadataFields: UsageMetaData
-): BestEffortPostCommitTask | null {
-  if (usage.cost <= 0) return null;
-
-  const owner = usage.organization_id
-    ? { type: 'organization' as const, id: usage.organization_id }
-    : { type: 'user' as const, id: usage.kilo_user_id };
-
-  return {
-    run: async () => {
-      await db.transaction(async tx => {
-        await setCostInsightCaptureTimeouts(tx);
-        await acquireCostInsightOwnerHourLock(
-          tx,
-          owner,
-          getCostInsightUtcHourStart(usage.created_at)
-        );
-        if (!(await acknowledgeCostInsightRollupCapture(tx, usage.id))) return;
-        await captureCostInsightSpend(tx, {
-          owner,
-          actorUserId: usage.kilo_user_id,
-          occurredAt: usage.created_at,
-          amountMicrodollars: usage.cost,
-          category: 'variable',
-          source: 'ai_gateway',
-          productKey: getAiGatewayCostInsightProductKey(metadataFields.feature),
-          featureKey: getAiGatewayCostInsightFeatureKey(metadataFields.api_kind),
-          modelOrPlanKey: usage.requested_model || usage.model || 'other',
-          providerKey: usage.inference_provider || usage.provider || 'other',
-        });
-      });
-      scheduleCostInsightEvaluationSafely(owner, usage.id);
-    },
-    reportError: async error => {
-      reportPostCommitFailure(
-        'post-commit cost insight spend capture failed',
-        error,
-        {
-          source: 'postCommitCostInsightSpendCapture',
-          spendCategory: 'variable',
-          spendSource: 'ai_gateway',
-          ownerType: owner.type,
-        },
-        usage.id
-      );
-    },
-  };
-}
-
 async function runPostCommitUsageWork(
   usage: MicrodollarUsage,
-  metadataFields: UsageMetaData
+  result: UsageStatementResult
 ): Promise<void> {
-  const tasks = [
-    organizationUsageMutationTask(usage),
-    costInsightSpendCaptureTask(usage, metadataFields),
-  ].filter(task => task !== null);
+  const tasks = [organizationUsageMutationTask(usage, result)].filter(task => task !== null);
   await runBestEffortPostCommitTasks(tasks);
 }
 
@@ -716,7 +599,7 @@ export async function insertUsageRecord(
       }
     );
 
-    await runPostCommitUsageWork(coreUsageFields, metadataFields);
+    await runPostCommitUsageWork(coreUsageFields, result.inserted);
     scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);
     return {
       usageId: result.inserted.usageId,
@@ -1119,7 +1002,7 @@ export async function parseMicrodollarUsageFromStream(
     responseContent,
     inference_provider,
     finish_reason,
-    upstream_id: null,
+    upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
     latency: null,
     moderation_latency: null,
     generation_time: null,
@@ -1152,6 +1035,7 @@ export function parseMicrodollarUsageFromString(
   }
   const choice = responseJson?.choices?.[0];
   const finish_reason = choice?.finish_reason ?? null;
+  const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
   const coreProps = {
     kiloUserId,
     messageId: responseJson?.id ?? null,
@@ -1159,10 +1043,8 @@ export function parseMicrodollarUsageFromString(
     model: responseJson?.model ?? null,
     responseContent: choice?.message.content ?? '',
     inference_provider:
-      responseJson?.provider ??
-      choice?.message?.provider_metadata?.gateway?.routing?.finalProvider ??
-      null,
-    upstream_id: null,
+      responseJson?.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
+    upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
     finish_reason,
     latency: null,
     moderation_latency: null,
@@ -1172,11 +1054,7 @@ export function parseMicrodollarUsageFromString(
     status_code: statusCode,
   };
 
-  const costs = processOpenRouterUsage(
-    responseJson?.usage,
-    coreProps,
-    choice?.message?.provider_metadata ?? null
-  );
+  const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);
 
   return { ...coreProps, ...costs };
 }
@@ -1252,15 +1130,24 @@ export async function processTokenData(
     }
 
     genStats.model = usageStats.model; // openrouter bug?
+    genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
     if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
+      // The provider's generation lookup and the response's own usage payload should
+      // yield the same cost. A mismatch means inconsistent token or pricing data from
+      // the provider; the generation lookup values win (see assignment below).
       console.warn(
-        `DEV ODDITY / WARNING: Usage stats do not match generation data:`,
-        genStats.model,
-        [genStats.cost_mUsd, usageStats.cost_mUsd],
-        [genStats.cacheDiscount_mUsd, usageStats.cacheDiscount_mUsd]
+        'Cost from provider generation lookup differs from cost computed from response usage data:',
+        {
+          model: genStats.model,
+          cost_mUsd: { generation: genStats.cost_mUsd, response: usageStats.cost_mUsd },
+          cacheDiscount_mUsd: {
+            generation: genStats.cacheDiscount_mUsd,
+            response: usageStats.cacheDiscount_mUsd,
+          },
+        }
       );
     }
     usageStats = genStats;

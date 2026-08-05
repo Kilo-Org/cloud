@@ -14,7 +14,16 @@ import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decisi
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
+import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import { readDb } from '@/lib/drizzle';
+import {
+  checkFreeModelRateLimit,
+  checkFreeModelRateLimitByUser,
+  checkPromotionLimit,
+  logFreeModelRequest,
+} from '@/lib/free-model-rate-limiter';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
+import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 
 jest.mock('next/server', () => {
   return {
@@ -34,6 +43,15 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
+jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@/lib/free-model-rate-limiter');
+jest.mock('@/lib/organizations/organization-group-policy-context.server', () => ({
+  getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
+}));
+jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+  evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
+  getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
+}));
 jest.mock('@/lib/ai-gateway/abuse-service', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/abuse-service');
   return {
@@ -55,9 +73,16 @@ jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   getToolsAvailable: jest.fn(() => false),
   getToolsUsed: jest.fn(() => false),
 }));
-jest.mock('@/lib/ai-gateway/handleRequestLogging', () => ({
-  handleRequestLogging: jest.fn(),
-}));
+jest.mock('@/lib/rewriteModelResponse', () => {
+  const actual = jest.requireActual('@/lib/rewriteModelResponse');
+  const { wrapInSafeNextResponse } = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
+  return {
+    ...actual,
+    // Mirror the production passthrough; these tests exercise the route, not
+    // the response rewrite.
+    rewriteModelResponse: jest.fn(async (response: Response) => wrapInSafeNextResponse(response)),
+  };
+});
 jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
   return {
@@ -96,7 +121,11 @@ const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision)
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
-const mockedHandleRequestLogging = jest.mocked(handleRequestLogging);
+const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
+const mockedCheckFreeModelRateLimit = jest.mocked(checkFreeModelRateLimit);
+const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitByUser);
+const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
+const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 
 const provider = {
   id: 'openrouter',
@@ -255,9 +284,23 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     );
 
     expect(response.status).toBe(200);
-    expect(mockedHandleRequestLogging).toHaveBeenCalledWith(
+    expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
       expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' })
     );
+  });
+
+  it('uses the read replica for balance and organization settings', async () => {
+    const { POST } = await import('./route');
+
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
+    expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[2]).toBe(readDb);
   });
 
   it('rate limits rules-engine rate-limit actions before upstream', async () => {
@@ -273,6 +316,43 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       message: 'Rate limit exceeded. Please try again later.',
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('applies free-model rate limiting to flagged Kilo-exclusive models', async () => {
+    mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: false, requestCount: 200 });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id)) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({
+      error_type: 'rate_limit_exceeded',
+      message: 'Model usage limit reached. Please try again later.',
+    });
+    expect(mockedCheckFreeModelRateLimit).toHaveBeenCalledWith('127.0.0.1');
+    expect(mockedCheckFreeModelRateLimitByUser).not.toHaveBeenCalled();
+    expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not apply free-model rate limiting to unflagged free models', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody(tencent_hy3_free_model.public_id)) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedCheckFreeModelRateLimit).not.toHaveBeenCalled();
+    expect(mockedCheckFreeModelRateLimitByUser).not.toHaveBeenCalled();
+    expect(mockedCheckPromotionLimit).not.toHaveBeenCalled();
+    expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
   it('adds latency and rewrites quarantine-3 non-BYOK requests to a free model', async () => {
@@ -549,6 +629,34 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(ctx.posthog_distinct_id).toBeUndefined();
   });
 
+  it('bills classifier cost for the balanced alias using its requested model id', async () => {
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.002,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
+
+    expect(response.status).toBe(200);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
+    );
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(ctx.requested_model).toBe('kilo-auto/balanced');
+  });
+
   it('does not bill when classifier cost is 0 (cache hit)', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
@@ -736,20 +844,25 @@ describe('auto-routing shadow classifier', () => {
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
-    mockedApplyResolvedAutoModel.mockImplementation(async (_opts, request) => {
+    mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
+      if (opts.efficientDecision) await opts.efficientDecision();
       request.body.model = 'openai/gpt-4o';
       return { kind: 'ok', resolved: { model: 'openai/gpt-4o' } };
     });
   });
 
-  it('does not schedule a background classifier request for non-efficient auto models', async () => {
+  it('routes kilo-auto/balanced through the efficient classifier', async () => {
     const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
+    );
     expect(mockedAfter).not.toHaveBeenCalled();
   });
 });

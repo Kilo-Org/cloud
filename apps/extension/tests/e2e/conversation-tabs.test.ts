@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi } from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -10,14 +10,8 @@ import {
   startFixtureServer,
   waitForStoredConversationText,
 } from './extension-context-fixture';
+import { expectSelectedModelId, selectModelById } from './model-picker-e2e-helpers';
 
-const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'search_memories',
-  'get_memory',
-];
 const getSelectedOptionText = (page: Page, label: string): Promise<string> =>
   page.getByLabel(label).evaluate(element => {
     if (!(element instanceof HTMLSelectElement)) {
@@ -121,7 +115,15 @@ const conversationStoreWithTitle = (title: string): unknown => ({
   activeConversationId: 'conversation-1',
   conversations: [
     {
-      events: [],
+      // History only lists conversations with at least one user message.
+      events: [
+        {
+          id: `${title}-user`,
+          role: 'user',
+          text: title,
+          type: 'message',
+        },
+      ],
       id: 'conversation-1',
       title,
       updatedAt: '2026-06-24T10:00:00.000Z',
@@ -217,7 +219,11 @@ test('inactive conversation completion does not switch the selected conversation
 
     releaseFirstCompletion();
 
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText('Visible request');
+    await expect(
+      sidePanel
+        .getByRole('tablist', { name: 'Conversation tabs' })
+        .getByRole('tab', { selected: true })
+    ).toContainText('Visible request');
     await expect(sidePanel.getByText('Inactive tab finished.')).toBeHidden();
     await sidePanel.getByRole('tab', { name: /Inactive request/u }).click();
     await expect(sidePanel.getByText('Inactive tab finished.')).toBeVisible();
@@ -267,7 +273,7 @@ test('conversation controls stay tied to the selected conversation', async () =>
 
     await expect(sidePanel.getByLabel('Target tab')).toContainText('First target tab');
     await sidePanel.getByLabel('Target tab').selectOption({ label: 'First target tab' });
-    await sidePanel.getByLabel('Model').selectOption('model-one');
+    await selectModelById(sidePanel, 'model-one');
     await sidePanel.getByLabel('Thinking effort').selectOption('low');
 
     await sidePanel.getByLabel('Message agent').fill('First settings');
@@ -275,14 +281,18 @@ test('conversation controls stay tied to the selected conversation', async () =>
     await expect(sidePanel.getByText('First settings reply.')).toBeVisible();
 
     await sidePanel.getByLabel('New conversation').click();
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText('Conversation 2');
+    await expect(
+      sidePanel
+        .getByRole('tablist', { name: 'Conversation tabs' })
+        .getByRole('tab', { selected: true })
+    ).toContainText('Conversation 2');
     await sidePanel.getByLabel('Target tab').selectOption({ label: 'Second target tab' });
-    await sidePanel.getByLabel('Model').selectOption('model-two');
+    await selectModelById(sidePanel, 'model-two');
     await sidePanel.getByLabel('Thinking effort').selectOption('high');
     await expect
       .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
       .toBe('Second target tab');
-    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-two');
+    await expectSelectedModelId(sidePanel, 'model-two');
     await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('high');
 
     await sidePanel.getByLabel('Message agent').fill('Second settings');
@@ -294,14 +304,14 @@ test('conversation controls stay tied to the selected conversation', async () =>
       .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
       .toBe('First target tab');
     await expect(sidePanel.getByLabel(/Safe mode/u)).toBeVisible();
-    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-one');
+    await expectSelectedModelId(sidePanel, 'model-one');
     await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('low');
 
     await sidePanel.getByRole('tab', { name: /Second settings/u }).click();
     await expect
       .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
       .toBe('Second target tab');
-    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-two');
+    await expectSelectedModelId(sidePanel, 'model-two');
     await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('high');
 
     expect(JSON.stringify(seenChatBodies[0])).toContain('First target tab');
@@ -325,7 +335,7 @@ test('conversation mode controls the selected conversation request tools', async
   try {
     await mockKiloApi(context, {
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Dangerous mode reply.' } }] }],
-      toolNames: [...safeToolNames, 'eval'],
+      toolNames: dangerousToolNames,
     });
 
     const page = await context.newPage();
@@ -358,9 +368,11 @@ test('conversation mode controls the selected conversation request tools', async
     });
     await sidePanel.reload();
 
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
-      'Dangerous saved conversation'
-    );
+    await expect(
+      sidePanel
+        .getByRole('tablist', { name: 'Conversation tabs' })
+        .getByRole('tab', { selected: true })
+    ).toContainText('Dangerous saved conversation');
     await sidePanel.getByLabel('Message agent').fill('Use dangerous tools');
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByText('Dangerous mode reply.')).toBeVisible();
@@ -512,6 +524,34 @@ test('conversation tabs persist across side panel reloads', async () => {
   }
 });
 
+test('closing the sole empty tab discards an unsent draft', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    const messageInput = sidePanel.getByLabel('Message agent');
+    await expect(messageInput).toBeVisible();
+    await messageInput.fill('Unsent draft that must not survive close');
+    await expect(messageInput).toHaveValue('Unsent draft that must not survive close');
+
+    await sidePanel.getByLabel('Close Conversation 1').click();
+
+    await expect(sidePanel.getByLabel('Message agent')).toHaveValue('');
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('Pick a tab and ask Kilo to inspect it.')
+    ).toBeVisible();
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('closing a conversation removes only that tab', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -643,8 +683,11 @@ test('history reuses an empty inactive tab when opening a closed conversation', 
     await sidePanel.getByLabel('History').click();
     await sidePanel.getByLabel('Open Restore me').click();
 
-    await expect(sidePanel.getByRole('tab')).toHaveCount(1);
-    await expect(sidePanel.getByRole('tab', { name: /Restore me/u })).toBeVisible();
+    const conversationTabs = sidePanel
+      .getByRole('tablist', { name: 'Conversation tabs' })
+      .getByRole('tab');
+    await expect(conversationTabs).toHaveCount(1);
+    await expect(conversationTabs.filter({ hasText: 'Restore me' })).toBeVisible();
     await expect(sidePanel.getByText('Restore me reply.')).toBeVisible();
   } finally {
     await context.close();
@@ -710,11 +753,19 @@ test('history virtualizes and pages large stored conversation lists', async () =
         activeConversationId: 'conversation-1',
         conversations: Array.from({ length: 250 }, (_value, index) => {
           const conversationNumber = index + 1;
+          const title = `Seeded conversation ${conversationNumber}`;
 
           return {
-            events: [],
+            events: [
+              {
+                id: `user-${conversationNumber}`,
+                role: 'user',
+                text: title,
+                type: 'message',
+              },
+            ],
             id: `conversation-${conversationNumber}`,
-            title: `Seeded conversation ${conversationNumber}`,
+            title,
             updatedAt: new Date(2026, 0, conversationNumber).toISOString(),
           };
         }),
@@ -849,7 +900,10 @@ test('conversation tab bar scrolls horizontally', async () => {
 
     await clickNewConversationTimes(sidePanel);
 
-    const tabBarState = await sidePanel.getByLabel('Conversation tabs').evaluate(element => ({
+    const tabList = sidePanel.getByLabel('Conversation tabs');
+    const newConversationButton = sidePanel.getByLabel('New conversation');
+
+    const tabBarState = await tabList.evaluate(element => ({
       clientWidth: element.clientWidth,
       overflowX: getComputedStyle(element).overflowX,
       scrollWidth: element.scrollWidth,
@@ -857,7 +911,36 @@ test('conversation tab bar scrolls horizontally', async () => {
 
     expect(tabBarState.overflowX).toBe('auto');
     expect(tabBarState.scrollWidth).toBeGreaterThan(tabBarState.clientWidth);
-    await expect(sidePanel.getByLabel('New conversation')).toBeVisible();
+
+    const assertNewConversationPinned = async (): Promise<void> => {
+      const geometry = await newConversationButton.evaluate(element => {
+        const rect = element.getBoundingClientRect();
+
+        return {
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+        };
+      });
+
+      expect(geometry.left).toBeGreaterThanOrEqual(0);
+      expect(geometry.top).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+      expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    };
+
+    await assertNewConversationPinned();
+
+    await tabList.evaluate(element => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect.poll(() => tabList.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+
+    await assertNewConversationPinned();
+    await expect(newConversationButton).toBeVisible();
   } finally {
     await context.close();
     await fixture.close();

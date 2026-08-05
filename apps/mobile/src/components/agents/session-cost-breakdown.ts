@@ -1,12 +1,17 @@
-import { getStepFinishRoutedModel, type RoutedModelRef } from 'cloud-agent-sdk/part-utils';
+import {
+  getStepFinishRoutedModel,
+  type RoutedModelRef,
+} from '@kilocode/cloud-agent-sdk/part-utils';
 import {
   type AssistantMessage,
   type Part,
   type StepFinishPart,
   type StoredMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
-export type SessionCostBreakdownTotals = {
+import { formatCost } from './context-usage-display';
+
+type SessionCostBreakdownTotals = {
   input: number;
   output: number;
   reasoning: number;
@@ -190,14 +195,44 @@ export function getVisibleSessionCostModels(
 }
 
 /**
+ * Persisted-vs-live cost residual for activity outside the loaded message
+ * page (unpaginated history / ingest gaps). Distinct from the subagent
+ * residual, which is computed on the live-message basis alone.
+ *
+ * Returns a row-ready amount: 0 when total is null/non-finite, when the
+ * delta is within ±epsilon, when live already covers the page total, or when
+ * the residual rounds to $0.0000 in the sheet's 4-decimal display. Sub-display
+ * residuals are absorbed as display rounding; reconciliation fixtures must use
+ * residuals above the display threshold.
+ */
+export function getOlderActivityCostUsd(
+  totalCostMicrodollars: number | null,
+  liveCostUsd: number
+): number {
+  if (totalCostMicrodollars === null || !Number.isFinite(totalCostMicrodollars)) {
+    return 0;
+  }
+  const residualUsd = totalCostMicrodollars / 1e6 - liveCostUsd;
+  if (residualUsd <= COST_RECONCILIATION_EPSILON_USD) {
+    return 0;
+  }
+  return formatCost(residualUsd) === '$0.0000' ? 0 : residualUsd;
+}
+
+/**
  * Section title count and visibility source: filtered model rows + optional
- * Subagents residual. Never derived from the unfiltered list.
+ * Subagents / Older activity residuals. Never derived from the unfiltered list.
  */
 export function getModelsSectionCount(
   models: SessionCostBreakdownModel[],
-  subagentCostUsd: number
+  subagentCostUsd: number,
+  olderActivityCostUsd = 0
 ): number {
-  return getVisibleSessionCostModels(models).length + (subagentCostUsd > 0 ? 1 : 0);
+  return (
+    getVisibleSessionCostModels(models).length +
+    (subagentCostUsd > 0 ? 1 : 0) +
+    (olderActivityCostUsd > 0 ? 1 : 0)
+  );
 }
 
 function collectStepFinishParts(parts: Part[]): StepFinishPart[] {

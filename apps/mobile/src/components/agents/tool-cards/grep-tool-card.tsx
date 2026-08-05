@@ -1,54 +1,59 @@
-import { ScrollView } from 'react-native';
+import { View } from 'react-native';
 import { FileSearch } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
-import { ToolCardShell } from '../tool-card-shell';
+import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
+import { FixedPartRow } from '../fixed-part-row';
+import { MonoScrollBlock } from '../mono-scroll-block';
+import { useOpenPartDetail } from '../open-part-detail-context';
+import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 
-function countOutputLines(output: string): number {
-  if (output.length === 0) {
-    return 0;
-  }
-  return output.split('\n').filter(line => line.trim().length > 0).length;
-}
-
-export function GrepToolCard({ part }: Readonly<{ part: ToolPart }>) {
-  const input = part.state.input;
-  const pattern = typeof input.pattern === 'string' ? input.pattern : '';
-  const include = typeof input.include === 'string' ? input.include : undefined;
-
-  let subtitle = pattern || 'grep';
-  if (include) {
-    subtitle += ` (${include})`;
-  }
+/**
+ * Sheet body for a grep tool part: the output block and the error. The pattern
+ * lives in the sheet title. Renders only inside the detail sheet — attachments
+ * and the pending/running status line live in `ToolPartDetailBody`.
+ */
+export function GrepToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
+  const textSelectable = useTranscriptTextSelectable();
 
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
 
-  const matchCount = output ? countOutputLines(output) : undefined;
-  const badge = matchCount !== undefined ? `${matchCount} matches` : undefined;
-
   return (
-    <ToolCardShell
-      icon={FileSearch}
-      title="grep"
-      subtitle={subtitle}
-      badge={badge}
-      status={part.state.status}
-    >
+    <View className="gap-2">
       {output ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <Text selectable className="font-mono text-xs leading-4 text-foreground">
-            {output.slice(0, 2000)}
-          </Text>
-        </ScrollView>
+        <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
       ) : null}
       {error ? (
-        <Text selectable className="text-xs text-destructive">
+        <Text selectable={textSelectable} className="text-xs text-destructive">
           {error}
         </Text>
       ) : null}
-    </ToolCardShell>
+    </View>
+  );
+}
+
+export function GrepToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const openPartDetail = useOpenPartDetail();
+  const display = getToolDisplay(part);
+  const hasDetails = toolPartHasDetails(part);
+
+  return (
+    <FixedPartRow
+      icon={FileSearch}
+      label={display.subtitle ?? display.title}
+      {...(display.badge ? { badge: display.badge } : {})}
+      status={part.state.status}
+      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      onPress={
+        hasDetails && openPartDetail
+          ? () => {
+              openPartDetail(part.id);
+            }
+          : undefined
+      }
+    />
   );
 }

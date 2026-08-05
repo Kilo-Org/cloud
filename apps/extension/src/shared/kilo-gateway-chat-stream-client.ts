@@ -66,13 +66,19 @@ const variantToGatewayEffort: Record<string, string> = {
 };
 const toolArgumentsSchema = z.record(z.string(), z.unknown());
 const builtInToolNameSchema = z.enum([
+  'delete_workflow',
   'eval',
   'find_in_page',
   'get_element_details',
   'get_memory',
   'get_page_snapshot',
   'get_viewport_screenshot',
+  'get_workflow',
+  'run_workflow',
+  'save_memory',
+  'save_workflow',
   'search_memories',
+  'search_workflows',
 ]);
 // Built-in tools plus dynamically mapped remote MCP tools (mcp_<slug>_<tool>).
 const gatewayToolNameSchema = z.union([

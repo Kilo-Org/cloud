@@ -10,14 +10,9 @@ import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET } from '@/lib/config.server';
-import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import {
-  createAllowPredicateFromRestrictions,
-  hasActiveModelRestrictions,
-} from '@/lib/model-allow.server';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
-import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 
 // OAuth scopes requested when installing Kilo into a Linear workspace.
 // `app:mentionable` combined with `actor=app` gives us an app-actor install
@@ -540,15 +535,8 @@ export async function updateModel(
   }
 
   if (owner.type === 'org') {
-    const organization = await getOrganizationById(owner.id);
-    if (organization) {
-      const restrictions = getEffectiveModelRestrictions(organization);
-      if (hasActiveModelRestrictions(restrictions)) {
-        const isAllowed = createAllowPredicateFromRestrictions(restrictions);
-        if (!(await isAllowed(modelSlug))) {
-          return { success: false, error: 'Model is not allowed by organization policy' };
-        }
-      }
+    if (!(await isOrganizationModelUpdateAllowed(owner.id, modelSlug))) {
+      return { success: false, error: 'Model is not allowed by organization policy' };
     }
   }
 

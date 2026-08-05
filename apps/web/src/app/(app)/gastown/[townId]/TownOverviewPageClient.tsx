@@ -30,6 +30,7 @@ import {
   Layers,
   MessageSquare,
   Copy,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -38,6 +39,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
 import { AdminViewingBanner } from '@/components/gastown/AdminViewingBanner';
 import { DrainStatusBanner } from '@/components/gastown/DrainStatusBanner';
+import { Banner } from '@/components/shared/Banner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useConfirm } from '@/components/ui/confirm';
 
@@ -49,6 +51,7 @@ type TownOverviewPageClientProps = {
   basePath?: string;
   /** When set, integration queries use org-scoped endpoints. */
   organizationId?: string;
+  billingAnnouncementEnabled: boolean;
 };
 
 const ROLE_ICONS: Record<string, typeof Bot> = {
@@ -94,6 +97,7 @@ export function TownOverviewPageClient({
   townId,
   basePath: basePathOverride,
   organizationId,
+  billingAnnouncementEnabled,
 }: TownOverviewPageClientProps) {
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const router = useRouter();
@@ -215,6 +219,20 @@ export function TownOverviewPageClient({
       <AdminViewingBanner townId={townId} />
       <div className="px-6">
         <DrainStatusBanner townId={townId} />
+        {billingAnnouncementEnabled && (
+          <Banner color="blue" className="my-4 rounded-lg p-3">
+            <Banner.Icon>
+              <Info aria-hidden="true" />
+            </Banner.Icon>
+            <Banner.Content>
+              <Banner.Title>Usage-based container billing is coming</Banner.Title>
+              <Banner.Description>
+                Charges will use Kilo credits only while the town container is running. We'll share
+                more details before billing is activated.
+              </Banner.Description>
+            </Banner.Content>
+          </Banner>
+        )}
       </div>
       {/* Top bar — sticky */}
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">

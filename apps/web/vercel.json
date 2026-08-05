@@ -25,6 +25,14 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/kilo-pass-org-bonus-repair",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/kilo-pass-org-issuance",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/kilo-pass-store-subscription-reconcile",
       "schedule": "*/15 * * * *"
     },
@@ -49,15 +57,19 @@
       "schedule": "0 * * * *"
     },
     {
-      "path": "/api/cron/cost-insights-hourly",
+      "path": "/api/cron/coding-plans-inventory-summary",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/usage-daily-rollup-repairs",
       "schedule": "5 * * * *"
     },
     {
-      "path": "/api/cron/cost-insights-retention",
-      "schedule": "15 3 * * *"
+      "path": "/api/cron/db-pool-metrics",
+      "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/db-pool-metrics",
+      "path": "/api/cron/db-replication-health",
       "schedule": "* * * * *"
     },
     {
@@ -67,6 +79,10 @@
     {
       "path": "/api/cron/dispatch-pending-code-reviews",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/reap-stale-code-reviews",
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/exa-partition-maintenance",

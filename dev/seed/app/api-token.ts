@@ -123,7 +123,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   if (matches.length === 0) {
     throw new Error(
-      `No user found for email ${options.email}. Sign in locally first (see apps/mobile/e2e/login.sh) or seed a user (pnpm dev:seed app:create-user).`
+      `No user found for email ${options.email}. Sign in locally first, or seed a user (pnpm dev:seed app:create-user).`
     );
   }
 

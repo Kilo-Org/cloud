@@ -19,7 +19,7 @@ export function AvailableProductCard({
 }: {
   icon: ReactNode;
   title: string;
-  price: { amount: string; cadenceLabel: string };
+  price: { amount: string; cadenceLabel: string; qualifier?: string };
   status?: string;
   features?: readonly string[];
   featureLayout?: 'responsive' | 'single';
@@ -71,7 +71,10 @@ export function AvailableProductCard({
         ) : null}
       </div>
 
-      <div className="mt-3 flex items-baseline gap-1">
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+        {price.qualifier ? (
+          <span className="text-muted-foreground text-sm font-medium">{price.qualifier}</span>
+        ) : null}
         <span className="text-2xl font-semibold text-white tabular-nums">{price.amount}</span>
         <span className="text-muted-foreground text-xs">{price.cadenceLabel}</span>
       </div>

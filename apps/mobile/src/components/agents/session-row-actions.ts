@@ -1,3 +1,4 @@
+import { type ActionSheetOptions } from '@expo/react-native-action-sheet';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Alert } from 'react-native';
@@ -43,4 +44,60 @@ export async function copySessionId(sessionId: string) {
   } catch {
     toast.error('Could not copy session ID');
   }
+}
+
+type SessionActionMenuOptions = {
+  showActionSheetWithOptions: (
+    options: ActionSheetOptions,
+    onSelect: (index?: number) => void
+  ) => void;
+  onCopySessionId: () => void;
+  /** Omitted → no Rename entry. */
+  onRename?: () => void;
+  /** Omitted → no Delete entry. */
+  onDelete?: () => void;
+  /** `useSafeAreaInsets().bottom` — pads the Android custom sheet. */
+  bottomInset: number;
+};
+
+/**
+ * Shared session long-press menu. Builds one options list — Copy session ID,
+ * optional Rename, optional Delete session, Cancel — and dispatches by index.
+ * iOS delegates to native ActionSheetIOS via @expo/react-native-action-sheet;
+ * Android gets backdrop-tap and hardware-back dismiss from the library.
+ */
+export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
+  const { showActionSheetWithOptions, onCopySessionId, onRename, onDelete, bottomInset } = opts;
+
+  const options = ['Copy session ID'];
+  const handlers: (() => void)[] = [onCopySessionId];
+
+  if (onRename) {
+    options.push('Rename');
+    handlers.push(onRename);
+  }
+  if (onDelete) {
+    options.push('Delete session');
+    handlers.push(onDelete);
+  }
+  options.push('Cancel');
+
+  const cancelButtonIndex = options.length - 1;
+  const deleteIndex = options.indexOf('Delete session');
+  const destructiveButtonIndex = deleteIndex === -1 ? undefined : deleteIndex;
+
+  showActionSheetWithOptions(
+    {
+      options,
+      cancelButtonIndex,
+      ...(destructiveButtonIndex !== undefined && { destructiveButtonIndex }),
+      containerStyle: { paddingBottom: bottomInset },
+    },
+    index => {
+      if (index === undefined || index === cancelButtonIndex) {
+        return;
+      }
+      handlers[index]?.();
+    }
+  );
 }

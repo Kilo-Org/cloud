@@ -5,6 +5,29 @@ import {
 
 export type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
 
+/**
+ * GitHub rejects REQUEST_CHANGES and COMMENT reviews that carry neither a
+ * summary nor at least one comment; APPROVE has no such requirement. Mirrored
+ * client-side so the sheet can explain the requirement instead of round-
+ * tripping to a 422.
+ */
+export function reviewSubmitBlockReason(args: {
+  event: ReviewEvent;
+  hasSummary: boolean;
+  commentCount: number;
+}): string | null {
+  if (args.event === 'APPROVE') {
+    return null;
+  }
+  if (args.hasSummary || args.commentCount > 0) {
+    return null;
+  }
+  if (args.event === 'REQUEST_CHANGES') {
+    return 'Add a summary or at least one comment to request changes.';
+  }
+  return 'Add a summary or at least one comment to post a comment review.';
+}
+
 type BuildSubmitReviewInputArgs = {
   owner: string;
   repo: string;

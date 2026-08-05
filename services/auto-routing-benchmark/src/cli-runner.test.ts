@@ -50,6 +50,54 @@ describe('runDeciderCaseViaCli', () => {
       orgId: 'org-123',
     });
   });
+
+  it('passes canonical variant as the container body variant field', async () => {
+    const fetch = vi.fn(async (_request: Request) =>
+      Response.json({
+        exitCode: 0,
+        durationMs: 10,
+        stdoutLines: [],
+        stderrTail: '',
+      })
+    );
+    const { env } = createEnv(fetch);
+
+    await runDeciderCaseViaCli(env, {
+      instanceName: 'run:model:0',
+      model: 'vendor/model',
+      benchCase,
+      kiloToken: 'kilo-user-token',
+      kiloApiUrl: 'http://host.docker.internal:3000',
+      variant: 'xhigh',
+    });
+
+    const request = fetch.mock.calls[0]?.[0];
+    await expect(readJsonBody(request)).resolves.toMatchObject({ variant: 'xhigh' });
+  });
+
+  it('accepts legacy reasoningEffort alias for the same body field', async () => {
+    const fetch = vi.fn(async (_request: Request) =>
+      Response.json({
+        exitCode: 0,
+        durationMs: 10,
+        stdoutLines: [],
+        stderrTail: '',
+      })
+    );
+    const { env } = createEnv(fetch);
+
+    await runDeciderCaseViaCli(env, {
+      instanceName: 'run:model:0',
+      model: 'vendor/model',
+      benchCase,
+      kiloToken: 'kilo-user-token',
+      kiloApiUrl: 'http://host.docker.internal:3000',
+      reasoningEffort: 'high',
+    });
+
+    const request = fetch.mock.calls[0]?.[0];
+    await expect(readJsonBody(request)).resolves.toMatchObject({ variant: 'high' });
+  });
 });
 
 describe('warmUpCliContainer', () => {

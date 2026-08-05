@@ -2,15 +2,17 @@
 //   - The "Comment" affordance that pushes the comment-composer route
 //     when a diff-line selection exists, plus a "Clear" button that
 //     drops the selection.
-//   - The "Finish review" button shown when the pending review queue
-//     is non-empty, which pushes the review-submit route.
+//   - The "Finish review" button that pushes the review-submit route,
+//     shown regardless of pending-comment count so a clean PR can still
+//     be approved. The numeric count badge only renders when the queue
+//     is non-empty.
 //
 // Extracted from `pr-diff-file-list.tsx` to keep that file under the
 // 300-line repo cap.
 
 import { type Href, useRouter } from 'expo-router';
 import { MessageCirclePlus } from 'lucide-react-native';
-import { View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -34,6 +36,8 @@ type PrDiffFloatingActionsProps = Readonly<{
   selection: SelectionState | null;
   /** Setter for the parent's selection state — `null` clears. */
   onClearSelection: () => void;
+  /** Optional callback for the measured root layout height (points). */
+  onHeightChange?: (height: number) => void;
 }>;
 
 export function PrDiffFloatingActions({
@@ -43,16 +47,17 @@ export function PrDiffFloatingActions({
   viewMode,
   selection,
   onClearSelection,
+  onHeightChange,
 }: PrDiffFloatingActionsProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const pending = usePendingReview();
 
   const showSelectionAction = viewMode === 'unified' && selection !== null;
-  const showFinishReview = pending.items.length > 0;
-  if (!showSelectionAction && !showFinishReview) {
-    return null;
-  }
+  // P1-F-46b: the submit affordance must always be reachable from the
+  // Files tab, even when the pending-comment queue is empty (clean
+  // approve). The numeric count badge is only rendered when the queue
+  // is non-empty (see below), so a "0" never shows.
 
   function openCommentComposer() {
     if (!selection) {
@@ -83,6 +88,9 @@ export function PrDiffFloatingActions({
 
   return (
     <View
+      onLayout={(event: LayoutChangeEvent) => {
+        onHeightChange?.(event.nativeEvent.layout.height);
+      }}
       pointerEvents="box-none"
       className="absolute inset-x-0 bottom-0 items-center gap-2 px-4 pb-6 pt-3"
     >
@@ -113,20 +121,20 @@ export function PrDiffFloatingActions({
             </Button>
           </View>
         ) : null}
-        {showFinishReview ? (
-          <Button
-            onPress={openReviewSubmit}
-            accessibilityLabel="Finish review"
-            className={cn(showSelectionAction && 'mt-1')}
-          >
-            <View className="relative flex-row items-center">
-              <Text>Finish review</Text>
+        <Button
+          onPress={openReviewSubmit}
+          accessibilityLabel="Finish review"
+          className={cn(showSelectionAction && 'mt-1')}
+        >
+          <View className="relative flex-row items-center">
+            <Text>Finish review</Text>
+            {pending.items.length > 0 ? (
               <View className="absolute -right-2.5 -top-2.5 min-h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground px-1.5">
                 <Text className="text-xs font-semibold text-primary">{pending.items.length}</Text>
               </View>
-            </View>
-          </Button>
-        ) : null}
+            ) : null}
+          </View>
+        </Button>
       </View>
     </View>
   );

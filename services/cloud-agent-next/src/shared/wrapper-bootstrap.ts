@@ -149,10 +149,63 @@ export type WrapperWorkspaceReady = {
   devcontainer?: WrapperDevContainerMetadata;
 };
 
+/**
+ * How the repository clone was performed.
+ * - `full`: ordinary clone (no partial-clone filter requested), or a blobless
+ *   attempt that the remote silently ignored (no rejection, but the filter
+ *   never took effect, e.g. no promisor remote configured after clone)
+ * - `blobless`: `--filter=blob:none` clone succeeded and was confirmed active
+ *   (the remote registered as a promisor remote)
+ * - `blobless_fallback`: blobless was rejected by the remote, retried as a full clone
+ */
+export type WrapperCloneMode = 'full' | 'blobless' | 'blobless_fallback';
+
+export type WrapperCloneTelemetry = {
+  mode: WrapperCloneMode;
+  /** Clone invocations issued (2 when a blobless attempt fell back). */
+  attempts: number;
+  /**
+   * Whether the blobless attempt's output matched the filter-rejection predicate
+   * that triggers the full-clone retry. A blobless clone that fails for a reason
+   * the predicate does not recognize reports `false` and gets no retry, so this
+   * distinguishes "remote refused the filter" from "clone failed for other reasons".
+   */
+  filterRejected: boolean;
+  durationMs: number;
+  repoKind: 'github' | 'git';
+  /** `unknown` for a generic git remote that declared no platform. */
+  repoPlatform: 'github' | 'gitlab' | 'bitbucket' | 'unknown';
+  shallow: boolean;
+  /** Size proxies parsed from git's own progress output; absent if git did not report them. */
+  totalObjects?: number;
+  receivedBytes?: number;
+};
+
+/**
+ * Non-sensitive bootstrap diagnostics, kept as a sibling of `workspaceReady` rather
+ * than a member of it: `workspaceReady` carries `gitToken`, so nesting telemetry there
+ * would make the object unsafe to log wholesale. Everything here is safe to log.
+ */
+export type WrapperBootstrapTelemetry = {
+  workspaceWasWarm: boolean;
+  /**
+   * True when the workspace was populated from an R2 backup rather than
+   * genuinely reused from a prior bootstrap. A restored workspace still
+   * reports `workspaceWasWarm: true` (the bootstrap marker is included in
+   * the backup archive), so this disambiguates "reused as-is" from
+   * "restored over the network," which otherwise inflates apparent
+   * sandbox-reuse rates.
+   */
+  restoredFromBackup: boolean;
+  clone?: WrapperCloneTelemetry;
+};
+
 export type WrapperSessionReadySuccessResponse = {
   status: 'ready';
   kiloSessionId: string;
   workspaceReady: WrapperWorkspaceReady;
+  /** Optional: wrappers older than this field's introduction do not send it. */
+  telemetry?: WrapperBootstrapTelemetry;
 };
 
 export const WRAPPER_READY_ERROR_MESSAGE_MAX_LENGTH = 4_096;

@@ -10,9 +10,10 @@ import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_FALLBACK_MODEL_ID,
   isClaudeModel,
   isFableModel,
+  isOpus5Model,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
@@ -38,8 +39,12 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
+  if (isOpenAiModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.openai];
+  }
   if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
     // fable is not available on bedrock on vercel
     // and specifying bedrock breaks the opus fallback
@@ -103,10 +108,10 @@ export async function applyGatewayModelsFallback(
 ) {
   if (
     !(await isFreeModel(requestedModel)) &&
-    isFableModel(requestedModel) &&
+    (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
     (providerId === 'openrouter' || providerId === 'vercel')
   ) {
-    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_CURRENT_MODEL_ID];
+    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID];
     return;
   }
 

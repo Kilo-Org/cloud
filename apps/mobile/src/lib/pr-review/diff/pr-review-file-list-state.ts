@@ -19,9 +19,10 @@
 // to the right terminal state.
 
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
+import { flattenFilePages } from '@/lib/pr-review/diff/dedupe-file-pages';
 import { PR_REVIEW_MAX_PAGES } from '@/lib/pr-review/diff/pr-review-file-types';
 import { getViewedFiles, toggleViewedFile } from '@/lib/pr-review/viewed-files';
 import { useTRPC } from '@/lib/trpc';
@@ -59,15 +60,16 @@ export function usePrReviewFileListQuery(args: {
   const firstPageErrorState = hasLoadedPages ? null : errorState;
   const laterPageError = Boolean(query.error) && hasLoadedPages;
 
+  const files = useMemo(() => flattenFilePages(query.data?.pages), [query.data]);
+
   return {
     query,
+    files,
     errorState,
     firstPageErrorState,
     laterPageError,
   };
 }
-
-export type UsePrReviewFileListQueryResult = ReturnType<typeof usePrReviewFileListQuery>;
 
 /**
  * Subscribes the viewed-files store for a specific PR (keyed by
@@ -181,8 +183,13 @@ export function useFetchToCompletion(
 
   const loadedFiles = (query.data?.pages ?? []).reduce((sum, page) => sum + page.files.length, 0);
 
+  // Hold the query in a ref so `run()` is stable across renders; every read
+  // inside the loop goes through `queryRef.current` so no closure staleness.
+  const queryRef = useRef(query);
+  queryRef.current = query;
+
   const run = useCallback(async () => {
-    if (query.isFetching || !query.hasNextPage) {
+    if (queryRef.current.isFetching || !queryRef.current.hasNextPage) {
       return;
     }
     setError(null);
@@ -191,13 +198,12 @@ export function useFetchToCompletion(
       // Loop instead of recursing to keep the call stack flat. Pages must be
       // fetched sequentially because each request needs the previous page's
       // cursor, so `await` inside the loop is intentional here.
-      // The `hasNextPage` value is re-checked on each iteration via the
-      // result of `fetchNextPage` (not a stale closure), so the loop
-      // condition is intentionally the live query flag.
+      // The loop exits on the `fetchNextPage()` return value, not on a
+      // captured flag, so the ref-read pattern is identity-only.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- hasNextPage is re-evaluated after each page
-      while (query.hasNextPage) {
+      while (queryRef.current.hasNextPage) {
         // eslint-disable-next-line no-await-in-loop -- sequential cursor pagination
-        const result = await query.fetchNextPage();
+        const result = await queryRef.current.fetchNextPage();
         if (!result.data || !result.hasNextPage) {
           break;
         }
@@ -207,7 +213,7 @@ export function useFetchToCompletion(
     } finally {
       setIsRunning(false);
     }
-  }, [query]);
+  }, []);
 
   return { run, isRunning, loadedFiles, totalFiles, error };
 }

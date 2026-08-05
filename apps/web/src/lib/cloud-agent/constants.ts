@@ -50,7 +50,7 @@ export const CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION: Record<
 };
 
 export const CLOUD_AGENT_ATTACHMENT_MAX_COUNT = 5;
-export const CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+export const CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 export const CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS = 900; // 15 min
 
 /**
@@ -175,10 +175,7 @@ export function normalizeAttachmentExtension(extension: string | undefined | nul
   return CLOUD_AGENT_ATTACHMENT_FALLBACK_EXTENSION;
 }
 
-export type CloudAgentAttachments = {
-  path: string;
-  files: string[];
-};
+export type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 
 /**
  * Maximum prompt length (in characters) accepted by the cloud agent.

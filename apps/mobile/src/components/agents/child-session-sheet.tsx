@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type ChildSessionHydrationState, type StoredMessage } from 'cloud-agent-sdk';
+import { type ChildSessionHydrationState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -14,11 +14,13 @@ import {
   type RenderPartFn,
 } from './child-session-section';
 import { MessageErrorBoundary } from './message-error-boundary';
+import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { getChildSessionSheetState } from './child-session-sheet-state';
 import { SessionMessageList } from './session-message-list';
 import { WorkingIndicator } from './working-indicator';
 
 type ChildSessionSheetProps = {
+  visible: boolean;
   sessionId: string;
   title: string;
   getChildMessages: (sessionId: string) => StoredMessage[];
@@ -28,12 +30,15 @@ type ChildSessionSheetProps = {
   onOpenChildSession: OpenChildSession;
   onRetry: () => void;
   onClose: () => void;
+  /** Fires on iOS after the native pageSheet dismiss animation completes. */
+  onDismiss?: () => void;
 };
 
 // eslint-disable-next-line no-empty-function -- child sessions are hydrated one-shot, no pagination
 function noopLoadOlder(): void {}
 
 export function ChildSessionSheet({
+  visible,
   sessionId,
   title,
   getChildMessages,
@@ -43,6 +48,7 @@ export function ChildSessionSheet({
   onOpenChildSession,
   onRetry,
   onClose,
+  onDismiss,
 }: Readonly<ChildSessionSheetProps>) {
   const messages = getChildMessages(sessionId);
   const state = getChildSessionSheetState(hydrationState, messages.length);
@@ -111,10 +117,16 @@ export function ChildSessionSheet({
   }
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+      onDismiss={onDismiss}
+    >
       <View className="flex-1 bg-background">
         <SheetHeader title={title} onDone={onClose} />
-        {content}
+        <PartDetailSheetHost messages={messages}>{content}</PartDetailSheetHost>
       </View>
     </Modal>
   );

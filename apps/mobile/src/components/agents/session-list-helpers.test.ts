@@ -5,6 +5,9 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
+  activeSessionMetaTimestamp,
+  composeActiveSessionSpokenMeta,
+  composeActiveSessionVisibleMeta,
   excludeActiveFromGroups,
   expandPlatformFilter,
   formatMeta,
@@ -14,6 +17,7 @@ import {
   remoteSessionEyebrowLabel,
   repoNameFromGitUrl,
   selectPinnedActiveSessions,
+  selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
@@ -32,26 +36,138 @@ describe('selectPinnedActiveSessions', () => {
   it('does not dedup against stored pages (returns actives regardless)', () => {
     // The helper intentionally has no stored-sessions parameter. The
     // exclusivity contract lives on the history side (Task 3); the pinned
-    // set is always driven solely by filters and the active input.
+    // set is driven by the search query, the platform/project filters, and the active input.
     const actives: ActiveSession[] = [makeActive({ id: 'a1' }), makeActive({ id: 'a2' })];
     const result = selectPinnedActiveSessions({
       activeSessions: actives,
       projectFilter: [],
       platformFilter: [],
+      searchQuery: '',
     });
     expect(result).toEqual(actives);
   });
 
-  it('has no search parameter (search is ignored by construction)', () => {
-    // Compile-time assertion: selectPinnedActiveSessions must not accept
-    // a `search` key. If one is added later, @ts-expect-error stops firing
-    // and typecheck fails.
-    selectPinnedActiveSessions({
-      activeSessions: [],
-      projectFilter: [],
-      platformFilter: [],
-      // @ts-expect-error — search must not be a param of selectPinnedActiveSessions
-      search: 'anything',
+  describe('search rules', () => {
+    it('empty query performs no narrowing', () => {
+      const a = makeActive({ id: 'a', title: 'Fix login' });
+      const b = makeActive({ id: 'b', title: 'Other work' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [a, b],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: '',
+      });
+      expect(result).toEqual([a, b]);
+    });
+
+    it('whitespace-only query performs no narrowing', () => {
+      const a = makeActive({ id: 'a', title: 'Fix login' });
+      const b = makeActive({ id: 'b', title: 'Other work' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [a, b],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: '   ',
+      });
+      expect(result).toEqual([a, b]);
+    });
+
+    it('matches a title substring mid-string', () => {
+      const match = makeActive({ id: 'm', title: 'Fix login bug' });
+      const other = makeActive({ id: 'o', title: 'Deploy release' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [match, other],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'login',
+      });
+      expect(result.map(s => s.id)).toEqual(['m']);
+    });
+
+    it('title match is case-insensitive both ways', () => {
+      const lower = makeActive({ id: 'lower', title: 'Fix login bug' });
+      const upper = makeActive({ id: 'upper', title: 'FIX LOGIN BUG' });
+      expect(
+        selectPinnedActiveSessions({
+          activeSessions: [lower],
+          projectFilter: [],
+          platformFilter: [],
+          searchQuery: 'LOGIN',
+        }).map(s => s.id)
+      ).toEqual(['lower']);
+      expect(
+        selectPinnedActiveSessions({
+          activeSessions: [upper],
+          projectFilter: [],
+          platformFilter: [],
+          searchQuery: 'fix',
+        }).map(s => s.id)
+      ).toEqual(['upper']);
+    });
+
+    it('matches a session id substring, case-insensitively', () => {
+      const match = makeActive({ id: 'ses-ABC123', title: 'Unrelated title' });
+      const other = makeActive({ id: 'ses-xyz', title: 'Also unrelated' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [match, other],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'abc123',
+      });
+      expect(result.map(s => s.id)).toEqual(['ses-ABC123']);
+    });
+
+    it('excludes sessions matching neither title nor id', () => {
+      const a = makeActive({ id: 'ses-a', title: 'Fix login' });
+      const b = makeActive({ id: 'ses-b', title: 'Deploy' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [a, b],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'zzz',
+      });
+      expect(result).toEqual([]);
+    });
+
+    it('applies the text query in conjunction with platform and project filters', () => {
+      const pass = makeActive({
+        id: 'pass',
+        title: 'Fix login bug',
+        gitUrl: 'git@github.com:org/repo.git',
+        createdOnPlatform: 'cli',
+      });
+      const wrongPlatform = makeActive({
+        id: 'wrongPlatform',
+        title: 'Fix login bug',
+        gitUrl: 'git@github.com:org/repo.git',
+        createdOnPlatform: 'slack',
+      });
+      const wrongProject = makeActive({
+        id: 'wrongProject',
+        title: 'Fix login bug',
+        gitUrl: 'git@github.com:org/other.git',
+        createdOnPlatform: 'cli',
+      });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [pass, wrongPlatform, wrongProject],
+        projectFilter: ['git@github.com:org/repo.git'],
+        platformFilter: ['cli'],
+        searchQuery: 'login',
+      });
+      expect(result.map(s => s.id)).toEqual(['pass']);
+    });
+
+    it('treats LIKE metacharacters literally (parity with server position() search)', () => {
+      const percent = makeActive({ id: 'pct', title: '100% done' });
+      const noPercent = makeActive({ id: 'nop', title: '1000 done' });
+      expect(
+        selectPinnedActiveSessions({
+          activeSessions: [percent, noPercent],
+          projectFilter: [],
+          platformFilter: [],
+          searchQuery: '100%',
+        }).map(s => s.id)
+      ).toEqual(['pct']);
     });
   });
 
@@ -63,6 +179,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [withUrl, withoutUrl],
         projectFilter: ['git@github.com:org/repo.git'],
         platformFilter: [],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['with']);
     });
@@ -74,6 +191,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [match, other],
         projectFilter: ['git@github.com:org/repo.git'],
         platformFilter: [],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['match']);
     });
@@ -86,6 +204,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [a, b, c],
         projectFilter: [],
         platformFilter: [],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['a', 'b', 'c']);
     });
@@ -99,6 +218,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [cli, slack],
         projectFilter: [],
         platformFilter: ['cli'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['cli']);
     });
@@ -110,6 +230,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [web, ca],
         projectFilter: [],
         platformFilter: ['cloud-agent'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id).toSorted()).toEqual(['ca', 'web']);
     });
@@ -122,6 +243,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [vscode, am, slack],
         projectFilter: [],
         platformFilter: ['extension'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id).toSorted()).toEqual(['am', 'vscode']);
     });
@@ -132,6 +254,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [weird],
         projectFilter: [],
         platformFilter: ['other'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['weird']);
     });
@@ -142,6 +265,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [cli],
         projectFilter: [],
         platformFilter: ['other'],
+        searchQuery: '',
       });
       expect(result).toEqual([]);
     });
@@ -154,6 +278,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [cli, weird, vscode],
         projectFilter: [],
         platformFilter: ['cli', 'other'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id).toSorted()).toEqual(['cli', 'weird']);
     });
@@ -165,6 +290,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [unknown, cli],
         projectFilter: [],
         platformFilter: ['cli'],
+        searchQuery: '',
       });
       expect(result.map(s => s.id)).toEqual(['cli']);
     });
@@ -176,6 +302,7 @@ describe('selectPinnedActiveSessions', () => {
         activeSessions: [unknown, cli],
         projectFilter: [],
         platformFilter: [],
+        searchQuery: '',
       });
       expect(result.map(s => s.id).toSorted()).toEqual(['cli', 'unknown']);
     });
@@ -201,6 +328,7 @@ describe('selectPinnedActiveSessions', () => {
       activeSessions: [pass, wrongProject, wrongPlatform],
       projectFilter: ['git@github.com:org/repo.git'],
       platformFilter: ['cli'],
+      searchQuery: '',
     });
     expect(result.map(s => s.id)).toEqual(['pass']);
   });
@@ -228,16 +356,65 @@ describe('remoteAgentLabel', () => {
   });
 });
 
-describe('remoteMeta', () => {
-  it('returns the uppercased relative time when updatedAt is present', () => {
-    const updatedAt = '2024-01-01T00:00:00.000Z';
-    const expected = timeAgo(parseTimestamp(updatedAt)).toUpperCase();
-    expect(remoteMeta({ status: 'running', updatedAt })).toBe(expected);
+describe('activeSessionMetaTimestamp', () => {
+  it('prefers lastActivityAt over updatedAt', () => {
+    expect(
+      activeSessionMetaTimestamp({
+        lastActivityAt: '2024-06-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      })
+    ).toBe('2024-06-01T00:00:00.000Z');
   });
 
-  it('returns the uppercased status when updatedAt is absent', () => {
-    expect(remoteMeta({ status: 'running' })).toBe('RUNNING');
-    expect(remoteMeta({ status: 'needs_input' })).toBe('NEEDS_INPUT');
+  it('falls back to updatedAt when lastActivityAt is absent', () => {
+    expect(activeSessionMetaTimestamp({ updatedAt: '2024-01-01T00:00:00.000Z' })).toBe(
+      '2024-01-01T00:00:00.000Z'
+    );
+  });
+
+  it('returns undefined when neither timestamp is present', () => {
+    expect(activeSessionMetaTimestamp({})).toBeUndefined();
+  });
+});
+
+describe('remoteMeta', () => {
+  it('returns the same relative-time string as formatMeta when updatedAt is present', () => {
+    const updatedAt = '2024-01-01T00:00:00.000Z';
+    expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
+    expect(remoteMeta({ updatedAt })).toBe(timeAgo(parseTimestamp(updatedAt)).toUpperCase());
+  });
+
+  it('prefers lastActivityAt over updatedAt', () => {
+    const lastActivityAt = '2024-06-01T00:00:00.000Z';
+    const updatedAt = '2024-01-01T00:00:00.000Z';
+    expect(remoteMeta({ lastActivityAt, updatedAt })).toBe(formatMeta(lastActivityAt));
+  });
+
+  it('falls back to updatedAt when lastActivityAt is absent', () => {
+    const updatedAt = '2024-01-01T00:00:00.000Z';
+    expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
+  });
+
+  it('returns undefined when neither timestamp is present (never idle/busy/retry status words)', () => {
+    // Former fallback uppercased session.status into the timestamp slot
+    // (BUSY/IDLE/RETRY). Status is no longer a parameter; assert undefined
+    // for each status that used to leak, plus a row with no status field.
+    // Extra `status` fields stay on the object so a regression that re-reads
+    // `.status` would still see them — remoteMeta must ignore them.
+    const idleRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'idle',
+    };
+    const busyRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'busy',
+    };
+    const retryRow: { updatedAt?: string; lastActivityAt?: string; status?: string } = {
+      status: 'retry',
+    };
+    const noStatusRow: { updatedAt?: string; lastActivityAt?: string } = {};
+    expect(remoteMeta(idleRow)).toBeUndefined();
+    expect(remoteMeta(busyRow)).toBeUndefined();
+    expect(remoteMeta(retryRow)).toBeUndefined();
+    expect(remoteMeta(noStatusRow)).toBeUndefined();
   });
 });
 
@@ -447,5 +624,98 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
         createdOnPlatform: 'cli',
       })
     ).toBe('MY-REPO');
+  });
+});
+
+describe('composeActiveSessionVisibleMeta', () => {
+  it('both cost and time → "$cost · timeMeta"', () => {
+    expect(composeActiveSessionVisibleMeta('$0.12', '5M AGO')).toBe('$0.12 · 5M AGO');
+  });
+
+  it('cost only → cost', () => {
+    expect(composeActiveSessionVisibleMeta('$3.50', undefined)).toBe('$3.50');
+  });
+
+  it('time only → timeMeta', () => {
+    expect(composeActiveSessionVisibleMeta(null, '1H AGO')).toBe('1H AGO');
+  });
+
+  it('neither → undefined', () => {
+    expect(composeActiveSessionVisibleMeta(null, undefined)).toBeUndefined();
+  });
+
+  it('null cost with empty time → undefined', () => {
+    expect(composeActiveSessionVisibleMeta(null, '')).toBeUndefined();
+  });
+});
+
+describe('composeActiveSessionSpokenMeta', () => {
+  it('both cost and time → "cost <cost>, <time>"', () => {
+    expect(composeActiveSessionSpokenMeta('12 cents', '5 minutes ago')).toBe(
+      'cost 12 cents, 5 minutes ago'
+    );
+  });
+
+  it('cost only → "cost <cost>"', () => {
+    expect(composeActiveSessionSpokenMeta('3 dollars', null)).toBe('cost 3 dollars');
+  });
+
+  it('time only → timeSpoken', () => {
+    expect(composeActiveSessionSpokenMeta(null, '1 hour ago')).toBe('1 hour ago');
+  });
+
+  it('neither → null', () => {
+    expect(composeActiveSessionSpokenMeta(null, null)).toBeNull();
+  });
+});
+
+describe('selectRemoteRowSpokenMeta', () => {
+  const costSpoken = '12 cents';
+  const timeSpoken = '5 minutes ago';
+
+  it('needsInput + cost + time → null', () => {
+    expect(selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken })).toBeNull();
+  });
+
+  it('needsInput + cost only → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken: null })
+    ).toBeNull();
+  });
+
+  it('needsInput + time only → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken })
+    ).toBeNull();
+  });
+
+  it('needsInput + neither → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken: null })
+    ).toBeNull();
+  });
+
+  it('cost + time → combined spoken form', () => {
+    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken })).toBe(
+      'cost 12 cents, 5 minutes ago'
+    );
+  });
+
+  it('cost only → spoken cost alone', () => {
+    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken: null })).toBe(
+      'cost 12 cents'
+    );
+  });
+
+  it('time only → spoken time alone', () => {
+    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken })).toBe(
+      '5 minutes ago'
+    );
+  });
+
+  it('neither → null', () => {
+    expect(
+      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken: null })
+    ).toBeNull();
   });
 });

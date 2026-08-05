@@ -2,17 +2,21 @@
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
-import {
-  JetBrainsMono_500Medium,
-  JetBrainsMono_600SemiBold,
-} from '@expo-google-fonts/jetbrains-mono';
-import { ThemeProvider } from '@react-navigation/native';
+import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
+
+// Deep imports of only the two weights this app renders. The package barrel
+// (`@expo-google-fonts/jetbrains-mono`) require()s all 16 weights at module
+// scope and Metro does not tree-shake, so importing it ships ~1.63MB of unused
+// font bytes. The per-weight subpaths pull only the two used `.ttf` files.
+import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
+import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
 import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';
 import { useFonts } from 'expo-font';
 import {
   type Href,
   Slot,
+  ThemeProvider,
   useGlobalSearchParams,
   useNavigationContainerRef,
   usePathname,
@@ -20,9 +24,11 @@ import {
   useSegments,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
@@ -30,6 +36,10 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
+import { shouldStartAnalytics } from '@/lib/analytics-consent';
+import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
+import { drainStartupTimings } from '@/lib/startup-drain';
+import { markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -37,29 +47,49 @@ import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
+import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
 import {
   checkInitialNotification,
-  getPendingNotificationLink,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
-import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
+import { resolvePendingNavigation } from '@/lib/pending-navigation';
+import {
+  isShellReadyForShare,
+  resolvePendingShareNavigation,
+  resolveSupersededPendingShareId,
+} from '@/lib/pending-share-navigation';
+import {
+  clearSharePayload,
+  discardUnstoredSharePayload,
+  normalizeShareIntent,
+  putSharePayload,
+  type ShareId,
+  type SharePayload,
+} from '@/lib/share-payload';
+import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
+import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
 
-// Session replay, screenshots, and view-hierarchy capture are gated on
-// stored consent (see src/lib/sentry-consent.ts) — the consent copy only
-// promises anonymous performance/crash data. The RN SDK reads all of these
-// options only at Sentry.init() time (Mobile Replay has no runtime
-// start/stop API in 7.x), so `consented` starts `false` and every consent
-// transition goes through reinitSentryForConsent, which awaits
-// Sentry.close() first — the only way to stop an in-flight native replay
-// recording and dispose the previous client — before calling this again.
-function initSentry(consented: boolean) {
+// No-op unless E2E_LATENCY_WS_MS is set at bundle time (see lib/e2e-ws-latency).
+installE2EWebSocketLatency();
+
+// DEC-02 consent rule: crash and error reporting is mandatory, so
+// `initSentry(false)` runs at module scope — a crash during bootstrap
+// must still be reported. The optional group is `tracesSampleRate`
+// only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+//
+// In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
+// — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
+//   integration). The authoritative per-launch timing metric is the PostHog
+//   `app_startup` event in src/lib/startup-timing.ts.
+function initSentry(optionalConsented: boolean) {
   Sentry.init({
     dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
 
@@ -67,12 +97,16 @@ function initSentry(consented: boolean) {
 
     sendDefaultPii: false,
 
-    enableLogs: true,
-    tracesSampleRate: 0,
-    ...sentryOptionsForConsent(consented),
+    environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
+    ...sentryOptionsForConsent(optionalConsented),
 
-    integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
+    integrations: [navigationIntegration],
     enableNativeFramesTracking: false,
+
+    beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
+    beforeBreadcrumb: scrubBreadcrumb as NonNullable<
+      Parameters<typeof Sentry.init>[0]
+    >['beforeBreadcrumb'],
 
     spotlight: __DEV__,
   });
@@ -83,10 +117,11 @@ initSentry(false);
 void SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
 checkInitialNotification();
+captureLaunchDeepLink();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading, signOut } = useAuth();
-  const { updateRequired, isChecking: updateChecking } = useForceUpdate();
+  const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
     JetBrainsMono_600SemiBold,
@@ -105,8 +140,15 @@ function RootLayoutNav() {
   } = useCurrentUserId({ enabled: token != null });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
+  const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
+  // Flipped by every splash-hide site below, so the app_startup drain can
+  // depend on "startup finished" as an ordinary dependency.
+  const [startupFinished, setStartupFinished] = useState(false);
+  // Reactive snapshot so the drain effect re-triggers when the PostHog
+  // client becomes ready after async init.
+  const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);
 
   useEffect(() => {
     if (fontsError) {
@@ -114,10 +156,36 @@ function RootLayoutNav() {
     }
   }, [fontsError]);
 
-  useSentryConsentSync(consentChecked && !needsConsent, initSentry);
+  useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
-  const isLoading = authLoading || updateChecking || !fontsReady || !themeHasLoaded;
+  // The force-update check is deliberately absent: it is a live network round
+  // trip that fails open in every branch (lib/hooks/use-force-update), so
+  // holding first paint for it only ever costs time. `updateRequired` starts
+  // false, first paint happens, and the effect below routes to /force-update
+  // if the check later says an update is required.
+  const isLoading = authLoading || !fontsReady || !themeHasLoaded;
+
+  // Startup phase timings (lib/startup-timing). Idempotent per mark, so this
+  // effect re-runs freely as gates settle. `userIdLoading` is false while the
+  // query is disabled, so it only counts once there is a token.
+  useEffect(() => {
+    if (!authLoading) {
+      markStartup('auth_ready');
+    }
+    if (fontsReady) {
+      markStartup('fonts_ready');
+    }
+    if (themeHasLoaded) {
+      markStartup('theme_ready');
+    }
+    if (token != null && !userIdLoading) {
+      markStartup('user_ready');
+    }
+    if (consentChecked) {
+      markStartup('consent_ready');
+    }
+  }, [authLoading, fontsReady, themeHasLoaded, token, userIdLoading, consentChecked]);
 
   useEffect(() => {
     if (themeHasLoaded) {
@@ -128,6 +196,38 @@ function RootLayoutNav() {
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
+  const onGateRoute = (segments as readonly string[]).includes('share-gate');
+  const {
+    hasShareIntent,
+    shareIntent,
+    resetShareIntent,
+    error: shareIntentError,
+  } = useShareIntentContext();
+  // expo-share-intent rebuilds resetShareIntent every render; keep it out of
+  // the ingest/error effect deps via ref (same pattern as share-prefill.ts).
+  const resetShareIntentRef = useRef(resetShareIntent);
+  resetShareIntentRef.current = resetShareIntent;
+  const [pendingShareId, setPendingShareId] = useState<ShareId | null>(null);
+  // Mirror pendingShareId so the ingest effect can release a superseded share
+  // without reading stale state or adding the id to effect deps.
+  const pendingShareIdRef = useRef(pendingShareId);
+  pendingShareIdRef.current = pendingShareId;
+
+  // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
+  const isShellReady = isShellReadyForShare({
+    hasToken: token != null,
+    isLoading,
+    updateRequired,
+    inAuthGroup,
+    inForceUpdate,
+    userIdLoading,
+    userIdError,
+    consentCheckError: consentCheckError != null,
+    consentChecked,
+    needsConsent,
+    onConsentRoute,
+    onConsentReviewRoute,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -136,6 +236,7 @@ function RootLayoutNav() {
       if (!token || !userId) {
         setConsentChecked(false);
         setNeedsConsent(false);
+        setOptionalConsentState(false);
         setConsentCheckError(null);
         return;
       }
@@ -148,11 +249,17 @@ function RootLayoutNav() {
       if (result.status === 'error') {
         Sentry.captureException(result.error);
         setNeedsConsent(false);
+        setOptionalConsentState(false);
         setConsentChecked(false);
         setConsentCheckError(result.error);
         return;
       }
 
+      if (result.status === 'accepted') {
+        setOptionalConsentState(result.optional);
+      } else {
+        setOptionalConsentState(false);
+      }
       setConsentCheckError(null);
       setNeedsConsent(result.status === 'needs-consent');
       setConsentChecked(true);
@@ -176,15 +283,79 @@ function RootLayoutNav() {
       }
 
       setNeedsConsent(!change.hasAccepted);
+      setOptionalConsentState(change.optional);
       setConsentChecked(true);
     });
 
     return unsubscribe;
   }, [token, userId]);
 
-  useTrackingPermissionPrompt(!isLoading);
-  useAnalyticsConsentGate({ hasToken: token != null, consentChecked, needsConsent, email });
+  useTrackingPermissionPrompt(
+    optionalConsent &&
+      shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
+  );
+  useAnalyticsConsentGate({
+    hasToken: token != null,
+    consentChecked,
+    needsConsent,
+    email,
+    accountId: userId,
+    optionalConsent,
+  });
   useScreenTracking();
+
+  useEffect(() => {
+    if (shareIntentError) {
+      Sentry.captureException(new Error(shareIntentError));
+      toast.error("Couldn't read the shared content");
+      resetShareIntentRef.current();
+    }
+  }, [shareIntentError]);
+
+  // Keyed per shareIntent identity so a newer intent cancels and supersedes
+  // an in-flight ingest. Success/failure reset for the happy path lives here
+  // (gate must never reset); the shareIntentError effect also resets on the
+  // error path. Calls go through resetShareIntentRef so the unstable context
+  // function stays out of the deps.
+  useEffect(() => {
+    if (!hasShareIntent) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const ingestShareIntent = async () => {
+      try {
+        const payload: SharePayload = await normalizeShareIntent(shareIntent);
+        if (cancelled) {
+          // Superseded mid-copy: never stored, so no lifecycle path can clean it.
+          discardUnstoredSharePayload(payload);
+          return;
+        }
+        const shareId = putSharePayload(payload);
+        resetShareIntentRef.current();
+        // Latest-wins: a superseded pending share is released — never silently orphaned.
+        const superseded = resolveSupersededPendingShareId(pendingShareIdRef.current, shareId);
+        if (superseded !== null) {
+          clearSharePayload(superseded);
+        }
+        setPendingShareId(shareId);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        Sentry.captureException(error);
+        toast.error("Couldn't read the shared content");
+        resetShareIntentRef.current();
+      }
+    };
+
+    void ingestShareIntent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasShareIntent, shareIntent]);
 
   useEffect(() => {
     if (isLoading) {
@@ -195,6 +366,8 @@ function RootLayoutNav() {
       if (!inForceUpdate) {
         router.replace('/force-update');
       } else {
+        markStartupComplete('force-update');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
       }
       return;
@@ -207,17 +380,23 @@ function RootLayoutNav() {
 
     if (!token) {
       if (inAuthGroup) {
+        markStartupComplete('login');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
       } else {
         router.replace('/(auth)/login');
       }
     } else {
       if (userIdError) {
+        markStartupComplete('user-error');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
         return;
       }
 
       if (consentCheckError) {
+        markStartupComplete('consent-error');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
         return;
       }
@@ -228,6 +407,8 @@ function RootLayoutNav() {
 
       if (needsConsent) {
         if (onConsentRoute) {
+          markStartupComplete('consent');
+          setStartupFinished(true);
           void SplashScreen.hideAsync();
         } else {
           router.replace('/(app)/consent' as Href);
@@ -240,12 +421,15 @@ function RootLayoutNav() {
         return;
       }
 
+      markStartupComplete('app');
+      setStartupFinished(true);
       void SplashScreen.hideAsync();
-      // Navigate to pending notification deep link (cold start / background tap)
-      const pendingNavigation = resolvePendingNotificationNavigation(getPendingNotificationLink());
+      // Navigate to pending deep link (cold start universal link / notification tap)
+      const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
       if (pendingNavigation) {
         router.navigate(pendingNavigation.href as Href);
       }
+      // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
     }
   }, [
     token,
@@ -262,6 +446,50 @@ function RootLayoutNav() {
     onConsentRoute,
     onConsentReviewRoute,
   ]);
+
+  // Declared after the auth effect so that on the same flush a pending
+  // notification navigate runs first and the share gate opens on top.
+  useEffect(() => {
+    if (pendingShareId === null || !isShellReady) {
+      return;
+    }
+
+    const navigation = resolvePendingShareNavigation({
+      shareId: pendingShareId,
+      onGateRoute,
+    });
+    if (!navigation) {
+      return;
+    }
+
+    if (navigation.mode === 'replace') {
+      router.replace(navigation.href as Href);
+    } else {
+      router.push(navigation.href as Href);
+    }
+    setPendingShareId(null);
+  }, [pendingShareId, isShellReady, onGateRoute, router]);
+
+  // One `app_startup` event per launch, delegated to a drain helper so
+  // tests can drive the real guard logic without mounting the full layout.
+  // Whichever gate settles last triggers the send. Because
+  // `useSyncExternalStore` re-renders when the PostHog client becomes ready,
+  // this effect re-triggers even after consent/startup has already resolved.
+  //
+  // Must stay the LAST effect here — `takeStartupTimings()` is one-shot.
+  // Signed-out launches are never reported.
+  useEffect(() => {
+    if (!startupFinished) {
+      return;
+    }
+    drainStartupTimings({
+      hasToken: token != null,
+      consentChecked,
+      needsConsent,
+      optionalConsent,
+      postHogReady,
+    });
+  }, [startupFinished, token, consentChecked, needsConsent, optionalConsent, postHogReady]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;
@@ -352,12 +580,14 @@ function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={navigationTheme}>
-      <AppRootProviders>
-        <StatusBar style="auto" />
-        <RootLayoutNav />
-      </AppRootProviders>
-    </ThemeProvider>
+    <ShareIntentProvider>
+      <ThemeProvider value={navigationTheme}>
+        <AppRootProviders>
+          <StatusBar style="auto" />
+          <RootLayoutNav />
+        </AppRootProviders>
+      </ThemeProvider>
+    </ShareIntentProvider>
   );
 }
 

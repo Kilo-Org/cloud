@@ -168,7 +168,7 @@ describe('getModelCapabilities', () => {
 
     await getModelCapabilities(env);
 
-    expect(put).toHaveBeenCalledWith('model_capabilities_v1', expect.stringContaining('"a/chat"'), {
+    expect(put).toHaveBeenCalledWith('model_capabilities_v2', expect.stringContaining('"a/chat"'), {
       expirationTtl: 3600,
     });
   });
@@ -198,11 +198,11 @@ describe('getModelCapabilities', () => {
 
     const result = await getModelCapabilities(env);
     expect(result.size).toBe(0);
-    // The model_capabilities_v1 key is never written; the routing-table
+    // The model_capabilities_v2 key is never written; the routing-table
     // lookup on the cache-miss path may write the routing_table_v1 key,
     // and that is unrelated to capability data.
     const capabilityPuts = put.mock.calls.filter(
-      (call: unknown[]) => call[0] === 'model_capabilities_v1'
+      (call: unknown[]) => call[0] === 'model_capabilities_v2'
     );
     expect(capabilityPuts).toEqual([]);
     expect(warn).toHaveBeenCalled();
@@ -333,6 +333,63 @@ describe('getModelCapabilities', () => {
     expect(result.get('coding-plan/chat')?.contextLength).toBe(200000);
   });
 
+  it('supplies static image capabilities for the recognized BytePlus coding-plan default', async () => {
+    const env = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+      })
+    );
+    const result = await getModelCapabilities(env, {
+      codingPlanModelId: 'byteplus-coding/bytedance-seed-code',
+    });
+    const capabilities = result.get('byteplus-coding/bytedance-seed-code');
+    expect(capabilities?.inputModalities.has('image')).toBe(true);
+    expect(capabilities?.inputModalities.has('file')).toBe(false);
+    expect(capabilities?.contextLength).toBe(262_144);
+    expect(capabilities?.isActive).toBe(true);
+    expect(dbWhere).not.toHaveBeenCalled();
+  });
+
+  it('does not query model_stats for the static BytePlus coding-plan default', async () => {
+    dbWhere.mockResolvedValue([
+      {
+        openrouterId: 'byteplus-coding/bytedance-seed-code',
+        inputModalities: ['file'],
+        contextLength: 4096,
+        isActive: false,
+      },
+    ]);
+    const env = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+      })
+    );
+    const result = await getModelCapabilities(env, {
+      codingPlanModelId: 'byteplus-coding/bytedance-seed-code',
+    });
+    const capabilities = result.get('byteplus-coding/bytedance-seed-code');
+    expect(capabilities?.inputModalities.has('image')).toBe(true);
+    expect(capabilities?.inputModalities.has('file')).toBe(false);
+    expect(capabilities?.contextLength).toBe(262_144);
+    expect(capabilities?.isActive).toBe(true);
+    expect(dbWhere).not.toHaveBeenCalled();
+  });
+
+  it('does not synthesize capabilities when BytePlus is not the coding-plan model', async () => {
+    const env = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+      })
+    );
+    const result = await getModelCapabilities(env, {
+      additionalModelIds: ['byteplus-coding/bytedance-seed-code'],
+    });
+    expect(result.has('byteplus-coding/bytedance-seed-code')).toBe(false);
+  });
+
   it('distinguishes an unavailable routing table from a genuinely empty one when caching capabilities', async () => {
     const put = vi.fn(async () => undefined);
     const get = vi.fn(async () => null);
@@ -340,13 +397,13 @@ describe('getModelCapabilities', () => {
     env.AUTO_ROUTING_CONFIG = { get, put } as unknown as KVNamespace;
 
     // (a) Routing table is unavailable: queryAllIds returns null, so the origin
-    // value for kvReadThrough is null and the model_capabilities_v1 key is NOT
+    // value for kvReadThrough is null and the model_capabilities_v2 key is NOT
     // written. A later in-memory-miss must still re-check KV and re-fetch origin.
     mockGetRoutingTable.mockResolvedValue(null);
     const first = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
     expect(first.size).toBe(0);
     const capabilityPutsBefore = put.mock.calls.filter(
-      (call: unknown[]) => call[0] === 'model_capabilities_v1'
+      (call: unknown[]) => call[0] === 'model_capabilities_v2'
     );
     expect(capabilityPutsBefore).toEqual([]);
 
@@ -355,7 +412,7 @@ describe('getModelCapabilities', () => {
     expect(second.size).toBe(0);
     expect(get).toHaveBeenCalledTimes(2);
     const capabilityPutsAfter = put.mock.calls.filter(
-      (call: unknown[]) => call[0] === 'model_capabilities_v1'
+      (call: unknown[]) => call[0] === 'model_capabilities_v2'
     );
     expect(capabilityPutsAfter).toEqual([]);
 
@@ -372,7 +429,7 @@ describe('getModelCapabilities', () => {
     const third = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
     expect(third.size).toBe(0);
     const capabilityPutsEmpty = (put.mock.calls as unknown[][]).filter(
-      call => call[0] === 'model_capabilities_v1'
+      call => call[0] === 'model_capabilities_v2'
     );
     expect(capabilityPutsEmpty).toHaveLength(1);
     expect(JSON.parse(capabilityPutsEmpty[0][1] as unknown as string)).toEqual({});
@@ -398,5 +455,59 @@ describe('getModelCapabilities', () => {
     dbWhere.mockReset();
     const result = await getModelCapabilities(env);
     expect(result.size).toBe(0);
+  });
+
+  it('selects isActive from model_stats and normalizes absent KV isActive to null', async () => {
+    dbWhere.mockImplementation(() =>
+      Promise.resolve([
+        {
+          openrouterId: 'a/chat',
+          inputModalities: ['text'],
+          contextLength: 8192,
+          isActive: true,
+        },
+        {
+          openrouterId: 'b/chat',
+          inputModalities: ['text'],
+          contextLength: 4096,
+          isActive: false,
+        },
+      ])
+    );
+    const env = makeEnv(null);
+    const result = await getModelCapabilities(env);
+    expect(result.get('a/chat')?.isActive).toBe(true);
+    expect(result.get('b/chat')?.isActive).toBe(false);
+
+    clearModelCapabilitiesCache();
+    const envFromKv = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192 },
+        'b/chat': { inputModalities: ['text'], contextLength: 4096, isActive: null },
+      })
+    );
+    const fromKv = await getModelCapabilities(envFromKv);
+    expect(fromKv.get('a/chat')?.isActive).toBeNull();
+    expect(fromKv.get('b/chat')?.isActive).toBeNull();
+  });
+
+  it('unions additionalModelIds into the queried id set', async () => {
+    dbWhere.mockImplementation(() =>
+      Promise.resolve([
+        { openrouterId: 'a/chat', inputModalities: ['text'], contextLength: 8192, isActive: true },
+        {
+          openrouterId: 'pool/extra',
+          inputModalities: ['text'],
+          contextLength: 4096,
+          isActive: true,
+        },
+      ])
+    );
+    const env = makeEnv(null);
+    const result = await getModelCapabilities(env, {
+      additionalModelIds: ['pool/extra', 'a/chat'],
+    });
+    expect(result.get('pool/extra')?.contextLength).toBe(4096);
+    expect(result.get('a/chat')?.isActive).toBe(true);
   });
 });

@@ -171,27 +171,6 @@ describe('container usage PostgreSQL application', () => {
       stopped_at: stale.last_seen_at,
       confirmed_seconds: 0,
     });
-    const lateHeartbeat = {
-      service: staleContext.service,
-      instanceId: staleContext.instanceId,
-      startEpochMs: 456,
-      idempotencyKey: heartbeatIdempotencyKey(
-        staleContext.service,
-        staleContext.instanceId,
-        456,
-        1
-      ),
-      seq: 1,
-      usageSinceLast: 5,
-      context: staleContext,
-    };
-    await applyHeartbeatWithDb(
-      client.db,
-      lateHeartbeat,
-      staleId,
-      staleFingerprint,
-      20 * 60_000 + 5_000
-    );
     await applyStopWithDb(
       client.db,
       {
@@ -199,8 +178,8 @@ describe('container usage PostgreSQL application', () => {
         instanceId: staleContext.instanceId,
         startEpochMs: 456,
         idempotencyKey: stopIdempotencyKey(staleContext.service, staleContext.instanceId, 456),
-        seq: 2,
-        usageSinceLast: 0,
+        seq: 1,
+        usageSinceLast: 5,
         reason: 'runtime_signal',
         context: staleContext,
       },
@@ -215,11 +194,254 @@ describe('container usage PostgreSQL application', () => {
     expect(corrected).toMatchObject({
       status: 'closed',
       close_reason: 'runtime_signal',
-      confirmed_seconds: 5,
+      stopped_at: stale.stopped_at,
+      last_seen_at: stale.last_seen_at,
+      confirmed_seconds: stale.confirmed_seconds,
     });
+    const lateStopSegments = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, staleId));
+    expect(lateStopSegments).toHaveLength(1);
+    expect(lateStopSegments[0]).toMatchObject({ reported_seconds: 5, usage_seconds: 0 });
     await client.db
       .delete(container_usage_interval)
       .where(eq(container_usage_interval.id, staleId));
+  });
+
+  it('recovers a missing interval from a heartbeat without reapplying SKU admission', async () => {
+    const recoveryContext = { ...context, instanceId: `heartbeat-recovery-${suffix}` };
+    const recoveryFingerprint = await usageContextFingerprint(recoveryContext);
+    const recoveryId = `cloud-agent-next:${recoveryContext.instanceId}:789`;
+    await client.db
+      .update(cloud_billing_sku)
+      .set({ accepts_new_usage: false })
+      .where(eq(cloud_billing_sku.id, skuId));
+
+    const heartbeat = {
+      service: recoveryContext.service,
+      instanceId: recoveryContext.instanceId,
+      startEpochMs: 789,
+      idempotencyKey: heartbeatIdempotencyKey(
+        recoveryContext.service,
+        recoveryContext.instanceId,
+        789,
+        1
+      ),
+      seq: 1,
+      usageSinceLast: 300,
+      context: recoveryContext,
+    };
+    await expect(
+      applyHeartbeatWithDb(client.db, heartbeat, recoveryId, recoveryFingerprint, 10_000)
+    ).resolves.toEqual({ kind: 'applied', dedup: false });
+    await expect(
+      applyHeartbeatWithDb(client.db, heartbeat, recoveryId, recoveryFingerprint, 11_000)
+    ).resolves.toEqual({ kind: 'applied', dedup: true });
+
+    const [recovered] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, recoveryId));
+    expect(recovered).toMatchObject({
+      status: 'open',
+      confirmed_seconds: 0,
+    });
+    expect(new Date(recovered.started_at).getTime()).toBe(10_000);
+    expect(new Date(recovered.last_seen_at).getTime()).toBe(10_000);
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        { ...heartbeat, context: { ...recoveryContext, sku: `${skuId}-other` } },
+        recoveryId,
+        await usageContextFingerprint({ ...recoveryContext, sku: `${skuId}-other` }),
+        12_000
+      )
+    ).rejects.toBeInstanceOf(UsageMutationConflictError);
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, recoveryId));
+  });
+
+  it('rejects missing-interval recovery for an unknown or non-second SKU', async () => {
+    const recoveryContext = { ...context, instanceId: `invalid-sku-recovery-${suffix}` };
+    const unknownSkuContext = { ...recoveryContext, sku: `${skuId}-unknown` };
+    const unknownId = `cloud-agent-next:${recoveryContext.instanceId}:791`;
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        {
+          service: recoveryContext.service,
+          instanceId: recoveryContext.instanceId,
+          startEpochMs: 791,
+          idempotencyKey: heartbeatIdempotencyKey(
+            recoveryContext.service,
+            recoveryContext.instanceId,
+            791,
+            1
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          context: unknownSkuContext,
+        },
+        unknownId,
+        await usageContextFingerprint(unknownSkuContext),
+        13_000
+      )
+    ).rejects.toThrow('Billing SKU not found during interval recovery');
+
+    const nonSecondSkuId = `meter-test-request-${suffix}`;
+    await client.db.insert(cloud_billing_sku).values({
+      id: nonSecondSkuId,
+      name: 'Non-container meter integration test',
+      unit: 'request',
+      rate_cents_per_unit: '0.000001',
+    });
+    const nonSecondContext = { ...recoveryContext, sku: nonSecondSkuId };
+    const nonSecondId = `cloud-agent-next:${recoveryContext.instanceId}:792`;
+    await expect(
+      applyStopWithDb(
+        client.db,
+        {
+          service: recoveryContext.service,
+          instanceId: recoveryContext.instanceId,
+          startEpochMs: 792,
+          idempotencyKey: stopIdempotencyKey(
+            recoveryContext.service,
+            recoveryContext.instanceId,
+            792
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          reason: 'exit',
+          context: nonSecondContext,
+        },
+        nonSecondId,
+        await usageContextFingerprint(nonSecondContext),
+        14_000
+      )
+    ).rejects.toThrow('Billing SKU is not measured in seconds');
+
+    const invalidIntervals = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.instance_id, recoveryContext.instanceId));
+    expect(invalidIntervals).toHaveLength(0);
+    await client.db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, nonSecondSkuId));
+  });
+
+  it('recovers a missing interval from a stop at a zero-duration boundary', async () => {
+    const recoveryContext = { ...context, instanceId: `stop-recovery-${suffix}` };
+    const recoveryFingerprint = await usageContextFingerprint(recoveryContext);
+    const recoveryId = `cloud-agent-next:${recoveryContext.instanceId}:790`;
+    const stop = {
+      service: recoveryContext.service,
+      instanceId: recoveryContext.instanceId,
+      startEpochMs: 790,
+      idempotencyKey: stopIdempotencyKey(recoveryContext.service, recoveryContext.instanceId, 790),
+      seq: 1,
+      usageSinceLast: 300,
+      reason: 'exit' as const,
+      exitCode: 0,
+      context: recoveryContext,
+    };
+    await expect(
+      applyStopWithDb(client.db, stop, recoveryId, recoveryFingerprint, 20_000)
+    ).resolves.toEqual({ kind: 'applied', dedup: false });
+    await expect(
+      applyStopWithDb(client.db, stop, recoveryId, recoveryFingerprint, 21_000)
+    ).resolves.toEqual({ kind: 'applied', dedup: true });
+
+    const [recovered] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, recoveryId));
+    expect(recovered).toMatchObject({
+      status: 'closed',
+      confirmed_seconds: 0,
+      close_reason: 'exit',
+    });
+    expect(new Date(recovered.started_at).getTime()).toBe(20_000);
+    expect(new Date(recovered.last_seen_at).getTime()).toBe(20_000);
+    expect(new Date(recovered.stopped_at ?? 0).getTime()).toBe(20_000);
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, recoveryId));
+  });
+
+  it('rejects missing-interval recovery when a newer generation owns the open slot', async () => {
+    await client.db
+      .update(cloud_billing_sku)
+      .set({ accepts_new_usage: true })
+      .where(eq(cloud_billing_sku.id, skuId));
+    const recoveryContext = { ...context, instanceId: `recovery-generation-${suffix}` };
+    const recoveryFingerprint = await usageContextFingerprint(recoveryContext);
+    const newerId = `cloud-agent-next:${recoveryContext.instanceId}:900`;
+    await applyStartWithDb(
+      client.db,
+      {
+        ...recoveryContext,
+        startEpochMs: 900,
+        idempotencyKey: startIdempotencyKey(
+          recoveryContext.service,
+          recoveryContext.instanceId,
+          900
+        ),
+      },
+      newerId,
+      recoveryFingerprint,
+      30_000
+    );
+
+    const olderId = `cloud-agent-next:${recoveryContext.instanceId}:800`;
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        {
+          service: recoveryContext.service,
+          instanceId: recoveryContext.instanceId,
+          startEpochMs: 800,
+          idempotencyKey: heartbeatIdempotencyKey(
+            recoveryContext.service,
+            recoveryContext.instanceId,
+            800,
+            1
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          context: recoveryContext,
+        },
+        olderId,
+        recoveryFingerprint,
+        31_000
+      )
+    ).rejects.toThrow('Another usage interval is already open');
+
+    await expect(
+      applyStopWithDb(
+        client.db,
+        {
+          service: recoveryContext.service,
+          instanceId: recoveryContext.instanceId,
+          startEpochMs: 800,
+          idempotencyKey: stopIdempotencyKey(
+            recoveryContext.service,
+            recoveryContext.instanceId,
+            800
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          reason: 'exit',
+          context: recoveryContext,
+        },
+        olderId,
+        recoveryFingerprint,
+        32_000
+      )
+    ).rejects.toBeInstanceOf(UsageMutationConflictError);
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, newerId));
   });
 
   it('does not let an older start supersede a newer generation', async () => {

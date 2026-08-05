@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@cloudflare/containers": "0.1.1",
+    "@kilocode/container-usage": "workspace:*",
     "@hono/trpc-server": "0.4.2",
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",

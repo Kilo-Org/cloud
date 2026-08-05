@@ -1,4 +1,4 @@
-/* eslint-disable import/no-nodejs-modules */
+/* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test, max-lines */
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
@@ -9,7 +9,7 @@ import {
   seedExtensionAuth,
   startFixtureServer,
 } from './extension-context-fixture';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import { findCapturedEvent, findCapturedEvents } from './posthog-fixture';
 import type { NormalizedPosthogEvent } from './posthog-fixture';
 
@@ -22,6 +22,93 @@ const PRODUCT_EVENTS = [
   'message_sent',
   'conversation_created',
 ] as const;
+
+/** Brand accent track (#f7f586) and knob (#1f1f1f); off track is surface-overlay (#333333). */
+const BRAND_PRIMARY_RGB = { blue: 134, green: 245, red: 247 } as const;
+const BRAND_PRIMARY_FOREGROUND_RGB = { blue: 31, green: 31, red: 31 } as const;
+const SURFACE_OVERLAY_RGB = { blue: 51, green: 51, red: 51 } as const;
+
+interface RgbaChannels {
+  readonly alpha: number;
+  readonly blue: number;
+  readonly green: number;
+  readonly red: number;
+}
+
+// Inline copy of design-tokens.test.ts helpers (A3.2b — do not extract a shared module).
+const parseRgba = (value: string): RgbaChannels => {
+  const commaMatch = value.match(
+    /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/u
+  );
+
+  if (commaMatch !== null) {
+    const [, redRaw, greenRaw, blueRaw, alphaRaw] = commaMatch;
+
+    return {
+      alpha: alphaRaw === undefined ? 1 : Number.parseFloat(alphaRaw),
+      blue: Number.parseFloat(blueRaw ?? '0'),
+      green: Number.parseFloat(greenRaw ?? '0'),
+      red: Number.parseFloat(redRaw ?? '0'),
+    };
+  }
+
+  // Modern browsers may serialize as `rgb(r g b / a)`.
+  const slashMatch = value.match(
+    /^rgba?\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)$/u
+  );
+
+  if (slashMatch === null) {
+    throw new Error(`Could not parse color: ${value}`);
+  }
+
+  const [, redRaw, greenRaw, blueRaw, alphaRaw] = slashMatch;
+  let alpha = 1;
+
+  if (alphaRaw !== undefined) {
+    alpha = alphaRaw.endsWith('%')
+      ? Number.parseFloat(alphaRaw) / 100
+      : Number.parseFloat(alphaRaw);
+  }
+
+  return {
+    alpha,
+    blue: Number.parseFloat(blueRaw ?? '0'),
+    green: Number.parseFloat(greenRaw ?? '0'),
+    red: Number.parseFloat(redRaw ?? '0'),
+  };
+};
+
+const expectRgb = (
+  value: string,
+  expected: { blue: number; green: number; red: number },
+  label: string
+): void => {
+  const parsed = parseRgba(value);
+  expect(parsed.red, `${label} red from ${value}`).toBe(expected.red);
+  expect(parsed.green, `${label} green from ${value}`).toBe(expected.green);
+  expect(parsed.blue, `${label} blue from ${value}`).toBe(expected.blue);
+};
+
+/** Poll until track/knob colour settles past disabled/transition frames (exact channels). */
+const expectRgbEventually = async (
+  readColor: () => Promise<string>,
+  expected: { blue: number; green: number; red: number },
+  label: string
+): Promise<string> => {
+  await expect
+    .poll(
+      async () => {
+        const value = await readColor();
+        const parsed = parseRgba(value);
+        return { alpha: parsed.alpha, blue: parsed.blue, green: parsed.green, red: parsed.red };
+      },
+      { timeout: 5000 }
+    )
+    .toEqual({ alpha: 1, blue: expected.blue, green: expected.green, red: expected.red });
+  const settled = await readColor();
+  expectRgb(settled, expected, label);
+  return settled;
+};
 
 const openSignedInSidePanel = async (
   context: BrowserContext,
@@ -81,6 +168,18 @@ const productEventsIn = (events: readonly NormalizedPosthogEvent[]): NormalizedP
 
 const analyticsSwitch = (sidePanel: Page) =>
   sidePanel.getByRole('switch', { name: 'Share usage analytics' });
+
+const readSwitchTrackBackground = (sidePanel: Page): Promise<string> =>
+  analyticsSwitch(sidePanel).evaluate(element => getComputedStyle(element).backgroundColor);
+
+const readSwitchKnobBackground = (sidePanel: Page): Promise<string> =>
+  analyticsSwitch(sidePanel).evaluate(element => {
+    const knob = element.querySelector('[aria-hidden="true"]');
+    if (!(knob instanceof HTMLElement)) {
+      throw new Error('Analytics switch knob was not found.');
+    }
+    return getComputedStyle(knob).backgroundColor;
+  });
 
 test('analytics identify and sign-in event fire on signed-in session start', async () => {
   const { context, extensionId, posthogFlagsOrDecideHits, posthogRequests, userDataDir } =
@@ -153,6 +252,19 @@ test('analytics opt-out toggle persists across side panel reloads', async () => 
     await sidePanel.getByLabel('Settings').click();
     await expect(analyticsSwitch(sidePanel)).toHaveAttribute('aria-checked', 'true');
 
+    // On state: brand accent track + dark knob (A3.1 / A3.2 / A3.4).
+    // Poll past disabled/transition settle before reading exact channels.
+    const onTrack = await expectRgbEventually(
+      () => readSwitchTrackBackground(sidePanel),
+      BRAND_PRIMARY_RGB,
+      'analytics switch on track'
+    );
+    await expectRgbEventually(
+      () => readSwitchKnobBackground(sidePanel),
+      BRAND_PRIMARY_FOREGROUND_RGB,
+      'analytics switch on knob'
+    );
+
     await analyticsSwitch(sidePanel).click();
     const optOutBaseline = posthogRequests.length;
 
@@ -160,6 +272,35 @@ test('analytics opt-out toggle persists across side panel reloads', async () => 
       .poll(() => readExtensionSyncStorage(sidePanel, ANALYTICS_OPT_OUT_KEY), { timeout: 5000 })
       .toBe(true);
     expect(productEventsIn(posthogRequests.slice(optOutBaseline))).toHaveLength(0);
+
+    await expect(analyticsSwitch(sidePanel)).toHaveAttribute('aria-checked', 'false');
+    const offTrack = await expectRgbEventually(
+      () => readSwitchTrackBackground(sidePanel),
+      SURFACE_OVERLAY_RGB,
+      'analytics switch off track'
+    );
+    // Off knob stays muted; only assert it differs from the on-track accent.
+    await expect
+      .poll(
+        async () => {
+          const offKnobRgb = parseRgba(await readSwitchKnobBackground(sidePanel));
+          return (
+            offKnobRgb.red === BRAND_PRIMARY_RGB.red &&
+            offKnobRgb.green === BRAND_PRIMARY_RGB.green &&
+            offKnobRgb.blue === BRAND_PRIMARY_RGB.blue
+          );
+        },
+        { timeout: 5000 }
+      )
+      .toBe(false);
+    // Track colours must differ measurably between on and off (A3.2).
+    const onTrackRgb = parseRgba(onTrack);
+    const offTrackRgb = parseRgba(offTrack);
+    expect(
+      onTrackRgb.red !== offTrackRgb.red ||
+        onTrackRgb.green !== offTrackRgb.green ||
+        onTrackRgb.blue !== offTrackRgb.blue
+    ).toBe(true);
 
     const afterReloadBaseline = posthogRequests.length;
     await sidePanel.reload();
@@ -170,6 +311,11 @@ test('analytics opt-out toggle persists across side panel reloads', async () => 
       .poll(() => readExtensionSyncStorage(sidePanel, ANALYTICS_OPT_OUT_KEY), { timeout: 5000 })
       .toBe(true);
     expect(productEventsIn(posthogRequests.slice(afterReloadBaseline))).toHaveLength(0);
+    await expectRgbEventually(
+      () => readSwitchTrackBackground(sidePanel),
+      SURFACE_OVERLAY_RGB,
+      'analytics switch off track after reload'
+    );
 
     await sidePanel.getByRole('button', { name: 'Sign out' }).click();
     await expect(sidePanel.getByRole('button', { name: 'Sign in' })).toBeVisible();
@@ -194,6 +340,17 @@ test('analytics opt-out toggle persists across side panel reloads', async () => 
     const toggleOnBaseline = posthogRequests.length;
     await analyticsSwitch(sidePanel).click();
     await waitForIdentify(posthogRequests, { baseline: toggleOnBaseline, email: SEEDED_EMAIL });
+    await expect(analyticsSwitch(sidePanel)).toHaveAttribute('aria-checked', 'true');
+    await expectRgbEventually(
+      () => readSwitchTrackBackground(sidePanel),
+      BRAND_PRIMARY_RGB,
+      'analytics switch on track after re-enable'
+    );
+    await expectRgbEventually(
+      () => readSwitchKnobBackground(sidePanel),
+      BRAND_PRIMARY_FOREGROUND_RGB,
+      'analytics switch on knob after re-enable'
+    );
   } finally {
     await context.close();
     await rm(userDataDir, { force: true, recursive: true });
@@ -207,13 +364,7 @@ test('analytics captures message sent and user-created conversation events', asy
   try {
     await mockKiloApi(context, {
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Analytics reply.' } }] }],
-      toolNames: [
-        'get_page_snapshot',
-        'get_element_details',
-        'find_in_page',
-        'search_memories',
-        'get_memory',
-      ],
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();

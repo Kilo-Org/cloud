@@ -1,10 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import {
+  createContext,
+  createElement,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { type Href, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
+  buildCreateRemoteSessionInput,
+  type CreateRemoteSessionInput,
   type CreateSessionOutcome,
   type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
@@ -14,6 +26,9 @@ import {
   REMOTE_SPAWN_RETRYABLE_TOAST,
   resolveRemoteSubmitOutcome,
 } from '@/lib/remote-submit-outcome';
+import { resolveRemoteSpawnAdmission } from '@/lib/remote-spawn-admission';
+import { putSharePayload, type SharePayload } from '@/lib/share-payload';
+import { appendShareParams } from '@/lib/share-navigation';
 
 /**
  * Refetch signature matching the slice of
@@ -26,8 +41,38 @@ type InstancesRefetch = () => Promise<{
   data: { instances: InstancePickerInstance[] } | undefined;
 }>;
 
+type RemoteSpawnInheritance = {
+  mode?: string;
+  model?: string;
+  variant?: string;
+};
+
+const RemoteSpawnInheritanceContext = createContext<RemoteSpawnInheritance>({});
+
+/**
+ * Supplies the new-session screen's current mode/model/variant to
+ * `useRemoteSpawnDispatch` without requiring the sibling-owned
+ * `use-new-session-share-remote` wrapper to forward those fields.
+ */
+export function RemoteSpawnInheritanceProvider({
+  mode,
+  model,
+  variant,
+  children,
+}: RemoteSpawnInheritance & { children: ReactNode }) {
+  const value = useMemo(() => ({ mode, model, variant }), [mode, model, variant]);
+  return createElement(RemoteSpawnInheritanceContext.Provider, { value }, children);
+}
+
 type UseRemoteSpawnDispatchArgs = {
   organizationId: string | undefined;
+  /**
+   * Optional override for inheritance fields. When omitted, values come from
+   * the nearest `RemoteSpawnInheritanceProvider` (the new-session screen).
+   */
+  mode?: string;
+  model?: string;
+  variant?: string;
   runOnInstance: InstancePickerInstance | null;
   setRunOnInstance: (next: InstancePickerInstance | null) => void;
   /**
@@ -42,6 +87,12 @@ type UseRemoteSpawnDispatchArgs = {
    * membership fallback if the refetch fails.
    */
   instanceList: InstancePickerInstance[];
+  /**
+   * Snapshot of the composer, read once at press time. When it returns a
+   * payload the ready path stages it, and the destination composer submits it
+   * once. Optional: a caller with no composer omits it.
+   */
+  getSubmitPayload?: () => SharePayload | null;
 };
 
 type UseRemoteSpawnDispatchResult = {
@@ -91,16 +142,28 @@ type UseRemoteSpawnDispatchResult = {
  */
 export function useRemoteSpawnDispatch({
   organizationId,
+  mode: modeArg,
+  model: modelArg,
+  variant: variantArg,
   runOnInstance,
   setRunOnInstance,
   refetchInstances,
   instanceList,
+  getSubmitPayload,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
+  const inheritance = useContext(RemoteSpawnInheritanceContext);
+  const mode = modeArg ?? inheritance.mode;
+  const model = modelArg ?? inheritance.model;
+  const variant = variantArg ?? inheritance.variant;
+  // Route param is frozen at navigation: missing param means personal, not
+  // "inherit live context". `?? null` so undefined does not fall through to
+  // `useOrganization()` after a later org switch (share-gate keeps zero-arg
+  // inherit by calling `useRemoteInstanceSpawn()` with no arg).
   const remoteSpawn: {
     status: RemoteInstanceSpawnStatus;
-    spawn: (connectionId: string) => Promise<CreateSessionOutcome>;
-  } = useRemoteInstanceSpawn();
+    spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
+  } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
 
   // kilocode_change - `onStart`'s async tail (spawn + refetch + classify)
@@ -117,15 +180,47 @@ export function useRemoteSpawnDispatch({
     runOnInstanceRef.current = runOnInstance;
   }, [runOnInstance]);
 
+  const getSubmitPayloadRef = useRef(getSubmitPayload);
+  const spawnFieldsRef = useRef({ mode, model, variant, organizationId });
+  useEffect(() => {
+    getSubmitPayloadRef.current = getSubmitPayload;
+    spawnFieldsRef.current = { mode, model, variant, organizationId };
+  }, [getSubmitPayload, mode, model, variant, organizationId]);
+
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
       return;
     }
     const selectedConnectionId = runOnInstance.connectionId;
+    const fields = spawnFieldsRef.current;
+    // Press-time snapshot. Read once, here, before any await.
+    const submitPayload = getSubmitPayloadRef.current?.() ?? null;
+    const admission = resolveRemoteSpawnAdmission({
+      instance: runOnInstance,
+      payload: submitPayload,
+    });
+    if (!admission.allowed) {
+      toast.error(admission.toast);
+      return;
+    }
+    const createInput = buildCreateRemoteSessionInput({
+      mode: fields.mode,
+      model: fields.model,
+      variant: fields.variant,
+      organizationId: fields.organizationId,
+    });
     void (async () => {
-      const outcome = await remoteSpawn.spawn(selectedConnectionId);
+      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput);
       if (outcome.status === 'ready') {
-        router.replace(getSpawnedAgentSessionPath(outcome.sessionID, organizationId));
+        const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
+        if (submitPayload === null) {
+          router.replace(spawnedPath);
+          return;
+        }
+        const shareId = putSharePayload(submitPayload);
+        router.replace(
+          appendShareParams(spawnedPath as string, shareId, { autoSend: true }) as Href
+        );
         return;
       }
       if (outcome.status === 'nonRetryable') {

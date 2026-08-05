@@ -18,21 +18,20 @@ import {
   HunkSideBySideHeader,
   SideBySideRow,
 } from '@/components/pr-review/diff/pr-diff-side-by-side-row';
+import { collapseOnMarkViewed } from '@/lib/pr-review/diff/collapse-on-mark-viewed';
 import { type ExpandSeparatorItem, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { sideForDiffLineType } from '@/lib/pr-review/diff-selection';
-import {
-  type FetchToCompletionResult,
-  type UsePrReviewFileListQueryResult,
-} from '@/lib/pr-review/diff/pr-review-file-list-state';
 
 type UseDiffRenderItemArgs = {
   viewed: {
     isViewed: (path: string) => boolean;
     toggle: (path: string) => Promise<void>;
   };
-  query: UsePrReviewFileListQueryResult['query'];
-  fetchToCompletion: FetchToCompletionResult;
+  /** Retries the failed next page (pagination row). */
+  onRetryPage: () => void;
+  /** Drives the query to completion ("Load all"). */
+  onFetchAll: () => void;
   handleLoadContext: (item: ExpandSeparatorItem, windowSize: number) => void;
   setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   /** Producer-side tap handler. Receives the parsed data needed to run
@@ -64,8 +63,8 @@ export type LineTapArgs = {
 
 export function useDiffRenderItem({
   viewed,
-  query,
-  fetchToCompletion,
+  onRetryPage,
+  onFetchAll,
   handleLoadContext,
   setExpanded,
   onLineTap,
@@ -89,6 +88,7 @@ export function useDiffRenderItem({
               }}
               onToggleViewed={() => {
                 void viewed.toggle(item.file.path);
+                setExpanded(prev => collapseOnMarkViewed(prev, item.file.path, item.viewed));
               }}
             />
           );
@@ -101,6 +101,7 @@ export function useDiffRenderItem({
               githubUrl={item.githubUrl}
               onToggleViewed={() => {
                 void viewed.toggle(item.file.path);
+                setExpanded(prev => collapseOnMarkViewed(prev, item.file.path, item.viewed));
               }}
             />
           );
@@ -167,12 +168,8 @@ export function useDiffRenderItem({
               state={item.state}
               loadedFiles={item.loadedFiles}
               totalFiles={item.totalFiles}
-              onRetry={() => {
-                void query.fetchNextPage();
-              }}
-              onFetchAll={() => {
-                void fetchToCompletion.run();
-              }}
+              onRetry={onRetryPage}
+              onFetchAll={onFetchAll}
             />
           );
         }
@@ -181,6 +178,6 @@ export function useDiffRenderItem({
         }
       }
     },
-    [viewed, query, fetchToCompletion, handleLoadContext, setExpanded, onLineTap, selection]
+    [viewed, onRetryPage, onFetchAll, handleLoadContext, setExpanded, onLineTap, selection]
   );
 }

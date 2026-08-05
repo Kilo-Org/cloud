@@ -15,11 +15,11 @@ import {
   planLiveSystemEventActions,
 } from './active-sessions-live';
 
-import { type UserWebConnection, type UserWebSystemEvent } from 'cloud-agent-sdk';
+import { type UserWebConnection, type UserWebSystemEvent } from '@kilocode/cloud-agent-sdk';
 
 const ENRICHMENT_RETRY_MIN_INTERVAL_MS = 10_000;
 
-type RefreshReason = 'enrichment' | 'cli-connected' | 'cli-disconnected' | 'reconnect';
+type RefreshReason = 'enrichment' | 'cli-connected' | 'cli-disconnected' | 'reconnect' | 'manual';
 
 type SystemEvent = UserWebSystemEvent;
 
@@ -92,6 +92,8 @@ export class ActiveSessionsLiveSync {
     this.attachmentEpoch += 1;
     this.lastConnectedState = this.connection.isConnected();
     this.releaseRetain = this.connection.retain();
+    // eslint-disable-next-line typescript-eslint/no-this-alias, unicorn/no-this-assignment
+    attachedSync = this;
     this.systemListenerUnsubscribe = this.connection.onSystemEvent(event => {
       this.handleSystemEvent(event);
     });
@@ -112,6 +114,9 @@ export class ActiveSessionsLiveSync {
     this.systemListenerUnsubscribe = null;
     this.connectionListenerUnsubscribe = null;
     this.releaseRetain = null;
+    if (attachedSync === this) {
+      attachedSync = null;
+    }
     void this.queryClient.cancelQueries({ queryKey: this.queryKey });
   }
 
@@ -121,6 +126,36 @@ export class ActiveSessionsLiveSync {
     }
     this.pendingReasons.add(reason);
     this.kickFetch();
+  }
+
+  /**
+   * Manual (pull-to-refresh) resync. Runs through the same serialized fetch
+   * queue as WS-driven refreshes, so it can neither be cancelled by nor race
+   * with this owner's own writes, and it retries a refresh that an earlier
+   * failure left pending. Resolves when the forced fetch settles — it never
+   * rejects (`processFetchQueue` swallows fetch failures), so a caller's
+   * pull-to-refresh spinner always stops. Returns false when detached, so the
+   * caller can fall back to a plain query refetch.
+   */
+  async refreshNow(): Promise<boolean> {
+    if (this.releaseRetain === null) {
+      return false;
+    }
+    this.scheduleRefresh('manual');
+    // A write landing mid-fetch cancels that fetch and re-kicks the queue, so
+    // awaiting a single hop can return while the replacement fetch is still in
+    // flight. Follow the chain until the manual refresh is done (a successful
+    // fetch clears the reason) or nothing new was scheduled.
+    /* eslint-disable no-await-in-loop */
+    while (this.pendingReasons.has('manual')) {
+      const queue = this.fetchQueue;
+      await queue;
+      if (this.fetchQueue === queue) {
+        break;
+      }
+    }
+    /* eslint-enable no-await-in-loop */
+    return true;
   }
 
   async getWriteQueue(): Promise<void> {
@@ -317,4 +352,19 @@ export class ActiveSessionsLiveSync {
   private readInFlightFetchCanceled(): boolean {
     return this.inFlightFetchCanceled;
   }
+}
+
+/**
+ * The currently attached owner. One `<ActiveSessionsLiveSyncMount />` in
+ * `app/(app)/_layout.tsx` owns the live tray app-wide, so a module-scoped
+ * reference is the whole registry this needs.
+ */
+let attachedSync: ActiveSessionsLiveSync | null = null;
+
+/**
+ * Pull-to-refresh entry point for the live tray. Returns false when no owner
+ * is attached, so the caller falls back to a plain query refetch.
+ */
+export async function refreshActiveSessionsNow(): Promise<boolean> {
+  return (await attachedSync?.refreshNow()) ?? false;
 }

@@ -5,6 +5,7 @@ import {
   type Message,
 } from '@kilocode/kilo-chat';
 import { type useAttachmentQueue } from '@kilocode/kilo-chat-hooks';
+import { type ClipboardImageFile } from '@/lib/agent-attachments/clipboard-image';
 
 import { type MessageInputSubmitControls } from './message-input-state';
 
@@ -27,7 +28,7 @@ export type AttachmentEnabledProps = {
   onSend: MessageInputContentBlocksOnSend;
 };
 
-export type AttachmentUnavailableProps = {
+type AttachmentUnavailableProps = {
   client?: never;
   conversationId?: never;
   hasAttachmentsCapability?: false;
@@ -60,4 +61,5 @@ export type ComposerAttachmentQueue = ReturnType<typeof useAttachmentQueue> & {
   openPicker: () => void;
   removeFile: (tempId: string) => void;
   clearSubmittedFiles: (tempIds: string[]) => void;
+  addClipboardImage: (file: ClipboardImageFile) => Promise<void>;
 };

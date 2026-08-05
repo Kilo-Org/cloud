@@ -168,7 +168,7 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
     case 'language-not-supported': {
       return {
         action: 'none',
-        availability: 'unavailable',
+        availability: 'available',
         message: "Voice input isn't available for this device language.",
         retryable: false,
       };

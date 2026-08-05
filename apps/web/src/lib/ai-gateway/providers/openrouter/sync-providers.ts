@@ -41,6 +41,11 @@ import {
   openRouterToVercelInferenceProviderId,
   VercelInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  applyFreeEndpointDataPolicy,
+  getOpenRouterFreeEndpoints,
+} from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -93,8 +98,17 @@ async function fetchGatewayModels(gateway: Provider) {
           );
         }
         const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
+        const { reasoning, ...modelMetadata } = model;
         result[model.id] = {
-          ...model,
+          ...modelMetadata,
+          ...(reasoning && {
+            reasoning: {
+              mandatory: reasoning.mandatory,
+              ...(reasoning.supported_efforts && {
+                supported_efforts: reasoning.supported_efforts,
+              }),
+            },
+          }),
           endpoints: endpoints.data.endpoints,
         };
       })
@@ -265,6 +279,7 @@ async function syncProviders(
       })
     )
   );
+  const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(providerModelData);
 
   injectExtraProviderModels(vercelModels, providerModelData);
 
@@ -295,6 +310,10 @@ async function syncProviders(
               prompt: model.pricing.prompt,
               completion: model.pricing.completion,
             },
+            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
+              !isUnavailableModel(kfm.public_id) && {
+                data_policy: { training: true, retainsPrompts: true },
+              }),
           },
         },
         provider: inferenceProvider,
@@ -312,6 +331,12 @@ async function syncProviders(
       providerData.models.splice(0, 0, extraModel.model);
     }
   }
+
+  applyFreeEndpointDataPolicy({
+    providerModelData,
+    openRouterFreeEndpoints,
+    kiloExclusiveModels,
+  });
 
   // Filter out providers with no models
   const filteredProviderModelData = providerModelData.filter(data => data.models.length > 0);
@@ -391,8 +416,6 @@ async function syncProviders(
   return result;
 }
 
-const MODEL_METADATA_REDIS_TTL_SECONDS = 7 * 24 * 60 * 60;
-
 async function mirrorToRedis(values: {
   providers: NormalizedOpenRouterResponse;
   openrouter: Record<string, StoredModel>;
@@ -401,8 +424,6 @@ async function mirrorToRedis(values: {
 }): Promise<void> {
   const entries: [RedisKey, unknown][] = [
     [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
-    [GATEWAY_METADATA_REDIS_KEYS.openrouterModels, values.openrouter],
-    [GATEWAY_METADATA_REDIS_KEYS.vercelModels, values.vercel],
     [GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds, getLanguageModelIds(values.openrouter)],
     [GATEWAY_METADATA_REDIS_KEYS.vercelModelIds, getLanguageModelIds(values.vercel)],
   ];
@@ -412,12 +433,6 @@ async function mirrorToRedis(values: {
   await Promise.all([
     ...entries.map(([key, value]) => {
       const serializedValue = JSON.stringify(value);
-      if (
-        key === GATEWAY_METADATA_REDIS_KEYS.openrouterModels ||
-        key === GATEWAY_METADATA_REDIS_KEYS.vercelModels
-      ) {
-        return redisClient.set(key, serializedValue, { ex: MODEL_METADATA_REDIS_TTL_SECONDS });
-      }
       return redisClient.set(key, serializedValue);
     }),
     mirrorVercelInferenceProvidersToRedis(values.vercel),

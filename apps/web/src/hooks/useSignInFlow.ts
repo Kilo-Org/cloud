@@ -8,6 +8,7 @@ import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import { useSignInHint, type SignInHint } from '@/hooks/useSignInHint';
 import { emailSchema, validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { sendMagicLink } from '@/lib/auth/send-magic-link';
+import { shouldDiscardSsoHintOnError } from '@/lib/auth/sign-in-hint-recovery';
 import type { SSOOrganizationsResponse } from '@/lib/schemas/sso-organizations';
 
 export type FlowState = 'landing' | 'provider-select' | 'magic-link-sent' | 'redirecting';
@@ -161,6 +162,34 @@ export function useSignInFlow({
   const [showEmailInput, setShowEmailInput] = useState(
     storybookInitialState?.showEmailInput ?? (ssoMode || initialError === 'DIFFERENT-OAUTH')
   );
+
+  // Recover from a stale SSO hint. A hint pointing at a WorkOS organization that
+  // no longer resolves renders an "Enterprise SSO" button that can only ever fail,
+  // and that screen has no alternative method, so retries loop forever. Dropping
+  // the hint falls back to the email prompt, which re-runs the server-side
+  // organization lookup. See shouldDiscardSsoHintOnError for the full reasoning.
+  //
+  // One-shot: only the hint the user arrived with is inspected, so a hint saved
+  // later in this session (just before signIn redirects) is never clobbered.
+  const hintRecoveryCheckedRef = useRef(false);
+  useEffect(() => {
+    if (storybookInitialState || !isHintLoaded || hintRecoveryCheckedRef.current) {
+      return;
+    }
+    hintRecoveryCheckedRef.current = true;
+
+    if (!shouldDiscardSsoHintOnError(hint, initialError)) {
+      return;
+    }
+
+    const rememberedEmail = hint?.lastEmail;
+    clearHint();
+    // Keep the address so recovery is a single click instead of a retype.
+    if (rememberedEmail) {
+      setEmailState(rememberedEmail);
+    }
+    setShowEmailInput(true);
+  }, [isHintLoaded, hint, initialError, clearHint, storybookInitialState]);
 
   // Store pending SSO orgId in ref instead of window object
   const pendingSSOOrgIdRef = useRef<string | null>(null);

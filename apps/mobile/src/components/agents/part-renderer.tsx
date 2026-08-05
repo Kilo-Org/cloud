@@ -1,4 +1,4 @@
-import { type Part, type StoredMessage } from 'cloud-agent-sdk';
+import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
@@ -64,6 +64,7 @@ export function PartRenderer({
     return (
       <MessageErrorBoundary>
         <ReasoningPartRenderer
+          partId={part.id}
           text={part.text}
           isStreaming={isStreaming && isPartStreaming(part)}
           defaultExpanded={defaultReasoningExpanded}

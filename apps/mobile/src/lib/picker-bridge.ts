@@ -60,6 +60,8 @@ export type InstancePickerInstance = {
   name: string;
   projectName: string;
   version?: string;
+  /** Optional capability map carried through from the tRPC row. */
+  capabilities?: { attachments?: boolean };
 };
 
 type InstancePickerBridge = {

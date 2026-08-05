@@ -174,6 +174,25 @@ describe('createVoiceInputController - events and serialization', () => {
         },
       ]);
     });
+
+    it('keeps availability available when a language-not-supported error is reported', async () => {
+      const { harness, controller } = build();
+      const fb = recordFeedback();
+      await controller.start(makeStartOptions({ onFeedback: fb.onFeedback }));
+      harness.emit('start', null);
+      expect(controller.getSnapshot().availability).toBe('available');
+
+      harness.emit('error', { error: 'language-not-supported', message: 'unsupported lang' });
+      expect(controller.getSnapshot().availability).toBe('available');
+      expect(fb.feedback).toEqual([
+        {
+          action: 'none',
+          availability: 'available',
+          message: "Voice input isn't available for this device language.",
+          retryable: false,
+        },
+      ]);
+    });
   });
 
   describe('start serialization', () => {

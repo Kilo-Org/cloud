@@ -306,7 +306,9 @@ describe('account-verification redirect logic', () => {
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
 
-      await renderPage({ callbackPath: '/openclaw-advisor-fake?code=ABCD-1234' });
+      await renderPage({
+        callbackPath: '/openclaw-advisor-fake?code=ABCD-1234',
+      });
 
       expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
     });
@@ -368,7 +370,9 @@ describe('account-verification redirect logic', () => {
 
       // 17 ASCII alphanumerics — within the charset but longer than the
       // device-auth generator ever produces. Rejected by the format guard.
-      await renderPage({ callbackPath: '/openclaw-advisor?code=ABCDEFGHIJKLMNOPQ' });
+      await renderPage({
+        callbackPath: '/openclaw-advisor?code=ABCDEFGHIJKLMNOPQ',
+      });
 
       expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
     });
@@ -393,7 +397,10 @@ describe('account-verification redirect logic', () => {
       // granted, sending the user back to /c/<slug> just shows them the
       // "for new accounts" message. Always strip the callback so they
       // land on /get-started like any other new signup.
-      const user = makeUser({ has_validation_stytch: null, customer_source: 'Reddit' });
+      const user = makeUser({
+        has_validation_stytch: null,
+        customer_source: 'Reddit',
+      });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
 
@@ -425,7 +432,10 @@ describe('account-verification redirect logic', () => {
       // fires on the callback so signup lands on /get-started instead of
       // the dead /c/<slug> URL.
       mockLookupCampaignBySlug.mockResolvedValue(null);
-      const user = makeUser({ has_validation_stytch: null, customer_source: 'Reddit' });
+      const user = makeUser({
+        has_validation_stytch: null,
+        customer_source: 'Reddit',
+      });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
 
@@ -442,7 +452,10 @@ describe('account-verification redirect logic', () => {
       // /c/Summit (uppercase) or /c/xx (short) would pass the callback
       // whitelist but skip the strip, and the user would be redirected
       // to the malformed URL post-signup.
-      const user = makeUser({ has_validation_stytch: null, customer_source: 'Reddit' });
+      const user = makeUser({
+        has_validation_stytch: null,
+        customer_source: 'Reddit',
+      });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
 
@@ -458,7 +471,10 @@ describe('account-verification redirect logic', () => {
       // second pass `has_validation_stytch` is no longer null. The strip
       // decision runs independently of `isFirstValidation` so the redirect
       // still routes to /get-started, not the (now-useless) /c/<slug>.
-      const user = makeUser({ has_validation_stytch: true, customer_source: 'Reddit' });
+      const user = makeUser({
+        has_validation_stytch: true,
+        customer_source: 'Reddit',
+      });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
 
@@ -554,6 +570,33 @@ describe('account-verification redirect logic', () => {
       expect(mockRedirect).toHaveBeenCalledTimes(1);
       // Invalid callbackPath dropped — go to /get-started
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // App-link-safe-redirect interstitial: claimed callback paths
+  // ---------------------------------------------------------------
+  describe('app-link-safe-redirect interstitial', () => {
+    it('routes callbackPath=/claw through the interstitial', async () => {
+      const user = makeUser({ customer_source: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/claw' });
+
+      expect(mockRedirect).toHaveBeenCalledTimes(1);
+      expect(mockRedirect).toHaveBeenCalledWith('/users/continue?to=%2Fclaw');
+    });
+
+    it('routes callbackPath=/profile through the interstitial', async () => {
+      const user = makeUser({ customer_source: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/profile' });
+
+      expect(mockRedirect).toHaveBeenCalledTimes(1);
+      expect(mockRedirect).toHaveBeenCalledWith('/users/continue?to=%2Fprofile');
     });
   });
 });

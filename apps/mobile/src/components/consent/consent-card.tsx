@@ -1,8 +1,15 @@
 import * as WebBrowser from 'expo-web-browser';
 import { type Href, useRouter } from 'expo-router';
-import { ChevronRight, MessageSquare, Shield, Smartphone, User } from 'lucide-react-native';
-import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
+import {
+  ChevronRight,
+  LineChart,
+  MessageSquare,
+  Shield,
+  Smartphone,
+  User,
+} from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRow } from '@/components/consent/consent-row';
@@ -11,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { WEB_BASE_URL } from '@/lib/config';
-import { acceptConsent, revokeConsent } from '@/lib/consent';
+import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -35,6 +42,39 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Onboarding pre-selects optional telemetry. Review mode starts off and the
+  // stored value loads over it, so a stored decline never flashes as on.
+  const [optionalToggle, setOptionalToggle] = useState(mode === 'onboarding');
+  const [savingOptional, setSavingOptional] = useState(false);
+  const loadedRef = useRef(false);
+  const userToggledRef = useRef(false);
+
+  // Load the stored optional value in review mode only.  The active flag
+  // stops a late resolve from overwriting a value the user just toggled.
+  useEffect(() => {
+    if (mode !== 'review' || !userId || loadedRef.current) {
+      return undefined;
+    }
+    let active = true;
+    // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- async/await would allow the promise to settle after unmount.
+    void readConsent(userId).then(
+      // eslint-disable-next-line promise/always-return
+      stored => {
+        if (active && !userToggledRef.current) {
+          setOptionalToggle(stored.optional);
+          loadedRef.current = true;
+        }
+      },
+      () => {
+        if (active) {
+          setError('Could not load your consent settings. Please try again.');
+        }
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [mode, userId]);
 
   const handlePrimaryAction = async () => {
     if (mode === 'review') {
@@ -50,7 +90,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     setError(null);
     setPendingAction('primary');
     try {
-      await acceptConsent(userId);
+      await acceptConsent(userId, optionalToggle);
       router.replace('/(app)/(tabs)' as Href);
     } catch {
       setError('Could not save your consent. Please try again.');
@@ -112,6 +152,34 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     void WebBrowser.openBrowserAsync(PRIVACY_URL);
   };
 
+  const handleToggleOptional = useCallback(
+    (next: boolean) => {
+      setOptionalToggle(next);
+      setError(null);
+
+      if (mode === 'review' && userId) {
+        userToggledRef.current = true;
+        setSavingOptional(true);
+        // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- fire-and-forget toggle revert pattern.
+        void setOptionalConsent(userId, next).then(
+          // eslint-disable-next-line promise/always-return
+          () => {
+            setSavingOptional(false);
+          },
+          () => {
+            setOptionalToggle(!next);
+            setError('Could not save your choice. Please try again.');
+            setSavingOptional(false);
+          }
+        );
+      } else if (mode === 'review') {
+        setOptionalToggle(!next);
+        setError('Could not load your account. Please try again.');
+      }
+    },
+    [mode, userId]
+  );
+
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
       <ScrollView
@@ -132,7 +200,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           what&apos;s shared and with whom.
         </Text>
 
-        <View className="mt-6 gap-5">
+        <Text className="mt-6 text-sm font-semibold text-foreground">Required to use Kilo</Text>
+
+        <View className="mt-3 gap-5">
           <ConsentRow
             icon={MessageSquare}
             title="Your prompts and conversations"
@@ -146,7 +216,28 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <ConsentRow
             icon={Smartphone}
             title="App diagnostics"
-            description="Anonymous performance and crash data, used to keep the app stable."
+            description="Crash and error reports, with app content removed, used to keep the app stable."
+          />
+        </View>
+
+        <Text className="mt-6 text-sm font-semibold text-foreground">Optional</Text>
+
+        <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
+          <View className="mt-0.5">
+            <LineChart size={18} color={colors.mutedForeground} />
+          </View>
+          <View className="flex-1 shrink gap-1">
+            <Text className="text-base font-semibold text-foreground">Help improve Kilo</Text>
+            <Text className="text-sm text-muted-foreground">
+              Share anonymous product analytics and install source. You can change this any time in
+              Settings.
+            </Text>
+          </View>
+          <Switch
+            value={optionalToggle}
+            disabled={mode === 'review' && savingOptional}
+            accessibilityLabel="Help improve Kilo"
+            onValueChange={handleToggleOptional}
           />
         </View>
 

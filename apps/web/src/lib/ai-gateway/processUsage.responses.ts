@@ -17,6 +17,7 @@ import {
   computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelIsByok,
+  extractVercelUpstreamId,
 } from '@/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 
@@ -50,9 +51,11 @@ export function processResponsesApiUsage(
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats
 ): JustTheCostsUsageStats {
+  // OpenAI-style input_tokens already includes cached and cache-write tokens.
   const inputTokens = usage?.input_tokens ?? 0;
   const outputTokens = usage?.output_tokens ?? 0;
   const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+  const cacheWriteTokens = usage?.input_tokens_details?.cache_write_tokens ?? 0;
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {
@@ -61,7 +64,7 @@ export function processResponsesApiUsage(
       coreProps,
       'responses_sse_processing'
     );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens: 0, cost_mUsd, is_byok };
+    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
   }
 
   // Vercel path: cost is in provider_metadata.gateway
@@ -72,7 +75,7 @@ export function processResponsesApiUsage(
       inputTokens,
       outputTokens,
       cacheHitTokens,
-      cacheWriteTokens: 0,
+      cacheWriteTokens,
       cost_mUsd,
       is_byok: extractVercelIsByok(vercelGateway),
     };
@@ -83,7 +86,7 @@ export function processResponsesApiUsage(
     inputTokens,
     outputTokens,
     cacheHitTokens,
-    cacheWriteTokens: 0,
+    cacheWriteTokens,
     cost_mUsd: 0,
     is_byok: null,
   };
@@ -210,7 +213,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
     responseContent,
     inference_provider,
     finish_reason,
-    upstream_id: null,
+    upstream_id: extractVercelUpstreamId(providerMetadata),
     latency: null,
     moderation_latency: null,
     generation_time: null,
@@ -240,7 +243,7 @@ export function parseResponsesMicrodollarUsageFromString(
     model: responseJson?.model ?? null,
     responseContent: responseJson?.output ? extractResponseContent(responseJson.output) : '',
     inference_provider,
-    upstream_id: null,
+    upstream_id: extractVercelUpstreamId(providerMetadata),
     finish_reason: responseJson?.status ?? null,
     latency: null,
     moderation_latency: null,

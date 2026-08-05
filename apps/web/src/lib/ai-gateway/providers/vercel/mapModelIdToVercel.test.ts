@@ -43,6 +43,7 @@ describe('mapModelIdToVercel', () => {
 
   describe('hardcoded OpenRouter → Vercel mapping', () => {
     it.each([
+      ['deepseek/deepseek-v4-flash-latest', 'deepseek/deepseek-v4-flash-0731'],
       ['mistralai/codestral-2508', 'mistral/codestral'],
       ['mistralai/devstral-2512', 'mistral/devstral-2'],
       ['mistralai/mistral-embed-2312', 'mistral/mistral-embed'],
@@ -54,7 +55,6 @@ describe('mapModelIdToVercel', () => {
       ['mistralai/mistral-medium-3-5', 'mistral/mistral-medium-3.5'],
       ['mistralai/mistral-small-2603', 'mistral/mistral-small'],
       ['mistralai/pixtral-large-2411', 'mistral/pixtral-large'],
-      ['poolside/laguna-s-2.1:free', 'poolside/laguna-s-2.1-free'],
       ['qwen/qwen3-14b', 'alibaba/qwen-3-14b'],
       ['qwen/qwen3-235b-a22b', 'alibaba/qwen-3-235b'],
       ['qwen/qwen3-30b-a3b', 'alibaba/qwen-3-30b'],
@@ -90,6 +90,10 @@ describe('mapModelIdToVercel', () => {
       expect(mapModelIdToVercel('openai/gpt-oss-20b')).toBe('openai/gpt-oss-20b');
     });
 
+    it('leaves the OpenRouter-only Poolside model unchanged', () => {
+      expect(mapModelIdToVercel('poolside/laguna-s-2.1:free')).toBe('poolside/laguna-s-2.1:free');
+    });
+
     it('leaves a model with an unknown provider prefix unchanged', () => {
       expect(mapModelIdToVercel('deepseek/deepseek-v3.2')).toBe('deepseek/deepseek-v3.2');
     });
@@ -109,12 +113,10 @@ describe('mapModelIdToVercel', () => {
     });
 
     it('does not use internal_id for exclusives that are not vercel-routed', () => {
-      // claude_sonnet_clawsetup_model has gateway 'openrouter' and no
+      // claude_sonnet_4_6_stealth_model has gateway 'martian' and no
       // 'vercel-routing' flag, so the mapping must pass the public id through
       // the generic prefix rewrite instead of substituting internal_id.
-      expect(mapModelIdToVercel('anthropic/claude-sonnet-4.6:clawsetup')).toBe(
-        'anthropic/claude-sonnet-4.6:clawsetup'
-      );
+      expect(mapModelIdToVercel('stealth/claude-sonnet-4.6')).toBe('stealth/claude-sonnet-4.6');
     });
 
     it('does not use internal_id for disabled exclusives even when vercel-routed', () => {

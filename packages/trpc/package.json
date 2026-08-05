@@ -10,6 +10,9 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts"
+    },
+    "./mobile": {
+      "types": "./dist/mobile.d.ts"
     }
   },
   "dependencies": {
@@ -27,7 +30,7 @@
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
-    "@sentry/nextjs": "10.43.0",
+    "@sentry/nextjs": "10.69.0",
     "@typescript/native-preview": "catalog:",
     "rollup": "4.59.1",
     "rollup-plugin-dts": "6.4.1",

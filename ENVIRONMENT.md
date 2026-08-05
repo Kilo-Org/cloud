@@ -74,6 +74,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Social OAuth Clients
 
+- `ANACONDA_CLIENT_ID` - Anaconda OAuth app client ID. `[PUBLIC]`
+- `ANACONDA_CLIENT_SECRET` - Anaconda OAuth app client secret. `[SECRET]`
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`
@@ -185,6 +187,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `WEBHOOK_AGENT_URL` - URL for the webhook agent worker. [SERVER]
 - `MODEL_EVAL_INGEST_URL` - URL for model evaluation ingest worker. [SERVER]
 - `SESSION_INGEST_WORKER_URL` - URL for the session ingest worker. [SERVER]
+- `NOTIFICATIONS_WORKER_URL` - URL for the push-notifications worker internal dispatch endpoint. [SERVER]
 - `NEXT_PUBLIC_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the browser. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
@@ -205,6 +208,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]
 - `GASTOWN_SERVICE_URL` - URL for the Gastown service. [SERVER]
+- `GASTOWN_BILLING_ENABLED` - Enables Gastown container usage billing _enforcement_: admission checks and low-balance stops. Does not control metering — usage is always reported to the meter whenever the `CONTAINER_USAGE` binding is present. Enabled in the Gastown Wrangler development environment and defaults to `false` in production. [SERVER]
+- `GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` - Set to exactly `true` to show the upcoming usage-based container billing announcement on Gastown town overview pages. Always enabled when Next.js runs in development and defaults to off otherwise. [SERVER]
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
 - `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
@@ -243,6 +248,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `MAILGUN_DOMAIN` - Mailgun sending domain. Used only when `VERCEL_TARGET_ENV` is `production` or `staging`. [SERVER]
 - `NEVERBOUNCE_API_KEY` - NeverBounce API key for email verification. In staging, only the effective internal sink is verified. `[SECRET]`
 - `STAGING_EMAIL_REDIRECT_TO` - Required when `VERCEL_TARGET_ENV=staging`. Must contain exactly one valid address in the `kilocode.ai` domain; every staging message is redirected there with a staging subject prefix and safe Reply-To. [SERVER]
+- `LOCAL_EMAIL_OPEN_BROWSER` - Set to `false` to stop locally captured emails from opening in a browser tab. Defaults to opening each capture. Local development only. [SERVER]
 
 When `VERCEL_TARGET_ENV` is absent in local development or a script process, transactional messages are captured as owner-only clickable HTML under `dev/logs/emails/` instead of being sent. Automated tests (including `IS_IN_AUTOMATED_TEST`) and non-production Vercel targets suppress provider delivery and report successful no-op delivery. A production-mode process without `VERCEL_TARGET_ENV` fails delivery as a configuration error so retryable email markers are not consumed as successful sends.
 
@@ -251,6 +257,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SLACK_CLIENT_ID` - Slack OAuth app client ID. [PUBLIC]
 - `SLACK_CLIENT_SECRET` - Slack OAuth app client secret. `[SECRET]`
 - `SLACK_SIGNING_SECRET` - Slack request signing secret for webhooks. `[SECRET]`
+- `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook used by server-side Admin UI code to send events, summaries, reminders, and actions. `[SECRET]`
 - `SLACK_USER_FEEDBACK_WEBHOOK_URL` - Slack incoming webhook for user feedback. [SERVER]
 - `SLACK_DEPLOY_THREAT_WEBHOOK_URL` - Slack incoming webhook for deploy threat alerts. [SERVER]
 
@@ -274,6 +281,10 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
 - `IMPACT_ADVOCATE_WIDGET_ID` - Impact.com Advocate widget ID. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
+### Cloudflare Analytics
+
+- `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `apps/web/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]
+- `CLOUDFLARE_ANALYTICS_API_TOKEN` - Cloudflare API token with **Account Analytics: Read** only, used by the web app to query `containersUsageAdaptiveGroups` for on-demand admin reconciliation; used in `apps/web/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. Optional at process start — missing values surface as actionable errors at point of use. `[SECRET]`
 
 ### R2 / Object Storage
 
@@ -355,6 +366,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 - `VITE_POSTHOG_API_KEY` - PostHog public project API key baked into extension builds; read in `apps/extension/src/shared/analytics.ts`; absent → analytics disabled. [PUBLIC]
 - `VITE_KILO_API_BASE_URL` - Selects the Kilo API base URL at build time; read in `apps/extension/src/shared/auth.ts`. [PUBLIC]
+- `VITE_CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production Cloud Agent endpoint otherwise. [PUBLIC]
+- `VITE_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production session ingest endpoint otherwise. [PUBLIC]
 
 ## Mobile
 
@@ -378,6 +391,9 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SNOWFLAKE_MAX_POLL_ATTEMPTS` - Max poll attempts for Snowflake job completion in `services/kiloclaw-billing/src/snowflake.ts`. [SERVER]
 - `CF_AE_TOKEN` - Cloudflare Account/Enterprise API token for the local dev CLI (`dev/local/cli.ts`). `[SECRET]`
 - `KILO_PORT_OFFSET` - Port offset for the local dev tmux dashboard; applied by `dev/local/cli.ts` and `dev/local/services.ts` to prevent port conflicts. [SERVER]
+- `COMPOSE_PROJECT_NAME` - Docker Compose project for the local infrastructure; written to `dev/.env` by `dev/local/infra-env.ts` so a worktree with a port offset owns its own containers and volumes. [SERVER]
+- `KILO_POSTGRES_PORT`, `KILO_REDIS_PORT`, `KILO_REDIS_HTTP_PORT`, `KILO_GRAFANA_PORT` - Host ports for the local infrastructure containers; written to `dev/.env` by `dev/local/infra-env.ts`, read by `dev/docker-compose.yml`. Default to 5432, 6379, 8079, and 4000. [SERVER]
+- `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` - Overrides the `localConnectionString` each `wrangler.jsonc` commits, so a worktree's workers reach that worktree's database; set on every worker command by `dev/local/services.ts`. [SERVER]
 
 ## E2E
 

@@ -46,6 +46,7 @@ import {
   hasSecurityReviewPermissions,
   getReauthorizeUrl,
 } from '@/lib/security-agent/github/permissions';
+import { checkDependabotAlertsAvailability } from '@/lib/security-agent/github/dependabot-api';
 import { submitManualSecuritySync } from '@/lib/security-agent/services/manual-sync-client';
 import { submitManualFindingDismissal } from '@/lib/security-agent/services/manual-dismiss-client';
 import { submitManualAnalysisStart } from '@/lib/security-agent/services/manual-analysis-client';
@@ -846,11 +847,42 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         repos = fetchedRepos;
       }
 
-      return repos.map(repo => ({
+      const repositoryDetails = repos.map(repo => ({
         id: repo.id,
         fullName: repo.full_name,
         name: repo.name,
         private: repo.private,
+      }));
+      const installationId = integration.platform_installation_id;
+      if (!installationId || !hasSecurityReviewPermissions(integration)) {
+        return repositoryDetails.map(repository => ({
+          ...repository,
+          dependabotAlerts: 'unknown' as const,
+        }));
+      }
+
+      const appType = integration.github_app_type || 'standard';
+      let availability: Awaited<ReturnType<typeof checkDependabotAlertsAvailability>>;
+      try {
+        availability = await checkDependabotAlertsAvailability(
+          installationId,
+          appType,
+          repositoryDetails
+        );
+      } catch (error) {
+        console.error('Failed to check Dependabot alerts availability', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return repositoryDetails.map(repository => ({
+          ...repository,
+          dependabotAlerts: 'unknown' as const,
+        }));
+      }
+      const availabilityById = new Map(availability.map(result => [result.id, result.status]));
+
+      return repositoryDetails.map(repository => ({
+        ...repository,
+        dependabotAlerts: availabilityById.get(repository.id) ?? ('unknown' as const),
       }));
     },
 

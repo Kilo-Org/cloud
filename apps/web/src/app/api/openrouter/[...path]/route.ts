@@ -19,13 +19,12 @@ import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-pro
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
-import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isDeadFreeModel, isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
+import { isDeadFreeModel, isKiloExclusiveRateLimitedModel } from '@/lib/ai-gateway/models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -47,8 +46,7 @@ import {
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
-  wrapInSafeNextResponse,
-  forbiddenFreeModelResponse,
+  unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
@@ -56,7 +54,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import { rewriteModelResponse, logUnrewrittenResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -69,7 +67,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
 import {
   classifyAbuse,
   awaitClassifyAbuse,
@@ -87,11 +84,11 @@ import {
   getToolsUsed,
 } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
+import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
-  KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
@@ -108,8 +105,14 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { logExceptInTest } from '@/lib/utils.server';
+import { readDb } from '@/lib/drizzle';
+import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
+import {
+  evaluateEffectiveModelAccessPolicy,
+  getEffectiveModelDecision,
+} from '@/lib/organizations/effective-model-access.server';
 
-export const maxDuration = 1800;
+export const maxDuration = 800;
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -233,7 +236,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const balanceAndSettingsPromise = authPromise.then(res =>
     res.user
-      ? getBalanceAndOrgSettings(res.organizationId, res.user)
+      ? getBalanceAndOrgSettings(res.organizationId, res.user, readDb)
       : { balance: 0, settings: undefined, plan: undefined }
   );
   const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(
@@ -256,14 +259,27 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // non-kilocode clients). `taskId` still wins when both are present.
   const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
   const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
+  // Vercel's per-invocation request id. Logged on the disconnect and upstream
+  // failure paths so a client disconnect can be correlated with the upstream
+  // error it causes, and with the platform logs for the same invocation.
+  const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
 
   const logClientDisconnect = () => {
-    console.log('AI gateway client disconnected, requested model: %s', requestedModelLowerCased, {
-      path,
-      elapsed_ms: Math.round(performance.now() - requestStartedAt),
-      client_request_id: clientRequestId,
-      session_id: taskId ?? sessionHeader,
-    });
+    // The request signal is forwarded to the upstream fetch and to the response
+    // stream reader, so this disconnect also aborts them. Any abort/cancellation
+    // logged for this request after this line is a consequence of the client
+    // going away, not an upstream provider failure.
+    console.log(
+      'AI gateway client disconnected (aborting in-flight upstream work for this request), requested model: %s',
+      requestedModelLowerCased,
+      {
+        path,
+        elapsed_ms: Math.round(performance.now() - requestStartedAt),
+        client_request_id: clientRequestId,
+        session_id: taskId ?? sessionHeader,
+        vercel_request_id: vercelRequestId,
+      }
+    );
   };
   if (request.signal.aborted) {
     logClientDisconnect();
@@ -273,21 +289,22 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   let autoModel: string | null = null;
   // Organization Auto can resolve through an intermediate route target before
-  // reaching a concrete model. Keep that target for nested free-tier rate
-  // limiting and direct-BYOK ownership validation after resolution.
+  // reaching a concrete model. Keep that target for direct-BYOK ownership
+  // validation after resolution.
   let routingTarget: string | null = null;
   let classifierCostUsd = 0;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     const efficientDecision =
-      requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id
+      requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
+      requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id
         ? async () => {
             const { user, authFailedResponse, organizationId } = await authPromise;
             // The classifier is a paid call on Kilo's own credential. Skip it
-            // for unauthenticated requests: kilo-auto/efficient resolves to a
+            // for unauthenticated requests: auto-routed models resolve to a
             // paid model, so an unauthenticated caller is rejected downstream
             // regardless, and a null decision simply falls back to balanced.
-            // This stops anonymous/abusive traffic from repeatedly spending
+            // This stops anonymous or abusive traffic from repeatedly spending
             // Kilo-funded classification with no user to attribute it to.
             if (!user || authFailedResponse) return null;
             const { settings, plan } = await balanceAndSettingsPromise;
@@ -350,29 +367,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // For FREE models: check rate limit, log at start.
+  // For rate-limited Kilo-exclusive models: check the limit and log at start.
   // Server-side products (cloud-agent, code-review, app-builder) rate-limit
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
   // All other products rate-limit per IP (fast pre-auth path).
-  const isRateLimitedFreeModelRequest =
-    isKiloExclusiveFreeModel(effectiveModelIdLowerCased) ||
-    autoModel === KILO_AUTO_FREE_MODEL.id ||
-    routingTarget === KILO_AUTO_FREE_MODEL.id ||
-    (await isPublicIdExperimented(effectiveModelIdLowerCased));
-  if (isRateLimitedFreeModelRequest) {
+  const isRateLimitedModelRequest = isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased);
+  if (isRateLimitedModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
 
     if (!rateLimit.result.allowed) {
       console.warn(
-        `Free model rate limit exceeded, ${rateLimit.subject}, model: ${effectiveModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
+        `Model rate limit exceeded, ${rateLimit.subject}, model: ${effectiveModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
       );
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
           error_type: ProxyErrorType.rate_limit_exceeded,
-          message:
-            'Free model usage limit reached. Please try again later or upgrade to a paid model.',
+          message: 'Model usage limit reached. Please try again later.',
         },
         { status: 429 }
       );
@@ -411,31 +423,33 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       );
     }
 
-    const promotionLimit = await checkPromotionLimit(ipAddress);
+    if (isRateLimitedModelRequest) {
+      const promotionLimit = await checkPromotionLimit(ipAddress);
 
-    if (!promotionLimit.allowed) {
-      console.warn(
-        `Promotion model limit exceeded, ip: ${ipAddress}, ` +
-          `model: ${effectiveModelIdLowerCased}, ` +
-          `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
-          `in ${PROMOTION_WINDOW_HOURS}h window`
-      );
+      if (!promotionLimit.allowed) {
+        console.warn(
+          `Promotion model limit exceeded, ip: ${ipAddress}, ` +
+            `model: ${effectiveModelIdLowerCased}, ` +
+            `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
+            `in ${PROMOTION_WINDOW_HOURS}h window`
+        );
 
-      return NextResponse.json(
-        {
-          error: {
-            code: PROMOTION_MODEL_LIMIT_REACHED,
-            message:
-              'Sign up for free to continue and explore 500 other models. ' +
-              'Takes 2 minutes, no credit card required. Or come back later.',
+        return NextResponse.json(
+          {
+            error: {
+              code: PROMOTION_MODEL_LIMIT_REACHED,
+              message:
+                'Sign up for free to continue and explore 500 other models. ' +
+                'Takes 2 minutes, no credit card required. Or come back later.',
+            },
+            error_type: ProxyErrorType.promotion_limit_reached,
           },
-          error_type: ProxyErrorType.promotion_limit_reached,
-        },
-        { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
-      );
+          { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
+        );
+      }
     }
 
-    // Anonymous access for free model (already rate-limited above)
+    // Anonymous access for free model (rate-limited above when configured)
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;
@@ -443,6 +457,25 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   } else {
     user = maybeUser;
   }
+
+  // Enterprise group model-access policy is enforced on the hottest request
+  // path, so start its DB read now — concurrently with provider resolution,
+  // abuse checks, and the balance await below — rather than sequentially just
+  // before routing. The evaluated policy and per-model decision are then
+  // in-memory (the provider index is cached), so awaiting this promise later
+  // adds no extra round-trip. Only authenticated org requests need it.
+  const organizationGroupPolicyPromise =
+    organizationId && !isAnonymousContext(user)
+      ? getOrganizationGroupPolicyContext({
+          organizationId,
+          subject: { type: 'member', kiloUserId: user.id },
+        }).then(evaluateEffectiveModelAccessPolicy)
+      : null;
+  // The prefetch is awaited only on the authorized, non-bypassed path below, and
+  // roughly a dozen earlier returns can skip it entirely. Attach a no-op handler
+  // so a policy-context failure can never surface as an unhandled rejection; the
+  // await below still receives the original error.
+  void organizationGroupPolicyPromise?.catch(() => {});
 
   // Fraud/project headers are pure header parsing; resolve them here so the
   // classifier-overhead billing below can be scheduled before any downstream
@@ -489,7 +522,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             fraudHeaders,
             organizationId,
             provider: 'openrouter',
-            requested_model: KILO_AUTO_EFFICIENT_MODEL.id,
+            requested_model: requestedModelLowerCased,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -523,7 +556,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
           };
           await logMicrodollarUsage(classifierStats, classifierContext);
         } catch (error) {
-          console.error('Failed to bill classifier cost for kilo-auto/efficient', error);
+          console.error('Failed to bill classifier cost for auto routing', error);
         }
       })()
     );
@@ -537,7 +570,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRateLimitedFreeModelRequest) {
+  if (isRateLimitedModelRequest) {
     await logFreeModelRequest(
       ipAddress,
       effectiveModelIdLowerCased,
@@ -610,7 +643,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // previously blocking/quarantine decision wait for a fresh abuse-service result.
   const shouldBlockOnClassify = isRulesEngineBlockingAction(cachedRulesEngineAction);
 
-  // Large responses may run longer than the 1800s serverless function timeout.
+  // Large responses may run longer than the 800s serverless function timeout.
   const requestMaxTokens = getMaxTokens(requestBodyParsed);
   if (requestMaxTokens && requestMaxTokens > MAX_TOKENS_LIMIT) {
     console.warn(`SECURITY: Max tokens limit exceeded: ${user.id}`, {
@@ -622,10 +655,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (
     isDeadFreeModel(effectiveModelIdLowerCased) ||
-    (!autoModel && isForbiddenFreeModel(effectiveModelIdLowerCased))
+    (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
   ) {
-    console.warn(`User requested forbidden free model ${effectiveModelIdLowerCased}; rejecting.`);
-    return forbiddenFreeModelResponse();
+    console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
+    return unavailableModelResponse();
   }
 
   let classifyResult = shouldBlockOnClassify ? await awaitClassifyAbuse(classifyPromise) : null;
@@ -780,6 +813,26 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
     if (modelRestrictionError) return modelRestrictionError;
 
+    let effectiveProviderConfig = providerConfig;
+    if (organizationGroupPolicyPromise) {
+      // Started right after auth so the DB read overlapped the work above; the
+      // decision itself is in-memory against the cached provider index.
+      const groupPolicy = await organizationGroupPolicyPromise;
+      const groupDecision = await getEffectiveModelDecision(
+        groupPolicy,
+        effectiveModelIdLowerCased
+      );
+      if (!groupDecision.allowed) return modelNotAllowedResponse();
+      if (groupDecision.eligibleProviderRoutes) {
+        const currentOnly = providerConfig?.only;
+        const only = currentOnly
+          ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
+          : [...groupDecision.eligibleProviderRoutes];
+        if (only.length === 0) return modelNotAllowedResponse();
+        effectiveProviderConfig = { ...providerConfig, only };
+      }
+    }
+
     // Experiment traffic captures prompts to R2 for partner evaluation, which
     // is a form of data collection that the gateway-pinned `data_collection`
     // setting cannot enforce on a direct partner upstream. If the org has
@@ -800,8 +853,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // Direct experiment upstreams must not have a Vercel/OpenRouter
     // provider config pinned onto them — the partner endpoint is selected
     // by the variant version.
-    if (providerConfig && !effectiveProviderContext.experiment) {
-      requestBodyParsed.body.provider = providerConfig;
+    if (effectiveProviderConfig && !effectiveProviderContext.experiment) {
+      requestBodyParsed.body.provider = effectiveProviderConfig;
     }
   }
 
@@ -874,6 +927,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     extraHeaders,
     provider: effectiveProviderContext.provider,
     signal: request.signal,
+    vercelRequestId,
   });
   if (upstreamResult.type === 'error') {
     return upstreamResult.response;
@@ -957,16 +1011,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  await handleRequestLogging({
-    clonedResponse: response.clone(),
+  const requestLogging = {
     user: maybeUser,
     organization_id: organizationId || null,
-    provider: effectiveProviderContext.provider.id,
-    model: effectiveModelIdLowerCased,
     session_id: usageContext.session_id,
-    vercel_request_id: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+    vercel_request_id: vercelRequestId,
     request: requestBodyParsed,
-  });
+  };
 
   {
     const errorResponse = await makeErrorReadable({
@@ -977,20 +1028,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
+      await logUnrewrittenResponse(
+        response,
+        effectiveModelIdLowerCased,
+        effectiveProviderContext.provider.id,
+        requestLogging
+      );
       return errorResponse;
     }
   }
 
-  const rewrittenResponse = await rewriteModelResponse(
+  return await rewriteModelResponse(
     response,
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,
     requestBodyParsed.kind,
-    organizationId
+    requestLogging
   );
-  if (rewrittenResponse) {
-    return rewrittenResponse;
-  }
-
-  return wrapInSafeNextResponse(response);
 }

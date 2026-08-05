@@ -21,6 +21,7 @@ vi.mock('@cloudflare/sandbox', () => ({
   Sandbox: sdk.StockSandbox,
   ContainerProxy: sdk.ContainerProxy,
 }));
+vi.mock('./container-usage.js', () => ({ MeteredSandbox: sdk.StockSandbox }));
 vi.mock('./logger.js', () => ({ logger: logging.logger }));
 
 import {
@@ -54,7 +55,8 @@ function createEnv(
   redeemGitHubSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
   redeemGitLabSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
   redeemKiloSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
-  logRejectedKiloUrls?: string
+  logRejectedKiloUrls?: string,
+  sessionIngestFetch: ReturnType<typeof vi.fn> = vi.fn(async () => new Response('forwarded'))
 ) {
   return {
     GIT_TOKEN_SERVICE: {
@@ -63,7 +65,9 @@ function createEnv(
       redeemKiloSessionCapability,
     },
     LOG_REJECTED_KILO_URLS: logRejectedKiloUrls,
-  } as never;
+    INTERNAL_API_SECRET_PROD: { get: vi.fn(async () => 'trusted-internal-secret') },
+    SESSION_INGEST: { fetch: sessionIngestFetch },
+  } as unknown as Cloudflare.Env;
 }
 
 function handleOutbound(request: Request, env: Cloudflare.Env): Promise<Response> {
@@ -1027,6 +1031,7 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
       requestMethod: 'GET',
       requestUrl: 'https://api.kilo.ai/api/users/me',
       bootstrapKiloSessionId: undefined,
+      sessionIngestProxyVersion: 1,
     });
     const forwarded = forward.mock.calls[0]?.[0] as Request;
     expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_KILO_AUTHORIZATION);
@@ -1060,7 +1065,122 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
       requestMethod: 'POST',
       requestUrl: 'https://ingest.kilosessions.ai/api/session',
       bootstrapKiloSessionId: 'kilo-session-1',
+      sessionIngestProxyVersion: 1,
     });
+  });
+
+  it('routes session-scoped ingest through the internal binding and treats 404 as terminal', async () => {
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+      sessionIngestScope: {
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        rootKiloSessionId: 'ses_12345678901234567890123456',
+      },
+    });
+    const scopedFetch = vi.fn(
+      async (_request: Request) => new Response('not deployed', { status: 404 })
+    );
+    const publicFetch = vi.fn();
+    vi.stubGlobal('fetch', publicFetch);
+
+    const response = await handleOutbound(
+      new Request(
+        'https://ingest.kilosessions.ai/api/session/ses_abcdefghijklmnopqrstuvwxyz/ingest?v=2',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${KILO_CAPABILITY}`,
+            'Content-Type': 'application/json',
+            'X-Internal-Secret': 'forged',
+            'X-Kilo-Cloud-Agent-Session': 'forged',
+            'X-Kilo-User-Id': 'forged-user',
+            'X-Kilo-Future-Identity': 'forged-future-value',
+          },
+          body: JSON.stringify({ data: [] }),
+        }
+      ),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, scopedFetch)
+    );
+
+    expect(response.status).toBe(404);
+    expect(publicFetch).not.toHaveBeenCalled();
+    expect(scopedFetch).toHaveBeenCalledTimes(1);
+    const forwarded = scopedFetch.mock.calls[0]?.[0] as Request;
+    expect(new URL(forwarded.url)).toMatchObject({
+      pathname: '/internal/cloud-agent/v1/session/ses_abcdefghijklmnopqrstuvwxyz/ingest',
+      search: '?v=2',
+    });
+    expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_KILO_AUTHORIZATION);
+    expect(forwarded.headers.get('X-Internal-Secret')).toBe('trusted-internal-secret');
+    expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('cloud-agent-session-1');
+    expect(forwarded.headers.get('X-Kilo-Root-Session')).toBe('ses_12345678901234567890123456');
+    expect(forwarded.headers.get('X-Kilo-User-Id')).toBeNull();
+    expect(forwarded.headers.get('X-Kilo-Future-Identity')).toBeNull();
+    await expect(forwarded.json()).resolves.toEqual({ data: [] });
+  });
+
+  it('keeps exact-root export on the public path', async () => {
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+    });
+    const scopedFetch = vi.fn();
+    const publicFetch = vi.fn(async (_request: Request) => new Response('exported'));
+    vi.stubGlobal('fetch', publicFetch);
+
+    await handleOutbound(
+      new Request(
+        'https://ingest.kilosessions.ai/api/session/ses_12345678901234567890123456/export',
+        {
+          headers: {
+            Authorization: `Bearer ${KILO_CAPABILITY}`,
+            'X-Internal-Secret': 'forged',
+            'X-Kilo-Cloud-Agent-Session': 'forged',
+          },
+        }
+      ),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, scopedFetch)
+    );
+
+    expect(publicFetch).toHaveBeenCalledTimes(1);
+    expect(scopedFetch).not.toHaveBeenCalled();
+    const forwarded = publicFetch.mock.calls[0]?.[0] as Request;
+    expect(forwarded.headers.get('X-Internal-Secret')).toBeNull();
+    expect(forwarded.headers.get('X-Kilo-Cloud-Agent-Session')).toBeNull();
+  });
+
+  it('fails closed when session scope claims are present but the internal proxy is unavailable', async () => {
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+      sessionIngestScope: {
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        rootKiloSessionId: 'ses_12345678901234567890123456',
+      },
+    });
+    const publicFetch = vi.fn();
+    vi.stubGlobal('fetch', publicFetch);
+    const baseEnv = createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability);
+    const env = { ...baseEnv, SESSION_INGEST: undefined } as never;
+
+    const response = await handleOutbound(
+      new Request(
+        'https://ingest.kilosessions.ai/api/session/ses_abcdefghijklmnopqrstuvwxyz/ingest',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
+          body: JSON.stringify({ data: [] }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(502);
+    expect(publicFetch).not.toHaveBeenCalled();
   });
 
   it('fails closed without logging a rejected Kilo URL by default', async () => {
@@ -1177,5 +1297,70 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
 
     expect(redeemKiloSessionCapability).not.toHaveBeenCalled();
     expect(forward).toHaveBeenCalledOnce();
+  });
+});
+
+describe('handleManagedScmOutbound Bitbucket', () => {
+  const BITBUCKET_CAPABILITY = 'kbb1.opaque';
+  const REDEEMED_BITBUCKET_AUTHORIZATION = `Basic ${Buffer.from('x-token-auth:upstream-token').toString('base64')}`;
+
+  function bitbucketEnv(
+    redeemBitbucketSessionCapability: ReturnType<typeof vi.fn>
+  ): Cloudflare.Env {
+    return {
+      GIT_TOKEN_SERVICE: {
+        redeemGitHubSessionCapability: vi.fn(),
+        redeemGitLabSessionCapability: vi.fn(),
+        redeemKiloSessionCapability: vi.fn(),
+        redeemBitbucketSessionCapability,
+      },
+      INTERNAL_API_SECRET_PROD: { get: vi.fn(async () => 'trusted-internal-secret') },
+      SESSION_INGEST: { fetch: vi.fn() },
+    } as unknown as Cloudflare.Env;
+  }
+
+  function bitbucketGitRequest(username = 'x-token-auth'): Request {
+    return new Request('https://bitbucket.org/acme/widgets.git/git-upload-pack', {
+      method: 'POST',
+      headers: { Authorization: basicCredential(BITBUCKET_CAPABILITY, 'Basic', username) },
+    });
+  }
+
+  it('redeems a Bitbucket capability and forwards with injected auth', async () => {
+    const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
+    vi.stubGlobal('fetch', forward);
+    const redeem = vi.fn(async () => ({
+      success: true,
+      headers: { authorization: REDEEMED_BITBUCKET_AUTHORIZATION },
+    }));
+
+    const response = await handleOutbound(bitbucketGitRequest(), bitbucketEnv(redeem));
+
+    expect(response.status).toBe(200);
+    expect(redeem).toHaveBeenCalledWith({
+      capability: BITBUCKET_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      requestMethod: 'POST',
+      requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+    });
+    const forwardedRequest = forward.mock.calls[0][0] as Request;
+    expect(forwardedRequest.headers.get('Authorization')).toBe(REDEEMED_BITBUCKET_AUTHORIZATION);
+  });
+
+  it('fails closed when Bitbucket redemption is rejected', async () => {
+    const redeem = vi.fn(async () => ({ success: false, reason: 'container_mismatch' }));
+    const response = await handleOutbound(bitbucketGitRequest(), bitbucketEnv(redeem));
+    expect(response.status).toBe(502);
+  });
+
+  it('does not redeem a Bitbucket capability sent under the wrong Basic username', async () => {
+    const redeem = vi.fn();
+    // A bitbucket capability is only valid git auth under x-token-auth.
+    const response = await handleOutbound(
+      bitbucketGitRequest('x-access-token'),
+      bitbucketEnv(redeem)
+    );
+    expect(redeem).not.toHaveBeenCalled();
+    expect(response.status).toBe(502);
   });
 });

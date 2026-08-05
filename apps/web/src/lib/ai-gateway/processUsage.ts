@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import { db } from '../drizzle';
+import { db, isUSRegion } from '../drizzle';
+import { recordUsageInPrimaryRegion } from './usage-record-client';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@/lib/timer';
@@ -297,7 +298,52 @@ export async function logMicrodollarUsage(
   return inserted ? { usageId: core.id, createdAt: core.created_at } : null;
 }
 
+/**
+ * Dispatches the usage write to whichever side of the Atlantic the PostgreSQL
+ * primary is on.
+ *
+ * `kilocode-global-app` executes in both Frankfurt and SFO while the primary is
+ * Frankfurt-only. This write holds row locks on `kilocode_users`,
+ * `organizations` and `organization_user_usage` across several sequential
+ * statements, so from SFO the lock hold is dominated by transatlantic round
+ * trips rather than by database work — which is what turns a contended counter
+ * row into a queue and, downstream, exhausts the connection pool.
+ *
+ * Frankfurt instances keep writing directly: a Frankfurt-to-Frankfurt HTTP hop
+ * would be pure overhead and a pointless new failure mode.
+ */
 async function saveUsageRelatedData(
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData,
+  prior_microdollar_usage: number,
+  posthog_distinct_id: string | null
+): Promise<UsageRecordInsertResult | null> {
+  if (isUSRegion()) {
+    const outcome = await recordUsageInPrimaryRegion({
+      core: coreUsageFields,
+      metadata: metadataFields,
+      prior_microdollar_usage,
+      posthog_distinct_id,
+    });
+    // On `unavailable` fall through to the local write. It is slow from here,
+    // but a slow billing record beats a lost one. `recordUsageInPrimaryRegion`
+    // has already reported the failure.
+    if (outcome.kind === 'ok') return outcome.result;
+  }
+
+  return saveUsageRelatedDataLocally(
+    coreUsageFields,
+    metadataFields,
+    prior_microdollar_usage,
+    posthog_distinct_id
+  );
+}
+
+/**
+ * The write itself, always executed against the primary from wherever it runs.
+ * Exported so `POST /api/internal/usage/record` can invoke it in Frankfurt.
+ */
+export async function saveUsageRelatedDataLocally(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,

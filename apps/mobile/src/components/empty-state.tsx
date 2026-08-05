@@ -11,7 +11,8 @@ const DEFAULT_ICON_CONTAINER_CLASS = 'h-14 w-14 rounded-2xl border border-border
 type EmptyStateProps = {
   icon: LucideIcon;
   title: string;
-  description: string;
+  /** Muted centered text, or a node that carries its own styling (e.g. AccessibleStatus). */
+  description: ReactNode;
   className?: string;
   action?: ReactNode;
   placement?: 'center' | 'top';
@@ -52,9 +53,13 @@ export function EmptyState({
         <Text variant="large" accessibilityRole={titleAccessibilityRole}>
           {title}
         </Text>
-        <Text variant="muted" className="text-center">
-          {description}
-        </Text>
+        {typeof description === 'string' ? (
+          <Text variant="muted" className="text-center">
+            {description}
+          </Text>
+        ) : (
+          description
+        )}
       </View>
       {action}
     </View>

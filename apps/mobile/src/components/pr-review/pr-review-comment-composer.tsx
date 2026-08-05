@@ -292,10 +292,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             ) : null}
           </View>
           {inlineError && inlineErrorKind !== 'reconnect' ? (
-            <View
-              className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5"
-              accessibilityLiveRegion="polite"
-            >
+            <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
               <Text className="text-xs text-destructive">{inlineError}</Text>
             </View>
           ) : null}

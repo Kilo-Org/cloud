@@ -15,7 +15,6 @@ export function PrMergePartialSuccessBanner({ reason }: Readonly<{ reason: strin
   return (
     <View
       className="gap-1 rounded-lg bg-accent-soft p-4"
-      accessibilityLiveRegion="polite"
       accessibilityLabel={`Merged. Couldn't delete the branch: ${reason}`}
     >
       <Text className="text-sm font-medium text-accent-soft-foreground">Merged</Text>

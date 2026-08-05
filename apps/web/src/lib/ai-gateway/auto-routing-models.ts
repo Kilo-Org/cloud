@@ -28,7 +28,7 @@ export async function addAutoRoutingModels(
 
   const [table, autoFreeCandidates] = await Promise.all([
     getCachedRoutingTable(),
-    getAutoFreeCandidates(null).catch(() => []),
+    getAutoFreeCandidates(null).catch(() => null),
   ]);
 
   const efficientModelIds = visibleConcreteModelIds(
@@ -37,15 +37,19 @@ export async function addAutoRoutingModels(
       .map(candidate => candidate.model),
     availableModelIds
   );
-  const freeModelIds = visibleConcreteModelIds(autoFreeCandidates, availableModelIds);
+  const freeModelIds = visibleConcreteModelIds(autoFreeCandidates ?? [], availableModelIds);
+  const hideAutoFreeModel = autoFreeCandidates !== null && freeModelIds.length === 0;
   const autoRoutingChoices = new Map([
     [KILO_AUTO_BALANCED_MODEL.id, efficientModelIds],
     [KILO_AUTO_EFFICIENT_MODEL.id, efficientModelIds],
     [KILO_AUTO_FREE_MODEL.id, freeModelIds],
   ]);
 
-  return models.map(model => {
+  return models.flatMap(model => {
     const modelIds = autoRoutingChoices.get(model.id);
-    return modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model;
+    if (hideAutoFreeModel && model.id === KILO_AUTO_FREE_MODEL.id) {
+      return [];
+    }
+    return [modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model];
   });
 }

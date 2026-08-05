@@ -10,6 +10,7 @@ import {
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FREE_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
@@ -20,6 +21,7 @@ const baseParams = {
   featureHeader: null,
   sessionId: null,
   clientIp: null,
+  isAutoFreeCandidateAllowed: null,
 };
 
 const nullUserPromise = Promise.resolve(null);
@@ -395,6 +397,46 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     );
 
     expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+  });
+});
+
+describe('resolveAutoModel — kilo-auto/free branch', () => {
+  it('excludes candidates denied by the effective organization policy', async () => {
+    const isAutoFreeCandidateAllowed = jest.fn(
+      async (modelId: string) => modelId === 'stepfun/step-3.7-flash:free'
+    );
+
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FREE_MODEL.id,
+        apiKind: 'chat_completions',
+        isAutoFreeCandidateAllowed,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: 'stepfun/step-3.7-flash:free' },
+    });
+    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('stepfun/step-3.7-flash:free');
+  });
+
+  it('reports no free models when organization policy denies every candidate', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FREE_MODEL.id,
+        apiKind: 'chat_completions',
+        isAutoFreeCandidateAllowed: async () => false,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'no_free_models_available' });
   });
 });
 

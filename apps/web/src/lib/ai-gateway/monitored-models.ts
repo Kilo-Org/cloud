@@ -51,7 +51,7 @@ export async function getMonitoredModels() {
   for (const model of autoModelIds) {
     for (const { balance, ...params } of VARIATIONS) {
       const result = await resolveAutoModel(
-        { model, ...params },
+        { model, ...params, isAutoFreeCandidateAllowed: null },
         Promise.resolve(null),
         Promise.resolve(balance)
       );

@@ -246,6 +246,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       plan: balanceAndSettings.plan,
     })
   );
+  const organizationGroupPolicyPromise = authPromise.then(async auth => {
+    if (!auth.organizationId || !auth.user || auth.authFailedResponse) return null;
+    const context = await getOrganizationGroupPolicyContext({
+      organizationId: auth.organizationId,
+      subject: { type: 'member', kiloUserId: auth.user.id },
+    });
+    return evaluateEffectiveModelAccessPolicy(context);
+  });
+  // Some early returns do not await organization policy. Keep those paths from
+  // surfacing policy-context failures as unhandled rejections.
+  void organizationGroupPolicyPromise.catch(() => {});
 
   // Extract IP early (needed for free model routing fallback and rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
@@ -341,6 +352,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         clientIp: ipAddress ?? null,
         efficientDecision,
         organizationContext: organizationContextPromise,
+        isAutoFreeCandidateAllowed: async modelId => {
+          const policy = await organizationGroupPolicyPromise;
+          return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
+        },
       },
       requestBodyParsed,
       authPromise.then(res => res.user),
@@ -457,25 +472,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   } else {
     user = maybeUser;
   }
-
-  // Enterprise group model-access policy is enforced on the hottest request
-  // path, so start its DB read now — concurrently with provider resolution,
-  // abuse checks, and the balance await below — rather than sequentially just
-  // before routing. The evaluated policy and per-model decision are then
-  // in-memory (the provider index is cached), so awaiting this promise later
-  // adds no extra round-trip. Only authenticated org requests need it.
-  const organizationGroupPolicyPromise =
-    organizationId && !isAnonymousContext(user)
-      ? getOrganizationGroupPolicyContext({
-          organizationId,
-          subject: { type: 'member', kiloUserId: user.id },
-        }).then(evaluateEffectiveModelAccessPolicy)
-      : null;
-  // The prefetch is awaited only on the authorized, non-bypassed path below, and
-  // roughly a dozen earlier returns can skip it entirely. Attach a no-op handler
-  // so a policy-context failure can never surface as an unhandled rejection; the
-  // await below still receives the original error.
-  void organizationGroupPolicyPromise?.catch(() => {});
 
   // Fraud/project headers are pure header parsing; resolve them here so the
   // classifier-overhead billing below can be scheduled before any downstream
@@ -814,10 +810,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (modelRestrictionError) return modelRestrictionError;
 
     let effectiveProviderConfig = providerConfig;
-    if (organizationGroupPolicyPromise) {
+    const groupPolicy = await organizationGroupPolicyPromise;
+    if (groupPolicy) {
       // Started right after auth so the DB read overlapped the work above; the
       // decision itself is in-memory against the cached provider index.
-      const groupPolicy = await organizationGroupPolicyPromise;
       const groupDecision = await getEffectiveModelDecision(
         groupPolicy,
         effectiveModelIdLowerCased

@@ -140,7 +140,7 @@ Matrix (runs the default regression suite):
 tsx services/cloud-agent-next/test/e2e/smoke.ts
 ```
 
-The dev `SandboxSmall` capacity is 16 because this matrix creates fourteen
+The dev `SandboxSmall` capacity is 16 because this matrix creates fifteen
 isolated sessions. Lowering it below the matrix demand turns later cold rows
 into local capacity probes rather than Cloud Agent health checks.
 

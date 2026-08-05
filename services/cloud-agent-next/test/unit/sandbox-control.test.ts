@@ -255,4 +255,25 @@ describe('waitForSandboxCleanupQuiescence', () => {
     ).resolves.toBe(false);
     expect(time.now()).toBe(1_000);
   });
+
+  it('accepts the stability window met on a tick observed past the deadline', async () => {
+    // Clock reads in order: deadline base, then per-tick observations. The
+    // final tick lands 1ms past the deadline with the window satisfied.
+    const observations = [0, 0, 600, 1_001];
+    let index = 0;
+    const now = () => observations[Math.min(index++, observations.length - 1)] ?? 0;
+    const sleep = vi.fn(async () => {});
+    const executeDocker = createSequencedDockerExecutor([[]]);
+
+    await expect(
+      waitForSandboxCleanupQuiescence(new Set(), {
+        timeoutMs: 1_000,
+        stableMs: 900,
+        pollIntervalMs: 500,
+        executeDocker,
+        now,
+        sleep,
+      })
+    ).resolves.toBe(true);
+  });
 });

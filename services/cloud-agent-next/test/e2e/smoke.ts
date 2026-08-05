@@ -25,10 +25,12 @@ import {
 import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
 import { printResult } from './run.js';
 import {
+  killSandboxFamily,
   listSandboxContainers,
   removeSandboxFamily,
   sandboxFamilyKey,
   waitForSandboxCleanupQuiescence,
+  waitForSandboxFamilyGone,
   type SandboxContainer,
 } from './sandbox-control.js';
 

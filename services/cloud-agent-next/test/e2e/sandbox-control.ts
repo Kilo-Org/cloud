@@ -267,7 +267,6 @@ export async function waitForSandboxCleanupQuiescence(
   while (true) {
     const containers = await listSandboxContainers(executeDocker);
     const observedAt = now();
-    if (observedAt > deadline) return false;
 
     const postBaselineSandboxes = containers.filter(
       container => !baselineSandboxIds.has(container.id)
@@ -285,7 +284,7 @@ export async function waitForSandboxCleanupQuiescence(
       if (observedAt - absentSince >= stableMs) return true;
     }
 
-    const remainingMs = deadline - now();
+    const remainingMs = deadline - observedAt;
     if (remainingMs <= 0) return false;
     await sleep(Math.min(pollIntervalMs, remainingMs));
   }

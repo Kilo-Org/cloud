@@ -365,8 +365,10 @@ class ExecCurlWrapperTransport implements WrapperTransport {
     const stdout = result.stdout ?? '';
     const markerIndex = stdout.lastIndexOf(responseMetadataMarker);
     if (markerIndex === -1) {
+      // The curl `-w` metadata is missing (truncated or hijacked output), so
+      // the real status is unknowable — fail loudly instead of faking a 200.
       return new Response(stdout, {
-        status: 200,
+        status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
     }

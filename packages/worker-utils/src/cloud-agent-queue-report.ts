@@ -35,8 +35,6 @@ export const CloudAgentRunFailureClassifications = [
   { failureStage: 'agent_activity', failureCode: 'payment_required' },
   { failureStage: 'agent_activity', failureCode: 'model_missing' },
   { failureStage: 'agent_activity', failureCode: 'wrapper_error_after_activity' },
-  { failureStage: 'agent_activity', failureCode: 'payment_required' },
-  { failureStage: 'agent_activity', failureCode: 'model_missing' },
   { failureStage: 'interruption', failureCode: 'user_interrupt' },
   { failureStage: 'interruption', failureCode: 'container_shutdown' },
   { failureStage: 'interruption', failureCode: 'system_interrupt' },

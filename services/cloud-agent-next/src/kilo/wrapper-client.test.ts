@@ -55,21 +55,30 @@ const preflightResult = (cmd: string): MockExecResult =>
     ? { exitCode: 0, stdout: '1.0.0' }
     : { exitCode: 0, stdout: 'ok' };
 
+/**
+ * Append the curl `-w` response-metadata marker the real exec transport
+ * produces, so mocks exercise the same parsing path as production.
+ */
+const withCurlMetadata = (cmd: string, result: MockExecResult): MockExecResult => {
+  if (result.exitCode !== 0) return result;
+  const marker = cmd.match(/__KILO_WRAPPER_RESPONSE_.+?__/)?.[0];
+  if (!marker || result.stdout?.includes(marker)) return result;
+  return { ...result, stdout: `${result.stdout ?? ''}\n${marker}200\tapplication/json` };
+};
+
 const createMockSession = (
-  execResult: MockExecResult | ((cmd: string) => MockExecResult)
+  execResult: MockExecResult | ((cmd: string) => MockExecResult),
+  options: { omitCurlMetadata?: boolean } = {}
 ): ExecutionSession => {
-  const execFn =
-    typeof execResult === 'function'
-      ? vi
-          .fn()
-          .mockImplementation((cmd: string) =>
-            Promise.resolve(isPreflightCommand(cmd) ? preflightResult(cmd) : execResult(cmd))
-          )
-      : vi
-          .fn()
-          .mockImplementation((cmd: string) =>
-            Promise.resolve(isPreflightCommand(cmd) ? preflightResult(cmd) : execResult)
-          );
+  const resolveResult = (cmd: string): MockExecResult => {
+    const result = isPreflightCommand(cmd)
+      ? preflightResult(cmd)
+      : typeof execResult === 'function'
+        ? execResult(cmd)
+        : execResult;
+    return options.omitCurlMetadata ? result : withCurlMetadata(cmd, result);
+  };
+  const execFn = vi.fn().mockImplementation((cmd: string) => Promise.resolve(resolveResult(cmd)));
 
   // Mock startProcess that returns a process with waitForPort and getLogs
   const startProcessFn = vi.fn().mockImplementation(() =>
@@ -2287,6 +2296,18 @@ describe('WrapperClient', () => {
       const client = new WrapperClient({ session, port: defaultPort });
 
       await expect(client.health()).rejects.toThrow(WrapperError);
+    });
+
+    it('fails as a diagnostic error when the curl metadata marker is missing', async () => {
+      const session = createMockSession(
+        { exitCode: 0, stdout: '{"status":"ready"}' },
+        { omitCurlMetadata: true }
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      // A missing marker means the true status is unknowable; the transport
+      // must surface a failure instead of silently reporting 200.
+      await expect(client.health()).rejects.toMatchObject({ code: 'PARSE_ERROR' });
     });
 
     it('retains the actual curl status and content type for malformed health diagnostics', async () => {

@@ -20,6 +20,7 @@ import { heartbeatIdempotencyKey } from '@kilocode/container-usage';
 import {
   billingModeFor,
   MINIMUM_REMAINING_MICRODOLLARS,
+  SHADOW_ONLY_BILLING_CONFIG,
   type BillingConfig,
 } from './billing-config';
 
@@ -235,6 +236,7 @@ async function settleSegment(
         .update(organizations)
         .set({
           microdollars_used: sql`${organizations.microdollars_used} + ${amountMicrodollars}`,
+          // Keep the deprecated rollback column synchronized with aggregate usage.
           microdollars_balance: sql`${organizations.microdollars_balance} - ${amountMicrodollars}`,
         })
         .where(eq(organizations.id, interval.subject_id))
@@ -346,13 +348,7 @@ export async function applyStartWithDb(
   intervalId: string,
   contextFingerprint: string,
   receivedAtMs: number,
-  billingConfig: BillingConfig = {
-    services: new Set(),
-    userIds: new Set(),
-    orgIds: new Set(),
-    warnRemainingMicrodollars: 10_000_000,
-    enabled: false,
-  }
+  billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<StartSkuAdmission> {
   const operation: Promise<StartSkuAdmission> = db.transaction(async tx => {
     const [existing] = await tx
@@ -484,13 +480,7 @@ export async function applyHeartbeatWithDb(
   intervalId: string,
   contextFingerprint: string,
   receivedAtMs: number,
-  billingConfig: BillingConfig = {
-    services: new Set(),
-    userIds: new Set(),
-    orgIds: new Set(),
-    warnRemainingMicrodollars: 10_000_000,
-    enabled: false,
-  }
+  billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<ApplyResult> {
   const operation: Promise<ApplyResult> = db.transaction(async tx => {
     const [existingInterval] = await tx
@@ -529,7 +519,9 @@ export async function applyHeartbeatWithDb(
         throw new UsageMutationConflictError('Heartbeat sequence has conflicting payload');
       }
       const remaining =
-        interval.billing_mode === 'paid' ? await balanceForSubject(tx, input.context.subject) : 0;
+        interval.billing_mode === 'paid'
+          ? await balanceForSubject(tx, input.context.subject, true)
+          : 0;
       return {
         kind: 'applied',
         dedup: true,
@@ -605,13 +597,7 @@ export async function applyStop(
   intervalId: string,
   contextFingerprint: string,
   receivedAtMs: number,
-  billingConfig: BillingConfig = {
-    services: new Set(),
-    userIds: new Set(),
-    orgIds: new Set(),
-    warnRemainingMicrodollars: 10_000_000,
-    enabled: false,
-  }
+  billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<ApplyResult> {
   return applyStopWithDb(
     getContainerUsageDb(env),
@@ -629,13 +615,7 @@ export async function applyStopWithDb(
   intervalId: string,
   contextFingerprint: string,
   receivedAtMs: number,
-  billingConfig: BillingConfig = {
-    services: new Set(),
-    userIds: new Set(),
-    orgIds: new Set(),
-    warnRemainingMicrodollars: 10_000_000,
-    enabled: false,
-  }
+  billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<ApplyResult> {
   const finalSegmentKey = heartbeatIdempotencyKey(
     input.service,
@@ -683,7 +663,9 @@ export async function applyStopWithDb(
         throw new UsageMutationConflictError('Closed interval has conflicting stop details');
       }
       const remaining =
-        interval.billing_mode === 'paid' ? await balanceForSubject(tx, input.context.subject) : 0;
+        interval.billing_mode === 'paid'
+          ? await balanceForSubject(tx, input.context.subject, true)
+          : 0;
       return {
         kind: 'applied',
         dedup: true,
@@ -728,7 +710,7 @@ export async function applyStopWithDb(
       ? interval.billing_mode === 'paid'
         ? budgetForRemaining(
             'paid',
-            await balanceForSubject(tx, input.context.subject),
+            await balanceForSubject(tx, input.context.subject, true),
             billingConfig.warnRemainingMicrodollars
           )
         : { verdict: 'continue' as const }

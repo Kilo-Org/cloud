@@ -9,6 +9,14 @@ export type BillingConfig = {
   enabled: boolean;
 };
 
+export const SHADOW_ONLY_BILLING_CONFIG: BillingConfig = {
+  services: new Set(),
+  userIds: new Set(),
+  orgIds: new Set(),
+  warnRemainingMicrodollars: DEFAULT_WARN_REMAINING_MICRODOLLARS,
+  enabled: false,
+};
+
 type BillingEnvironment = {
   CONTAINER_BILLING_SERVICES?: string;
   CONTAINER_BILLING_USER_IDS?: string;
@@ -34,9 +42,9 @@ export function billingConfigFromEnv(env: BillingEnvironment): BillingConfig {
     warnRemainingMicrodollars >= MINIMUM_REMAINING_MICRODOLLARS;
   const enabled = services !== null && userIds !== null && orgIds !== null && validThreshold;
   return {
-    services: services ?? new Set(),
-    userIds: userIds ?? new Set(),
-    orgIds: orgIds ?? new Set(),
+    services: services ?? SHADOW_ONLY_BILLING_CONFIG.services,
+    userIds: userIds ?? SHADOW_ONLY_BILLING_CONFIG.userIds,
+    orgIds: orgIds ?? SHADOW_ONLY_BILLING_CONFIG.orgIds,
     warnRemainingMicrodollars: validThreshold
       ? warnRemainingMicrodollars
       : DEFAULT_WARN_REMAINING_MICRODOLLARS,

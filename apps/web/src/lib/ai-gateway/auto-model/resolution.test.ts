@@ -288,15 +288,15 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   });
 
   it('applies exact thinking and instant variant settings', async () => {
-    // kimi-k2 uses REASONING_VARIANTS_BINARY: instant + thinking
-    const kimiModel = 'moonshotai/kimi-k2.5';
+    // Mistral uses REASONING_VARIANTS_BINARY: instant + thinking
+    const binaryModel = 'mistralai/mistral-medium-3-5';
     const thinkingResult = await resolveAutoModel(
       {
         ...baseParams,
         apiKind: 'chat_completions',
         efficientDecision: async () => ({
           ...sampleDecision,
-          model: kimiModel,
+          model: binaryModel,
           variant: 'thinking',
         }),
       },
@@ -309,7 +309,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
         apiKind: 'chat_completions',
         efficientDecision: async () => ({
           ...sampleDecision,
-          model: kimiModel,
+          model: binaryModel,
           variant: 'instant',
         }),
       },
@@ -320,14 +320,14 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(thinkingResult).toEqual({
       kind: 'ok',
       resolved: {
-        model: kimiModel,
+        model: binaryModel,
         reasoning: { enabled: true, effort: 'high' },
       },
     });
     expect(instantResult).toEqual({
       kind: 'ok',
       resolved: {
-        model: kimiModel,
+        model: binaryModel,
         reasoning: { enabled: false, effort: 'none' },
       },
     });

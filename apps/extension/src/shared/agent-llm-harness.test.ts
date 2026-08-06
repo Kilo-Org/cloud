@@ -374,7 +374,47 @@ describe('agent LLM harness', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
       'When the user repeats the same multi-step task on a site, offer to save it as a workflow with save_workflow.'
     );
-    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('Never do a real run to verify');
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain('Never do a real run to verify');
+  });
+
+  it('no longer claims unconditional card approval or an absolute real-run rule', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
+      'The user approves each workflow script version and each saved memory on a card.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'The user approves each saved memory on a card, and each workflow script version too unless auto-approve workflow changes is on.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'Follow the nextStep value in the save_workflow result: it says whether you may start the real run yourself or must ask the user.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'Never start a real run of a workflow whose actions buy, send, delete, or otherwise change data without asking the user first.'
+    );
+  });
+
+  it('run_workflow description names nextStep and drops the absolute user-starts rule', () => {
+    const definitions = createWorkflowToolDefinitions({ mode: 'dangerous' });
+    const runWorkflow = definitions.find(tool => tool.function.name === 'run_workflow');
+
+    expect(runWorkflow?.function.description).toContain('nextStep');
+    expect(runWorkflow?.function.description).not.toContain('and the user starts it');
+    expect(runWorkflow?.function.description).toContain(
+      'Start a real run yourself only when the save_workflow nextStep says you may, or when the user asks for a run.'
+    );
+  });
+
+  it('save_workflow description names autoApproved and nextStep and drops the absolute card claim', () => {
+    const definitions = createWorkflowToolDefinitions({ mode: 'dangerous' });
+    const saveWorkflow = definitions.find(tool => tool.function.name === 'save_workflow');
+
+    expect(saveWorkflow?.function.description).toContain('nextStep');
+    expect(saveWorkflow?.function.description).toContain('autoApproved');
+    expect(saveWorkflow?.function.description).not.toContain(
+      'must approve before the workflow is stored'
+    );
+    expect(saveWorkflow?.function.description).toContain(
+      'The user approves the change on a card unless auto-approve workflow changes is on'
+    );
   });
 
   it('tells the model that omitting pathPrefix, startUrl, or params clears them when updating a workflow', () => {

@@ -11,7 +11,11 @@ import {
   searchAgentWorkflows,
   matchesWorkflowScope,
 } from '@/src/shared/agent-workflows';
-import { loadAgentWorkflows, deleteAgentWorkflow } from '@/src/shared/agent-workflows-storage';
+import {
+  deleteAgentWorkflow,
+  loadAgentWorkflows,
+  loadWorkflowSettings,
+} from '@/src/shared/agent-workflows-storage';
 import { runWorkflow } from '@/src/shared/agent-workflow-runner';
 import type { WorkflowRunResult } from '@/src/shared/agent-workflow-runner';
 import type { ApprovalKind, ApprovalOutcome } from './pending-approval';
@@ -74,6 +78,15 @@ const saveMemoryArgsSchema = z.object({
   note: z.string().max(200).optional(),
   text: z.string().max(8000),
 });
+
+// ---------- run guidance ----------
+
+// The runs toggle is a permission the model reads through the save result's nextStep.
+// It is never a runtime refusal. The exact strings are pinned by the runtime tests.
+const NEXT_STEP_RUNS_AUTO_APPROVED =
+  'Auto-approve workflow runs is on. Verify with run_workflow dryRun: true when the script clicks or fills, then start the real run yourself with run_workflow.';
+const NEXT_STEP_RUNS_ASK_USER =
+  'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.';
 
 // ---------- helpers ----------
 
@@ -181,13 +194,16 @@ const validateWorkflowInput = (
  * Map an ApprovalOutcome (from requestApproval) to an EvalTabResult.
  * The mapping is identical for save_workflow and save_memory.
  * `savedId` is keyed as `workflowId` for workflow saves and `memoryId` for memory saves.
+ * `extra` is merged into the approved value only, so the rejected, aborted, and failed
+ * shapes stay byte-identical.
  */
 const approvalOutcomeToToolResult = (
   outcome: ApprovalOutcome,
-  idKey: 'workflowId' | 'memoryId'
+  idKey: 'workflowId' | 'memoryId',
+  extra: Record<string, unknown> = {}
 ): EvalTabResult => {
   if (outcome.status === 'approved') {
-    return { ok: true, value: { [idKey]: outcome.savedId, saved: true } };
+    return { ok: true, value: { [idKey]: outcome.savedId, saved: true, ...extra } };
   }
   if (outcome.status === 'rejected') {
     return { ok: true, value: { reason: 'The user rejected the save.', saved: false } };
@@ -377,8 +393,26 @@ const executeSaveWorkflow = async (
         }),
   };
 
+  // The runs toggle is a permission the model reads through the save result's nextStep.
+  // Read the setting before requesting approval. A failed settings read still permits
+  // The save and falls back to the cautious ask-the-user guidance.
+  let runsAutoApproved = false;
+  try {
+    const settings = await loadWorkflowSettings(ctx.storage);
+    runsAutoApproved = settings.autoApproveWorkflowRuns;
+  } catch {
+    // The nextStep is guidance only. An unreadable setting falls back to the cautious text.
+  }
+
   const outcome = await ctx.requestApproval('workflow', draft);
-  return approvalOutcomeToToolResult(outcome, 'workflowId');
+  const extra: Record<string, unknown> =
+    outcome.status === 'approved'
+      ? {
+          autoApproved: outcome.autoApproved,
+          nextStep: runsAutoApproved ? NEXT_STEP_RUNS_AUTO_APPROVED : NEXT_STEP_RUNS_ASK_USER,
+        }
+      : {};
+  return approvalOutcomeToToolResult(outcome, 'workflowId', extra);
 };
 
 const executeRunWorkflow = async (
@@ -449,9 +483,20 @@ const executeDeleteWorkflow = async (
     return { error: formatArgsError('delete_workflow', parsed.error), ok: false };
   }
 
+  const workflows = await loadAgentWorkflows(ctx.storage);
+  const workflow = workflows.find(item => item.id === parsed.data.workflowId);
+
+  if (workflow === undefined) {
+    return {
+      error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
+      ok: false,
+    };
+  }
+
   await deleteAgentWorkflow(ctx.storage, parsed.data.workflowId);
 
-  return { ok: true, value: { deleted: true } };
+  // Name the deleted workflow so the transcript and the model can report the change.
+  return { ok: true, value: { deleted: true, name: workflow.name, workflowId: workflow.id } };
 };
 
 const executeSaveMemory = async (

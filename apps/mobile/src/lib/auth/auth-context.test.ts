@@ -84,6 +84,10 @@ vi.mock('@/lib/query-client', () => ({
   queryClient: { clear: vi.fn(), invalidateQueries: vi.fn() },
 }));
 
+vi.mock('@/lib/auth/logout-cleanup', () => ({
+  runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('react-native', () => ({
   AppState: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),

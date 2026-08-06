@@ -81,6 +81,12 @@ const readCacheMock = vi.hoisted(() => ({
   setSignOutActive: vi.fn(),
 }));
 
+// Hoisted so the FIFO and failure-matrix tests can hold remote cleanup open or
+// force it to reject without loading the tRPC/notifications chain.
+const logoutCleanupMock = vi.hoisted(() => ({
+  runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ---- all vi.mock calls ----
 
 vi.mock('expo-secure-store', () => ({
@@ -117,6 +123,8 @@ vi.mock('@/lib/query-client', () => ({
 }));
 
 vi.mock('@/lib/persist/read-cache', () => readCacheMock);
+
+vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: vi.fn(),
@@ -497,38 +505,39 @@ describe('stale sign-in continuation', () => {
     };
   }
 
-  it('does not clear the guard, update auth state, or run login side effects when a sign-out fences the sign-in write', async () => {
+  it('signs the new session out when a sign-out is queued behind a sign-in (FIFO)', async () => {
     const { getCtx, unmount } = await mountStaleTest();
 
-    // The sign-in bumps the epoch and queues its credential write; the
-    // sign-out bumps it again and fences that write before it can publish.
-    const staleSignIn = getCtx().signIn('stale-token');
+    // Whole-body FIFO: the sign-in completes first (its credentials publish
+    // and its login side effects run), then the sign-out runs the full
+    // teardown of that new session.
+    const signInPromise = getCtx().signIn('stale-token');
     const signOutPromise = getCtx().signOut(true);
 
     await act(async () => {
-      await Promise.all([staleSignIn, signOutPromise]);
+      await Promise.all([signInPromise, signOutPromise]);
     });
 
-    // The fenced sign-in ran none of its continuation: no login side effect,
-    // no token restore, no session reset.
-    expect(hoisted.appsflyer.trackEvent).not.toHaveBeenCalled();
+    expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(1);
     const { resetPurchaseErrorToastDedup } =
       await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
-    expect(resetPurchaseErrorToastDedup).not.toHaveBeenCalled();
+    expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(1);
+    // The sign-out won the race to the final state.
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
-    // The fenced sign-in also never opened the sign-out fence: the cache mount
-    // stays refused while the user is signed out.
     expect(getCtx().isSigningOut).toBe(true);
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
 
     unmount();
   });
 
-  it('does not run login side effects for a sign-in superseded by a newer sign-in', async () => {
+  it('runs each queued sign-in as a whole body; the newer sign-in wins', async () => {
     const { getCtx, unmount } = await mountStaleTest();
 
-    // The second sign-in bumps the epoch and fences the first sign-in's
-    // credential write.
+    // FIFO serialization means the first sign-in is NOT fenced by the second:
+    // both publish and run their login side effects in queue order, and the
+    // newer sign-in owns the final token.
     const firstSignIn = getCtx().signIn('first-token');
     const secondSignIn = getCtx().signIn('second-token');
 
@@ -536,11 +545,10 @@ describe('stale sign-in continuation', () => {
       await Promise.all([firstSignIn, secondSignIn]);
     });
 
-    // Only the winning sign-in runs login side effects and owns the token.
-    expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(1);
+    expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(2);
     const { resetPurchaseErrorToastDedup } =
       await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
-    expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(1);
+    expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(2);
     expect(getCtx().token).toBe('second-token');
 
     unmount();
@@ -564,11 +572,11 @@ describe('stale sign-in continuation', () => {
     unmount();
   });
 
-  it('regression: a published sign-in clears the sign-out state, a fenced one does not', async () => {
+  it('regression: a published sign-in clears the sign-out state, a queued sign-out re-closes it', async () => {
     const { getCtx, unmount } = await mountStaleTest();
 
-    // Sign out, then sign in successfully: only a sign-in whose credentials
-    // published on the winning epoch opens the fence.
+    // Sign out, then sign in successfully: the sign-in publishes on the
+    // winning epoch and opens the fence.
     await act(async () => {
       await getCtx().signOut();
     });
@@ -578,12 +586,13 @@ describe('stale sign-in continuation', () => {
     expect(getCtx().isSigningOut).toBe(false);
     expect(readCacheMock.setSignOutActive).toHaveBeenCalledWith(false);
 
-    // A sign-in fenced by a newer sign-out never published its credentials:
-    // the reactive state stays active and the fence stays closed.
-    const staleSignIn = getCtx().signIn('stale-token');
+    // FIFO: the sign-in runs its whole body (the fence opens), then the
+    // sign-out queued behind it runs the full teardown and closes the fence
+    // again — the final state is signed out.
+    const signInPromise = getCtx().signIn('stale-token');
     const signOutPromise = getCtx().signOut(true);
     await act(async () => {
-      await Promise.all([staleSignIn, signOutPromise]);
+      await Promise.all([signInPromise, signOutPromise]);
     });
     expect(getCtx().isSigningOut).toBe(true);
     expect(getCtx().sessionEnded).toBe(true);
@@ -875,6 +884,224 @@ describe('reactive auth epoch', () => {
 
     expect(getCtx().authEpoch).toBeGreaterThan(before);
     expect(getCtx().authEpoch).toBe(currentAuthEpoch());
+
+    unmount();
+  });
+});
+
+describe('auth-transition queue and sign-out failure matrix', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.callOrder.length = 0;
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+  });
+
+  async function mountQueueTest(): Promise<{
+    getCtx: () => AuthContextValue;
+    unmount: () => void;
+  }> {
+    vi.resetModules();
+    const mod = await import('./auth-context');
+
+    let capturedCtx: AuthContextValue | undefined = undefined;
+    function Consumer(): null {
+      capturedCtx = mod.useAuth();
+      return null;
+    }
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(mod.AuthProvider, null, createElement(Consumer))
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    return {
+      getCtx: () => {
+        // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- safety net for test failures
+        if (!capturedCtx) {
+          throw new Error('auth context not captured');
+        }
+        return capturedCtx;
+      },
+      unmount: () => {
+        renderer?.unmount();
+      },
+    };
+  }
+
+  it('queues a sign-in behind an in-flight sign-out so it lands after the full teardown', async () => {
+    const { getCtx, unmount } = await mountQueueTest();
+
+    // Hold the sign-out's remote cleanup open so the teardown is mid-flight
+    // when the sign-in is queued.
+    let releaseCleanup: (() => void) | undefined = undefined;
+    const cleanupGate = new Promise<void>(resolve => {
+      releaseCleanup = resolve;
+    });
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
+      await cleanupGate;
+    });
+
+    const signOutPromise = getCtx().signOut();
+    await vi.waitFor(() => {
+      expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalled();
+    });
+
+    // The sign-in is queued behind the sign-out: while the cleanup is held it
+    // must not run its credential write or any login side effect.
+    const signInPromise = getCtx().signIn('queued-token');
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+    expect(hoisted.secureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(hoisted.appsflyer.trackEvent).not.toHaveBeenCalled();
+
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    const clearMock = vi.mocked(queryClientMock.clear);
+
+    releaseCleanup?.();
+    await act(async () => {
+      await Promise.all([signOutPromise, signInPromise]);
+    });
+
+    // Whole-body FIFO: the sign-out's teardown (including the query-client
+    // clear) settled before the sign-in's credential write ran.
+    expect(clearMock).toHaveBeenCalledTimes(1);
+    const clearOrder = clearMock.mock.invocationCallOrder[0];
+    const setOrder = hoisted.secureStore.setItemAsync.mock.invocationCallOrder[0];
+    expect(clearOrder).toBeLessThan(setOrder);
+    expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(1);
+    expect(getCtx().token).toBe('queued-token');
+    expect(getCtx().sessionEnded).toBe(false);
+    expect(getCtx().isSigningOut).toBe(false);
+
+    unmount();
+  });
+
+  it('runs a double sign-out teardown exactly once (in-run dedupe)', async () => {
+    const { getCtx, unmount } = await mountQueueTest();
+
+    const first = getCtx().signOut();
+    const second = getCtx().signOut();
+
+    await act(async () => {
+      await Promise.all([first, second]);
+    });
+
+    // The second queued sign-out no-ops: teardown ran exactly once.
+    expect(hoisted.posthog.discardPostHog).toHaveBeenCalledTimes(1);
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(false);
+
+    unmount();
+  });
+
+  it('still runs cleanup, the epoch bump, the deletion batch, and state reset when PostHog teardown throws', async () => {
+    const { getCtx, unmount } = await mountQueueTest();
+    hoisted.posthog.discardPostHog.mockRejectedValueOnce(new Error('posthog down'));
+
+    await act(async () => {
+      await getCtx().signOut();
+    });
+
+    // Cleanup still ran, the deletion batch still ran, and auth state reset.
+    expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalledTimes(1);
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(false);
+
+    unmount();
+  });
+
+  it('still bumps the epoch, clears the token, runs the batch, and resets state when runLogoutCleanup throws', async () => {
+    const { getCtx, unmount } = await mountQueueTest();
+    const { currentAuthEpoch } = await import('@/lib/auth/auth-epoch');
+    const before: number = currentAuthEpoch();
+    // Contract violation (runLogoutCleanup never throws): the outer finally
+    // must still run the epoch bump and the local teardown.
+    logoutCleanupMock.runLogoutCleanup.mockRejectedValueOnce(new Error('cleanup exploded'));
+
+    const signOutPromise = getCtx().signOut();
+    await act(async () => {
+      await signOutPromise.catch(() => {
+        // The rejection is the forced contract violation; only the finally
+        // ordering matters here.
+      });
+    });
+
+    expect(currentAuthEpoch()).toBeGreaterThan(before);
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()).toBeNull();
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(false);
+
+    unmount();
+  });
+
+  it('runs every other batch member, the preference clears, and state reset when one batch member rejects', async () => {
+    const { getCtx, unmount } = await mountQueueTest();
+    const { clearLastActiveInstance } = await import('@/lib/last-active-instance');
+    vi.mocked(clearLastActiveInstance).mockRejectedValueOnce(new Error('storage down'));
+
+    await act(async () => {
+      await getCtx().signOut();
+    });
+
+    // All independent batch members still ran despite the one rejection.
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
+    const { clearAgentModelPreference } = await import('@/lib/hooks/use-persisted-agent-model');
+    expect(clearAgentModelPreference).toHaveBeenCalled();
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
+    expect(getCtx().token).toBeUndefined();
+
+    unmount();
+  });
+
+  it('resets auth state even when the deletion batch phase throws synchronously', async () => {
+    const { getCtx, unmount } = await mountQueueTest();
+    // A synchronous throw while the allSettled batch is being built: the
+    // batch never runs, the preference clears are skipped, and the inner
+    // finally still resets query and auth state.
+    readCacheMock.readCachedUserId.mockImplementationOnce(() => {
+      throw new Error('cache read exploded');
+    });
+
+    const signOutPromise = getCtx().signOut();
+    await act(async () => {
+      await signOutPromise.catch(() => {
+        // The synchronous batch-phase throw propagates after the finally.
+      });
+    });
+
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
+    const { clearAgentModelPreference } = await import('@/lib/hooks/use-persisted-agent-model');
+    expect(clearAgentModelPreference).not.toHaveBeenCalled();
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(false);
 
     unmount();
   });

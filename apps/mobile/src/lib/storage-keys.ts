@@ -27,6 +27,13 @@ export const PERSIST_DB_KEY = 'persist-db-key';
  * deleted on sign-out via `deleteAccountMetadata`.
  */
 export const ACTIVE_USER_ID_KEY = 'active-user-id';
+/**
+ * Sign-out cleanup tombstone (Phase 2, class `safe-retry`). Records which
+ * remote cleanup parts (session revoke / push unregister) failed at logout so
+ * the next authenticated opportunity can reconcile them. Deliberately NOT
+ * epoch-fenced and NOT deleted on sign-out: it must survive the teardown.
+ */
+export const LOGOUT_CLEANUP_TOMBSTONE_KEY = 'logout-cleanup-tombstone';
 export const KILOCLAW_OWNED_KEY = 'kiloclaw-owned';
 export const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';

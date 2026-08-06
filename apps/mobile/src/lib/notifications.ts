@@ -140,6 +140,33 @@ export async function getDevicePushToken(): Promise<string | null> {
   return tokenResponse.data;
 }
 
+export type DevicePushTokenOutcome =
+  | { kind: 'none' }
+  | { kind: 'token'; token: string }
+  | { kind: 'lookup-failed' };
+
+/**
+ * Three-outcome device push token read for sign-out cleanup. `'none'` means
+ * the permission is not granted (denied or undetermined), so the device never
+ * obtained a token this install and there is nothing to unregister. `'token'`
+ * is the stable per-device Expo push token. `'lookup-failed'` means either
+ * expo call threw, so a server row may exist and reconciliation must re-read.
+ */
+export async function getDevicePushTokenOutcome(): Promise<DevicePushTokenOutcome> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== Notifications.PermissionStatus.GRANTED) {
+      return { kind: 'none' };
+    }
+    const tokenResponse = await Notifications.getExpoPushTokenAsync({
+      projectId: getProjectId(),
+    });
+    return { kind: 'token', token: tokenResponse.data };
+  } catch {
+    return { kind: 'lookup-failed' };
+  }
+}
+
 export async function getNotificationPermissionStatus(): Promise<
   'granted' | 'denied' | 'undetermined'
 > {

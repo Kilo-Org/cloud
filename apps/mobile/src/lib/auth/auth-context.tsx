@@ -17,11 +17,13 @@ import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { API_BASE_URL } from '@/lib/config';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { runLogoutCleanup } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setActiveToken } from '@/lib/auth/token-owner';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
@@ -331,86 +333,127 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
   const signIn = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresIn?: number) => {
-      invalidateRefreshSession();
-      setAuthEpoch(currentAuthEpoch());
-      const epoch = currentAuthEpoch();
-      const published = await persistSignInCredentials(tokenValue, refreshTokenValue, expiresIn);
-      // A sign-in superseded by a newer sign-in or sign-out while its
-      // credential write was fenced must not clear the signed-out guard,
-      // update React auth state, or run login side effects.
-      if (!published || !isCurrentAuthEpoch(epoch)) {
-        return;
-      }
-      // Clear the guard so a later refused refresh can sign out again.
-      isSignedOutReference.current = false;
-      setSessionEnded(false);
-      // Credentials published on the winning epoch: the sign-out fence opens
-      // so the read-cache mount can subscribe for the new session.
-      setSignOutActive(false);
-      setIsSigningOut(false);
-      trackEvent('login');
-      resetPurchaseErrorToastDedup();
-      setToken(tokenValue);
+      // The ENTIRE sign-in body runs inside the FIFO auth-transition queue, so
+      // a sign-in queued behind an in-flight sign-out lands only after the
+      // full teardown, and a sign-out queued behind a sign-in signs that new
+      // session out (documented, correct FIFO semantics).
+      await chainSave('auth-transition', async () => {
+        invalidateRefreshSession();
+        setAuthEpoch(currentAuthEpoch());
+        const epoch = currentAuthEpoch();
+        const published = await persistSignInCredentials(tokenValue, refreshTokenValue, expiresIn);
+        // A sign-in superseded by a newer sign-in or sign-out while its
+        // credential write was fenced must not clear the signed-out guard,
+        // update React auth state, or run login side effects.
+        if (!published || !isCurrentAuthEpoch(epoch)) {
+          return;
+        }
+        // Clear the guard so a later refused refresh can sign out again.
+        isSignedOutReference.current = false;
+        setSessionEnded(false);
+        // Credentials published on the winning epoch: the sign-out fence opens
+        // so the read-cache mount can subscribe for the new session.
+        setSignOutActive(false);
+        setIsSigningOut(false);
+        trackEvent('login');
+        resetPurchaseErrorToastDedup();
+        setToken(tokenValue);
+      });
     },
     []
   );
 
   const signOut = useCallback(async (ended = false) => {
-    isSignedOutReference.current = true;
-    // Close the cache publication fence synchronously, before the epoch bump
-    // and before any await, so a write can never land in the scope that the
-    // cleanup below clears. The reactive state flips in the same render as
-    // the epoch bump, so the read-cache mount unsubscribes and cannot
-    // resubscribe while the old user id is still cached.
-    setSignOutActive(true);
-    setIsSigningOut(true);
-    invalidateRefreshSession();
-    setAuthEpoch(currentAuthEpoch());
-    clearActiveToken();
-    // Close ownership persistence before any await so a late list response
-    // cannot write the previous account's answer during teardown.
-    gateKiloClawOwned();
-    clearTelemetryDecision();
-    Sentry.setUser(null);
-    // SDK teardown — drop queues, do not flush them. Must happen before
-    // any SecureStore or cache awaits so optional analytics cannot transmit
-    // during the teardown window.
-    resetAppsFlyerState();
-    await discardPostHog();
-    purgePostHogPersistence();
-
-    await writeCredentials(async () => {
-      await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
-      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-      await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY);
-      await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+    // The ENTIRE sign-out body runs inside the FIFO auth-transition queue.
+    // Dedupe inside the queued run, not at enqueue: a sign-out queued behind
+    // an in-flight sign-out (or after a completed teardown) no-ops, so
+    // double sign-out runs teardown exactly once.
+    await chainSave('auth-transition', async () => {
+      if (isSignedOutReference.current) {
+        return;
+      }
+      isSignedOutReference.current = true;
+      // Close the cache publication fence synchronously, before the epoch
+      // bump and before any await, so a write can never land in the scope
+      // that the cleanup below clears. The reactive state flips in the same
+      // render as the epoch bump, so the read-cache mount unsubscribes and
+      // cannot resubscribe while the old user id is still cached.
+      setSignOutActive(true);
+      setIsSigningOut(true);
+      try {
+        // Close ownership persistence before any await so a late list
+        // response cannot write the previous account's answer during
+        // teardown.
+        gateKiloClawOwned();
+        clearTelemetryDecision();
+        Sentry.setUser(null);
+        // SDK teardown — drop queues, do not flush them. Must happen before
+        // any SecureStore or cache awaits so optional analytics cannot
+        // transmit during the teardown window. Each step is individually
+        // caught: a telemetry failure must never block sign-out.
+        resetAppsFlyerState();
+        try {
+          await discardPostHog();
+        } catch {
+          // Optional analytics teardown is best effort.
+        }
+        try {
+          purgePostHogPersistence();
+        } catch {
+          // Optional telemetry storage purge is best effort.
+        }
+        // Remote cleanup (session revoke + push unregister + tombstone)
+        // runs BEFORE the epoch bump while the token owner still serves auth
+        // headers. Never throws by contract.
+        await runLogoutCleanup();
+      } finally {
+        // The epoch bumps after remote cleanup (cleanup requests pass the
+        // fence) and before any local deletion (no deferred save can land
+        // after it).
+        bumpAuthEpoch();
+        setAuthEpoch(currentAuthEpoch());
+        clearActiveToken();
+        try {
+          // Independent local cleanup, concurrent via allSettled: a
+          // rejection in any member must never stop the others or the
+          // preference clears. The credential deletion and the identity-hint
+          // deletion are members of the same always-attempted batch.
+          await Promise.allSettled([
+            writeCredentials(async () => {
+              await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+              await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+              await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY);
+              await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+            }),
+            deleteAccountMetadata(ACTIVE_USER_ID_KEY),
+            deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
+            deleteAccountMetadata(SESSION_FILTERS_KEY),
+            deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
+            // Phase 4b read-cache cleanup: capture the authoritative user
+            // id from the getMe cache while it is still present (the batch
+            // expression runs before queryClient.clear()), then remove that
+            // user's cache scope (or every `cache:` scope when the id is
+            // unknown — privacy wins). Best effort: a failed cleanup can
+            // never abort sign-out.
+            clearCacheScopeForSignOut(readCachedUserId(queryClient)),
+            clearLastActiveInstance(),
+            clearKiloClawOwned(),
+            clearRecentPrs(),
+            clearViewedFiles(),
+          ]);
+          // Synchronous preference clears so they don't leak to the next
+          // signed-in account. A synchronous throw here still falls through
+          // to the state reset below.
+          clearAgentModelPreference();
+          clearReasoningPreference();
+          clearKeepScreenOnPreference();
+        } finally {
+          queryClient.clear();
+          setSessionEnded(ended);
+          setToken(undefined);
+        }
+      }
     });
-    // Clear per-user preferences so they don't leak to the next signed-in account
-    await deleteAccountMetadata(ORGANIZATION_STORAGE_KEY);
-    await deleteAccountMetadata(SESSION_FILTERS_KEY);
-    await deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY);
-    await deleteAccountMetadata(ACTIVE_USER_ID_KEY);
-    await clearLastActiveInstance();
-    await clearKiloClawOwned();
-    await clearRecentPrs();
-    await clearViewedFiles();
-    clearAgentModelPreference();
-    clearReasoningPreference();
-    clearKeepScreenOnPreference();
-    // Phase 4b read-cache cleanup: capture the authoritative user id from the
-    // getMe cache before it is cleared, then remove that user's cache scope
-    // (or every `cache:` scope when the id is unknown — privacy wins). Best
-    // effort: a failed cleanup must never abort sign-out, so the query client
-    // and auth state reset below always run.
-    const knownUserId = readCachedUserId(queryClient);
-    try {
-      await clearCacheScopeForSignOut(knownUserId);
-    } catch {
-      // A stale blob only costs a future warm start.
-    }
-    queryClient.clear();
-    setSessionEnded(ended);
-    setToken(undefined);
   }, []);
 
   // Unauthorized handler: try refresh first, sign out only on a refused 401.

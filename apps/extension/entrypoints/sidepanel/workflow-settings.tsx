@@ -9,8 +9,8 @@ import {
   loadWorkflowSettings,
   saveWorkflowSettings,
 } from '@/src/shared/agent-workflows-storage';
-import type { AgentWorkflowSettings } from '@/src/shared/agent-workflows';
 import { useAgentWorkflows } from './use-agent-workflows';
+import { WorkflowRunPrompt } from './workflow-run-prompt';
 import {
   deriveWorkflowRunDisabledReason,
   deriveWorkflowSettingsView,
@@ -23,7 +23,11 @@ import {
   settingsDialogOpenAtom,
 } from './settings-dialog-state';
 
-const EMPTY_MESSAGE = 'No workflows yet. Kilo offers to save one when you repeat steps on a site.';
+type AgentWorkflowSettings = Awaited<ReturnType<typeof loadWorkflowSettings>>;
+type StoredWorkflow = Parameters<typeof WorkflowRunPrompt>[0]['workflow'];
+
+const EMPTY_MESSAGE =
+  'No workflows yet. Ask Kilo to save one — for example "Create a workflow that checks the price of this item" — or repeat steps on a site and Kilo offers to save them.';
 const LOAD_ERROR_MESSAGE = "Couldn't load workflows. Try again.";
 
 const secondaryButtonClass =
@@ -60,6 +64,9 @@ const WorkflowRow = ({
         <p className="type-body truncate font-medium text-foreground" title={item.name}>
           {item.name}
         </p>
+        {item.description !== '' && (
+          <p className="type-label mt-0.5 line-clamp-2 text-foreground-muted">{item.description}</p>
+        )}
         <p className="type-label mt-0.5 text-foreground-muted">
           {item.scope}
           {' · '}
@@ -170,12 +177,31 @@ export const WorkflowSettings = (): JSX.Element => {
     void deleteAgentWorkflow(storage, id);
   }, []);
 
+  const [runPromptWorkflow, setRunPromptWorkflow] = useState<StoredWorkflow | undefined>();
+
   const handleRun = useCallback(
     (id: string) => {
+      const workflow = workflows.find(candidate => candidate.id === id);
+      if (workflow !== undefined && (workflow.params ?? []).length > 0) {
+        setRunPromptWorkflow(workflow);
+        return;
+      }
       setRunRequest({ workflowId: id });
       setIsSettingsOpen(false);
     },
-    [setRunRequest, setIsSettingsOpen]
+    [workflows, setRunRequest, setIsSettingsOpen]
+  );
+
+  const handlePromptRun = useCallback(
+    (input: Record<string, string>) => {
+      if (runPromptWorkflow === undefined) {
+        return;
+      }
+      setRunRequest({ input, workflowId: runPromptWorkflow.id });
+      setRunPromptWorkflow(undefined);
+      setIsSettingsOpen(false);
+    },
+    [runPromptWorkflow, setRunRequest, setIsSettingsOpen]
   );
 
   return (
@@ -247,6 +273,16 @@ export const WorkflowSettings = (): JSX.Element => {
           ))}
         </ul>
       ) : null}
+
+      {runPromptWorkflow !== undefined && (
+        <WorkflowRunPrompt
+          onCancel={() => {
+            setRunPromptWorkflow(undefined);
+          }}
+          onRun={handlePromptRun}
+          workflow={runPromptWorkflow}
+        />
+      )}
     </section>
   );
 };

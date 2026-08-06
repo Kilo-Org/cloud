@@ -72,7 +72,7 @@ describe('buildWorkflowPageCode function', () => {
 
     expect(code).toContain('const dryRun = false');
     expect(code).toContain(
-      'const workflow = async ({ page, state }) => { return { done: true, result: 1 }; }'
+      'const workflow = async ({ page, state, input }) => { return { done: true, result: 1 }; }'
     );
     expect(code).toContain('"input":{"key":1}');
   });
@@ -744,6 +744,126 @@ describe('runWorkflow function', () => {
       ok: true,
       pagesVisited: 2,
       result: 'done',
+    });
+  });
+});
+
+describe('workflow params and input', () => {
+  it('injects input into the page code and exposes the waitFor helper', () => {
+    const code = buildWorkflowPageCode('return { done: true, result: 1 };', {}, false, {
+      destination: 'SFO',
+    });
+
+    expect(code).toContain('input: {"destination":"SFO"}');
+    expect(code).toContain('async waitFor(selector, timeoutMs)');
+  });
+
+  it('defaults input to an empty object in the page code', () => {
+    const code = buildWorkflowPageCode('return { done: true, result: 1 };', {}, false);
+    expect(code).toContain('input: {}');
+  });
+
+  it('records waitFor as a dry-run action instead of polling', () => {
+    const code = buildWorkflowPageCode('return { done: true, result: 1 };', {}, true);
+    expect(code).toContain("dryRunActions.push({ action: 'waitFor', selector }); return;");
+  });
+
+  it('rejects a run when required params are missing, before any navigation', async () => {
+    const workflow = await buildApprovedWorkflow({
+      params: [
+        {
+          description: 'City or airport to fly to',
+          example: 'SFO',
+          name: 'destination',
+          required: true,
+        },
+        { description: 'Departure date', name: 'date', required: true },
+        { description: 'Cabin class', name: 'cabin' },
+      ],
+      startUrl: 'https://shop.example.com/start',
+    });
+    const deps = createDeps();
+
+    const result = await runWorkflow(deps, { input: { date: '2026-09-01' }, tabId: 1, workflow });
+
+    expect(result).toStrictEqual({
+      error:
+        'Missing required input: "destination" — City or airport to fly to (e.g. "SFO"). ' +
+        'Call run_workflow again with input: {"destination":"SFO"}.',
+      ok: false,
+    });
+    expect(deps.navigateUrls).toStrictEqual([]);
+  });
+
+  it('runs when only optional params are missing', async () => {
+    const workflow = await buildApprovedWorkflow({
+      params: [{ description: 'Cabin class', name: 'cabin' }],
+    });
+    const deps = createDeps({
+      evalResponses: [{ ok: true, value: { ok: true, value: { done: true, result: 'ok' } } }],
+    });
+
+    const result = await runWorkflow(deps, { tabId: 1, workflow });
+    expect(result).toStrictEqual({ ok: true, pagesVisited: 1, result: 'ok' });
+  });
+
+  it.each(['SFO', [['SFO']], 42])(
+    'rejects non-object input %j with an actionable message',
+    async badInput => {
+      const workflow = await buildApprovedWorkflow();
+      const deps = createDeps();
+
+      const result = await runWorkflow(deps, { input: badInput, tabId: 1, workflow });
+      expect(result).toStrictEqual({
+        error: 'run_workflow input must be a JSON object like { "name": "value" }.',
+        ok: false,
+      });
+    }
+  );
+
+  it('re-injects input on every page across navigations', async () => {
+    const evalCodes: string[] = [];
+    const deps = createDeps({
+      evalResponses: [
+        {
+          ok: true,
+          value: {
+            ok: true,
+            value: { navigate: 'https://shop.example.com/page2', state: { step: 2 } },
+          },
+        },
+        { ok: true, value: { ok: true, value: { done: true, result: 'end' } } },
+      ],
+      tabUrls: ['https://shop.example.com/page1', 'https://shop.example.com/page2'],
+    });
+    const capturingDeps = {
+      ...deps,
+      evalInTab: (tabId: number, code: string) => {
+        evalCodes.push(code);
+        return deps.evalInTab(tabId, code);
+      },
+    };
+    const workflow = await buildApprovedWorkflow();
+
+    const result = await runWorkflow(capturingDeps, {
+      input: { destination: 'SFO' },
+      tabId: 1,
+      workflow,
+    });
+
+    expect(result).toStrictEqual({ ok: true, pagesVisited: 2, result: 'end' });
+    expect({
+      count: evalCodes.length,
+      firstInput: evalCodes[0]?.includes('input: {"destination":"SFO"}'),
+      firstState: evalCodes[0]?.includes('state: {"input":{"destination":"SFO"}}'),
+      secondInput: evalCodes[1]?.includes('input: {"destination":"SFO"}'),
+      secondState: evalCodes[1]?.includes('state: {"step":2}'),
+    }).toStrictEqual({
+      count: 2,
+      firstInput: true,
+      firstState: true,
+      secondInput: true,
+      secondState: true,
     });
   });
 });

@@ -6,6 +6,8 @@ import {
   MAX_WORKFLOW_COUNT,
   MAX_WORKFLOW_NAME_LENGTH,
   MAX_WORKFLOW_SCRIPT_LENGTH,
+  agentWorkflowParamSchema,
+  MAX_WORKFLOW_PARAM_COUNT,
   searchAgentWorkflows,
   matchesWorkflowScope,
 } from '@/src/shared/agent-workflows';
@@ -42,6 +44,7 @@ export interface WorkflowToolContext {
 const saveWorkflowArgsSchema = z.object({
   description: z.string().max(300),
   name: z.string().max(MAX_WORKFLOW_NAME_LENGTH),
+  params: z.array(agentWorkflowParamSchema).max(MAX_WORKFLOW_PARAM_COUNT).optional(),
   pathPrefix: z.string().optional(),
   scopeOrigin: z.string(),
   script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
@@ -96,6 +99,13 @@ const validateWorkflowInput = (
 
   if (args.pathPrefix !== undefined && !args.pathPrefix.startsWith('/')) {
     return 'pathPrefix must start with /.';
+  }
+
+  if (args.params !== undefined) {
+    const names = args.params.map(param => param.name);
+    if (new Set(names).size !== names.length) {
+      return 'params must not contain duplicate names.';
+    }
   }
 
   if (args.startUrl !== undefined) {
@@ -197,6 +207,7 @@ const executeSearchWorkflows = async (
         description: item.description,
         id: item.id,
         name: item.name,
+        params: item.params ?? [],
         pathPrefix: item.pathPrefix,
         scopeOrigin: item.scopeOrigin,
       })),
@@ -237,7 +248,8 @@ const executeSaveWorkflow = async (
     return { error: validationError, ok: false };
   }
 
-  const { name, description, scopeOrigin, script, pathPrefix, startUrl, workflowId } = parsed.data;
+  const { name, description, scopeOrigin, script, pathPrefix, startUrl, workflowId, params } =
+    parsed.data;
 
   // For a Create (no workflowId), check store fullness first.
   if (workflowId === undefined) {
@@ -267,13 +279,16 @@ const executeSaveWorkflow = async (
     script,
     ...(workflowId === undefined
       ? {
+          ...(params === undefined || params.length === 0 ? {} : { params }),
           ...(pathPrefix === undefined ? {} : { pathPrefix }),
           ...(startUrl === undefined ? {} : { startUrl }),
         }
       : {
           // Update: always include so the card and storage can carry a clear intent.
           // Empty string is the "cleared" sentinel — it survives JSON serialization
-          // (unlike undefined) but is never a valid real value.
+          // (unlike undefined) but is never a valid real value. Params use the
+          // Empty array the same way.
+          params: params ?? [],
           pathPrefix: pathPrefix ?? '',
           startUrl: startUrl ?? '',
           workflowId,

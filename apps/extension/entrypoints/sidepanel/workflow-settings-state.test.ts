@@ -109,6 +109,7 @@ describe('workflow settings view selection', () => {
         {
           dateLabel: formatWorkflowListDate(200),
           deleteAriaLabel: 'Delete workflow "Newer"',
+          description: 'A test workflow',
           id: 'newer',
           isApproved: false,
           name: 'Newer',
@@ -117,6 +118,7 @@ describe('workflow settings view selection', () => {
         {
           dateLabel: formatWorkflowListDate(100),
           deleteAriaLabel: 'Delete workflow "Older"',
+          description: 'A test workflow',
           id: 'older',
           isApproved: false,
           name: 'Older',

@@ -698,3 +698,121 @@ describe('save_memory', () => {
     );
   });
 });
+
+// ---------- workflow params ----------
+
+describe('workflow params through tools', () => {
+  it('rejects save_workflow with duplicate param names', async () => {
+    const ctx = createBaseCtx();
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'Test',
+        name: 'Test',
+        params: [
+          { description: 'One', name: 'city' },
+          { description: 'Two', name: 'city' },
+        ],
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+      }),
+      ctx
+    );
+
+    expect(result).toStrictEqual({ error: 'params must not contain duplicate names.', ok: false });
+  });
+
+  it('carries params into the approval draft on create', async () => {
+    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'id-1', status: 'approved' });
+    const ctx = createBaseCtx({ requestApproval });
+
+    await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'Test',
+        name: 'Test',
+        params: [{ description: 'City', example: 'SFO', name: 'destination', required: true }],
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+      }),
+      ctx
+    );
+
+    expect(requestApproval).toHaveBeenCalledWith(
+      'workflow',
+      expect.objectContaining({
+        params: [{ description: 'City', example: 'SFO', name: 'destination', required: true }],
+      })
+    );
+  });
+
+  it('uses the empty params array as the cleared sentinel on update', async () => {
+    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'wf-1', status: 'approved' });
+    const stored = {
+      approvedScriptHash: 'hash',
+      createdAt: 1,
+      description: 'Old',
+      id: 'wf-1',
+      name: 'Old',
+      scopeOrigin: 'https://example.com',
+      script: 'return { done: true, result: 1 };',
+      updatedAt: 1,
+    };
+    const ctx = createBaseCtx({
+      requestApproval,
+      storage: {
+        getItem: vi.fn().mockResolvedValue([stored]),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+    await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'New',
+        name: 'New',
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 2 };',
+        workflowId: 'wf-1',
+      }),
+      ctx
+    );
+
+    expect(requestApproval).toHaveBeenCalledWith(
+      'workflow',
+      expect.objectContaining({ params: [], workflowId: 'wf-1' })
+    );
+  });
+
+  it('returns params in search_workflows results', async () => {
+    const stored = {
+      approvedScriptHash: 'hash',
+      createdAt: 1,
+      description: 'Flights',
+      id: 'wf-1',
+      name: 'Flights',
+      params: [{ description: 'City', name: 'destination', required: true }],
+      scopeOrigin: 'https://example.com',
+      script: 'return { done: true, result: 1 };',
+      updatedAt: 1,
+    };
+    const ctx = createBaseCtx({
+      storage: {
+        getItem: vi.fn().mockResolvedValue([stored]),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+    const result = await executeWorkflowToolCall(createToolCall('search_workflows', {}), ctx);
+
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        results: [
+          expect.objectContaining({
+            params: [{ description: 'City', name: 'destination', required: true }],
+          }),
+        ],
+      },
+    });
+  });
+});

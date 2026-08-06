@@ -10,6 +10,7 @@ export type WorkflowSettingsView =
 export interface WorkflowSettingsListItem {
   id: string;
   name: string;
+  description: string;
   scope: string;
   dateLabel: string;
   isApproved: boolean;
@@ -23,6 +24,7 @@ export interface WorkflowRunDisabledReason {
 
 export interface WorkflowRunRequest {
   workflowId: string;
+  input?: Record<string, string> | undefined;
 }
 
 export const workflowRunRequestAtom = atom<WorkflowRunRequest | undefined>();
@@ -37,6 +39,7 @@ export const formatWorkflowListDate = (updatedAt: number): string =>
 export const toWorkflowSettingsListItem = (workflow: AgentWorkflow): WorkflowSettingsListItem => ({
   dateLabel: formatWorkflowListDate(workflow.updatedAt),
   deleteAriaLabel: `Delete workflow "${workflow.name}"`,
+  description: workflow.description,
   id: workflow.id,
   isApproved: workflow.approvedScriptHash !== undefined,
   name: workflow.name,

@@ -8,7 +8,9 @@ import {
   agentWorkflowSchema,
   agentWorkflowInputSchema,
   storedAgentWorkflowsSchema,
+  findMissingRequiredParams,
   formatAgentWorkflowIndex,
+  formatMissingParamsError,
   hashWorkflowScript,
   isWorkflowApproved,
   matchesWorkflowScope,
@@ -400,5 +402,56 @@ describe('isWorkflowApproved function', () => {
       script,
     });
     expect(result).toBe(true);
+  });
+});
+
+describe('workflow params in the index and error formatting', () => {
+  it('appends declared input names to index entries', () => {
+    const index = formatAgentWorkflowIndex(
+      [
+        workflow({
+          description: 'Search flights',
+          id: 'fl',
+          name: 'Flights',
+          params: [
+            { description: 'City', name: 'destination', required: true },
+            { description: 'Date', name: 'date' },
+          ],
+          scopeOrigin: 'https://shop.example.com',
+          script: '1',
+        }),
+      ],
+      'https://shop.example.com'
+    );
+
+    expect(index).toContain('(inputs: destination, date)');
+  });
+
+  it('finds missing required params and formats an actionable error', () => {
+    const params = [
+      {
+        description: 'City or airport to fly to',
+        example: 'SFO',
+        name: 'destination',
+        required: true,
+      },
+      { description: 'Cabin class', name: 'cabin' },
+    ];
+
+    const emptyInput: Record<string, unknown> | undefined = undefined;
+
+    expect({
+      // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- Fixture index is static.
+      formatted: formatMissingParamsError([params[0]!]),
+      missingForEmptyInput: findMissingRequiredParams({ params }, emptyInput),
+      missingForProvided: findMissingRequiredParams({ params }, { destination: 'SFO' }),
+      missingWithoutParams: findMissingRequiredParams({}, emptyInput),
+    }).toStrictEqual({
+      formatted:
+        'Missing required input: "destination" — City or airport to fly to (e.g. "SFO"). Call run_workflow again with input: {"destination":"SFO"}.',
+      missingForEmptyInput: [params[0]],
+      missingForProvided: [],
+      missingWithoutParams: [],
+    });
   });
 });

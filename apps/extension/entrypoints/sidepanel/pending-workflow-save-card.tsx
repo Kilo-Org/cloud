@@ -219,6 +219,26 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
                   </div>
                 )}
 
+                {pendingDraft.params !== undefined && pendingDraft.params.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="type-label text-foreground-muted">Inputs</p>
+                    <ul className="flex flex-col gap-1">
+                      {pendingDraft.params.map(param => (
+                        <li className="type-label text-foreground" key={param.name}>
+                          <span className="font-mono">{param.name}</span>
+                          {param.required === true ? (
+                            <span className="text-foreground-muted"> (required)</span>
+                          ) : null}
+                          <span className="text-foreground-muted"> — {param.description}</span>
+                          {param.example !== undefined && param.example !== '' ? (
+                            <span className="text-foreground-subtle"> e.g. {param.example}</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {isUpdate && storedWorkflow !== undefined ? (
                   <>
                     <div className="space-y-1">

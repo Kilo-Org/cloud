@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   MAX_WORKFLOW_PAGES_PER_RUN,
   MAX_WORKFLOW_STATE_LENGTH,
+  findMissingRequiredParams,
+  formatMissingParamsError,
   isWorkflowApproved,
   matchesWorkflowScope,
 } from './agent-workflows';
@@ -52,10 +54,17 @@ const scriptEnvelopeSchema = z.object({
  * Build the injected page code for a single workflow page eval.
  * Uses plain string CONCATENATION, never a template literal — a workflow script
  * containing a backtick or `${` would otherwise break or corrupt the composed code.
- * `state` and `dryRun` are embedded with `JSON.stringify`.
+ * `state`, `dryRun`, and `input` are embedded with `JSON.stringify`.
+ * `input` is re-injected on every page so scripts never lose run inputs
+ * across navigations; `state` carries only what the script returns.
  */
-/* eslint-disable prefer-template -- Concatenation avoids template-literal injection from untrusted workflow scripts. */
-export const buildWorkflowPageCode = (script: string, state: unknown, dryRun: boolean): string =>
+/* eslint-disable prefer-template, max-params -- Concatenation avoids template-literal injection from untrusted workflow scripts; the page code needs all four values. */
+export const buildWorkflowPageCode = (
+  script: string,
+  state: unknown,
+  dryRun: boolean,
+  input: unknown = {}
+): string =>
   'const dryRun = ' +
   JSON.stringify(dryRun) +
   ';\n' +
@@ -88,13 +97,26 @@ export const buildWorkflowPageCode = (script: string, state: unknown, dryRun: bo
   '  },\n' +
   '  attr(selector, name) { return page.__q(selector).getAttribute(name); },\n' +
   '  exists(selector) { return document.querySelector(selector) !== null; },\n' +
+  '  async waitFor(selector, timeoutMs) {\n' +
+  "    if (dryRun) { dryRunActions.push({ action: 'waitFor', selector }); return; }\n" +
+  '    const limit = typeof timeoutMs === "number" && timeoutMs > 0 ? Math.min(timeoutMs, 25000) : 10000;\n' +
+  '    const start = Date.now();\n' +
+  '    while (document.querySelector(selector) === null) {\n' +
+  '      if (Date.now() - start >= limit) {\n' +
+  "        throw new Error('Timed out waiting for selector: ' + selector + ' (' + limit + 'ms). The element never appeared; check the selector or wait for a different one.');\n" +
+  '      }\n' +
+  '      await new Promise((resolve) => setTimeout(resolve, 100));\n' +
+  '    }\n' +
+  '  },\n' +
   '};\n' +
-  'const workflow = async ({ page, state }) => { ' +
+  'const workflow = async ({ page, state, input }) => { ' +
   script +
   ' };\n' +
   'try {\n' +
   '  const value = await workflow({ page, state: ' +
   JSON.stringify(state) +
+  ', input: ' +
+  JSON.stringify(input) +
   ' });\n' +
   '  return { ok: true, value, dryRunActions };\n' +
   '} catch (error) {\n' +
@@ -208,8 +230,10 @@ const validateNavigationState = (
 /**
  * Run a stored workflow script across one or more pages.
  *
- * The script receives `{ page, state }` where page provides DOM helpers and
- * state is `{ input }` on the first page. The script must return one of:
+ * The script receives `{ page, state, input }`: page provides DOM helpers,
+ * input holds the run inputs on every page, and state carries what the
+ * script returns across navigations (`state.input` also mirrors input on
+ * the first page for older scripts). The script must return one of:
  * - `{ done: true, result: <JSON-serializable> }` to finish
  * - `{ navigate: '<url>', state: <JSON object> }` to move to the next page
  * A thrown error fails the run with the error message and the page URL.
@@ -228,6 +252,34 @@ export const runWorkflow = async (
     return resultWithActions({ error: 'Workflow script is not approved.', ok: false }, dryRun, []);
   }
 
+  // 2a. Input shape gate — before any navigation.
+  if (
+    input !== undefined &&
+    (typeof input !== 'object' || input === null || Array.isArray(input))
+  ) {
+    return resultWithActions(
+      {
+        error: 'run_workflow input must be a JSON object like { "name": "value" }.',
+        ok: false,
+      },
+      dryRun,
+      []
+    );
+  }
+
+  // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Preceding check guarantees a plain object or undefined.
+  const normalizedInput = (input ?? {}) as Record<string, unknown>;
+
+  // 2b. Declared-params gate — actionable message listing every missing value.
+  const missingParams = findMissingRequiredParams(workflow, normalizedInput);
+  if (missingParams.length > 0) {
+    return resultWithActions(
+      { error: formatMissingParamsError(missingParams), ok: false },
+      dryRun,
+      []
+    );
+  }
+
   // 2. Optional startUrl navigation.
   if (workflow.startUrl !== undefined && workflow.startUrl !== '') {
     if (!matchesWorkflowScope(workflow, workflow.startUrl)) {
@@ -243,8 +295,9 @@ export const runWorkflow = async (
     }
   }
 
-  // 3. Initialize before the loop.
-  let state: unknown = { input: input ?? {} };
+  // 3. Initialize before the loop. `state.input` mirrors `input` on the first
+  // Page for scripts written against the old contract.
+  let state: unknown = { input: normalizedInput };
   let pagesVisited = 0;
   const dryRunActions: { action: string; selector: string }[] = [];
 
@@ -281,7 +334,7 @@ export const runWorkflow = async (
     }
 
     // C. Build the injected code.
-    const code = buildWorkflowPageCode(workflow.script, state, dryRun);
+    const code = buildWorkflowPageCode(workflow.script, state, dryRun, normalizedInput);
 
     // D. Eval in the tab.
     // eslint-disable-next-line no-await-in-loop — Sequential workflow execution by design.

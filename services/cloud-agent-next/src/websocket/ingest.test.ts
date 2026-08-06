@@ -1248,11 +1248,6 @@ describe('createIngestHandler', () => {
         error: 'Assistant response hit the output length limit',
         safeMessage: 'Assistant response hit the output length limit',
       },
-      {
-        failureCode: 'kilo_empty_terminal_response' as const,
-        error: 'The review ended without any user-visible response.',
-        safeMessage: 'The review ended without any user-visible response',
-      },
     ])(
       'forwards $failureCode wrapper failures to the session coordinator',
       async ({ safeMessage, ...failure }) => {

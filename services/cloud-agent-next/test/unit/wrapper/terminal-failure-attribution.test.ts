@@ -1,6 +1,6 @@
 /**
  * Unit tests for Tier-1 failure attribution in createConnectionManager:
- * output-limit termination (1b) and empty code-review terminal responses (1c).
+ * output-limit termination (finish === "length" / MessageOutputLengthError).
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -191,28 +191,8 @@ function rootAssistantUpdated(overrides: {
   };
 }
 
-function rootTextPart(text: string, ignored = false): KiloEvent {
-  return {
-    type: 'message.part.updated',
-    properties: {
-      part: {
-        type: 'text',
-        text,
-        ignored,
-        messageID: ASSISTANT_MESSAGE_ID,
-        sessionID: ROOT_SESSION_ID,
-        id: 'part_text_1',
-      },
-    },
-  };
-}
-
 function rootIdle(): KiloEvent {
   return { type: 'session.idle', properties: { sessionID: ROOT_SESSION_ID } };
-}
-
-function childIdle(): KiloEvent {
-  return { type: 'session.idle', properties: { sessionID: CHILD_SESSION_ID } };
 }
 
 describe('terminal failure attribution', () => {
@@ -280,75 +260,35 @@ describe('terminal failure attribution', () => {
     expect(callbacks.onCompletionSignal).toHaveBeenCalled();
   });
 
-  it('fails empty finish=stop code-review responses at root idle', async () => {
-    await runEvents(
-      [rootAssistantUpdated({ finish: 'stop' }), rootIdle()],
-      createSessionContext({ platform: 'code-review' })
-    );
-
-    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-      code: 'kilo_empty_terminal_response',
-      message: 'The review ended without any user-visible response.',
-      errorSource: 'assistant',
-    });
-    // message.updated may still arm completion waiters for finish=stop; idle must
-    // not seal the batch once the empty-response terminal error is raised.
-    expect(callbacks.onSessionIdle).not.toHaveBeenCalled();
-  });
-
-  it('completes code-review runs with visible text normally', async () => {
-    await runEvents(
-      [rootAssistantUpdated({ finish: 'stop' }), rootTextPart('Looks good.'), rootIdle()],
-      createSessionContext({ platform: 'code-review' })
-    );
+  it('completes finish=stop with no visible text as success', async () => {
+    await runEvents([rootAssistantUpdated({ finish: 'stop' }), rootIdle()]);
 
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
     expect(callbacks.onCompletionSignal).toHaveBeenCalled();
     expect(callbacks.onSessionIdle).toHaveBeenCalled();
   });
 
-  it('ignores ignored warning text parts for empty-response detection', async () => {
-    await runEvents(
-      [
-        rootAssistantUpdated({ finish: 'stop' }),
-        rootTextPart('Output length limit reached', true),
-        rootIdle(),
-      ],
-      createSessionContext({ platform: 'code-review' })
-    );
+  it('skips output-limit detection while finalizing', async () => {
+    state = new WrapperState();
+    state.bindSession(createSessionContext());
+    state.acceptMessage('msg_1', {
+      autoCommit: false,
+      condenseOnComplete: true,
+    });
+    expect(state.beginFinalizing()).toBe(true);
 
-    expect(callbacks.onTerminalError).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'kilo_empty_terminal_response' })
-    );
-  });
-
-  it('does not raise empty-response for non-code-review jobs', async () => {
-    await runEvents([rootAssistantUpdated({ finish: 'stop' }), rootIdle()]);
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([rootAssistantUpdated({ finish: 'length' }), rootIdle()]),
+      }),
+    });
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
     expect(callbacks.onCompletionSignal).toHaveBeenCalled();
-  });
-
-  it('ignores child session.idle for empty-response detection', async () => {
-    await runEvents(
-      [rootAssistantUpdated({ finish: 'stop' }), childIdle()],
-      createSessionContext({ platform: 'code-review' })
-    );
-
-    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
-    expect(callbacks.onSessionIdle).not.toHaveBeenCalled();
-  });
-
-  it('lets finish=length own the failure over empty-response at idle', async () => {
-    await runEvents(
-      [rootAssistantUpdated({ finish: 'length' }), rootIdle()],
-      createSessionContext({ platform: 'code-review' })
-    );
-
-    expect(callbacks.onTerminalError).toHaveBeenCalledTimes(1);
-    expect(callbacks.onTerminalError).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'kilo_output_limit' })
-    );
-    expect(callbacks.onCompletionSignal).not.toHaveBeenCalled();
+    expect(callbacks.onSessionIdle).toHaveBeenCalled();
   });
 });

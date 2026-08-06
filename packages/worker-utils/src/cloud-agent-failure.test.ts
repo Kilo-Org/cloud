@@ -46,7 +46,6 @@ describe('classifyCloudAgentFailure', () => {
 
   it.each([
     'kilo_output_limit',
-    'kilo_empty_terminal_response',
     'wrapper_no_output',
     'wrapper_ping_timeout',
     'wrapper_disconnected',

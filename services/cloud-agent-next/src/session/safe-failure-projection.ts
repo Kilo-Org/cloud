@@ -51,7 +51,6 @@ const GENERIC_FAILURE_MESSAGES = {
   missing_assistant_reply: 'No assistant reply was produced',
   payment_required: 'Assistant request failed: insufficient credits',
   kilo_output_limit: 'Assistant response hit the output length limit',
-  kilo_empty_terminal_response: 'The review ended without any user-visible response',
   user_interrupt: 'The message was interrupted by the user',
   container_shutdown: 'The agent container shut down',
   system_interrupt: 'The message was interrupted',

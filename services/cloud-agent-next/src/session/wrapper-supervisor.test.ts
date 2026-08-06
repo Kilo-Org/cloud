@@ -1031,16 +1031,7 @@ describe('WrapperSupervisor', () => {
     });
   });
 
-  it.each([
-    {
-      failureCode: 'kilo_output_limit' as const,
-      error: 'Assistant response hit the output length limit',
-    },
-    {
-      failureCode: 'kilo_empty_terminal_response' as const,
-      error: 'The review ended without any user-visible response.',
-    },
-  ])('preserves $failureCode after agent activity', async failure => {
+  it('preserves kilo_output_limit after agent activity', async () => {
     const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
     await putSessionMessageState(harness.storage, {
       ...acceptedMessage(),
@@ -1051,13 +1042,14 @@ describe('WrapperSupervisor', () => {
       wrapperRunId: WRAPPER_RUN_ID,
       status: 'failed',
       errorSource: 'assistant',
-      ...failure,
+      failureCode: 'kilo_output_limit',
+      error: 'Assistant response hit the output length limit',
     });
 
     await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'agent_activity',
-      failureCode: failure.failureCode,
+      failureCode: 'kilo_output_limit',
     });
   });
 

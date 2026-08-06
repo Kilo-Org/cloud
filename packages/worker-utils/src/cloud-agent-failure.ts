@@ -29,7 +29,6 @@ export const CLOUD_AGENT_FAILURE_CODES = [
   'missing_assistant_reply',
   'payment_required',
   'kilo_output_limit',
-  'kilo_empty_terminal_response',
   'user_interrupt',
   'container_shutdown',
   'system_interrupt',
@@ -237,7 +236,6 @@ export function classifyCloudAgentFailure(
     case 'wrapper_error_after_activity':
     case 'missing_assistant_reply':
     case 'kilo_output_limit':
-    case 'kilo_empty_terminal_response':
       return classified('platform', 'wrapper_liveness');
     case 'assistant_error':
     case 'payment_required':

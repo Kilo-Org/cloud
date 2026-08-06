@@ -1434,9 +1434,7 @@ export function createWrapperSupervisor(
             const assistantFailure = classifyAssistantFailure(error);
             const failureCode =
               terminalFailureCode ?? assistantFailure.terminalCode ?? 'assistant_error';
-            const usesExplicitTerminalCode =
-              terminalFailureCode === 'kilo_output_limit' ||
-              terminalFailureCode === 'kilo_empty_terminal_response';
+            const usesExplicitTerminalCode = terminalFailureCode === 'kilo_output_limit';
             await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
               kind: 'failed',
               reason: 'assistant_error',

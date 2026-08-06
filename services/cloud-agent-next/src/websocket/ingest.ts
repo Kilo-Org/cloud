@@ -156,8 +156,8 @@ function sanitizeKilocodeEventData(data: unknown): unknown {
 }
 
 /**
- * The wrapper sends fixed text for kilo_output_limit/kilo_empty_terminal_response that
- * text classification cannot recognize, so resolve those from the structured code.
+ * The wrapper sends fixed text for kilo_output_limit that text classification
+ * cannot recognize, so resolve it from the structured code.
  * payment_required/model_missing keep text classification: the model-not-found
  * diagnostics gate keys off the classified safe message.
  */
@@ -165,7 +165,7 @@ function safeAssistantFailureMessage(
   failureCode: WrapperTerminalFailureCode | undefined,
   rawError: unknown
 ): string {
-  if (failureCode === 'kilo_output_limit' || failureCode === 'kilo_empty_terminal_response') {
+  if (failureCode === 'kilo_output_limit') {
     return genericFailureMessage(failureCode);
   }
   return classifyAssistantFailureMessage(rawError);

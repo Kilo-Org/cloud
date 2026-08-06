@@ -70,7 +70,7 @@ describe('submitManualSecuritySync', () => {
       })
     ).rejects.toMatchObject({
       name: 'TRPCError',
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'BAD_GATEWAY',
     });
 
     try {
@@ -110,7 +110,50 @@ describe('submitManualSecuritySync', () => {
       captured = e;
     }
     expect(captured).toBeInstanceOf(TRPCError);
-    expect((captured as TRPCError).code).toBe('INTERNAL_SERVER_ERROR');
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
+    expect((captured as TRPCError).message).not.toContain('security-sync.test');
+    expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+
+  it('classifies a 5xx status as ambiguous transport (BAD_GATEWAY)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ error: 'boom' }),
+    });
+
+    await expect(
+      submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      })
+    ).rejects.toMatchObject({
+      name: 'TRPCError',
+      code: 'BAD_GATEWAY',
+    });
+  });
+
+  it('classifies a 4xx status as a definitive pre-acceptance rejection (PRECONDITION_FAILED)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ error: 'invalid request' }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('PRECONDITION_FAILED');
+    expect((captured as TRPCError).message).toContain('400');
+    expect((captured as TRPCError).message).not.toContain('invalid request');
     expect((captured as TRPCError).message).not.toContain('security-sync.test');
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
   });
@@ -133,7 +176,7 @@ describe('submitManualSecuritySync', () => {
       captured = e;
     }
     expect(captured).toBeInstanceOf(TRPCError);
-    expect((captured as TRPCError).code).toBe('INTERNAL_SERVER_ERROR');
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
     // Generic status-bearing message; must not echo the worker error or our secret
     expect((captured as TRPCError).message).toContain('500');
     expect((captured as TRPCError).message).not.toContain('boom');
@@ -159,7 +202,7 @@ describe('submitManualSecuritySync', () => {
       captured = e;
     }
     expect(captured).toBeInstanceOf(TRPCError);
-    expect((captured as TRPCError).code).toBe('INTERNAL_SERVER_ERROR');
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
     expect((captured as TRPCError).message).not.toContain('security-sync.test');
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
   });

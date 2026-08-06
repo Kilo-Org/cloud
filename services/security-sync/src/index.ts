@@ -11,7 +11,8 @@ import {
   type SecurityAgentCommandTransitionOutcome,
 } from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { agent_configs } from '@kilocode/db/schema';
+import { agent_configs, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
+import { settleOperation } from '@kilocode/db/operation-ledger';
 import {
   buildScheduledJobFailureEvent,
   buildScheduledJobSuccessEvent,
@@ -370,6 +371,174 @@ function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>)
   return { status: 'succeeded', resultCode: 'SYNC_COMPLETED' };
 }
 
+// ----- security operation ledger join (P1-A-08e) ----------------------------
+//
+// Manual sync and dismissal commands admitted with an `operationKey` store the
+// Worker `messageId` in `operation_ledgers.provider_ref` at acceptance. After
+// the command reaches a terminal state, the Worker joins that row by provider
+// reference and settles it with the security terminal mapping
+// (succeeded→completed, failed→failed, no_op→no_op) plus a durable
+// `security_command_settled` outbox event written atomically by
+// `settleOperation`. Rows that are missing or already terminal are skipped:
+// scheduled syncs and keyless commands have no ledger row, and a second settle
+// of a terminal row is a no-op by ledger design.
+
+const SECURITY_TERMINAL_STATUS_MAP = {
+  succeeded: 'completed',
+  failed: 'failed',
+  no_op: 'no_op',
+} as const;
+
+function isTerminalSecurityLedgerStatus(
+  status: string
+): status is keyof typeof SECURITY_TERMINAL_STATUS_MAP {
+  return status === 'succeeded' || status === 'failed' || status === 'no_op';
+}
+
+/** Resolves the analytics identity channel (user email) for the outbox event. */
+async function resolveSecuritySettleDistinctId(
+  db: WorkerDb,
+  params: { userId?: string; email?: string | null }
+): Promise<string> {
+  if (params.email) return params.email;
+  if (!params.userId) return 'unknown';
+  try {
+    const [user] = await db
+      .select({ email: kilocode_users.google_user_email })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, params.userId))
+      .limit(1);
+    return user?.email ?? params.userId;
+  } catch (error) {
+    console.error('Failed to resolve security settle distinct id', {
+      error_type: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return params.userId;
+  }
+}
+
+/**
+ * Settles the ledger row joined by `provider_ref = messageId`. Missing rows
+ * skip; the settle is best-effort (a failure never re-queues the message — the
+ * command already reached a terminal state). Terminal rows are no-ops.
+ */
+async function settleSecurityLedgerByProviderRef(
+  db: WorkerDb,
+  params: {
+    providerRef: string;
+    intent: 'manual_sync' | 'dismiss_finding';
+    status: 'succeeded' | 'failed' | 'no_op';
+    resultCode: string;
+    userId?: string;
+    actorEmail?: string | null;
+    dispatchedAt: string;
+    repoCount?: number;
+    errorCount?: number;
+  }
+): Promise<void> {
+  let row: { id: string } | undefined;
+  try {
+    const rows = await db
+      .select({ id: operation_ledgers.id })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.provider_ref, params.providerRef))
+      .limit(1);
+    row = rows[0];
+  } catch (error) {
+    console.error('Security operation ledger lookup failed', {
+      provider_ref: params.providerRef,
+      error_type: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return;
+  }
+  if (!row) {
+    console.info('Security operation ledger row not found for provider ref; skipping settle', {
+      provider_ref: params.providerRef,
+      intent: params.intent,
+      result_code: params.resultCode,
+    });
+    return;
+  }
+
+  const status = SECURITY_TERMINAL_STATUS_MAP[params.status];
+  const dispatched = new Date(params.dispatchedAt).getTime();
+  const durationMs = Number.isFinite(dispatched) ? Math.max(0, Date.now() - dispatched) : 0;
+  const distinctId = await resolveSecuritySettleDistinctId(db, {
+    userId: params.userId,
+    email: params.actorEmail,
+  });
+
+  try {
+    await settleOperation(db, {
+      rowId: row.id,
+      status,
+      outcomeCode: params.resultCode,
+      canonicalResult: {
+        ...(params.repoCount !== undefined ? { repo_count: params.repoCount } : {}),
+        ...(params.errorCount !== undefined ? { error_count: params.errorCount } : {}),
+      },
+      outboxEvent: {
+        eventName: 'security_command_settled',
+        distinctId,
+        properties: {
+          source: 'server',
+          surface: 'security',
+          phase: 'terminal',
+          intent: params.intent,
+          outcome: status,
+          ...(params.repoCount !== undefined ? { repo_count: params.repoCount } : {}),
+          ...(params.errorCount !== undefined ? { error_count: params.errorCount } : {}),
+          duration_ms: durationMs,
+        },
+      },
+    });
+    console.info('Security operation ledger row settled', {
+      row_id: row.id,
+      provider_ref: params.providerRef,
+      intent: params.intent,
+      status,
+      result_code: params.resultCode,
+    });
+  } catch (error) {
+    console.error('Failed to settle security operation ledger row', {
+      row_id: row.id,
+      status,
+      result_code: params.resultCode,
+      error_type: error instanceof Error ? error.name : 'UnknownError',
+    });
+  }
+}
+
+/** Extracts the ledger join identity from a queue message body, if present. */
+function ledgerSettleIdentityFromMessage(body: unknown): {
+  providerRef: string;
+  intent: 'manual_sync' | 'dismiss_finding';
+  dispatchedAt: string;
+  userId?: string;
+  actorEmail?: string | null;
+} | null {
+  const dismiss = SecurityDismissMessageSchema.safeParse(body);
+  if (dismiss.success) {
+    return {
+      providerRef: dismiss.data.messageId,
+      intent: 'dismiss_finding',
+      dispatchedAt: dismiss.data.dispatchedAt,
+      userId: dismiss.data.actor.id,
+    };
+  }
+  const sync = SecuritySyncMessageSchema.safeParse(body);
+  if (sync.success) {
+    return {
+      providerRef: sync.data.messageId,
+      intent: 'manual_sync',
+      dispatchedAt: sync.data.dispatchedAt,
+      userId: sync.data.actor?.id,
+      actorEmail: sync.data.actor?.email,
+    };
+  }
+  return null;
+}
+
 async function processSecurityDismissMessage(
   message: Message<SecuritySyncQueueMessage>,
   env: CloudflareEnv
@@ -391,6 +560,16 @@ async function processSecurityDismissMessage(
       result_code: running.command?.result_code,
       attempts: message.attempts,
     });
+    if (running.command && isTerminalSecurityLedgerStatus(running.command.status)) {
+      await settleSecurityLedgerByProviderRef(db, {
+        providerRef: parsed.data.messageId,
+        intent: 'dismiss_finding',
+        status: running.command.status,
+        resultCode: running.command.result_code ?? 'UNKNOWN',
+        userId: parsed.data.actor.id,
+        dispatchedAt: parsed.data.dispatchedAt,
+      });
+    }
     message.ack();
     return true;
   }
@@ -406,6 +585,14 @@ async function processSecurityDismissMessage(
     resultCode: result.resultCode,
   });
   requireSecurityAgentCommandTransitionOrTerminal(terminal, 'terminal');
+  await settleSecurityLedgerByProviderRef(db, {
+    providerRef: parsed.data.messageId,
+    intent: 'dismiss_finding',
+    status: result.commandStatus,
+    resultCode: result.resultCode,
+    userId: parsed.data.actor.id,
+    dispatchedAt: parsed.data.dispatchedAt,
+  });
   console.info('Security Agent dismissal command completed', {
     command_id: parsed.data.commandId,
     command_type: 'dismiss_finding',
@@ -459,6 +646,17 @@ async function processSecuritySyncMessage(
         result_code: running.command?.result_code,
         attempts: message.attempts,
       });
+      if (running.command && isTerminalSecurityLedgerStatus(running.command.status)) {
+        await settleSecurityLedgerByProviderRef(db, {
+          providerRef: body.messageId,
+          intent: 'manual_sync',
+          status: running.command.status,
+          resultCode: running.command.result_code ?? 'UNKNOWN',
+          userId: body.actor?.id,
+          actorEmail: body.actor?.email,
+          dispatchedAt: body.dispatchedAt,
+        });
+      }
       message.ack();
       return;
     }
@@ -488,6 +686,17 @@ async function processSecuritySyncMessage(
     });
     requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
   }
+  await settleSecurityLedgerByProviderRef(db, {
+    providerRef: body.messageId,
+    intent: 'manual_sync',
+    status: terminal.status,
+    resultCode: terminal.resultCode,
+    userId: body.actor?.id,
+    actorEmail: body.actor?.email,
+    dispatchedAt: body.dispatchedAt,
+    repoCount: result.synced,
+    errorCount: result.errors,
+  });
   console.info('Security sync completed for owner', {
     command_id: body.commandId,
     command_type: body.commandId ? 'sync' : undefined,
@@ -719,6 +928,18 @@ export default {
               correlation.commandId
             );
             if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
+              const settleIdentity = ledgerSettleIdentityFromMessage(message.body);
+              if (settleIdentity) {
+                await settleSecurityLedgerByProviderRef(db, {
+                  providerRef: settleIdentity.providerRef,
+                  intent: settleIdentity.intent,
+                  status: 'failed',
+                  resultCode: 'QUEUE_RETRIES_EXHAUSTED',
+                  userId: settleIdentity.userId,
+                  actorEmail: settleIdentity.actorEmail,
+                  dispatchedAt: settleIdentity.dispatchedAt,
+                });
+              }
               console.info('Security Agent command delivery already terminal after failure', {
                 command_id: correlation.commandId,
                 command_type: correlation.commandType,

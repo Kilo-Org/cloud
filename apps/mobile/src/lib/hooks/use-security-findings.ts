@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Security finding write hooks stay in one module; the dismiss commandId guard is one line over the cap. */
 import {
   getNextSecurityFindingsOffset,
   getRemediationUnavailableCopy,
@@ -106,7 +107,9 @@ export function useDismissSecurityFinding(scope: string) {
             ...vars,
           }),
     onSuccess: result => {
-      trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      if (result.commandId) {
+        trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      }
     },
   });
 }

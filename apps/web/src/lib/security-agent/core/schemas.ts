@@ -96,12 +96,21 @@ export const ListFindingsInputSchema = z.object({
 
 export const TriggerSyncInputSchema = z.object({
   repoFullName: z.string().optional(),
+  /**
+   * Optional client-generated per-intent key (P1-A-08e). When present, the
+   * handler admits a `security`-domain operation ledger row before submitting
+   * to the Worker, so retries of the same intent dedupe/replay/conflict and
+   * the Worker joins the terminal outcome by the stored `provider_ref`.
+   */
+  operationKey: z.string().min(1).max(128).optional(),
 });
 
 export const DismissFindingInputSchema = z.object({
   findingId: z.string().uuid(),
   reason: DismissReasonSchema,
   comment: z.string().optional(),
+  /** Optional client-generated per-intent key (P1-A-08e); see TriggerSyncInputSchema. */
+  operationKey: z.string().min(1).max(128).optional(),
 });
 
 export const GetFindingInputSchema = z.object({

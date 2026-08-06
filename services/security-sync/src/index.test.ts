@@ -7,6 +7,7 @@ import {
 } from '@kilocode/db';
 import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
+import { settleOperation } from '@kilocode/db/operation-ledger';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { runSecurityNotificationSweep } from './notifications/sweep.js';
@@ -27,6 +28,7 @@ vi.mock('@kilocode/db', async importOriginal => {
   };
 });
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
+vi.mock('@kilocode/db/operation-ledger', () => ({ settleOperation: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./notifications/sweep.js', () => ({ runSecurityNotificationSweep: vi.fn() }));
 vi.mock('./sync.js', () => ({ syncOwner: vi.fn() }));
@@ -822,5 +824,175 @@ describe('manual dismissal dispatch', () => {
 
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('security operation ledger provider_ref join', () => {
+  const messageId = 'manual-sync-message-123';
+  const actor = { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' };
+
+  function ledgerLookupDb(rows: { id: string }[]) {
+    return {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => rows,
+          }),
+        }),
+      }),
+    } as never;
+  }
+
+  function syncQueueMessage(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 1,
+      commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      messageId,
+      trigger: 'manual',
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      ownerKey: 'org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      chunkIndex: 0,
+      chunkCount: 1,
+      dispatchedAt: '2026-06-11T10:00:00.000Z',
+      actor,
+      ...overrides,
+    };
+  }
+
+  async function processSyncMessage(
+    overrides: Record<string, unknown> = {},
+    attempts = 1
+  ): Promise<{ ack: ReturnType<typeof vi.fn>; retry: ReturnType<typeof vi.fn> }> {
+    const ack = vi.fn();
+    const retry = vi.fn();
+    await worker.queue(
+      {
+        messages: [{ attempts, body: syncQueueMessage(overrides), ack, retry }],
+      } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        GIT_TOKEN_SERVICE: {},
+      } as CloudflareEnv
+    );
+    return { ack, retry };
+  }
+
+  it('settles a succeeded manual sync row as completed via the provider reference', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerLookupDb([{ id: 'ledger-row-id' }]));
+    vi.mocked(syncOwner).mockResolvedValue({ synced: 3, errors: 0, staleRepos: 0 } as never);
+
+    await processSyncMessage();
+
+    expect(settleOperation).toHaveBeenCalledTimes(1);
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'completed',
+        outcomeCode: 'SYNC_COMPLETED',
+        canonicalResult: { repo_count: 3, error_count: 0 },
+      })
+    );
+    const settleCall = vi.mocked(settleOperation).mock.calls[0]?.[1] as {
+      outboxEvent?: {
+        eventName: string;
+        distinctId: string;
+        properties: Record<string, unknown>;
+      };
+    };
+    expect(settleCall?.outboxEvent).toMatchObject({
+      eventName: 'security_command_settled',
+      distinctId: 'owner@example.com',
+      properties: {
+        source: 'server',
+        surface: 'security',
+        phase: 'terminal',
+        intent: 'manual_sync',
+        outcome: 'completed',
+        repo_count: 3,
+        error_count: 0,
+      },
+    });
+  });
+
+  it('settles a failed manual sync row as failed with the partial-failure result code', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerLookupDb([{ id: 'ledger-row-id' }]));
+    vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 2, staleRepos: 0 } as never);
+
+    await processSyncMessage();
+
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'failed',
+        outcomeCode: 'SYNC_PARTIAL_FAILURE',
+      })
+    );
+  });
+
+  it('settles a no-op manual sync row as no_op with the disabled result code', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerLookupDb([{ id: 'ledger-row-id' }]));
+    vi.mocked(syncOwner).mockResolvedValue({
+      synced: 0,
+      errors: 0,
+      staleRepos: [],
+      commandResultCode: 'CONFIG_DISABLED',
+    } as never);
+
+    await processSyncMessage();
+
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'no_op',
+        outcomeCode: 'CONFIG_DISABLED',
+      })
+    );
+  });
+
+  it('skips the settle when no ledger row matches the provider reference', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerLookupDb([]));
+    vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await processSyncMessage();
+
+    expect(settleOperation).not.toHaveBeenCalled();
+    expect(
+      info.mock.calls.find(
+        ([message]) =>
+          typeof message === 'string' && message.includes('row not found for provider ref')
+      )?.[0]
+    ).toBe('Security operation ledger row not found for provider ref; skipping settle');
+    info.mockRestore();
+  });
+
+  it('settles the row failed with retry-exhaustion after final delivery failure', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerLookupDb([{ id: 'ledger-row-id' }]));
+    vi.mocked(syncOwner).mockRejectedValue(new Error('sync processing failed'));
+    vi.mocked(markSecurityAgentCommandRetriesExhausted).mockResolvedValueOnce({
+      transitioned: false,
+      command: { status: 'failed', result_code: 'QUEUE_RETRIES_EXHAUSTED' },
+    } as never);
+
+    const { ack, retry } = await processSyncMessage({}, 4);
+
+    expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith(
+      expect.anything(),
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    );
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'failed',
+        outcomeCode: 'QUEUE_RETRIES_EXHAUSTED',
+      })
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
   });
 });

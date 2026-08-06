@@ -72,9 +72,11 @@ export async function submitManualSecuritySync(
     try {
       body = (await response.json()) as ManualSecuritySyncWorkerResponse;
     } catch {
-      // Non-JSON response body (e.g. gateway HTML/error page) — treat as transport failure
+      // Non-JSON response body (e.g. gateway HTML/error page). The Worker may
+      // still have accepted and enqueued the command, so this is ambiguous
+      // transport — never a definitive rejection.
       throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
+        code: 'BAD_GATEWAY',
         message: 'Could not reach the security sync service. Try again.',
       });
     }
@@ -82,18 +84,29 @@ export async function submitManualSecuritySync(
     if (error instanceof TRPCError) {
       throw error;
     }
+    // A network failure is ambiguous transport: the command may have been
+    // accepted before the connection dropped.
     throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'BAD_GATEWAY',
       message: 'Could not reach the security sync service. Try again.',
     });
   }
 
   if (!response.ok) {
-    // Do not blindly interpolate body.error — the worker may not be ours and the body
-    // can be attacker/gateway-controlled HTML. Keep the message short and non-secret.
+    // A 5xx is ambiguous transport: the Worker may or may not have accepted.
+    if (response.status >= 500) {
+      throw new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: `Security sync service request failed (status ${response.status}). Try again.`,
+      });
+    }
+    // A 4xx is a definitive pre-acceptance rejection (validation, auth,
+    // disabled routing). Do not blindly interpolate body.error — the worker
+    // may not be ours and the body can be attacker/gateway-controlled HTML.
+    // Keep the message short and non-secret.
     throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: `Security sync service request failed (status ${response.status}). Try again.`,
+      code: 'PRECONDITION_FAILED',
+      message: `Security sync service request failed (status ${response.status}).`,
     });
   }
 
@@ -105,8 +118,11 @@ export async function submitManualSecuritySync(
     typeof body.runId !== 'string' ||
     typeof body.messageId !== 'string'
   ) {
+    // A 2xx with an invalid accepted shape: the Worker accepted the command
+    // but the correlation ids were lost, so the provider reference cannot be
+    // recorded. Ambiguous transport.
     throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'BAD_GATEWAY',
       message: 'Security sync service returned an unexpected response. Try again.',
     });
   }

@@ -13,8 +13,9 @@ import {
   organization_invitations,
   kilocode_users,
   organizations,
+  type OperationLedgerRow,
 } from '@kilocode/db/schema';
-import { db, sql } from '@/lib/drizzle';
+import { db, sql, type DrizzleTransaction } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   ensureOrganizationAccess,
@@ -29,22 +30,33 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { findUserById } from '@/lib/user';
-import { successResult } from '@/lib/maybe-result';
+import { successResult, type SuccessResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
 import { PublicOrganizationMembersSchema } from '@/lib/organizations/organization-types';
+import {
+  admitOperation,
+  settleOperation,
+  type OutboxEventInput,
+} from '@kilocode/db/operation-ledger';
 
 const MAX_DAILY_LIMIT_USD = 2000;
+
+const operationKeySchema = z.string().min(1).max(128).optional();
 
 const UpdateMemberSchema = OrganizationIdInputSchema.extend({
   memberId: z.string(),
   role: z.enum(['owner', 'member', 'billing_manager']).optional(),
   dailyUsageLimitUsd: z.number().min(0).max(MAX_DAILY_LIMIT_USD).nullable().optional(),
+  /** Optional client-generated per-intent key for the role-change ledger (P1-A-08e). */
+  operationKey: operationKeySchema,
 });
 
 const RemoveMemberSchema = OrganizationIdInputSchema.extend({
   memberId: z.string(),
+  /** Optional client-generated per-intent key for the member-removal ledger (P1-A-08e). */
+  operationKey: operationKeySchema,
 });
 
 const InviteMemberSchema = OrganizationIdInputSchema.extend({
@@ -79,6 +91,430 @@ async function getDirectOrganizationRole(
   return membership?.role ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Organization operation ledger (P1-A-08e)
+// ---------------------------------------------------------------------------
+//
+// The role-change (`update` with `role`) and member-removal (`remove`)
+// mutations accept an optional `operationKey`. When present, the mutation
+// admits an `organization`-domain ledger row BEFORE running the membership
+// helper, and only then executes. Later same-key calls dedupe, replay the
+// canonical result, or conflict. After a successful helper commit, the success
+// audit log, the terminal settle, and the `organization_write_settled` outbox
+// event are written in ONE transaction (atomic). A failed helper result
+// settles the row `failed` without a success audit or success outbox. A
+// takeover/reconcile retry reads the membership back FIRST: an already-applied
+// role or an already-removed member settles completed and replays, which
+// avoids the NOT_FOUND trap of re-running the helper on the already-applied
+// state. The membership helpers and the `dailyUsageLimitUsd` path are
+// unchanged.
+
+const ORG_LEDGER_DOMAIN = 'organization' as const;
+/** The in-flight window: while an `admitted` row holds a live lease, same-key
+ *  retries receive CONFLICT `operation_in_progress` instead of re-running. */
+const ORG_LEDGER_LEASE_SECONDS = 120;
+
+const ORG_LEDGER_INTENTS = ['member_role_change', 'member_remove'] as const;
+type OrgLedgerIntent = (typeof ORG_LEDGER_INTENTS)[number];
+
+const ORG_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
+const ORG_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
+const ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
+// A provider-confirmed outcome whose ledger settle failed: the membership
+// helper DID commit, but the row was not settled. Never surface a success
+// receipt for an un-recorded row — a same-key retry repairs by read-back.
+const ORG_LEDGER_SETTLE_FAILED_MESSAGE =
+  'The action completed, but we could not record the result. Please try again.';
+
+function orgOperationInProgressError(): TRPCError {
+  return new TRPCError({ code: 'CONFLICT', message: ORG_OPERATION_IN_PROGRESS_MESSAGE });
+}
+
+function orgOperationKeyReuseMismatchError(): TRPCError {
+  return new TRPCError({ code: 'CONFLICT', message: ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
+}
+
+/** `organization_write_settled` outbox payload (DEC-05): no free text, no resource keys. */
+function orgSettledOutboxEvent(params: {
+  distinctId: string;
+  intent: OrgLedgerIntent;
+  outcome: 'completed' | 'failed';
+}): OutboxEventInput {
+  return {
+    eventName: 'organization_write_settled',
+    distinctId: params.distinctId,
+    properties: {
+      source: 'web',
+      surface: 'organization',
+      phase: 'terminal',
+      intent: params.intent,
+      outcome: params.outcome,
+    },
+  };
+}
+
+function orgMemberRoleResourceKey(organizationId: string, memberId: string, role: string): string {
+  return `organization:${organizationId}:member:${memberId}:role:${role}`;
+}
+
+function orgMemberRemoveResourceKey(organizationId: string, memberId: string): string {
+  return `organization:${organizationId}:member:${memberId}`;
+}
+
+/**
+ * Best-effort ledger write, reserved for FAILED-status settles only: the
+ * caller is already receiving a typed rejection, so a ledger write that fails
+ * here must never mask the helper outcome.
+ */
+async function bestEffortOrgLedgerWrite(work: () => Promise<unknown>): Promise<void> {
+  try {
+    await work();
+  } catch (error) {
+    console.error(
+      `Failed to write organization operation ledger row: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/** Replays a terminal row: only `completed`/`no_op` may replay a canonical result. */
+function replaySettledOrgRow<T>(row: OperationLedgerRow): T {
+  if (row.status === 'completed' || row.status === 'no_op') {
+    return { success: true, ...(row.canonical_result ?? {}), replayed: true } as T;
+  }
+  throw new TRPCError({ code: 'BAD_REQUEST', message: ORG_REPLAY_FAILED_MESSAGE });
+}
+
+/**
+ * Durably settles a provider-confirmed org outcome as `completed` with the
+ * success outbox event inside the SAME transaction as the success audit log.
+ * A settle failure must never yield a success receipt for an un-recorded row.
+ */
+async function settleOrgCompletedInTransaction(args: {
+  tx: DrizzleTransaction;
+  row: OperationLedgerRow;
+  canonicalResult: Record<string, unknown>;
+  outboxEvent: OutboxEventInput;
+}): Promise<void> {
+  try {
+    await settleOperation(args.tx, {
+      rowId: args.row.id,
+      status: 'completed',
+      outcomeCode: 'ok',
+      canonicalResult: args.canonicalResult,
+      outboxEvent: args.outboxEvent,
+    });
+  } catch (error) {
+    console.error(
+      `Failed to settle completed organization operation ledger row: ${error instanceof Error ? error.message : String(error)}`
+    );
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: ORG_LEDGER_SETTLE_FAILED_MESSAGE,
+      cause: error,
+    });
+  }
+}
+
+type OrgActor = {
+  id: string;
+  google_user_email: string | null;
+  google_user_name: string | null;
+  is_admin: boolean;
+};
+
+/**
+ * Runs the role-change helper under an already-admitted row and, after the
+ * helper commits, writes the success audit log + terminal settle + outbox in
+ * one transaction. A failed helper result settles the row `failed` without a
+ * success audit or success outbox.
+ */
+async function executeOrgRoleChange(args: {
+  row: OperationLedgerRow;
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+  role: 'owner' | 'member' | 'billing_manager';
+  dailyUsageLimitUsd?: number | null;
+  targetMember?: { role: string };
+}): Promise<SuccessResult<{ updated: string }>> {
+  const { organizationId, memberId, role } = args;
+  const distinctId = args.user.google_user_email || args.user.id;
+
+  const result = await updateUserRoleInOrganization(organizationId, memberId, role);
+  if (!result.success) {
+    await bestEffortOrgLedgerWrite(() =>
+      settleOperation(db, {
+        rowId: args.row.id,
+        status: 'failed',
+        outcomeCode: 'role_change_failed',
+        outboxEvent: orgSettledOutboxEvent({
+          distinctId,
+          intent: 'member_role_change',
+          outcome: 'failed',
+        }),
+      })
+    );
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Failed to update user role',
+    });
+  }
+
+  if (args.dailyUsageLimitUsd !== undefined && args.targetMember) {
+    await updateOrganizationUserLimit(organizationId, memberId, args.dailyUsageLimitUsd);
+  }
+
+  const updatedUser = await findUserById(memberId);
+  const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
+  const updated = 'role and limit';
+
+  await db.transaction(async tx => {
+    await createAuditLog({
+      action: 'organization.member.change_role',
+      actor_email: args.user.google_user_email,
+      actor_id: args.user.id,
+      actor_name: args.user.google_user_name,
+      message: `Changed role for user ${updatedUserEmail} from ${args.targetMember?.role ?? 'unknown'} to ${role}`,
+      organization_id: organizationId,
+      tx,
+    });
+    await settleOrgCompletedInTransaction({
+      tx,
+      row: args.row,
+      canonicalResult: { updated },
+      outboxEvent: orgSettledOutboxEvent({
+        distinctId,
+        intent: 'member_role_change',
+        outcome: 'completed',
+      }),
+    });
+  });
+
+  return successResult({ updated });
+}
+
+/**
+ * Read-back-first takeover repair for a role change: if the read-back shows
+ * the target role already applied, the first attempt committed the change
+ * without settling — settle completed and replay without re-running the
+ * helper (avoiding the NOT_FOUND trap). If the member is gone, settle failed.
+ * Otherwise re-run the helper under the same row.
+ */
+async function repairOrgRoleChange(args: {
+  row: OperationLedgerRow;
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+  role: 'owner' | 'member' | 'billing_manager';
+  dailyUsageLimitUsd?: number | null;
+}): Promise<SuccessResult<{ updated: string }>> {
+  const distinctId = args.user.google_user_email || args.user.id;
+  const [membership] = await db
+    .select({ role: organization_memberships.role })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, args.organizationId),
+        eq(organization_memberships.kilo_user_id, args.memberId)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    await bestEffortOrgLedgerWrite(() =>
+      settleOperation(db, {
+        rowId: args.row.id,
+        status: 'failed',
+        outcomeCode: 'member_absent',
+        outboxEvent: orgSettledOutboxEvent({
+          distinctId,
+          intent: 'member_role_change',
+          outcome: 'failed',
+        }),
+      })
+    );
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'User is not a member of this organization',
+    });
+  }
+
+  if (membership.role === args.role) {
+    const updatedUser = await findUserById(args.memberId);
+    const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
+    await db.transaction(async tx => {
+      await createAuditLog({
+        action: 'organization.member.change_role',
+        actor_email: args.user.google_user_email,
+        actor_id: args.user.id,
+        actor_name: args.user.google_user_name,
+        message: `Changed role for user ${updatedUserEmail} from ${membership.role} to ${args.role}`,
+        organization_id: args.organizationId,
+        tx,
+      });
+      await settleOrgCompletedInTransaction({
+        tx,
+        row: args.row,
+        canonicalResult: { updated: 'role and limit' },
+        outboxEvent: orgSettledOutboxEvent({
+          distinctId,
+          intent: 'member_role_change',
+          outcome: 'completed',
+        }),
+      });
+    });
+    return successResult({ updated: 'role and limit', replayed: true });
+  }
+
+  // Not applied yet: re-run the helper under the same row (takeover).
+  return executeOrgRoleChange({
+    ...args,
+    targetMember: { role: membership.role },
+  });
+}
+
+/** KiloClaw instance cleanup after a member removal (existing behavior, extracted). */
+async function cleanupRemovedMemberInstances(
+  memberId: string,
+  organizationId: string
+): Promise<void> {
+  // Runs after the membership deletion transaction commits.
+  // Fire-and-forget worker calls — Postgres rows are already soft-deleted,
+  // so even if worker calls fail the instance is "dead" from the platform
+  // perspective and reconciliation will clean up.
+  try {
+    const destroyedInstances = await destroyOrgInstancesForUser(memberId, organizationId);
+    if (destroyedInstances.length > 0) {
+      const client = new KiloClawInternalClient();
+      const results = await Promise.allSettled(
+        destroyedInstances.map(({ instanceId }) =>
+          client.destroy(memberId, instanceId, { reason: 'org_member_cleanup' })
+        )
+      );
+      for (const [i, result] of results.entries()) {
+        if (result.status === 'rejected') {
+          console.error(
+            `[kiloclaw-org] Failed to destroy worker instance ${destroyedInstances[i].instanceId} for removed member ${memberId}:`,
+            result.reason
+          );
+        }
+      }
+      console.log(
+        `[kiloclaw-org] Destroyed ${destroyedInstances.length} instance(s) for removed member ${memberId} in org ${organizationId}`
+      );
+    }
+  } catch (err) {
+    console.error(
+      `[kiloclaw-org] Failed to clean up KiloClaw instances for removed member ${memberId}:`,
+      err
+    );
+  }
+}
+
+/** Transactional success audit + settle + outbox, then existing post-removal side effects. */
+async function completeOrgMemberRemoval(args: {
+  row: OperationLedgerRow;
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+}): Promise<SuccessResult<{ updated: string }>> {
+  const distinctId = args.user.google_user_email || args.user.id;
+  const removedUser = await findUserById(args.memberId);
+
+  await db.transaction(async tx => {
+    await createAuditLog({
+      action: 'organization.member.remove',
+      actor_email: args.user.google_user_email,
+      actor_id: args.user.id,
+      actor_name: args.user.google_user_name,
+      message: `Removed user ${removedUser?.google_user_email || 'unknown'}`,
+      organization_id: args.organizationId,
+      tx,
+    });
+    await settleOrgCompletedInTransaction({
+      tx,
+      row: args.row,
+      canonicalResult: { updated: args.memberId },
+      outboxEvent: orgSettledOutboxEvent({
+        distinctId,
+        intent: 'member_remove',
+        outcome: 'completed',
+      }),
+    });
+  });
+
+  await revokeGatewayStateForOrganizationMember(db, args.organizationId, args.memberId);
+  await cleanupRemovedMemberInstances(args.memberId, args.organizationId);
+
+  return successResult({ updated: args.memberId });
+}
+
+/**
+ * Runs the removal helper under an already-admitted row. A `rowCount` of zero
+ * means the member was already gone (never satisfied under the `admitted`
+ * path): settle failed and surface the existing NOT_FOUND rejection.
+ */
+async function executeOrgMemberRemove(args: {
+  row: OperationLedgerRow;
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+}): Promise<SuccessResult<{ updated: string }>> {
+  const distinctId = args.user.google_user_email || args.user.id;
+  const result = await removeUserFromOrganization(args.organizationId, args.memberId, args.user.id);
+  if (result.rowCount === 0) {
+    await bestEffortOrgLedgerWrite(() =>
+      settleOperation(db, {
+        rowId: args.row.id,
+        status: 'failed',
+        outcomeCode: 'member_absent',
+        outboxEvent: orgSettledOutboxEvent({
+          distinctId,
+          intent: 'member_remove',
+          outcome: 'failed',
+        }),
+      })
+    );
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Failed to remove user from organization',
+    });
+  }
+  return completeOrgMemberRemoval(args);
+}
+
+/**
+ * Read-back-first takeover repair for a member removal: if the read-back shows
+ * the member already gone, the first attempt committed the removal without
+ * settling — complete the record (audit + settle + outbox + side effects) and
+ * replay without re-running the helper (avoiding the NOT_FOUND trap).
+ * Otherwise re-run the helper under the same row.
+ */
+async function repairOrgMemberRemove(args: {
+  row: OperationLedgerRow;
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+}): Promise<SuccessResult<{ updated: string; replayed: true }>> {
+  const [membership] = await db
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, args.organizationId),
+        eq(organization_memberships.kilo_user_id, args.memberId)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    const completed = await completeOrgMemberRemoval(args);
+    return { ...completed, replayed: true };
+  }
+  const completed = await executeOrgMemberRemove(args);
+  return { ...completed, replayed: true };
+}
+
 export const organizationsMembersRouter = createTRPCRouter({
   listPublic: organizationMemberProcedure
     .input(OrganizationIdInputSchema)
@@ -91,11 +527,19 @@ export const organizationsMembersRouter = createTRPCRouter({
     .input(UpdateMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
-      const { organizationId, memberId, role, dailyUsageLimitUsd } = input;
+      const { organizationId, memberId, role, dailyUsageLimitUsd, operationKey } = input;
 
       // Get the target user's role if we need to check permissions for role or limit changes
       let targetMember: { role: string } | undefined;
       if (role !== undefined || dailyUsageLimitUsd !== undefined) {
+        // Prevent users from changing their own role
+        if (role !== undefined && user.id === memberId) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You cannot change your own role',
+          });
+        }
+
         const [member] = await db
           .select({ role: organization_memberships.role })
           .from(organization_memberships)
@@ -116,16 +560,16 @@ export const organizationsMembersRouter = createTRPCRouter({
         targetMember = member;
       }
 
-      // Handle role update if provided
-      if (role !== undefined) {
-        // Prevent users from changing their own role
-        if (user.id === memberId) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'You cannot change your own role',
-          });
+      // Limit-only update: existing path exactly, no ledger.
+      if (role === undefined) {
+        if (dailyUsageLimitUsd !== undefined && targetMember) {
+          await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
         }
+        return successResult({ updated: 'limit' });
+      }
 
+      // Role change without an operationKey: existing path exactly.
+      if (operationKey === undefined) {
         const result = await updateUserRoleInOrganization(organizationId, memberId, role);
         const updatedUser = await findUserById(memberId);
         const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
@@ -144,16 +588,60 @@ export const organizationsMembersRouter = createTRPCRouter({
             message: 'Failed to update user role',
           });
         }
+
+        if (dailyUsageLimitUsd !== undefined && targetMember) {
+          await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
+        }
+
+        return successResult({ updated: 'role and limit' });
       }
 
-      // Handle daily usage limit update if provided
-      if (dailyUsageLimitUsd !== undefined && targetMember) {
-        await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
-      }
-
-      return successResult({
-        updated: role !== undefined ? 'role and limit' : 'limit',
+      // Role change with an operationKey: admit a ledger row before running
+      // the helper (P1-A-08e).
+      const resourceKey = orgMemberRoleResourceKey(organizationId, memberId, role);
+      const admission = await admitOperation(db, {
+        userId: user.id,
+        orgId: organizationId,
+        domain: ORG_LEDGER_DOMAIN,
+        intent: 'member_role_change',
+        operationKey,
+        resourceKey,
+        taxonomy: 'reconcile-first',
+        leaseSeconds: ORG_LEDGER_LEASE_SECONDS,
       });
+      if (
+        admission.row.intent !== 'member_role_change' ||
+        admission.row.resource_key !== resourceKey
+      ) {
+        throw orgOperationKeyReuseMismatchError();
+      }
+      switch (admission.admission) {
+        case 'admitted':
+          return executeOrgRoleChange({
+            row: admission.row,
+            user,
+            organizationId,
+            memberId,
+            role,
+            dailyUsageLimitUsd,
+            targetMember,
+          });
+        case 'takeover':
+        case 'duplicate_reconcile_pending':
+          return repairOrgRoleChange({
+            row: admission.row,
+            user,
+            organizationId,
+            memberId,
+            role,
+            dailyUsageLimitUsd,
+          });
+        case 'duplicate_settled':
+          return replaySettledOrgRow(admission.row);
+        case 'duplicate_in_flight':
+        case 'duplicate_reconcile_in_progress':
+          throw orgOperationInProgressError();
+      }
     }),
   setChildMemberships: organizationBillingMutationProcedure
     .input(SetChildMembershipsSchema)
@@ -287,7 +775,7 @@ export const organizationsMembersRouter = createTRPCRouter({
     .input(RemoveMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
-      const { organizationId, memberId } = input;
+      const { organizationId, memberId, operationKey } = input;
 
       // Prevent users from removing themselves (unless they are kilo admin users)
       if (user.id === memberId && !user.is_admin) {
@@ -327,61 +815,70 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      const result = await removeUserFromOrganization(organizationId, memberId, user.id);
-      if (result.rowCount === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Failed to remove user from organization',
-        });
-      }
-
-      const removedUser = await findUserById(memberId);
-      await createAuditLog({
-        action: 'organization.member.remove',
-        actor_email: user.google_user_email,
-        actor_id: user.id,
-        actor_name: user.google_user_name,
-        message: `Removed user ${removedUser?.google_user_email || 'unknown'}`,
-        organization_id: organizationId,
-      });
-
-      await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
-
-      // KiloClaw cleanup: destroy org instances assigned to the removed member.
-
-      // Runs after the membership deletion transaction commits.
-      // Fire-and-forget worker calls — Postgres rows are already soft-deleted,
-      // so even if worker calls fail the instance is "dead" from the platform
-      // perspective and reconciliation will clean up.
-      try {
-        const destroyedInstances = await destroyOrgInstancesForUser(memberId, organizationId);
-        if (destroyedInstances.length > 0) {
-          const client = new KiloClawInternalClient();
-          const results = await Promise.allSettled(
-            destroyedInstances.map(({ instanceId }) =>
-              client.destroy(memberId, instanceId, { reason: 'org_member_cleanup' })
-            )
-          );
-          for (const [i, result] of results.entries()) {
-            if (result.status === 'rejected') {
-              console.error(
-                `[kiloclaw-org] Failed to destroy worker instance ${destroyedInstances[i].instanceId} for removed member ${memberId}:`,
-                result.reason
-              );
-            }
-          }
-          console.log(
-            `[kiloclaw-org] Destroyed ${destroyedInstances.length} instance(s) for removed member ${memberId} in org ${organizationId}`
-          );
+      // Without an operationKey, use the existing path exactly.
+      if (operationKey === undefined) {
+        const result = await removeUserFromOrganization(organizationId, memberId, user.id);
+        if (result.rowCount === 0) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Failed to remove user from organization',
+          });
         }
-      } catch (err) {
-        console.error(
-          `[kiloclaw-org] Failed to clean up KiloClaw instances for removed member ${memberId}:`,
-          err
-        );
+
+        const removedUser = await findUserById(memberId);
+        await createAuditLog({
+          action: 'organization.member.remove',
+          actor_email: user.google_user_email,
+          actor_id: user.id,
+          actor_name: user.google_user_name,
+          message: `Removed user ${removedUser?.google_user_email || 'unknown'}`,
+          organization_id: organizationId,
+        });
+
+        await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
+        await cleanupRemovedMemberInstances(memberId, organizationId);
+
+        return successResult({ updated: memberId });
       }
 
-      return successResult({ updated: memberId });
+      // With an operationKey, admit a ledger row before running the helper
+      // (P1-A-08e).
+      const resourceKey = orgMemberRemoveResourceKey(organizationId, memberId);
+      const admission = await admitOperation(db, {
+        userId: user.id,
+        orgId: organizationId,
+        domain: ORG_LEDGER_DOMAIN,
+        intent: 'member_remove',
+        operationKey,
+        resourceKey,
+        taxonomy: 'reconcile-first',
+        leaseSeconds: ORG_LEDGER_LEASE_SECONDS,
+      });
+      if (admission.row.intent !== 'member_remove' || admission.row.resource_key !== resourceKey) {
+        throw orgOperationKeyReuseMismatchError();
+      }
+      switch (admission.admission) {
+        case 'admitted':
+          return executeOrgMemberRemove({
+            row: admission.row,
+            user,
+            organizationId,
+            memberId,
+          });
+        case 'takeover':
+        case 'duplicate_reconcile_pending':
+          return repairOrgMemberRemove({
+            row: admission.row,
+            user,
+            organizationId,
+            memberId,
+          });
+        case 'duplicate_settled':
+          return replaySettledOrgRow(admission.row);
+        case 'duplicate_in_flight':
+        case 'duplicate_reconcile_in_progress':
+          throw orgOperationInProgressError();
+      }
     }),
   invite: organizationBillingMutationProcedure
     .input(InviteMemberSchema)

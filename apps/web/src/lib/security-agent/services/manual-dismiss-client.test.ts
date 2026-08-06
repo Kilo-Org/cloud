@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import { submitManualFindingDismissal } from './manual-dismiss-client';
 
 jest.mock('@/lib/config.server', () => ({
@@ -58,5 +59,159 @@ describe('submitManualFindingDismissal', () => {
       actor: { id: 'user-123' },
     });
     expect(JSON.parse(String(request.body)).actor).toEqual({ id: 'user-123' });
+  });
+
+  it('throws a TRPCError (not a raw Error) when fetch rejects with a transport error', async () => {
+    mockFetch.mockRejectedValue(new Error('network down'));
+
+    await expect(
+      submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      })
+    ).rejects.toMatchObject({
+      name: 'TRPCError',
+      code: 'BAD_GATEWAY',
+    });
+  });
+
+  it('classifies a 5xx status as ambiguous transport (BAD_GATEWAY)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: () => Promise.resolve({ error: 'boom' }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
+    expect((captured as TRPCError).message).toContain('502');
+    expect((captured as TRPCError).message).not.toContain('boom');
+    expect((captured as TRPCError).message).not.toContain('security-sync.test');
+    expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+
+  it('classifies a 4xx status as a definitive pre-acceptance rejection (PRECONDITION_FAILED)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ error: 'invalid' }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('PRECONDITION_FAILED');
+    expect((captured as TRPCError).message).not.toContain('invalid');
+    expect((captured as TRPCError).message).not.toContain('security-sync.test');
+    expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+
+  it('classifies a non-JSON body as ambiguous transport (BAD_GATEWAY)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON')),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
+  });
+
+  it('classifies a 2xx with lost correlation ids as ambiguous transport (BAD_GATEWAY)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: () => Promise.resolve({ success: true, accepted: true }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
+    expect((captured as TRPCError).message).not.toContain('security-sync.test');
+    expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+});
+
+describe('submitManualFindingDismissal env configuration', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('throws a TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
+    jest.resetModules();
+    jest.doMock('@/lib/config.server', () => ({
+      INTERNAL_API_SECRET: 'test-internal-secret',
+      SECURITY_SYNC_WORKER_URL: '',
+    }));
+    const mod = await import('./manual-dismiss-client');
+    let captured: unknown;
+    try {
+      await mod.submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      });
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeDefined();
+    expect((captured as { name?: string }).name).toBe('TRPCError');
+    expect((captured as { code?: string }).code).toBe('INTERNAL_SERVER_ERROR');
+    expect((captured as Error).message).toContain('not configured');
+    expect((captured as Error).message).not.toContain('test-internal-secret');
   });
 });

@@ -72,7 +72,7 @@ describe('buildWorkflowPageCode function', () => {
 
     expect(code).toContain('const dryRun = false');
     expect(code).toContain(
-      'const workflow = async ({ page, state }) => { return { done: true, result: 1 }; }'
+      'const workflow = async ({ page, state, input }) => { return { done: true, result: 1 }; }'
     );
     expect(code).toContain('"input":{"key":1}');
   });
@@ -166,7 +166,9 @@ describe('runWorkflow function', () => {
     expect(result.ok).toBe(false);
     /* eslint-disable jest/no-conditional-in-test, jest/no-conditional-expect -- Discriminated union narrowing with preceding runtime assertion. */
     if (!result.ok) {
-      expect(result.error).toBe('Workflow script returned an invalid value.');
+      expect(result.error).toBe(
+        'Workflow script returned an invalid value: {"something":"else"}. Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.'
+      );
       expect(result.pageUrl).toBe('https://shop.example.com/page');
     }
     /* eslint-enable jest/no-conditional-in-test, jest/no-conditional-expect */
@@ -182,7 +184,9 @@ describe('runWorkflow function', () => {
     expect(result.ok).toBe(false);
     /* eslint-disable jest/no-conditional-in-test, jest/no-conditional-expect -- Discriminated union narrowing with preceding runtime assertion. */
     if (!result.ok) {
-      expect(result.error).toBe('Workflow script returned an invalid value.');
+      expect(result.error).toBe(
+        'Workflow script returned an invalid value: null. Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.'
+      );
     }
     /* eslint-enable jest/no-conditional-in-test, jest/no-conditional-expect */
   });
@@ -218,7 +222,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Navigation target is outside the workflow scope.',
+      error:
+        'Navigation target https://other.example.com/page is outside the workflow scope https://shop.example.com. Navigate only within the scope, or save the workflow with a wider scope.',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -234,7 +239,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Tab is outside the workflow scope.',
+      error:
+        'Tab is at https://malicious.example.com/hijack, but this workflow only runs on https://shop.example.com. Navigate the tab there first, or save the workflow with a startUrl so runs navigate automatically.',
       ok: false,
       pageUrl: 'https://malicious.example.com/hijack',
     });
@@ -245,7 +251,11 @@ describe('runWorkflow function', () => {
     const deps = createDeps();
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
-    expect(result).toStrictEqual({ error: 'Workflow script is not approved.', ok: false });
+    expect(result).toStrictEqual({
+      error:
+        'Workflow script is not approved. Save it again with save_workflow (same workflowId) so the user can approve this version on the card.',
+      ok: false,
+    });
   });
 
   it('fails for approval hash mismatch', async () => {
@@ -256,7 +266,11 @@ describe('runWorkflow function', () => {
     const deps = createDeps();
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
-    expect(result).toStrictEqual({ error: 'Workflow script is not approved.', ok: false });
+    expect(result).toStrictEqual({
+      error:
+        'Workflow script is not approved. Save it again with save_workflow (same workflowId) so the user can approve this version on the card.',
+      ok: false,
+    });
   });
 
   it('fails when page limit is exceeded', async () => {
@@ -280,7 +294,7 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow exceeded the page limit.',
+      error: 'Workflow exceeded the page limit (20 pages). Check the script for a navigation loop.',
       ok: false,
     });
   });
@@ -359,7 +373,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow startUrl is outside the workflow scope.',
+      error:
+        'Workflow startUrl https://other.example.com/evil is outside the workflow scope https://shop.example.com. Update the workflow so startUrl matches the scope.',
       ok: false,
     });
     expect(deps.navigateUrls).toStrictEqual([]);
@@ -489,7 +504,8 @@ describe('runWorkflow function', () => {
     const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
     expect(result).toStrictEqual({
       dryRunActions: [],
-      error: 'Workflow script is not approved.',
+      error:
+        'Workflow script is not approved. Save it again with save_workflow (same workflowId) so the user can approve this version on the card.',
       ok: false,
     });
   });
@@ -502,7 +518,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an unparseable value.',
+      error:
+        'Workflow script returned an invalid value: "just a string". Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -541,7 +558,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an invalid value.',
+      error:
+        'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -564,7 +582,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an invalid value.',
+      error:
+        'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -590,7 +609,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an invalid value.',
+      error:
+        'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -613,7 +633,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an invalid value.',
+      error:
+        'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -701,7 +722,7 @@ describe('runWorkflow function', () => {
     const deps = createDeps();
     const result = await runWorkflow(deps, { input: circular, tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow initial input is not serializable.',
+      error: 'run_workflow input is not JSON-serializable.',
       ok: false,
     });
   });
@@ -745,5 +766,228 @@ describe('runWorkflow function', () => {
       pagesVisited: 2,
       result: 'done',
     });
+  });
+});
+
+describe('workflow params and input', () => {
+  it('injects input into the page code and exposes the waitFor helper', () => {
+    const code = buildWorkflowPageCode('return { done: true, result: 1 };', {}, false, {
+      destination: 'SFO',
+    });
+
+    expect(code).toContain('input: {"destination":"SFO"}');
+    expect(code).toContain('async waitFor(selector, timeoutMs)');
+  });
+
+  it('defaults input to an empty object in the page code', () => {
+    const code = buildWorkflowPageCode('return { done: true, result: 1 };', {}, false);
+    expect(code).toContain('input: {}');
+  });
+
+  it('records waitFor as a dry-run action instead of polling', () => {
+    const code = buildWorkflowPageCode('return { done: true, result: 1 };', {}, true);
+    expect(code).toContain("dryRunActions.push({ action: 'waitFor', selector }); return;");
+  });
+
+  it('rejects a run when required params are missing, before any navigation', async () => {
+    const workflow = await buildApprovedWorkflow({
+      params: [
+        {
+          description: 'City or airport to fly to',
+          example: 'SFO',
+          name: 'destination',
+          required: true,
+        },
+        { description: 'Departure date', name: 'date', required: true },
+        { description: 'Cabin class', name: 'cabin' },
+      ],
+      startUrl: 'https://shop.example.com/start',
+    });
+    const deps = createDeps();
+
+    const result = await runWorkflow(deps, { input: { date: '2026-09-01' }, tabId: 1, workflow });
+
+    expect(result).toStrictEqual({
+      error:
+        'Missing required input: "destination" — City or airport to fly to (e.g. "SFO"). ' +
+        'Call run_workflow again with input: {"destination":"SFO"}.',
+      ok: false,
+    });
+    expect(deps.navigateUrls).toStrictEqual([]);
+  });
+
+  it('runs when only optional params are missing', async () => {
+    const workflow = await buildApprovedWorkflow({
+      params: [{ description: 'Cabin class', name: 'cabin' }],
+    });
+    const deps = createDeps({
+      evalResponses: [{ ok: true, value: { ok: true, value: { done: true, result: 'ok' } } }],
+    });
+
+    const result = await runWorkflow(deps, { tabId: 1, workflow });
+    expect(result).toStrictEqual({ ok: true, pagesVisited: 1, result: 'ok' });
+  });
+
+  it.each(['SFO', [['SFO']], 42])(
+    'rejects non-object input %j with an actionable message',
+    async badInput => {
+      const workflow = await buildApprovedWorkflow();
+      const deps = createDeps();
+
+      const result = await runWorkflow(deps, { input: badInput, tabId: 1, workflow });
+      expect(result).toStrictEqual({
+        error: 'run_workflow input must be a JSON object like { "name": "value" }.',
+        ok: false,
+      });
+    }
+  );
+
+  it('re-injects input on every page across navigations', async () => {
+    const evalCodes: string[] = [];
+    const deps = createDeps({
+      evalResponses: [
+        {
+          ok: true,
+          value: {
+            ok: true,
+            value: { navigate: 'https://shop.example.com/page2', state: { step: 2 } },
+          },
+        },
+        { ok: true, value: { ok: true, value: { done: true, result: 'end' } } },
+      ],
+      tabUrls: ['https://shop.example.com/page1', 'https://shop.example.com/page2'],
+    });
+    const capturingDeps = {
+      ...deps,
+      evalInTab: (tabId: number, code: string) => {
+        evalCodes.push(code);
+        return deps.evalInTab(tabId, code);
+      },
+    };
+    const workflow = await buildApprovedWorkflow();
+
+    const result = await runWorkflow(capturingDeps, {
+      input: { destination: 'SFO' },
+      tabId: 1,
+      workflow,
+    });
+
+    expect(result).toStrictEqual({ ok: true, pagesVisited: 2, result: 'end' });
+    expect({
+      count: evalCodes.length,
+      firstInput: evalCodes[0]?.includes('input: {"destination":"SFO"}'),
+      firstState: evalCodes[0]?.includes('state: {"input":{"destination":"SFO"}}'),
+      secondInput: evalCodes[1]?.includes('input: {"destination":"SFO"}'),
+      secondState: evalCodes[1]?.includes('state: {"step":2}'),
+    }).toStrictEqual({
+      count: 2,
+      firstInput: true,
+      firstState: true,
+      secondInput: true,
+      secondState: true,
+    });
+  });
+});
+
+describe('dry-run selector verification', () => {
+  it('marks post-action selector misses as unverified instead of hard failures', () => {
+    const code = buildWorkflowPageCode('return { done: true, result: 1 };', {}, true);
+
+    expect(code).toContain('if (dryRun && dryRunActions.length > 0)');
+    expect(code).toContain('kiloDryRunUnverified');
+  });
+
+  it('reports success with recorded actions when a dry run cannot reach later content', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        {
+          ok: true,
+          value: {
+            dryRunActions: [{ action: 'click', selector: '#search' }],
+            dryRunUnverified: true,
+            error: 'Selector not reachable in a dry run: .result',
+            ok: false,
+          },
+        },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
+
+    expect(result.ok).toBe(true);
+    expect(result.dryRunActions).toStrictEqual([{ action: 'click', selector: '#search' }]);
+  });
+
+  it('still fails a dry run when a selector is wrong before any action', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        {
+          ok: true,
+          value: {
+            dryRunActions: [],
+            dryRunUnverified: false,
+            error: 'No element matches selector: #missing',
+            ok: false,
+          },
+        },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('treats a dry run that returns nothing after recorded actions as verified', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        {
+          ok: true,
+          value: {
+            dryRunActions: [{ action: 'fill', selector: '#origin' }],
+            ok: true,
+            value: undefined,
+          },
+        },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails a real run that returns nothing', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [{ ok: true, value: { dryRunActions: [], ok: true, value: undefined } }],
+    });
+
+    const result = await runWorkflow(deps, { tabId: 1, workflow });
+
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('run input bound', () => {
+  it('rejects an oversized input before touching the page', async () => {
+    const workflow = await buildApprovedWorkflow({ startUrl: 'https://shop.example.com/start' });
+    const deps = createDeps();
+
+    const result = await runWorkflow(deps, {
+      input: { blob: 'x'.repeat(20_000) },
+      tabId: 1,
+      workflow,
+    });
+
+    expect(result).toStrictEqual({
+      error:
+        'run_workflow input exceeds the size limit (16000 characters). Pass only the values the workflow declares as params.',
+      ok: false,
+    });
+    expect(deps.navigateUrls).toStrictEqual([]);
   });
 });

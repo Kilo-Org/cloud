@@ -8,7 +8,9 @@ import {
   agentWorkflowSchema,
   agentWorkflowInputSchema,
   storedAgentWorkflowsSchema,
+  findMissingRequiredParams,
   formatAgentWorkflowIndex,
+  formatMissingParamsError,
   hashWorkflowScript,
   isWorkflowApproved,
   matchesWorkflowScope,
@@ -400,5 +402,101 @@ describe('isWorkflowApproved function', () => {
       script,
     });
     expect(result).toBe(true);
+  });
+});
+
+describe('workflow params in the index and error formatting', () => {
+  it('appends declared input names to index entries', () => {
+    const index = formatAgentWorkflowIndex(
+      [
+        workflow({
+          description: 'Search flights',
+          id: 'fl',
+          name: 'Flights',
+          params: [
+            { description: 'City', name: 'destination', required: true },
+            { description: 'Date', name: 'date' },
+          ],
+          scopeOrigin: 'https://shop.example.com',
+          script: '1',
+        }),
+      ],
+      'https://shop.example.com'
+    );
+
+    expect(index).toContain('(inputs: destination, date)');
+  });
+
+  it('finds missing required params and formats an actionable error', () => {
+    const params = [
+      {
+        description: 'City or airport to fly to',
+        example: 'SFO',
+        name: 'destination',
+        required: true,
+      },
+      { description: 'Cabin class', name: 'cabin' },
+    ];
+
+    const emptyInput: Record<string, unknown> | undefined = undefined;
+
+    expect({
+      // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- Fixture index is static.
+      formatted: formatMissingParamsError([params[0]!]),
+      missingForEmptyInput: findMissingRequiredParams({ params }, emptyInput),
+      missingForProvided: findMissingRequiredParams({ params }, { destination: 'SFO' }),
+      missingWithoutParams: findMissingRequiredParams({}, emptyInput),
+    }).toStrictEqual({
+      formatted:
+        'Missing required input: "destination" — City or airport to fly to (e.g. "SFO"). Call run_workflow again with input: {"destination":"SFO"}.',
+      missingForEmptyInput: [params[0]],
+      missingForProvided: [],
+      missingWithoutParams: [],
+    });
+  });
+});
+
+describe('cross-site workflow search', () => {
+  const flights = workflow({
+    description: 'Search Google Flights for one-way flights',
+    id: 'flights',
+    name: 'Google Flights Search',
+    scopeOrigin: 'https://www.google.com',
+    script: '1',
+    updatedAt: 50,
+  });
+  const local = workflow({
+    description: 'Reads the cart',
+    id: 'cart',
+    name: 'Cart reader',
+    scopeOrigin: 'https://shop.example.com',
+    script: '1',
+    updatedAt: 100,
+  });
+
+  it('finds workflows on other sites when a query is given', () => {
+    const results = searchAgentWorkflows(
+      [flights, local],
+      'https://shop.example.com/page',
+      'flights'
+    );
+    expect(results.map(entry => entry.id)).toStrictEqual(['flights']);
+  });
+
+  it('ranks in-scope matches before out-of-scope matches', () => {
+    const both = searchAgentWorkflows([flights, local], 'https://shop.example.com/page', 'reads');
+    expect(both.map(entry => entry.id)).toStrictEqual(['cart']);
+
+    const searchAll = searchAgentWorkflows(
+      [flights, local],
+      'https://shop.example.com/page',
+      'search'
+    );
+    expect(searchAll.map(entry => entry.id)).toStrictEqual(['flights']);
+  });
+
+  it('still lists only in-scope workflows without a query', () => {
+    const results = searchAgentWorkflows([flights, local], 'https://shop.example.com/page');
+    expect(results.map(entry => entry.id)).toStrictEqual(['cart']);
   });
 });

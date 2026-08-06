@@ -859,7 +859,10 @@ export const AgentChatPanel = ({
 
       // Execute the workflow as a tool call and append the result.
       const toolCall = createWorkflowToolCall({
-        arguments: { workflowId: request.workflowId },
+        arguments: {
+          workflowId: request.workflowId,
+          ...(request.input === undefined ? {} : { input: request.input }),
+        },
         name: 'run_workflow',
         tabId: runSelectedTabId,
       });

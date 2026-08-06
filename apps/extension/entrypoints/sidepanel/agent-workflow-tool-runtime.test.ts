@@ -2,7 +2,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
-import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
+import {
+  executeWorkflowToolCall,
+  formatEmptySearchMessage,
+  resolveWorkflowStartUrl,
+} from './agent-workflow-tool-runtime';
 
 // ---------- mocks ----------
 
@@ -55,7 +59,7 @@ describe('search_workflows', () => {
     const result = await executeWorkflowToolCall(createToolCall('search_workflows'), ctx);
     expect(result).toStrictEqual({
       ok: true,
-      value: { message: 'No workflows for this site.', results: [] },
+      value: { message: 'No workflows saved yet. Use save_workflow to create one.', results: [] },
     });
   });
 
@@ -289,7 +293,8 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
-      error: 'Workflow not found.',
+      error:
+        'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
       ok: false,
     });
   });
@@ -372,7 +377,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
-      error: 'startUrl is not a valid URL.',
+      error: `startUrl must be an absolute URL inside the scope, e.g. "https://example.com/path", or a path starting with "/". Received: not-a-valid-url`,
       ok: false,
     });
   });
@@ -464,7 +469,8 @@ describe('run_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
-      error: 'Workflows are disabled in safe mode. The user can enable them in settings.',
+      error:
+        'Workflow runs are disabled in safe mode. Ask the user to enable "Allow workflows in safe mode" in settings, or to switch this conversation to dangerous mode.',
       ok: false,
     });
   });
@@ -546,7 +552,10 @@ describe('run_workflow', () => {
       createToolCall('run_workflow', { workflowId: 'nonexistent' }),
       ctx
     );
-    expect(result).toStrictEqual({ error: 'Workflow not found.', ok: false });
+    expect(result).toStrictEqual({
+      error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
+      ok: false,
+    });
   });
 });
 
@@ -696,5 +705,240 @@ describe('save_memory', () => {
       'memory',
       expect.objectContaining({ note: 'my note' })
     );
+  });
+});
+
+// ---------- workflow params ----------
+
+describe('workflow params through tools', () => {
+  it('rejects save_workflow with duplicate param names', async () => {
+    const ctx = createBaseCtx();
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'Test',
+        name: 'Test',
+        params: [
+          { description: 'One', name: 'city' },
+          { description: 'Two', name: 'city' },
+        ],
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+      }),
+      ctx
+    );
+
+    expect(result).toStrictEqual({ error: 'params must not contain duplicate names.', ok: false });
+  });
+
+  it('carries params into the approval draft on create', async () => {
+    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'id-1', status: 'approved' });
+    const ctx = createBaseCtx({ requestApproval });
+
+    await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'Test',
+        name: 'Test',
+        params: [{ description: 'City', example: 'SFO', name: 'destination', required: true }],
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+      }),
+      ctx
+    );
+
+    expect(requestApproval).toHaveBeenCalledWith(
+      'workflow',
+      expect.objectContaining({
+        params: [{ description: 'City', example: 'SFO', name: 'destination', required: true }],
+      })
+    );
+  });
+
+  it('uses the empty params array as the cleared sentinel on update', async () => {
+    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'wf-1', status: 'approved' });
+    const stored = {
+      approvedScriptHash: 'hash',
+      createdAt: 1,
+      description: 'Old',
+      id: 'wf-1',
+      name: 'Old',
+      scopeOrigin: 'https://example.com',
+      script: 'return { done: true, result: 1 };',
+      updatedAt: 1,
+    };
+    const ctx = createBaseCtx({
+      requestApproval,
+      storage: {
+        getItem: vi.fn().mockResolvedValue([stored]),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+    await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'New',
+        name: 'New',
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 2 };',
+        workflowId: 'wf-1',
+      }),
+      ctx
+    );
+
+    expect(requestApproval).toHaveBeenCalledWith(
+      'workflow',
+      expect.objectContaining({ params: [], workflowId: 'wf-1' })
+    );
+  });
+
+  it('returns params in search_workflows results', async () => {
+    const stored = {
+      approvedScriptHash: 'hash',
+      createdAt: 1,
+      description: 'Flights',
+      id: 'wf-1',
+      name: 'Flights',
+      params: [{ description: 'City', name: 'destination', required: true }],
+      scopeOrigin: 'https://example.com',
+      script: 'return { done: true, result: 1 };',
+      updatedAt: 1,
+    };
+    const ctx = createBaseCtx({
+      storage: {
+        getItem: vi.fn().mockResolvedValue([stored]),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+    const result = await executeWorkflowToolCall(createToolCall('search_workflows', {}), ctx);
+
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        results: [
+          expect.objectContaining({
+            params: [{ description: 'City', name: 'destination', required: true }],
+          }),
+        ],
+      },
+    });
+  });
+});
+
+describe('startUrl resolution', () => {
+  it('resolves a path startUrl against the scope origin', () => {
+    expect(resolveWorkflowStartUrl('/', 'https://example.com')).toBe('https://example.com/');
+    expect(resolveWorkflowStartUrl('/travel/flights', 'https://example.com')).toBe(
+      'https://example.com/travel/flights'
+    );
+  });
+
+  it('leaves absolute and unresolvable values untouched', () => {
+    expect(resolveWorkflowStartUrl('https://example.com/x', 'https://example.com')).toBe(
+      'https://example.com/x'
+    );
+    expect(resolveWorkflowStartUrl('travel', 'https://example.com')).toBe('travel');
+    expect(resolveWorkflowStartUrl(undefined, 'https://example.com')).toBeUndefined();
+  });
+
+  it('accepts a path startUrl in save_workflow and stores it absolute', async () => {
+    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'id-1', status: 'approved' });
+    const ctx = createBaseCtx({ requestApproval });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'Test',
+        name: 'Test',
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+        startUrl: '/search',
+      }),
+      ctx
+    );
+
+    expect(result).toStrictEqual({ ok: true, value: { saved: true, workflowId: 'id-1' } });
+    expect(requestApproval).toHaveBeenCalledWith(
+      'workflow',
+      expect.objectContaining({ startUrl: 'https://example.com/search' })
+    );
+  });
+});
+
+describe('run results name the workflow', () => {
+  const stored = {
+    approvedScriptHash: 'hash',
+    createdAt: 1,
+    description: 'Flights',
+    id: 'wf-1',
+    name: 'Flight price search',
+    scopeOrigin: 'https://example.com',
+    script: 'return { done: true, result: 1 };',
+    updatedAt: 1,
+  };
+
+  const ctxWithStored = () =>
+    createBaseCtx({
+      storage: {
+        getItem: vi.fn().mockResolvedValue([stored]),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+  it('includes the workflow name in a successful result', async () => {
+    vi.mocked(runWorkflow).mockResolvedValueOnce({ ok: true, pagesVisited: 1, result: 'done' });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('run_workflow', { workflowId: 'wf-1' }),
+      ctxWithStored()
+    );
+
+    expect(result).toStrictEqual({
+      ok: true,
+      value: { pagesVisited: 1, result: 'done', workflowName: 'Flight price search' },
+    });
+  });
+
+  it('names the workflow in a failure', async () => {
+    vi.mocked(runWorkflow).mockResolvedValueOnce({ error: 'Tab is at X.', ok: false });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('run_workflow', { workflowId: 'wf-1' }),
+      ctxWithStored()
+    );
+
+    expect(result).toStrictEqual({
+      error: 'Workflow "Flight price search" failed: Tab is at X.',
+      ok: false,
+    });
+  });
+});
+
+describe('empty search messages', () => {
+  it('tells the model to create one when nothing is saved', () => {
+    expect(formatEmptySearchMessage(0, undefined)).toBe(
+      'No workflows saved yet. Use save_workflow to create one.'
+    );
+    expect(formatEmptySearchMessage(0, 'flights')).toBe(
+      'No workflows saved yet. Use save_workflow to create one.'
+    );
+  });
+
+  it('never suggests searching with a query when a query already missed', () => {
+    const message = formatEmptySearchMessage(3, 'flights');
+    expect(message).toContain('No saved workflow matches "flights"');
+    expect(message).toContain('already covered every site');
+    expect(message).not.toContain('with a query to find them');
+  });
+
+  it('suggests a query search only when no query was given', () => {
+    expect(formatEmptySearchMessage(3, undefined)).toBe(
+      'No workflows for this site. 3 workflow(s) are saved for other sites — call search_workflows with a query to find them.'
+    );
+  });
+
+  it('treats a blank query as no query', () => {
+    expect(formatEmptySearchMessage(2, '   ')).toContain('call search_workflows with a query');
   });
 });

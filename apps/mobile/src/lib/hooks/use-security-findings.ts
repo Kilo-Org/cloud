@@ -9,6 +9,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
+import { isSecuritySyncRetryable } from '@/lib/hooks/use-security-agent-mutations';
+import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -95,17 +97,50 @@ export function useSecurityAnalysis(scope: string, findingId: string) {
 // No hook-level onError toast: dismiss-finding-screen.tsx is the sole caller
 // and is a form sheet that stays open on failure — it renders
 // `dismissFinding.isError` inline above the confirm button instead (P2).
+
+/**
+ * Deterministic intent fingerprint for a finding dismissal (P1-A-08e). A
+ * retry of the SAME scope+finding+reason+comment reuses the hoisted key; a
+ * form edit (or a scope change) rotates it so the ledger treats the submit as
+ * a fresh intent instead of replaying the previous one's canonical result.
+ */
+export function dismissFindingIntentFingerprint(
+  scope: string,
+  vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]
+): string {
+  return JSON.stringify({
+    resource: [scope],
+    findingId: vars.findingId,
+    reason: vars.reason,
+    comment: vars.comment,
+  });
+}
+
 export function useDismissSecurityFinding(scope: string) {
   const queryClient = useQueryClient();
+  const { getKey, rotateKey } = useHoistedOperationKey();
   return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.dismissFinding.mutate(vars)
-        : trpcClient.organizations.securityAgent.dismissFinding.mutate({
-            organizationId: scope,
-            ...vars,
-          }),
+    mutationFn: async (
+      vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]
+    ) => {
+      const operationKey = getKey(dismissFindingIntentFingerprint(scope, vars));
+      try {
+        const result = isPersonalSecurityScope(scope)
+          ? await trpcClient.securityAgent.dismissFinding.mutate({ ...vars, operationKey })
+          : await trpcClient.organizations.securityAgent.dismissFinding.mutate({
+              organizationId: scope,
+              ...vars,
+              operationKey,
+            });
+        rotateKey();
+        return result;
+      } catch (error) {
+        if (!isSecuritySyncRetryable(error)) {
+          rotateKey();
+        }
+        throw error;
+      }
+    },
     onSuccess: result => {
       if (result.commandId) {
         trackSecurityAgentCommand(queryClient, scope, result.commandId);

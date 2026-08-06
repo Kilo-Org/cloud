@@ -20,10 +20,12 @@ import {
 import type { AnalyticsEventOutboxRow } from '@kilocode/db/schema';
 
 const mockCapture = jest.fn();
+const mockFlushPostHog = jest.fn();
 
 jest.mock('@/lib/posthog', () => ({
   __esModule: true,
   default: jest.fn(() => ({ capture: mockCapture })),
+  flushPostHog: (...args: unknown[]) => mockFlushPostHog(...args),
 }));
 
 jest.mock('@/lib/drizzle', () => ({
@@ -81,6 +83,8 @@ describe('dispatchQueuedAnalyticsEvents', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCapture.mockReset();
+    mockFlushPostHog.mockReset();
+    mockFlushPostHog.mockResolvedValue(undefined);
     mockReclaimStaleSendingEvents.mockResolvedValue([]);
     mockClaimDueOutboxEvents.mockResolvedValue([]);
     mockPurgeExpired.mockResolvedValue(emptyPurge);
@@ -155,6 +159,44 @@ describe('dispatchQueuedAnalyticsEvents', () => {
     expect(summary.claimed).toBe(1);
     expect(summary.retried).toBe(1);
     expect(summary.failed).toBe(0);
+    expect(summary.delivered).toBe(0);
+  });
+
+  it('waits for the async flush before marking the event delivered', async () => {
+    const row = makeRow();
+    mockClaimDueOutboxEvents.mockResolvedValueOnce([row]);
+    mockMarkOutboxDelivered.mockResolvedValue(row);
+
+    const summary = await dispatchQueuedAnalyticsEvents();
+
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(mockFlushPostHog).toHaveBeenCalledTimes(1);
+    expect(mockFlushPostHog.mock.invocationCallOrder[0]).toBeLessThan(
+      mockMarkOutboxDelivered.mock.invocationCallOrder[0]
+    );
+    expect(summary.delivered).toBe(1);
+  });
+
+  it('backs a rejected async flush off for retry with the error recorded', async () => {
+    const row = makeRow();
+    mockClaimDueOutboxEvents.mockResolvedValueOnce([row]);
+    mockFlushPostHog.mockRejectedValue(new Error('flush timed out'));
+    mockMarkOutboxRetry.mockResolvedValue({
+      outcome: 'retried',
+      row: { ...row, status: 'pending', attempts: 1 },
+    });
+
+    const summary = await dispatchQueuedAnalyticsEvents();
+
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(mockFlushPostHog).toHaveBeenCalledTimes(1);
+    expect(mockMarkOutboxRetry).toHaveBeenCalledWith(expect.anything(), {
+      eventId: row.id,
+      claimedAt: row.claimed_at,
+      error: 'flush timed out',
+    });
+    expect(mockMarkOutboxDelivered).not.toHaveBeenCalled();
+    expect(summary.retried).toBe(1);
     expect(summary.delivered).toBe(0);
   });
 

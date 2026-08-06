@@ -10,14 +10,15 @@
  * no-op, so rows still advance to `delivered`; the state machine is
  * environment-independent. Each send passes the deterministic `event_uuid` as
  * the PostHog event UUID (`posthog-node` 5.10.4 supports `EventMessage.uuid`),
- * which PostHog uses to dedupe replayed at-least-once deliveries. A
- * synchronous capture throw is a failed send and drives the DB-side backoff
- * retry or terminal failure.
+ * which PostHog uses to dedupe replayed at-least-once deliveries. The send is
+ * awaited through the client flush so a cron pass cannot mark an event
+ * delivered before PostHog has it; a capture throw or a rejected flush is a
+ * failed send and drives the DB-side backoff retry or terminal failure.
  */
 import 'server-only';
 
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient, { flushPostHog } from '@/lib/posthog';
 import { sentryLogger } from '@/lib/utils.server';
 import {
   claimDueOutboxEvents,
@@ -135,7 +136,7 @@ async function dispatchOutboxEvent(
   }
 
   try {
-    sendToPostHog(row);
+    await sendToPostHog(row);
   } catch (error) {
     const message = errorMessage(error);
     logError('Analytics outbox send failed', {
@@ -173,17 +174,20 @@ async function dispatchOutboxEvent(
 }
 
 /**
- * Sends one event to PostHog. The deterministic `event_uuid` goes in the
- * PostHog event UUID field; if the installed client ever dropped that field,
- * the catalog fallback carries it as an `event_uuid` property instead.
+ * Sends one event to PostHog and waits for the client flush so the send is
+ * durable before the row is marked delivered. The deterministic `event_uuid`
+ * goes in the PostHog event UUID field; if the installed client ever dropped
+ * that field, the catalog fallback carries it as an `event_uuid` property
+ * instead.
  */
-function sendToPostHog(row: AnalyticsEventOutboxRow): void {
+async function sendToPostHog(row: AnalyticsEventOutboxRow): Promise<void> {
   PostHogClient().capture({
     distinctId: row.distinct_id,
     event: row.event_name,
     properties: row.properties,
     uuid: row.event_uuid,
   });
+  await flushPostHog();
 }
 
 function outboxLogFields(row: AnalyticsEventOutboxRow): Record<string, unknown> {

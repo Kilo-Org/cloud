@@ -139,6 +139,13 @@ export type SessionMessageQueueDependencies = {
   validateModeAgainstRuntimeAgents: (metadata: SessionMetadata, mode: string) => string | null;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
   getDeliveryBlock: () => Promise<WrapperCleanupBlock | null>;
+  /**
+   * Attempt one out-of-cadence recovery of an exhausted wrapper-cleanup block
+   * while a user is actively waiting on the flush. Implementations must be a
+   * no-op for non-exhausted blocks; the flush re-reads `getDeliveryBlock`
+   * afterwards to learn whether the block cleared.
+   */
+  recoverExhaustedDeliveryBlock?: () => Promise<void>;
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
   isDeliveryHeld?: () => Promise<boolean>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
@@ -176,6 +183,52 @@ function toFailureResult(
   };
 }
 
+/**
+ * Record a blocked flush when wrapper cleanup is exhausted. The lease fences off
+ * re-allocation, but exhaustion is recoverable — the supervisor releases it once
+ * the wedged wrapper is observably gone, and each flush attempt forces one
+ * observation. So this retries on the cleanup-exhausted budget (a container
+ * reaped moments after exhaustion still delivers) and then fails closed, because
+ * skipping indefinitely would leave the message `queued` with no terminal signal.
+ *
+ * The code must be `WRAPPER_CLEANUP_EXHAUSTED` rather than a generic `INTERNAL`:
+ * `recordPendingFlushFailure` treats `INTERNAL` as non-authoritative and would
+ * keep whatever earlier cause the message carried, terminalizing it with a stale
+ * reason.
+ */
+async function recordExhaustedCleanupFlushFailure(
+  params: {
+    storage: SessionMessageQueueStorage;
+    now: number;
+    scheduleTerminalizationRepair?: () => Promise<void>;
+  },
+  message: PendingSessionMessage,
+  policy: PendingFlushPolicy,
+  totalCount: number
+): Promise<PendingFlushFailure> {
+  const failure = await recordPendingFlushFailure(
+    params.storage,
+    message,
+    'Wrapper cleanup exhausted: the unresponsive wrapper could not be stopped or observed',
+    params.now,
+    {
+      policy,
+      code: 'WRAPPER_CLEANUP_EXHAUSTED',
+      scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
+    }
+  );
+  logger
+    .withFields({
+      messageId: message.messageId,
+      attempts: failure.attempts,
+      exhausted: failure.exhausted,
+      nextFlushAttemptAt: failure.nextFlushAttemptAt,
+      logTag: 'pending_flush_cleanup_exhausted',
+    })
+    .warn('Queued message blocked by exhausted wrapper cleanup');
+  return toFailureResult(failure, totalCount);
+}
+
 function isSandboxConnectionRetry(message: PendingSessionMessage): boolean {
   return (
     message.lastFlushFailureCode === 'SANDBOX_CONNECT_FAILED' && (message.flushAttempts ?? 0) >= 1
@@ -202,6 +255,7 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
       return { failureStage: 'pre_dispatch', failureCode: 'invalid_delivery_request' };
     case 'MODEL_MISSING':
       return { failureStage: 'pre_dispatch', failureCode: 'model_missing' };
+    case 'WRAPPER_CLEANUP_EXHAUSTED':
     case 'SANDBOX_CAPABILITY_UNAVAILABLE':
     case 'WRAPPER_FINALIZING':
     case 'INTERNAL':
@@ -294,6 +348,7 @@ export async function flushNextPendingSessionMessage(params: {
   now: number;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
   getDeliveryBlock?: SessionMessageQueueDependencies['getDeliveryBlock'];
+  recoverExhaustedDeliveryBlock?: SessionMessageQueueDependencies['recoverExhaustedDeliveryBlock'];
   validateModeAgainstRuntimeAgents: SessionMessageQueueDependencies['validateModeAgainstRuntimeAgents'];
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
   isDeliveryHeld?: () => Promise<boolean>;
@@ -411,8 +466,19 @@ export async function flushNextPendingSessionMessage(params: {
 
   await params.repairQueuedMessageEffects?.(intent);
 
-  const deliveryBlock = await params.getDeliveryBlock?.();
+  let deliveryBlock = await params.getDeliveryBlock?.();
+  if (deliveryBlock?.kind === 'exhausted' && params.recoverExhaustedDeliveryBlock) {
+    // A user is actively waiting on this flush; the recheck cadence gate exists
+    // to bound background churn, not to delay an explicit send. Force one
+    // bounded inspection — if the wedged sandbox has been reaped since
+    // exhaustion, the lease releases and delivery proceeds below.
+    await params.recoverExhaustedDeliveryBlock();
+    deliveryBlock = await params.getDeliveryBlock?.();
+  }
   if (deliveryBlock) {
+    if (deliveryBlock.kind === 'exhausted') {
+      return recordExhaustedCleanupFlushFailure(params, message, policy, totalCount);
+    }
     if (isSandboxConnectionRetry(message)) {
       const failure = await recordPendingFlushFailure(
         params.storage,
@@ -429,7 +495,7 @@ export async function flushNextPendingSessionMessage(params: {
     }
     return {
       type: 'skipped',
-      nextFlushAttemptAt: deliveryBlock.kind === 'retryable' ? deliveryBlock.retryAt : undefined,
+      nextFlushAttemptAt: deliveryBlock.retryAt,
       remainingCount: totalCount,
     };
   }
@@ -446,6 +512,9 @@ export async function flushNextPendingSessionMessage(params: {
     startResult = await params.deliver(plan);
   } catch (error) {
     if (error instanceof WrapperCleanupBlockedError) {
+      if (error.block.kind === 'exhausted') {
+        return recordExhaustedCleanupFlushFailure(params, message, policy, totalCount);
+      }
       if (isSandboxConnectionRetry(message)) {
         const failure = await recordPendingFlushFailure(
           params.storage,
@@ -462,7 +531,7 @@ export async function flushNextPendingSessionMessage(params: {
       }
       return {
         type: 'skipped',
-        nextFlushAttemptAt: error.block.kind === 'retryable' ? error.block.retryAt : undefined,
+        nextFlushAttemptAt: error.block.retryAt,
         remainingCount: totalCount,
       };
     }
@@ -545,6 +614,7 @@ export function createSessionMessageQueue(
     validateModeAgainstRuntimeAgents,
     getDeliveryContext,
     getDeliveryBlock,
+    recoverExhaustedDeliveryBlock,
     deliver,
     isDeliveryHeld,
     ensureQueuedMessageEvent,
@@ -922,6 +992,7 @@ export function createSessionMessageQueue(
       now,
       getDeliveryContext,
       getDeliveryBlock,
+      recoverExhaustedDeliveryBlock,
       validateModeAgainstRuntimeAgents,
       deliver,
       isDeliveryHeld,

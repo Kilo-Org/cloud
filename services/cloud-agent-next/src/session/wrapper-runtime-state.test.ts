@@ -8,6 +8,7 @@ import {
   getWrapperLease,
   getWrapperRuntimeState,
   hasCompleteWrapperRunMessageIndex,
+  isWrapperCleanupExhausted,
   isWrapperDeliveryHeld,
   markWrapperFinalizing,
   nextSandboxRecoveryDeadline,
@@ -18,6 +19,9 @@ import {
   recordWrapperAcceptedMessage,
   reduceSandboxRecoveryState,
   reduceWrapperLease,
+  WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+  WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS,
+  WRAPPER_STOP_MAX_ATTEMPTS,
 } from './wrapper-runtime-state.js';
 
 type MemoryStorage = Pick<DurableObjectStorage, 'get' | 'put'> & DurableObjectStorage;
@@ -209,7 +213,7 @@ describe('WrapperLease', () => {
     expect(nextWrapperLeaseDeadline(retrying)).toBe(5_200);
   });
 
-  it('keeps an exhausted cleanup quarantined without another deadline', () => {
+  it('keeps an exhausted cleanup quarantined between slow recheck deadlines', () => {
     const requested = reduceWrapperLease(emptyWrapperLease(), {
       type: 'request_stop',
       target: { kind: 'session' },
@@ -238,9 +242,10 @@ describe('WrapperLease', () => {
       attempts: 5,
       exhaustedAt: 300,
       lastError: 'inspection failed',
+      nextRecheckAt: 300 + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
     });
-    expect(nextWrapperCleanupDeadline(exhausted)).toBeUndefined();
-    expect(nextWrapperLeaseDeadline(exhausted)).toBeUndefined();
+    expect(nextWrapperCleanupDeadline(exhausted)).toBe(300 + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS);
+    expect(nextWrapperLeaseDeadline(exhausted)).toBe(300 + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS);
     expect(isWrapperDeliveryHeld(emptyWrapperRuntimeState(), exhausted)).toBe(true);
     expect(
       reduceWrapperLease(exhausted, {
@@ -250,6 +255,104 @@ describe('WrapperLease', () => {
         now: 400,
       })
     ).toEqual(exhausted);
+  });
+
+  it('falls back to one recheck interval for exhausted leases without a recheck deadline', () => {
+    const exhausted = reduceWrapperLease(emptyWrapperLease(), {
+      type: 'request_stop',
+      target: { kind: 'session' },
+      reason: 'observation-failed',
+      now: 100,
+    });
+    if (exhausted.state !== 'stop_needed') throw new Error('Expected cleanup request');
+    const legacyExhausted = {
+      ...exhausted,
+      attempts: WRAPPER_STOP_MAX_ATTEMPTS,
+      exhaustedAt: 5_000,
+      nextAttemptAt: Number.MAX_SAFE_INTEGER,
+    };
+
+    expect(nextWrapperCleanupDeadline(legacyExhausted)).toBe(
+      5_000 + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS
+    );
+  });
+
+  it('drops the maintenance deadline once the exhausted recovery window closes', () => {
+    const exhausted = reduceWrapperLease(emptyWrapperLease(), {
+      type: 'request_stop',
+      target: { kind: 'session' },
+      reason: 'observation-failed',
+      now: 100,
+    });
+    if (exhausted.state !== 'stop_needed') throw new Error('Expected cleanup request');
+    const exhaustedAt = 5_000;
+    const base = {
+      ...exhausted,
+      attempts: WRAPPER_STOP_MAX_ATTEMPTS,
+      exhaustedAt,
+      nextAttemptAt: Number.MAX_SAFE_INTEGER,
+    };
+    const lastInWindow = exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS;
+
+    expect(nextWrapperCleanupDeadline({ ...base, nextRecheckAt: lastInWindow })).toBe(lastInWindow);
+    // Past the window the lease stops re-arming the alarm, so an unrecoverable
+    // exhaustion does not wake the DO every recheck interval forever.
+    expect(
+      nextWrapperCleanupDeadline({ ...base, nextRecheckAt: lastInWindow + 1 })
+    ).toBeUndefined();
+    expect(nextWrapperLeaseDeadline({ ...base, nextRecheckAt: lastInWindow + 1 })).toBeUndefined();
+  });
+
+  it('schedules the next exhausted recheck and releases to none on confirmed absence', () => {
+    const requested = reduceWrapperLease(emptyWrapperLease(), {
+      type: 'request_stop',
+      target: { kind: 'session' },
+      reason: 'unhealthy-wrapper',
+      now: 100,
+    });
+    if (requested.state !== 'stop_needed') throw new Error('Expected cleanup request');
+    const stopping = reduceWrapperLease(
+      { ...requested, attempts: 4 },
+      { type: 'begin_stop_attempt', attemptId: 'attempt_fifth', now: 200, attemptDeadlineAt: 300 }
+    );
+    const exhausted = reduceWrapperLease(stopping, {
+      type: 'cleanup_exhausted',
+      attemptId: 'attempt_fifth',
+      now: 300,
+      error: 'inspection failed',
+    });
+    if (!isWrapperCleanupExhausted(exhausted)) throw new Error('Expected exhausted cleanup');
+
+    const rescheduled = reduceWrapperLease(exhausted, {
+      type: 'exhausted_recheck_scheduled',
+      now: 1_000,
+    });
+    expect(rescheduled).toMatchObject({
+      state: 'stop_needed',
+      exhaustedAt: 300,
+      attempts: 5,
+      nextRecheckAt: 1_000 + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+    });
+
+    const released = reduceWrapperLease(rescheduled, { type: 'release_exhausted' });
+    expect(released).toEqual({ state: 'none', nextInstanceGeneration: 1 });
+  });
+
+  it('ignores exhausted recheck events for non-exhausted leases', () => {
+    const requested = reduceWrapperLease(emptyWrapperLease(), {
+      type: 'request_stop',
+      target: { kind: 'session' },
+      reason: 'unhealthy-wrapper',
+      now: 100,
+    });
+
+    expect(
+      reduceWrapperLease(requested, { type: 'exhausted_recheck_scheduled', now: 200 })
+    ).toEqual(requested);
+    expect(reduceWrapperLease(requested, { type: 'release_exhausted' })).toEqual(requested);
+    expect(reduceWrapperLease(emptyWrapperLease(), { type: 'release_exhausted' })).toEqual(
+      emptyWrapperLease()
+    );
   });
 
   it('counts only fresh list-processes timeouts and persists publication deadlines', () => {
@@ -463,7 +566,12 @@ describe('WrapperLease', () => {
       exhaustedAt: expect.any(Number),
     });
     expect(isWrapperDeliveryHeld(emptyWrapperRuntimeState(), repaired)).toBe(true);
-    expect(nextWrapperCleanupDeadline(repaired)).toBeUndefined();
+    // Quarantined leases predate nextRecheckAt; the deadline falls back to one
+    // recheck interval after exhaustion so the quarantine is recoverable.
+    const exhaustedAt = isWrapperCleanupExhausted(repaired) ? repaired.exhaustedAt : 0;
+    expect(nextWrapperCleanupDeadline(repaired)).toBe(
+      exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS
+    );
     await expect(getWrapperLease(storage)).resolves.toEqual(repaired);
   });
 });

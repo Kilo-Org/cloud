@@ -129,6 +129,7 @@ function createQueueHarness(options?: {
   failTerminalizationOnce?: boolean;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
   getDeliveryBlock?: () => Promise<WrapperCleanupBlock | null>;
+  recoverExhaustedDeliveryBlock?: () => Promise<void>;
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
@@ -165,6 +166,7 @@ function createQueueHarness(options?: {
       validateModeAgainstRuntimeAgents: () => null,
       getDeliveryContext: async () => (metadata ? createContext(metadata) : null),
       getDeliveryBlock: options?.getDeliveryBlock ?? (async () => null),
+      recoverExhaustedDeliveryBlock: options?.recoverExhaustedDeliveryBlock,
       deliver,
       ensureQueuedMessageEvent: event => {
         if (failQueuedEvent) {
@@ -655,6 +657,135 @@ describe('SessionMessageQueue', () => {
     expect(pending?.lastFlushError).toBeUndefined();
   });
 
+  it('recovers an exhausted cleanup block and delivers when the forced recheck clears it', async () => {
+    let blocked = true;
+    const recover = vi.fn(async () => {
+      blocked = false;
+    });
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => (blocked ? { kind: 'exhausted' as const } : null),
+      recoverExhaustedDeliveryBlock: recover,
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'recover and deliver' },
+    });
+
+    const drain = await harness.queue.drainNextPendingMessage();
+
+    expect(recover).toHaveBeenCalledOnce();
+    expect(harness.deliver).toHaveBeenCalledOnce();
+    expect(harness.terminalizations).toHaveLength(0);
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
+  });
+
+  it('retries on its own budget when the forced cleanup recheck does not clear the block', async () => {
+    const now = 200_000;
+    const recover = vi.fn(async () => {});
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ kind: 'exhausted' as const }),
+      recoverExhaustedDeliveryBlock: recover,
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'recheck keeps block',
+        createdAt: 1,
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    // Exhaustion is recoverable, so one blocked attempt must not be terminal:
+    // the container may be reaped before the retry budget runs out.
+    expect(recover).toHaveBeenCalledOnce();
+    expect(harness.deliver).not.toHaveBeenCalled();
+    expect(harness.terminalizations).toHaveLength(0);
+    expect(drain).toEqual({ retryAt: now + 30_000, remainingPendingCount: 1 });
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending).toMatchObject({
+      flushAttempts: 1,
+      lastFlushFailureCode: 'WRAPPER_CLEANUP_EXHAUSTED',
+    });
+  });
+
+  it('delivers when a later forced recheck clears a block that earlier attempts hit', async () => {
+    let blocked = true;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => (blocked ? { kind: 'exhausted' as const } : null),
+      recoverExhaustedDeliveryBlock: async () => {},
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'reaped between attempts',
+        createdAt: 1,
+        flushAttempts: 2,
+        lastFlushError: 'Wrapper cleanup exhausted',
+        lastFlushFailureCode: 'WRAPPER_CLEANUP_EXHAUSTED',
+      })
+    );
+
+    blocked = false;
+    const drain = await harness.queue.drainNextPendingMessage();
+
+    expect(harness.deliver).toHaveBeenCalledOnce();
+    expect(harness.terminalizations).toHaveLength(0);
+    expect(drain).toEqual({ remainingPendingCount: 0 });
+  });
+
+  it('fails closed once the cleanup-exhausted retry budget is spent', async () => {
+    const now = 200_000;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ kind: 'exhausted' as const }),
+      recoverExhaustedDeliveryBlock: async () => {},
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'recheck never clears',
+        createdAt: 1,
+        flushAttempts: 3,
+        nextFlushAttemptAt: now,
+        lastFlushError: 'Wrapper cleanup exhausted',
+        lastFlushFailureCode: 'WRAPPER_CLEANUP_EXHAUSTED',
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(harness.deliver).not.toHaveBeenCalled();
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      reason: 'exhausted',
+      failureStage: 'pre_dispatch',
+      failureCode: 'delivery_failure_unknown',
+      error: 'Wrapper cleanup exhausted: the unresponsive wrapper could not be stopped or observed',
+    });
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
+  });
+
   it('fails the second sandbox attempt when wrapper cleanup remains blocked', async () => {
     const now = 200_000;
     const harness = createQueueHarness({
@@ -746,7 +877,7 @@ describe('SessionMessageQueue', () => {
     expect(pending?.lastFlushError).toBeUndefined();
   });
 
-  it('retains a queued message without scheduling another cleanup after quarantine', async () => {
+  it('retries a queued message when delivery reports exhausted cleanup', async () => {
     const harness = createQueueHarness({
       deliver: async () => {
         throw new WrapperCleanupBlockedError({ kind: 'exhausted' });
@@ -758,12 +889,78 @@ describe('SessionMessageQueue', () => {
     });
 
     const drain = await harness.queue.drainNextPendingMessage();
-    const [pending] = await listPendingSessionMessages(harness.storage);
 
-    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 1 });
-    expect(pending?.messageId).toBe(FIRST_MESSAGE_ID);
-    expect(pending?.flushAttempts).toBeUndefined();
-    expect(pending?.lastFlushError).toBeUndefined();
+    expect(harness.terminalizations).toHaveLength(0);
+    expect(drain.remainingPendingCount).toBe(1);
+    expect(drain.retryAt).toBeDefined();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending).toMatchObject({
+      flushAttempts: 1,
+      lastFlushFailureCode: 'WRAPPER_CLEANUP_EXHAUSTED',
+    });
+  });
+
+  it('does not attempt delivery while cleanup is exhausted', async () => {
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ kind: 'exhausted' }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'blocked by exhausted cleanup',
+        createdAt: 1,
+      })
+    );
+
+    const drain = await harness.queue.drainNextPendingMessage();
+
+    expect(harness.deliver).not.toHaveBeenCalled();
+    expect(harness.terminalizations).toHaveLength(0);
+    expect(drain.remainingPendingCount).toBe(1);
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(1);
+  });
+
+  it('attributes the terminal failure to cleanup exhaustion, not the earlier sandbox failure', async () => {
+    const now = 200_000;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ kind: 'exhausted' }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'sandbox retries then exhausted cleanup',
+        createdAt: 100_000,
+        flushAttempts: 3,
+        nextFlushAttemptAt: now,
+        lastFlushError: 'Sandbox connection failed during wrapper discovery',
+        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      // Sandbox-connect is itself reset-eligible, so the counter carries over
+      // and the fourth attempt spends the budget.
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(harness.deliver).not.toHaveBeenCalled();
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'delivery_failure_unknown',
+      error: 'Wrapper cleanup exhausted: the unresponsive wrapper could not be stopped or observed',
+    });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
   });
 
   it('fails the second sandbox attempt when delivery discovers blocked cleanup', async () => {

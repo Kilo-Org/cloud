@@ -770,6 +770,12 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     });
   }
 
+  async observeWrappersWithoutWaking(): Promise<WrapperObservation> {
+    const sandbox = await this.getSandbox();
+    if ((await isSandboxContainerRunning(sandbox)) === false) return { status: 'absent' };
+    return this.discoverSessionWrappers();
+  }
+
   private async observeTarget(_target: WrapperStopTarget): Promise<WrapperObservation> {
     // The lease is session-scoped: confirming absence must account for every
     // physical wrapper carrying this logical session marker, including duplicates.

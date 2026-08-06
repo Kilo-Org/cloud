@@ -4,6 +4,7 @@ import {
   ImagesSchema,
   MCPServerConfigSchema,
   MetadataSchema,
+  modelIdSchema,
   RuntimeAgentSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
@@ -996,6 +997,30 @@ describe('MetadataSchema with runtimeSkills', () => {
     };
     const result = MetadataSchema.parse(metadata);
     expect(result.runtimeSkills).toEqual([{ name: 'demo', rawMarkdown: 'body' }]);
+  });
+});
+
+describe('modelIdSchema', () => {
+  it('accepts standard provider/model IDs', () => {
+    expect(modelIdSchema.parse('anthropic/claude-sonnet-4-20250514')).toBe(
+      'anthropic/claude-sonnet-4-20250514'
+    );
+    expect(modelIdSchema.parse('inclusionai/ling-3.0-flash:free')).toBe(
+      'inclusionai/ling-3.0-flash:free'
+    );
+  });
+
+  it('accepts tilde-prefixed latest aliases', () => {
+    expect(modelIdSchema.parse('~x-ai/grok-latest')).toBe('~x-ai/grok-latest');
+    expect(modelIdSchema.parse('~anthropic/claude-sonnet-latest')).toBe(
+      '~anthropic/claude-sonnet-latest'
+    );
+  });
+
+  it('rejects whitespace and other unsafe characters', () => {
+    expect(modelIdSchema.safeParse('x ai/grok').success).toBe(false);
+    expect(modelIdSchema.safeParse('x;ai/grok').success).toBe(false);
+    expect(modelIdSchema.safeParse('').success).toBe(false);
   });
 });
 

@@ -1,8 +1,21 @@
 import { createGateway, generateText } from 'ai';
 
+import { listBytePlusSeatsByUsername } from '@/lib/coding-plans/byteplus-control-plane';
 import { validateCodingPlanCredential } from '@/lib/coding-plans/inventory-validation';
 
+jest.mock('@/lib/config.server', () => ({
+  BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID: 'test-byteplus-access',
+  BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY: 'test-byteplus-secret',
+}));
+
 const mockDirectModel = jest.fn((modelId: string) => ({ directModelId: modelId }));
+
+jest.mock('@/lib/coding-plans/byteplus-control-plane', () => ({
+  BytePlusControlPlaneError: class BytePlusControlPlaneError extends Error {
+    code = 'application';
+  },
+  listBytePlusSeatsByUsername: jest.fn(),
+}));
 
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   createAiSdkProvider: jest.fn(() => mockDirectModel),
@@ -18,6 +31,19 @@ jest.mock('@/lib/utils.server', () => ({
 }));
 
 const mockedGenerateText = jest.mocked(generateText);
+const mockedListBytePlusSeatsByUsername = jest.mocked(listBytePlusSeatsByUsername);
+
+beforeEach(() => {
+  mockedListBytePlusSeatsByUsername.mockResolvedValue([
+    {
+      seatId: 'seat-lite',
+      bizInfo: 'Lite',
+      seatStatus: 2,
+      billingStatus: 2,
+      apiKey: 'byteplus-inventory-key',
+    },
+  ]);
+});
 
 afterEach(() => {
   jest.clearAllMocks();
@@ -34,7 +60,7 @@ describe('validateCodingPlanCredential', () => {
         providerId: 'minimax',
         upstreamPlanId: 'minimax-token-plan-plus-123',
       })
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ valid: true });
 
     expect(createGateway).toHaveBeenCalled();
     expect(mockedGenerateText).toHaveBeenCalledWith({
@@ -60,7 +86,7 @@ describe('validateCodingPlanCredential', () => {
         providerId: 'minimax',
         upstreamPlanId: 'provider-issued-plan-123',
       })
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ valid: true });
   });
 
   it('rejects unsuccessful model completions', async () => {
@@ -73,7 +99,7 @@ describe('validateCodingPlanCredential', () => {
         providerId: 'minimax',
         upstreamPlanId: 'minimax-token-plan-ultra-123',
       })
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ valid: false });
   });
 
   it('rejects provider request failures without throwing', async () => {
@@ -86,7 +112,7 @@ describe('validateCodingPlanCredential', () => {
         providerId: 'minimax',
         upstreamPlanId: 'minimax-token-plan-plus-123',
       })
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ valid: false });
   });
 
   it('treats upstream plan IDs as opaque operational metadata', async () => {
@@ -99,7 +125,7 @@ describe('validateCodingPlanCredential', () => {
         providerId: 'minimax',
         upstreamPlanId: 'provider-plan-without-tier-marker',
       })
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ valid: true });
 
     expect(mockedGenerateText).toHaveBeenCalled();
   });
@@ -114,7 +140,7 @@ describe('validateCodingPlanCredential', () => {
         providerId: 'byteplus-coding',
         upstreamPlanId: 'byteplus-plan-123',
       })
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ valid: true, upstreamUsageId: 'seat-lite' });
 
     expect(mockDirectModel).toHaveBeenCalledWith('bytedance-seed-code');
     expect(mockedGenerateText).toHaveBeenCalledWith({
@@ -122,10 +148,23 @@ describe('validateCodingPlanCredential', () => {
       prompt: 'Say hi',
       maxOutputTokens: 1,
     });
+    expect(mockedListBytePlusSeatsByUsername).toHaveBeenCalledWith({
+      username: 'byteplus-plan-123',
+      bizInfo: 'Lite',
+    });
   });
 
   it('accepts BytePlus Pro credentials through the same direct provider validation', async () => {
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+    mockedListBytePlusSeatsByUsername.mockResolvedValueOnce([
+      {
+        seatId: 'seat-pro',
+        bizInfo: 'Pro',
+        seatStatus: 2,
+        billingStatus: 2,
+        apiKey: 'byteplus-pro-inventory-key',
+      },
+    ]);
 
     await expect(
       validateCodingPlanCredential({
@@ -134,8 +173,34 @@ describe('validateCodingPlanCredential', () => {
         providerId: 'byteplus-coding',
         upstreamPlanId: 'byteplus-pro-plan-123',
       })
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ valid: true, upstreamUsageId: 'seat-pro' });
 
     expect(mockDirectModel).toHaveBeenCalledWith('bytedance-seed-code');
+    expect(mockedListBytePlusSeatsByUsername).toHaveBeenCalledWith({
+      username: 'byteplus-pro-plan-123',
+      bizInfo: 'Pro',
+    });
+  });
+
+  it('rejects a BytePlus seat without a verifiable matching inference key', async () => {
+    mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+    mockedListBytePlusSeatsByUsername.mockResolvedValueOnce([
+      {
+        seatId: 'seat-mismatch',
+        bizInfo: 'Lite',
+        seatStatus: 2,
+        billingStatus: 2,
+        apiKey: 'different-key',
+      },
+    ]);
+
+    await expect(
+      validateCodingPlanCredential({
+        apiKey: 'byteplus-inventory-key',
+        planId: 'byteplus-coding-plan-team-lite',
+        providerId: 'byteplus-coding',
+        upstreamPlanId: 'byteplus-plan-123',
+      })
+    ).resolves.toEqual({ valid: false });
   });
 });

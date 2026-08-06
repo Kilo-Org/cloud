@@ -30,6 +30,7 @@ import {
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import { CodingPlanProviderIcon } from './CodingPlanProviderIcon';
+import { CodingPlanUsage } from './CodingPlanUsage';
 import {
   getCodingPlanAccessNoticeVariant,
   getCodingPlanPurchaseBlocker,
@@ -214,6 +215,11 @@ export function CodingPlansGroup({
                   isTerminal={isCodingPlanTerminal(subscription.status)}
                   statusNote={statusNote}
                   warningTone={needsAttention ? 'warning' : undefined}
+                  supplementalContent={
+                    subscription.canQueryUsage ? (
+                      <CodingPlanUsage subscriptionId={subscription.id} variant="compact" />
+                    ) : undefined
+                  }
                 />
               );
             })}

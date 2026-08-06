@@ -32,6 +32,7 @@ import {
 import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { CodingPlanProviderIcon } from './CodingPlanProviderIcon';
+import { CodingPlanUsage } from './CodingPlanUsage';
 
 export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string }) {
   const trpc = useTRPC();
@@ -167,6 +168,10 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
           ) : null}
         </CardContent>
       </Card>
+
+      {subscription.canQueryUsage ? (
+        <CodingPlanUsage subscriptionId={subscription.id} variant="full" />
+      ) : null}
 
       <Card>
         <CardHeader className="pb-4">

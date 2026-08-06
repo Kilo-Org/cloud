@@ -464,7 +464,7 @@ type RevocationWorkItem = {
   inventoryKeyId: string;
   providerId: string;
   planId: string;
-  upstreamPlanId: string;
+  upstreamPlanId: string | null;
   status: string;
   revocationRequestedAt: string | null;
   subscriptionExpiresAt: string | null;
@@ -1168,6 +1168,7 @@ function OperationsTabs({
   onUpload: () => void;
 }) {
   const hasSelectedPlan = planOptions.some(plan => plan.planId === selectedPlanId);
+  const isBytePlusSelected = selectedProviderId === 'byteplus-coding';
 
   return (
     <Tabs defaultValue="overview" className="space-y-4">
@@ -1200,7 +1201,7 @@ function OperationsTabs({
               <CardDescription>
                 Pending and failed issued credentials requiring action in the provider&apos;s admin
                 console. Revoke removes stock permanently; Replace validates a newly generated key
-                for the same upstream plan ID.
+                for the same upstream assignment.
               </CardDescription>
             </div>
             <Button variant="secondary" size="sm" onClick={onRefresh}>
@@ -1215,7 +1216,7 @@ function OperationsTabs({
                   <TableRow>
                     <TableHead>Inventory item</TableHead>
                     <TableHead>Provider / plan</TableHead>
-                    <TableHead>Upstream plan ID</TableHead>
+                    <TableHead>Upstream identifier</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Requested</TableHead>
                     <TableHead>Subscription expires</TableHead>
@@ -1248,7 +1249,7 @@ function OperationsTabs({
                           <div className="text-muted-foreground mt-1">{item.planId}</div>
                         </TableCell>
                         <TableCell className="min-w-44 font-mono text-xs">
-                          {item.upstreamPlanId}
+                          {item.upstreamPlanId ?? '—'}
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -1298,7 +1299,12 @@ function OperationsTabs({
             <CardTitle>Upload validated inventory</CardTitle>
             <CardDescription>
               Choose the BYOK provider ID and Kilo plan for this batch. Enter one{' '}
-              <code>{'<api key>::<upstream plan id>'}</code> pair per line.
+              <code>
+                {isBytePlusSelected
+                  ? '<api key>::<assigned BytePlus username>'
+                  : '<api key>::<upstream plan id>'}
+              </code>{' '}
+              pair per line.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1350,12 +1356,20 @@ function OperationsTabs({
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="coding-plan-entries">API keys and upstream plan IDs</Label>
+              <Label htmlFor="coding-plan-entries">
+                {isBytePlusSelected
+                  ? 'API keys and assigned BytePlus usernames'
+                  : 'API keys and upstream plan IDs'}
+              </Label>
               <Textarea
                 id="coding-plan-entries"
                 value={entriesText}
                 onChange={event => onEntriesTextChange(event.target.value)}
-                placeholder="<api key>::<upstream plan id>"
+                placeholder={
+                  isBytePlusSelected
+                    ? '<api key>::<assigned BytePlus username>'
+                    : '<api key>::<upstream plan id>'
+                }
                 className="min-h-28 font-mono"
                 autoComplete="off"
               />
@@ -1364,8 +1378,9 @@ function OperationsTabs({
               <ShieldAlert className="size-4" />
               <AlertDescription>
                 API keys are encrypted after validation and are never returned or displayed. The
-                upstream plan ID is retained for provider-side deprovisioning and appears in the
-                Pending Key Rotation queue.
+                upstream identifier is retained for provider-side operations and appears in the
+                Pending Key Rotation queue. BytePlus usernames are used to verify the assigned seat
+                and are not displayed after upload.
               </AlertDescription>
             </Alert>
             <Button

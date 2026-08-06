@@ -262,7 +262,7 @@ describe('submitManualSecuritySync env configuration', () => {
     mockFetch.mockReset();
   });
 
-  it('throws a TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
+  it('throws a stable PRECONDITION_FAILED TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
     jest.resetModules();
     jest.doMock('@/lib/config.server', () => ({
       INTERNAL_API_SECRET: 'test-internal-secret',
@@ -280,12 +280,12 @@ describe('submitManualSecuritySync env configuration', () => {
     }
     expect(captured).toBeDefined();
     expect((captured as { name?: string }).name).toBe('TRPCError');
-    expect((captured as { code?: string }).code).toBe('INTERNAL_SERVER_ERROR');
-    expect((captured as Error).message).toContain('not configured');
+    expect((captured as { code?: string }).code).toBe('PRECONDITION_FAILED');
+    expect((captured as Error).message).toBe('Security service is not configured');
     expect((captured as Error).message).not.toContain('test-internal-secret');
   });
 
-  it('throws a TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
+  it('throws a stable PRECONDITION_FAILED TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
     jest.resetModules();
     jest.doMock('@/lib/config.server', () => ({
       INTERNAL_API_SECRET: '',
@@ -303,7 +303,7 @@ describe('submitManualSecuritySync env configuration', () => {
     }
     expect(captured).toBeDefined();
     expect((captured as { name?: string }).name).toBe('TRPCError');
-    expect((captured as { code?: string }).code).toBe('INTERNAL_SERVER_ERROR');
-    expect((captured as Error).message).toContain('not configured');
+    expect((captured as { code?: string }).code).toBe('PRECONDITION_FAILED');
+    expect((captured as Error).message).toBe('Security service is not configured');
   });
 });

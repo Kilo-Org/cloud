@@ -32,6 +32,22 @@ const SECURITY_LEDGER_SETTLE_FAILED_MESSAGE =
 const SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
 
+// Server-side missing Worker configuration: the manual-sync Worker URL or the
+// internal secret is unset. Mirrored from the web manual-sync and
+// manual-dismiss clients. The command can never be accepted until the
+// deployment is reconfigured, so this outcome is non-retryable — a resubmit
+// fails identically.
+export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not configured';
+
+/** Surface copy for the missing-configuration state (dismiss sheet). */
+export const SECURITY_CONFIGURATION_COPY =
+  'Security service is not configured. Resubmitting cannot succeed until this is fixed.';
+
+/** True when the error is the server's missing-Worker-configuration rejection. */
+export function isSecurityConfigurationError(error: unknown): boolean {
+  return error instanceof Error && error.message === SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE;
+}
+
 /** In-progress surface copy: reads like the existing retryable toasts. */
 const SECURITY_SYNC_IN_PROGRESS_COPY = 'A security sync is already in progress. Please try again.';
 
@@ -39,12 +55,16 @@ const SECURITY_SYNC_IN_PROGRESS_COPY = 'A security sync is already in progress. 
  * True when the sync may be retried under the SAME operation key. Retryable:
  * `operation_in_progress`, the ambiguous outcome (reconcile-pending), the
  * settle-failed marker, and generic transient errors. Non-retryable: the
- * replay-failed marker, the persistence-failure marker (the reconcile-pending
- * guarantee does not hold), the cross-intent key-reuse rejection, and typed
- * validation/permission errors — the next submit must be a fresh intent.
+ * missing-Worker-configuration rejection, the replay-failed marker, the
+ * persistence-failure marker (the reconcile-pending guarantee does not hold),
+ * the cross-intent key-reuse rejection, and typed validation/permission
+ * errors — the next submit must be a fresh intent.
  */
 export function isSecuritySyncRetryable(error: unknown): boolean {
   if (error instanceof Error) {
+    if (isSecurityConfigurationError(error)) {
+      return false;
+    }
     if (error.message === SECURITY_OPERATION_KEY_REUSE_MISMATCH_MESSAGE) {
       return false;
     }

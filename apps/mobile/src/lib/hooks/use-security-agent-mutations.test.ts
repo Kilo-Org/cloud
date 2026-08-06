@@ -12,8 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as PrOperationLedgerModule from '@/lib/pr-review/merge/pr-operation-ledger';
 import {
+  isSecurityConfigurationError,
   isSecuritySyncRetryable,
   mapSecuritySyncOperationError,
+  SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   securitySyncIntentFingerprint,
   useTriggerSecuritySync,
 } from './use-security-agent-mutations';
@@ -214,6 +216,18 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
+  it('regenerates the key on a missing-configuration rejection (fresh intent next)', async () => {
+    const configError = new Error(SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE);
+    Object.assign(configError, { data: { code: 'PRECONDITION_FAILED' } });
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(configError);
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({ message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE });
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
   it('onError toasts the mapped message through the existing toast path', () => {
     useTriggerSecuritySync('personal');
     lastCapturedOptions?.onError?.(
@@ -278,5 +292,28 @@ describe('isSecuritySyncRetryable (P1-A-08e key-rotation policy)', () => {
     const repoUnknown = new Error('Repository not found in your GitHub integration');
     Object.assign(repoUnknown, { data: { code: 'PRECONDITION_FAILED' } });
     expect(isSecuritySyncRetryable(repoUnknown)).toBe(false);
+  });
+
+  it('treats the missing-configuration rejection as non-retryable by message and by code', () => {
+    const byMessage = new Error(SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE);
+    expect(isSecuritySyncRetryable(byMessage)).toBe(false);
+
+    const byCode = new Error('Security service is not configured');
+    Object.assign(byCode, { data: { code: 'PRECONDITION_FAILED' } });
+    expect(isSecuritySyncRetryable(byCode)).toBe(false);
+  });
+});
+
+describe('isSecurityConfigurationError', () => {
+  it('recognizes the server missing-configuration message', () => {
+    expect(isSecurityConfigurationError(new Error(SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE))).toBe(
+      true
+    );
+  });
+
+  it('rejects unrelated errors and non-Error values', () => {
+    expect(isSecurityConfigurationError(new Error('Network request failed'))).toBe(false);
+    expect(isSecurityConfigurationError(null)).toBe(false);
+    expect(isSecurityConfigurationError('Security service is not configured')).toBe(false);
   });
 });

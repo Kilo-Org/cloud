@@ -2,9 +2,10 @@
 
 // Dismiss-screen terminal-state contract: a persistence failure (the ledger
 // could not record the outcome, so a same-key retry guarantee does not hold)
-// is non-retryable — the form must show its state-specific copy and disable
-// the dismissal CTA. Retryable failures (in-progress, ambiguous, transport)
-// keep the CTA so the user can retry under the same hoisted key.
+// and a missing-configuration rejection are non-retryable — the form must show
+// its state-specific copy and disable the dismissal CTA. Retryable failures
+// (in-progress, ambiguous, transport) keep the CTA so the user can retry
+// under the same hoisted key.
 
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -17,6 +18,10 @@ const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
 );
 const IN_PROGRESS_COPY = vi.hoisted(
   () => 'A security sync is already in progress. Please try again.'
+);
+const CONFIGURATION_ERROR_MESSAGE = vi.hoisted(() => 'Security service is not configured');
+const CONFIGURATION_COPY = vi.hoisted(
+  () => 'Security service is not configured. Resubmitting cannot succeed until this is fixed.'
 );
 
 const routerBack = vi.hoisted(() => vi.fn());
@@ -64,15 +69,20 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
   useDismissSecurityFinding: () => dismiss,
 }));
 // Faithful-enough mirror of the real classifier (covered by its own suite):
-// the persistence-failure and replay-failed markers are non-retryable, the
-// rest (transport, in-progress copy, ambiguous, settle-failed) are retryable.
+// the persistence-failure and replay-failed markers and the
+// missing-configuration rejection are non-retryable, the rest (transport,
+// in-progress copy, ambiguous, settle-failed) are retryable.
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
+  isSecurityConfigurationError: (error: unknown) =>
+    error instanceof Error && error.message === CONFIGURATION_ERROR_MESSAGE,
+  SECURITY_CONFIGURATION_COPY: CONFIGURATION_COPY,
   isSecuritySyncRetryable: (error: unknown) => {
     const message = error instanceof Error ? error.message : '';
     return !(
       message === 'We could not record this action. Please try again later.' ||
       message === 'This action did not complete. Please try again.' ||
-      message === 'operation_key_reuse_mismatch'
+      message === 'operation_key_reuse_mismatch' ||
+      message === CONFIGURATION_ERROR_MESSAGE
     );
   },
 }));
@@ -178,6 +188,18 @@ describe('DismissFindingScreen dismissal CTA states', () => {
 
     expect(buttonDisabled(root.root)).toBe(true);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
+  });
+
+  it('disables the dismissal CTA and shows configuration-specific copy after a missing-configuration error', () => {
+    dismiss.isError = true;
+    dismiss.error = new Error(CONFIGURATION_ERROR_MESSAGE);
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(true);
+    expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
+    // The raw server message is replaced by the state-specific copy.
+    expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
   });
 
   it('disables the dismissal CTA while the dismissal is pending', () => {

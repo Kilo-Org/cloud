@@ -244,7 +244,7 @@ describe('submitManualFindingDismissal env configuration', () => {
     mockFetch.mockReset();
   });
 
-  it('throws a TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
+  it('throws a stable PRECONDITION_FAILED TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
     jest.resetModules();
     jest.doMock('@/lib/config.server', () => ({
       INTERNAL_API_SECRET: 'test-internal-secret',
@@ -265,8 +265,33 @@ describe('submitManualFindingDismissal env configuration', () => {
     }
     expect(captured).toBeDefined();
     expect((captured as { name?: string }).name).toBe('TRPCError');
-    expect((captured as { code?: string }).code).toBe('INTERNAL_SERVER_ERROR');
-    expect((captured as Error).message).toContain('not configured');
+    expect((captured as { code?: string }).code).toBe('PRECONDITION_FAILED');
+    expect((captured as Error).message).toBe('Security service is not configured');
     expect((captured as Error).message).not.toContain('test-internal-secret');
+  });
+
+  it('throws a stable PRECONDITION_FAILED TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
+    jest.resetModules();
+    jest.doMock('@/lib/config.server', () => ({
+      INTERNAL_API_SECRET: '',
+      SECURITY_SYNC_WORKER_URL: 'https://security-sync.test',
+    }));
+    const mod = await import('./manual-dismiss-client');
+    let captured: unknown;
+    try {
+      await mod.submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      });
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeDefined();
+    expect((captured as { name?: string }).name).toBe('TRPCError');
+    expect((captured as { code?: string }).code).toBe('PRECONDITION_FAILED');
+    expect((captured as Error).message).toBe('Security service is not configured');
   });
 });

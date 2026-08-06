@@ -43,20 +43,21 @@ type ManualFindingDismissalWorkerResponse = {
 // paused — not ambiguous transport.
 const FINDING_DISMISSAL_DISABLED_ROUTING_ERROR = 'Finding dismissal Worker routing is disabled';
 
+// Missing Worker configuration (URL or internal secret) is a definitive
+// server-side precondition failure: the request can never be accepted until
+// the deployment is reconfigured, so a retry fails identically. It surfaces
+// as a stable non-retryable code (PRECONDITION_FAILED), not the generic 500
+// the mobile classifier would treat as retryable transport. The message is a
+// cross-package contract mirrored by the mobile security mutation classifier.
+const FINDING_DISMISSAL_CONFIG_ERROR_MESSAGE = 'Security service is not configured';
+
 export async function submitManualFindingDismissal(
   params: SubmitManualFindingDismissalParams
 ): Promise<AcceptedManualFindingDismissal> {
-  if (!SECURITY_SYNC_WORKER_URL) {
+  if (!SECURITY_SYNC_WORKER_URL || !INTERNAL_API_SECRET) {
     throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Security dismissal service is not configured',
-    });
-  }
-
-  if (!INTERNAL_API_SECRET) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Security dismissal service is not configured',
+      code: 'PRECONDITION_FAILED',
+      message: FINDING_DISMISSAL_CONFIG_ERROR_MESSAGE,
     });
   }
 

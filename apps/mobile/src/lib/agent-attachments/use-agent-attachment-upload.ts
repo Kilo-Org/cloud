@@ -64,11 +64,11 @@ export function useAgentAttachmentUpload(
   const pathRef = useRef<string>(Crypto.randomUUID());
   const messageUuidRef = useRef<string>(Crypto.randomUUID());
   const isMountedRef = useRef(true);
-  // Row 3.3 stale-outcome guard. `generationRef` bumps on reset so uploads
-  // started before a reset can never update state or announce for the new
-  // composer session. `liveIdsRef` mirrors the current attachment ids so an
-  // in-flight upload for a removed chip is invalidated synchronously — the
-  // async completion cannot observe a stale `attachments` closure.
+  // Row 3.3 stale-outcome guard. `liveIdsRef` mirrors the current attachment
+  // ids, so an in-flight upload for a removed chip — or for any chip cleared by
+  // a reset — is invalidated synchronously; the async completion never observes
+  // a stale `attachments` closure. `generationRef` covers only the window
+  // before ids exist: a reset while candidate measurement is in flight.
   const generationRef = useRef(0);
   const liveIdsRef = useRef<Set<string>>(new Set());
 
@@ -95,7 +95,6 @@ export function useAgentAttachmentUpload(
 
   const startUpload = useCallback(
     (attachment: AgentAttachment, path: string) => {
-      const generation = generationRef.current;
       const run = async () => {
         updateAttachment(attachment.id, {
           status: 'uploading',
@@ -117,9 +116,10 @@ export function useAgentAttachmentUpload(
             },
           });
           // Row 3.3 stale-outcome guard: a removed or reset upload must not
-          // flip state or announce for the current composer. Unmount is
-          // still suppressed separately via `isMountedRef`.
-          if (generationRef.current !== generation || !liveIdsRef.current.has(attachment.id)) {
+          // flip state or announce for the current composer. Ids are UUIDs, so
+          // a cleared id can never come back. Unmount is suppressed separately
+          // via `isMountedRef`.
+          if (!liveIdsRef.current.has(attachment.id)) {
             return;
           }
           updateAttachment(attachment.id, {
@@ -136,7 +136,7 @@ export function useAgentAttachmentUpload(
             announceForA11y('Attachment uploaded');
           }
         } catch (error) {
-          if (generationRef.current !== generation || !liveIdsRef.current.has(attachment.id)) {
+          if (!liveIdsRef.current.has(attachment.id)) {
             return;
           }
           const { retryable, reason } = classifyUploadFailure(error);

@@ -11,6 +11,7 @@ import {
 import {
   createPhaseTimer,
   emitUsageRecordTiming,
+  isPrimaryPoolSaturated,
   readPoolGauges,
   shouldEmitUsageRecordTiming,
 } from '@/lib/ai-gateway/usage-record-diagnostics';
@@ -46,6 +47,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // the pre-check gets confirmed.
   const timer = createPhaseTimer();
   const poolBefore = readPoolGauges();
+  if (isPrimaryPoolSaturated(poolBefore)) {
+    // Do not join an unbounded pg-pool queue. A 503 proves no write started, so
+    // the caller can safely retry this delivery without creating a duplicate.
+    return NextResponse.json(
+      { error: 'Usage record sink busy' },
+      { status: 503, headers: { 'retry-after': '1' } }
+    );
+  }
   let poolWaitingPeak = poolBefore.waiting;
   const samplePool = () => {
     const gauges = readPoolGauges();

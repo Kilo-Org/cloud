@@ -7,6 +7,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   createPhaseTimer,
   describeDatabaseError,
+  isPrimaryPoolSaturated,
   isUsageRowConflict,
   readPoolGauges,
   shouldEmitUsageRecordTiming,
@@ -249,6 +250,20 @@ describe('createPhaseTimer', () => {
 describe('readPoolGauges', () => {
   test('reports the in-process pool counters, not Supavisor stats', () => {
     expect(readPoolGauges()).toEqual({ total: 4, idle: 1, waiting: 0 });
+  });
+});
+
+describe('isPrimaryPoolSaturated', () => {
+  test('rejects work when every configured connection is checked out', () => {
+    expect(isPrimaryPoolSaturated({ total: 10, idle: 0, waiting: 245 })).toBe(true);
+  });
+
+  test('accepts work when an idle connection is available', () => {
+    expect(isPrimaryPoolSaturated({ total: 10, idle: 1, waiting: 0 })).toBe(false);
+  });
+
+  test('accepts work when the pool can still open a connection', () => {
+    expect(isPrimaryPoolSaturated({ total: 9, idle: 0, waiting: 0 })).toBe(false);
   });
 });
 

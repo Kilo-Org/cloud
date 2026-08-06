@@ -95,7 +95,10 @@ describe('model preferences client', () => {
     const { fetch, seen } = captureFetch(() => favoritesEnvelope(['anthropic/claude-sonnet-4']));
     await expect(
       fetchModelPreferences({ apiBaseUrl: 'https://app.kilo.ai/', fetch, token: 'token-1' })
-    ).resolves.toStrictEqual({ favorites: ['anthropic/claude-sonnet-4'] });
+    ).resolves.toStrictEqual({
+      favorites: ['anthropic/claude-sonnet-4'],
+      lastSelected: null,
+    });
     const request = firstRequest(seen);
     expect(request.input).toBe('https://app.kilo.ai/api/trpc/modelPreferences.get');
     expect(request.input).not.toContain('batch');
@@ -128,8 +131,11 @@ describe('model preferences client', () => {
         },
       })
     );
+    // The lastSelected value passes through so the new-session form can reuse
+    // This request instead of issuing its own.
     await expect(fetchModelPreferences(clientOpts(fetch))).resolves.toStrictEqual({
       favorites: ['model-a'],
+      lastSelected: { model: 'model-a', variant: 'high' },
     });
   });
 

@@ -25,6 +25,8 @@ import {
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import type { StoredAuth } from '@/src/shared/auth';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
+import { fetchModelPreferences } from '@/src/shared/model-preferences-client';
+import { getModelPreferencesQueryKey } from '@/src/shared/side-panel-query-options';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import { useExtensionAgents } from './agents-provider';
 import { activeSessionsQueryKey, sessionHistoryQueryKey } from './agents-session-list';
@@ -124,6 +126,45 @@ export const buildSubmitInput = ({
   ...(selectedVariant ? { variant: selectedVariant } : {}),
 });
 
+/**
+ * One line saying why Start session is unavailable. A disabled button with no
+ * reason is a dead end — most often no GitHub integration, so a cloud session
+ * can never get a repository.
+ */
+export const submitBlockedReason = ({
+  hasModels,
+  integrationInstalled,
+  isCloudTarget,
+  isPromptValid,
+  repoCount,
+  selectedRepo,
+}: {
+  hasModels: boolean;
+  integrationInstalled: boolean;
+  isCloudTarget: boolean;
+  isPromptValid: boolean;
+  repoCount: number;
+  selectedRepo: string;
+}): 'connect-github' | 'no-repos' | 'pick-repo' | 'no-models' | null => {
+  if (!isPromptValid || !isCloudTarget) {
+    // The textarea already reports a short prompt; a CLI target needs nothing else.
+    return null;
+  }
+  if (!integrationInstalled) {
+    return 'connect-github';
+  }
+  if (repoCount === 0) {
+    return 'no-repos';
+  }
+  if (!hasModels) {
+    return 'no-models';
+  }
+  if (selectedRepo === '') {
+    return 'pick-repo';
+  }
+  return null;
+};
+
 const isModelPreferencesGetResult = (
   value: unknown
 ): value is { favorites: string[]; lastSelected: LastSelected | null } =>
@@ -165,14 +206,22 @@ export const AgentsNewSession = ({
   });
 
   // ---- Model preferences (lastSelected) ----
+  // Same key and fetcher as the embedded ModelPicker's `useModelPreferences`,
+  // So favorites and lastSelected arrive on one request.
   const { data: modelPrefsData } = useQuery({
     enabled: auth !== undefined && auth.token !== '',
-    queryFn: () => {
-      const input = organizationId === null ? undefined : { organizationId };
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC query input union
-      return trpcClient.modelPreferences.get.query(input as never);
-    },
-    queryKey: ['agents-new-session', 'model-preferences', organizationId],
+    queryFn: ({ signal }) =>
+      fetchModelPreferences({
+        apiBaseUrl: getKiloApiBaseUrl(),
+        fetch: (input, init) => fetch(input, init),
+        organizationId: organizationId ?? undefined,
+        signal,
+        token: auth?.token ?? '',
+      }),
+    queryKey: getModelPreferencesQueryKey({
+      organizationId: organizationId ?? undefined,
+      token: auth?.token ?? '',
+    }),
   });
 
   const lastSelected: LastSelected | null = useMemo(() => {
@@ -343,6 +392,15 @@ export const AgentsNewSession = ({
         repo.name.toLowerCase().includes(normalized)
     );
   }, [repos, repoSearch]);
+
+  const blockedReason = submitBlockedReason({
+    hasModels: modelOptions.length > 0,
+    integrationInstalled,
+    isCloudTarget,
+    isPromptValid,
+    repoCount: repos.length,
+    selectedRepo,
+  });
 
   const isCreditsError = submitError?.toLowerCase().includes('insufficient credits') ?? false;
 
@@ -593,16 +651,21 @@ export const AgentsNewSession = ({
 
         {/* Toolbar: model + variant + repo */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Model picker (cloud target only) — same component as the browser tab */}
+          {/* Model picker (cloud target only) — same component as the browser tab.
+              The wrapper's min width stops the flexible trigger collapsing to a
+              sliver once the repo and Run-on pickers share the row; the row
+              wraps instead. */}
           {isCloudTarget && auth !== undefined ? (
-            <ModelPicker
-              auth={auth}
-              disabled={isSubmitting || modelOptions.length === 0}
-              model={selectedModel}
-              modelOptions={modelOptions}
-              onModelChange={handleModelSelect}
-              organizationId={organizationId ?? undefined}
-            />
+            <div className="flex min-w-36 flex-1">
+              <ModelPicker
+                auth={auth}
+                disabled={isSubmitting || modelOptions.length === 0}
+                model={selectedModel}
+                modelOptions={modelOptions}
+                onModelChange={handleModelSelect}
+                organizationId={organizationId ?? undefined}
+              />
+            </div>
           ) : null}
           {isCloudTarget
             ? (() => {
@@ -848,6 +911,28 @@ export const AgentsNewSession = ({
         {isCloudTarget || selectedInstance === undefined ? null : (
           <p className="type-label -mt-2 text-foreground-muted">
             Runs in {selectedInstance.projectName} with the repository and model of the CLI.
+          </p>
+        )}
+
+        {/* Why Start session is unavailable */}
+        {blockedReason === null ? null : (
+          <p className="type-label -mt-2 text-foreground-muted">
+            {blockedReason === 'connect-github' ? (
+              <>
+                <a
+                  className="text-link hover:text-link-hover underline underline-offset-4"
+                  href={`${getKiloApiBaseUrl().replace(/\/+$/, '')}${organizationId === null ? '/integrations' : `/organizations/${organizationId}/integrations`}`}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Connect GitHub
+                </a>{' '}
+                to start a cloud session, or pick a connected CLI instance.
+              </>
+            ) : null}
+            {blockedReason === 'no-repos' ? 'No repositories available on this account.' : null}
+            {blockedReason === 'no-models' ? 'No models available. Retry above.' : null}
+            {blockedReason === 'pick-repo' ? 'Choose a repository to start.' : null}
           </p>
         )}
 

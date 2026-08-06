@@ -75,8 +75,8 @@ export interface ConnectedInstanceSeed {
 
 export const DEFAULT_INSTANCE: ConnectedInstanceSeed = {
   connectionId: 'cli-connection-42',
-  name: 'igor-mbp',
-  projectName: 'cloud',
+  name: 'dev-laptop',
+  projectName: 'checkout-service',
 };
 
 export const SPAWNED_SESSION_ID = 'ses_spawnedcli0000000000000001';
@@ -85,6 +85,9 @@ export interface AssociatedPrSeed {
   headSha: string | null;
   lastSyncedAt: string;
   number: number;
+  /** Server always sends these two; keep the seed shape faithful. */
+  reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null;
+  reviewDecisionPending: boolean;
   state: string;
   title: string | null;
   url: string;

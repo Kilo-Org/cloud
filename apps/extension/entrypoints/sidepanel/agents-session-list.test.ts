@@ -39,6 +39,16 @@ describe('sessionStatusBadge()', () => {
     expect(badge!.label).toBe('Running');
   });
 
+  it("maps the cloud agent's busy status onto the Running label", () => {
+    const badge = sessionStatusBadge('busy');
+    expect(badge!.label).toBe('Running');
+    expect(badge!.className).toContain('bg-status-green');
+  });
+
+  it('maps retry onto a Retrying label', () => {
+    expect(sessionStatusBadge('retry')!.label).toBe('Retrying');
+  });
+
   it('returns "Running" for uppercase RUNNING', () => {
     const badge = sessionStatusBadge('RUNNING');
     expect(badge).not.toBeNull();

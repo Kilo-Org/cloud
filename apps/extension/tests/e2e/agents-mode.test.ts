@@ -11,6 +11,7 @@ import {
   buildQuestionCloudAgentStream,
   buildRunningCloudAgentStream,
   DEFAULT_CLOUD_SESSION,
+  DEFAULT_HISTORY_SESSION_1,
   DEFAULT_INSTANCE,
   DEFAULT_REMOTE_SESSION,
   mockAgentsApi,
@@ -563,7 +564,7 @@ test('Agents new session spawns onto a connected CLI instance', async () => {
     // Cloud-only pickers leave the form; the CLI hint appears.
     await expect(sidePanel.getByLabel('Model', { exact: true })).toBeHidden();
     await expect(sidePanel.getByLabel('Select repository')).toBeHidden();
-    await expect(sidePanel.getByText(/Runs in cloud/)).toBeVisible();
+    await expect(sidePanel.getByText(/Runs in checkout-service/)).toBeVisible();
 
     await sidePanel.getByRole('button', { name: 'Start session' }).click();
 
@@ -591,6 +592,8 @@ test('Agents session header links the associated PR', async () => {
       headSha: 'abc123',
       lastSyncedAt: new Date().toISOString(),
       number: 512,
+      reviewDecision: 'review_required',
+      reviewDecisionPending: false,
       state: 'open',
       title: 'Fix login bug',
       url: 'https://github.com/org/repo/pull/512',
@@ -735,10 +738,22 @@ test('Agents offline pill waits out the connect grace period', async () => {
     const sidePanel = await getSidePanel();
     await navigateToAgentsMode(sidePanel);
 
-    // The mocked ingest socket never completes the connected handshake, so
-    // The pill must stay hidden through the grace period and appear after.
-    await expect(sidePanel.getByText('Offline')).toBeHidden();
-    await expect(sidePanel.getByText('Offline')).toBeVisible({ timeout: 10_000 });
+    // The mocked ingest socket never completes the connected handshake. The
+    // Pill must stay hidden for the whole grace period, then appear.
+    const offlinePill = sidePanel.getByText('Offline');
+    const startedAt = Date.now();
+    await expect(offlinePill).toBeHidden();
+    // Sample across the first 3s — one check could miss an immediate render.
+    const samples = await Promise.all(
+      [0, 500, 1000, 1500, 2000, 2500, 3000].map(async delayMs => {
+        await sidePanel.waitForTimeout(delayMs);
+        return offlinePill.isVisible().catch(() => false);
+      })
+    );
+    expect(samples).not.toContain(true);
+    await expect(offlinePill).toBeVisible({ timeout: 15_000 });
+    // It appeared only after the grace period, never before.
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(4500);
   } finally {
     await cleanup();
   }
@@ -756,7 +771,93 @@ test('Agents new session repo picker shows Connect GitHub when not installed', a
     await expect(sidePanel.getByText('GitHub integration not connected')).toBeVisible({
       timeout: 10_000,
     });
-    await expect(sidePanel.getByRole('link', { name: 'Connect GitHub' })).toBeVisible();
+    await expect(sidePanel.getByRole('link', { name: 'Connect GitHub' }).first()).toBeVisible();
+  } finally {
+    await cleanup();
+  }
+});
+
+test('Agents new session explains why Start session is unavailable', async () => {
+  const { cleanup, getSidePanel } = await setupAgentsTest({
+    instances: [DEFAULT_INSTANCE],
+    integrationInstalled: false,
+  });
+  try {
+    const sidePanel = await getSidePanel();
+    await navigateToAgentsMode(sidePanel);
+    await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
+
+    const startButton = sidePanel.getByRole('button', { name: 'Start session' });
+    await sidePanel.getByLabel('What would you like to do?').fill('Fix the flaky login test');
+
+    // Cloud target with no GitHub integration can never get a repository, so
+    // The form says so instead of leaving a dead button.
+    await expect(startButton).toBeDisabled();
+    await expect(
+      sidePanel.getByText(/to start a cloud session, or pick a connected CLI instance/)
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Switching to the connected CLI instance clears the block.
+    await sidePanel.getByLabel('Run on').selectOption(DEFAULT_INSTANCE.connectionId);
+    await expect(startButton).toBeEnabled();
+    await expect(
+      sidePanel.getByText(/to start a cloud session, or pick a connected CLI instance/)
+    ).toBeHidden();
+  } finally {
+    await cleanup();
+  }
+});
+
+test('Agents list shows a live session once, not in both Active and History', async () => {
+  const { cleanup, getSidePanel } = await setupAgentsTest({
+    activeSessions: [DEFAULT_CLOUD_SESSION],
+    // The same session is also a history row — the wire returns it in both.
+    historySessions: [
+      {
+        sessionId: DEFAULT_CLOUD_SESSION.kiloSessionId,
+        title: DEFAULT_CLOUD_SESSION.title,
+        updatedAt: new Date(Date.now() - 600_000).toISOString(),
+      },
+      DEFAULT_HISTORY_SESSION_1,
+    ],
+  });
+  try {
+    const sidePanel = await getSidePanel();
+    await navigateToAgentsMode(sidePanel);
+
+    // Exactly one row for the live session; the plain history row still shows.
+    await expect(sidePanel.getByText(DEFAULT_CLOUD_SESSION.title)).toHaveCount(1);
+    await expect(sidePanel.getByText('Refactor auth module')).toBeVisible();
+
+    // Search stays complete so a live session is still findable by name.
+    await sidePanel.getByLabel('Search sessions').fill('Fix login');
+    await expect(sidePanel.getByText(DEFAULT_CLOUD_SESSION.title)).toHaveCount(2);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('Agents new session toolbar stays usable at the narrowest panel width', async () => {
+  const { cleanup, getSidePanel } = await setupAgentsTest({ instances: [DEFAULT_INSTANCE] });
+  try {
+    const sidePanel = await getSidePanel();
+    await sidePanel.setViewportSize({ height: 700, width: 320 });
+    await navigateToAgentsMode(sidePanel);
+    await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
+    await sidePanel.getByLabel('What would you like to do?').fill('Fix the flaky login test');
+
+    // The flexible model trigger must keep its label instead of collapsing to a
+    // Sliver once the repo and Run-on pickers share the row.
+    const modelTrigger = sidePanel.getByLabel('Model', { exact: true });
+    await expect(modelTrigger).toBeVisible({ timeout: 10_000 });
+    const box = await modelTrigger.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThan(100);
+
+    // The fixed side panel must never scroll horizontally.
+    const overflow = await sidePanel.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
   } finally {
     await cleanup();
   }

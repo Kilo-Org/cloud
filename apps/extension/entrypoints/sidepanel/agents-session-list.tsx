@@ -32,6 +32,18 @@ const sessionSearchQueryKey = (organizationId: string | null, query: string) =>
 // Exported for focused test coverage.
 export { activeSessionsQueryKey, sessionHistoryQueryKey, sessionSearchQueryKey };
 
+/**
+ * Input for `activeSessions.list`. Both the Active section and the History
+ * section observe this query; an identical key plus input means React Query
+ * serves them from one request.
+ */
+const activeSessionsListInput = (
+  organizationId: string | null
+): { organizationId: string | null; includeCloudAgentSessions: boolean } => ({
+  includeCloudAgentSessions: true,
+  organizationId,
+});
+
 const HISTORY_PAGE_LIMIT = 30;
 const SEARCH_LIMIT = 50;
 const MIN_SEARCH_LENGTH = 2;
@@ -103,6 +115,11 @@ export function mapHistorySessionRow(params: {
 // Status badge classifier
 // ---------------------------------------------------------------------------
 
+/**
+ * Map a wire status to one badge vocabulary. The wire carries `busy` for a
+ * cloud agent and `running` for a CLI session; both mean the same thing to a
+ * reader, so they render the same label.
+ */
 export const sessionStatusBadge = (
   status: string | null
 ): { label: string; className: string } | null => {
@@ -113,8 +130,11 @@ export const sessionStatusBadge = (
   if (lowerStatus === 'question' || lowerStatus === 'permission') {
     return { className: 'bg-status-yellow-500/15 text-status-yellow-500', label: 'Needs input' };
   }
-  if (lowerStatus === 'running') {
+  if (lowerStatus === 'running' || lowerStatus === 'busy') {
     return { className: 'bg-status-green-500/15 text-status-green-500', label: 'Running' };
+  }
+  if (lowerStatus === 'retry') {
+    return { className: 'bg-status-yellow-500/15 text-status-yellow-500', label: 'Retrying' };
   }
   return {
     className: 'bg-surface-selected text-foreground-muted',
@@ -181,17 +201,8 @@ const ActiveSessionsSection = ({
     };
   }, [userWebConnection, queryClient, organizationId]);
 
-  const listInput = useMemo(
-    () =>
-      ({
-        includeCloudAgentSessions: true,
-        organizationId,
-      }) satisfies { organizationId: string | null; includeCloudAgentSessions: boolean },
-    [organizationId]
-  );
-
   const { data, error, isError, isLoading, refetch, isRefetching } = useQuery({
-    queryFn: () => trpcClient.activeSessions.list.query(listInput),
+    queryFn: () => trpcClient.activeSessions.list.query(activeSessionsListInput(organizationId)),
     queryKey: activeSessionsQueryKey(organizationId),
     refetchInterval: connected ? ACTIVE_POLL_CONNECTED_MS : ACTIVE_POLL_DISCONNECTED_MS,
   });
@@ -344,6 +355,18 @@ const HistorySessionsSection = ({
   const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Live sessions already have a row in the Active section. Observing the same
+  // Query (identical key + input) costs no extra request and keeps the two
+  // Sections consistent on every refetch.
+  const { data: activeData } = useQuery({
+    queryFn: () => trpcClient.activeSessions.list.query(activeSessionsListInput(organizationId)),
+    queryKey: activeSessionsQueryKey(organizationId),
+  });
+  const activeIds = useMemo(
+    () => new Set((activeData?.sessions ?? []).map(session => session.id)),
+    [activeData]
+  );
+
   // Debounce search input so we don't request on every keystroke.
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -437,7 +460,7 @@ const HistorySessionsSection = ({
     }
   };
   const isRefetching = isSearching ? isSearchRefetching : isHistoryRefetching;
-  const rows = isSearching ? searchRows : allHistoryRows;
+  const rows = isSearching ? searchRows : allHistoryRows.filter(row => !activeIds.has(row.id));
   const hasNoResults = !isLoading && !hasError && rows.length === 0;
   // Hide the search box when there is nothing to search and no query typed.
   const showSearch = inputValue !== '' || isLoading || hasError || rows.length > 0;

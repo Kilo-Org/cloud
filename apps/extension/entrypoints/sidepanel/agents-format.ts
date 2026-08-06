@@ -2,9 +2,22 @@
  * Display helpers shared by the agents session list and session view.
  */
 
-/** Strip the host prefix from a stored git URL: "github.com/org/repo" → "org/repo". */
-export const displayRepoName = (gitUrl: string): string =>
-  gitUrl.replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//, '');
+/**
+ * Reduce a git remote to `owner/repo` for display.
+ *
+ * Handles every form the wire carries: bare `github.com/org/repo` from cloud
+ * sessions, and the CLI heartbeat's raw remote — `https://host/org/repo.git`,
+ * `ssh://git@host/org/repo.git`, or scp-style `git@host:org/repo.git`. A value
+ * that already looks like `owner/repo` (no host segment) passes through.
+ */
+export const displayRepoName = (gitUrl: string): string => {
+  const withoutScheme = gitUrl.trim().replace(/^[a-z][a-z\d+.-]*:\/\//i, '');
+  const withoutUser = withoutScheme.replace(/^[^@/]+@/, '');
+  // Strip the leading segment only when it looks like a host (contains a dot),
+  // So a plain `owner/repo` keeps its owner.
+  const withoutHost = withoutUser.replace(/^[^/:]*\.[^/:]*[:/]+/, '');
+  return withoutHost.replace(/\.git$/i, '');
+};
 
 export const relativeTime = (dateStr: string): string => {
   const date = new Date(dateStr);

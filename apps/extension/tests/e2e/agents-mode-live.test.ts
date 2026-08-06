@@ -89,9 +89,12 @@ const signInWithLocalDeviceAuth = async ({
  * A prompt whose output keeps the session busy for the whole reopen round
  * trip. A short prompt would finish before phase "reopen while running" and
  * the Stop assertion would fail on a finished run, not on a broken control.
+ * Measured live, "1 to 100" streamed the full list in ~33s, which finished
+ * before the reopen round trip completed; 300 keeps the run alive past the
+ * reopen, queue, and stop phases.
  */
 const longPrompt = (nonce: string): string =>
-  `Nonce ${nonce}. Count from 1 to 100. Put each number on its own line with one short sentence about it.`;
+  `Nonce ${nonce}. Count from 1 to 300. Put each number on its own line with one short sentence about it.`;
 
 const readSessionTitle = async (sidePanel: Page): Promise<string> => {
   const titleText = await sidePanel.locator('h1').first().textContent();
@@ -168,13 +171,71 @@ const reopenRunningSession = async ({
   await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 15_000 });
   const openedTitle = await readSessionTitle(sidePanel);
 
+  /*
+   * The conversation list virtualizes rows and pins to the newest message, so
+   * a nonce-bearing user message can stay out of the DOM until the transcript
+   * scrolls to it. The nonce sits at the top in the start flow (the loaded
+   * first user message) and near the bottom in the existing-session fallback
+   * (the queued follow-up), so check both ends and poll while the paged
+   * history streams in. The first scroll up releases auto-scroll.
+   */
+  const conversationPane = sidePanel.getByLabel('Agent conversation');
+
   try {
-    await expect(sidePanel.getByText(nonce).first()).toBeVisible({ timeout: 60_000 });
+    await expect
+      .poll(
+        async () => {
+          try {
+            if (!(await conversationPane.isVisible().catch(() => false))) {
+              return false;
+            }
+
+            const nonceRow = sidePanel.getByText(nonce).first();
+
+            if (await nonceRow.isVisible().catch(() => false)) {
+              return true;
+            }
+
+            await conversationPane.evaluate(element => {
+              element.scrollTop = 0;
+            });
+
+            if (await nonceRow.isVisible().catch(() => false)) {
+              return true;
+            }
+
+            await conversationPane.evaluate(element => {
+              element.scrollTop = element.scrollHeight;
+            });
+
+            return false;
+          } catch {
+            return false;
+          }
+        },
+        {
+          message: `the reopened transcript never rendered the loaded user message (nonce "${nonce}")`,
+          timeout: 60_000,
+        }
+      )
+      .toBe(true);
   } catch (error) {
     throw new Error(
       `Reopened the wrong session: expected nonce "${nonce}" but the opened session is "${openedTitle}". ${error instanceof Error ? error.message : ''}`,
       { cause: error }
     );
+  }
+
+  /*
+   * A scroll-up releases auto-scroll and shows the Jump to latest control;
+   * re-engage it so the running output and the queued follow-up stay in view
+   * for the queue and stop phases. When the nonce was already visible at the
+   * bottom — the existing-session fallback — no scroll-up happened and the
+   * list is still following, so there is nothing to re-engage.
+   */
+  const jumpToLatest = sidePanel.getByRole('button', { name: 'Jump to latest' });
+  if (await jumpToLatest.isVisible().catch(() => false)) {
+    await jumpToLatest.click();
   }
 };
 

@@ -183,8 +183,14 @@ const approvalOutcomeToToolResult = (
 
 /**
  * Map a WorkflowRunResult to an EvalTabResult.
+ * The workflow name rides along so the transcript and the model can say
+ * which workflow produced the result or the failure.
  */
-const runResultToToolResult = (result: WorkflowRunResult, dryRun: boolean): EvalTabResult => {
+const runResultToToolResult = (
+  result: WorkflowRunResult,
+  dryRun: boolean,
+  workflowName: string
+): EvalTabResult => {
   if (result.ok) {
     const extra: Record<string, unknown> = {};
     if (dryRun) {
@@ -199,16 +205,17 @@ const runResultToToolResult = (result: WorkflowRunResult, dryRun: boolean): Eval
       value: {
         pagesVisited: result.pagesVisited,
         result: result.result,
+        workflowName,
         ...extra,
       },
     };
   }
 
-  const error =
+  const withPage =
     result.pageUrl === undefined ? result.error : `${result.error} (page: ${result.pageUrl})`;
 
   return {
-    error,
+    error: `Workflow "${workflowName}" failed: ${withPage}`,
     ok: false,
   };
 };
@@ -405,7 +412,7 @@ const executeRunWorkflow = async (
     }
   );
 
-  return runResultToToolResult(result, dryRun);
+  return runResultToToolResult(result, dryRun, workflow.name);
 };
 
 const executeDeleteWorkflow = async (

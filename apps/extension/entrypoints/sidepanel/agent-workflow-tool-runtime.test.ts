@@ -860,3 +860,53 @@ describe('startUrl resolution', () => {
     );
   });
 });
+
+describe('run results name the workflow', () => {
+  const stored = {
+    approvedScriptHash: 'hash',
+    createdAt: 1,
+    description: 'Flights',
+    id: 'wf-1',
+    name: 'Flight price search',
+    scopeOrigin: 'https://example.com',
+    script: 'return { done: true, result: 1 };',
+    updatedAt: 1,
+  };
+
+  const ctxWithStored = () =>
+    createBaseCtx({
+      storage: {
+        getItem: vi.fn().mockResolvedValue([stored]),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+  it('includes the workflow name in a successful result', async () => {
+    vi.mocked(runWorkflow).mockResolvedValueOnce({ ok: true, pagesVisited: 1, result: 'done' });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('run_workflow', { workflowId: 'wf-1' }),
+      ctxWithStored()
+    );
+
+    expect(result).toStrictEqual({
+      ok: true,
+      value: { pagesVisited: 1, result: 'done', workflowName: 'Flight price search' },
+    });
+  });
+
+  it('names the workflow in a failure', async () => {
+    vi.mocked(runWorkflow).mockResolvedValueOnce({ error: 'Tab is at X.', ok: false });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('run_workflow', { workflowId: 'wf-1' }),
+      ctxWithStored()
+    );
+
+    expect(result).toStrictEqual({
+      error: 'Workflow "Flight price search" failed: Tab is at X.',
+      ok: false,
+    });
+  });
+});

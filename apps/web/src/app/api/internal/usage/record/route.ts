@@ -104,7 +104,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         status: result.wasRedelivery ? 'duplicate' : 'recorded',
         result: {
           usageId: result.usageId,
-          createdAt: result.createdAt,
+          // `core.created_at` rather than the value the write returns: a fresh
+          // insert reports `RETURNING created_at`, which PostgreSQL renders as
+          // "2026-04-29 01:16:12.945+00" and which is not strict ISO 8601. It is
+          // the same instant, because that column was inserted from this value.
+          createdAt: core.created_at,
           newMicrodollarsUsed: result.newMicrodollarsUsed,
         },
       }

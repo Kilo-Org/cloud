@@ -26,7 +26,6 @@ import { selectSessionListContentSurface } from '@/components/agents/session-lis
 import { type SessionSection } from '@/components/agents/session-list-helpers';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
-import { sessionListSearchInputA11yRef } from '@/components/agents/session-list-search-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -45,6 +44,8 @@ export const FAB_SIZE = 56;
 export const FAB_MARGIN = 16;
 
 type AgentSessionListContentProps = {
+  /** Post-deletion focus anchor: the screen's always-mounted search input. */
+  searchInputRef: Parameters<typeof moveA11yFocus>[0];
   sections: SessionSection[];
   hasAnySessions: boolean;
   /** True when the pinned "Active now" tray is non-empty. Used by the
@@ -90,6 +91,7 @@ type AgentSessionListContentProps = {
 };
 
 export function AgentSessionListContent({
+  searchInputRef,
   sections,
   hasAnySessions,
   hasPinnedActive,
@@ -165,11 +167,9 @@ export function AgentSessionListContent({
     [bottom, fontScale]
   );
 
-  const hasHistoryContent = sections.length > 0;
-
   // Pure body decision — see `session-list-body-model.ts`.
   const bodyModel = selectSessionListBodyModel({
-    hasHistoryContent,
+    hasHistoryContent: sections.length > 0,
     hasStoredSessions,
     hasMoreHistory,
     hasPinnedActive,
@@ -185,7 +185,7 @@ export function AgentSessionListContent({
     activeIsError,
     hasAnySessions,
     hasPinnedActive,
-    hasHistoryContent,
+    hasHistoryContent: sections.length > 0,
   });
 
   const emptyStateAction = useMemo(
@@ -241,12 +241,11 @@ export function AgentSessionListContent({
           onSessionPress(item.session_id, item.organization_id);
         }}
         onDelete={() => {
-          // The search input is an always-mounted accessible anchor (when any
-          // sessions remain). The deletion is announced by the mutation hook's
-          // success toast; onDeleted only restores focus, and moveA11yFocus
-          // no-ops when the header is unmounted (last session deleted).
+          // The hook's success toast announces the deletion; onDeleted only
+          // restores focus, and moveA11yFocus no-ops once the header is
+          // unmounted (last session deleted).
           deleteSession(item.session_id, () => {
-            moveA11yFocus(sessionListSearchInputA11yRef);
+            moveA11yFocus(searchInputRef);
           });
         }}
         onRename={newTitle => {
@@ -254,7 +253,7 @@ export function AgentSessionListContent({
         }}
       />
     ),
-    [onSessionPress, deleteSession, renameSession, sortBy]
+    [onSessionPress, deleteSession, renameSession, sortBy, searchInputRef]
   );
 
   const renderSectionHeader = useCallback(

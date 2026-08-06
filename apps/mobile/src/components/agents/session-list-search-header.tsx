@@ -1,19 +1,9 @@
 import { Search, X } from 'lucide-react-native';
-import { type RefObject, useCallback } from 'react';
+import { type RefObject } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-/**
- * Module-level anchor ref for the Agents search input. The screen owns the
- * uncontrolled TextInput ref (the `inputRef` prop); this shared ref mirrors
- * the same node so the session-list content can restore
- * assistive-technology focus after a session deletion without new screen
- * plumbing. It stays null while the header is unmounted (for example after
- * the last session is deleted), where `moveA11yFocus` no-ops safely.
- */
-export const sessionListSearchInputA11yRef: RefObject<TextInput | null> = { current: null };
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -35,16 +25,6 @@ export function SessionListSearchHeader({
   onClearSearch,
 }: Readonly<SessionListSearchHeaderProps>) {
   const colors = useThemeColors();
-  // Attach the screen's uncontrolled ref AND the shared deletion anchor to
-  // the same TextInput node. The screen's ref identity is stable (a useRef
-  // from `useSessionSearchInput`), so the callback ref stays stable too.
-  const attachInputRef = useCallback(
-    (node: TextInput | null) => {
-      inputRef.current = node;
-      sessionListSearchInputA11yRef.current = node;
-    },
-    [inputRef]
-  );
   return (
     <View>
       <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
@@ -61,7 +41,7 @@ export function SessionListSearchHeader({
           )}
         </View>
         <TextInput
-          ref={attachInputRef}
+          ref={inputRef}
           accessibilityLabel="Search sessions"
           className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
           placeholder="Search sessions..."

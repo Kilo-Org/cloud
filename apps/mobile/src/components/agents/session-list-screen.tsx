@@ -224,6 +224,7 @@ export function AgentSessionListScreen() {
       ) : null}
       <Animated.View layout={LinearTransition} className="flex-1">
         <AgentSessionListContent
+          searchInputRef={searchInputRef}
           sections={sections}
           hasAnySessions={hasAnySessions}
           hasPinnedActive={hasPinnedActive}

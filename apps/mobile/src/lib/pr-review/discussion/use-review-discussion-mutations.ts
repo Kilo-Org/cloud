@@ -36,7 +36,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
+import {
+  isPrMutationRetryable,
+  mapPrOperationError,
+  prOperationToastMessage,
+  useHoistedOperationKey,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
 
 import {
   applyReactionToggle,
@@ -61,21 +67,56 @@ async function invalidateDiscussionCaches(
 
 // ── Reply (not optimistic) ────────────────────────────────────────────
 
+export type ReplyToCommentInput = {
+  owner: string;
+  repo: string;
+  number: number;
+  commentId: number;
+  body: string;
+};
+
+/**
+ * Deterministic intent fingerprint for a reply submit. The retry of the SAME
+ * reply text on the SAME comment reuses the hoisted operation key; changing
+ * the reply body or the target comment rotates the key so a changed intent
+ * cannot replay the previous reply's canonical ledger result.
+ */
+export function replyToCommentIntentFingerprint(input: ReplyToCommentInput): string {
+  return JSON.stringify({
+    resource: [input.owner, input.repo, input.number],
+    commentId: input.commentId,
+    body: input.body,
+  });
+}
+
 export function useReplyToCommentMutation() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const keys = useDiscussionKeys();
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
-  return useMutation(
-    trpc.githubPrReview.replyToComment.mutationOptions({
-      onError: (error: { message: string }) => {
-        toast.error(error.message);
-      },
-      onSettled: async () => {
-        await invalidateDiscussionCaches(queryClient, keys);
-      },
-    })
-  );
+  return useMutation({
+    mutationFn: async (input: ReplyToCommentInput) => {
+      try {
+        const result = await trpcClient.githubPrReview.replyToComment.mutate({
+          ...input,
+          operationKey: getKey(replyToCommentIntentFingerprint(input)),
+        });
+        rotateKey();
+        return result;
+      } catch (error) {
+        if (!isPrMutationRetryable(error)) {
+          rotateKey();
+        }
+        throw mapPrOperationError(error, 'reply');
+      }
+    },
+    onError: (error: { message: string }) => {
+      toast.error(prOperationToastMessage(error, 'reply'));
+    },
+    onSettled: async () => {
+      await invalidateDiscussionCaches(queryClient, keys);
+    },
+  });
 }
 
 // ── Resolve / unresolve (optimistic) ──────────────────────────────────

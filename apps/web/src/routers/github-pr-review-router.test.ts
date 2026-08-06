@@ -4,11 +4,40 @@
 import { TRPCError } from '@trpc/server';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import { prLedgerResourceKey } from './github-pr-review-router';
 
 const getGitHubUserAccessToken = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/user-token-client', () => ({
   getGitHubUserAccessToken: (...args: unknown[]) => getGitHubUserAccessToken(...args),
+}));
+
+// P1-A-08c: the PR operation ledger. The router admits / settles /
+// marks-reconcile-pending through `@kilocode/db/operation-ledger` and
+// resolves the analytics identity via `@/lib/drizzle`. Both are mocked so
+// the ledger tests can assert admission, settle, replay, and reconcile
+// orchestration without a database. The `db` mock resolves an empty user
+// list, so `resolvePrDistinctId` falls back to the user id.
+const mockAdmitOperation = jest.fn();
+const mockSettleOperation = jest.fn();
+const mockMarkReconcilePending = jest.fn();
+
+jest.mock('@kilocode/db/operation-ledger', () => ({
+  admitOperation: (...args: unknown[]) => mockAdmitOperation(...args),
+  settleOperation: (...args: unknown[]) => mockSettleOperation(...args),
+  markReconcilePending: (...args: unknown[]) => mockMarkReconcilePending(...args),
+}));
+
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]),
+        }),
+      }),
+    }),
+  },
 }));
 
 // The retry wrapper invokes `createGitHubPrReviewOctokit(token)` to build the
@@ -22,6 +51,8 @@ type OctokitMock = {
     createReview: jest.Mock;
     createReviewComment: jest.Mock;
     createReplyForReviewComment: jest.Mock;
+    getReviewComment: jest.Mock;
+    getReview: jest.Mock;
     updateBranch: jest.Mock;
     listFiles: jest.Mock;
     get: jest.Mock;
@@ -42,6 +73,8 @@ function buildOctokit(token: string): OctokitMock {
       createReview: jest.fn(),
       createReviewComment: jest.fn(),
       createReplyForReviewComment: jest.fn(),
+      getReviewComment: jest.fn(),
+      getReview: jest.fn(),
       updateBranch: jest.fn(),
       listFiles: jest.fn(),
       get: jest.fn(),
@@ -1094,3 +1127,852 @@ describe('githubPrReviewRouter GraphQL mutations', () => {
 // Touch the TRPCError import so the linter doesn't strip it (the retry
 // wrapper surfaces already-classified TRPCError unchanged).
 void TRPCError;
+
+// ----- P1-A-08c: PR operation ledger --------------------------------------
+//
+// With an `operationKey`, the four PR mutations admit a `pr`-domain ledger
+// row, run the GitHub effect only after admission, and dedupe / replay /
+// reconcile same-key retries. These tests drive the router through the
+// mocked ledger helpers and assert admission payloads, settle outcomes,
+// CONFLICT markers, replay markers, reconcile decisions, and the
+// `pr_operation_settled` outbox payload (no free text, no resource keys).
+
+const PR_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the PR before retrying.";
+const PR_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
+const PR_CONFLICT_MESSAGE = 'GitHub reported a conflict for this PR';
+const OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
+const OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
+const PR_LEDGER_SETTLE_FAILED_MESSAGE =
+  'The action completed, but we could not record the result. Please try again.';
+const PR_LEDGER_PERSISTENCE_FAILED_MESSAGE =
+  'We could not record this action. Please try again later.';
+
+function ledgerRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'ledger-row-1',
+    status: 'admitted',
+    canonical_result: null,
+    intent: 'create_review_comment',
+    resource_key: commentResourceKey,
+    ...overrides,
+  };
+}
+
+const ledgerCommentInput = {
+  owner: 'octocat',
+  repo: 'hello',
+  number: 1,
+  body: 'ledger comment body',
+  path: 'src/foo.ts',
+  line: 4,
+  side: 'RIGHT',
+  commitSha: '0'.repeat(40),
+  operationKey: 'key-comment-1',
+};
+
+const ledgerMergeInput = {
+  ...baseMergeInput,
+  operationKey: 'key-merge-1',
+};
+
+// The stored ledger identity embeds the deterministic request fingerprint;
+// tests build the exact value so the post-admission row comparison matches.
+const commentResourceKey = prLedgerResourceKey('create_review_comment', ledgerCommentInput);
+const mergeResourceKey = prLedgerResourceKey('merge', ledgerMergeInput);
+const replyResourceKey = prLedgerResourceKey('reply_comment', {
+  owner: 'octocat',
+  repo: 'hello',
+  number: 1,
+  commentId: 5,
+  body: 'thanks',
+});
+const reviewResourceKey = prLedgerResourceKey('submit_review', {
+  owner: 'octocat',
+  repo: 'hello',
+  number: 1,
+  event: 'APPROVE',
+  body: 'lgtm!!!',
+  commitSha: '0'.repeat(40),
+  comments: [{ path: 'src/foo.ts', line: 5, side: 'RIGHT', body: 'fix me' }],
+});
+
+describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
+  beforeEach(() => {
+    mockAdmitOperation.mockReset();
+    mockSettleOperation.mockReset();
+    mockMarkReconcilePending.mockReset();
+    mockSettleOperation.mockResolvedValue({ settled: true });
+    mockMarkReconcilePending.mockResolvedValue(ledgerRow({ status: 'reconcile_pending' }));
+  });
+
+  it('admits createReviewComment under domain pr and settles completed at the effect boundary', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'admitted', row: ledgerRow() });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReviewComment.mockResolvedValueOnce({
+      data: { id: 42, node_id: 'N_42' },
+    });
+
+    const result = await caller.createReviewComment(ledgerCommentInput);
+
+    expect(result).toEqual({ commentId: 42, nodeId: 'N_42' });
+    expect(mockAdmitOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'user-1',
+        domain: 'pr',
+        intent: 'create_review_comment',
+        operationKey: 'key-comment-1',
+        resourceKey: commentResourceKey,
+        taxonomy: 'reconcile-first',
+        leaseSeconds: 120,
+      })
+    );
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-1',
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: { commentId: 42, nodeId: 'N_42' },
+      })
+    );
+    // The outbox event is the pr_operation_settled catalog schema with
+    // enum-only properties: no free text, no resource key.
+    const settleCall = mockSettleOperation.mock.calls[0][1] as {
+      outboxEvent: { eventName: string; properties: Record<string, unknown> };
+    };
+    expect(settleCall.outboxEvent.eventName).toBe('pr_operation_settled');
+    expect(settleCall.outboxEvent.properties).toEqual(
+      expect.objectContaining({
+        source: 'web',
+        surface: 'pr',
+        phase: 'terminal',
+        intent: 'create_review_comment',
+        outcome: 'completed',
+        duration_ms: expect.any(Number),
+      })
+    );
+    const serialized = JSON.stringify(settleCall.outboxEvent.properties);
+    expect(serialized).not.toContain('octocat/hello#1');
+    expect(serialized).not.toContain('ledger comment body');
+  });
+
+  it('admits and settles replyToComment with a commentId canonical result', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: ledgerRow({ intent: 'reply_comment', resource_key: replyResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReplyForReviewComment.mockResolvedValueOnce({
+      data: { id: 9, node_id: 'N_9' },
+    });
+
+    const result = await caller.replyToComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 5,
+      body: 'thanks',
+      operationKey: 'key-reply-1',
+    });
+
+    expect(result).toEqual({ commentId: 9, nodeId: 'N_9' });
+    expect(mockAdmitOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ intent: 'reply_comment', operationKey: 'key-reply-1' })
+    );
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'completed',
+        canonicalResult: { commentId: 9, nodeId: 'N_9' },
+      })
+    );
+  });
+
+  it('admits and settles submitReview and keeps free text out of the canonical result', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: ledgerRow({ intent: 'submit_review', resource_key: reviewResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReview.mockResolvedValueOnce({
+      data: { id: 99, node_id: 'N_99', state: 'APPROVE' },
+    });
+
+    const result = await caller.submitReview({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      event: 'APPROVE',
+      body: 'lgtm!!!',
+      commitSha: '0'.repeat(40),
+      comments: [{ path: 'src/foo.ts', line: 5, side: 'RIGHT', body: 'fix me' }],
+      operationKey: 'key-review-1',
+    });
+
+    expect(result).toEqual({ reviewId: 99, nodeId: 'N_99', state: 'APPROVE' });
+    expect(mockAdmitOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ intent: 'submit_review', operationKey: 'key-review-1' })
+    );
+    const settleCall = mockSettleOperation.mock.calls[0][1] as {
+      canonicalResult: Record<string, unknown>;
+      outboxEvent: { properties: Record<string, unknown> };
+    };
+    // Only opaque provider ids enter the canonical result — the body and the
+    // inline comment text never do.
+    expect(settleCall.canonicalResult).toEqual({ reviewId: 99, nodeId: 'N_99' });
+    const serialized = JSON.stringify({
+      canonical: settleCall.canonicalResult,
+      properties: settleCall.outboxEvent.properties,
+    });
+    expect(serialized).not.toContain('lgtm!!!');
+    expect(serialized).not.toContain('fix me');
+    expect(serialized).not.toContain('octocat/hello#1');
+  });
+
+  it('returns CONFLICT operation_in_progress for a live same-key duplicate without touching GitHub', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_in_flight',
+      row: ledgerRow(),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: OPERATION_IN_PROGRESS_MESSAGE,
+    });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('replays the sanitized canonical result marked replayed on a same-key settled duplicate', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        status: 'completed',
+        canonical_result: { commentId: 7, nodeId: 'N_7' },
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    const result = await caller.createReviewComment(ledgerCommentInput);
+
+    expect(result).toEqual({ commentId: 7, nodeId: 'N_7', replayed: true });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replayed settled-failed row as a non-retryable fresh-intent signal', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({ status: 'failed' }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: PR_REPLAY_FAILED_MESSAGE,
+    });
+  });
+
+  it('rejects cross-intent operation-key reuse with operation_key_reuse_mismatch (no effect, no replay)', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    // The key already exists but belongs to a DIFFERENT intent (a merge row
+    // stored under the same operation key). The stored identity must never
+    // replay or reconcile the comment request.
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({ intent: 'merge', resource_key: mergeResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
+    });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('rejects operation-key reuse for a different request fingerprint under the same intent', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    // Same key, same intent, but the stored row was written for a DIFFERENT
+    // request (the client changed an intent input without rotating). The
+    // server must not replay the previous request's canonical result.
+    const editedResourceKey = prLedgerResourceKey('create_review_comment', {
+      ...ledgerCommentInput,
+      body: 'edited body',
+    });
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        status: 'completed',
+        canonical_result: { commentId: 7, nodeId: 'N_7' },
+        resource_key: editedResourceKey,
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
+    });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('settles a deterministic GitHub rejection as failed and rethrows the typed error', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'admitted', row: ledgerRow() });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReviewComment.mockRejectedValueOnce({
+      status: 422,
+      message: 'Line was not part of the diff',
+    });
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'failed',
+        outcomeCode: 'bad_request',
+        outboxEvent: expect.objectContaining({
+          properties: expect.objectContaining({ outcome: 'failed' }),
+        }),
+      })
+    );
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('marks an ambiguous 5xx outcome reconcile-pending and surfaces the ambiguous CONFLICT', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'admitted', row: ledgerRow() });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReviewComment.mockRejectedValueOnce({
+      status: 503,
+      message: 'Service unavailable',
+    });
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: PR_AMBIGUOUS_MESSAGE,
+    });
+    expect(mockMarkReconcilePending).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-1',
+        outboxEvent: expect.objectContaining({
+          eventName: 'pr_operation_settled',
+          properties: expect.objectContaining({
+            intent: 'create_review_comment',
+            outcome: 'ambiguous',
+            reconcile_result: 'unresolved',
+          }),
+        }),
+      })
+    );
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('marks an ambiguous network/timeout failure reconcile-pending (no status on the raw error)', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'admitted', row: ledgerRow() });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReviewComment.mockRejectedValueOnce(new Error('socket hang up'));
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: PR_AMBIGUOUS_MESSAGE,
+    });
+    expect(mockMarkReconcilePending).toHaveBeenCalledTimes(1);
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('never re-executes an unresolved same-key retry when no provider reference was recorded', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    // Takeover: the admitted lease expired but the write response was never
+    // persisted, so no provider reference exists to reconcile against.
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'takeover', row: ledgerRow() });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: PR_AMBIGUOUS_MESSAGE,
+    });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    // The unresolved takeover marks the row reconcile-pending (never settles
+    // it) so the reconciliation lease is immediately claimable and the
+    // ambiguous outbox event is recorded exactly once.
+    expect(mockMarkReconcilePending).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-1',
+        outboxEvent: expect.objectContaining({
+          eventName: 'pr_operation_settled',
+          properties: expect.objectContaining({
+            intent: 'create_review_comment',
+            outcome: 'ambiguous',
+            reconcile_result: 'unresolved',
+          }),
+        }),
+      })
+    );
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('reconciles a same-key retry by re-reading the recorded provider reference and replays it', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        canonical_result: { commentId: 42, nodeId: 'N_42' },
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.getReviewComment.mockResolvedValueOnce({
+      data: { id: 42, node_id: 'N_42' },
+    });
+
+    const result = await caller.createReviewComment(ledgerCommentInput);
+
+    expect(result).toEqual({ commentId: 42, nodeId: 'N_42', replayed: true });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: { commentId: 42, nodeId: 'N_42' },
+        outboxEvent: expect.objectContaining({
+          properties: expect.objectContaining({
+            outcome: 'completed',
+            reconcile_result: 'confirmed_completed',
+          }),
+        }),
+      })
+    );
+  });
+
+  it('settles failed as confirmed_absent when the recorded provider reference is gone', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        canonical_result: { commentId: 42, nodeId: 'N_42' },
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.getReviewComment.mockRejectedValueOnce({ status: 404, message: 'gone' });
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: PR_AMBIGUOUS_MESSAGE,
+    });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'failed',
+        outcomeCode: 'effect_absent',
+        outboxEvent: expect.objectContaining({
+          properties: expect.objectContaining({
+            outcome: 'failed',
+            reconcile_result: 'confirmed_absent',
+          }),
+        }),
+      })
+    );
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('reconciles a same-key merge retry to completed when the PR is merged', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        intent: 'merge',
+        resource_key: mergeResourceKey,
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.get.mockResolvedValueOnce({
+      data: {
+        state: 'closed',
+        merged: true,
+        merge_commit_sha: 'm1',
+        head: { ref: 'feature/x', sha: 'a'.repeat(40) },
+      },
+    });
+
+    const result = await caller.mergePullRequest(ledgerMergeInput);
+
+    expect(result).toEqual({ merged: true, sha: 'm1', branchDeleted: false, replayed: true });
+    expect(t1Octokit.pulls.merge).not.toHaveBeenCalled();
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'completed',
+        canonicalResult: { merged: true, sha: 'm1', branchDeleted: false },
+        outboxEvent: expect.objectContaining({
+          properties: expect.objectContaining({
+            intent: 'merge',
+            outcome: 'completed',
+            reconcile_result: 'confirmed_completed',
+          }),
+        }),
+      })
+    );
+  });
+
+  it('reconciles a same-key merge retry to failed/absent when the PR closed without merging', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        intent: 'merge',
+        resource_key: mergeResourceKey,
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.get.mockResolvedValueOnce({
+      data: { state: 'closed', merged: false },
+    });
+
+    await expect(caller.mergePullRequest(ledgerMergeInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: PR_CONFLICT_MESSAGE,
+    });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'failed', outcomeCode: 'already_closed' })
+    );
+    expect(t1Octokit.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it('reconciles a same-key merge retry to failed/absent when the expected head moved', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        intent: 'merge',
+        resource_key: mergeResourceKey,
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.get.mockResolvedValueOnce({
+      data: { state: 'open', head: { ref: 'feature/x', sha: 'b'.repeat(40) } },
+    });
+
+    await expect(caller.mergePullRequest(ledgerMergeInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: PR_CONFLICT_MESSAGE,
+    });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'failed', outcomeCode: 'head_moved' })
+    );
+    expect(t1Octokit.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it('re-executes the merge when the expected head lineage is intact (takeover)', async () => {
+    // Two token fetches: one for the reconcile read, one for the re-executed merge.
+    getGitHubUserAccessToken
+      .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+      .mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: ledgerRow({ intent: 'merge', resource_key: mergeResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    const prFixture = {
+      state: 'open',
+      head: { ref: 'feature/x', sha: 'a'.repeat(40), repo: { id: SAME_REPO_ID } },
+      base: { ref: 'main', repo: { id: SAME_REPO_ID } },
+    };
+    // One read for the reconcile, one read inside runMergeWrite.
+    t1Octokit.pulls.get.mockResolvedValueOnce({ data: prFixture }).mockResolvedValueOnce({
+      data: prFixture,
+    });
+    t1Octokit.pulls.merge.mockResolvedValueOnce({ data: { merged: true, sha: 'm1' } });
+    t1Octokit.git.deleteRef.mockResolvedValueOnce({ data: {} });
+
+    const result = await caller.mergePullRequest(ledgerMergeInput);
+
+    expect(result).toEqual({ merged: true, sha: 'm1', branchDeleted: true });
+    expect(t1Octokit.pulls.merge).toHaveBeenCalledTimes(1);
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'completed',
+        canonicalResult: { merged: true, sha: 'm1', branchDeleted: true },
+      })
+    );
+  });
+
+  it('marks a merge takeover reconcile-pending when the authoritative read fails (unresolved)', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: ledgerRow({ intent: 'merge', resource_key: mergeResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    // The authoritative PR read fails (network / 5xx): the merge may or may
+    // not have committed, so the row must stay reconcile-pending and the
+    // merge must never re-execute under this key.
+    t1Octokit.pulls.get.mockRejectedValueOnce({ status: 503, message: 'boom' });
+
+    await expect(caller.mergePullRequest(ledgerMergeInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: PR_AMBIGUOUS_MESSAGE,
+    });
+    expect(mockMarkReconcilePending).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-1',
+        outboxEvent: expect.objectContaining({
+          eventName: 'pr_operation_settled',
+          properties: expect.objectContaining({
+            intent: 'merge',
+            outcome: 'ambiguous',
+            reconcile_result: 'unresolved',
+          }),
+        }),
+      })
+    );
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+    expect(t1Octokit.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it('keeps an admitted merge reconcile-pending when the authoritative read returns NOT_FOUND', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: ledgerRow({ intent: 'merge', resource_key: mergeResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    // The merge begins with an authoritative PR read; a NOT_FOUND there means
+    // the PR state is READ-unavailable, which is ambiguous (the merge may or
+    // may not have committed) — the row must never settle absent from a
+    // failed read.
+    t1Octokit.pulls.get.mockRejectedValueOnce({ status: 404, message: 'not found' });
+
+    await expect(caller.mergePullRequest(ledgerMergeInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: PR_AMBIGUOUS_MESSAGE,
+    });
+    expect(mockMarkReconcilePending).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-1',
+        outboxEvent: expect.objectContaining({
+          eventName: 'pr_operation_settled',
+          properties: expect.objectContaining({
+            intent: 'merge',
+            outcome: 'ambiguous',
+            reconcile_result: 'unresolved',
+          }),
+        }),
+      })
+    );
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+    expect(t1Octokit.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it('keeps a declined merge un-settled so a later same-key retry reconciles instead of re-merging', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: ledgerRow({ intent: 'merge', resource_key: mergeResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.get.mockResolvedValueOnce({
+      data: {
+        state: 'open',
+        head: { ref: 'feature/x', sha: 'a'.repeat(40), repo: { id: SAME_REPO_ID } },
+        base: { ref: 'main', repo: { id: SAME_REPO_ID } },
+      },
+    });
+    t1Octokit.pulls.merge.mockResolvedValueOnce({ data: { merged: false, sha: 's1' } });
+
+    const result = await caller.mergePullRequest(ledgerMergeInput);
+
+    expect(result).toEqual({ merged: false, sha: 's1', branchDeleted: false });
+    // No settle: the row stays admitted so the next same-key retry can
+    // reconcile the authoritative PR state before re-merging.
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a retryable server error when the completed settle fails after a committed provider write', async () => {
+    // P1-A-08c + final PR finding: the GitHub effect committed but the ledger
+    // settle failed. The router must NOT return the success receipt (the row
+    // is still `admitted`, so a success would falsely claim a retry-safe
+    // replay); it surfaces a retryable INTERNAL_SERVER_ERROR instead so a
+    // same-key retry reconciles and settles the row.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'admitted', row: ledgerRow() });
+    mockSettleOperation.mockRejectedValueOnce(new Error('db unavailable'));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReviewComment.mockResolvedValueOnce({
+      data: { id: 42, node_id: 'N_42' },
+    });
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: PR_LEDGER_SETTLE_FAILED_MESSAGE,
+    });
+    // The completed settle was attempted with the committed provider outcome…
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'completed',
+        canonicalResult: { commentId: 42, nodeId: 'N_42' },
+      })
+    );
+    // …and no ambiguous/conflict marker leaked from the failure path.
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the distinct non-retryable persistence error when reconcile-pending persistence fails on an ambiguous outcome', async () => {
+    // The provider write went ambiguous (5xx) but `markReconcilePending`
+    // failed: the row was never marked `reconcile_pending`, so the ambiguous
+    // "check the PR before retrying" CONFLICT (which promises same-key
+    // dedupe/reconcile) must NOT be surfaced. A distinct persistence error is
+    // returned instead so the client cannot blind-retry the same key.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'admitted', row: ledgerRow() });
+    mockMarkReconcilePending.mockRejectedValueOnce(new Error('db unavailable'));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReviewComment.mockRejectedValueOnce({
+      status: 503,
+      message: 'Service unavailable',
+    });
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: PR_LEDGER_PERSISTENCE_FAILED_MESSAGE,
+    });
+    expect(mockMarkReconcilePending).toHaveBeenCalledTimes(1);
+    // The ambiguous CONFLICT must never replace the hidden persistence failure,
+    // and the row must never be settled from a failed mark.
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a retryable server error when a confirmed reconcile cannot settle (never replays an un-recorded row)', async () => {
+    // The reconcile re-read confirmed the provider reference exists, but the
+    // completed settle failed. A `replayed: true` success here would be a
+    // false retry-safe receipt for a row that is still reconcile_pending, so
+    // the retryable server error is surfaced instead.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        canonical_result: { commentId: 42, nodeId: 'N_42' },
+      }),
+    });
+    mockSettleOperation.mockRejectedValueOnce(new Error('db unavailable'));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.getReviewComment.mockResolvedValueOnce({
+      data: { id: 42, node_id: 'N_42' },
+    });
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: PR_LEDGER_SETTLE_FAILED_MESSAGE,
+    });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'completed',
+        canonicalResult: { commentId: 42, nodeId: 'N_42' },
+        outboxEvent: expect.objectContaining({
+          properties: expect.objectContaining({ reconcile_result: 'confirmed_completed' }),
+        }),
+      })
+    );
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the distinct persistence error when an unresolved takeover cannot mark reconcile-pending', async () => {
+    // Takeover with no recorded provider reference: presence cannot be
+    // confirmed, so the row must become `reconcile_pending` before the
+    // ambiguous outcome is surfaced. When that persistence fails, the distinct
+    // non-retryable persistence error is surfaced instead — never the ambiguous
+    // marker and never a re-executed write.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'takeover', row: ledgerRow() });
+    mockMarkReconcilePending.mockRejectedValueOnce(new Error('db unavailable'));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: PR_LEDGER_PERSISTENCE_FAILED_MESSAGE,
+    });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the distinct persistence error when the merge reconcile read is unresolved and the mark fails', async () => {
+    // The merge reconcile's authoritative read failed (unresolved), so the row
+    // must stay reconcile-pending before the ambiguous outcome is surfaced.
+    // When that persistence fails, the distinct non-retryable persistence
+    // error is surfaced instead of the ambiguous marker.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: ledgerRow({ intent: 'merge', resource_key: mergeResourceKey }),
+    });
+    mockMarkReconcilePending.mockRejectedValueOnce(new Error('db unavailable'));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.get.mockRejectedValueOnce({ status: 503, message: 'boom' });
+
+    await expect(caller.mergePullRequest(ledgerMergeInput)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: PR_LEDGER_PERSISTENCE_FAILED_MESSAGE,
+    });
+    expect(t1Octokit.pulls.merge).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+});

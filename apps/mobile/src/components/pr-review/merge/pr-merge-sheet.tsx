@@ -27,6 +27,10 @@ import {
   useMergePullRequestMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import {
+  isPrOperationPersistenceFailed,
+  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
 import { applyMergeSuccessEffects } from '@/lib/pr-review/merge/merge-success-effects';
 import {
   defaultMergeMethodOptionFor,
@@ -149,6 +153,13 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
 
   useEffect(() => {
     if (lastError) {
+      // The ledger persistence-failure marker is retry-blocking: the row never
+      // became `reconcile_pending`, so the same key must not be retried.
+      if (isPrOperationPersistenceFailed(lastError)) {
+        setInlineError(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+        setInlineErrorKind('non-retryable');
+        return;
+      }
       const classification = classifyPrReviewMutationError(lastError);
       if (classification.kind === 'bad-request' || classification.kind === 'forbidden') {
         setInlineError(

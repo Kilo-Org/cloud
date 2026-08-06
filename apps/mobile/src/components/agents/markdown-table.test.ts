@@ -158,6 +158,14 @@ function isAccessibleLabelElement(node: RenderedElement): boolean {
   );
 }
 
+/**
+ * A TableRow's cell elements. A direct call does not render nested components,
+ * so match the TableCell nodes by the prop that carries the row's decision.
+ */
+function isTableCell(node: RenderedElement): boolean {
+  return typeof node.props.hiddenFromA11y === 'boolean';
+}
+
 /** The row container: a flex-row View that must stay a non-accessible wrapper. */
 function isRowContainer(node: RenderedElement): boolean {
   return node.type === 'View' && node.props.className === 'flex-row';
@@ -284,6 +292,49 @@ describe('MarkdownTable table semantics', () => {
     const container = findFirst(element, isRowContainer);
     expect(container?.props.accessible).not.toBe(true);
     expect(container?.props.accessibilityLabel).toBeUndefined();
+  });
+
+  it('hides the cells of a plain row so the linear label is not read twice', () => {
+    // eslint-disable-next-line new-cap
+    const element = TableRow({
+      palette: mockPalette,
+      cells: [['John'], ['30']],
+      columnCount: 2,
+      columnWidth: 200,
+      isLastRow: true,
+      headerTexts: ['Name', 'Age'],
+    });
+
+    expect(accessibilityLabelOf(findFirst(element, isAccessibleLabelElement))).toBe(
+      'Name: John, Age: 30'
+    );
+    const cells = findAll(element, isTableCell);
+    expect(cells).toHaveLength(2);
+    for (const cell of cells) {
+      expect(cell.props.hiddenFromA11y).toBe(true);
+    }
+  });
+
+  it('keeps a row with a nested control reachable and drops its linear label', () => {
+    const link = createElement('Pressable', { onPress: () => undefined }, 'kilocode.ai');
+    // eslint-disable-next-line new-cap
+    const element = TableRow({
+      palette: mockPalette,
+      cells: [[link], ['30']],
+      columnCount: 2,
+      columnWidth: 200,
+      isLastRow: true,
+      headerTexts: ['Site', 'Age'],
+    });
+
+    // No row label: an accessible sibling plus reachable cells would read the
+    // row twice, and the nested link must keep its own focus and tap target.
+    expect(findFirst(element, isAccessibleLabelElement)).toBeNull();
+    const cells = findAll(element, isTableCell);
+    expect(cells).toHaveLength(2);
+    for (const cell of cells) {
+      expect(cell.props.hiddenFromA11y).toBe(false);
+    }
   });
 
   it('labels a multi-column body row with every header', () => {

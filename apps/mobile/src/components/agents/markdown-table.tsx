@@ -32,7 +32,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { extractNodeText, linearRowLabel } from './markdown-a11y';
+import { containsPressable, extractNodeText, linearRowLabel } from './markdown-a11y';
 import { type MarkdownPalette } from './markdown-palette';
 
 const MODAL_COLUMN_MIN_WIDTH = 148;
@@ -346,27 +346,32 @@ export function TableRow({
   isHeader = false,
   headerTexts,
 }: TableRowProps) {
-  // The label is the linear reading fallback for the row: the header row
-  // announces the column titles, and every body row announces "header: cell"
-  // pairs in reading order. The row container is deliberately NOT an
-  // accessibility element, so nested Markdown links and image buttons stay
-  // independently reachable; the label lives on a 1px invisible accessible
-  // sibling that both screen readers can focus (an accessible container
-  // would shadow the nested controls on iOS).
+  // A row announces exactly one way, never both:
+  //
+  // - Plain row (no nested control): the linear label carries the whole row
+  //   ("Header: cell, Header: cell") on a 1px invisible accessible sibling,
+  //   and the cells leave the accessibility tree. Without hiding them the
+  //   screen reader reads the row label AND every cell again.
+  // - Row with a Markdown link or image: the cells stay reachable so those
+  //   controls keep their own focus and tap target, and the linear label is
+  //   dropped — an accessible container would shadow them on iOS.
   const cellTexts = cells.map(node => extractNodeText(node));
   const rowLabel = linearRowLabel(isHeader ? [] : headerTexts, cellTexts);
+  const hasControls = containsPressable(cells);
   return (
     <View
       className="flex-row"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant header background
       style={isHeader ? { backgroundColor: palette.codeBackground } : undefined}
     >
-      <View
-        accessible
-        accessibilityLabel={rowLabel}
-        className="absolute h-px w-px overflow-hidden"
-        pointerEvents="none"
-      />
+      {hasControls ? null : (
+        <View
+          accessible
+          accessibilityLabel={rowLabel}
+          className="absolute h-px w-px overflow-hidden"
+          pointerEvents="none"
+        />
+      )}
       {Array.from({ length: columnCount }, (_, colIdx) => (
         <TableCell
           key={colIdx}
@@ -374,6 +379,7 @@ export function TableRow({
           width={columnWidth}
           hasRightBorder={colIdx < columnCount - 1}
           hasBottomBorder={isHeader || !isLastRow}
+          hiddenFromA11y={!hasControls}
         >
           {cells[colIdx] ?? []}
         </TableCell>
@@ -387,13 +393,24 @@ type TableCellProps = {
   width: number;
   hasRightBorder: boolean;
   hasBottomBorder: boolean;
+  /** True when the row's linear label already speaks this cell's content. */
+  hiddenFromA11y: boolean;
   children: ReactNode;
 };
 
-function TableCell({ palette, width, hasRightBorder, hasBottomBorder, children }: TableCellProps) {
+function TableCell({
+  palette,
+  width,
+  hasRightBorder,
+  hasBottomBorder,
+  hiddenFromA11y,
+  children,
+}: TableCellProps) {
   return (
     <View
       className="p-2"
+      accessibilityElementsHidden={hiddenFromA11y}
+      importantForAccessibility={hiddenFromA11y ? 'no-hide-descendants' : 'auto'}
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic column width and per-variant border color
       style={{
         width,

@@ -40,3 +40,22 @@ export function linearRowLabel(header: string[], cells: string[]): string {
   }
   return parts.join(', ');
 }
+
+/**
+ * True when the tree contains an activatable node — any element carrying an
+ * `onPress` prop. Markdown links and images render as `Pressable`, so this
+ * finds every control a rendered cell can hold.
+ */
+export function containsPressable(node: ReactNode): boolean {
+  if (Array.isArray(node)) {
+    return node.some((item: ReactNode) => containsPressable(item));
+  }
+  if (!isValidElement(node)) {
+    return false;
+  }
+  const props = node.props as { onPress?: unknown; children?: ReactNode };
+  if (typeof props.onPress === 'function') {
+    return true;
+  }
+  return containsPressable(props.children);
+}

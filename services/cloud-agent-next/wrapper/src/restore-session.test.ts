@@ -80,6 +80,18 @@ function writeMockKilo(binDir: string, exitCode: number): void {
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
+/** Captures the snapshot path passed to `kilo import` by copying it before exit. */
+function writeCapturingMockKilo(binDir: string, capturePath: string): void {
+  const script = `#!/bin/sh
+if [ "$1" = "import" ] && [ -n "$2" ]; then
+  cp "$2" "${capturePath}"
+fi
+exit 0
+`;
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
 function writeSlowMockKilo(binDir: string): void {
   const script = '#!/bin/sh\nsleep 1\nexit 0\n';
   const kiloPath = path.join(binDir, 'kilo');
@@ -427,6 +439,60 @@ describe('restoreSession', () => {
   });
 
   // ---- Happy paths ----
+
+  it('strips transient lifecycle parts from the snapshot before kilo import', async () => {
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const snapshot = JSON.stringify({
+      info: snapshotInfo(),
+      messages: [
+        {
+          info: { role: 'assistant', id: 'msg_1' },
+          parts: [
+            {
+              type: 'text',
+              text: 'Initializing snapshot…',
+              metadata: { 'kilocode.lifecycle': 'transient' },
+            },
+            {
+              type: 'text',
+              text: 'Real assistant reply',
+            },
+            {
+              type: 'text',
+              text: 'Keep durable metadata',
+              metadata: { 'kilocode.lifecycle': 'durable' },
+            },
+          ],
+        },
+        {
+          info: { role: 'user', id: 'msg_2' },
+          parts: [{ type: 'text', text: 'hello' }],
+        },
+      ],
+    });
+    mockFetchOk(snapshot);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(true);
+    expect(fs.existsSync(capturePath)).toBe(true);
+
+    const imported = JSON.parse(fs.readFileSync(capturePath, 'utf-8')) as {
+      messages: Array<{ parts: Array<{ text?: string; metadata?: Record<string, string> }> }>;
+    };
+    expect(imported.messages[0]?.parts).toEqual([
+      { type: 'text', text: 'Real assistant reply' },
+      {
+        type: 'text',
+        text: 'Keep durable metadata',
+        metadata: { 'kilocode.lifecycle': 'durable' },
+      },
+    ]);
+    expect(imported.messages[1]?.parts).toEqual([{ type: 'text', text: 'hello' }]);
+    expect(JSON.stringify(imported)).not.toContain('"kilocode.lifecycle":"transient"');
+  });
 
   it('downloads snapshot, imports, and applies diffs', async () => {
     const snapshot = makeSnapshot([

@@ -50,8 +50,14 @@ const JQ_SANITIZE_TOKEN_COUNTS_FILTER =
 // These leak into durable session history when snapshot progress cleanup fails; on
 // restore, toModelMessages copies part.metadata into providerOptions and AI SDK
 // rejects string values under providerOptions.kilocode.lifecycle.
+// The type guard keeps the filter total: non-object snapshots pass through
+// unchanged instead of producing empty output that sanitizeSnapshotWithJq would
+// mistake for success and rename (0 bytes) over a user-supplied --file snapshot.
 const JQ_SANITIZE_TRANSIENT_PARTS_FILTER =
-  'if (.messages? | type) == "array" then .messages |= map(if type == "object" and (.parts? | type) == "array" then .parts |= map(select((type != "object") or ((.metadata["kilocode.lifecycle"]? // null) != "transient"))) else . end) else . end';
+  'if type == "object" and (.messages | type) == "array" then .messages |= map(if type == "object" and (.parts | type) == "array" then .parts |= map(select((type != "object") or ((.metadata["kilocode.lifecycle"]? // null) != "transient"))) else . end) else . end';
+// Both sanitizations run in a single jq pass so the snapshot is read+rewritten
+// once per restore — exports can be very large.
+const JQ_SANITIZE_SNAPSHOT_FILTER = `${JQ_SANITIZE_TOKEN_COUNTS_FILTER} | ${JQ_SANITIZE_TRANSIENT_PARTS_FILTER}`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -417,40 +423,14 @@ async function sanitizeSnapshotWithJq(
   }
 }
 
-async function sanitizeSnapshotTokenCounts(
-  snapshotPath: string,
-  signal?: AbortSignal
-): Promise<void> {
+async function sanitizeSnapshot(snapshotPath: string, signal?: AbortSignal): Promise<void> {
   if (
-    await sanitizeSnapshotWithJq(
-      snapshotPath,
-      JQ_SANITIZE_TOKEN_COUNTS_FILTER,
-      'token_sanitization',
-      signal
-    )
+    await sanitizeSnapshotWithJq(snapshotPath, JQ_SANITIZE_SNAPSHOT_FILTER, 'sanitization', signal)
   ) {
-    log('snapshot token counts sanitized');
+    log('snapshot sanitized');
     return;
   }
-  log('snapshot token count sanitization skipped');
-}
-
-async function sanitizeSnapshotTransientParts(
-  snapshotPath: string,
-  signal?: AbortSignal
-): Promise<void> {
-  if (
-    await sanitizeSnapshotWithJq(
-      snapshotPath,
-      JQ_SANITIZE_TRANSIENT_PARTS_FILTER,
-      'transient_parts_sanitization',
-      signal
-    )
-  ) {
-    log('snapshot transient parts sanitized');
-    return;
-  }
-  log('snapshot transient parts sanitization skipped');
+  log('snapshot sanitization skipped');
 }
 
 // jq filter that extracts diffs from the snapshot JSON using last-write-wins
@@ -670,8 +650,7 @@ export async function restoreSession(
   }
 
   try {
-    await sanitizeSnapshotTokenCounts(tmpPath, options.signal);
-    await sanitizeSnapshotTransientParts(tmpPath, options.signal);
+    await sanitizeSnapshot(tmpPath, options.signal);
 
     // ---- Step 2: Run kilo import ----
     const importStartedAt = Date.now();

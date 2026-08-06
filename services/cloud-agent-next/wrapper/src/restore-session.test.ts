@@ -480,7 +480,9 @@ describe('restoreSession', () => {
     expect(fs.existsSync(capturePath)).toBe(true);
 
     const imported = JSON.parse(fs.readFileSync(capturePath, 'utf-8')) as {
-      messages: Array<{ parts: Array<{ text?: string; metadata?: Record<string, string> }> }>;
+      messages: Array<{
+        parts: Array<{ type?: string; text?: string; metadata?: Record<string, string> }>;
+      }>;
     };
     expect(imported.messages[0]?.parts).toEqual([
       { type: 'text', text: 'Real assistant reply' },
@@ -492,6 +494,25 @@ describe('restoreSession', () => {
     ]);
     expect(imported.messages[1]?.parts).toEqual([{ type: 'text', text: 'hello' }]);
     expect(JSON.stringify(imported)).not.toContain('"kilocode.lifecycle":"transient"');
+  });
+
+  it('passes a non-object provided snapshot through sanitization unchanged', async () => {
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    // Valid JSON but not a snapshot object. The --file path only logs metadata
+    // validation, so sanitization must leave the file intact rather than let a
+    // non-total jq filter truncate it to 0 bytes before kilo import.
+    const provided = '[1,2,3]';
+    const providedPath = path.join(tmpDir, 'provided.json');
+    fs.writeFileSync(providedPath, provided);
+
+    const result = await restoreSession(SESSION_ID, workspace, providedPath);
+
+    expect(result.ok).toBe(true);
+    expect(fs.existsSync(capturePath)).toBe(true);
+    // jq re-serializes the file, so compare values rather than bytes.
+    expect(JSON.parse(fs.readFileSync(capturePath, 'utf-8'))).toEqual(JSON.parse(provided));
   });
 
   it('downloads snapshot, imports, and applies diffs', async () => {

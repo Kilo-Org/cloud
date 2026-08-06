@@ -547,6 +547,8 @@ export type Env = {
   KILO_OPENROUTER_BASE?: string;
   /** Kilocode CLI timeout override (seconds) */
   CLI_TIMEOUT_SECONDS?: string;
+  /** Experimental default shell-tool timeout (ms) forwarded to the Kilo server */
+  KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS?: string;
   /** Reaper interval override (ms) */
   REAPER_INTERVAL_MS?: string;
   /** Kilo server idle timeout override (ms) - defaults to 15 minutes */

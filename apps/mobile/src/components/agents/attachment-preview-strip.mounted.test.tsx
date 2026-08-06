@@ -153,10 +153,6 @@ function runtimeTargetRect(className: string, dims: { width: number; height: num
   };
 }
 
-function intersects(a: Rect, b: Rect): boolean {
-  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-}
-
 describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
   it('exposes determinate progressbar semantics while uploading', async () => {
     const renderer = await mount([makeAttachment({ status: 'uploading', progress: 0.42 })]);
@@ -285,9 +281,12 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     const remove = pressableByLabel(renderer.root, 'Remove attachment doc.pdf');
     expect(retry).toBeDefined();
     expect(remove).toBeDefined();
-    // 28pt visible button + 8pt slop on every side = 44pt effective target.
-    expect(retry?.props.hitSlop).toEqual({ top: 8, bottom: 8, left: 8, right: 8 });
+    // Retry covers the whole chip, so it needs no hitSlop to clear 44pt.
+    expect(String(retry?.props.className)).toContain('inset-0');
+    expect(retry?.props.hitSlop).toBeUndefined();
     expect(retry?.props.accessibilityRole).toBe('button');
+    // Remove keeps its own slop: 28pt button + 8pt per side = 44pt.
+    expect(remove?.props.hitSlop).toEqual({ top: 8, bottom: 8, left: 8, right: 8 });
 
     if (!retry || !remove) {
       throw new Error('Retry and Remove buttons must both render for a retryable chip');
@@ -324,14 +323,14 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
       throw new Error('Retry and Remove must both render for a retryable chip');
     }
 
-    // Distinct layout regions: Retry owns the bottom-left corner, Remove
-    // owns the top-right corner.
-    expect(String(retry.props.className)).toContain('bottom-1');
-    expect(String(retry.props.className)).toContain('left-1');
+    // Retry owns the whole chip; Remove owns the top-right corner and, as the
+    // later sibling, wins the region where they overlap.
+    expect(String(retry.props.className)).toContain('inset-0');
     expect(String(remove.props.className)).toContain('top-1');
     expect(String(remove.props.className)).toContain('right-1');
-    expect(retry.props.hitSlop).toEqual(HIT_SLOP);
     expect(remove.props.hitSlop).toEqual(HIT_SLOP);
+    const order = labeledPressables(renderer.root);
+    expect(order.indexOf(retry)).toBeLessThan(order.indexOf(remove));
 
     // Final finding — parent clipping: the chip body's immediate parent is
     // the overflow-hidden surface, and neither control lives inside it, so
@@ -340,18 +339,17 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     expect(surface?.props.className).toContain('overflow-hidden');
     expect(surface?.findAll(node => node === retry || node === remove)).toHaveLength(0);
 
-    // Runtime bounds: `runtimeTargetRect` is the full 44pt effective target
-    // (28pt button + 8pt hitSlop per side), unreduced by any clip parent.
+    // Runtime bounds: Retry is `inset-0`, so its target is the chip box, which
+    // clears 44pt on both axes for both chip shapes. Remove keeps the 44pt
+    // effective target its 28pt button plus hitSlop forms, unreduced by any
+    // clip parent.
     const dims = CHIP_DIMS[kind];
-    const retryRect = runtimeTargetRect(String(retry.props.className), dims);
+    expect(dims.width, `${kind} chip retry width`).toBeGreaterThanOrEqual(44);
+    expect(dims.height, `${kind} chip retry height`).toBeGreaterThanOrEqual(44);
     const removeRect = runtimeTargetRect(String(remove.props.className), dims);
-    expect([retryRect.right - retryRect.left, retryRect.bottom - retryRect.top]).toEqual([44, 44]);
     expect([removeRect.right - removeRect.left, removeRect.bottom - removeRect.top]).toEqual([
       44, 44,
     ]);
-    expect(intersects(retryRect, removeRect), `${kind} chip hit slops must not overlap`).toBe(
-      false
-    );
 
     renderer.unmount();
   }

@@ -15,7 +15,7 @@ type Props = {
 };
 
 /** 28pt visible button + 8pt slop on every side = 44pt effective target. */
-const CHIP_BUTTON_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 
 function AttachmentChip({
   attachment,
@@ -128,22 +128,28 @@ function AttachmentChip({
         </View>
       </View>
 
+      {/* Retry covers the whole chip, restoring the tap-anywhere target a
+          failed chip has always had, while staying a SIBLING of the surface and
+          of Remove — nesting it as their parent would shadow both for assistive
+          technology. It renders before Remove, so Remove wins the overlap. The
+          badge is the visible affordance; the content is padded clear of it. */}
       {description.showRetry ? (
         <Pressable
           onPress={onRetry}
-          hitSlop={CHIP_BUTTON_HIT_SLOP}
-          className="absolute bottom-1 left-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
+          className="absolute inset-0 items-start justify-end p-1 active:opacity-70"
           accessibilityRole="button"
           accessibilityLabel={`Retry uploading ${attachment.filename}`}
         >
-          <RotateCcw size={14} color={colors.foreground} />
+          <View className="h-7 w-7 items-center justify-center rounded-full bg-background">
+            <RotateCcw size={14} color={colors.foreground} />
+          </View>
         </Pressable>
       ) : null}
 
       {description.showRemove ? (
         <Pressable
           onPress={onRemove}
-          hitSlop={CHIP_BUTTON_HIT_SLOP}
+          hitSlop={REMOVE_HIT_SLOP}
           className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
           accessibilityRole="button"
           accessibilityLabel={`Remove attachment ${attachment.filename}`}

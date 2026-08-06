@@ -10,7 +10,7 @@ import { Readable } from 'node:stream';
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
 // without a central directory record. macOS Archive Utility then refused to
 // extract it ("Error 79 - Inappropriate file type or format").
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 const BATCH_SIZE = 25;
 

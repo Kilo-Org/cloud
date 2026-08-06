@@ -178,6 +178,12 @@ const GIT_FAILURE_PATTERNS = [
     pattern: /authentication failed|could not read username|http 401|http 403/i,
   },
   {
+    subtype: 'git_rate_limited',
+    // Anchor 429 to an HTTP-error context: clones run with --progress, so a bare
+    // 429 also matches object counts (e.g. "remote: Total 429 (delta 12)").
+    pattern: /(?:error|http|status(?:\s+code)?)\s*:?\s*429\b|too many requests|rate limit(?:ed)?/i,
+  },
+  {
     subtype: 'git_network_failed',
     pattern:
       /remote end hung up|connection (?:reset|timed out)|could not resolve host|failed to connect/i,

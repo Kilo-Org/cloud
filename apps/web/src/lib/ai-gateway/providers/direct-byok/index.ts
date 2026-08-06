@@ -63,7 +63,9 @@ function convertModel(
     hasUserByokAvailable: true,
     opencode: {
       ai_sdk_provider: getAiSdkProvider(id, provider.id) ?? provider.default_ai_sdk_provider,
-      variants: model.variants ?? getFallbackModelVariants(id),
+      variants:
+        model.variants ??
+        (model.flags?.includes('reasoning') ? getFallbackModelVariants(id) : undefined),
     } satisfies OpenCodeSettings,
   };
 }

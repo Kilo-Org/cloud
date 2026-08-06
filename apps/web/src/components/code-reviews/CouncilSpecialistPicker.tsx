@@ -14,10 +14,7 @@ import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import type { ModelOption } from '@/components/shared/model-combobox-options';
 import { COUNCIL_SPECIALIST_PRESETS } from '@kilocode/worker-utils/code-review-council';
 import type { CouncilSpecialistSelection } from '@/lib/code-reviews/core/council-selection';
-import {
-  getAvailableThinkingEfforts,
-  thinkingEffortLabel,
-} from '@/lib/code-reviews/core/model-variants';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 
 const DEFAULT_EFFORT_VALUE = '__default__';
 
@@ -69,7 +66,9 @@ export function CouncilSpecialistPicker({
     const next: Record<string, CouncilSpecialistSelection> = {};
     for (const [id, selection] of Object.entries(selections)) {
       const effortModel = selection.modelSlug ?? defaultModelSlug ?? null;
-      const validEfforts = effortModel ? getAvailableThinkingEfforts(effortModel) : [];
+      const validEfforts = effortModel
+        ? (modelOptions.find(model => model.id === effortModel)?.variants ?? [])
+        : [];
       if (selection.thinkingEffort && !validEfforts.includes(selection.thinkingEffort)) {
         next[id] = { ...selection, thinkingEffort: null };
         changed = true;
@@ -78,7 +77,7 @@ export function CouncilSpecialistPicker({
       }
     }
     if (changed) onChange(next);
-  }, [selections, defaultModelSlug, isLoadingModels, onChange]);
+  }, [selections, defaultModelSlug, isLoadingModels, modelOptions, onChange]);
 
   return (
     <div className="space-y-3">
@@ -91,7 +90,9 @@ export function CouncilSpecialistPicker({
         // Effort options follow the specialist's own model, or the review's default
         // model when the specialist is left on the default.
         const effortModel = selection.modelSlug ?? defaultModelSlug ?? null;
-        const variants = effortModel ? getAvailableThinkingEfforts(effortModel) : [];
+        const variants = effortModel
+          ? (modelOptions.find(model => model.id === effortModel)?.variants ?? [])
+          : [];
 
         return (
           <div key={preset.id} className="space-y-3 rounded-md border p-3">

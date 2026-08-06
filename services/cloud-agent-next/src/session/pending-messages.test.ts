@@ -403,6 +403,119 @@ describe('recordPendingFlushFailure', () => {
     expect(delays).toEqual([10_000, 30_000, 60_000, undefined]);
   });
 
+  it('gives a git rate-limited workspace failure a backed-off retry budget', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const delays: (number | undefined)[] = [];
+    const now = 100_000;
+
+    // A workspace_setup_failed with the git_rate_limited subtype is transient
+    // GitHub throttling that typically clears within well under a minute: two
+    // backed-off retries, then exhaustion (unlike a plain workspace failure's
+    // single warm-followup retry above).
+    for (let i = 0; i < 3; i++) {
+      const result = await recordPendingFlushFailure(
+        storage,
+        message,
+        'The requested URL returned error: 429',
+        now,
+        {
+          policy: 'warm-followup',
+          code: 'WORKSPACE_SETUP_FAILED',
+          subtype: 'git_rate_limited',
+        }
+      );
+      delays.push(
+        result.nextFlushAttemptAt !== undefined ? result.nextFlushAttemptAt - now : undefined
+      );
+      message = result.message;
+    }
+
+    expect(delays).toEqual([15_000, 45_000, undefined]);
+  });
+
+  it('starts the git rate-limit retry budget fresh after a different earlier failure', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage({
+      createdAt: 1,
+      flushAttempts: 2,
+      lastFlushFailureCode: 'WRAPPER_START_FAILED',
+    });
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(
+      storage,
+      message,
+      'The requested URL returned error: 429',
+      100_000,
+      {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+        subtype: 'git_rate_limited',
+      }
+    );
+
+    // Reset to attempt 1 so the full 15s/45s budget applies, not truncated
+    // by the two earlier non-rate-limit attempts.
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
+    expect(result.nextFlushAttemptAt).toBe(115_000);
+  });
+
+  it('bounds retries when failures alternate between storage-full and rate-limit modes', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+    const now = 100_000;
+
+    // Fresh storage-full failure resets to attempt 1.
+    let result = await recordPendingFlushFailure(storage, message, 'sandbox storage full', now, {
+      policy: 'warm-followup',
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'sandbox_storage_full',
+    });
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
+    message = result.message;
+
+    // Switching to rate-limit (both modes reset-eligible) does NOT reset;
+    // attempts accumulate and the shorter rate-limit budget applies.
+    result = await recordPendingFlushFailure(
+      storage,
+      message,
+      'The requested URL returned error: 429',
+      now,
+      {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+        subtype: 'git_rate_limited',
+      }
+    );
+    expect(result.attempts).toBe(2);
+    expect(result.exhausted).toBe(false);
+    expect(result.nextFlushAttemptAt).toBe(now + 45_000);
+    message = result.message;
+
+    // Continuing to alternate keeps accumulating and exceeds the rate-limit
+    // budget, so the flapping message exhausts instead of resetting forever.
+    result = await recordPendingFlushFailure(
+      storage,
+      message,
+      'The requested URL returned error: 429',
+      now,
+      {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+        subtype: 'git_rate_limited',
+      }
+    );
+    expect(result.attempts).toBe(3);
+    expect(result.exhausted).toBe(true);
+    expect(result.nextFlushAttemptAt).toBeUndefined();
+  });
+
   it('starts the capacity retry budget fresh after a different earlier failure', async () => {
     const storage = createMemoryStorage();
     const message = makeMessage({

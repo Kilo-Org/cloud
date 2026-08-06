@@ -244,7 +244,7 @@ async function resolveEfficientDecisionModel(
   // `variant` is only on the benchmark decision branch of the discriminated
   // union; coding-plan defaults never carry it.
   if ('variant' in decision && decision.variant != null) {
-    const variants = await getModelVariants(decision.model);
+    const variants = await getModelVariants(decision.model, true);
     const variantSettings: OpenCodeVariant | undefined = variants?.[decision.variant];
     if (!variantSettings) {
       return null;
